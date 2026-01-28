@@ -704,7 +704,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected void logInconsistentResults(String segmentName, int numKeysStillNotReplaced) {
     _logger.error("Found {} primary keys not replaced for segment: {}. "
-        + "Proceeding with current state which may cause inconsistency. To correct this behaviour  cleanup the "
+        + "Proceeding with current state which may cause inconsistency. To correct this behaviour cleanup the "
         + "table on disk and restart the servers by setting cluster config: `pinot.server.consuming.segment.consistency"
         + ".mode` to `PROTECTED`.", numKeysStillNotReplaced, segmentName);
     if (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null) {

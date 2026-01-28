@@ -346,33 +346,32 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       int docId = primaryKeyEntry.getKey();
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
+            RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
+            if (prevLocation == null || !_trackedSegments.contains(prevLocation.getSegment())) {
+              _previousKeyToRecordLocationMap.remove(primaryKey);
+              return null;
+            }
             if (recordLocation.getSegment() == segment) {
-              RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-              if (prevLocation != null && _trackedSegments.contains(prevLocation.getSegment())) {
-                // Revert to previous segment location
-                IndexSegment prevSegment = prevLocation.getSegment();
-                ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
-                if (prevValidDocIds != null) {
-                  try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
-                      _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
-                    int prevDocId = prevLocation.getDocId();
-                    RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
-                    replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
-                        prevDocId, recordInfo);
-                    _previousKeyToRecordLocationMap.remove(primaryKey);
-                    if (!uniquePrimaryKeys.add(pk)) {
-                      return prevLocation;
-                    }
-                    return new RecordLocation(prevLocation.getSegment(), prevLocation.getDocId(),
-                        prevLocation.getComparisonValue(),
-                        RecordLocation.decrementSegmentCount(prevLocation.getDistinctSegmentCount()));
-                  } catch (IOException e) {
-                    _logger.warn("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
-                        e);
-                    _previousKeyToRecordLocationMap.remove(primaryKey);
-                    return null;
+              // Revert to previous segment location
+              IndexSegment prevSegment = prevLocation.getSegment();
+              ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
+              if (prevValidDocIds != null) {
+                try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
+                    _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+                  int prevDocId = prevLocation.getDocId();
+                  RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
+                  replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
+                      prevDocId, recordInfo);
+                  _previousKeyToRecordLocationMap.remove(primaryKey);
+                  if (!uniquePrimaryKeys.add(pk)) {
+                    return prevLocation;
                   }
-                } else {
+                  return new RecordLocation(prevLocation.getSegment(), prevLocation.getDocId(),
+                      prevLocation.getComparisonValue(),
+                      RecordLocation.decrementSegmentCount(prevLocation.getDistinctSegmentCount()));
+                } catch (IOException e) {
+                  _logger.warn("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
+                      e);
                   _previousKeyToRecordLocationMap.remove(primaryKey);
                   return null;
                 }

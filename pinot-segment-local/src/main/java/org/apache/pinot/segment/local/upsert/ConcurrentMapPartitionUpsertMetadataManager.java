@@ -226,27 +226,26 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
+            if (prevLocation == null || !_trackedSegments.contains(prevLocation.getSegment())) {
+              _previousKeyToRecordLocationMap.remove(primaryKey);
+              return null;
+            }
             if (recordLocation.getSegment() == segment) {
-              if (prevLocation != null && _trackedSegments.contains(prevLocation.getSegment())) {
-                // Revert to previous segment location
-                IndexSegment prevSegment = prevLocation.getSegment();
-                ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
-                if (prevValidDocIds != null) {
-                  try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
-                      _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
-                    int prevDocId = prevLocation.getDocId();
-                    RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
-                    replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
-                        prevDocId, recordInfo);
-                    _previousKeyToRecordLocationMap.remove(primaryKey);
-                    return prevLocation;
-                  } catch (IOException e) {
-                    _logger.warn("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
-                        e);
-                    _previousKeyToRecordLocationMap.remove(primaryKey);
-                    return null;
-                  }
-                } else {
+              // Revert to previous segment location
+              IndexSegment prevSegment = prevLocation.getSegment();
+              ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
+              if (prevValidDocIds != null) {
+                try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
+                    _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+                  int prevDocId = prevLocation.getDocId();
+                  RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
+                  replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
+                      prevDocId, recordInfo);
+                  _previousKeyToRecordLocationMap.remove(primaryKey);
+                  return prevLocation;
+                } catch (IOException e) {
+                  _logger.warn("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
+                      e);
                   _previousKeyToRecordLocationMap.remove(primaryKey);
                   return null;
                 }
@@ -258,10 +257,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               _previousKeyToRecordLocationMap.remove(primaryKey);
             } else {
               _logger.warn(
-                  "Consuming segment {} has already ingested the primary key for docId {} from segment {}, suggesting"
+                  "Consuming segment: {} has already ingested the primary key for docId {} from segment: {}, suggesting"
                       + " that consumption is occurring concurrently with segment replacement, which is undesirable "
-                      + "for consistency.",
-                  recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(), segment.getSegmentName());
+                      + "for consistency.", recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(),
+                  segment.getSegmentName());
             }
             return recordLocation;
           });
