@@ -72,8 +72,8 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
-import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -559,7 +559,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
               // The fix restores correct segment metadata before winner selection.
               // Force commit behavior can be toggled dynamically using the cluster config
               // `pinot.server.consuming.segment.consistency.mode` to `PROTECTED` without restarting servers.
-              UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
+              ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
               if (config.isForceCommitAllowed()) {
                 ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
               } else {

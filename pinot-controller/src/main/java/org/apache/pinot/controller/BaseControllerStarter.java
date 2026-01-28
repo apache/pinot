@@ -158,9 +158,9 @@ import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
@@ -758,8 +758,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(UpsertInconsistentStateConfig.getInstance());
-    LOGGER.info("Registered UpsertInconsistentStateConfig as cluster config change listener");
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        ConsumingSegmentConsistencyModeListener.getInstance());
+    LOGGER.info("Registered ConsumingSegmentConsistencyModeListener as cluster config change listener");
   }
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {

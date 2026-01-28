@@ -66,8 +66,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig;
-import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig.Mode;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -683,8 +682,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    * @return true if metadata revert should be performed on inconsistency
    */
   public boolean shouldRevertMetadataOnInconsistency(IndexSegment oldSegment) {
-    return UpsertInconsistentStateConfig.getInstance().getConsistencyMode() == Mode.PROTECTED
-        && oldSegment instanceof MutableSegment && _context.hasInconsistentTableConfigs();
+    return ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode()
+        .equals(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED) && oldSegment instanceof MutableSegment
+        && _context.hasInconsistentTableConfigs();
   }
 
   /**

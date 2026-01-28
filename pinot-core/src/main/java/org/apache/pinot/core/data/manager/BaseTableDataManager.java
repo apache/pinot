@@ -108,7 +108,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -828,7 +828,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // `pinot.server.consuming.segment.consistency.mode` to PROTECTED for safer reload. This doesn't
         // need a server restart
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-        UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
+        ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
         if (tableConfig != null && config.isForceCommitAllowed()) {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
           ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
