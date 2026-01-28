@@ -174,7 +174,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseControllerStarter.class);
 
   public static final String CONTROLLER_INSTANCE_ID = "controllerInstanceId";
-  public static final String MINION_TASK_RESOURCE_EXECUTOR_SERVICE_NAME = "minionTaskResourceExecutorService";
   private static final String METRICS_REGISTRY_NAME = "pinot.controller.metrics";
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
@@ -237,7 +236,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
-  protected ExecutorService _minionTaskResourceExecutorService;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -649,11 +647,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _tenantRebalancer =
         new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _rebalancerExecutorService);
 
-    // Set up executor service for specific resources for isolation
-    _minionTaskResourceExecutorService =
-        createExecutorService(_config.getControllerExecutorMinionTaskResourceNumThreads(),
-            "minion-task-resource-thread-%d");
-
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
 
@@ -706,8 +699,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_taskManagerStatusCache).to(TaskManagerStatusCache.class);
         bind(_connectionManager).to(HttpClientConnectionManager.class);
         bind(_executorService).to(Executor.class);
-        bind(_minionTaskResourceExecutorService).named(MINION_TASK_RESOURCE_EXECUTOR_SERVICE_NAME)
-            .to(ExecutorService.class);
         bind(_controllerMetrics).to(ControllerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
         bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);

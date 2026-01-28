@@ -41,11 +41,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.inject.Named;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -73,7 +71,6 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.minion.BaseTaskGeneratorInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -95,6 +92,7 @@ import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.grizzly.http.server.Request;
+import org.glassfish.jersey.server.ManagedAsync;
 import org.quartz.CronTrigger;
 import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
@@ -174,13 +172,6 @@ public class PinotTaskRestletResource {
   @Inject
   ControllerConf _controllerConf;
 
-  // TODO: To prevent blocking, we make most of the API resources here to run async because they are calling
-  //  synchronized methods in PinotHelixTaskResourceManager. We should revisit the synchronization strategy in
-  //  PinotHelixTaskResourceManager and see if we can remove the need of async APIs here.
-  @Inject
-  @Named(BaseControllerStarter.MINION_TASK_RESOURCE_EXECUTOR_SERVICE_NAME)
-  ExecutorService _minionTaskResourceExecutorService;
-
   @Context
   private UriInfo _uriInfo;
 
@@ -189,15 +180,14 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all task types")
+  @ManagedAsync
   public void listTaskTypes(@Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        Set<String> taskTypes = listTaskTypesSync();
-        asyncResponse.resume(taskTypes);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      Set<String> taskTypes = listTaskTypesSync();
+      asyncResponse.resume(taskTypes);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private Set<String> listTaskTypesSync() {
@@ -210,18 +200,17 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get summary of all tasks across all task types, grouped by tenant. "
       + "Optionally filter by server tenant name to get tasks for a specific tenant only.")
+  @ManagedAsync
   public void getTasksSummary(
       @ApiParam(value = "Server tenant name to filter tasks. If not specified, returns all tenants grouped.")
       @QueryParam("tenant") @Nullable String tenantName,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        PinotHelixTaskResourceManager.TaskSummaryResponse response = getTasksSummarySync(tenantName);
-        asyncResponse.resume(response);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      PinotHelixTaskResourceManager.TaskSummaryResponse response = getTasksSummarySync(tenantName);
+      asyncResponse.resume(response);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private PinotHelixTaskResourceManager.TaskSummaryResponse getTasksSummarySync(@Nullable String tenantName) {
@@ -233,17 +222,16 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the state (task queue state) for the given task type")
+  @ManagedAsync
   public void getTaskQueueState(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        TaskState state = getTaskQueueStateSync(taskType);
-        asyncResponse.resume(state);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      TaskState state = getTaskQueueStateSync(taskType);
+      asyncResponse.resume(state);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private TaskState getTaskQueueStateSync(String taskType) {
@@ -255,16 +243,15 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all tasks for the given task type")
+  @ManagedAsync
   public void getTasks(@ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        Set<String> tasks = getTasksSync(taskType);
-        asyncResponse.resume(tasks);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      Set<String> tasks = getTasksSync(taskType);
+      asyncResponse.resume(tasks);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private Set<String> getTasksSync(String taskType) {
@@ -280,16 +267,15 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK_COUNT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Count of all tasks for the given task type")
+  @ManagedAsync
   public void getTasksCount(@ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        int count = getTasksCountSync(taskType);
-        asyncResponse.resume(count);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      int count = getTasksCountSync(taskType);
+      asyncResponse.resume(count);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private int getTasksCountSync(String taskType) {
@@ -301,19 +287,18 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all tasks for the given task type")
+  @ManagedAsync
   public void getTaskStatesByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType, @Context HttpHeaders headers, @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, headers);
-        Map<String, TaskState> states = getTaskStatesByTableSync(taskType, translatedTableName);
-        asyncResponse.resume(states);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, headers);
+      Map<String, TaskState> states = getTaskStatesByTableSync(taskType, translatedTableName);
+      asyncResponse.resume(states);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private Map<String, TaskState> getTaskStatesByTableSync(String taskType, String tableNameWithType) {
@@ -360,6 +345,7 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch count of sub-tasks for each of the tasks for the given task type")
+  @ManagedAsync
   public void getTaskCounts(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Task state(s) to filter by. Can be single state or comma-separated multiple states "
@@ -370,16 +356,14 @@ public class PinotTaskRestletResource {
           + "Only tasks that have subtasks for this table will be returned.")
       @QueryParam("table") @Nullable String table, @Context HttpHeaders headers,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        String tableNameWithType = table != null ? DatabaseUtils.translateTableName(table, headers) : null;
-        Map<String, PinotHelixTaskResourceManager.TaskCount> counts =
-            getTaskCountsSync(taskType, state, tableNameWithType);
-        asyncResponse.resume(counts);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      String tableNameWithType = table != null ? DatabaseUtils.translateTableName(table, headers) : null;
+      Map<String, PinotHelixTaskResourceManager.TaskCount> counts =
+          getTaskCountsSync(taskType, state, tableNameWithType);
+      asyncResponse.resume(counts);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private Map<String, PinotHelixTaskResourceManager.TaskCount> getTaskCountsSync(String taskType,
@@ -396,6 +380,7 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch information for all the tasks for the given task type")
+  @ManagedAsync
   public void getTasksDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "verbosity (Prints information for all the tasks for the given task type."
@@ -403,14 +388,12 @@ public class PinotTaskRestletResource {
           + "Value of > 0 prints subtask details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> debugInfo = getTasksDebugInfoSync(taskType, verbosity);
-        asyncResponse.resume(debugInfo);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> debugInfo = getTasksDebugInfoSync(taskType, verbosity);
+      asyncResponse.resume(debugInfo);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfoSync(String taskType,
@@ -423,6 +406,7 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch information for all the tasks for the given task type and table")
+  @ManagedAsync
   public void getTasksDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
@@ -432,16 +416,14 @@ public class PinotTaskRestletResource {
           + "Value of > 0 prints subtask details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity, @Context HttpHeaders headers,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, headers);
-        Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> debugInfo =
-            getTasksDebugInfoByTableSync(taskType, translatedTableName, verbosity);
-        asyncResponse.resume(debugInfo);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, headers);
+      Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> debugInfo =
+          getTasksDebugInfoByTableSync(taskType, translatedTableName, verbosity);
+      asyncResponse.resume(debugInfo);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfoByTableSync(String taskType,
@@ -454,20 +436,19 @@ public class PinotTaskRestletResource {
   @Path("/tasks/generator/{tableNameWithType}/{taskType}/debug")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
+  @ManagedAsync
   public void getTaskGenerationDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType,
       @ApiParam(value = "Whether to only lookup local cache for logs", defaultValue = "false") @QueryParam("localOnly")
       boolean localOnly, @Context HttpHeaders httpHeaders, @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        String result = getTaskGenerationDebugInfoSync(taskType, tableNameWithType, localOnly, httpHeaders);
-        asyncResponse.resume(result);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      String result = getTaskGenerationDebugInfoSync(taskType, tableNameWithType, localOnly, httpHeaders);
+      asyncResponse.resume(result);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private String getTaskGenerationDebugInfoSync(String taskType, String tableNameWithType, boolean localOnly,
@@ -521,6 +502,7 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch information for the given task name")
+  @ManagedAsync
   public void getTaskDebugInfo(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @ApiParam(value = "verbosity (Prints information for the given task name."
@@ -531,18 +513,16 @@ public class PinotTaskRestletResource {
           + "Only subtasks for this table will be returned.")
       @QueryParam("tableName") @Nullable String tableNameWithType, @Context HttpHeaders httpHeaders,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        String translatedTableName = tableNameWithType != null
-            ? DatabaseUtils.translateTableName(tableNameWithType, httpHeaders)
-            : null;
-        PinotHelixTaskResourceManager.TaskDebugInfo debugInfo =
-            getTaskDebugInfoSync(taskName, translatedTableName, verbosity);
-        asyncResponse.resume(debugInfo);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      String translatedTableName = tableNameWithType != null
+          ? DatabaseUtils.translateTableName(tableNameWithType, httpHeaders)
+          : null;
+      PinotHelixTaskResourceManager.TaskDebugInfo debugInfo =
+          getTaskDebugInfoSync(taskName, translatedTableName, verbosity);
+      asyncResponse.resume(debugInfo);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private PinotHelixTaskResourceManager.TaskDebugInfo getTaskDebugInfoSync(String taskName,
@@ -555,17 +535,16 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get a map from task to task state for the given task type")
+  @ManagedAsync
   public void getTaskStates(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        Map<String, TaskState> states = getTaskStatesSync(taskType);
-        asyncResponse.resume(states);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      Map<String, TaskState> states = getTaskStatesSync(taskType);
+      asyncResponse.resume(states);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private Map<String, TaskState> getTaskStatesSync(String taskType) {
@@ -577,17 +556,16 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the task state for the given task")
+  @ManagedAsync
   public void getTaskState(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        TaskState state = getTaskStateSync(taskName);
-        asyncResponse.resume(state);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      TaskState state = getTaskStateSync(taskName);
+      asyncResponse.resume(state);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private TaskState getTaskStateSync(String taskName) {
@@ -599,17 +577,16 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the states of all the sub tasks for the given task")
+  @ManagedAsync
   public void getSubtaskStates(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        Map<String, TaskPartitionState> states = getSubtaskStatesSync(taskName);
-        asyncResponse.resume(states);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      Map<String, TaskPartitionState> states = getSubtaskStatesSync(taskName);
+      asyncResponse.resume(states);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private Map<String, TaskPartitionState> getSubtaskStatesSync(String taskName) {
@@ -621,17 +598,16 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the task config (a list of child task configs) for the given task")
+  @ManagedAsync
   public void getTaskConfigs(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        List<PinotTaskConfig> configs = getTaskConfigsSync(taskName);
-        asyncResponse.resume(configs);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      List<PinotTaskConfig> configs = getTaskConfigsSync(taskName);
+      asyncResponse.resume(configs);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private List<PinotTaskConfig> getTaskConfigsSync(String taskName) {
@@ -643,17 +619,16 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the task runtime config for the given task")
+  @ManagedAsync
   public void getTaskConfig(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        Map<String, String> config = getTaskConfigSync(taskName);
-        asyncResponse.resume(config);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      Map<String, String> config = getTaskConfigSync(taskName);
+      asyncResponse.resume(config);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private Map<String, String> getTaskConfigSync(String taskName) {
@@ -665,19 +640,18 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get the configs of specified sub tasks for the given task")
+  @ManagedAsync
   public void getSubtaskConfigs(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") @Nullable
       String subtaskNames,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        Map<String, PinotTaskConfig> configs = getSubtaskConfigsSync(taskName, subtaskNames);
-        asyncResponse.resume(configs);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      Map<String, PinotTaskConfig> configs = getSubtaskConfigsSync(taskName, subtaskNames);
+      asyncResponse.resume(configs);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private Map<String, PinotTaskConfig> getSubtaskConfigsSync(String taskName, @Nullable String subtaskNames) {
@@ -689,19 +663,18 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get progress of specified sub tasks for the given task tracked by minion worker in memory")
+  @ManagedAsync
   public void getSubtaskProgress(@Context HttpHeaders httpHeaders,
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") @Nullable
       String subtaskNames,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        String progress = getSubtaskProgressSync(httpHeaders, taskName, subtaskNames);
-        asyncResponse.resume(progress);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      String progress = getSubtaskProgressSync(httpHeaders, taskName, subtaskNames);
+      asyncResponse.resume(progress);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private String getSubtaskProgressSync(HttpHeaders httpHeaders, String taskName,
@@ -742,20 +715,19 @@ public class PinotTaskRestletResource {
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
+  @ManagedAsync
   public void getSubtaskOnWorkerProgress(@Context HttpHeaders httpHeaders,
       @ApiParam(value = "Subtask state (UNKNOWN,IN_PROGRESS,SUCCEEDED,CANCELLED,ERROR)", required = true)
       @QueryParam("subTaskState") String subTaskState,
       @ApiParam(value = "Minion worker IDs separated by comma") @QueryParam("minionWorkerIds") @Nullable
       String minionWorkerIds,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        String progress = getSubtaskOnWorkerProgressSync(httpHeaders, subTaskState, minionWorkerIds);
-        asyncResponse.resume(progress);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      String progress = getSubtaskOnWorkerProgressSync(httpHeaders, subTaskState, minionWorkerIds);
+      asyncResponse.resume(progress);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private String getSubtaskOnWorkerProgressSync(HttpHeaders httpHeaders, String subTaskState,
@@ -916,6 +888,7 @@ public class PinotTaskRestletResource {
   @ApiOperation("Schedule tasks and return a map from task type to task name scheduled. If task type is missing, "
       + "schedules all tasks. If table name is missing, schedules tasks for all tables in the database. If database "
       + "is missing in headers, uses default.")
+  @ManagedAsync
   public void scheduleTasks(
       @ApiParam(value = "Task type. If missing, schedules all tasks.") @QueryParam("taskType") @Nullable
       String taskType,
@@ -923,42 +896,39 @@ public class PinotTaskRestletResource {
       @QueryParam("tableName") @Nullable String tableName,
       @ApiParam(value = "Minion Instance tag to schedule the task explicitly on") @QueryParam("minionInstanceTag")
       @Nullable String minionInstanceTag, @Context HttpHeaders headers, @Suspended AsyncResponse asyncResponse) {
-
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;
-        Map<String, String> response = new HashMap<>();
-        List<String> generationErrors = new ArrayList<>();
-        List<String> schedulingErrors = new ArrayList<>();
-        TaskSchedulingContext context = new TaskSchedulingContext()
-            .setTriggeredBy(CommonConstants.TaskTriggers.MANUAL_TRIGGER.name())
-            .setMinionInstanceTag(minionInstanceTag)
-            .setLeader(false);
-        if (taskType != null) {
-          context.setTasksToSchedule(Collections.singleton(taskType));
-        }
-        if (tableName != null) {
-          context.setTablesToSchedule(Collections.singleton(DatabaseUtils.translateTableName(tableName, headers)));
-        } else {
-          context.setDatabasesToSchedule(Collections.singleton(database));
-        }
-        Map<String, TaskSchedulingInfo> allTaskInfos = _pinotTaskManager.scheduleTasks(context);
-        allTaskInfos.forEach((key, value) -> {
-          if (value.getScheduledTaskNames() != null) {
-            response.put(key, String.join(",", value.getScheduledTaskNames()));
-          }
-          generationErrors.addAll(value.getGenerationErrors());
-          schedulingErrors.addAll(value.getSchedulingErrors());
-        });
-        response.put(GENERATION_ERRORS_KEY, String.join(",", generationErrors));
-        response.put(SCHEDULING_ERRORS_KEY, String.join(",", schedulingErrors));
-        asyncResponse.resume(response);
-      } catch (Exception e) {
-        asyncResponse.resume(new ControllerApplicationException(LOGGER,
-            String.format("Failed to schedule tasks due to error: %s", ExceptionUtils.getStackTrace(e)),
-            Response.Status.INTERNAL_SERVER_ERROR, e));
+    try {
+      String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;
+      Map<String, String> response = new HashMap<>();
+      List<String> generationErrors = new ArrayList<>();
+      List<String> schedulingErrors = new ArrayList<>();
+      TaskSchedulingContext context = new TaskSchedulingContext()
+          .setTriggeredBy(CommonConstants.TaskTriggers.MANUAL_TRIGGER.name())
+          .setMinionInstanceTag(minionInstanceTag)
+          .setLeader(false);
+      if (taskType != null) {
+        context.setTasksToSchedule(Collections.singleton(taskType));
       }
-    });
+      if (tableName != null) {
+        context.setTablesToSchedule(Collections.singleton(DatabaseUtils.translateTableName(tableName, headers)));
+      } else {
+        context.setDatabasesToSchedule(Collections.singleton(database));
+      }
+      Map<String, TaskSchedulingInfo> allTaskInfos = _pinotTaskManager.scheduleTasks(context);
+      allTaskInfos.forEach((key, value) -> {
+        if (value.getScheduledTaskNames() != null) {
+          response.put(key, String.join(",", value.getScheduledTaskNames()));
+        }
+        generationErrors.addAll(value.getGenerationErrors());
+        schedulingErrors.addAll(value.getSchedulingErrors());
+      });
+      response.put(GENERATION_ERRORS_KEY, String.join(",", generationErrors));
+      response.put(SCHEDULING_ERRORS_KEY, String.join(",", schedulingErrors));
+      asyncResponse.resume(response);
+    } catch (Exception e) {
+      asyncResponse.resume(new ControllerApplicationException(LOGGER,
+          String.format("Failed to schedule tasks due to error: %s", ExceptionUtils.getStackTrace(e)),
+          Response.Status.INTERNAL_SERVER_ERROR, e));
+    }
   }
 
   @POST
@@ -967,36 +937,35 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.EXECUTE_TASK)
   @Authenticate(AccessType.CREATE)
   @ApiOperation("Execute a task on minion")
+  @ManagedAsync
   public void executeAdhocTask(AdhocTaskConfig adhocTaskConfig, @Suspended AsyncResponse asyncResponse,
       @Context Request requestContext) {
-    _minionTaskResourceExecutorService.execute(() -> {
+    try {
       try {
-        try {
-          asyncResponse.resume(
-              _pinotTaskManager.createTask(adhocTaskConfig.getTaskType(), adhocTaskConfig.getTableName(),
-                  adhocTaskConfig.getTaskName(), adhocTaskConfig.getTaskConfigs()));
-        } catch (TableNotFoundException e) {
-          throw new ControllerApplicationException(LOGGER, "Failed to find table: " + adhocTaskConfig.getTableName(),
-              Response.Status.NOT_FOUND, e);
-        } catch (TaskAlreadyExistsException e) {
-          throw new ControllerApplicationException(LOGGER, "Task already exists: " + adhocTaskConfig.getTaskName(),
-              Response.Status.CONFLICT, e);
-        } catch (UnknownTaskTypeException e) {
-          throw new ControllerApplicationException(LOGGER, "Unknown task type: " + adhocTaskConfig.getTaskType(),
-              Response.Status.NOT_FOUND, e);
-        } catch (NoTaskScheduledException e) {
-          throw new ControllerApplicationException(LOGGER,
-              "No task is generated for table: " + adhocTaskConfig.getTableName() + ", with task type: "
-                  + adhocTaskConfig.getTaskType(), Response.Status.BAD_REQUEST, e);
-        } catch (Exception e) {
-          throw new ControllerApplicationException(LOGGER,
-              "Failed to create adhoc task: " + ExceptionUtils.getStackTrace(e), Response.Status.INTERNAL_SERVER_ERROR,
-              e);
-        }
+        asyncResponse.resume(
+            _pinotTaskManager.createTask(adhocTaskConfig.getTaskType(), adhocTaskConfig.getTableName(),
+                adhocTaskConfig.getTaskName(), adhocTaskConfig.getTaskConfigs()));
+      } catch (TableNotFoundException e) {
+        throw new ControllerApplicationException(LOGGER, "Failed to find table: " + adhocTaskConfig.getTableName(),
+            Response.Status.NOT_FOUND, e);
+      } catch (TaskAlreadyExistsException e) {
+        throw new ControllerApplicationException(LOGGER, "Task already exists: " + adhocTaskConfig.getTaskName(),
+            Response.Status.CONFLICT, e);
+      } catch (UnknownTaskTypeException e) {
+        throw new ControllerApplicationException(LOGGER, "Unknown task type: " + adhocTaskConfig.getTaskType(),
+            Response.Status.NOT_FOUND, e);
+      } catch (NoTaskScheduledException e) {
+        throw new ControllerApplicationException(LOGGER,
+            "No task is generated for table: " + adhocTaskConfig.getTableName() + ", with task type: "
+                + adhocTaskConfig.getTaskType(), Response.Status.BAD_REQUEST, e);
       } catch (Exception e) {
-        asyncResponse.resume(e);
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to create adhoc task: " + ExceptionUtils.getStackTrace(e), Response.Status.INTERNAL_SERVER_ERROR,
+            e);
       }
-    });
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   @PUT
@@ -1005,17 +974,16 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Clean up finished tasks (COMPLETED, FAILED) for the given task type")
+  @ManagedAsync
   public void cleanUpTasks(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        SuccessResponse response = cleanUpTasksSync(taskType);
-        asyncResponse.resume(response);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      SuccessResponse response = cleanUpTasksSync(taskType);
+      asyncResponse.resume(response);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private SuccessResponse cleanUpTasksSync(String taskType) {
@@ -1029,17 +997,16 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Stop all running/pending tasks (as well as the task queue) for the given task type")
+  @ManagedAsync
   public void stopTasks(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        SuccessResponse response = stopTasksSync(taskType);
-        asyncResponse.resume(response);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      SuccessResponse response = stopTasksSync(taskType);
+      asyncResponse.resume(response);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private SuccessResponse stopTasksSync(String taskType) {
@@ -1053,17 +1020,16 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Resume all stopped tasks (as well as the task queue) for the given task type")
+  @ManagedAsync
   public void resumeTasks(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        SuccessResponse response = resumeTasksSync(taskType);
-        asyncResponse.resume(response);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      SuccessResponse response = resumeTasksSync(taskType);
+      asyncResponse.resume(response);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private SuccessResponse resumeTasksSync(String taskType) {
@@ -1077,19 +1043,18 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.DELETE)
   @ApiOperation("Delete all tasks (as well as the task queue) for the given task type")
+  @ManagedAsync
   public void deleteTasks(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Whether to force deleting the tasks (expert only option, enable with cautious")
       @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        SuccessResponse response = deleteTasksSync(taskType, forceDelete);
-        asyncResponse.resume(response);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      SuccessResponse response = deleteTasksSync(taskType, forceDelete);
+      asyncResponse.resume(response);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private SuccessResponse deleteTasksSync(String taskType, boolean forceDelete) {
@@ -1103,19 +1068,18 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.DELETE)
   @ApiOperation("Delete a single task given its task name")
+  @ManagedAsync
   public void deleteTask(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @ApiParam(value = "Whether to force deleting the task (expert only option, enable with cautious")
       @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete,
       @Suspended AsyncResponse asyncResponse) {
-    _minionTaskResourceExecutorService.execute(() -> {
-      try {
-        SuccessResponse response = deleteTaskSync(taskName, forceDelete);
-        asyncResponse.resume(response);
-      } catch (Exception e) {
-        asyncResponse.resume(e);
-      }
-    });
+    try {
+      SuccessResponse response = deleteTaskSync(taskName, forceDelete);
+      asyncResponse.resume(response);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
+    }
   }
 
   private SuccessResponse deleteTaskSync(String taskName, boolean forceDelete) {

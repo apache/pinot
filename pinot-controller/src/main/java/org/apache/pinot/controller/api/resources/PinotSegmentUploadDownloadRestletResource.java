@@ -46,10 +46,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.inject.Named;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
@@ -86,7 +84,6 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
-import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -161,10 +158,6 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
-
-  @Inject
-  @Named(BaseControllerStarter.MINION_TASK_RESOURCE_EXECUTOR_SERVICE_NAME)
-  ExecutorService _resourceExecutorService;
 
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -994,6 +987,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Start to replace segments", notes = "Start to replace segments")
+  @ManagedAsync
   public void startReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
@@ -1009,19 +1003,17 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    _resourceExecutorService.execute(() -> {
-      try {
-        String segmentLineageEntryId = _pinotHelixResourceManager.startReplaceSegments(tableNameWithType,
-            startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup,
-            startReplaceSegmentsRequest.getCustomMap());
-        asyncResponse.resume(
-            Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build());
-      } catch (Exception e) {
-        _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_START_REPLACE_FAILURE, 1);
-        asyncResponse.resume(
-            new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
-      }
-    });
+    try {
+      String segmentLineageEntryId = _pinotHelixResourceManager.startReplaceSegments(tableNameWithType,
+          startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup,
+          startReplaceSegmentsRequest.getCustomMap());
+      asyncResponse.resume(
+          Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build());
+    } catch (Exception e) {
+      _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_START_REPLACE_FAILURE, 1);
+      asyncResponse.resume(
+          new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
+    }
   }
 
   @POST
@@ -1030,6 +1022,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "End to replace segments", notes = "End to replace segments")
+  @ManagedAsync
   public void endReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
@@ -1048,22 +1041,20 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    _resourceExecutorService.execute(() -> {
-      try {
-        // Check that the segment lineage entry id is valid
-        Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
-        _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
-            endReplaceSegmentsRequest);
-        if (cleanupSegments) {
-          _pinotHelixResourceManager.invokeControllerPeriodicTask(tableNameWithType, RetentionManager.TASK_NAME, null);
-        }
-        asyncResponse.resume(Response.ok().build());
-      } catch (Exception e) {
-        _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);
-        asyncResponse.resume(
-            new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
+    try {
+      // Check that the segment lineage entry id is valid
+      Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
+      _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
+          endReplaceSegmentsRequest);
+      if (cleanupSegments) {
+        _pinotHelixResourceManager.invokeControllerPeriodicTask(tableNameWithType, RetentionManager.TASK_NAME, null);
       }
-    });
+      asyncResponse.resume(Response.ok().build());
+    } catch (Exception e) {
+      _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);
+      asyncResponse.resume(
+          new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
+    }
   }
 
   @POST
@@ -1072,6 +1063,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Revert segments replacement", notes = "Revert segments replacement")
+  @ManagedAsync
   public void revertReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
@@ -1090,19 +1082,17 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    _resourceExecutorService.execute(() -> {
-      try {
-        // Check that the segment lineage entry id is valid
-        Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
-        _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert,
-            revertReplaceSegmentsRequest);
-        asyncResponse.resume(Response.ok().build());
-      } catch (Exception e) {
-        _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);
-        asyncResponse.resume(
-            new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
-      }
-    });
+    try {
+      // Check that the segment lineage entry id is valid
+      Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
+      _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert,
+          revertReplaceSegmentsRequest);
+      asyncResponse.resume(Response.ok().build());
+    } catch (Exception e) {
+      _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);
+      asyncResponse.resume(
+          new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
+    }
   }
 
   @POST
