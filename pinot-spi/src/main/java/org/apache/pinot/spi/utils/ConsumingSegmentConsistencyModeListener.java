@@ -30,9 +30,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Singleton class to manage the configuration for force commit on consuming segments
- * for upsert tables with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true
- * with consistency mode NONE and replication > 1).
- *
+ * for upsert tables with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true or
+ * outOfOrderColumn). By default, the force commit and reload is disabled
  * This configuration is dynamically updatable via ZK cluster config without requiring a server restart.
  */
 public class ConsumingSegmentConsistencyModeListener implements PinotClusterConfigChangeListener {
