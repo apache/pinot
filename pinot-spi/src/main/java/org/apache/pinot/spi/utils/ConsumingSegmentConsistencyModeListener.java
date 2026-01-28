@@ -35,9 +35,9 @@ import org.slf4j.LoggerFactory;
  *
  * This configuration is dynamically updatable via ZK cluster config without requiring a server restart.
  */
-public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeListener {
-  private static final Logger LOGGER = LoggerFactory.getLogger(UpsertInconsistentStateConfig.class);
-  private static final UpsertInconsistentStateConfig INSTANCE = new UpsertInconsistentStateConfig();
+public class ConsumingSegmentConsistencyModeListener implements PinotClusterConfigChangeListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentConsistencyModeListener.class);
+  private static final ConsumingSegmentConsistencyModeListener INSTANCE = new ConsumingSegmentConsistencyModeListener();
 
   public enum Mode {
     /**
@@ -84,10 +84,10 @@ public class UpsertInconsistentStateConfig implements PinotClusterConfigChangeLi
 
   private final AtomicReference<Mode> _consistencyMode = new AtomicReference<>(Mode.DEFAULT);
 
-  private UpsertInconsistentStateConfig() {
+  private ConsumingSegmentConsistencyModeListener() {
   }
 
-  public static UpsertInconsistentStateConfig getInstance() {
+  public static ConsumingSegmentConsistencyModeListener getInstance() {
     return INSTANCE;
   }
 
