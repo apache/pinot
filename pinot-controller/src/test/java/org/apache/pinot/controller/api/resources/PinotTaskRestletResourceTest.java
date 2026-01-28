@@ -124,7 +124,7 @@ public class PinotTaskRestletResourceTest {
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
     _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", minionWorkerIds, asyncResponse);
-    
+
     verify(asyncResponse).resume(responseCaptor.capture());
     assertEquals(responseCaptor.getValue(), "{}");
     return minionWorkerEndpointsCaptor.getValue();
@@ -150,7 +150,7 @@ public class PinotTaskRestletResourceTest {
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Throwable> responseCaptor = ArgumentCaptor.forClass(Throwable.class);
     _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", null, asyncResponse);
-    
+
     verify(asyncResponse).resume(responseCaptor.capture());
     assertTrue(responseCaptor.getValue() instanceof ControllerApplicationException);
   }
@@ -166,7 +166,7 @@ public class PinotTaskRestletResourceTest {
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
     _pinotTaskRestletResource.getTasksSummary(null, asyncResponse);
-    
+
     verify(asyncResponse).resume(responseCaptor.capture());
 
     PinotHelixTaskResourceManager.TaskSummaryResponse response =
@@ -209,7 +209,7 @@ public class PinotTaskRestletResourceTest {
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
     _pinotTaskRestletResource.getTasksSummary(null, asyncResponse);
-    
+
     verify(asyncResponse).resume(responseCaptor.capture());
 
     PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse =
@@ -260,7 +260,7 @@ public class PinotTaskRestletResourceTest {
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
     _pinotTaskRestletResource.getTasksSummary("defaultTenant", asyncResponse);
-    
+
     verify(asyncResponse).resume(responseCaptor.capture());
 
     PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse =
