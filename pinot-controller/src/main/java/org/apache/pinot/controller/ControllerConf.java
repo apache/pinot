@@ -97,7 +97,6 @@ public class ControllerConf extends PinotConfiguration {
   // Used to determine whether to use group commit idealstate on segment completion
   public static final String CONTROLLER_SEGMENT_COMPLETION_GROUP_COMMIT_ENABLED =
       "controller.segment.completion.group.commit.enabled";
-
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
   }
@@ -323,8 +322,6 @@ public class ControllerConf extends PinotConfiguration {
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
   public static final String CONTROLLER_EXECUTOR_NUM_THREADS = "controller.executor.numThreads";
   public static final String CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS = "controller.executor.rebalance.numThreads";
-  public static final String CONTROLLER_EXECUTOR_MINION_TASK_RESOURCE_NUM_THREADS =
-      "controller.executor.minionTaskResource.numThreads";
 
   public static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
@@ -571,13 +568,6 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getControllerExecutorRebalanceNumThreads() {
     return getProperty(CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS, UNSPECIFIED_THREAD_POOL);
-  }
-
-  public int getControllerExecutorMinionTaskResourceNumThreads() {
-    // We don't want unbounded thread pool here for minion task API resources, as they could be requested by minions
-    // with a high concurrency
-    return getProperty(CONTROLLER_EXECUTOR_MINION_TASK_RESOURCE_NUM_THREADS,
-        Runtime.getRuntime().availableProcessors() * 2);
   }
 
   public boolean isUpdateSegmentStateModel() {

@@ -67,8 +67,6 @@ public class PinotTaskRestletResourceTest {
   @Mock
   UriInfo _uriInfo;
   @Mock
-  ExecutorService _minionTaskResourceExecutorService;
-  @Mock
   Executor _executor;
   @Mock
   HttpClientConnectionManager _connectionManager;
@@ -81,12 +79,6 @@ public class PinotTaskRestletResourceTest {
       throws URISyntaxException {
     MockitoAnnotations.openMocks(this);
     when(_uriInfo.getRequestUri()).thenReturn(new URI("http://localhost:9000"));
-    // Make executor service execute tasks synchronously for testing
-    doAnswer(invocation -> {
-      Runnable runnable = invocation.getArgument(0);
-      runnable.run();
-      return null;
-    }).when(_minionTaskResourceExecutorService).execute(any(Runnable.class));
   }
 
   @Test
@@ -134,7 +126,7 @@ public class PinotTaskRestletResourceTest {
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
     _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", minionWorkerIds, asyncResponse);
-    verify(_minionTaskResourceExecutorService).execute(any(Runnable.class));
+    
     verify(asyncResponse).resume(responseCaptor.capture());
     assertEquals(responseCaptor.getValue(), "{}");
     return minionWorkerEndpointsCaptor.getValue();
@@ -160,7 +152,7 @@ public class PinotTaskRestletResourceTest {
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Throwable> responseCaptor = ArgumentCaptor.forClass(Throwable.class);
     _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", null, asyncResponse);
-    verify(_minionTaskResourceExecutorService).execute(any(Runnable.class));
+    
     verify(asyncResponse).resume(responseCaptor.capture());
     assertTrue(responseCaptor.getValue() instanceof ControllerApplicationException);
   }
@@ -176,7 +168,7 @@ public class PinotTaskRestletResourceTest {
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
     _pinotTaskRestletResource.getTasksSummary(null, asyncResponse);
-    verify(_minionTaskResourceExecutorService).execute(any(Runnable.class));
+    
     verify(asyncResponse).resume(responseCaptor.capture());
 
     PinotHelixTaskResourceManager.TaskSummaryResponse response =
@@ -219,7 +211,7 @@ public class PinotTaskRestletResourceTest {
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
     _pinotTaskRestletResource.getTasksSummary(null, asyncResponse);
-    verify(_minionTaskResourceExecutorService).execute(any(Runnable.class));
+    
     verify(asyncResponse).resume(responseCaptor.capture());
 
     PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse =
@@ -270,7 +262,7 @@ public class PinotTaskRestletResourceTest {
     AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
     ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
     _pinotTaskRestletResource.getTasksSummary("defaultTenant", asyncResponse);
-    verify(_minionTaskResourceExecutorService).execute(any(Runnable.class));
+    
     verify(asyncResponse).resume(responseCaptor.capture());
 
     PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse =

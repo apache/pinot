@@ -615,6 +615,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       throw new RuntimeException("Failed to register cluster config change handler", e);
     }
 
+
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
 
     _segmentCompletionManager =
