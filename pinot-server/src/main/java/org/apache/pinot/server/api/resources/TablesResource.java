@@ -84,6 +84,9 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -472,10 +475,10 @@ public class TablesResource {
     }
   }
 
-  // TODO Add access control similar to PinotSegmentUploadDownloadRestletResource for segment download.
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DOWNLOAD_SEGMENT)
   @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
   public Response downloadSegment(
       @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE")
