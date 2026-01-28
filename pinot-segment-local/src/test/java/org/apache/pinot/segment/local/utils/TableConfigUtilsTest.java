@@ -593,7 +593,7 @@ public class TableConfigUtilsTest {
     }
 
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.BYTES).build();
-    // distinctcounthllmv is not supported, we expect this to not validate
+    // distinctcounthllmv is now supported
     List<AggregationConfig> aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "DISTINCTCOUNTHLLMV(s1)"));
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME")
@@ -601,13 +601,7 @@ public class TableConfigUtilsTest {
         .setIngestionConfig(ingestionConfig)
         .setNoDictionaryColumns(List.of("d1"))
         .build();
-
-    try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
-      fail("Should fail due to not supported aggregation function");
-    } catch (IllegalStateException e) {
-      // expected
-    }
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
 
     // distinctcounthll, expect that the function name in various forms (with and without underscores) still validates
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)

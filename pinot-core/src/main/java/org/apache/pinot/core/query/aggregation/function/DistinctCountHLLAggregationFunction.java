@@ -103,6 +103,15 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       return;
     }
 
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(length, aggregationResultHolder, blockValSet, storedType);
+    } else {
+      aggregateMV(length, aggregationResultHolder, blockValSet, storedType);
+    }
+  }
+
+  protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
+      DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
@@ -149,6 +158,67 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
+      DataType storedType) {
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        dictIdBitmap.add(dictIds[i]);
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the HyperLogLog
+    HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
+    switch (storedType) {
+      case INT:
+        int[][] intValuesArray = blockValSet.getIntValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (int value : intValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+      case LONG:
+        long[][] longValuesArray = blockValSet.getLongValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (long value : longValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+      case FLOAT:
+        float[][] floatValuesArray = blockValSet.getFloatValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (float value : floatValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+      case DOUBLE:
+        double[][] doubleValuesArray = blockValSet.getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (double value : doubleValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+      case STRING:
+        String[][] stringValuesArray = blockValSet.getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (String value : stringValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
+    }
+  }
+
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
@@ -175,6 +245,15 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       return;
     }
 
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
+    } else {
+      aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
+    }
+  }
+
+  protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
@@ -222,6 +301,70 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the HyperLogLog
+    switch (storedType) {
+      case INT:
+        int[][] intValuesArray = blockValSet.getIntValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          for (int value : intValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+      case LONG:
+        long[][] longValuesArray = blockValSet.getLongValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          for (long value : longValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+      case FLOAT:
+        float[][] floatValuesArray = blockValSet.getFloatValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          for (float value : floatValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+      case DOUBLE:
+        double[][] doubleValuesArray = blockValSet.getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          for (double value : doubleValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+      case STRING:
+        String[][] stringValuesArray = blockValSet.getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          for (String value : stringValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
+    }
+  }
+
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
@@ -251,6 +394,15 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       return;
     }
 
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
+    } else {
+      aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
+    }
+  }
+
+  protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
@@ -291,6 +443,87 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
+    }
+  }
+
+  protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.getDictionary();
+    if (dictionary != null) {
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds[i]);
+        }
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the HyperLogLog
+    switch (storedType) {
+      case INT:
+        int[][] intValuesArray = blockValSet.getIntValuesMV();
+        for (int i = 0; i < length; i++) {
+          int[] intValues = intValuesArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+            for (int value : intValues) {
+              hyperLogLog.offer(value);
+            }
+          }
+        }
+        break;
+      case LONG:
+        long[][] longValuesArray = blockValSet.getLongValuesMV();
+        for (int i = 0; i < length; i++) {
+          long[] longValues = longValuesArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+            for (long value : longValues) {
+              hyperLogLog.offer(value);
+            }
+          }
+        }
+        break;
+      case FLOAT:
+        float[][] floatValuesArray = blockValSet.getFloatValuesMV();
+        for (int i = 0; i < length; i++) {
+          float[] floatValues = floatValuesArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+            for (float value : floatValues) {
+              hyperLogLog.offer(value);
+            }
+          }
+        }
+        break;
+      case DOUBLE:
+        double[][] doubleValuesArray = blockValSet.getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          double[] doubleValues = doubleValuesArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+            for (double value : doubleValues) {
+              hyperLogLog.offer(value);
+            }
+          }
+        }
+        break;
+      case STRING:
+        String[][] stringValuesArray = blockValSet.getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          String[] stringValues = stringValuesArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+            for (String value : stringValues) {
+              hyperLogLog.offer(value);
+            }
+          }
         }
         break;
       default:
