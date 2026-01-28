@@ -33,6 +33,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.UpsertInconsistentStateConfig;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -75,6 +76,10 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     startBroker();
     startServers(NUM_SERVERS);
 
+    // Enable PROTECTED mode to allow force commit for upsert tables in tests.
+    // This must be set after startController() to ensure the singleton is initialized.
+    UpsertInconsistentStateConfig.getInstance().setMode(UpsertInconsistentStateConfig.Mode.PROTECTED);
+
     // Start Kafka
     startKafkaWithoutTopic();
   }
@@ -90,6 +95,9 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
+
+    // Reset the consistency mode to default
+    UpsertInconsistentStateConfig.getInstance().reset();
   }
 
   @Test
