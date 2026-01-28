@@ -428,6 +428,7 @@ public class PinotTableRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/recommender")
+  @Authenticate(AccessType.READ)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RECOMMEND_CONFIG)
   @ApiOperation(value = "Recommend config", notes = "Recommend a config with input json")
   public String recommendConfig(String inputStr) {
@@ -1436,6 +1437,7 @@ public class PinotTableRestletResource {
 
   @POST
   @Path("tables/{tableName}/timeBoundary")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIG)
   @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata", notes = "Set "
       + "hybrid table query time boundary based on offline segments' metadata")
