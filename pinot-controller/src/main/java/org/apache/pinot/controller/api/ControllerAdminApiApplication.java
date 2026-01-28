@@ -22,11 +22,16 @@ import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.ext.Provider;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.pinot.common.audit.AuditLogFilter;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -50,7 +55,9 @@ import org.glassfish.grizzly.threadpool.ThreadPoolProbe;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
+import org.glassfish.jersey.server.ManagedAsyncExecutor;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.spi.ExecutorServiceProvider;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
@@ -62,6 +69,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   private final boolean _useHttps;
   private final boolean _enableSwagger;
   private HttpServer _httpServer;
+  private final ThreadPoolExecutor _managedAsyncExecutor;
 
   public ControllerAdminApiApplication(ControllerConf conf) {
     super();
@@ -83,6 +91,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     register(new CorsFilter());
     register(AuthenticationFilter.class);
     register(AuditLogFilter.class);
+    _managedAsyncExecutor = createManagedAsyncExecutor();
+    register(new ManagedAsyncExecutorServiceProvider(_managedAsyncExecutor));
     // property("jersey.config.server.tracing.type", "ALL");
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }
@@ -117,6 +127,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
         .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/images/"), "/images/");
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
     registerHttpThreadUtilizationGauge(controllerMetrics);
+    registerManagedAsyncThreadGauges(controllerMetrics);
   }
 
   public void stop() {
@@ -124,6 +135,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       return;
     }
     _httpServer.shutdownNow();
+    _managedAsyncExecutor.shutdown();
   }
 
   private class CorsFilter implements ContainerResponseFilter {
@@ -145,8 +157,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   }
 
   /**
-    * Registers a gauge that tracks HTTP thread pool utilization without using reflection.
-    * Instead, it uses a custom ThreadPoolProbe to count active threads.
+   * Registers a gauge that tracks HTTP thread pool utilization without using reflection.
+   * Instead, it uses a custom ThreadPoolProbe to count active threads.
    */
   private void registerHttpThreadUtilizationGauge(ControllerMetrics metrics) {
     NetworkListener listener = _httpServer.getListeners().iterator().next();
@@ -170,6 +182,16 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     });
   }
 
+  private void registerManagedAsyncThreadGauges(ControllerMetrics metrics) {
+    metrics.setOrUpdateGauge(ControllerGauge.MANAGED_ASYNC_ACTIVE_THREADS.getGaugeName(),
+        () -> (long) _managedAsyncExecutor.getActiveCount());
+  }
+
+  private ThreadPoolExecutor createManagedAsyncExecutor() {
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("managed-async-%d").build();
+    return (ThreadPoolExecutor) Executors.newCachedThreadPool(threadFactory);
+  }
+
   /**
    * Custom probe to track busy threads in Grizzly thread pools without using reflection.
    */
@@ -191,6 +213,26 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     /** Current number of active threads. */
     public int getActiveCount() {
       return _active.get();
+    }
+  }
+
+  @Provider
+  @ManagedAsyncExecutor
+  private static final class ManagedAsyncExecutorServiceProvider implements ExecutorServiceProvider {
+    private final ExecutorService _executorService;
+
+    private ManagedAsyncExecutorServiceProvider(ExecutorService executorService) {
+      _executorService = executorService;
+    }
+
+    @Override
+    public ExecutorService getExecutorService() {
+      return _executorService;
+    }
+
+    @Override
+    public void dispose(ExecutorService executorService) {
+      // managed in ControllerAdminApiApplication.stop()
     }
   }
 }
