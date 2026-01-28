@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.util.List;
@@ -31,7 +32,6 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.ext.Provider;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.pinot.common.audit.AuditLogFilter;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
