@@ -380,8 +380,16 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 _previousKeyToRecordLocationMap.remove(primaryKey);
                 return null;
               }
+            } else if (recordLocation.getSegment() instanceof ImmutableSegmentImpl) {
+              // The consuming segment's key is in a different immutable segment
+              _previousKeyToRecordLocationMap.remove(primaryKey);
+            } else {
+              _logger.warn(
+                  "Consuming segment {} has already ingested the primary key for docId {} from segment {}, suggesting"
+                      + " that consumption is occurring concurrently with segment replacement, which is undesirable "
+                      + "for consistency.", recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(),
+                  segment.getSegmentName());
             }
-            _previousKeyToRecordLocationMap.remove(primaryKey);
             if (!uniquePrimaryKeys.add(pk)) {
               return recordLocation;
             }

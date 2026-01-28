@@ -254,8 +254,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 _previousKeyToRecordLocationMap.remove(primaryKey);
                 return null;
               }
+            } else if (recordLocation.getSegment() instanceof ImmutableSegmentImpl) {
+              _previousKeyToRecordLocationMap.remove(primaryKey);
+            } else {
+              _logger.warn(
+                  "Consuming segment {} has already ingested the primary key for docId {} from segment {}, suggesting"
+                      + " that consumption is occurring concurrently with segment replacement, which is undesirable "
+                      + "for consistency.",
+                  recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(), segment.getSegmentName());
             }
-            _previousKeyToRecordLocationMap.remove(primaryKey);
             return recordLocation;
           });
     }
