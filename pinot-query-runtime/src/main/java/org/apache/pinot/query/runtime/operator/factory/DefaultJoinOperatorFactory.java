@@ -49,7 +49,7 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
           return new HashJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
         }
       case LOOKUP:
-        return new LookupJoinOperator(context, leftOperator, rightOperator, joinNode);
+        return new LookupJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
       case ASOF:
         return new AsofJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);
       default:
