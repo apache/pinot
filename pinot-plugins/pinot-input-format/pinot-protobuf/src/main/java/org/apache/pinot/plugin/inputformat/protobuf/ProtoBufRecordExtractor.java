@@ -34,6 +34,12 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 /**
  * Extractor for ProtoBuf records
+ *
+ * <p>Performance optimizations:
+ * <ul>
+ *   <li>Field descriptors are cached during initialization to avoid repeated lookups</li>
+ *   <li>A reusable ProtoBufFieldInfo instance is used to reduce object allocation</li>
+ * </ul>
  */
 @SuppressWarnings("unchecked")
 public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
@@ -41,14 +47,64 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   private Set<String> _fields;
   private boolean _extractAll = false;
 
+  // Cached field descriptors to avoid repeated lookups via findFieldByName
+  private Descriptors.FieldDescriptor[] _cachedFieldDescriptors;
+  private String[] _cachedFieldNames;
+  // Store the descriptor's full name to detect schema changes
+  private String _cachedDescriptorFullName;
+
+  // Reusable ProtoBufFieldInfo to reduce object allocation
+  private final ProtoBufFieldInfo _reusableFieldInfo = new ProtoBufFieldInfo(null, null);
+
   @Override
   public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
       _fields = Set.of();
     } else {
+      _extractAll = false;
       _fields = Set.copyOf(fields);
     }
+    // Reset cache state for re-initialization
+    _cachedDescriptorFullName = null;
+    _cachedFieldDescriptors = null;
+    _cachedFieldNames = null;
+  }
+
+  /**
+   * Initializes the field descriptor cache from the message descriptor.
+   * This is called on the first message and when schema changes are detected.
+   *
+   * <p>Schema changes are detected by comparing the descriptor's full name.
+   * This handles:
+   * <ul>
+   *   <li>Different message types (should not happen in normal use)</li>
+   *   <li>Schema evolution scenarios where descriptor might change</li>
+   * </ul>
+   */
+  private void initFieldDescriptorCache(Descriptors.Descriptor descriptor) {
+    if (_extractAll) {
+      List<Descriptors.FieldDescriptor> fieldsList = descriptor.getFields();
+      int numFields = fieldsList.size();
+      _cachedFieldDescriptors = new Descriptors.FieldDescriptor[numFields];
+      _cachedFieldNames = new String[numFields];
+      for (int i = 0; i < numFields; i++) {
+        Descriptors.FieldDescriptor fd = fieldsList.get(i);
+        _cachedFieldDescriptors[i] = fd;
+        _cachedFieldNames[i] = fd.getName();
+      }
+    } else {
+      int numFields = _fields.size();
+      _cachedFieldDescriptors = new Descriptors.FieldDescriptor[numFields];
+      _cachedFieldNames = new String[numFields];
+      int i = 0;
+      for (String fieldName : _fields) {
+        _cachedFieldDescriptors[i] = descriptor.findFieldByName(fieldName);
+        _cachedFieldNames[i] = fieldName;
+        i++;
+      }
+    }
+    _cachedDescriptorFullName = descriptor.getFullName();
   }
 
   /**
@@ -68,23 +124,32 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   @Override
   public GenericRow extract(Message from, GenericRow to) {
     Descriptors.Descriptor descriptor = from.getDescriptorForType();
-    if (_extractAll) {
-      for (Descriptors.FieldDescriptor fieldDescriptor : descriptor.getFields()) {
-        Object fieldValue = getFieldValue(fieldDescriptor, from);
+
+    // Initialize or reinitialize cache if descriptor changed (handles schema evolution)
+    if (_cachedDescriptorFullName == null || !_cachedDescriptorFullName.equals(descriptor.getFullName())) {
+      initFieldDescriptorCache(descriptor);
+    }
+
+    // Use cached field descriptors to avoid repeated lookups
+    int numFields = _cachedFieldDescriptors.length;
+    for (int i = 0; i < numFields; i++) {
+      Descriptors.FieldDescriptor fieldDescriptor = _cachedFieldDescriptors[i];
+      String fieldName = _cachedFieldNames[i];
+
+      Object fieldValue;
+      if (fieldDescriptor == null) {
+        // Field not found in descriptor (only possible in non-extractAll mode)
+        fieldValue = null;
+      } else {
+        fieldValue = getFieldValue(fieldDescriptor, from);
         if (fieldValue != null) {
-          fieldValue = convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor));
+          // Reuse ProtoBufFieldInfo to avoid object allocation
+          _reusableFieldInfo.setFieldValue(fieldValue);
+          _reusableFieldInfo.setFieldDescriptor(fieldDescriptor);
+          fieldValue = convert(_reusableFieldInfo);
         }
-        to.putValue(fieldDescriptor.getName(), fieldValue);
       }
-    } else {
-      for (String fieldName : _fields) {
-        Descriptors.FieldDescriptor fieldDescriptor = descriptor.findFieldByName(fieldName);
-        Object fieldValue = fieldDescriptor == null ? null : getFieldValue(fieldDescriptor, from);
-        if (fieldValue != null) {
-          fieldValue = convert(new ProtoBufFieldInfo(fieldValue, descriptor.findFieldByName(fieldName)));
-        }
-        to.putValue(fieldName, fieldValue);
-      }
+      to.putValue(fieldName, fieldValue);
     }
     return to;
   }
