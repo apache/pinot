@@ -395,7 +395,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     BaseOperator<DistinctResultsBlock> operator = getOperator(query);
     DistinctResultsBlock resultsBlock = operator.nextBlock();
     assertEquals(resultsBlock.getEarlyTerminationReason(), BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_ROWS);
-    assertTrue(resultsBlock.getDistinctTable().size() < 100);
+    assertEquals(resultsBlock.getDistinctTable().size(), 5);
   }
 
   @Test
@@ -417,15 +417,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     BaseOperator<DistinctResultsBlock> operator = getOperator(query);
     DistinctResultsBlock resultsBlock = operator.nextBlock();
     assertEquals(resultsBlock.getEarlyTerminationReason(), BaseResultsBlock.EarlyTerminationReason.DISTINCT_TIME_LIMIT);
+    assertEquals(resultsBlock.getDistinctTable().size(), 0);
   }
 
   @Test
-  public void testTimeLimitEarlyTerminationDictionaryBasedInnerSegment() {
+  public void testTimeLimitIgnoredWithinDictionaryBasedInnerSegment() {
     String query =
         "SET \"maxExecutionTimeMsInDistinct\" = 0; SELECT DISTINCT(intColumn) FROM testTable LIMIT 200";
     BaseOperator<DistinctResultsBlock> operator = getOperator(query);
     DistinctResultsBlock resultsBlock = operator.nextBlock();
-    assertEquals(resultsBlock.getEarlyTerminationReason(), BaseResultsBlock.EarlyTerminationReason.DISTINCT_TIME_LIMIT);
+    assertEquals(resultsBlock.getEarlyTerminationReason(), BaseResultsBlock.EarlyTerminationReason.NONE);
   }
 
   @Test

@@ -36,10 +36,12 @@ public class DistinctEarlyTerminationContext {
   private int _numRowsWithoutChangeLimit = UNLIMITED_ROWS;
   private int _numRowsWithoutChange = 0;
   private boolean _numRowsWithoutChangeLimitReached = false;
+  private boolean _maxRowsLimitReached = false;
   private boolean _trackingEnabled = false;
   // Absolute deadline (in nanos from the configured time supplier). A deadline stays consistent with the time source
   // and enables budget checks.
   private long _deadlineTimeNanos = UNLIMITED_TIME_NANOS;
+  private boolean _timeLimitReached = false;
   private LongSupplier _timeSupplier = System::nanoTime;
 
   @VisibleForTesting
@@ -54,6 +56,9 @@ public class DistinctEarlyTerminationContext {
     _rowsRemaining = maxRows;
     if (maxRows != UNLIMITED_ROWS) {
       _trackingEnabled = true;
+      if (maxRows <= 0) {
+        _maxRowsLimitReached = true;
+      }
     }
   }
 
@@ -107,6 +112,9 @@ public class DistinctEarlyTerminationContext {
     _numRowsProcessed++;
     if (_rowsRemaining != UNLIMITED_ROWS) {
       _rowsRemaining--;
+      if (_rowsRemaining <= 0) {
+        _maxRowsLimitReached = true;
+      }
     }
     if (_numRowsWithoutChangeLimit != UNLIMITED_ROWS) {
       if (distinctChanged) {
@@ -124,6 +132,9 @@ public class DistinctEarlyTerminationContext {
     if (!_trackingEnabled) {
       return false;
     }
+    if (_rowsRemaining <= 0) {
+      _maxRowsLimitReached = true;
+    }
     return _rowsRemaining <= 0 || _numRowsWithoutChangeLimitReached;
   }
 
@@ -138,7 +149,11 @@ public class DistinctEarlyTerminationContext {
     if (_deadlineTimeNanos == UNLIMITED_TIME_NANOS) {
       return UNLIMITED_TIME_NANOS;
     }
-    return _deadlineTimeNanos - _timeSupplier.getAsLong();
+    long remaining = _deadlineTimeNanos - _timeSupplier.getAsLong();
+    if (remaining <= 0) {
+      _timeLimitReached = true;
+    }
+    return remaining;
   }
 
   /**
@@ -154,6 +169,7 @@ public class DistinctEarlyTerminationContext {
     long now = _timeSupplier.getAsLong();
     if (remainingTimeNanos <= 0) {
       _deadlineTimeNanos = now;
+      _timeLimitReached = true;
       return;
     }
     try {
@@ -162,5 +178,21 @@ public class DistinctEarlyTerminationContext {
       // Saturate to "unlimited" if the computed deadline overflows.
       _deadlineTimeNanos = UNLIMITED_TIME_NANOS;
     }
+  }
+
+  public boolean isMaxRowsLimitReached() {
+    return _maxRowsLimitReached;
+  }
+
+  public boolean isTimeLimitReached() {
+    if (_deadlineTimeNanos == UNLIMITED_TIME_NANOS) {
+      return false;
+    }
+    if (_timeLimitReached) {
+      return true;
+    }
+    // Update based on current time budget.
+    getRemainingTimeNanos();
+    return _timeLimitReached;
   }
 }

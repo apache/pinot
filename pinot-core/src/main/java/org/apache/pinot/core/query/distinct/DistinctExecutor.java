@@ -74,6 +74,20 @@ public interface DistinctExecutor {
   }
 
   /**
+   * Returns {@code true} if the executor has early-terminated because the maximum row budget was exhausted.
+   */
+  default boolean isMaxRowsLimitReached() {
+    return false;
+  }
+
+  /**
+   * Returns {@code true} if the executor has early-terminated because the time budget was exhausted.
+   */
+  default boolean isTimeLimitReached() {
+    return false;
+  }
+
+  /**
    * Returns the total number of rows processed so far.
    */
   default int getNumRowsProcessed() {

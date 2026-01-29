@@ -66,6 +66,16 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
   }
 
   @Override
+  public boolean isMaxRowsLimitReached() {
+    return _earlyTerminationContext.isMaxRowsLimitReached();
+  }
+
+  @Override
+  public boolean isTimeLimitReached() {
+    return _earlyTerminationContext.isTimeLimitReached();
+  }
+
+  @Override
   public int getNumRowsProcessed() {
     return _earlyTerminationContext.getNumRowsProcessed();
   }

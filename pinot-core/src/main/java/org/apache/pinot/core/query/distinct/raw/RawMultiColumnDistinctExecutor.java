@@ -87,6 +87,16 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
   }
 
   @Override
+  public boolean isMaxRowsLimitReached() {
+    return _earlyTerminationContext.isMaxRowsLimitReached();
+  }
+
+  @Override
+  public boolean isTimeLimitReached() {
+    return _earlyTerminationContext.isTimeLimitReached();
+  }
+
+  @Override
   public int getNumRowsProcessed() {
     return _earlyTerminationContext.getNumRowsProcessed();
   }

@@ -25,7 +25,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColumnDistinctExecutor;
@@ -57,16 +56,7 @@ public class DistinctExecutorFactory {
       QueryContext queryContext) {
     List<ExpressionContext> expressions = queryContext.getSelectExpressions();
     int queryLimit = queryContext.getLimit();
-    // The distinct table capacity is independent from the early-termination row budgets enforced by DistinctOperator.
-    // Keep a dedicated variable so it is clear we are only constraining how many unique rows we can store.
     int tableCapacity = queryLimit;
-    if (queryContext.getQueryOptions() != null) {
-      Integer maxRowsInDistinct = QueryOptionsUtils.getMaxRowsInDistinct(queryContext.getQueryOptions());
-      if (maxRowsInDistinct != null) {
-        // Only retain enough space to hold what the server will be allowed to scan.
-        tableCapacity = Math.min(queryLimit, maxRowsInDistinct);
-      }
-    }
     boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     int numExpressions = expressions.size();
