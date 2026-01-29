@@ -191,6 +191,7 @@ public class MutableSegmentImpl implements MutableSegment {
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
+  private volatile long _minimumIngestionLagMs = Long.MAX_VALUE;
 
   // multi-column text index fields
   private final MultiColumnRealtimeLuceneTextIndex _multiColumnTextIndex;
@@ -222,6 +223,11 @@ public class MutableSegmentImpl implements MutableSegment {
       @Override
       public long getLatestIngestionTimestamp() {
         return _latestIngestionTimeMs;
+      }
+
+      @Override
+      public long getMinimumIngestionLagMs() {
+        return _minimumIngestionLagMs;
       }
 
       @Override
@@ -701,6 +707,10 @@ public class MutableSegmentImpl implements MutableSegment {
     _lastIndexedTimeMs = System.currentTimeMillis();
     if (metadata != null) {
       _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, metadata.getRecordIngestionTimeMs());
+      // if for some reason the record ingestion time is in the future, we should not
+      // update the minimum ingestion lag past 0
+      long ingestionLagMs = Math.max(0, _lastIndexedTimeMs - _latestIngestionTimeMs);
+      _minimumIngestionLagMs = Math.min(_minimumIngestionLagMs, ingestionLagMs);
     }
 
     return canTakeMore;
