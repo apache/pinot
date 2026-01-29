@@ -672,18 +672,23 @@ public class PinotSegmentUploadDownloadRestletResource {
               allowRefresh, headers, segmentUploadMetadataList);
         }
       }
-    } catch (WebApplicationException e) {
-      throw e;
     } catch (Exception e) {
-      // Check if the original cause was a quota failure
-      if (e instanceof ControllerApplicationException) {
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR,
-            segmentUploadMetadataList.size());
-        _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR,
-            segmentUploadMetadataList.size());
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR,
+          segmentUploadMetadataList.size());
+      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR,
+          segmentUploadMetadataList.size());
+      if (e instanceof WebApplicationException) {
+        if (((WebApplicationException) e).getResponse().getStatus()
+            == Response.Status.FORBIDDEN.getStatusCode()) {
+          LOGGER.error("Segment upload forbidden for segments: {} of table: {}",
+              segmentNames, tableNameWithType);
+        }
+        throw (WebApplicationException) e;
+      } else {
+        throw new ControllerApplicationException(LOGGER,
+            "Exception while processing segments to upload: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR,
+            e);
       }
-      throw new ControllerApplicationException(LOGGER,
-          "Exception while processing segments to upload: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     } finally {
       cleanupTempFiles(tempFiles);
       multiPart.cleanup();
