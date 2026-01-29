@@ -114,7 +114,8 @@ public class BenchmarkProtoBufRecordExtractor {
   @Param({"all_fields", "subset_5_fields", "single_field"})
   private String _extractionMode;
 
-  private static final int NUM_MESSAGES = 1000;
+  @Param({"1000"})
+  private int _numMessages;
 
   private List<byte[]> _messagePayloads;
   private List<Message> _parsedMessages;
@@ -179,11 +180,11 @@ public class BenchmarkProtoBufRecordExtractor {
     Descriptors.Descriptor descriptor = dynamicSchema.getMessageDescriptor(PROTO_CLASS_NAME);
 
     // Generate test messages
-    _messagePayloads = new ArrayList<>(NUM_MESSAGES);
-    _parsedMessages = new ArrayList<>(NUM_MESSAGES);
+    _messagePayloads = new ArrayList<>(_numMessages);
+    _parsedMessages = new ArrayList<>(_numMessages);
     Random random = new Random(42);
 
-    for (int i = 0; i < NUM_MESSAGES; i++) {
+    for (int i = 0; i < _numMessages; i++) {
       Message message = generateTestMessage(descriptor, random, i);
       _messagePayloads.add(message.toByteArray());
       _parsedMessages.add(message);
@@ -261,13 +262,13 @@ public class BenchmarkProtoBufRecordExtractor {
 
   private byte[] getNextPayload() {
     byte[] payload = _messagePayloads.get(_currentIndex);
-    _currentIndex = (_currentIndex + 1) % NUM_MESSAGES;
+    _currentIndex = (_currentIndex + 1) % _numMessages;
     return payload;
   }
 
   private Message getNextParsedMessage() {
     Message message = _parsedMessages.get(_currentIndex);
-    _currentIndex = (_currentIndex + 1) % NUM_MESSAGES;
+    _currentIndex = (_currentIndex + 1) % _numMessages;
     return message;
   }
 

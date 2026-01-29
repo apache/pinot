@@ -194,7 +194,7 @@ public class ProtoBufRecordExtractorCachingTest {
     Message message1 = createTestMessage("init1", 100);
     GenericRow row1 = _extractor.extract(message1, new GenericRow());
     int allFieldsCount = row1.getFieldToValueMap().size();
-    assertTrue(allFieldsCount > 5); // All fields from schema (27 total)
+    assertTrue(allFieldsCount > 5); // All fields from schema
 
     // Re-initialize with subset fields
     Set<String> subsetFields = new HashSet<>(Arrays.asList(STRING_FIELD, INT_FIELD));

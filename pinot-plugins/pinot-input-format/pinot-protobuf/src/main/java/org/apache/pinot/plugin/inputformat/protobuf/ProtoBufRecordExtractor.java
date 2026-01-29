@@ -47,10 +47,10 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   private Set<String> _fields;
   private boolean _extractAll = false;
 
-  // Cached field descriptors to avoid repeated lookups via findFieldByName
+  // Cached field descriptors initialized lazily on first message extraction to avoid repeated lookups
+  // via findFieldByName. The cache is invalidated when the descriptor's full name changes.
   private Descriptors.FieldDescriptor[] _cachedFieldDescriptors;
   private String[] _cachedFieldNames;
-  // Store the descriptor's full name to detect schema changes
   private String _cachedDescriptorFullName;
 
   // Reusable ProtoBufFieldInfo to reduce object allocation
