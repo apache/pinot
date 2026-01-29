@@ -629,12 +629,14 @@ public class PinotSegmentUploadDownloadRestletResource {
         // TODO: Include the un-tarred segment size when using the METADATA push rest API. Currently we can only use the
         //  tarred segment size as an approximation.
         long segmentSizeInBytes = getSegmentSizeFromFile(sourceDownloadURIStr);
-        if (segmentSizeInBytes < 0) {
-          segmentSizeInBytes = FileUtils.sizeOfDirectory(tempSegmentDir);
+        if (segmentSizeInBytes > 0) {
+          // Only check storage quota when segment size is available
+          SegmentValidationUtils.checkStorageQuota(segmentName, segmentSizeInBytes, segmentSizeInBytes, tableConfig,
+              _storageQuotaChecker);
+        } else {
+          LOGGER.warn("Skipping storage quota check for segment: {} of table: {} as segment size is unavailable",
+              segmentName, tableNameWithType);
         }
-        // Adding Storage Quota Check
-        SegmentValidationUtils.checkStorageQuota(segmentName, segmentSizeInBytes, segmentSizeInBytes,
-            tableConfig, _storageQuotaChecker);
 
         // Encrypt segment
         String crypterNameInTableConfig = tableConfig.getValidationConfig().getCrypterClassName();
@@ -673,10 +675,13 @@ public class PinotSegmentUploadDownloadRestletResource {
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR,
-          segmentUploadMetadataList.size());
-      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR,
-          segmentUploadMetadataList.size());
+      // Check if the original cause was a quota failure
+      if (e instanceof ControllerApplicationException) {
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR,
+            segmentUploadMetadataList.size());
+        _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR,
+            segmentUploadMetadataList.size());
+      }
       throw new ControllerApplicationException(LOGGER,
           "Exception while processing segments to upload: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     } finally {
