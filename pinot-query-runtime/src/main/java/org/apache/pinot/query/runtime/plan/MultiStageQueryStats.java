@@ -82,7 +82,6 @@ public class MultiStageQueryStats {
    * @see #mergeUpstream(MultiStageQueryStats)
    */
   private final ArrayList<StageStats.Closed> _closedStats;
-  private static final MultiStageOperator.Type[] ALL_TYPES = MultiStageOperator.Type.values();
 
   private MultiStageQueryStats(int stageId) {
     _currentStageId = stageId;
@@ -516,10 +515,8 @@ public class MultiStageQueryStats {
         throws IOException {
       // TODO: we can serialize with short or variable size
       output.writeInt(_operatorTypes.size());
-      assert MultiStageOperator.Type.values().length < Byte.MAX_VALUE : "Too many operator types. "
-          + "Need to increase the number of bytes size per operator type";
       for (int i = 0; i < _operatorTypes.size(); i++) {
-        output.writeByte(_operatorTypes.get(i).ordinal());
+        output.writeByte(_operatorTypes.get(i).getId());
         StatMap<?> statMap = _operatorStats.get(i);
         statMap.serialize(output);
       }
@@ -601,10 +598,10 @@ public class MultiStageQueryStats {
               + ". Deserialized stats: " + deserialized);
         }
         for (int i = 0; i < numOperators; i++) {
-          byte ordinal = input.readByte();
-          if (ordinal != _operatorTypes.get(i).ordinal()) {
+          int typeId = input.readByte();
+          if (typeId != _operatorTypes.get(i).getId()) {
             throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
-                + " operator " + _operatorTypes.get(i) + "at index " + i + ", got " + ordinal);
+                + " operator " + _operatorTypes.get(i) + " at index " + i + ", got id " + typeId);
           }
           _operatorStats.get(i).merge(input);
         }
@@ -625,16 +622,15 @@ public class MultiStageQueryStats {
       List<MultiStageOperator.Type> operatorTypes = new ArrayList<>(numOperators);
       List<StatMap<?>> operatorStats = new ArrayList<>(numOperators);
 
-      MultiStageOperator.Type[] allTypes = ALL_TYPES;
       try {
         for (int i = 0; i < numOperators; i++) {
-          byte ordinal = input.readByte();
-          if (ordinal < 0 || ordinal >= allTypes.length) {
+          int typeId = input.readByte();
+          MultiStageOperator.Type type = MultiStageOperator.Type.fromId(typeId);
+          if (type == null) {
             throw new IllegalStateException(
-                "Invalid operator type ordinal " + ordinal + " at index " + i + ". " + "Deserialized so far: "
+                "Invalid operator type id " + typeId + " at index " + i + ". " + "Deserialized so far: "
                     + new Closed(operatorTypes, operatorStats));
           }
-          MultiStageOperator.Type type = allTypes[ordinal];
           operatorTypes.add(type);
 
           @SuppressWarnings("unchecked")

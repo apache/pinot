@@ -23,7 +23,11 @@ import java.io.File;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -31,10 +35,12 @@ import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
@@ -109,6 +115,31 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     _minionMetrics.addMeteredGlobalValue(meter, unitCount);
     _minionMetrics.addMeteredTableValue(tableName, meter, unitCount);
     _minionMetrics.addMeteredTableValue(tableName, taskType, meter, unitCount);
+  }
+
+  /**
+   * Resolves the AuthProvider to use for Minion tasks.
+   * Priority order:
+   * 1. If AUTH_TOKEN is explicitly provided in task configs (by Controller), use it for this specific task
+   * 2. Otherwise, fall back to the runtime AuthProvider from MinionContext (enables per-request token rotation)
+   *
+   * This approach allows:
+   * - Controller to override credentials per-task (e.g., for multi-tenancy or privileged operations)
+   * - Dynamic token rotation when no explicit override is provided
+   * - Clean separation between task-specific and global authentication
+   */
+  protected static AuthProvider resolveAuthProvider(Map<String, String> taskConfigs) {
+    String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
+    if (StringUtils.isNotBlank(explicitToken)) {
+      return AuthProviderUtils.makeAuthProvider(explicitToken);
+    }
+
+    AuthProvider runtimeProvider = MINION_CONTEXT.getTaskAuthProvider();
+    if (runtimeProvider == null || runtimeProvider instanceof NullAuthProvider) {
+      return new NullAuthProvider();
+    }
+
+    return runtimeProvider;
   }
 
   protected File downloadSegmentToLocalAndUntar(String tableNameWithType, String segmentName, String deepstoreURL,

@@ -321,6 +321,7 @@ const syncTableSchemaData = (data, showFieldType) => {
   const metricFields = data.metricFieldSpecs || [];
   const dateTimeField = data.dateTimeFieldSpecs || [];
   const complexFields = data.complexFieldSpecs || [];
+  const primaryKeys = new Set(data.primaryKeyColumns || []);
 
   dimensionFields.map((field) => {
     field.fieldType = 'Dimension';
@@ -341,9 +342,9 @@ const syncTableSchemaData = (data, showFieldType) => {
   const columnList = [...dimensionFields, ...metricFields, ...dateTimeField, ...complexFields];
   if (showFieldType) {
     return {
-      columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
+      columns: ['Column', 'Type', 'Field Type', 'Multi Value', 'Primary Key'],
       records: columnList.map((field) => {
-        return [field.name, field.dataType, field.fieldType, getMultiValueField(field)];
+        return [field.name, field.dataType, field.fieldType, getMultiValueField(field), primaryKeys.has(field.name)];
       }),
     };
   }
