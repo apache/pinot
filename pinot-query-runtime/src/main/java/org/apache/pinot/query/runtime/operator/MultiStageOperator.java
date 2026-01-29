@@ -433,6 +433,14 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         StatMap<LookupJoinOperator.StatKey> stats = (StatMap<LookupJoinOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(LookupJoinOperator.StatKey.EMITTED_ROWS));
       }
+    },
+    GAPFILL(GapfillOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<GapfillOperator.StatKey> stats = (StatMap<GapfillOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(GapfillOperator.StatKey.EMITTED_ROWS));
+      }
     };
 
     private final Class _statKeyClass;

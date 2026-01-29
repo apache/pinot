@@ -32,6 +32,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -66,6 +67,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  */
 public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
   private static final ServerPlanRequestVisitor INSTANCE = new ServerPlanRequestVisitor();
+  private static final String GAP_FILL = "gapfill";
 
   static void walkPlanNode(PlanNode node, ServerPlanRequestContext context) {
     node.visit(INSTANCE, context);
@@ -73,7 +75,14 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
 
   @Override
   public Void visitAggregate(AggregateNode node, ServerPlanRequestContext context) {
-    if (visit(node.getInputs().get(0), context)) {
+    PlanNode inputNode = node.getInputs().get(0);
+    if (visit(inputNode, context)) {
+      if (inputNode instanceof ProjectNode && containsGapfill(((ProjectNode) inputNode).getProjects())) {
+        // GAPFILL must be executed in MSQ runtime (GapfillOperator). Do not include the ProjectNode containing GAPFILL
+        // in the leaf-stage PinotQuery; keep it in the operator chain by setting the leaf boundary to its input.
+        context.setLeafStageBoundaryNode(((ProjectNode) inputNode).getInputs().get(0));
+        return null;
+      }
       PinotQuery pinotQuery = context.getPinotQuery();
       List<Expression> groupByList = CalciteRexExpressionParser.convertInputRefs(node.getGroupKeys(), pinotQuery);
       if (!groupByList.isEmpty()) {
@@ -264,6 +273,12 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
+      // GAPFILL is executed in MSQ TransformOperator. Do not push a ProjectNode containing GAPFILL into the leaf-stage
+      // PinotQuery; set the leaf boundary to the input so the ProjectNode stays in the operator chain.
+      if (containsGapfill(node.getProjects())) {
+        context.setLeafStageBoundaryNode(node.getInputs().get(0));
+        return null;
+      }
       PinotQuery pinotQuery = context.getPinotQuery();
       List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(node.getProjects(),
           pinotQuery.getSelectList());
@@ -346,5 +361,51 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         applyTimestampIndex(operand, pinotQuery);
       }
     }
+  }
+
+  private static boolean containsGapfill(List<RexExpression> expressions) {
+    for (RexExpression expression : expressions) {
+      if (containsGapfill(expression)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean containsGapfill(RexExpression expression) {
+    if (expression instanceof RexExpression.FunctionCall) {
+      RexExpression.FunctionCall functionCall = (RexExpression.FunctionCall) expression;
+      String canonicalName =
+          RequestUtils.canonicalizeFunctionNamePreservingSpecialKey(functionCall.getFunctionName());
+      if (GAP_FILL.equals(canonicalName)) {
+        return true;
+      }
+      for (RexExpression operand : functionCall.getFunctionOperands()) {
+        if (containsGapfill(operand)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static void applyAliases(PinotQuery query, DataSchema dataSchema) {
+    List<Expression> selectList = query.getSelectList();
+    String[] columnNames = dataSchema.getColumnNames();
+    if (selectList == null || selectList.size() != columnNames.length) {
+      return;
+    }
+    List<Expression> aliased = new ArrayList<>(selectList.size());
+    for (int i = 0; i < selectList.size(); i++) {
+      Expression expression = selectList.get(i);
+      Function function = expression.getFunctionCall();
+      if (function != null && "as".equals(function.getOperator())) {
+        aliased.add(expression);
+      } else {
+        aliased.add(RequestUtils.getFunctionExpression("as", expression,
+            RequestUtils.getIdentifierExpression(columnNames[i])));
+      }
+    }
+    query.setSelectList(aliased);
   }
 }
