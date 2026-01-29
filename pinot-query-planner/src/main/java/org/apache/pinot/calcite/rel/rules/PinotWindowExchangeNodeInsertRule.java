@@ -43,6 +43,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 
@@ -119,11 +120,12 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       // Assess whether this is a PARTITION BY only query or not (includes queries of the type where PARTITION BY and
       // ORDER BY key(s) are the same)
       boolean isPartitionByOnly = isPartitionByOnlyQuery(windowGroup);
-
+      // Force pre-partitioned exchange when 'is_partitioned_by_window_keys' hint is provided
+      Boolean prePartitioned = PinotHintOptions.WindowHintOptions.isPartitionedByWindowKeys(window);
       if (isPartitionByOnly) {
         // Only PARTITION BY or PARTITION BY and ORDER BY on the same key(s)
         // Add an Exchange hashed on the partition by keys
-        exchange = PinotLogicalExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()));
+        exchange = PinotLogicalExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()), prePartitioned);
       } else {
         // PARTITION BY and ORDER BY on different key(s)
         // Add a LogicalSortExchange hashed on the partition by keys and collation based on order by keys
@@ -132,7 +134,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         //       sorting on the receiver side can be a no-op. Add support for this hint and pass it on. Until sender
         //       side sorting is implemented, setting this hint will throw an error on execution.
         exchange = PinotLogicalSortExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()),
-            windowGroup.orderKeys, false, true);
+            windowGroup.orderKeys, false, true, prePartitioned);
       }
     }
     // NOTE: Need to create a new LogicalWindow to use the modified window group.
