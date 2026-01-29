@@ -667,9 +667,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
         return;
       } else {
-        if (_context.hasInconsistentTableConfigs()) {
-          logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
-        }
+        logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
       }
       removeSegment(oldSegment, validDocIdsForOldSegment);
     }
@@ -697,16 +695,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Inconsistencies noticed for the segment: {} across servers, reverting the metadata to resolve...",
         segmentName);
     // Revert the keys in the segment to previous location and remove the newly added keys
-    // The revertAndRemoveSegment method will log a detailed summary of what happened
     removeSegment(oldSegment, validDocIdsForOldSegment);
-    _logger.info("Completed revert operation for segment: {}", segmentName);
+    if (getPrevKeyToRecordLocationSize() == 0) {
+      _logger.info("Successfully resolved inconsistency for segment: {} across servers", segmentName);
+      return;
+    }
+    int numKeysStillNotReplaced = getPrevKeyToRecordLocationSize();
+    if (numKeysStillNotReplaced > 0) {
+      logInconsistentResults(segmentName, numKeysStillNotReplaced);
+      removeSegment(oldSegment, validDocIdsForOldSegment);
+    }
   }
 
   protected void logInconsistentResults(String segmentName, int numKeysStillNotReplaced) {
     _logger.error("Found {} primary keys not replaced for segment: {}. "
-        + "Proceeding with current state which may cause inconsistency. To correct this behaviour cleanup the "
-        + "table on disk and restart the servers by setting cluster config: `pinot.server.consuming.segment.consistency"
-        + ".mode` to `PROTECTED`.", numKeysStillNotReplaced, segmentName);
+            + "Proceeding with current state which may cause inconsistency. To correct this behaviour from now, set "
+            + "cluster config: `pinot.server.consuming.segment.consistency.mode` to `PROTECTED`",
+        numKeysStillNotReplaced, segmentName);
     if (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
           numKeysStillNotReplaced);

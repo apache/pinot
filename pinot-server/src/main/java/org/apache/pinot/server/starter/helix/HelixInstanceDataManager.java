@@ -62,6 +62,7 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
@@ -547,25 +548,27 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         tableNameWithType, segmentNames));
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
+      // Use cached table config for performance - properties we check (replication, upsert mode)
+      // rarely change after table creation, and cache is refreshed on reload
+      TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
+      boolean hasInconsistentConfigs = TableConfigUtils.checkForInconsistentStateConfigs(tableConfig);
+      ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
+
+      // Only restrict force commit for tables with inconsistent state configs
+      // (partial upsert or dropOutOfOrderRecord=true with replication > 1)
+      // when mode is DEFAULT (isForceCommitAllowed = false)
+      if (hasInconsistentConfigs && !config.isForceCommitAllowed()) {
+        LOGGER.warn("Force commit disabled for table: {} due to inconsistent state config. "
+            + "Change the config to `PROTECTED` via cluster config: {}", tableNameWithType, config.getConfigKey());
+        return;
+      }
+
       segmentNames.forEach(segName -> {
         SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
         if (segmentDataManager != null) {
           try {
             if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-              // Force-committing consuming segments is disabled by default.
-              // For partial-upsert tables or upserts with out-of-order events enabled (notably when replication > 1),
-              // winner selection could incorrectly favor replicas with fewer consumed rows.
-              // This triggered unnecessary reconsumption and resulted in inconsistent upsert state.
-              // The fix restores correct segment metadata before winner selection.
-              // Force commit behavior can be toggled dynamically using the cluster config
-              // `pinot.server.consuming.segment.consistency.mode` to `PROTECTED` without restarting servers.
-              ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
-              if (config.isForceCommitAllowed()) {
-                ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
-              } else {
-                LOGGER.warn("Force commit disabled for table: {} due to inconsistent state config. "
-                    + "Control via cluster config: {}", tableNameWithType, config.getConfigKey());
-              }
+              ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
             }
           } finally {
             tableDataManager.releaseSegment(segmentDataManager);
