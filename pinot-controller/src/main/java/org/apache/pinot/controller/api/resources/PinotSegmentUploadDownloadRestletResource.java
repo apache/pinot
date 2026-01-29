@@ -425,7 +425,7 @@ public class PinotSegmentUploadDownloadRestletResource {
             Response.Status.FORBIDDEN);
       } else if (isDiskUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) {
         LOGGER.warn(
-            "Disk utilization status could not be determined for for table: {}. Will allow segment upload to proceed.",
+            "Disk utilization status could not be determined for table: {}. Will allow segment upload to proceed.",
             tableNameWithType);
       }
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
