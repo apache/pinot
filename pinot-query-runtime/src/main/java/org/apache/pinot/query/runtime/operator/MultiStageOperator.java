@@ -22,13 +22,12 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -440,22 +439,23 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       }
     };
 
-    private static final Map<Integer, Type> ID_TO_TYPE;
+    // When adding new operator types, update MAX_ID if the new ID exceeds the current max
+    private static final int MAX_ID = 15;
+    private static final Type[] ID_TO_TYPE = new Type[MAX_ID + 1];
 
     static {
-      Map<Integer, Type> map = new HashMap<>();
       for (Type type : values()) {
         int id = type._id;
         if (id < 0 || id > Byte.MAX_VALUE) {
           throw new IllegalStateException("Operator type id must fit in a signed byte (0-127), but " + type
               + " has id " + id);
         }
-        Type existing = map.put(id, type);
-        if (existing != null) {
-          throw new IllegalStateException("Duplicate id " + id + " for types " + existing + " and " + type);
-        }
+        Preconditions.checkArgument(id <= MAX_ID,
+            "Operator type id %s exceeds MAX_ID %s. Please update MAX_ID.", id, MAX_ID);
+        Preconditions.checkArgument(ID_TO_TYPE[id] == null,
+            "Duplicate id %s for types %s and %s", id, ID_TO_TYPE[id], type);
+        ID_TO_TYPE[id] = type;
       }
-      ID_TO_TYPE = Map.copyOf(map);
     }
 
     private final int _id;
@@ -481,7 +481,10 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
      */
     @Nullable
     public static Type fromId(int id) {
-      return ID_TO_TYPE.get(id);
+      if (id >= 0 && id < ID_TO_TYPE.length) {
+        return ID_TO_TYPE[id];
+      }
+      return null;
     }
 
     /**
