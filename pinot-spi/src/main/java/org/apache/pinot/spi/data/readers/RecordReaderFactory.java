@@ -53,6 +53,10 @@ public class RecordReaderFactory {
       "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader";
   static final String DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS =
       "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReaderConfig";
+  static final String DEFAULT_PROTO_RECORD_READER_CLASS =
+      "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReader";
+  static final String DEFAULT_PROTO_RECORD_READER_CONFIG_CLASS =
+      "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig";
 
   public static void register(String fileFormat, String recordReaderClassName, String recordReaderConfigClassName) {
     DEFAULT_RECORD_READER_CLASS_MAP.put(fileFormat.toUpperCase(), recordReaderClassName);
@@ -71,6 +75,7 @@ public class RecordReaderFactory {
     register(FileFormat.THRIFT, DEFAULT_THRIFT_RECORD_READER_CLASS, DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS);
     register(FileFormat.ORC, DEFAULT_ORC_RECORD_READER_CLASS, null);
     register(FileFormat.PARQUET, DEFAULT_PARQUET_RECORD_READER_CLASS, DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS);
+    register(FileFormat.PROTOBUF, DEFAULT_PROTO_RECORD_READER_CLASS, DEFAULT_PROTO_RECORD_READER_CONFIG_CLASS);
   }
 
   /**
