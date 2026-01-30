@@ -19,7 +19,6 @@
 package org.apache.pinot.common.assignment;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -262,10 +261,11 @@ public class InstancePartitionsUtils {
     Map<String, List<String>> idealStateListFields = idealState.getRecord().getListFields();
     for (InstancePartitions instancePartitions : instancePartitionsList) {
       String instancePartitionsName = instancePartitions.getInstancePartitionsName();
-      for (String partitionReplica : instancePartitions.getPartitionToInstancesMap().keySet()) {
+      for (Map.Entry<String, List<String>> entry : instancePartitions.getPartitionToInstancesMap().entrySet()) {
+        String partitionReplica = entry.getKey();
         String idealStateListKey = InstancePartitionsUtils.IDEAL_STATE_IP_PREFIX + instancePartitionsName
             + InstancePartitionsUtils.IDEAL_STATE_IP_SEPARATOR + partitionReplica;
-        idealStateListFields.put(idealStateListKey, new ArrayList<>(instancePartitions.getInstances(partitionReplica)));
+        idealStateListFields.put(idealStateListKey, entry.getValue());
       }
     }
   }
@@ -318,11 +318,9 @@ public class InstancePartitionsUtils {
         int separatorIndex = key.lastIndexOf(InstancePartitions.PARTITION_REPLICA_GROUP_SEPARATOR);
         Integer replicaGroup = Integer.parseInt(key.substring(separatorIndex + 1));
         listFields.getValue().forEach(value -> {
-          if (serverToReplicaGroupMap.containsKey(value)) {
+          if (serverToReplicaGroupMap.put(value, replicaGroup) != null) {
             LOGGER.warn("Server {} assigned to multiple replica groups ({}, {})", value, replicaGroup,
                 serverToReplicaGroupMap.get(value));
-          } else {
-            serverToReplicaGroupMap.put(value, replicaGroup);
           }
         });
       }

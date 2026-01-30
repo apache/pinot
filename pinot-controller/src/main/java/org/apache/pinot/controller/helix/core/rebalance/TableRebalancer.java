@@ -301,18 +301,6 @@ public class TableRebalancer {
           "Cannot rebalance disabled table without downtime", null, null, null, null, null);
     }
 
-    // Wipe out ideal state instance partitions metadata
-    if (_updateIdealStateInstancePartitions && !dryRun && !downtime) {
-      try {
-        currentIdealState = replaceInstancePartitionsInIdealState(tableNameWithType, currentIdealState, List.of());
-      } catch (Exception e) {
-        onReturnFailure("Caught exception while updating ideal state, aborting the rebalance", e, tableRebalanceLogger);
-        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
-            "Caught exception while updating ideal state: " + e, null,
-            null, null, null, null);
-      }
-    }
-
     tableRebalanceLogger.info("Processing instance partitions");
 
     // Calculate instance partitions map
@@ -758,13 +746,6 @@ public class TableRebalancer {
       } while (needsRecalculation);
 
       if (currentAssignment.equals(targetAssignment)) {
-        String msg = "Finished rebalancing with minAvailableReplicas: " + minAvailableReplicas
-            + ", enableStrictReplicaGroup: " + enableStrictReplicaGroup + ", bestEfforts: " + bestEfforts + " in "
-            + (System.currentTimeMillis() - startTimeMs) + " ms.";
-        tableRebalanceLogger.info(msg);
-        // Record completion
-        _tableRebalanceObserver.onSuccess(msg);
-
         if (_updateIdealStateInstancePartitions) {
           // Rebalance completed successfully, so we can update the instance partitions in the ideal state to reflect
           // the new set of instance partitions.
@@ -782,6 +763,13 @@ public class TableRebalancer {
                 tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
           }
         }
+
+        String msg = "Finished rebalancing with minAvailableReplicas: " + minAvailableReplicas
+            + ", enableStrictReplicaGroup: " + enableStrictReplicaGroup + ", bestEfforts: " + bestEfforts + " in "
+            + (System.currentTimeMillis() - startTimeMs) + " ms.";
+        tableRebalanceLogger.info(msg);
+        // Record completion
+        _tableRebalanceObserver.onSuccess(msg);
 
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE, "Success with minAvailableReplicas: "
             + minAvailableReplicas + " (both IdealState and ExternalView should reach the target segment assignment)",
@@ -828,6 +816,12 @@ public class TableRebalancer {
       idealStateRecord.setMapFields(nextAssignment);
       idealState.setNumPartitions(nextAssignment.size());
       idealState.setReplicas(Integer.toString(nextAssignment.values().iterator().next().size()));
+
+      // Wipe out ideal state instance partitions metadata before updating the ideal state segment assignment for the
+      // first time.
+      if (_updateIdealStateInstancePartitions) {
+        InstancePartitionsUtils.replaceInstancePartitionsInIdealState(idealState, List.of());
+      }
 
       // Check version and update IdealState
       try {

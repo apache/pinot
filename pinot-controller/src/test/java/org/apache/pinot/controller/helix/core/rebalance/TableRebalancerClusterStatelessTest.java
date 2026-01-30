@@ -29,14 +29,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
@@ -2544,89 +2541,18 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         .build();
     _helixResourceManager.updateTableConfig(tableConfigNew);
 
-    // Start rebalance asynchronously (with instance reassignment enabled)
-    CountDownLatch startSeen = new CountDownLatch(1);
-    CountDownLatch release = new CountDownLatch(1);
-
-    TableRebalanceObserver blockingObserver = new TableRebalanceObserver() {
-      @Override
-      public void onTrigger(Trigger trigger, Map<String, Map<String, String>> currentState,
-          Map<String, Map<String, String>> targetState, RebalanceContext rebalanceContext) {
-        if (trigger == Trigger.START_TRIGGER) {
-          startSeen.countDown();
-          try {
-            // Block to allow assertions against IdealState instance-partitions while rebalance is paused. Note that
-            // instance partitions are updated before START_TRIGGER is called so this is a good hook between instance
-            // assignment and segment assignment.
-            release.await(5, TimeUnit.SECONDS);
-          } catch (InterruptedException ignored) {
-          }
-        }
-      }
-
-      @Override
-      public void onNoop(String msg) {
-      }
-
-      @Override
-      public void onSuccess(String msg) {
-      }
-
-      @Override
-      public void onError(String errorMsg) {
-      }
-
-      @Override
-      public void onRollback() {
-      }
-
-      @Override
-      public boolean isStopped() {
-        return false;
-      }
-
-      @Override
-      public RebalanceResult.Status getStopStatus() {
-        throw new UnsupportedOperationException();
-      }
-    };
-
+    // Perform rebalance with instance reassignment
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, blockingObserver, null, null, _tableSizeReader, null, true);
+        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null, true);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setReassignInstances(true);
-    AtomicReference<RebalanceResult> resultRef = new AtomicReference<>();
-    Thread rebalanceThread =
-        new Thread(() -> resultRef.set(tableRebalancer.rebalance(tableConfigNew, rebalanceConfig, null)));
-    rebalanceThread.start();
-
-    // Wait until the rebalance has started (after new INSTANCE_PARTITIONS persisted and combined into IdealState)
-    assertTrue(startSeen.await(10, TimeUnit.SECONDS), "Rebalance did not start in time");
-    // ZK should now reflect the new instance partitions (2x2 for tenantNew)
-    InstancePartitions ipZkNew =
-        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, instancePartitionsName);
-    assertNotNull(ipZkNew);
-    assertEquals(ipZkNew.getNumReplicaGroups(), 2);
-    assertEquals(ipZkNew.getNumPartitions(), 2);
-    // IdealState should not contain instance partitions metadata during this inconsistent transient state where
-    // instance partitions and ideal state are out of sync.
-    for (int partition = 0; partition < numPartitions; partition++) {
-      for (int replicaGroup = 0; replicaGroup < numReplicaGroups; replicaGroup++) {
-        ZNRecord intermediateIdealState = _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord();
-        assertNotNull(intermediateIdealState);
-        assertEquals(intermediateIdealState.getListFields(), Collections.emptyMap());
-      }
-    }
-
-    // Allow rebalance to proceed and complete
-    release.countDown();
-    rebalanceThread.join(TimeUnit.SECONDS.toMillis(60));
-    RebalanceResult rebalanceResult = resultRef.get();
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfigNew, rebalanceConfig, null);
     assertNotNull(rebalanceResult, "Rebalance did not complete in time");
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
 
+    InstancePartitions ipZkNew =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, instancePartitionsName);
     // Final assertion: IdealState instance-partitions should reflect only the new assignment (for each key)
-    // IdealState should contain union (per partition/replica key) of old and new assignments
     for (int partition = 0; partition < numPartitions; partition++) {
       for (int replicaGroup = 0; replicaGroup < numReplicaGroups; replicaGroup++) {
         String partitionReplica = partition + "_" + replicaGroup;

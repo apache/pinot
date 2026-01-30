@@ -33,7 +33,7 @@ public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
   private final int _pool;
-  private final int _replicaGroupId;
+  private final int _replicaId;
 
   @VisibleForTesting
   public SegmentInstanceCandidate(String instance, boolean online) {
@@ -42,14 +42,14 @@ public class SegmentInstanceCandidate {
     // no group
     _pool = FALLBACK_POOL_ID;
     // no replica group
-    _replicaGroupId = FALLBACK_REPLICA_ID;
+    _replicaId = FALLBACK_REPLICA_ID;
   }
 
-  public SegmentInstanceCandidate(String instance, boolean online, int pool, int replicaGroupId) {
+  public SegmentInstanceCandidate(String instance, boolean online, int pool, int replicaId) {
     _instance = instance;
     _online = online;
     _pool = pool;
-    _replicaGroupId = replicaGroupId;
+    _replicaId = replicaId;
   }
 
   public String getInstance() {
@@ -64,13 +64,13 @@ public class SegmentInstanceCandidate {
     return _pool;
   }
 
-  public int getReplicaGroupId() {
-    return _replicaGroupId;
+  public int getReplicaId() {
+    return _replicaId;
   }
 
   @Override
   public String toString() {
     return "SegmentInstanceCandidate{" + "_instance='" + _instance + '\'' + ", _online=" + _online + ", _pool=" + _pool
-        + ", _replicaGroupId=" + _replicaGroupId + '}';
+        + ", _replicaGroupId=" + _replicaId + '}';
   }
 }
