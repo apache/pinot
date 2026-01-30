@@ -147,7 +147,7 @@ docker run -p 8098:8098 pinot:release-0.1.0 StartServer -zkAddress 172.17.0.2:21
 
 ### Use docker compose to bring up Pinot stack
 
-Please note that this quickstart is based on Kafka 2.0.
+Please note that this quickstart is based on Kafka 3.0.
 
 Below is a script to use docker compose to bring up zookeeper/kafka/pinot-controller/pinot-broker/pinot-server
 ```SHELL

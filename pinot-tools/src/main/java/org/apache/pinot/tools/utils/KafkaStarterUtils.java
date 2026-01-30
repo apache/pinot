@@ -84,6 +84,7 @@ public class KafkaStarterUtils {
     configuration.put(BROKER_ID, DEFAULT_BROKER_ID);
     configuration.put(ZOOKEEPER_CONNECT, getDefaultKafkaZKAddress());
     configuration.put(LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));
+    configureListeners(configuration, DEFAULT_KAFKA_PORT);
 
     return configuration;
   }
@@ -118,7 +119,7 @@ public class KafkaStarterUtils {
       final Properties configuration) {
     List<StreamDataServerStartable> startables = new ArrayList<>(brokerCount);
     for (int i = 0; i < brokerCount; i++) {
-      startables.add(startServer(port + i, i, zkStr, configuration));
+      startables.add(startServer(port + i, i, zkStr + i, configuration));
     }
     return startables;
   }
@@ -126,14 +127,18 @@ public class KafkaStarterUtils {
   public static StreamDataServerStartable startServer(final int port, final int brokerId, final String zkStr,
       final Properties baseConf) {
     StreamDataServerStartable kafkaStarter;
-    Properties configuration = new Properties(baseConf);
+    Properties configuration = new Properties();
+    configuration.putAll(baseConf);
     int kafkaPort = NetUtils.findOpenPort(port);
     try {
-      configureOffsetsTopicReplicationFactor(configuration, (short) 1);
+      if (!configuration.containsKey("offsets.topic.replication.factor")) {
+        configureOffsetsTopicReplicationFactor(configuration, (short) 1);
+      }
       configuration.put(KafkaStarterUtils.PORT, kafkaPort);
       configuration.put(KafkaStarterUtils.BROKER_ID, brokerId);
       configuration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, zkStr);
       configuration.put(KafkaStarterUtils.LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));
+      configureListeners(configuration, kafkaPort);
       kafkaStarter = StreamDataProvider.getServerDataStartable(KAFKA_SERVER_STARTABLE_CLASS_NAME, configuration);
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
@@ -146,5 +151,13 @@ public class KafkaStarterUtils {
     Properties kafkaConfiguration = getDefaultKafkaConfiguration();
     kafkaConfiguration.put(ZOOKEEPER_CONNECT, zookeeperInstance.getZkUrl() + "/kafka");
     return kafkaConfiguration;
+  }
+
+  private static void configureListeners(Properties configuration, int port) {
+    String listener = "PLAINTEXT://localhost:" + port;
+    configuration.put("listeners", listener);
+    configuration.put("advertised.listeners", listener);
+    configuration.put("listener.security.protocol.map", "PLAINTEXT:PLAINTEXT");
+    configuration.put("inter.broker.listener.name", "PLAINTEXT");
   }
 }

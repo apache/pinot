@@ -48,6 +48,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-server</artifactId>
+      <version>${kafka3.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
       <artifactId>kafka_${scala.compat.version}</artifactId>
       <version>${kafka3.version}</version>
       <exclusions>

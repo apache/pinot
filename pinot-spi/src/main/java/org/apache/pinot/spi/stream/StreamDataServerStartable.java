@@ -26,7 +26,7 @@ import org.apache.commons.lang3.NotImplementedException;
  * StreamDataServerStartable is the interface for stream data sources.
  * Each stream data connector should implement a mock/wrapper of the data server.
  *
- * E.g. KafkaDataServerStartable is a wrapper class of Kafka 2.x broker.
+ * E.g. KafkaDataServerStartable is a wrapper class of a Kafka broker.
  *
  */
 public interface StreamDataServerStartable {

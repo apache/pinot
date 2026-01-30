@@ -96,7 +96,21 @@ public class PluginManager {
 
       // StreamConsumerFactory
       put("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
+          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+      put("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+      put("org.apache.pinot.plugin.stream.kafka20.KafkaPartitionLevelConsumer",
+          "org.apache.pinot.plugin.stream.kafka30.KafkaPartitionLevelConsumer");
+      put("org.apache.pinot.plugin.stream.kafka20.KafkaPartitionLevelConnectionHandler",
+          "org.apache.pinot.plugin.stream.kafka30.KafkaPartitionLevelConnectionHandler");
+      put("org.apache.pinot.plugin.stream.kafka20.KafkaStreamMetadataProvider",
+          "org.apache.pinot.plugin.stream.kafka30.KafkaStreamMetadataProvider");
+      put("org.apache.pinot.plugin.stream.kafka20.SynchronizedKafkaStreamMetadataProvider",
+          "org.apache.pinot.plugin.stream.kafka30.SynchronizedKafkaStreamMetadataProvider");
+      put("org.apache.pinot.plugin.stream.kafka20.server.KafkaDataServerStartable",
+          "org.apache.pinot.plugin.stream.kafka30.server.KafkaDataServerStartable");
+      put("org.apache.pinot.plugin.stream.kafka20.server.KafkaDataProducer",
+          "org.apache.pinot.plugin.stream.kafka30.server.KafkaDataProducer");
       put("org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory",
           "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
     }
