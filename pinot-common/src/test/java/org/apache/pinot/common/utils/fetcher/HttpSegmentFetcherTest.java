@@ -126,4 +126,52 @@ public class HttpSegmentFetcherTest {
     List<URI> uris = List.of();
     segmentFetcher.fetchSegmentToLocal(SEGMENT_NAME, () -> uris, SEGMENT_FILE);
   }
+
+  @Test(expectedExceptions = java.io.FileNotFoundException.class)
+  public void testFetchSegmentToLocalFileNotFoundNoRetry()
+      throws Exception {
+    FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
+    when(client.downloadFile(any(), any(), any())).thenThrow(new java.io.FileNotFoundException("Segment file not found"));
+    HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
+    List<URI> uris = List.of(new URI("http://h1:8080"));
+    // Should throw FileNotFoundException immediately without retries
+    segmentFetcher.fetchSegmentToLocal(SEGMENT_NAME, () -> uris, SEGMENT_FILE);
+  }
+
+  @Test(expectedExceptions = java.io.FileNotFoundException.class)
+  public void testFetchSegmentToLocalWithURIFileNotFoundNoRetry()
+      throws Exception {
+    FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
+    when(client.downloadFile(any(), any(), any())).thenThrow(new java.io.FileNotFoundException("Segment file not found"));
+    HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
+    URI uri = new URI("http://h1:8080/segment");
+    // Should throw FileNotFoundException immediately without retries
+    segmentFetcher.fetchSegmentToLocal(uri, SEGMENT_FILE);
+  }
+
+  @Test(expectedExceptions = java.io.FileNotFoundException.class)
+  public void testFetchSegmentToLocalWithURIListFileNotFoundNoRetry()
+      throws Exception {
+    FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
+    when(client.downloadFile(any(), any(), any())).thenThrow(new java.io.FileNotFoundException("Segment file not found"));
+    HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
+    List<URI> uris = List.of(new URI("http://h1:8080"), new URI("http://h2:8080"));
+    // Should throw FileNotFoundException immediately without retries
+    segmentFetcher.fetchSegmentToLocal(uris, SEGMENT_FILE);
+  }
+
+  @Test(expectedExceptions = java.io.FileNotFoundException.class)
+  public void testFetchSegmentToLocalWrappedFileNotFoundNoRetry()
+      throws Exception {
+    FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
+    java.io.FileNotFoundException fnfe = new java.io.FileNotFoundException("Segment not found");
+    java.io.IOException wrappedException = new java.io.IOException("Wrapped error", fnfe);
+    when(client.downloadFile(any(), any(), any())).thenThrow(wrappedException);
+
+    HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
+    List<URI> uris = List.of(new URI("http://h1:8080"));
+
+    // Should detect FileNotFoundException in cause chain and throw immediately
+    segmentFetcher.fetchSegmentToLocal(SEGMENT_NAME, () -> uris, SEGMENT_FILE);
+  }
 }
