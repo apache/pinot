@@ -33,6 +33,8 @@ public class DistinctResultsBlock extends BaseResultsBlock {
   private final QueryContext _queryContext;
 
   private DistinctTable _distinctTable;
+  private boolean _liteLeafLimitReached;
+  private String _leafTruncationReason;
 
   public DistinctResultsBlock(DistinctTable distinctTable, QueryContext queryContext) {
     _distinctTable = distinctTable;
@@ -45,6 +47,14 @@ public class DistinctResultsBlock extends BaseResultsBlock {
 
   public void setDistinctTable(DistinctTable distinctTable) {
     _distinctTable = distinctTable;
+  }
+
+  public void setLiteLeafLimitReached(boolean liteLeafLimitReached) {
+    _liteLeafLimitReached = liteLeafLimitReached;
+  }
+
+  public void setLeafTruncationReason(String reason) {
+    _leafTruncationReason = reason;
   }
 
   @Override
@@ -71,5 +81,17 @@ public class DistinctResultsBlock extends BaseResultsBlock {
   public DataTable getDataTable()
       throws IOException {
     return _distinctTable.toDataTable();
+  }
+
+  @Override
+  public java.util.Map<String, String> getResultsMetadata() {
+    java.util.Map<String, String> metadata = super.getResultsMetadata();
+    if (_liteLeafLimitReached && "LITE_CAP".equals(_leafTruncationReason)) {
+      metadata.put(DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName(), "true");
+    }
+    if (_leafTruncationReason != null) {
+      metadata.put(DataTable.MetadataKey.LEAF_TRUNCATION_REASON.getName(), _leafTruncationReason);
+    }
+    return metadata;
   }
 }
