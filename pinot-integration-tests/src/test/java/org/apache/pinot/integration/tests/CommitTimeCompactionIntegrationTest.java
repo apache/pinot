@@ -341,6 +341,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "201,Player201Updated,game2,95.0,1681154300000,false,strategy;rts");
 
     String kafkaTopicName = getKafkaTopic() + "-multivalue";
+    createKafkaTopic(kafkaTopicName);
 
     // TABLE 1: With commit-time compaction DISABLED (baseline)
     String tableNameWithoutCompaction = "gameScoresMVCompactionDisabled";

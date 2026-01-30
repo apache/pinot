@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.Properties;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
@@ -43,10 +41,6 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
   @CommandLine.Option(names = {"-brokerId"}, required = false, description = "Kafka broker ID.")
   private int _brokerId = KafkaStarterUtils.DEFAULT_BROKER_ID;
 
-  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Address of Zookeeper.")
-  private String _zkAddress = KafkaStarterUtils.getDefaultKafkaZKAddress();
-  private StreamDataServerStartable _kafkaStarter;
-
   @Override
   public String getName() {
     return "StartKafka";
@@ -54,7 +48,7 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
 
   @Override
   public String toString() {
-    return "StartKafka -port " + _port + " -brokerId " + _brokerId + " -zkAddress " + _zkAddress;
+    return "StartKafka -port " + _port + " -brokerId " + _brokerId;
   }
 
   @Override
@@ -64,20 +58,25 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
 
   @Override
   public boolean execute()
-      throws IOException {
-    Properties kafkaConfiguration = KafkaStarterUtils.getDefaultKafkaConfiguration();
-    kafkaConfiguration.put(KafkaStarterUtils.BROKER_ID, _brokerId);
-    kafkaConfiguration.put(KafkaStarterUtils.PORT, _port);
-    kafkaConfiguration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, _zkAddress);
-    try {
-      _kafkaStarter = StreamDataProvider
-          .getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, kafkaConfiguration);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
+      throws Exception {
+    if (_port <= 0 || _port > 65535) {
+      throw new IllegalArgumentException("Invalid Kafka port: " + _port);
     }
-    _kafkaStarter.start();
-    LOGGER.info("Start kafka at localhost:{} in thread {}", _port, Thread.currentThread().getName());
-    savePID(System.getProperty("java.io.tmpdir") + File.separator + ".kafka.pid");
+    if (_brokerId < 0) {
+      throw new IllegalArgumentException("Invalid Kafka brokerId: " + _brokerId);
+    }
+
+    Properties props = new Properties();
+    props.put(KafkaStarterUtils.KAFKA_SERVER_OWNER_NAME, getName());
+    props.put(KafkaStarterUtils.KAFKA_SERVER_BOOTSTRAP_SERVERS, "localhost:" + _port);
+    props.put(KafkaStarterUtils.KAFKA_SERVER_PORT, String.valueOf(_port));
+    props.put(KafkaStarterUtils.KAFKA_SERVER_BROKER_ID, String.valueOf(_brokerId));
+    props.put(KafkaStarterUtils.KAFKA_SERVER_ALLOW_MANAGED_FOR_CONFIGURED_BROKER, "true");
+
+    StreamDataServerStartable kafkaStarter =
+        StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, props);
+    kafkaStarter.start();
+    LOGGER.info("Kafka server started at localhost:{}", _port);
     return true;
   }
 }

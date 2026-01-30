@@ -43,7 +43,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.plugin.stream.kafka30.utils.MiniKafkaCluster;
+import org.apache.pinot.plugin.stream.kafka30.server.KafkaServerStartable;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -56,6 +56,7 @@ import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.retry.ExponentialBackoffRetryPolicy;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -83,18 +84,27 @@ public class KafkaPartitionLevelConsumerTest {
   private static final long TIMESTAMP = Instant.now().toEpochMilli();
   private static final Random RANDOM = new Random();
 
-  private MiniKafkaCluster _kafkaCluster;
+  private KafkaServerStartable _kafkaCluster;
   private String _kafkaBrokerAddress;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    _kafkaCluster = new MiniKafkaCluster("0");
+    int kafkaServerPort = NetUtils.findOpenPort();
+    Properties serverProperties = new Properties();
+    serverProperties.put("kafka.server.bootstrap.servers", "localhost:" + kafkaServerPort);
+    serverProperties.put("kafka.server.port", Integer.toString(kafkaServerPort));
+    serverProperties.put("kafka.server.broker.id", "0");
+    serverProperties.put("kafka.server.owner.name", getClass().getSimpleName());
+    serverProperties.put("kafka.server.allow.managed.for.configured.broker", "true");
+
+    _kafkaCluster = new KafkaServerStartable();
+    _kafkaCluster.init(serverProperties);
     _kafkaCluster.start();
-    _kafkaBrokerAddress = _kafkaCluster.getKafkaServerAddress();
-    _kafkaCluster.createTopic(TEST_TOPIC_1, 1, 1);
-    _kafkaCluster.createTopic(TEST_TOPIC_2, 2, 1);
-    _kafkaCluster.createTopic(TEST_TOPIC_3, 1, 1);
+    _kafkaBrokerAddress = "localhost:" + _kafkaCluster.getPort();
+    _kafkaCluster.createTopic(TEST_TOPIC_1, 1);
+    _kafkaCluster.createTopic(TEST_TOPIC_2, 2);
+    _kafkaCluster.createTopic(TEST_TOPIC_3, 1);
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
     produceMsgToKafka();
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
@@ -127,7 +137,7 @@ public class KafkaPartitionLevelConsumerTest {
       _kafkaCluster.deleteTopic(TEST_TOPIC_2);
       _kafkaCluster.deleteTopic(TEST_TOPIC_3);
     } finally {
-      _kafkaCluster.close();
+      _kafkaCluster.stop();
     }
   }
 
