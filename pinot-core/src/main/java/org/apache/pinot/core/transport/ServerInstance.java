@@ -57,12 +57,11 @@ public final class ServerInstance {
   private final String _adminEndpoint;
   private final int _pool;
 
-  /**
-   * By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
-   * {@code Server_localhost_12345}, hostname is of format: {@code Server_<hostname>}, e.g. {@code Server_localhost}.
-   */
-  public ServerInstance(InstanceConfig instanceConfig) {
-    _instanceId = instanceConfig.getInstanceName();
+  /// By default (auto joined instances), server instance id is of format: `Server_<hostname>_<port>`, e.g.
+  /// `Server_localhost_12345`, hostname is of format: `Server_<hostname>`, e.g. `Server_localhost`.
+  /// NOTE: Pass in `instanceId` so that it can be interned at the caller side.
+  public ServerInstance(String instanceId, InstanceConfig instanceConfig) {
+    _instanceId = instanceId;
     String hostname = instanceConfig.getHostName();
     if (hostname != null) {
       if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
@@ -74,11 +73,10 @@ public final class ServerInstance {
     } else {
       // Hostname might be null in some tests (InstanceConfig created by calling the constructor instead of fetching
       // from ZK), directly parse the instance name
-      String instanceName = instanceConfig.getInstanceName();
-      if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        instanceName = instanceName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+      if (instanceId.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        instanceId = instanceId.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
       }
-      String[] hostnameAndPort = StringUtils.split(instanceName, HOSTNAME_PORT_DELIMITER);
+      String[] hostnameAndPort = StringUtils.split(instanceId, HOSTNAME_PORT_DELIMITER);
       _hostname = hostnameAndPort[0];
       _port = Integer.parseInt(hostnameAndPort[1]);
     }
@@ -90,6 +88,11 @@ public final class ServerInstance {
         INVALID_PORT);
     _adminEndpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig, _hostname, CommonConstants.HTTP_PROTOCOL);
     _pool = extractPool(instanceConfig);
+  }
+
+  @VisibleForTesting
+  public ServerInstance(InstanceConfig instanceConfig) {
+    this(instanceConfig.getInstanceName(), instanceConfig);
   }
 
   @VisibleForTesting

@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -311,6 +312,9 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     ZNRecord znRecord = _zkDataAccessor.get(idealStatePath, stat, AccessOption.PERSISTENT);
     if (znRecord != null) {
       znRecord.setVersion(stat.getVersion());
+      // Intern all the instance id and state to reduce memory footprint
+      internMapFields(znRecord);
+      // TODO: Avoid copying ZNRecord. This requires Helix change.
       return new IdealState(znRecord);
     } else {
       return null;
@@ -323,9 +327,21 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     ZNRecord znRecord = _zkDataAccessor.get(externalViewPath, stat, AccessOption.PERSISTENT);
     if (znRecord != null) {
       znRecord.setVersion(stat.getVersion());
+      // Intern all the instance id and state to reduce memory footprint
+      internMapFields(znRecord);
+      // TODO: Avoid copying ZNRecord. This requires Helix change.
       return new ExternalView(znRecord);
     } else {
       return null;
+    }
+  }
+
+  private void internMapFields(ZNRecord znRecord) {
+    for (Map.Entry<String, Map<String, String>> entry : znRecord.getMapFields().entrySet()) {
+      Map<String, String> instanceStateMap = entry.getValue();
+      Map<String, String> internedInstanceStateMap = new TreeMap<>();
+      instanceStateMap.forEach((k, v) -> internedInstanceStateMap.put(k.intern(), v.intern()));
+      entry.setValue(internedInstanceStateMap);
     }
   }
 
@@ -384,14 +400,15 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     for (ZNRecord instanceConfigZNRecord : instanceConfigZNRecords) {
       // Put instance initialization logics into try-catch block to prevent bad server configs affecting the entire
       // cluster
-      String instanceId = instanceConfigZNRecord.getId();
       try {
         if (isEnabledServer(instanceConfigZNRecord)) {
+          // Intern the instance id to reduce memory footprint
+          String instanceId = instanceConfigZNRecord.getId().intern();
           enabledServers.add(instanceId);
 
           // Always refresh the server instance with the latest instance config in case it changes
           InstanceConfig instanceConfig = new InstanceConfig(instanceConfigZNRecord);
-          ServerInstance serverInstance = new ServerInstance(instanceConfig);
+          ServerInstance serverInstance = new ServerInstance(instanceId, instanceConfig);
           if (_enabledServerInstanceMap.put(instanceId, serverInstance) == null) {
             newEnabledServers.add(instanceId);
 
@@ -408,7 +425,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
           }
         }
       } catch (Exception e) {
-        LOGGER.error("Caught exception while adding instance: {}, ignoring it", instanceId, e);
+        LOGGER.error("Caught exception while adding instance: {}, ignoring it", instanceConfigZNRecord.getId(), e);
       }
     }
     List<String> newDisabledServers = new ArrayList<>();
