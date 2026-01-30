@@ -749,9 +749,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
+    KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate =
+        KeepPipelineBreakerStatsPredicate.create(_serverConf);
     _serverInstance =
         new ServerInstance(serverConf, _instanceId, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
-            _threadAccountant, sendStatsPredicate, _reloadJobStatusCache);
+            _threadAccountant, sendStatsPredicate, keepPipelineBreakerStatsPredicate, _reloadJobStatusCache);
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
@@ -791,6 +793,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottler);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
 
     if (sendStatsPredicate.needWatchForInstanceConfigChange()) {
       LOGGER.info("Initializing and registering the SendStatsPredicate");

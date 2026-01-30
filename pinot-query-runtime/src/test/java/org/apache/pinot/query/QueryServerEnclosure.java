@@ -62,7 +62,7 @@ public class QueryServerEnclosure {
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
     _queryRunner = new QueryRunner();
-    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true);
+    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true, () -> true);
   }
 
   public int getPort() {
