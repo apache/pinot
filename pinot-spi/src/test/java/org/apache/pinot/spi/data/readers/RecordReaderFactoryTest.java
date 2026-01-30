@@ -36,6 +36,7 @@ public class RecordReaderFactoryTest {
     assertEquals(getRecordReaderClassName("thrift"), DEFAULT_THRIFT_RECORD_READER_CLASS);
     assertEquals(getRecordReaderClassName("orc"), DEFAULT_ORC_RECORD_READER_CLASS);
     assertEquals(getRecordReaderClassName("parquet"), DEFAULT_PARQUET_RECORD_READER_CLASS);
+    assertEquals(getRecordReaderClassName("protobuf"), DEFAULT_PROTO_RECORD_READER_CLASS);
   }
 
   @Test
@@ -47,5 +48,6 @@ public class RecordReaderFactoryTest {
     assertEquals(getRecordReaderConfigClassName("thrift"), DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS);
     assertNull(getRecordReaderConfigClassName("orc"));
     assertEquals(getRecordReaderConfigClassName("parquet"), DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS);
+    assertEquals(getRecordReaderConfigClassName("protobuf"), DEFAULT_PROTO_RECORD_READER_CONFIG_CLASS);
   }
 }
