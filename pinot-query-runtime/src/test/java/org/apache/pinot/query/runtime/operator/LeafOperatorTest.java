@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -398,6 +399,52 @@ public class LeafOperatorTest {
     // Child thread should exit
     executorService.shutdown();
     assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS));
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldRecordMaxRowsEarlyTerminationStat()
+      throws Exception {
+    assertLeafOperatorEarlyTerminationStat(BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_ROWS,
+        LeafOperator.StatKey.MAX_ROWS_IN_DISTINCT_REACHED);
+  }
+
+  @Test
+  public void shouldRecordNoChangeEarlyTerminationStat()
+      throws Exception {
+    assertLeafOperatorEarlyTerminationStat(BaseResultsBlock.EarlyTerminationReason.DISTINCT_NO_NEW_VALUES,
+        LeafOperator.StatKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT_REACHED);
+  }
+
+  @Test
+  public void shouldRecordTimeLimitEarlyTerminationStat()
+      throws Exception {
+    assertLeafOperatorEarlyTerminationStat(BaseResultsBlock.EarlyTerminationReason.DISTINCT_TIME_LIMIT,
+        LeafOperator.StatKey.TIME_LIMIT_IN_DISTINCT_REACHED);
+  }
+
+  private void assertLeafOperatorEarlyTerminationStat(BaseResultsBlock.EarlyTerminationReason reason,
+      LeafOperator.StatKey expectedStatKey)
+      throws Exception {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    MetadataResultsBlock metadataResultsBlock = new MetadataResultsBlock();
+    metadataResultsBlock.setEarlyTerminationReason(reason);
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(metadataResultsBlock);
+    QueryExecutor queryExecutor = mockQueryExecutor(Collections.emptyList(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    MseBlock resultBlock = operator.nextBlock();
+    assertTrue(resultBlock.isEos());
+
+    @SuppressWarnings("unchecked")
+    StatMap<LeafOperator.StatKey> stats = (StatMap<LeafOperator.StatKey>) operator.copyStatMaps();
+    assertTrue(stats.getBoolean(expectedStatKey));
 
     operator.close();
   }
