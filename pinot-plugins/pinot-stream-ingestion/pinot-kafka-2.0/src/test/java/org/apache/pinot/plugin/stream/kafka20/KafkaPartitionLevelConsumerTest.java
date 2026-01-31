@@ -203,6 +203,86 @@ public class KafkaPartitionLevelConsumerTest {
   }
 
   @Test
+  public void testFetchPartitionCountWithSubset()
+      throws Exception {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
+    String clientId = "clientId";
+    String tableNameWithType = "tableName_REALTIME";
+
+    // TEST_TOPIC_2 has 2 partitions (0, 1). Subset "0" -> count 1.
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_2);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "0");
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+    try (KafkaStreamMetadataProvider provider = new KafkaStreamMetadataProvider(clientId, streamConfig)) {
+      Assert.assertEquals(provider.fetchPartitionCount(10000L), 1);
+    }
+
+    // Subset "0,1" -> count 2.
+    streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "0,1");
+    streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+    try (KafkaStreamMetadataProvider provider = new KafkaStreamMetadataProvider(clientId, streamConfig)) {
+      Assert.assertEquals(provider.fetchPartitionCount(10000L), 2);
+    }
+  }
+
+  @Test
+  public void testFetchPartitionIdsWithSubset()
+      throws Exception {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
+    String clientId = "clientId";
+    String tableNameWithType = "tableName_REALTIME";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_2);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "1,0");
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+    try (KafkaStreamMetadataProvider provider = new KafkaStreamMetadataProvider(clientId, streamConfig)) {
+      Set<Integer> ids = provider.fetchPartitionIds(10000L);
+      Assert.assertEquals(ids, Set.of(0, 1));
+    }
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = "Configured partition id 99 does not exist in topic " + TEST_TOPIC_2 + ".*")
+  public void testInvalidPartitionIdThrows()
+      throws Exception {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
+    String clientId = "clientId";
+    String tableNameWithType = "tableName_REALTIME";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_2);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "0,99");
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+    try (KafkaStreamMetadataProvider provider = new KafkaStreamMetadataProvider(clientId, streamConfig)) {
+      provider.fetchPartitionCount(10000L);
+    }
+  }
+
+  @Test
   public void testFetchMessages() {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";

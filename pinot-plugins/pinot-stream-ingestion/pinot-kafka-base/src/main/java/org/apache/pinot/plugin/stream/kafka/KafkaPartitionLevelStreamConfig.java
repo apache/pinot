@@ -120,6 +120,10 @@ public class KafkaPartitionLevelStreamConfig {
     return _populateMetadata;
   }
 
+  public Map<String, String> getStreamConfigMap() {
+    return _streamConfigMap;
+  }
+
   private int getIntConfigWithDefault(Map<String, String> configMap, String key, int defaultValue) {
     String stringValue = configMap.get(key);
     try {

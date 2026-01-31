@@ -160,12 +160,15 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
           instancesAssigned.add(instances.get(segmentPartitionId % instances.size()));
         }
       } else {
-        // Explicit partition:
-        // Assign segment to the first instance within the partition.
-
+        // Explicit partition: instance partitions are keyed by stream partition id (supports non-contiguous subset).
         for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-          int partitionId = segmentPartitionId % numPartitions;
-          instancesAssigned.add(instancePartitions.getInstances(partitionId, replicaGroupId).get(0));
+          List<String> instances = instancePartitions.getInstances(segmentPartitionId, replicaGroupId);
+          Preconditions.checkState(instances != null && !instances.isEmpty(),
+              "No instances for partition %s in CONSUMING instance partitions (table: %s). "
+                  + "Check that the stream partition subset configuration (e.g. 'stream.kafka.partition.ids') "
+                  + "matches the instance partition selection in the table configuration.",
+              segmentPartitionId, _tableNameWithType);
+          instancesAssigned.add(instances.get(0));
         }
       }
 

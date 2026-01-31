@@ -19,6 +19,10 @@
 package org.apache.pinot.controller.helix.core.assignment.instance;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -26,23 +30,24 @@ import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitio
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
- * Variation of {@link InstanceReplicaGroupPartitionSelector} that uses the number of partitions from the stream
- * to determine the number of partitions in each replica group.
+ * Variation of {@link InstanceReplicaGroupPartitionSelector} that uses the number and IDs of partitions
+ * from the stream to determine the partitions in each replica group. When the stream exposes partition IDs
+ * (e.g. Kafka with subset), instance partitions are keyed by those IDs so non-contiguous subsets work.
  */
 public class ImplicitRealtimeTablePartitionSelector extends InstanceReplicaGroupPartitionSelector {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ImplicitRealtimeTablePartitionSelector.class);
   private final int _numPartitions;
+  private final List<Integer> _partitionIds;
 
   public ImplicitRealtimeTablePartitionSelector(TableConfig tableConfig,
       InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig, String tableNameWithType,
       @Nullable InstancePartitions existingInstancePartitions, boolean minimizeDataMovement) {
     this(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions, minimizeDataMovement,
-        // Get the number of partitions from the first stream config
-        // TODO: Revisit this logic to better handle multiple streams in the future - either validate that they
-        //       all have the same number of partitions and use that or disallow the use of this selector in case the
-        //       partition counts differ.
         StreamConsumerFactoryProvider.create(IngestionConfigUtils.getFirstStreamConfig(tableConfig))
             .createStreamMetadataProvider(
                 ImplicitRealtimeTablePartitionSelector.class.getSimpleName() + "-" + tableNameWithType)
@@ -54,20 +59,34 @@ public class ImplicitRealtimeTablePartitionSelector extends InstanceReplicaGroup
       String tableNameWithType, @Nullable InstancePartitions existingInstancePartitions, boolean minimizeDataMovement,
       StreamMetadataProvider streamMetadataProvider) {
     super(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions, minimizeDataMovement);
-    _numPartitions = getStreamNumPartitions(streamMetadataProvider);
-  }
-
-  private int getStreamNumPartitions(StreamMetadataProvider streamMetadataProvider) {
+    List<Integer> partitionIds = null;
     try (streamMetadataProvider) {
-      return streamMetadataProvider.fetchPartitionCount(10_000L);
+      _numPartitions = streamMetadataProvider.fetchPartitionCount(10_000L);
+      try {
+        Set<Integer> ids = streamMetadataProvider.fetchPartitionIds(10_000L);
+        if (ids != null && !ids.isEmpty()) {
+          partitionIds = new ArrayList<>(ids);
+          Collections.sort(partitionIds);
+        }
+      } catch (UnsupportedOperationException e) {
+        // Stream does not expose partition IDs; instance partitions will use 0..numPartitions-1
+        LOGGER.debug("Stream metadata provider does not support fetchPartitionIds; using default partition ids.");
+      }
     } catch (Exception e) {
       throw new RuntimeException("Failed to retrieve partition info for table: " + _tableNameWithType, e);
     }
+    _partitionIds = partitionIds;
   }
 
   @Override
   protected int getNumPartitions() {
     return _numPartitions;
+  }
+
+  @Nullable
+  @Override
+  protected List<Integer> getPartitionIds() {
+    return _partitionIds;
   }
 
   @Override

@@ -81,17 +81,19 @@ public abstract class QuickStartBase {
       "examples/batch/testUnnest",
   };
 
-  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = Map.of(
-      "airlineStats", "examples/stream/airlineStats",
-      "dailySales", "examples/stream/dailySales",
-      "githubEvents", "examples/stream/githubEvents",
-      "meetupRsvp", "examples/stream/meetupRsvp",
-      "meetupRsvpJson", "examples/stream/meetupRsvpJson",
-      "meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType",
-      "upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp",
-      "upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp",
-      "upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp",
-      "fineFoodReviews", "examples/stream/fineFoodReviews");
+  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = Map.ofEntries(
+      Map.entry("airlineStats", "examples/stream/airlineStats"),
+      Map.entry("dailySales", "examples/stream/dailySales"),
+      Map.entry("githubEvents", "examples/stream/githubEvents"),
+      Map.entry("meetupRsvp", "examples/stream/meetupRsvp"),
+      Map.entry("meetupRsvpJson", "examples/stream/meetupRsvpJson"),
+      Map.entry("meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType"),
+      Map.entry("upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp"),
+      Map.entry("upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp"),
+      Map.entry("upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp"),
+      Map.entry("fineFoodReviews", "examples/stream/fineFoodReviews"),
+      Map.entry("fineFoodReviews-part-0", "examples/stream/fineFoodReviews-part-0"),
+      Map.entry("fineFoodReviews-part-1", "examples/stream/fineFoodReviews-part-1"));
 
   protected File _dataDir = FileUtils.getTempDirectory();
   protected boolean _setCustomDataDir;
@@ -541,6 +543,10 @@ public abstract class QuickStartBase {
           printStatus(Quickstart.Color.CYAN,
               "***** Starting fineFoodReviews data stream and publishing to Kafka *****");
           publishStreamDataToKafka("fineFoodReviews", new File(quickstartTmpDir, "fineFoodReviews"));
+          break;
+        case "fineFoodReviews-part-0":
+        case "fineFoodReviews-part-1":
+          // Consume from existing fineFoodReviews topic (partition subset); no separate stream to start
           break;
         default:
           throw new UnsupportedOperationException("Unknown stream name: " + streamName);
