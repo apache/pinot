@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client.admin;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
@@ -195,6 +196,20 @@ public class PinotAdminClient implements AutoCloseable {
       _taskClient = new PinotTaskAdminClient(_transport, _controllerAddress, _headers);
     }
     return _taskClient;
+  }
+
+  /**
+   * Fetches the table size details.
+   *
+   * @param tableName Table name (raw or with type)
+   * @param verbose Whether to include per-segment details
+   * @param includeReplacedSegments Whether to include replaced segments
+   * @return Table size response as JsonNode
+   * @throws PinotAdminException If the request fails
+   */
+  public JsonNode getTableSize(String tableName, boolean verbose, boolean includeReplacedSegments)
+      throws PinotAdminException {
+    return getTableClient().getTableSize(tableName, verbose, includeReplacedSegments);
   }
 
   @Override
