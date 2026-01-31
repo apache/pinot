@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -132,7 +133,6 @@ public class UpsertUtils {
       MutableRoaringBitmap validDocIds) {
     return new Iterator<>() {
       private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
-
       @Override
       public boolean hasNext() {
         return _docIdIterator.hasNext();
@@ -145,10 +145,29 @@ public class UpsertUtils {
     };
   }
 
+  public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
+      MutableRoaringBitmap validDocIds) {
+
+    return new Iterator<>() {
+      private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
+
+      @Override
+      public boolean hasNext() {
+        return _docIdIterator.hasNext();
+      }
+
+      @Override
+      public Map.Entry<Integer, PrimaryKey> next() {
+        int docId = _docIdIterator.next();
+        return Map.entry(docId, primaryKeyReader.getPrimaryKey(docId));
+      }
+    };
+  }
+
   /**
-   * Returns an iterator of {@link PrimaryKey} for all the documents from the segment.
+   * Returns an iterator of docId and {@link PrimaryKey} for all the documents from the segment.
    */
-  public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
+  public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
       int numDocs) {
     return new Iterator<>() {
       private int _docId = 0;
@@ -159,8 +178,9 @@ public class UpsertUtils {
       }
 
       @Override
-      public PrimaryKey next() {
-        return primaryKeyReader.getPrimaryKey(_docId++);
+      public Map.Entry<Integer, PrimaryKey> next() {
+        int docId = _docId++;
+        return Map.entry(docId, primaryKeyReader.getPrimaryKey(docId));
       }
     };
   }
