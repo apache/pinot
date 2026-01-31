@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotClientTransportFactory;
@@ -368,11 +369,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
             KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
-        "localhost:" + _kafkaStarters.get(0).getPort());
+        getKafkaBrokerList());
     if (useKafkaTransaction()) {
       streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
               KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),
           KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED);
+      // Ensure the consumer can fetch complete transactional batches plus commit markers.
+      streamConfigMap.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG,
+          Integer.toString(10 * 1024 * 1024));
     }
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
         StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), getStreamConsumerFactoryClassName());
@@ -387,6 +391,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
         StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
     return streamConfigMap;
+  }
+
+  protected String getKafkaBrokerList() {
+    StringBuilder builder = new StringBuilder();
+    for (int i = 0; i < _kafkaStarters.size(); i++) {
+      if (i > 0) {
+        builder.append(',');
+      }
+      builder.append("localhost:").append(_kafkaStarters.get(i).getPort());
+    }
+    return builder.toString();
   }
 
   /**
@@ -737,8 +752,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void startKafkaWithoutTopic(int port) {
+    Properties kafkaConfiguration = KafkaStarterUtils.getDefaultKafkaConfiguration();
+    if (useKafkaTransaction()) {
+      int brokerCount = getNumKafkaBrokers();
+      short replicationFactor = (short) Math.max(1, brokerCount);
+      KafkaStarterUtils.configureOffsetsTopicReplicationFactor(kafkaConfiguration, replicationFactor);
+      KafkaStarterUtils.configureTransactionStateLogReplicationFactor(kafkaConfiguration, replicationFactor);
+      kafkaConfiguration.put("transaction.state.log.min.isr", Math.max(1, brokerCount - 1));
+    }
     _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(),
-        KafkaStarterUtils.getDefaultKafkaConfiguration());
+        kafkaConfiguration);
   }
 
   protected void createKafkaTopic(String topic) {

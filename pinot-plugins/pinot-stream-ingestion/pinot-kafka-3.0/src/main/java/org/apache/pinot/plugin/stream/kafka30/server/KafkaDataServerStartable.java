@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20.server;
+package org.apache.pinot.plugin.stream.kafka30.server;
 
 import com.google.common.base.Function;
 import java.io.File;
@@ -62,6 +62,13 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
     _zkStr = props.getProperty(ZOOKEEPER_CONNECT);
     _logDirPath = props.getProperty(LOG_DIRS);
 
+    // Ensure Kafka 3 binds to the requested port instead of the default 9092.
+    String listener = "PLAINTEXT://localhost:" + _port;
+    props.put("listeners", listener);
+    props.put("advertised.listeners", listener);
+    props.put("listener.security.protocol.map", "PLAINTEXT:PLAINTEXT");
+    props.put("inter.broker.listener.name", "PLAINTEXT");
+
     // Create the ZK nodes for Kafka, if needed
     int indexOfFirstSlash = _zkStr.indexOf('/');
     if (indexOfFirstSlash != -1) {
@@ -79,7 +86,7 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
     _serverStartable = new KafkaServer(new KafkaConfig(props), Time.SYSTEM, Option.empty(), false);
     final Map<String, Object> config = new HashMap<>();
     config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + _port);
-    config.put(AdminClientConfig.CLIENT_ID_CONFIG, "Kafka2AdminClient-" + UUID.randomUUID().toString());
+    config.put(AdminClientConfig.CLIENT_ID_CONFIG, "KafkaAdminClient-" + UUID.randomUUID());
     config.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
     _adminClient = KafkaAdminClient.create(config);
   }
