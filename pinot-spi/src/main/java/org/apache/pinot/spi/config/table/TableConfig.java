@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -31,6 +32,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -58,6 +60,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String TIER_CONFIGS_LIST_KEY = "tierConfigs";
   public static final String TUNER_CONFIG_LIST_KEY = "tunerConfigs";
   public static final String TIER_OVERWRITES_KEY = "tierOverwrites";
+  public static final String TABLE_SAMPLERS_KEY = "tableSamplers";
 
   // Double underscore is reserved for real-time segment name delimiter
   public static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
@@ -113,6 +116,9 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "Configs for Table config tuner")
   private List<TunerConfig> _tunerConfigList;
 
+  @JsonPropertyDescription(value = "Configs for table samplers")
+  private List<TableSamplerConfig> _tableSamplers;
+
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
       @JsonProperty(value = TABLE_TYPE_KEY, required = true) String tableType,
@@ -138,7 +144,8 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(INSTANCE_PARTITIONS_MAP_CONFIG_KEY) @Nullable
       Map<InstancePartitionsType, String> instancePartitionsMap,
       @JsonProperty(SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable
-      Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap) {
+      Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap,
+      @JsonProperty(TABLE_SAMPLERS_KEY) @Nullable List<TableSamplerConfig> tableSamplers) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -169,6 +176,7 @@ public class TableConfig extends BaseJsonConfig {
     _tunerConfigList = tunerConfigList;
     _instancePartitionsMap = instancePartitionsMap;
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
+    _tableSamplers = sanitizeTableSamplers(tableSamplers);
   }
 
   public TableConfig(TableConfig tableConfig) {
@@ -193,6 +201,7 @@ public class TableConfig extends BaseJsonConfig {
     _tunerConfigList = tableConfig.getTunerConfigsList();
     _instancePartitionsMap = tableConfig.getInstancePartitionsMap();
     _segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    _tableSamplers = sanitizeTableSamplers(tableConfig.getTableSamplers());
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -252,6 +261,33 @@ public class TableConfig extends BaseJsonConfig {
 
   public void setCustomConfig(TableCustomConfig customConfig) {
     _customConfig = customConfig;
+  }
+
+  @JsonProperty(TABLE_SAMPLERS_KEY)
+  @Nullable
+  public List<TableSamplerConfig> getTableSamplers() {
+    return _tableSamplers;
+  }
+
+  public void setTableSamplers(@Nullable List<TableSamplerConfig> tableSamplers) {
+    _tableSamplers = sanitizeTableSamplers(tableSamplers);
+  }
+
+  @Nullable
+  private static List<TableSamplerConfig> sanitizeTableSamplers(@Nullable List<TableSamplerConfig> tableSamplers) {
+    if (tableSamplers == null || tableSamplers.isEmpty()) {
+      return null;
+    }
+    List<TableSamplerConfig> sanitized = new ArrayList<>(tableSamplers.size());
+    for (TableSamplerConfig config : tableSamplers) {
+      if (config != null) {
+        sanitized.add(config);
+      }
+    }
+    if (sanitized.isEmpty()) {
+      return null;
+    }
+    return sanitized;
   }
 
   @JsonProperty(QUOTA_CONFIG_KEY)
