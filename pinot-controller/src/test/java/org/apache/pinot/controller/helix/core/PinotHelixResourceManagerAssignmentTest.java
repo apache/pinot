@@ -23,15 +23,23 @@ import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -43,6 +51,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -65,6 +74,7 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
   protected void overrideControllerConf(Map<String, Object> properties) {
     properties.put(ControllerConf.CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT, true);
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+    properties.put(ControllerConf.ENABLE_IDEAL_STATE_INSTANCE_PARTITIONS, true);
   }
 
   @BeforeClass
@@ -158,6 +168,93 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
     String coldServerName = currentAssignment.get(segmentName).keySet().iterator().next();
     InstanceConfig coldServerConfig = HelixHelper.getInstanceConfig(_helixManager, coldServerName);
     assertTrue(coldServerConfig.containsTag(coldOfflineServerTag));
+  }
+
+  @Test
+  public void testInstanceAssignment()
+      throws Exception {
+    String testTableName = "testInstanceAssignmentTable";
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(testTableName);
+
+    // Add schema for the realtime table
+    addDummySchema(testTableName);
+
+    // Create instance assignment config for CONSUMING
+    InstanceTagPoolConfig consumingTagPoolConfig =
+        new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME), false, 0, null);
+    InstanceReplicaGroupPartitionConfig consumingReplicaGroupConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REALTIME_SERVER_INSTANCES, 0, 0, 0, false, null);
+    InstanceAssignmentConfig consumingInstanceAssignmentConfig =
+        new InstanceAssignmentConfig(consumingTagPoolConfig, null, consumingReplicaGroupConfig, null, false);
+
+    // Create realtime table with CONSUMING instance assignment explicitly configured
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(testTableName).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setInstanceAssignmentConfigMap(
+                Map.of(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig))
+            .build();
+
+    waitForEVToDisappear(realtimeTableName);
+    _helixResourceManager.addTable(tableConfig);
+
+    // Verify CONSUMING instance partitions are persisted in ZK
+    String consumingInstancePartitionsName =
+        InstancePartitionsUtils.getInstancePartitionsName(testTableName, InstancePartitionsType.CONSUMING.toString());
+    InstancePartitions consumingInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, consumingInstancePartitionsName);
+    assertNotNull(consumingInstancePartitions, "CONSUMING instance partitions should be persisted in ZK");
+    assertEquals(consumingInstancePartitions.getInstancePartitionsName(), consumingInstancePartitionsName);
+    assertEquals(consumingInstancePartitions.getNumReplicaGroups(), NUM_REALTIME_SERVER_INSTANCES);
+
+    // Verify that IdealState reflects the instance partitions
+    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
+    Map<String, InstancePartitions> idealStateInstancePartitions =
+        InstancePartitionsUtils.extractInstancePartitionsFromIdealState(idealState);
+    assertEquals(idealStateInstancePartitions.size(), 1, "Only CONSUMING instance partitions should be present");
+    assertEquals(idealStateInstancePartitions.get(consumingInstancePartitionsName), consumingInstancePartitions);
+
+    // Verify COMPLETED instance partitions do not exist yet
+    String completedInstancePartitionsName =
+        InstancePartitionsUtils.getInstancePartitionsName(testTableName, InstancePartitionsType.COMPLETED.toString());
+    InstancePartitions completedInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, completedInstancePartitionsName);
+    assertNull(completedInstancePartitions, "COMPLETED instance partitions should not exist yet");
+
+    // Create instance assignment config for COMPLETED
+    InstanceTagPoolConfig completedTagPoolConfig =
+        new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME), false, 0, null);
+    InstanceReplicaGroupPartitionConfig completedReplicaGroupConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REALTIME_SERVER_INSTANCES, 0, 0, 0, false, null);
+    InstanceAssignmentConfig completedInstanceAssignmentConfig =
+        new InstanceAssignmentConfig(completedTagPoolConfig, null, completedReplicaGroupConfig, null, false);
+
+    // Update table config to add COMPLETED instance partitions
+    tableConfig.setInstanceAssignmentConfigMap(
+        Map.of(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig,
+            InstancePartitionsType.COMPLETED.toString(), completedInstanceAssignmentConfig));
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // Verify COMPLETED instance partitions are now persisted in ZK
+    completedInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, completedInstancePartitionsName);
+    assertNotNull(completedInstancePartitions, "COMPLETED instance partitions should be persisted in ZK after update");
+    assertEquals(completedInstancePartitions.getInstancePartitionsName(), completedInstancePartitionsName);
+    assertEquals(completedInstancePartitions.getNumReplicaGroups(), NUM_REALTIME_SERVER_INSTANCES);
+
+    // Verify CONSUMING instance partitions are still present
+    consumingInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, consumingInstancePartitionsName);
+    assertNotNull(consumingInstancePartitions, "CONSUMING instance partitions should still be present");
+
+    // Verify that IdealState reflects the instance partitions
+    idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
+    idealStateInstancePartitions = InstancePartitionsUtils.extractInstancePartitionsFromIdealState(idealState);
+    assertEquals(idealStateInstancePartitions.size(), 2,
+        "CONSUMING and COMPLETED instance partitions should be present");
+    assertEquals(idealStateInstancePartitions.get(consumingInstancePartitionsName), consumingInstancePartitions);
+    assertEquals(idealStateInstancePartitions.get(completedInstancePartitionsName), completedInstancePartitions);
   }
 
   @AfterClass

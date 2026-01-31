@@ -32,12 +32,15 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_REPLICA_ID;
 
 
 /**
@@ -241,6 +244,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
     }
 
+    Map<String, Integer> serverToReplicaGroupMap = InstancePartitionsUtils.serverToReplicaGroupMap(idealState);
+
     // Iterate over the maps and exclude the unavailable instances
     for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
@@ -251,7 +256,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
       for (String instance : onlineInstances) {
         if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance)));
+          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance),
+              serverToReplicaGroupMap.getOrDefault(instance, FALLBACK_REPLICA_ID)));
         }
       }
       _oldSegmentCandidatesMap.put(segment, candidates);
@@ -266,7 +272,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
       for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
         if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance)));
+          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance),
+              serverToReplicaGroupMap.getOrDefault(instance, FALLBACK_REPLICA_ID)));
         }
       }
       _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));
