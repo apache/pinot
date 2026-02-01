@@ -145,6 +145,26 @@ public class UpsertUtils {
     };
   }
 
+  /**
+   * Returns an iterator of {@link PrimaryKey} for all the documents from the segment.
+   */
+  public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
+      int numDocs) {
+    return new Iterator<>() {
+      private int _docId = 0;
+
+      @Override
+      public boolean hasNext() {
+        return _docId < numDocs;
+      }
+
+      @Override
+      public PrimaryKey next() {
+        return primaryKeyReader.getPrimaryKey(_docId++);
+      }
+    };
+  }
+
   public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
       MutableRoaringBitmap validDocIds) {
 

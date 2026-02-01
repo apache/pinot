@@ -239,8 +239,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     // For ConsistentDeletes, we need to iterate over ALL docs in the segment (not just valid ones)
     // to properly decrement distinctSegmentCount for every key that was ever in the segment
     try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
-      revertAndRemoveSegment(segment,
-          UpsertUtils.getRecordIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()));
+      if (shouldRevertMetadataOnInconsistency(segment)) {
+        revertAndRemoveSegment(segment,
+            UpsertUtils.getRecordIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()));
+      } else {
+        removeSegment(segment,
+            UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()));
+      }
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while removing segment: %s, table: %s", segment.getSegmentName(),
@@ -291,11 +296,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             oldSegment, validDocIdsForOldSegment);
       }
       if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-        if (shouldRevertMetadataOnInconsistency(segment)) {
-          revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
-          return;
-        } else {
-          logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
+        if (_context.hasInconsistentTableConfigs()) {
+          if (shouldRevertMetadataOnInconsistency(oldSegment)) {
+            revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
+            return;
+          } else {
+            logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
+          }
         }
       }
       // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true

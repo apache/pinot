@@ -661,13 +661,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     }
     if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-      if (shouldRevertMetadataOnInconsistency(oldSegment)) {
-        // If there are still valid docs in the old segment, validate and revert the metadata of the
-        // consuming segment in place
-        revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
-        return;
-      } else {
-        logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
+      if (_context.hasInconsistentTableConfigs()) {
+        if (shouldRevertMetadataOnInconsistency(oldSegment)) {
+          // If there are still valid docs in the old segment, validate and revert the metadata of the
+          // consuming segment in place
+          revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
+          return;
+        } else {
+          logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
+        }
       }
       removeSegment(oldSegment, validDocIdsForOldSegment);
     }
