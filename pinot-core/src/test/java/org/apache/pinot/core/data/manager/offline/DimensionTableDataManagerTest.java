@@ -37,6 +37,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
@@ -54,6 +55,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -67,6 +69,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -133,8 +136,9 @@ public class DimensionTableDataManagerTest {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
-  private TableConfig getTableConfig(boolean disablePreload, boolean errorOnDuplicatePrimaryKey) {
-    DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload, errorOnDuplicatePrimaryKey);
+  private TableConfig getTableConfig(boolean disablePreload, boolean errorOnDuplicatePrimaryKey, boolean enableUpsert) {
+    DimensionTableConfig dimensionTableConfig =
+        new DimensionTableConfig(disablePreload, errorOnDuplicatePrimaryKey, enableUpsert);
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("dimBaseballTeams")
         .setDimensionTableConfig(dimensionTableConfig)
@@ -187,7 +191,7 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testInstantiation()
       throws Exception {
-    TableConfig tableConfig = getTableConfig(false, false);
+    TableConfig tableConfig = getTableConfig(false, false, false);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
     assertEquals(tableDataManager.getTableName(), OFFLINE_TABLE_NAME);
@@ -216,7 +220,7 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testLookup()
       throws Exception {
-    TableConfig tableConfig = getTableConfig(false, false);
+    TableConfig tableConfig = getTableConfig(false, false, false);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
@@ -272,7 +276,7 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testReloadTable()
       throws Exception {
-    TableConfig tableConfig = getTableConfig(false, false);
+    TableConfig tableConfig = getTableConfig(false, false, false);
     Schema schema = getSchema();
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema, propertyStore);
@@ -321,7 +325,7 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testLookupWithoutPreLoad()
       throws Exception {
-    TableConfig tableConfig = getTableConfig(true, false);
+    TableConfig tableConfig = getTableConfig(true, false, false);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
@@ -371,7 +375,7 @@ public class DimensionTableDataManagerTest {
   @Test(dataProvider = "options")
   public void testDeleteTableRemovesManagerFromMemory(boolean disablePreload)
       throws Exception {
-    TableConfig tableConfig = getTableConfig(disablePreload, false);
+    TableConfig tableConfig = getTableConfig(disablePreload, false, false);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
@@ -383,10 +387,31 @@ public class DimensionTableDataManagerTest {
     Assert.assertNull(DimensionTableDataManager.getInstanceByTableName(tableDataManager.getTableName()));
   }
 
+  @Test(dataProvider = "options")
+  public void testLookupRespectsQueryableDocIds(boolean disablePreload)
+      throws Exception {
+    TableConfig tableConfig = getTableConfig(disablePreload, false, true);
+    Schema schema = getSchema();
+    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
+
+    ImmutableSegmentImpl immutableSegment =
+        (ImmutableSegmentImpl) ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+            SEGMENT_OPERATIONS_THROTTLER);
+    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap(new MutableRoaringBitmap());
+    ThreadSafeMutableRoaringBitmap queryableDocIds = new ThreadSafeMutableRoaringBitmap(new MutableRoaringBitmap());
+    immutableSegment.enableUpsert(null, validDocIds, queryableDocIds);
+
+    tableDataManager.addSegment(immutableSegment);
+
+    PrimaryKey key = new PrimaryKey(new String[]{"SF"});
+    assertFalse(tableDataManager.containsKey(key));
+    assertNull(tableDataManager.lookupRow(key));
+  }
+
   @Test
   public void testLookupErrorOnDuplicatePrimaryKey()
       throws Exception {
-    TableConfig tableConfig = getTableConfig(false, true);
+    TableConfig tableConfig = getTableConfig(false, true, false);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 

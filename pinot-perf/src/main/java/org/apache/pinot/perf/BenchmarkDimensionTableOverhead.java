@@ -228,7 +228,7 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
         .setFieldConfigList(FIELD_CONFIGS)
         .setNoDictionaryColumns(List.of(RAW_INT_COL_NAME, RAW_STRING_COL_NAME, TIMESTAMP_COL))
         .setSortedColumn(SORTED_COL_NAME)
-        .setDimensionTableConfig(new DimensionTableConfig(disablePreload, false))
+        .setDimensionTableConfig(new DimensionTableConfig(disablePreload, false, false))
         .build();
   }
 
