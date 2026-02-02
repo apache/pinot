@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
@@ -136,6 +137,13 @@ public class PinotClientRequest {
   @Inject
   @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
   private String _instanceId;
+
+  private final ObjectMapper _mapper;
+
+  public PinotClientRequest() {
+    _mapper = JsonUtils.createMapper();
+    StreamingBrokerResponseJacksonSerializer.registerModule(_mapper, KeysComparator.INSTANCE);
+  }
 
   @GET
   @ManagedAsync
@@ -827,11 +835,7 @@ public class PinotClientRequest {
   private StreamingOutput streamResponse(StreamingBrokerResponse streamingResponse, HttpHeaders httpHeaders) {
     return (outputStream) -> {
       try {
-        StreamingBrokerResponseJacksonSerializer.serialize(
-            streamingResponse,
-            JsonUtils.createJsonGenerator(outputStream),
-            KeysComparator.INSTANCE
-        );
+        _mapper.writeValue(outputStream, streamingResponse);
         streamingResponse.getMetaInfo().emitBrokerResponseMetrics(_brokerMetrics);
       } catch (Exception e) {
         LOGGER.error(RESPONSE_EXCEPTION_MARKER, "Caught exception while writing streaming response", e);
