@@ -21,7 +21,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 
 
-/// A [BrokerResponse] that is lazily evaluated.
+/// A [org.apache.pinot.common.response.BrokerResponse] that is lazily evaluated.
 ///
 /// This class can only be used once the data schema is known. In case there is an error before that, an
 /// early error [EarlyResponse] should be used.
@@ -30,8 +30,6 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
 
   private final DataSchema _dataSchema;
   private final MultiStageOperator _rootOperator;
-  private final StatMap<BrokerResponseNativeV2.StatKey> _brokerStats =
-      new StatMap<>(BrokerResponseNativeV2.StatKey.class);
   @Nullable
   private Metainfo _metainfo;
 

@@ -261,7 +261,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try {
       StreamingBrokerResponse plainResponse = handleRequestThrowing(requestId, query, sqlNodeAndOptions,
           requesterIdentity, requestContext, httpHeaders);
-      return postDecorate(plainResponse, sqlNodeAndOptions);
+      return postDecorate(plainResponse, sqlNodeAndOptions, requestId);
     } catch (QueryException e) {
       String exceptionMessage = ExceptionUtils.consolidateExceptionMessages(e);
       if (isYellowError(e)) {
@@ -429,14 +429,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /// This cannot be done in [MseHandlerStreamingBrokerResponse] because sometimes the query finished before even
   /// getting to the data consumption phase (ie authorization error or quota exceeded). Also, this ensures that even if
   /// the exception is thrown during post-reduce processing, it is still caught and handled properly.
-  private StreamingBrokerResponse postDecorate(StreamingBrokerResponse response, SqlNodeAndOptions sqlNodeAndOptions) {
+  private StreamingBrokerResponse postDecorate(StreamingBrokerResponse response, SqlNodeAndOptions sqlNodeAndOptions,
+      long requestId) {
     return new StreamingBrokerResponse.Delegator(response) {
       Metainfo _metainfo;
 
       @Override
       public Metainfo consumeData(DataConsumer consumer)
           throws InterruptedException {
-        long requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
         try {
           Metainfo metainfo = _delegate.consumeData(consumer);
           if (!metainfo.getExceptions().isEmpty()) {
@@ -759,6 +759,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     private final int _stageCount;
     private final int _opChainCount;
     private final boolean _queryWasLogged;
+    private final Map<String, String> _queryOpts;
+    private final long _requestId;
+    private final String _clientRequestId;
 
     public MseHandlerStreamingBrokerResponse(QueryDispatcher.DispatcherStreamingBrokerResponse delegate,
         RequestContext requestContext, int estimatedNumQueryThreads, DispatchableSubPlan dispatchableSubPlan,
@@ -774,6 +777,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _stageCount = stageCount;
       _opChainCount = opChainCount;
       _queryWasLogged = queryWasLogged;
+      _queryOpts = query.getOptions();
+      QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
+      _requestId = executionContext.getRequestId();
+      _clientRequestId = executionContext.getCid();
     }
 
     @Override
@@ -823,9 +830,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     private void postExecution(BrokerResponseNativeV2 brokerResponse) {
       long executionStartTimeNs = System.nanoTime();
-      QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
-      long requestId = executionContext.getRequestId();
-      String clientRequestId = executionContext.getCid();
 
       for (QueryProcessingException processingException : brokerResponse.getExceptions()) {
         brokerResponse.addException(processingException);
@@ -834,7 +838,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           for (String table : _tableNames) {
             _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
           }
-          LOGGER.warn("Timed out executing request {}: {}", requestId, _query);
+          LOGGER.warn("Timed out executing request {}: {}", _requestId, _query);
         }
         _requestContext.setErrorCode(errorCode);
       }
@@ -845,7 +849,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             executionEndTimeNs - executionStartTimeNs);
       }
 
-      brokerResponse.setClientRequestId(clientRequestId);
+      brokerResponse.setClientRequestId(_clientRequestId);
       brokerResponse.setTablesQueried(_tableNames);
 
       Set<QueryServerInstance> servers = new HashSet<>();

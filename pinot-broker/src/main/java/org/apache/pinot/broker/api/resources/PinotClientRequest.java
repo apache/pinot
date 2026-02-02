@@ -611,8 +611,9 @@ public class PinotClientRequest {
       case DQL:
         try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
           requestContext.setRequestArrivalTimeMillis(requestArrivalTimeMs);
-          return _requestHandler.handleStreamingRequest(
+          StreamingBrokerResponse streamingBrokerResponse = _requestHandler.handleStreamingRequest(
               sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext, httpHeaders);
+          return streamingBrokerResponse;
         } catch (Exception e) {
           LOGGER.error("Error handling DQL request:\n{}", sqlRequestJson, e);
           throw e;

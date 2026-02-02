@@ -15,7 +15,14 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
 
-
+/// A streaming broker response that allows consuming data blocks one by one.
+///
+/// This is used by the broker whenever it can stream data to the client as soon as it is available rather than
+/// buffering the full response in memory. This is especially useful for MSE queries that return large amounts of data.
+///
+/// It is important to note that the [#consumeData] method can only be called once and may be called by a thread where
+/// [org.apache.pinot.spi.query.QueryThreadContext] may not be set up. Therefore, implementations should be careful
+/// to not rely on thread-local context during data consumption.
 public interface StreamingBrokerResponse extends AutoCloseable {
   @Nullable
   DataSchema getDataSchema();
@@ -278,21 +285,6 @@ public interface StreamingBrokerResponse extends AutoCloseable {
     @Override
     public void close() {
       _delegate.close();
-    }
-
-    @Override
-    public StreamingBrokerResponse withDecoratedMetainfo(Consumer<ObjectNode> decorator) {
-      return _delegate.withDecoratedMetainfo(decorator);
-    }
-
-    @Override
-    public StreamingBrokerResponse withPostMetainfo(Consumer<StatMap<StdMetaField>> postUpdater) {
-      return _delegate.withPostMetainfo(postUpdater);
-    }
-
-    @Override
-    public StreamingBrokerResponse withListener(BiConsumer<StreamingBrokerResponse, Metainfo> onConsumptionFinished) {
-      return _delegate.withListener(onConsumptionFinished);
     }
   }
 
