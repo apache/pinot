@@ -100,6 +100,7 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
       return new Metainfo.Error(List.of(new QueryProcessingException(error.getKey().getId(), errorMessage)));
     }
     assert block.isSuccess();
+
     return new Metainfo() {
       @Override
       public List<QueryProcessingException> getExceptions() {
@@ -108,7 +109,8 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
 
       @Override
       public ObjectNode asJson() {
-        return JsonUtils.newObjectNode();
+        return JsonUtils.newObjectNode()
+            .set("exceptions", JsonUtils.newArrayNode());
       }
     };
   }

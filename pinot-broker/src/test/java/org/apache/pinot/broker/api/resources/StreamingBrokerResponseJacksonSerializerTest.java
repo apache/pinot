@@ -51,10 +51,9 @@ public class StreamingBrokerResponseJacksonSerializerTest {
     return outputStream.toString();
   }
 
-  private JsonNode serializeToJsonNode(StreamingBrokerResponse response, Comparator<String> keysComparator)
-      throws Exception {
-    String json = serialize(response, keysComparator);
-    return JsonUtils.stringToJsonNode(json);
+  private JsonNode serializeToJsonNode(StreamingBrokerResponse response, Comparator<String> keysComparator) {
+    ObjectMapper mapper = createMapper(keysComparator);
+    return mapper.valueToTree(response);
   }
 
   @Test
@@ -265,7 +264,7 @@ public class StreamingBrokerResponseJacksonSerializerTest {
 
     JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
 
-    assertEquals(json.toString(), "{}");
+    assertEquals(json.toString(), "{\"exceptions\":[]}");
   }
 
   @Test
@@ -432,9 +431,7 @@ public class StreamingBrokerResponseJacksonSerializerTest {
     @Override
     public ObjectNode asJson() {
       ObjectNode json = JsonUtils.newObjectNode();
-      if (!_exceptions.isEmpty()) {
-        json.set("exceptions", JsonUtils.objectToJsonNode(_exceptions));
-      }
+      json.set("exceptions", JsonUtils.objectToJsonNode(_exceptions));
       _additionalFields.fieldNames().forEachRemaining(fieldName -> json.set(fieldName, _additionalFields.get(fieldName)));
       return json;
     }
