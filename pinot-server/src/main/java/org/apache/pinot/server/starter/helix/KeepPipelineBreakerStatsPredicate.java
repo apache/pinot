@@ -31,43 +31,43 @@ import org.slf4j.LoggerFactory;
 public class KeepPipelineBreakerStatsPredicate implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(KeepPipelineBreakerStatsPredicate.class);
 
-  private volatile boolean _enabled;
+  private volatile boolean _skip;
 
-  public KeepPipelineBreakerStatsPredicate(boolean enabled) {
-    _enabled = enabled;
+  public KeepPipelineBreakerStatsPredicate(boolean skip) {
+    this._skip = skip;
   }
 
   // NOTE: When this method is called, the helix manager is not yet connected.
   public static KeepPipelineBreakerStatsPredicate create(PinotConfiguration serverConf) {
     boolean enabled = serverConf.getProperty(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_KEEP_PIPELINE_BREAKER_STATS,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_KEEP_PIPELINE_BREAKER_STATS);
+        CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_SKIP_PIPELINE_BREAKER_STATS);
     return new KeepPipelineBreakerStatsPredicate(enabled);
   }
 
   public boolean isEnabled() {
-    return _enabled;
+    return !_skip;
   }
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    String key = CommonConstants.MultiStageQueryRunner.KEY_OF_KEEP_PIPELINE_BREAKER_STATS;
+    String key = CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS;
     if (!changedConfigs.contains(key)) {
-      LOGGER.debug("No change for key: {}, keeping its value as {}", key, _enabled);
+      LOGGER.debug("No change for key: {}, keeping its value as {}", key, _skip);
       return;
     }
     String value = clusterConfigs.get(key);
     if (value == null || value.isEmpty()) {
       LOGGER.info("Empty or null value for key: {}, reset to default: {}",
           key,
-          CommonConstants.MultiStageQueryRunner.DEFAULT_KEEP_PIPELINE_BREAKER_STATS);
-      _enabled = CommonConstants.MultiStageQueryRunner.DEFAULT_KEEP_PIPELINE_BREAKER_STATS;
+          CommonConstants.MultiStageQueryRunner.DEFAULT_SKIP_PIPELINE_BREAKER_STATS);
+      _skip = CommonConstants.MultiStageQueryRunner.DEFAULT_SKIP_PIPELINE_BREAKER_STATS;
     } else {
-      boolean oldEnabled = _enabled;
+      boolean oldEnabled = _skip;
       String valueStr = value.trim();
-      _enabled = Boolean.parseBoolean(valueStr.toLowerCase(Locale.ENGLISH));
-      if (oldEnabled != _enabled) {
-        LOGGER.warn("Updated {} from: {} to: {}, parsed as {}", key, valueStr, oldEnabled, _enabled);
+      _skip = Boolean.parseBoolean(valueStr.toLowerCase(Locale.ENGLISH));
+      if (oldEnabled != _skip) {
+        LOGGER.warn("Updated {} from: {} to: {}, parsed as {}", key, valueStr, oldEnabled, _skip);
       } else {
         LOGGER.info("{} kept as {}", key, value);
       }

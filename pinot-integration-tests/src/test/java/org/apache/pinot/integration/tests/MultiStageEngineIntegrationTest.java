@@ -2151,107 +2151,117 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testStageStatsPipelineBreaker()
       throws Exception {
-    String query = "select * from mytable "
-        + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
-    JsonNode response = postQuery(query);
-    assertNotNull(response.get("stageStats"), "Should have stage stats");
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    try {
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "false");
+      String query = "select * from mytable "
+          + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
+      JsonNode response = postQuery(query);
+      assertNotNull(response.get("stageStats"), "Should have stage stats");
 
-    JsonNode receiveNode = response.get("stageStats");
-    Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+      JsonNode receiveNode = response.get("stageStats");
+      Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
 
-    JsonNode sendNode = receiveNode.get("children").get(0);
-    Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
+      JsonNode sendNode = receiveNode.get("children").get(0);
+      Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
 
-    JsonNode mytableLeaf = sendNode.get("children").get(0);
-    Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
-    Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
+      JsonNode mytableLeaf = sendNode.get("children").get(0);
+      Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
+      Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
 
-    JsonNode pipelineReceive = mytableLeaf.get("children").get(0);
-    Assertions.assertThat(pipelineReceive.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+      JsonNode pipelineReceive = mytableLeaf.get("children").get(0);
+      Assertions.assertThat(pipelineReceive.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
 
-    JsonNode pipelineSend = pipelineReceive.get("children").get(0);
-    Assertions.assertThat(pipelineSend.get("type").asText()).isEqualTo("MAILBOX_SEND");
+      JsonNode pipelineSend = pipelineReceive.get("children").get(0);
+      Assertions.assertThat(pipelineSend.get("type").asText()).isEqualTo("MAILBOX_SEND");
 
-    JsonNode dayOfWeekLeaf = pipelineSend.get("children").get(0);
-    Assertions.assertThat(dayOfWeekLeaf.get("type").asText()).isEqualTo("LEAF");
-    Assertions.assertThat(dayOfWeekLeaf.get("table").asText()).isEqualTo("daysOfWeek");
+      JsonNode dayOfWeekLeaf = pipelineSend.get("children").get(0);
+      Assertions.assertThat(dayOfWeekLeaf.get("type").asText()).isEqualTo("LEAF");
+      Assertions.assertThat(dayOfWeekLeaf.get("table").asText()).isEqualTo("daysOfWeek");
+    } finally {
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "true");
+    }
   }
 
   @Test
   public void testPipelineBreakerKeepsNumGroupsLimitReached()
       throws Exception {
-    String query = ""
-        + "SET numGroupsLimit = 1;"
-        + "SELECT * FROM daysOfWeek "
-        + "WHERE dayid in ("
-        + " SELECT DayOfWeek FROM mytable"
-        + " GROUP BY DayOfWeek"
-        + ")";
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    try {
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "false");
+      String query = ""
+          + "SET numGroupsLimit = 1;"
+          + "SELECT * FROM daysOfWeek "
+          + "WHERE dayid in ("
+          + " SELECT DayOfWeek FROM mytable"
+          + " GROUP BY DayOfWeek"
+          + ")";
 
-    JsonNode response = postQuery(query);
-    assertNotNull(response.get("stageStats"), "Should have stage stats");
+      JsonNode response = postQuery(query);
+      assertNotNull(response.get("stageStats"), "Should have stage stats");
 
-    JsonNode receiveNode = response.get("stageStats");
-    Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+      JsonNode receiveNode = response.get("stageStats");
+      Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
 
-    JsonNode sendNode = receiveNode.get("children").get(0);
-    Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
+      JsonNode sendNode = receiveNode.get("children").get(0);
+      Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
 
-    JsonNode mytableLeaf = sendNode.get("children").get(0);
-    Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
-    Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualToIgnoringCase("daysOfWeek");
+      JsonNode mytableLeaf = sendNode.get("children").get(0);
+      Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
+      Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualToIgnoringCase("daysOfWeek");
 
-    JsonNode pipelineReceive = mytableLeaf.get("children").get(0);
-    Assertions.assertThat(pipelineReceive.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+      JsonNode pipelineReceive = mytableLeaf.get("children").get(0);
+      Assertions.assertThat(pipelineReceive.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
 
-    JsonNode pipelineSend = pipelineReceive.get("children").get(0);
-    Assertions.assertThat(pipelineSend.get("type").asText()).isEqualTo("MAILBOX_SEND");
+      JsonNode pipelineSend = pipelineReceive.get("children").get(0);
+      Assertions.assertThat(pipelineSend.get("type").asText()).isEqualTo("MAILBOX_SEND");
 
-    Assertions.assertThat(response.get("numGroupsLimitReached").asBoolean(false))
-        .describedAs("numGroupsLimitReached should be true even when the limit is reached on a pipeline breaker")
-        .isEqualTo(true);
+      Assertions.assertThat(response.get("numGroupsLimitReached").asBoolean(false))
+          .describedAs("numGroupsLimitReached should be true even when the limit is reached on a pipeline breaker")
+          .isEqualTo(true);
+    } finally {
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "true");
+    }
   }
 
   @Test
   public void testPipelineBreakerWithoutKeepingStats()
       throws Exception {
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_KEEP_PIPELINE_BREAKER_STATS, "false");
-    try {
-      // lets try several times to give helix time to propagate the config change
-      for (int i = 0; i < 10; i++) {
-        try {
-          String query = "select * from mytable "
-              + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
-          JsonNode response = postQuery(query);
-          assertNotNull(response.get("stageStats"), "Should have stage stats");
+    // lets try several times to give helix time to propagate the config change
+    for (int i = 0; i < 10; i++) {
+      try {
+        String query = "select * from mytable "
+            + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
+        JsonNode response = postQuery(query);
+        assertNotNull(response.get("stageStats"), "Should have stage stats");
 
-          JsonNode receiveNode = response.get("stageStats");
-          Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+        JsonNode receiveNode = response.get("stageStats");
+        Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
 
-          JsonNode sendNode = receiveNode.get("children").get(0);
-          Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
+        JsonNode sendNode = receiveNode.get("children").get(0);
+        Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
 
-          JsonNode mytableLeaf = sendNode.get("children").get(0);
-          Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
-          Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
+        JsonNode mytableLeaf = sendNode.get("children").get(0);
+        Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
+        Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
 
-          Assert.assertNull(mytableLeaf.get("children"), "When pipeline breaker stats are not kept, "
-              + "there should be no children under the leaf node");
-          System.out.println("Successfully verified absence of pipeline breaker stats on attempt " + (i + 1));
-          return;
-        } catch (AssertionError e) {
-          Thread.sleep(100);
-        }
+        Assert.assertNull(mytableLeaf.get("children"), "When pipeline breaker stats are not kept, "
+            + "there should be no children under the leaf node");
+        System.out.println("Successfully verified absence of pipeline breaker stats on attempt " + (i + 1));
+        return;
+      } catch (AssertionError e) {
+        Thread.sleep(100);
       }
-      fail("Failed to verify absence of pipeline breaker stats after multiple attempts after 10 attempts");
-    } finally {
-      _helixManager.getConfigAccessor()
-          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_KEEP_PIPELINE_BREAKER_STATS, "true");
     }
+    fail("Failed to verify absence of pipeline breaker stats after multiple attempts after 10 attempts");
   }
 
   @AfterClass
