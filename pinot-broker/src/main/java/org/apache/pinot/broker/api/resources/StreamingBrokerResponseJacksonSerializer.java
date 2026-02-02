@@ -1,56 +1,66 @@
 package org.apache.pinot.broker.api.resources;
 
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.Module;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleSerializers;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /// A utility class that serializes [StreamingBrokerResponse] into JSON using Jackson.
-public class StreamingBrokerResponseJacksonSerializer {
+public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<StreamingBrokerResponse> {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingBrokerResponseJacksonSerializer.class);
+  private final Comparator<String> _keysComparator;
 
-  private StreamingBrokerResponseJacksonSerializer() {
+  public StreamingBrokerResponseJacksonSerializer(Comparator<String> keysComparator) {
+    super(StreamingBrokerResponse.class);
+    _keysComparator = keysComparator;
   }
 
-  /// Serializes the given [StreamingBrokerResponse] into JSON using the given [JsonGenerator].
-  public static void serialize(StreamingBrokerResponse value, JsonGenerator gen, Comparator<String> keysComparator)
+  @Override
+  public void serialize(StreamingBrokerResponse value, JsonGenerator gen, SerializerProvider provider)
       throws IOException {
     try {
-      writeResultTable(value, gen);
-
-      writeMetainfo(value, gen, keysComparator);
+      gen.writeStartObject();
+      writeResultTable(value, gen, provider);
+      writeMetainfo(value, gen, _keysComparator);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       String errorMessage = "Thread interrupted while serializing broker response";
       LOGGER.error(errorMessage, e);
       throw new IOException(errorMessage, e);
+    } finally {
+      gen.writeEndObject();
     }
   }
 
   /// Writes all the data from the StreamingBrokerResponse into the "resultTable" field.
   ///
   /// This method consumes the data blocks from the response.
-  private static void writeResultTable(StreamingBrokerResponse value, JsonGenerator gen)
+  private static void writeResultTable(StreamingBrokerResponse value, JsonGenerator gen, SerializerProvider provider)
       throws IOException, InterruptedException {
     DataSchema dataSchema = value.getDataSchema();
     if (dataSchema == null) {
       return;
     }
 
-    gen.writeStartObject("resultTable");
+    gen.writeFieldName("resultTable");
+    gen.writeStartObject();
 
     // write the data schema
     gen.writeFieldName("dataSchema");
-    SerializerProvider provider = JsonUtils.getSerializerProvider();
     provider.defaultSerializeValue(dataSchema, gen);
 
     try {
@@ -66,7 +76,6 @@ public class StreamingBrokerResponseJacksonSerializer {
   private static void writeRowsIfAny(StreamingBrokerResponse value, JsonGenerator gen, SerializerProvider provider,
       DataSchema dataSchema
   ) throws IOException, InterruptedException {
-
     gen.writeFieldName("rows");
     // write all the rows as an array of arrays
     gen.writeStartArray();
@@ -81,9 +90,7 @@ public class StreamingBrokerResponseJacksonSerializer {
         serializers[colIdx] = provider.findTypedValueSerializer(columnTypes[colIdx].getExternalClass(), false, null);
       }
 
-      value.consumeData(data -> {
-        writeDataBlockContent(data, gen, columnTypes, serializers, width, provider);
-      });
+      value.consumeData(data -> writeDataBlockContent(data, gen, columnTypes, serializers, width, provider));
     } finally {
       gen.writeEndArray();
     }
@@ -130,6 +137,35 @@ public class StreamingBrokerResponseJacksonSerializer {
       }
     } catch (IOException e) {
       throw new UncheckedIOException(e);
+    }
+  }
+
+  public static void registerModule(ObjectMapper mapper, Comparator<String> keysComparator) {
+    mapper.registerModule(new JacksonModule(keysComparator));
+  }
+
+  public static class JacksonModule extends Module {
+    private final Comparator<String> _keysComparator;
+
+    public JacksonModule(Comparator<String> keysComparator) {
+      _keysComparator = keysComparator;
+    }
+
+    @Override
+    public String getModuleName() {
+      return "StreamingBrokerResponseJacksonModule";
+    }
+
+    @Override
+    public Version version() {
+      return new Version(1, 0, 0, null, null, null);
+    }
+
+    @Override
+    public void setupModule(SetupContext context) {
+      context.addSerializers(
+          new SimpleSerializers(
+              List.of(new StreamingBrokerResponseJacksonSerializer(_keysComparator))));
     }
   }
 }

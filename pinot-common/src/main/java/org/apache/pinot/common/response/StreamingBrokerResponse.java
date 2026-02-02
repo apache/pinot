@@ -414,4 +414,39 @@ public interface StreamingBrokerResponse extends AutoCloseable {
       return _type;
     }
   }
+
+  class ListStreamingBrokerResponse implements StreamingBrokerResponse {
+    private final DataSchema _dataSchema;
+    private final Metainfo _metainfo;
+    private final List<Object[]> _rows;
+
+    public ListStreamingBrokerResponse(DataSchema dataSchema, Metainfo metainfo, List<Object[]> rows) {
+      _dataSchema = dataSchema;
+      _metainfo = metainfo;
+      _rows = rows;
+    }
+
+    @Override
+    public @Nullable DataSchema getDataSchema() {
+      return _dataSchema;
+    }
+
+    @Override
+    public Metainfo consumeData(DataConsumer consumer)
+        throws InterruptedException, IllegalStateException {
+      Data.FromObjectArrList block = new Data.FromObjectArrList(_rows);
+      consumer.consume(block);
+      return _metainfo;
+    }
+
+    @Override
+    public Metainfo getMetaInfo()
+        throws IllegalStateException {
+      return _metainfo;
+    }
+
+    @Override
+    public void close() {
+    }
+  }
 }
