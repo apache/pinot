@@ -31,7 +31,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.common.response.EagerToLazyBrokerResponseAdaptor;
 import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
