@@ -78,6 +78,8 @@ public interface BrokerResponse {
    * This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
    */
   default void emitBrokerResponseMetrics(BrokerMetrics brokerMetrics) {
+    boolean hasCriticalError = false;
+    boolean hasNonCriticalError = false;
     for (QueryProcessingException exception : this.getExceptions()) {
       QueryErrorCode queryErrorCode;
       try {
@@ -87,6 +89,18 @@ public interface BrokerResponse {
         queryErrorCode = QueryErrorCode.UNKNOWN;
       }
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.getQueryErrorMeter(queryErrorCode), 1);
+      if (queryErrorCode.isCriticalError()) {
+        hasCriticalError = true;
+      } else {
+        hasNonCriticalError = true;
+      }
+    }
+    // Emit exactly one SLA-style metric per query if there are any exceptions
+    if (hasCriticalError) {
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_CRITICAL_ERROR, 1);
+    }
+    if (hasNonCriticalError) {
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_NON_CRITICAL_ERROR, 1);
     }
   }
 

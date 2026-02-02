@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
 import org.apache.pinot.spi.data.readers.ColumnarDataSource;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -32,12 +33,16 @@ public class PinotSegmentColumnarDataSource implements ColumnarDataSource {
 
   private final IndexSegment _indexSegment;
   private final int _totalDocs;
-  private final boolean _initializeDefaultValueReaders;
+  private final RoaringBitmap _validDocIds;
 
-  public PinotSegmentColumnarDataSource(IndexSegment indexSegment, boolean initializeDefaultValueReaders) {
+  /**
+   * @param indexSegment Source segment to read from
+   *
+   */
+  public PinotSegmentColumnarDataSource(IndexSegment indexSegment, RoaringBitmap validDocIds) {
     _indexSegment = indexSegment;
     _totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
-    _initializeDefaultValueReaders = initializeDefaultValueReaders;
+    _validDocIds = validDocIds;
   }
 
   @Override
@@ -47,13 +52,18 @@ public class PinotSegmentColumnarDataSource implements ColumnarDataSource {
 
   @Override
   public ColumnReaderFactory createColumnReaderFactory() {
-    return new PinotSegmentColumnReaderFactory(_indexSegment, _initializeDefaultValueReaders);
+    return new PinotSegmentColumnReaderFactory(_indexSegment, true, false);
+  }
+
+  @Override
+  public RoaringBitmap getValidDocIds() {
+    return _validDocIds;
   }
 
   @Override
   public void close()
       throws IOException {
-    // Segment lifecycle is managed externally, so no cleanup needed here
+    _indexSegment.destroy();
   }
 
   @Override

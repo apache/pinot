@@ -73,6 +73,7 @@ import org.apache.pinot.common.utils.Timer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.ImmutableQueryEnvironment;
@@ -92,6 +93,7 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
@@ -128,6 +130,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
 
   private final WorkerManager _workerManager;
+  private final WorkerManager _multiClusterWorkerManager;
   private final QueryDispatcher _queryDispatcher;
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;
@@ -136,15 +139,30 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected final long _extraPassiveTimeoutMs;
   protected final boolean _enableQueryFingerprinting;
 
+  protected final PinotMeter _stagesStartedMeter = BrokerMeter.MSE_STAGES_STARTED.getGlobalMeter();
+  protected final PinotMeter _stagesFinishedMeter = BrokerMeter.MSE_STAGES_COMPLETED.getGlobalMeter();
+  protected final PinotMeter _opchainsStartedMeter = BrokerMeter.MSE_OPCHAINS_STARTED.getGlobalMeter();
+  protected final PinotMeter _opchainsCompletedMeter = BrokerMeter.MSE_OPCHAINS_COMPLETED.getGlobalMeter();
+
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector, ThreadAccountant threadAccountant) {
+      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector, ThreadAccountant threadAccountant,
+      MultiClusterRoutingContext multiClusterRoutingContext) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        threadAccountant);
+        threadAccountant, multiClusterRoutingContext);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+
     _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
+    if (multiClusterRoutingContext != null) {
+      _multiClusterWorkerManager = new WorkerManager(_brokerId, hostname, port,
+          multiClusterRoutingContext.getMultiClusterRoutingManager());
+    } else {
+      // if multi-cluster routing is not enabled, use the same worker manager.
+      _multiClusterWorkerManager = _workerManager;
+    }
+
     TlsConfig tlsConfig = config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
@@ -315,7 +333,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders
   ) throws QueryException, WebApplicationException {
-    _queryLogger.log(requestId, query);
+    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query);
 
     String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
     if (_enableQueryFingerprinting) {
@@ -356,7 +374,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return explain(compiledQuery, requestId, requestContext, queryTimer).toStreamingResponse();
       } else {
         StreamingBrokerResponse plainResponse = query(compiledQuery, requestId, requesterIdentity, requestContext,
-            httpHeaders, queryTimer);
+            httpHeaders, queryTimer, queryWasLogged);
         if (rlsFiltersApplied.get()) {
           return plainResponse.withDecoratedMetainfo(stats -> {
             stats.put("rlsFiltersApplied", true);
@@ -439,7 +457,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     try {
       ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId);
-      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf);
+      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf, _multiClusterRoutingContext);
       return callAsync(requestId, query, () -> queryEnv.compile(query, sqlNodeAndOptions), queryTimer);
     } catch (WebApplicationException e) {
       throw e;
@@ -527,11 +545,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sortExchangeCopyThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD);
+    WorkerManager workerManager = QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
+        ? _multiClusterWorkerManager : _workerManager;
     return QueryEnvironment.configBuilder()
         .requestId(requestId)
         .database(database)
         .tableCache(_tableCache)
-        .workerManager(_workerManager)
+        .workerManager(workerManager)
         .isCaseSensitive(caseSensitive)
         .isNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(queryOptions))
         .defaultInferPartitionHint(inferPartitionHint)
@@ -587,7 +607,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   private StreamingBrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
-      RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer)
+      RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
+      boolean queryWasLogged)
       throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
@@ -643,13 +664,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return StreamingBrokerResponse.error(QueryErrorCode.EXECUTION_TIMEOUT);
     }
 
+    _stagesStartedMeter.mark(countStages(dispatchableSubPlan));
+    _opchainsStartedMeter.mark(countOpChain(dispatchableSubPlan));
+
     String clientRequestId = extractClientRequestId(query.getSqlNodeAndOptions());
     onQueryStart(requestId, clientRequestId, query.getTextQuery());
     try {
+
       QueryDispatcher.DispatcherStreamingBrokerResponse dispatcherResponse = _queryDispatcher.submit(
           requestContext, dispatchableSubPlan, timer.getRemainingTimeMs(), query.getOptions());
       return new MseHandlerStreamingBrokerResponse(dispatcherResponse, requestContext, estimatedNumQueryThreads,
-          dispatchableSubPlan, query, requesterIdentity, tableNames);
+          dispatchableSubPlan, query, requesterIdentity, tableNames, queryWasLogged, query.getOptions());
     } catch (QueryException e) {
       onQueryFinish(requestId);
       throw e;
@@ -666,6 +691,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
+  private int countStages(DispatchableSubPlan dispatchableSubPlan) {
+    return dispatchableSubPlan.getQueryStageMap().size();
+  }
+
+  private int countOpChain(DispatchableSubPlan dispatchableSubPlan) {
+    return dispatchableSubPlan.getQueryStageMap().values().stream()
+        .mapToInt(stage -> stage.getWorkerMetadataList().size())
+        .sum();
+  }
+
   /// A StreamingBrokerResponse that wraps another a [QueryDispatcher.DispatcherStreamingBrokerResponse] and
   /// performs some pre- and post-processing around it.
   ///
@@ -678,10 +713,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     private final QueryEnvironment.CompiledQuery _query;
     private final RequesterIdentity _requesterIdentity;
     private final Set<String> _tableNames;
+    private final boolean _queryWasLogged;
+    private final Map<String, String> _queryOpts;
 
     public MseHandlerStreamingBrokerResponse(QueryDispatcher.DispatcherStreamingBrokerResponse delegate,
         RequestContext requestContext, int estimatedNumQueryThreads, DispatchableSubPlan dispatchableSubPlan,
-        QueryEnvironment.CompiledQuery query, RequesterIdentity requesterIdentity, Set<String> tableNames) {
+        QueryEnvironment.CompiledQuery query, RequesterIdentity requesterIdentity, Set<String> tableNames,
+        boolean queryWasLogged, Map<String, String> queryOpts) {
       super(delegate);
       _requestContext = requestContext;
       _estimatedNumQueryThreads = estimatedNumQueryThreads;
@@ -689,6 +727,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _query = query;
       _requesterIdentity = requesterIdentity;
       _tableNames = tableNames;
+      _queryWasLogged = queryWasLogged;
+      _queryOpts = queryOpts;
     }
 
     @Override
@@ -735,6 +775,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     private void postExecution(BrokerResponseNativeV2 brokerResponse) {
+      _stagesFinishedMeter.mark(countStages(_dispatchableSubPlan));
+      _opchainsCompletedMeter.mark(countOpChain(_dispatchableSubPlan));
+
       long executionStartTimeNs = System.nanoTime();
       QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
       long requestId = executionContext.getRequestId();
@@ -789,6 +832,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
       _requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
+      // Add warnings for unavailable remote clusters in multi-cluster routing
+      if (_multiClusterRoutingContext != null && QueryOptionsUtils.isMultiClusterRoutingEnabled(_queryOpts, false)) {
+        for (QueryProcessingException clusterException
+            : _multiClusterRoutingContext.getUnavailableClusterExceptions()) {
+          brokerResponse.addException(clusterException);
+        }
+      }
+
       long totalTimeMs = System.currentTimeMillis() - _requestContext.getRequestArrivalTimeMillis();
       _brokerMetrics.addTimedValue(BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
 
@@ -810,9 +861,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
 
       // Log query and stats
-      _queryLogger.log(
+      _queryLogger.logQueryCompleted(
           new QueryLogger.QueryLogParams(_requestContext, _tableNames.toString(), brokerResponse,
-              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, _requesterIdentity, null));
+              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, _requesterIdentity, null), _queryWasLogged);
     }
   }
 
@@ -935,5 +986,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       default:
         return false;
     }
+  }
+
+  public QueryDispatcher getQueryDispatcher() {
+    return _queryDispatcher;
   }
 }

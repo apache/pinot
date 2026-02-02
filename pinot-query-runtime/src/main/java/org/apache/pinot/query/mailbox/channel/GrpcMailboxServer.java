@@ -24,6 +24,7 @@ import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
@@ -57,8 +58,19 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final MailboxService _mailboxService;
   private final Server _server;
 
+  /**
+   * Constructs a gRPC-based mailbox server.
+   *
+   * @param mailboxService mailbox service providing configuration such as port and instance type
+   * @param config Pinot configuration used to initialize access control and server options
+   * @param tlsConfig optional TLS configuration; when {@code null}, the server is started without TLS
+   * @param sslContext optional pre-built SSL context; when non-null, this context is used instead of creating a new one
+   *                   from {@code tlsConfig}
+   * @param accessControlFactory optional factory for building query access control; when {@code null}, a factory is
+   *                             created from {@code config}
+   */
   public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config, @Nullable TlsConfig tlsConfig,
-      @Nullable QueryAccessControlFactory accessControlFactory) {
+      @Nullable SslContext sslContext, @Nullable QueryAccessControlFactory accessControlFactory) {
     _mailboxService = mailboxService;
     int port = mailboxService.getPort();
     if (accessControlFactory == null) {
@@ -130,7 +142,9 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
 
     // Add SSL context only if TLS is configured
     if (tlsConfig != null) {
-      builder.sslContext(GrpcQueryServer.buildGrpcSslContext(tlsConfig));
+      SslContext serverSslContext =
+          sslContext != null ? sslContext : GrpcQueryServer.buildGrpcSslContext(tlsConfig);
+      builder.sslContext(serverSslContext);
     }
 
     _server = builder.build();

@@ -78,11 +78,18 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     // the stream consumer to check partition count if we're already caught up.
     StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
 
-    StreamMetadataProvider streamMetadataProvider =
-        realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
-    StreamPartitionMsgOffset latestStreamOffset =
-        RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(rtSegmentDataManager, streamMetadataProvider);
+    StreamPartitionMsgOffset latestStreamOffset = null;
+    try {
+      StreamMetadataProvider streamMetadataProvider =
+          realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
+      latestStreamOffset =
+          RealtimeSegmentMetadataUtils.fetchLatestStreamOffset(rtSegmentDataManager, streamMetadataProvider);
+    } catch (Exception e) {
+      _logger.warn("Failed to fetch latest stream offset for segment: {}. Will continue with other checks.",
+          segmentName, e);
+    }
 
+    // Check if we're caught up (isOffsetCaughtUp handles null latestStreamOffset by returning false)
     if (isOffsetCaughtUp(segmentName, currentOffset, latestStreamOffset)) {
       _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}. "
               + "But the current ingested offset is equal to the latest available offset {}.", segmentName, freshnessMs,

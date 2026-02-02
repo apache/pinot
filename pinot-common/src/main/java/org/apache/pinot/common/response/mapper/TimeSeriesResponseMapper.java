@@ -29,6 +29,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
@@ -158,6 +159,32 @@ public class TimeSeriesResponseMapper {
     map.merge(BrokerResponseNativeV2.StatKey.TOTAL_DOCS,
         getLongMetadataValue(metadata, DataTable.MetadataKey.TOTAL_DOCS));
     brokerResponse.addBrokerStats(map);
+  }
+
+  public static void setStatsInRequestContext(RequestContext requestContext, Map<String, String> metadata) {
+    if (metadata == null || metadata.isEmpty() || requestContext == null) {
+      return;
+    }
+    requestContext.setNumDocsScanned(getLongMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_DOCS_SCANNED));
+    requestContext.setNumEntriesScannedInFilter(getLongMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER));
+    requestContext.setNumEntriesScannedPostFilter(getLongMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER));
+    requestContext.setTotalDocs(getLongMetadataValue(metadata,
+        DataTable.MetadataKey.TOTAL_DOCS));
+    requestContext.setNumSegmentsQueried(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_SEGMENTS_QUERIED));
+    requestContext.setNumSegmentsProcessed(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED));
+    requestContext.setNumSegmentsMatched(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_SEGMENTS_MATCHED));
+    requestContext.setNumConsumingSegmentsMatched(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED));
+    requestContext.setNumConsumingSegmentsProcessed(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED));
+    requestContext.setNumConsumingSegmentsQueried(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED));
   }
 
   private static long getLongMetadataValue(Map<String, String> metadata, DataTable.MetadataKey key) {

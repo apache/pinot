@@ -380,7 +380,7 @@ export default function CustomizedTables({
   }, [search, timeoutId, filterSearchResults]);
 
   const styleCell = (str: string) => {
-    if (str.toLowerCase() === 'good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
+    if (str.toLowerCase() === 'good' || str.toLowerCase() === 'healthy' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
           return (
             <StyledChip
               label={str}
@@ -389,7 +389,7 @@ export default function CustomizedTables({
             />
           );
         }
-    if (str.toLocaleLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
+    if (str.toLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
       return (
         <StyledChip
           label={str}
@@ -398,7 +398,16 @@ export default function CustomizedTables({
         />
       );
     }
-    if (str.toLowerCase() === 'consuming' || str.toLocaleLowerCase() === "partial" || str.toLocaleLowerCase() === "updating" ) {
+    if (str.toLowerCase() === 'disabled' || str.toLowerCase() === "queries disabled" || str.toLowerCase() === 'unhealthy') {
+      return (
+        <StyledChip
+          label={str}
+          className={classes.cellStatusConsuming}
+          variant="outlined"
+        />
+      );
+    }
+    if (str.toLowerCase() === 'consuming' || str.toLowerCase() === "partial" || str.toLowerCase() === "updating") {
       return (
         <StyledChip
           label={str}

@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.inputformat.parquet;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema;
-import org.apache.parquet.schema.PrimitiveType;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
@@ -40,10 +39,10 @@ public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
 
   Object handleDeprecatedTypes(Object value, Schema.Field field) {
     Schema.Type avroColumnType = field.schema().getType();
-    if (avroColumnType == org.apache.avro.Schema.Type.UNION) {
-      org.apache.avro.Schema nonNullSchema = null;
-      for (org.apache.avro.Schema childFieldSchema : field.schema().getTypes()) {
-        if (childFieldSchema.getType() != org.apache.avro.Schema.Type.NULL) {
+    if (avroColumnType == Schema.Type.UNION) {
+      Schema nonNullSchema = null;
+      for (Schema childFieldSchema : field.schema().getTypes()) {
+        if (childFieldSchema.getType() != Schema.Type.NULL) {
           if (nonNullSchema == null) {
             nonNullSchema = childFieldSchema;
           } else {
@@ -51,10 +50,15 @@ public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
           }
         }
       }
+      assert nonNullSchema != null;
 
-      //INT96 is deprecated. We convert to long as we do in the native parquet extractor.
-      if (nonNullSchema.getName().equals(PrimitiveType.PrimitiveTypeName.INT96.name())) {
-       return ParquetNativeRecordExtractor.convertInt96ToLong((byte[]) value);
+      // NOTE:
+      // INT96 is deprecated. We convert to long as we do in the native parquet extractor.
+      // See org.apache.parquet.avro.AvroSchemaConverter about how INT96 is converted into Avro schema.
+      // We have to rely on the doc to determine whether a field is INT96.
+      if (nonNullSchema.getType() == Schema.Type.FIXED && nonNullSchema.getFixedSize() == 12
+          && "INT96 represented as byte[12]".equals(nonNullSchema.getDoc())) {
+        return ParquetNativeRecordExtractor.convertInt96ToLong((byte[]) value);
       }
     }
     return value;
