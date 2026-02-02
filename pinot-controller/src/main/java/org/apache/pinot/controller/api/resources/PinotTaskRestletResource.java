@@ -183,15 +183,11 @@ public class PinotTaskRestletResource {
   @ManagedAsync
   public void listTaskTypes(@Suspended AsyncResponse asyncResponse) {
     try {
-      Set<String> taskTypes = listTaskTypesSync();
+      Set<String> taskTypes = _pinotHelixTaskResourceManager.getTaskTypes();
       asyncResponse.resume(taskTypes);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private Set<String> listTaskTypesSync() {
-    return _pinotHelixTaskResourceManager.getTaskTypes();
   }
 
   @GET
@@ -206,15 +202,12 @@ public class PinotTaskRestletResource {
       @QueryParam("tenant") @Nullable String tenantName,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      PinotHelixTaskResourceManager.TaskSummaryResponse response = getTasksSummarySync(tenantName);
+      PinotHelixTaskResourceManager.TaskSummaryResponse response =
+          _pinotHelixTaskResourceManager.getTasksSummary(tenantName);
       asyncResponse.resume(response);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private PinotHelixTaskResourceManager.TaskSummaryResponse getTasksSummarySync(@Nullable String tenantName) {
-    return _pinotHelixTaskResourceManager.getTasksSummary(tenantName);
   }
 
   @GET
@@ -227,15 +220,11 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      TaskState state = getTaskQueueStateSync(taskType);
+      TaskState state = _pinotHelixTaskResourceManager.getTaskQueueState(taskType);
       asyncResponse.resume(state);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private TaskState getTaskQueueStateSync(String taskType) {
-    return _pinotHelixTaskResourceManager.getTaskQueueState(taskType);
   }
 
   @GET
@@ -247,19 +236,14 @@ public class PinotTaskRestletResource {
   public void getTasks(@ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      Set<String> tasks = getTasksSync(taskType);
+      Set<String> tasks = _pinotHelixTaskResourceManager.getTasks(taskType);
+      if (tasks == null) {
+        throw new NotFoundException("No tasks found for task type: " + taskType);
+      }
       asyncResponse.resume(tasks);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private Set<String> getTasksSync(String taskType) {
-    Set<String> tasks = _pinotHelixTaskResourceManager.getTasks(taskType);
-    if (tasks == null) {
-      throw new NotFoundException("No tasks found for task type: " + taskType);
-    }
-    return tasks;
   }
 
   @GET
@@ -271,15 +255,11 @@ public class PinotTaskRestletResource {
   public void getTasksCount(@ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      int count = getTasksCountSync(taskType);
+      int count = _pinotHelixTaskResourceManager.getTasks(taskType).size();
       asyncResponse.resume(count);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private int getTasksCountSync(String taskType) {
-    return _pinotHelixTaskResourceManager.getTasks(taskType).size();
   }
 
   @GET
@@ -294,15 +274,12 @@ public class PinotTaskRestletResource {
       String tableNameWithType, @Context HttpHeaders headers, @Suspended AsyncResponse asyncResponse) {
     try {
       String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, headers);
-      Map<String, TaskState> states = getTaskStatesByTableSync(taskType, translatedTableName);
+      Map<String, TaskState> states =
+          _pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, translatedTableName);
       asyncResponse.resume(states);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private Map<String, TaskState> getTaskStatesByTableSync(String taskType, String tableNameWithType) {
-    return _pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, tableNameWithType);
   }
 
   @GET
@@ -358,20 +335,15 @@ public class PinotTaskRestletResource {
       @Suspended AsyncResponse asyncResponse) {
     try {
       String tableNameWithType = table != null ? DatabaseUtils.translateTableName(table, headers) : null;
-      Map<String, PinotHelixTaskResourceManager.TaskCount> counts =
-          getTaskCountsSync(taskType, state, tableNameWithType);
+      Map<String, PinotHelixTaskResourceManager.TaskCount> counts;
+      if (StringUtils.isNotEmpty(state) || StringUtils.isNotEmpty(tableNameWithType)) {
+        counts = _pinotHelixTaskResourceManager.getTaskCounts(taskType, state, tableNameWithType);
+      } else {
+        counts = _pinotHelixTaskResourceManager.getTaskCounts(taskType);
+      }
       asyncResponse.resume(counts);
     } catch (Exception e) {
       asyncResponse.resume(e);
-    }
-  }
-
-  private Map<String, PinotHelixTaskResourceManager.TaskCount> getTaskCountsSync(String taskType,
-      @Nullable String state, @Nullable String tableNameWithType) {
-    if (StringUtils.isNotEmpty(state) || StringUtils.isNotEmpty(tableNameWithType)) {
-      return _pinotHelixTaskResourceManager.getTaskCounts(taskType, state, tableNameWithType);
-    } else {
-      return _pinotHelixTaskResourceManager.getTaskCounts(taskType);
     }
   }
 
@@ -389,16 +361,12 @@ public class PinotTaskRestletResource {
       @DefaultValue("0") @QueryParam("verbosity") int verbosity,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> debugInfo = getTasksDebugInfoSync(taskType, verbosity);
+      Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> debugInfo =
+          _pinotHelixTaskResourceManager.getTasksDebugInfo(taskType, verbosity);
       asyncResponse.resume(debugInfo);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfoSync(String taskType,
-      int verbosity) {
-    return _pinotHelixTaskResourceManager.getTasksDebugInfo(taskType, verbosity);
   }
 
   @GET
@@ -419,16 +387,11 @@ public class PinotTaskRestletResource {
     try {
       String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, headers);
       Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> debugInfo =
-          getTasksDebugInfoByTableSync(taskType, translatedTableName, verbosity);
+          _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, translatedTableName, verbosity);
       asyncResponse.resume(debugInfo);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfoByTableSync(String taskType,
-      String tableNameWithType, int verbosity) {
-    return _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, tableNameWithType, verbosity);
   }
 
   @GET
@@ -518,16 +481,11 @@ public class PinotTaskRestletResource {
           ? DatabaseUtils.translateTableName(tableNameWithType, httpHeaders)
           : null;
       PinotHelixTaskResourceManager.TaskDebugInfo debugInfo =
-          getTaskDebugInfoSync(taskName, translatedTableName, verbosity);
+          _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, translatedTableName, verbosity);
       asyncResponse.resume(debugInfo);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private PinotHelixTaskResourceManager.TaskDebugInfo getTaskDebugInfoSync(String taskName,
-      @Nullable String tableNameWithType, int verbosity) {
-    return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, tableNameWithType, verbosity);
   }
 
   @GET
@@ -540,15 +498,11 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      Map<String, TaskState> states = getTaskStatesSync(taskType);
+      Map<String, TaskState> states = _pinotHelixTaskResourceManager.getTaskStates(taskType);
       asyncResponse.resume(states);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private Map<String, TaskState> getTaskStatesSync(String taskType) {
-    return _pinotHelixTaskResourceManager.getTaskStates(taskType);
   }
 
   @GET
@@ -561,15 +515,11 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      TaskState state = getTaskStateSync(taskName);
+      TaskState state = _pinotHelixTaskResourceManager.getTaskState(taskName);
       asyncResponse.resume(state);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private TaskState getTaskStateSync(String taskName) {
-    return _pinotHelixTaskResourceManager.getTaskState(taskName);
   }
 
   @GET
@@ -582,15 +532,11 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      Map<String, TaskPartitionState> states = getSubtaskStatesSync(taskName);
+      Map<String, TaskPartitionState> states = _pinotHelixTaskResourceManager.getSubtaskStates(taskName);
       asyncResponse.resume(states);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private Map<String, TaskPartitionState> getSubtaskStatesSync(String taskName) {
-    return _pinotHelixTaskResourceManager.getSubtaskStates(taskName);
   }
 
   @GET
@@ -603,15 +549,11 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      List<PinotTaskConfig> configs = getTaskConfigsSync(taskName);
+      List<PinotTaskConfig> configs = _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName);
       asyncResponse.resume(configs);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private List<PinotTaskConfig> getTaskConfigsSync(String taskName) {
-    return _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName);
   }
 
   @GET
@@ -624,15 +566,11 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      Map<String, String> config = getTaskConfigSync(taskName);
+      Map<String, String> config = _pinotHelixTaskResourceManager.getTaskRuntimeConfig(taskName);
       asyncResponse.resume(config);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private Map<String, String> getTaskConfigSync(String taskName) {
-    return _pinotHelixTaskResourceManager.getTaskRuntimeConfig(taskName);
   }
 
   @GET
@@ -647,15 +585,12 @@ public class PinotTaskRestletResource {
       String subtaskNames,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      Map<String, PinotTaskConfig> configs = getSubtaskConfigsSync(taskName, subtaskNames);
+      Map<String, PinotTaskConfig> configs =
+          _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName, subtaskNames);
       asyncResponse.resume(configs);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private Map<String, PinotTaskConfig> getSubtaskConfigsSync(String taskName, @Nullable String subtaskNames) {
-    return _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName, subtaskNames);
   }
 
   @GET
@@ -979,16 +914,12 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      SuccessResponse response = cleanUpTasksSync(taskType);
+      _pinotHelixTaskResourceManager.cleanUpTaskQueue(taskType);
+      SuccessResponse response = new SuccessResponse("Successfully cleaned up tasks for task type: " + taskType);
       asyncResponse.resume(response);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private SuccessResponse cleanUpTasksSync(String taskType) {
-    _pinotHelixTaskResourceManager.cleanUpTaskQueue(taskType);
-    return new SuccessResponse("Successfully cleaned up tasks for task type: " + taskType);
   }
 
   @PUT
@@ -1002,16 +933,12 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      SuccessResponse response = stopTasksSync(taskType);
+      _pinotHelixTaskResourceManager.stopTaskQueue(taskType);
+      SuccessResponse response = new SuccessResponse("Successfully stopped tasks for task type: " + taskType);
       asyncResponse.resume(response);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private SuccessResponse stopTasksSync(String taskType) {
-    _pinotHelixTaskResourceManager.stopTaskQueue(taskType);
-    return new SuccessResponse("Successfully stopped tasks for task type: " + taskType);
   }
 
   @PUT
@@ -1025,16 +952,12 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      SuccessResponse response = resumeTasksSync(taskType);
+      _pinotHelixTaskResourceManager.resumeTaskQueue(taskType);
+      SuccessResponse response = new SuccessResponse("Successfully resumed tasks for task type: " + taskType);
       asyncResponse.resume(response);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private SuccessResponse resumeTasksSync(String taskType) {
-    _pinotHelixTaskResourceManager.resumeTaskQueue(taskType);
-    return new SuccessResponse("Successfully resumed tasks for task type: " + taskType);
   }
 
   @DELETE
@@ -1050,16 +973,12 @@ public class PinotTaskRestletResource {
       @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      SuccessResponse response = deleteTasksSync(taskType, forceDelete);
+      _pinotHelixTaskResourceManager.deleteTaskQueue(taskType, forceDelete);
+      SuccessResponse response = new SuccessResponse("Successfully deleted tasks for task type: " + taskType);
       asyncResponse.resume(response);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private SuccessResponse deleteTasksSync(String taskType, boolean forceDelete) {
-    _pinotHelixTaskResourceManager.deleteTaskQueue(taskType, forceDelete);
-    return new SuccessResponse("Successfully deleted tasks for task type: " + taskType);
   }
 
   @DELETE
@@ -1075,16 +994,12 @@ public class PinotTaskRestletResource {
       @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      SuccessResponse response = deleteTaskSync(taskName, forceDelete);
+      _pinotHelixTaskResourceManager.deleteTask(taskName, forceDelete);
+      SuccessResponse response = new SuccessResponse("Successfully deleted task: " + taskName);
       asyncResponse.resume(response);
     } catch (Exception e) {
       asyncResponse.resume(e);
     }
-  }
-
-  private SuccessResponse deleteTaskSync(String taskName, boolean forceDelete) {
-    _pinotHelixTaskResourceManager.deleteTask(taskName, forceDelete);
-    return new SuccessResponse("Successfully deleted task: " + taskName);
   }
 
   @DELETE
