@@ -303,7 +303,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * Override to provide custom transition thread pool manager
    */
   protected void initTransitionThreadPoolManager() {
-    _transitionThreadPoolManager = null;
+    _transitionThreadPoolManager = new DefaultStateTransitionThreadPoolManager();
   }
 
   /// Can be overridden to apply custom configs to the server conf.

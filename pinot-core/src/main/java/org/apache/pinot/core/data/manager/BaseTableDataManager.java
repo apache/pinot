@@ -481,14 +481,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return;
     }
     _logger.info("Enqueuing segment: {} to be replaced", segmentName);
-    _segmentReloadRefreshExecutor.submit(() -> {
+    Runnable task = SegmentOperationsThrottlerContextRegistry.get().wrap(() -> {
       try {
         replaceSegmentInternal(segmentName);
       } catch (Exception e) {
         LOGGER.error("Caught exception while replacing segment: {}", segmentName, e);
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
       }
-    });
+    }, SegmentOperationsTaskType.REFRESH_THREAD);
+    _segmentReloadRefreshExecutor.submit(task);
   }
 
   protected void replaceSegmentInternal(String segmentName)
@@ -788,24 +789,26 @@ public abstract class BaseTableDataManager implements TableDataManager {
       throws Exception {
     List<String> failedSegments = new ArrayList<>();
     AtomicReference<Throwable> sampleException = new AtomicReference<>();
-    CompletableFuture.allOf(segmentDataManagers.stream().map(segmentDataManager -> CompletableFuture.runAsync(() -> {
-      String segmentName = segmentDataManager.getSegmentName();
-      try {
-        _segmentReloadSemaphore.acquire(segmentName, _logger);
-        try {
-          reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
-        } finally {
-          _segmentReloadSemaphore.release();
-        }
-      } catch (Throwable t) {
-        _logger.error("Caught exception while reloading segment: {}", segmentName, t);
-        failedSegments.add(segmentName);
-        sampleException.set(t);
-        if (reloadJobId != null) {
-          _reloadJobStatusCache.recordFailure(reloadJobId, segmentName, t);
-        }
-      }
-    }, _segmentReloadRefreshExecutor)).toArray(CompletableFuture[]::new)).get();
+    CompletableFuture.allOf(segmentDataManagers.stream().map(segmentDataManager -> CompletableFuture.runAsync(
+        SegmentOperationsThrottlerContextRegistry.get().wrap(() -> {
+          String segmentName = segmentDataManager.getSegmentName();
+          try {
+            _segmentReloadSemaphore.acquire(segmentName, _logger);
+            try {
+              reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
+            } finally {
+              _segmentReloadSemaphore.release();
+            }
+          } catch (Throwable t) {
+            _logger.error("Caught exception while reloading segment: {}", segmentName, t);
+            failedSegments.add(segmentName);
+            sampleException.set(t);
+            if (reloadJobId != null) {
+              _reloadJobStatusCache.recordFailure(reloadJobId, segmentName, t);
+            }
+          }
+        }, SegmentOperationsTaskType.RELOAD_THREAD), _segmentReloadRefreshExecutor)).toArray(CompletableFuture[]::new))
+        .get();
     if (sampleException.get() != null) {
       throw new RuntimeException(
           String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),
