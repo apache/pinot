@@ -19,7 +19,6 @@
 package org.apache.pinot.perf;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -75,12 +74,12 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Warmup(iterations = 10, time = 1)
 @Measurement(iterations = 5, time = 1)
 @State(Scope.Benchmark)
-public class BenchmarkEquiJoin extends BaseClusterIntegrationTest {
+public class BenchmarkBrokerSerializer extends BaseClusterIntegrationTest {
 
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder()
-        .include(BenchmarkEquiJoin.class.getSimpleName())
+        .include(BenchmarkBrokerSerializer.class.getSimpleName())
         .addProfiler(GCProfiler.class);
     new Runner(opt.build()).run();
   }
@@ -88,16 +87,7 @@ public class BenchmarkEquiJoin extends BaseClusterIntegrationTest {
   /// Number of rows on each segment
   private int _rowsPerSegment = 100_000;
   @Param({"10"})
-  private int _segments;
-
-  /// The ratio (in the range of `(0, 1]`) of unique rows in the table.
-  ///
-  /// The lower the [#_uRatio], the more rows will match in the join.
-  /// The requested uniqueness will not be guaranteed. Instead it will be statistically approached by using a
-  /// random number generator to create the data.
-  //@Param({"1", "0.1", "0.01"})
-  @Param({"1"})
-  private double _uRatio;
+  int _segments;
 
   private JsonNode query(String query)
       throws Exception {
@@ -117,64 +107,13 @@ public class BenchmarkEquiJoin extends BaseClusterIntegrationTest {
     return Map.of("useMultistageEngine", "true", "dropResults", "true");
   }
 
-//  /// Executes a query where [#_rowsPerSegment] left rows are joined by int with [#_rowsPerSegment]/100 right rows
-//  /// and then counted
-//  @Benchmark
-//  public JsonNode countJoinOneHundredthInt()
-//      throws Exception {
-//    @Language("sql")
-//    String query = "SET useMultistageEngine=true;"
-//        + "SET maxRowsInJoin=1000000000;"
-//        + "SELECT count(*) "
-//        + "FROM MyTable t1 "
-//        + "JOIN MyTable t2 "
-//        + "ON t1.intCol = t2.intCol "
-//        + "WHERE t2.intCol % 10 = 0";
-//    return query(query);
-//  }
-//
-//  /// Executes a query where [#_rowsPerSegment] left rows are joined by str with [#_rowsPerSegment]/100 right rows
-//  /// and then counted
-//  @Benchmark
-//  public JsonNode countJoinOneHundredthStr()
-//      throws Exception {
-//    @Language("sql")
-//    String query = "SET useMultistageEngine=true;"
-//        + "SELECT COUNT(*) "
-//        + "FROM MyTable t1 "
-//        + "JOIN MyTable t2 "
-//        + "ON t1.strCol = t2.strCol "
-//        + "WHERE t2.intCol % 100 = 0";
-//    return query(query);
-//  }
-//
-//  /// Executes a query where [#_rowsPerSegment] left rows are joined by int with [#_rowsPerSegment]/100 right rows
-//  /// and then all rows projected
-//  @Benchmark
-//  public JsonNode projectJoinOneHundredthInt()
-//      throws Exception {
-//    @Language("sql")
-//    String query = "SET useMultistageEngine=true;"
-//        + "SELECT * "
-//        + "FROM MyTable t1 "
-//        + "JOIN MyTable t2 "
-//        + "ON t1.intCol = t2.intCol "
-//        + "WHERE t2.intCol % 100 = 0";
-//    return query(query);
-//  }
-
-  /// Executes a query where [#_rowsPerSegment] left rows are joined by str with [#_rowsPerSegment]/100 right rows
-  /// and then all rows projected
   @Benchmark
-  public JsonNode projectJoinOneHundredthStr()
+  public JsonNode projectAll()
       throws Exception {
     @Language("sql")
     String query = "SET useMultistageEngine=true;"
         + "SELECT * "
-        + "FROM MyTable t1 "
-        + "JOIN MyTable t2 "
-        + "ON t1.strCol = t2.strCol "
-        + "WHERE t2.intCol % 100 = 0";
+        + "FROM MyTable t1 ";
     return query(query);
   }
 
@@ -274,10 +213,8 @@ public class BenchmarkEquiJoin extends BaseClusterIntegrationTest {
 
   private Distribution.DataSupplier createSupplier() {
     int actualTableRows = _rowsPerSegment * _segments;
-    Preconditions.checkState(_uRatio > 0 && _uRatio <= 1.0, "_uRatio must be in the range of (0, 1]");
-    int uniqueRows = _uRatio == 1 ? actualTableRows : (int) (actualTableRows * _uRatio);
 
-    return Distribution.UNIFORM.createSupplier(42, 0, uniqueRows);
+    return Distribution.UNIFORM.createSupplier(42, 0, actualTableRows);
   }
 
   @TearDown
