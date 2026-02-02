@@ -34,7 +34,7 @@ public class KeepPipelineBreakerStatsPredicate implements PinotClusterConfigChan
   private volatile boolean _skip;
 
   public KeepPipelineBreakerStatsPredicate(boolean skip) {
-    this._skip = skip;
+    _skip = skip;
   }
 
   // NOTE: When this method is called, the helix manager is not yet connected.
