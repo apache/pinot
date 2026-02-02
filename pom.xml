@@ -2831,6 +2831,13 @@
             <exclude>**/.classpath</exclude>
             <exclude>.externalToolBuilders/**</exclude>
 
+            <!-- GenAI Config files -->
+            <exclude>.codex/**</exclude>
+            <exclude>.continue/**</exclude>
+            <exclude>.copilot/**</exclude>
+            <exclude>.openai/**</exclude>
+            <exclude>.ollama/**</exclude>
+
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>helm/**</exclude>
             <exclude>docker/**</exclude>
