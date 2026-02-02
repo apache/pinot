@@ -75,7 +75,7 @@ public class RecordReaderFactory {
     register(FileFormat.THRIFT, DEFAULT_THRIFT_RECORD_READER_CLASS, DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS);
     register(FileFormat.ORC, DEFAULT_ORC_RECORD_READER_CLASS, null);
     register(FileFormat.PARQUET, DEFAULT_PARQUET_RECORD_READER_CLASS, DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS);
-    register(FileFormat.PROTOBUF, DEFAULT_PROTO_RECORD_READER_CLASS, DEFAULT_PROTO_RECORD_READER_CONFIG_CLASS);
+    register(FileFormat.PROTO, DEFAULT_PROTO_RECORD_READER_CLASS, DEFAULT_PROTO_RECORD_READER_CONFIG_CLASS);
   }
 
   /**
@@ -177,20 +177,20 @@ public class RecordReaderFactory {
   }
 
   /**
-   * Get registered RecordReader class name given a file format.
+   * Get registered RecordReader class name given a file format string.
    *
-   * @param fileFormatStr
-   * @return recordReaderClassName
+   * @param fileFormatStr the file format string (case-insensitive)
+   * @return recordReaderClassName or null if not found
    */
   public static String getRecordReaderClassName(String fileFormatStr) {
     return DEFAULT_RECORD_READER_CLASS_MAP.get(fileFormatStr.toUpperCase());
   }
 
   /**
-   * Get registered RecordReaderConfig class name given a file format.
+   * Get registered RecordReaderConfig class name given a file format string.
    *
-   * @param fileFormatStr
-   * @return recordReaderConfigClassName
+   * @param fileFormatStr the file format string (case-insensitive)
+   * @return recordReaderConfigClassName or null if not found
    */
   public static String getRecordReaderConfigClassName(String fileFormatStr) {
     return DEFAULT_RECORD_READER_CONFIG_CLASS_MAP.get(fileFormatStr.toUpperCase());

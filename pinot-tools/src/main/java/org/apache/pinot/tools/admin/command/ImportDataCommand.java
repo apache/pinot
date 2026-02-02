@@ -379,7 +379,6 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
         return "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig";
       case CSV:
         return "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig";
-      case PROTOBUF:
       case PROTO:
         return "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig";
       case THRIFT:
@@ -406,7 +405,6 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
         return "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
       case PARQUET:
         return "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader";
-      case PROTOBUF:
       case PROTO:
         return "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReader";
       case THRIFT:

@@ -124,7 +124,7 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
         String segmentName = entry.getKey();
         String inputPath = entry.getValue();
         String outputPath = new File(outputDir, segmentName).getAbsolutePath();
-        switch (FileFormat.valueOf(_outputFormat.toUpperCase())) {
+        switch (FileFormat.fromString(_outputFormat)) {
           case AVRO:
             outputPath += ".avro";
             new PinotSegmentToAvroConverter(inputPath, outputPath).convert();
