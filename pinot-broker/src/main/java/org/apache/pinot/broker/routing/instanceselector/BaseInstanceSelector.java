@@ -31,7 +31,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -261,16 +260,27 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     Set<Integer> pools = new HashSet<>();
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Map<String, String> sortedIdealStateMap = convertToSortedMap(idealStateInstanceStateMap);
       Long newSegmentCreationTimeMs = newSegmentCreationTimeMap.get(segment);
       Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
+
+      // Build mapping from instance to position in ideal state (ideal state replica ID)
+      Map<String, Integer> instanceToIdealStateReplicaId = new HashMap<>();
+      int idealStateReplicaId = 0;
+      for (String instance : sortedIdealStateMap.keySet()) {
+        instanceToIdealStateReplicaId.put(instance, idealStateReplicaId);
+        idealStateReplicaId++;
+      }
+
       if (externalViewInstanceStateMap == null) {
         if (newSegmentCreationTimeMs != null) {
           // New segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-          for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
+          for (Map.Entry<String, String> entry : sortedIdealStateMap.entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
-              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance)));
+              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance),
+                  instanceToIdealStateReplicaId.get(instance)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -287,7 +297,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
               candidates.add(
-                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance)));
+                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance),
+                      instanceToIdealStateReplicaId.get(instance)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -295,7 +306,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
           // Old segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
           for (String instance : onlineInstances) {
-            candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance)));
+            candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance),
+                instanceToIdealStateReplicaId.get(instance)));
           }
           _oldSegmentCandidatesMap.put(segment, candidates);
         }
@@ -454,20 +466,18 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     // Copy the volatile reference so that segmentToInstanceMap and unavailableSegments can have a consistent view of
     // the state.
     SegmentStates segmentStates = _segmentStates;
-    Pair<Map<String, String>, Map<String, String>> segmentToInstanceMap =
-        select(segments, requestIdInt, segmentStates, queryOptions);
+    SelectionResult selectionResult = select(segments, requestIdInt, segmentStates, queryOptions);
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
-    if (unavailableSegments.isEmpty()) {
-      return new SelectionResult(segmentToInstanceMap, Collections.emptyList(), 0);
-    } else {
-      List<String> unavailableSegmentsForRequest = new ArrayList<>();
+    if (!unavailableSegments.isEmpty()) {
+      Set<String> unavailableSegmentsForRequest = new HashSet<>(selectionResult.getUnavailableSegments());
       for (String segment : segments) {
         if (unavailableSegments.contains(segment)) {
           unavailableSegmentsForRequest.add(segment);
         }
       }
-      return new SelectionResult(segmentToInstanceMap, unavailableSegmentsForRequest, 0);
+      selectionResult.setUnavailableSegments(new ArrayList<>(unavailableSegmentsForRequest));
     }
+    return selectionResult;
   }
 
   @Override
@@ -492,8 +502,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
    * Selects the server instances for the given segments based on the request id and segment states. Returns two maps
    * from segment to selected server instance hosting the segment. The 2nd map is for optional segments. The optional
    * segments are used to get the new segments that are not online yet. Instead of simply skipping them by broker at
-   * routing time, we can send them to servers and let servers decide how to handle them.
+   * routing time, we can send them to servers and let servers decide how to handle them. List of unavailable segments
+   * can also be included.
    */
-  protected abstract Pair<Map<String, String>, Map<String, String>/*optional segments*/> select(List<String> segments,
+  protected abstract SelectionResult select(List<String> segments,
       int requestId, SegmentStates segmentStates, Map<String, String> queryOptions);
 }

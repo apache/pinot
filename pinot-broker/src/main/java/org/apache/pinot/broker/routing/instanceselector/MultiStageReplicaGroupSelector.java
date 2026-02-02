@@ -86,8 +86,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   }
 
   @Override
-  public Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
-      SegmentStates segmentStates, Map<String, String> queryOptions) {
+  public SelectionResult select(List<String> segments, int requestId, SegmentStates segmentStates,
+      Map<String, String> queryOptions) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
     int replicaGroupSelected;
@@ -103,7 +103,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
     }
 
-    return assign(Sets.newHashSet(segments), segmentStates, instancePartitions, replicaGroupSelected);
+    return new SelectionResult(
+        assign(Sets.newHashSet(segments), segmentStates, instancePartitions, replicaGroupSelected), List.of(), 0);
   }
 
   /**

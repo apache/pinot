@@ -32,6 +32,7 @@ public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
   private final int _pool;
+  private int _idealStateReplicaId = -1;
 
   @VisibleForTesting
   public SegmentInstanceCandidate(String instance, boolean online) {
@@ -41,10 +42,11 @@ public class SegmentInstanceCandidate {
     _pool = FALLBACK_POOL_ID;
   }
 
-  public SegmentInstanceCandidate(String instance, boolean online, int pool) {
+  public SegmentInstanceCandidate(String instance, boolean online, int pool, int idealStateReplicaId) {
     _instance = instance;
     _online = online;
     _pool = pool;
+    _idealStateReplicaId = idealStateReplicaId;
   }
 
   public String getInstance() {
@@ -57,6 +59,10 @@ public class SegmentInstanceCandidate {
 
   public int getPool() {
     return _pool;
+  }
+
+  public int getIdealStateReplicaId() {
+    return _idealStateReplicaId;
   }
 
   @Override

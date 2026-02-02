@@ -71,7 +71,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupInstanceSelector.class);
 
   @Override
-  public Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+  public SelectionResult select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
     if (_adaptiveServerSelector != null) {
@@ -85,10 +85,14 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       for (int idx = 0; idx < serverRankList.size(); idx++) {
         serverRankMap.put(serverRankList.get(idx), idx);
       }
-      return selectServers(segments, requestId, segmentStates, serverRankMap, ctx);
+      Pair<Map<String, String>, Map<String, String>> selectedServers =
+          selectServers(segments, requestId, segmentStates, serverRankMap, ctx);
+      return new SelectionResult(selectedServers, List.of(), 0);
     } else {
       // Adaptive Server Selection is NOT enabled.
-      return selectServers(segments, requestId, segmentStates, null, ctx);
+      Pair<Map<String, String>, Map<String, String>> selectedServers =
+          selectServers(segments, requestId, segmentStates, null, ctx);
+      return new SelectionResult(selectedServers, List.of(), 0);
     }
   }
 
@@ -247,11 +251,21 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       // NOTE: onlineInstances is either a TreeSet or an EmptySet (sorted)
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+
+      // Build mapping from instance to position in ideal state (ideal state replica ID)
+      Map<String, Integer> instanceToIdealStateReplicaId = new HashMap<>();
+      int idealStateReplicaId = 0;
+      for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
+        instanceToIdealStateReplicaId.put(instance, idealStateReplicaId);
+        idealStateReplicaId++;
+      }
+
       Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
       for (String instance : onlineInstances) {
         if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance)));
+          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance),
+              instanceToIdealStateReplicaId.get(instance)));
         }
       }
       _oldSegmentCandidatesMap.put(segment, candidates);
@@ -261,12 +275,22 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       String segment = entry.getKey();
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Map<String, String> sortedIdealStateInstanceStateMap = convertToSortedMap(idealStateInstanceStateMap);
+      // Build mapping from instance to position in ideal state (ideal state replica ID)
+      Map<String, Integer> instanceToIdealStateReplicaId = new HashMap<>();
+      int idealStateReplicaId = 0;
+      for (String instance : sortedIdealStateInstanceStateMap.keySet()) {
+        instanceToIdealStateReplicaId.put(instance, idealStateReplicaId);
+        idealStateReplicaId++;
+      }
+
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Collections.emptySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-      for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
+      for (String instance : sortedIdealStateInstanceStateMap.keySet()) {
         if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance)));
+          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance),
+              instanceToIdealStateReplicaId.get(instance)));
         }
       }
       _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));

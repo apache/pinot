@@ -1912,8 +1912,7 @@ public class InstanceSelectorTest {
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(serverRanks);
 
     // Act
-    Pair<Map<String, String>, Map<String, String>> selectedResult =
-        instanceSelector.select(segments, 0, segmentStates, null);
+    InstanceSelector.SelectionResult selectedResult = instanceSelector.select(segments, 0, segmentStates, null);
 
     // Assert
     Map<String, String> expectedSelection = new HashMap<>();
@@ -1921,6 +1920,6 @@ public class InstanceSelectorTest {
     expectedSelection.put(segment1, instance3);
     expectedSelection.put(segment2, instance4);
 
-    assertEquals(selectedResult.getLeft(), expectedSelection);
+    assertEquals(selectedResult.getSegmentToInstanceMap(), expectedSelection);
   }
 }
