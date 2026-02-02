@@ -32,10 +32,14 @@ import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManagerFactory;
 import nl.altindag.ssl.SSLFactory;
 import nl.altindag.ssl.exception.GenericSSLContextException;
@@ -70,6 +74,7 @@ public final class TlsUtils {
   private static final String INSECURE = "insecure";
 
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
+  private static final Set<String> LOGGED_TLS_DIAGNOSTICS_KEYS = ConcurrentHashMap.newKeySet();
 
   private TlsUtils() {
     // left blank
@@ -251,6 +256,7 @@ public final class TlsUtils {
       // HttpsURLConnection
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
       setSslContext(sc);
+      logTlsDiagnosticsOnce("https.default", sc, null, false);
     } catch (GenericSSLContextException | GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
@@ -321,6 +327,7 @@ public final class TlsUtils {
     sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
     sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
     try {
+      warnIfNonJdkProviderConfiguredInternal("netty.client", tlsConfig);
       return sslContextBuilder.build();
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -346,6 +353,7 @@ public final class TlsUtils {
       sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
     }
     try {
+      warnIfNonJdkProviderConfiguredInternal("netty.server", tlsConfig);
       return sslContextBuilder.build();
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -367,6 +375,95 @@ public final class TlsUtils {
           || makeKeyOrTrustStoreUrl(keyOrTrustStorePath).toURI().getScheme().startsWith(FILE_SCHEME);
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private static void warnIfNonJdkProviderConfiguredInternal(String contextName, TlsConfig tlsConfig) {
+    // In Platform-FIPS-JDK deployments, you typically want to stay on the JDK TLS stack
+    // (JSSE provider selection happens via java.security / JVM configuration).
+    String configured = tlsConfig != null ? tlsConfig.getSslProvider() : null;
+    if (configured != null) {
+      try {
+        SslProvider sslProvider = SslProvider.valueOf(configured);
+        if (sslProvider != SslProvider.JDK) {
+          LOGGER.warn("TLS config for '{}' sets sslProvider='{}'. Platform-FIPS-JDK deployments typically require "
+              + "sslProvider='JDK' (avoid OpenSSL).", contextName, configured);
+        }
+      } catch (Exception e) {
+        // If config is invalid, let existing code fail where it parses/builds the context.
+      }
+    }
+  }
+
+  /**
+   * Log (once) the JSSE provider/protocol actually used at runtime for the given TLS config.
+   * <p>
+   * This is intended as a lightweight runtime self-check for Platform-FIPS-JDK deployments: Pinot generally uses the
+   * JDK TLS stack (JSSE), and the platform/JDK decides which provider is active via {@code java.security} and other JVM
+   * settings. This method helps surface misconfiguration early without enforcing behavior.
+   */
+  public static void logJsseDiagnosticsOnce(String contextName, SSLFactory sslFactory, TlsConfig tlsConfig) {
+    if (sslFactory == null) {
+      return;
+    }
+    try {
+      SSLContext sslContext = sslFactory.getSslContext();
+      String configuredSslProvider = tlsConfig != null ? tlsConfig.getSslProvider() : null;
+      boolean insecure = tlsConfig != null && tlsConfig.isInsecure();
+      logTlsDiagnosticsOnce(contextName, sslContext, configuredSslProvider, insecure);
+    } catch (Exception e) {
+      LOGGER.warn("TLS diagnostics ({}): failed to obtain SSLContext for diagnostics", contextName, e);
+    }
+  }
+
+  /**
+   * Emit a warning when a non-JDK TLS stack is configured.
+   */
+  public static void warnIfNonJdkProviderConfigured(String contextName, TlsConfig tlsConfig) {
+    warnIfNonJdkProviderConfiguredInternal(contextName, tlsConfig);
+  }
+
+  private static void logTlsDiagnosticsOnce(String contextName, SSLContext sslContext, String configuredSslProvider,
+      boolean insecure) {
+    if (sslContext == null) {
+      return;
+    }
+    String providerName = sslContext.getProvider() != null ? sslContext.getProvider().getName() : "null";
+    String protocol = sslContext.getProtocol();
+    String key = contextName + "|" + providerName + "|" + protocol + "|" + configuredSslProvider + "|" + insecure;
+    if (!LOGGED_TLS_DIAGNOSTICS_KEYS.add(key)) {
+      return;
+    }
+
+    // Basic “what are we actually using at runtime?” visibility.
+    LOGGER.info(
+        "TLS diagnostics ({}): SSLContext protocol='{}', provider='{}', configuredSslProvider='{}', insecure={}",
+        contextName, protocol, providerName, configuredSslProvider, insecure);
+
+    // Heuristic warnings that are helpful for FIPS hardening (without enforcing behavior here).
+    if ("SSL".equalsIgnoreCase(protocol)) {
+      LOGGER.warn("TLS diagnostics ({}): SSLContext protocol is '{}'. Consider using 'TLS' and enforcing TLSv1.2+ via "
+          + "protocol/cipher allowlists for compliance hardening.", contextName, protocol);
+    }
+
+    try {
+      SSLEngine engine = sslContext.createSSLEngine();
+      String[] enabledProtocols = engine.getEnabledProtocols();
+      String[] enabledCiphers = engine.getEnabledCipherSuites();
+      LOGGER.info("TLS diagnostics ({}): enabledProtocols={}, enabledCipherSuites(count)={}", contextName,
+          Arrays.toString(enabledProtocols), enabledCiphers != null ? enabledCiphers.length : 0);
+
+      if (enabledProtocols != null) {
+        for (String p : enabledProtocols) {
+          if ("TLSv1".equalsIgnoreCase(p) || "TLSv1.1".equalsIgnoreCase(p) || "SSLv3".equalsIgnoreCase(p)
+              || "SSLv2Hello".equalsIgnoreCase(p)) {
+            LOGGER.warn("TLS diagnostics ({}): enabled protocol '{}' is typically disallowed in modern/FIPS-hardened "
+                + "deployments. Consider enforcing TLSv1.2+.", contextName, p);
+          }
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("TLS diagnostics ({}): failed to create SSLEngine for diagnostics", contextName, e);
     }
   }
 }

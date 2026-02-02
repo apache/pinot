@@ -363,9 +363,9 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
           RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig);
       // since tlsConfig.getKeyStorePath() is not null, sslFactory.getKeyManagerFactory().get() should not be null
       SslProvider sslProvider = SslProvider.valueOf(tlsConfig.getSslProvider());
-      if (sslProvider != SslProvider.JDK) {
-        LOGGER.warn("Configured SSL provider is {}. For FIPS/BCJSSE environments use JDK provider.", sslProvider);
-      }
+      // Runtime visibility for Platform-FIPS-JDK deployments: warn & log the actual JSSE provider/protocol once.
+      TlsUtils.warnIfNonJdkProviderConfigured("grpc.broker.server", tlsConfig);
+      TlsUtils.logJsseDiagnosticsOnce("grpc.broker.server", sslFactory, tlsConfig);
       SslContextBuilder sslContextBuilder =
           SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get()).sslProvider(sslProvider);
       sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);

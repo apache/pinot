@@ -131,6 +131,7 @@ public class PinotAccessControlUserRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/users")
+  @Authenticate(AccessType.CREATE)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_USER)
   @ApiOperation(value = "Add a user", notes = "Add a user")
   public SuccessResponse addUser(String userConfigStr) {

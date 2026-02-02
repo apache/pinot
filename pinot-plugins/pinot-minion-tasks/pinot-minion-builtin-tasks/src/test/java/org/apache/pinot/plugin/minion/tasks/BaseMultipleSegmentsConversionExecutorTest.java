@@ -30,9 +30,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
@@ -52,6 +55,7 @@ public class BaseMultipleSegmentsConversionExecutorTest {
 
   @AfterMethod
   public void tearDown() throws IOException {
+    MinionContext.getInstance().setTaskAuthProvider(null);
     // Clean up the temporary directory
     FileUtils.deleteDirectory(_tempDir);
   }
@@ -80,6 +84,35 @@ public class BaseMultipleSegmentsConversionExecutorTest {
     };
   }
 
+  // Helper method to create task configs with optional AUTH_TOKEN
+  private Map<String, String> createTaskConfigs(String authToken) {
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put("tableName", "myTable_OFFLINE");
+    taskConfigs.put("uploadURL", "http://controller:9000/upload");
+    if (authToken != null) {
+      taskConfigs.put(MinionConstants.AUTH_TOKEN, authToken);
+    }
+    return taskConfigs;
+  }
+
+  // Helper method to create SegmentUploadContext and get auth provider headers
+  private List<Header> getAuthHeaders(Map<String, String> taskConfigs) {
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig("customMinionTask", taskConfigs);
+    List<SegmentConversionResult> results = new ArrayList<>();
+    BaseMultipleSegmentsConversionExecutor.SegmentUploadContext ctx =
+        new BaseMultipleSegmentsConversionExecutor.SegmentUploadContext(pinotTaskConfig, results);
+    return _executor.getSegmentPushCommonHeaders(pinotTaskConfig, ctx.getAuthProvider(), results);
+  }
+
+  // Helper method to get AuthProvider from task configs
+  private AuthProvider getAuthProviderFromTaskConfigs(Map<String, String> taskConfigs) {
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig("customMinionTask", taskConfigs);
+    List<SegmentConversionResult> results = new ArrayList<>();
+    BaseMultipleSegmentsConversionExecutor.SegmentUploadContext ctx =
+        new BaseMultipleSegmentsConversionExecutor.SegmentUploadContext(pinotTaskConfig, results);
+    return ctx.getAuthProvider();
+  }
+
   @Test
   public void testGetPushJobSpec() {
     Map<String, String> taskConfigs = new HashMap<>();
@@ -96,6 +129,99 @@ public class BaseMultipleSegmentsConversionExecutorTest {
     List<Header> headers =
         _executor.getSegmentPushCommonHeaders(pinotTaskConfig, _mockAuthProvider, segmentConversionResults);
     Assert.assertEquals(headers.size(), 1);
+  }
+
+  @Test
+  public void testRuntimeAuthProviderUsedWhenNoExplicitToken() {
+    // Set up a runtime provider in MinionContext
+    AuthProvider runtimeProvider = new AuthProvider() {
+      @Override
+      public Map<String, Object> getRequestHeaders() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("X-Runtime-Auth", "runtime-value");
+        return m;
+      }
+      @Override
+      public String getTaskToken() {
+        return "IGNORED";
+      }
+    };
+    MinionContext.getInstance().setTaskAuthProvider(runtimeProvider);
+
+    // Create task WITHOUT explicit AUTH_TOKEN
+    Map<String, String> taskConfigs = createTaskConfigs(null);
+    List<Header> headers = getAuthHeaders(taskConfigs);
+
+    // Should use runtime provider since no explicit token was provided
+    boolean foundCustom = headers.stream().anyMatch(h -> h.getName().equals("X-Runtime-Auth")
+        && h.getValue().equals("runtime-value"));
+    Assert.assertTrue(foundCustom, "Expected custom header from runtime provider when no explicit token provided");
+  }
+
+  @Test
+  public void testExplicitTaskTokenTakesPrecedence() {
+    // Set up a runtime provider in MinionContext
+    AuthProvider runtimeProvider = new AuthProvider() {
+      @Override
+      public Map<String, Object> getRequestHeaders() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("X-Runtime-Auth", "should-not-be-used");
+        return m;
+      }
+      @Override
+      public String getTaskToken() {
+        return "IGNORED";
+      }
+    };
+    MinionContext.getInstance().setTaskAuthProvider(runtimeProvider);
+
+    // Create task WITH explicit AUTH_TOKEN (should take precedence)
+    Map<String, String> taskConfigs = createTaskConfigs("Bearer explicit-task-token");
+    List<Header> headers = getAuthHeaders(taskConfigs);
+
+    // Should use explicit AUTH_TOKEN, not runtime provider
+    boolean foundExplicitToken = headers.stream().anyMatch(h -> h.getName().equals("Authorization")
+        && h.getValue().equals("Bearer explicit-task-token"));
+    Assert.assertTrue(foundExplicitToken, "Expected explicit AUTH_TOKEN to take precedence over runtime provider");
+
+    // Should NOT have runtime provider's custom header
+    boolean foundRuntimeHeader = headers.stream().anyMatch(h -> h.getName().equals("X-Runtime-Auth"));
+    Assert.assertFalse(foundRuntimeHeader, "Runtime provider should not be used when explicit token is provided");
+  }
+
+  @Test
+  public void testExplicitTokenUsedWhenRuntimeProviderIsNull() {
+    // No runtime provider configured (or NullAuthProvider)
+    MinionContext.getInstance().setTaskAuthProvider(new NullAuthProvider());
+
+    // Create task WITH explicit AUTH_TOKEN
+    Map<String, String> taskConfigs = createTaskConfigs("Bearer fallback-token");
+    List<Header> headers = getAuthHeaders(taskConfigs);
+
+    // Should use explicit AUTH_TOKEN
+    boolean foundAuth = headers.stream().anyMatch(h -> h.getName().equals("Authorization")
+        && h.getValue().equals("Bearer fallback-token"));
+    Assert.assertTrue(foundAuth, "Expected explicit AUTH_TOKEN to be used"
+  + " when runtime provider is null/NullAuthProvider");
+  }
+
+  @Test
+  public void testReturnsNullAuthProviderWhenBothTokenAndProviderAbsent() {
+    // No runtime provider configured
+    MinionContext.getInstance().setTaskAuthProvider(null);
+
+    // Create task WITHOUT explicit AUTH_TOKEN
+    Map<String, String> taskConfigs = createTaskConfigs(null);
+    List<Header> headers = getAuthHeaders(taskConfigs);
+
+    // Should return NullAuthProvider (no auth headers)
+    Assert.assertTrue(headers.isEmpty() || headers.stream().noneMatch(h -> h.getName().equals("Authorization")),
+        "Expected no Authorization header when both explicit token and runtime provider are absent");
+
+    // Verify the auth provider is indeed a NullAuthProvider
+    AuthProvider resolvedProvider = getAuthProviderFromTaskConfigs(taskConfigs);
+    Assert.assertTrue(resolvedProvider instanceof NullAuthProvider,
+        "Expected NullAuthProvider when both explicit token and runtime provider are absent");
   }
 
   @Test

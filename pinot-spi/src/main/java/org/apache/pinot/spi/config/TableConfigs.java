@@ -20,6 +20,7 @@ package org.apache.pinot.spi.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
@@ -83,7 +84,8 @@ public class TableConfigs extends BaseJsonConfig {
     return _realtime;
   }
 
-  private ObjectNode toJsonObject() {
+  @JsonValue
+  public ObjectNode toJsonObject() {
     ObjectNode tableConfigsObjectNode = JsonUtils.newObjectNode();
     tableConfigsObjectNode.put("tableName", _tableName);
     tableConfigsObjectNode.set("schema", _schema.toJsonObject());

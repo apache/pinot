@@ -150,7 +150,7 @@ controller:
   pluginsDir: /opt/pinot/plugins
 
   pdb:
-    enabled: false 
+    enabled: false
     minAvailable: ""
     maxUnavailable: 50%
 
@@ -445,7 +445,7 @@ server:
   pluginsDir: /opt/pinot/plugins
 
   pdb:
-    enabled: false 
+    enabled: false
     minAvailable: ""
     maxUnavailable: 1
 
@@ -631,6 +631,11 @@ minion:
     configs: |-
       pinot.set.instance.id.to.hostname=true
 
+  # In a PodDisruptionBudget, only one of minAvailable or maxUnavailable may be set.
+  # By default we use maxUnavailable; override this section if you prefer minAvailable.
+  pdb:
+    enabled: false
+    maxUnavailable: 1
 
 # ------------------------------------------------------------------------------
 # Pinot Minion Stateless:
@@ -699,7 +704,7 @@ minionStateless:
       # - containerPort: 1234
       #   protocol: PROTOCOL
       #   name: extra-port
-      
+
   resources:
     requests:
       memory: "1.25Gi"
@@ -735,6 +740,12 @@ minionStateless:
   extra:
     configs: |-
       pinot.set.instance.id.to.hostname=true
+
+  # In a PodDisruptionBudget, only one of minAvailable or maxUnavailable may be set.
+  # By default we use maxUnavailable; override this section if you prefer minAvailable.
+  pdb:
+    enabled: false
+    maxUnavailable: 1
 
 # ------------------------------------------------------------------------------
 # Zookeeper:

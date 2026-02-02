@@ -150,7 +150,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       try {
         timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       } catch (URISyntaxException e) {
-        throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);
+        throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest: "
+            + e.getMessage(), e);
       }
       requestContext.setQuery(timeSeriesRequest.getQuery());
 
@@ -174,7 +175,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       if (e instanceof QueryException) {
         qe = (QueryException) e;
       } else {
-        qe = new QueryException(QueryErrorCode.UNKNOWN, "Error processing time-series query", e);
+        qe = new QueryException(QueryErrorCode.UNKNOWN, e.getClass().getSimpleName() + ": " + e.getMessage(), e);
       }
       requestContext.setErrorCode(qe.getErrorCode());
       throw qe;

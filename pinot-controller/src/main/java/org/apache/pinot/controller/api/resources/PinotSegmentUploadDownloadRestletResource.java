@@ -627,8 +627,16 @@ public class PinotSegmentUploadDownloadRestletResource {
           SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
         }
         // TODO: Include the un-tarred segment size when using the METADATA push rest API. Currently we can only use the
-        //  tarred segment size as an approximation. Additionally, add the storage quota check for batch upload mode.
+        //  tarred segment size as an approximation.
         long segmentSizeInBytes = getSegmentSizeFromFile(sourceDownloadURIStr);
+        if (segmentSizeInBytes > 0) {
+          // Only check storage quota when segment size is available
+          SegmentValidationUtils.checkStorageQuota(segmentName, segmentSizeInBytes, segmentSizeInBytes, tableConfig,
+              _storageQuotaChecker);
+        } else {
+          LOGGER.warn("Skipping storage quota check for segment: {} of table: {} as segment size is unavailable",
+              segmentName, tableNameWithType);
+        }
 
         // Encrypt segment
         String crypterNameInTableConfig = tableConfig.getValidationConfig().getCrypterClassName();
@@ -667,8 +675,20 @@ public class PinotSegmentUploadDownloadRestletResource {
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR,
           segmentUploadMetadataList.size());
-      throw new ControllerApplicationException(LOGGER,
-          "Exception while processing segments to upload: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR,
+          segmentUploadMetadataList.size());
+      if (e instanceof WebApplicationException) {
+        if (((WebApplicationException) e).getResponse().getStatus()
+            == Response.Status.FORBIDDEN.getStatusCode()) {
+          LOGGER.error("Segment upload forbidden for segments: {} of table: {}",
+              segmentNames, tableNameWithType);
+        }
+        throw (WebApplicationException) e;
+      } else {
+        throw new ControllerApplicationException(LOGGER,
+            "Exception while processing segments to upload: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR,
+            e);
+      }
     } finally {
       cleanupTempFiles(tempFiles);
       multiPart.cleanup();

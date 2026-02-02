@@ -25,11 +25,13 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +74,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
       }
       Set<String> consumingSegments = tableSegments.getValue();
       Set<String> caughtUpSegments = _caughtUpSegmentsByTable.computeIfAbsent(tableNameWithType, k -> new HashSet<>());
+      boolean skippedSegmentsLogged = false;
+
       for (String segName : consumingSegments) {
         if (caughtUpSegments.contains(segName)) {
           continue;
@@ -94,7 +98,22 @@ public abstract class IngestionBasedConsumptionStatusChecker {
             continue;
           }
           RealtimeSegmentDataManager rtSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          if (isSegmentCaughtUp(segName, rtSegmentDataManager, (RealtimeTableDataManager) tableDataManager)) {
+          RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
+
+          StreamMetadataProvider streamMetadataProvider =
+              realtimeTableDataManager.getStreamMetadataProvider(rtSegmentDataManager);
+
+          if (!streamMetadataProvider.supportsOffsetLag()) {
+            // Cannot conclude if segment has caught up or not. Skip such segments.
+            if (!skippedSegmentsLogged) {
+              _logger.warn(
+                  "Stream provider for table: {} does not support offset subtraction. Cannot conclude if the segment "
+                      + "has caught up. Skipping the segments.",
+                  realtimeTableDataManager.getTableName());
+              skippedSegmentsLogged = true;
+            }
+            caughtUpSegments.add(segName);
+          } else if (isSegmentCaughtUp(segName, rtSegmentDataManager, realtimeTableDataManager)) {
             caughtUpSegments.add(segName);
           }
         } finally {
@@ -139,8 +158,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
   protected abstract boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager,
       RealtimeTableDataManager realtimeTableDataManager);
 
-  protected boolean isOffsetCaughtUp(String segmentName,
-      StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset) {
+  protected boolean isOffsetCaughtUp(String segmentName, @Nullable StreamPartitionMsgOffset currentOffset,
+      @Nullable StreamPartitionMsgOffset latestOffset) {
     if (currentOffset != null && latestOffset != null) {
       // Kafka's "latest" offset is actually the next available offset. Therefore it will be 1 ahead of the
       // current offset in the case we are caught up.

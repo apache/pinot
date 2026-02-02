@@ -26,6 +26,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -213,6 +214,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
+    if (!_errorOnDuplicatePrimaryKey) {
+      sortSegmentsForUpsert(segmentDataManagers);
+    }
     try {
       // count all documents to limit map re-sizings
       int totalDocs = 0;
@@ -249,7 +253,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
               if (_errorOnDuplicatePrimaryKey && previousValue != null) {
                 throw new IllegalStateException(
                     "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
-                        + "primary key already exist for: " + Arrays.toString(primaryKey));
+                        + " primary key already exists for: " + Arrays.toString(primaryKey));
               }
             }
           } catch (Exception e) {
@@ -288,6 +292,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
+    if (!_errorOnDuplicatePrimaryKey) {
+      sortSegmentsForUpsert(segmentDataManagers);
+    }
     List<PinotSegmentRecordReader> recordReaders = new ArrayList<>(segmentDataManagers.size());
 
     int totalDocs = 0;
@@ -320,7 +327,12 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
             Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
 
             long readerIdxAndDocId = (((long) readerIdx) << 32) | (i & 0xffffffffL);
-            lookupTable.put(primaryKey, readerIdxAndDocId);
+            long previousValue = lookupTable.put(primaryKey, readerIdxAndDocId);
+            if (_errorOnDuplicatePrimaryKey && previousValue != Long.MIN_VALUE) {
+              throw new IllegalStateException(
+                  "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
+                      + " primary key already exists for: " + Arrays.toString(primaryKey));
+            }
           }
         } catch (Exception e) {
           throw new RuntimeException(
@@ -330,6 +342,13 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
     return new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable, segmentDataManagers, recordReaders,
         this);
+  }
+
+  private void sortSegmentsForUpsert(List<SegmentDataManager> segmentDataManagers) {
+    segmentDataManagers.sort(Comparator
+        .comparingLong((SegmentDataManager segmentDataManager) -> segmentDataManager.getSegment().getSegmentMetadata()
+            .getIndexCreationTime())
+        .thenComparing(segmentDataManager -> segmentDataManager.getSegment().getSegmentName()));
   }
 
   private void releaseResources(List<PinotSegmentRecordReader> recordReaders,
