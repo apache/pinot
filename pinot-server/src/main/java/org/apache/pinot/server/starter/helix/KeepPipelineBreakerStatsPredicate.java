@@ -39,10 +39,12 @@ public class KeepPipelineBreakerStatsPredicate implements PinotClusterConfigChan
 
   // NOTE: When this method is called, the helix manager is not yet connected.
   public static KeepPipelineBreakerStatsPredicate create(PinotConfiguration serverConf) {
-    boolean enabled = serverConf.getProperty(
+    boolean skip = serverConf.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_SKIP_PIPELINE_BREAKER_STATS);
-    return new KeepPipelineBreakerStatsPredicate(enabled);
+    LOGGER.info("Initialized {} with value: {}",
+        CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, skip);
+    return new KeepPipelineBreakerStatsPredicate(skip);
   }
 
   public boolean isEnabled() {
