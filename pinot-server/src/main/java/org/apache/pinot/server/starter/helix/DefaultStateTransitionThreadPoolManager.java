@@ -19,15 +19,19 @@
 package org.apache.pinot.server.starter.helix;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+
+import org.apache.helix.messaging.handling.MessageTask;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
-import org.apache.pinot.core.data.manager.SegmentOperationsThrottlerContextRegistry;
+import org.apache.pinot.core.data.manager.SegmentOperationsTaskWrapper;
 
 
 /**
@@ -46,14 +50,13 @@ public class DefaultStateTransitionThreadPoolManager implements StateTransitionT
   @Override
   @Nullable
   public StateModelFactory.CustomizedExecutorService getExecutorService(Message.MessageInfo messageInfo) {
-    return new StateModelFactory.CustomizedExecutorService(Message.MessageInfo.MessageIdentifierBase.PER_RESOURCE,
-        _executorService);
+    return null;
   }
 
   @Override
   @Nullable
   public ExecutorService getExecutorService(String resourceName, String fromState, String toState) {
-    return _executorService;
+    return null;
   }
 
   @Override
@@ -74,9 +77,11 @@ public class DefaultStateTransitionThreadPoolManager implements StateTransitionT
     }
 
     @Override
-    public void execute(Runnable command) {
-      super.execute(
-          SegmentOperationsThrottlerContextRegistry.get().wrap(command, SegmentOperationsTaskType.STATE_TRANSITION));
+    public <T> Future<T> submit(Callable<T> task) {
+      Message message = task instanceof MessageTask ? ((MessageTask) task).getMessage() : null;
+      String tableNameWithType = message != null ? message.getResourceName() : null;
+      return super.submit(
+          SegmentOperationsTaskWrapper.wrap(task, SegmentOperationsTaskType.STATE_TRANSITION, tableNameWithType));
     }
   }
 }
