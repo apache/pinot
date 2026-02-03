@@ -481,14 +481,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return;
     }
     _logger.info("Enqueuing segment: {} to be replaced", segmentName);
-    Runnable task = SegmentOperationsThrottlerContextRegistry.get().wrap(() -> {
+    Runnable task = SegmentOperationsTaskWrapper.wrap(() -> {
       try {
         replaceSegmentInternal(segmentName);
       } catch (Exception e) {
         LOGGER.error("Caught exception while replacing segment: {}", segmentName, e);
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
       }
-    }, SegmentOperationsTaskType.REFRESH_THREAD);
+    }, SegmentOperationsTaskType.REFRESH_THREAD, _tableNameWithType);
     _segmentReloadRefreshExecutor.submit(task);
   }
 
@@ -790,7 +790,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     List<String> failedSegments = new ArrayList<>();
     AtomicReference<Throwable> sampleException = new AtomicReference<>();
     CompletableFuture.allOf(segmentDataManagers.stream().map(segmentDataManager -> CompletableFuture.runAsync(
-        SegmentOperationsThrottlerContextRegistry.get().wrap(() -> {
+        SegmentOperationsTaskWrapper.wrap(() -> {
           String segmentName = segmentDataManager.getSegmentName();
           try {
             _segmentReloadSemaphore.acquire(segmentName, _logger);
@@ -807,8 +807,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
               _reloadJobStatusCache.recordFailure(reloadJobId, segmentName, t);
             }
           }
-        }, SegmentOperationsTaskType.RELOAD_THREAD), _segmentReloadRefreshExecutor)).toArray(CompletableFuture[]::new))
-        .get();
+        }, SegmentOperationsTaskType.RELOAD_THREAD, _tableNameWithType), _segmentReloadRefreshExecutor))
+        .toArray(CompletableFuture[]::new)).get();
     if (sampleException.get() != null) {
       throw new RuntimeException(
           String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),
