@@ -261,6 +261,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     Set<Integer> pools = new HashSet<>();
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      // TODO: Verify whether sorting is actually needed
       Map<String, String> sortedIdealStateMap = convertToSortedMap(idealStateInstanceStateMap);
       Long newSegmentCreationTimeMs = newSegmentCreationTimeMap.get(segment);
       Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
@@ -294,7 +295,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         if (newSegmentCreationTimeMs != null) {
           // New segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-          for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
+          for (Map.Entry<String, String> entry : sortedIdealStateMap.entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
               candidates.add(
