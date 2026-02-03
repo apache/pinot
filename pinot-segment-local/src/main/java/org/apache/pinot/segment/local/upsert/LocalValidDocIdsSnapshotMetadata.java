@@ -29,7 +29,9 @@ import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -89,6 +91,9 @@ public class LocalValidDocIdsSnapshotMetadata {
   // Default partial upsert strategy (only applicable for PARTIAL mode)
   private UpsertConfig.Strategy _defaultPartialUpsertStrategy;
 
+  // Number of partitions - changes to this invalidate the snapshot
+  private int _numPartitions;
+
   public LocalValidDocIdsSnapshotMetadata() {
   }
 
@@ -118,9 +123,33 @@ public class LocalValidDocIdsSnapshotMetadata {
           metadata.setDefaultPartialUpsertStrategy(upsertConfig.getDefaultPartialUpsertStrategy());
         }
       }
+      // Get number of partitions from segment partition config
+      metadata.setNumPartitions(getNumPartitionsFromTableConfig(tableConfig));
     }
 
     return metadata;
+  }
+
+  /**
+   * Gets the number of partitions from the table's segment partition config.
+   *
+   * @param tableConfig the table configuration
+   * @return the number of partitions, or 0 if not configured
+   */
+  private static int getNumPartitionsFromTableConfig(TableConfig tableConfig) {
+    if (tableConfig.getIndexingConfig() == null) {
+      return 0;
+    }
+    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (segmentPartitionConfig == null || segmentPartitionConfig.getColumnPartitionMap() == null
+        || segmentPartitionConfig.getColumnPartitionMap().isEmpty()) {
+      return 0;
+    }
+    // For upsert tables, typically there's only one partition column
+    for (ColumnPartitionConfig columnPartitionConfig : segmentPartitionConfig.getColumnPartitionMap().values()) {
+      return columnPartitionConfig.getNumPartitions();
+    }
+    return 0;
   }
 
   /**
@@ -240,6 +269,14 @@ public class LocalValidDocIdsSnapshotMetadata {
           }
         }
       }
+
+      // Check number of partitions
+      int currentNumPartitions = getNumPartitionsFromTableConfig(tableConfig);
+      if (_numPartitions != 0 && currentNumPartitions != 0 && _numPartitions != currentNumPartitions) {
+        LOGGER.info("Previous snapshot used numPartitions: {} different from current: {} for table: {}, partition: {}",
+            _numPartitions, currentNumPartitions, tableName, _partitionId);
+        return false;
+      }
     }
 
     LOGGER.debug("Snapshot metadata is compatible for table: {}, partition: {}", tableName, _partitionId);
@@ -344,6 +381,14 @@ public class LocalValidDocIdsSnapshotMetadata {
     _defaultPartialUpsertStrategy = defaultPartialUpsertStrategy;
   }
 
+  public int getNumPartitions() {
+    return _numPartitions;
+  }
+
+  public void setNumPartitions(int numPartitions) {
+    _numPartitions = numPartitions;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -356,6 +401,7 @@ public class LocalValidDocIdsSnapshotMetadata {
     return _version == that._version && _partitionId == that._partitionId && _creationTime == that._creationTime
         && Double.compare(that._metadataTTL, _metadataTTL) == 0
         && Double.compare(that._deletedKeysTTL, _deletedKeysTTL) == 0
+        && _numPartitions == that._numPartitions
         && Objects.equals(_primaryKeyColumns, that._primaryKeyColumns)
         && Objects.equals(_comparisonColumns, that._comparisonColumns)
         && Objects.equals(_deleteRecordColumn, that._deleteRecordColumn)
@@ -369,7 +415,7 @@ public class LocalValidDocIdsSnapshotMetadata {
   public int hashCode() {
     return Objects.hash(_version, _partitionId, _creationTime, _primaryKeyColumns, _comparisonColumns,
         _deleteRecordColumn, _hashFunction, _metadataTTL, _deletedKeysTTL, _upsertMode, _partialUpsertStrategies,
-        _defaultPartialUpsertStrategy);
+        _defaultPartialUpsertStrategy, _numPartitions);
   }
 
   @Override
@@ -387,6 +433,7 @@ public class LocalValidDocIdsSnapshotMetadata {
         + ", _upsertMode=" + _upsertMode
         + ", _partialUpsertStrategies=" + _partialUpsertStrategies
         + ", _defaultPartialUpsertStrategy=" + _defaultPartialUpsertStrategy
+        + ", _numPartitions=" + _numPartitions
         + '}';
   }
 }

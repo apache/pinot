@@ -179,12 +179,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _largestSeenComparisonValue = new AtomicDouble(TTL_WATERMARK_NOT_SET);
       WatermarkUtils.deleteWatermark(getWatermarkFile());
     }
-
-    // Persist local snapshot metadata with current table config so we can check compatibility during preload.
-    // This is done once during partition manager creation since table configs don't change during runtime.
-    if (_enableSnapshot) {
-      persistLocalSnapshotMetadata();
-    }
   }
 
   @Override
@@ -264,6 +258,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     } finally {
       _isPreloading = false;
       _preloadLock.unlock();
+      // Persist snapshot metadata AFTER preload completes (whether successful or not).
+      // This ensures we first check compatibility with OLD metadata before overwriting with new config.
+      // The metadata will be used on the next restart to check if snapshots are still compatible.
+      if (_enableSnapshot) {
+        persistLocalSnapshotMetadata();
+      }
     }
   }
 
@@ -1176,7 +1176,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    * This metadata contains the table configuration that was used when taking the snapshots,
    * allowing us to check compatibility during preload.
    *
-   * This is called once during partition manager creation since table configs don't change during runtime.
+   * This is called AFTER preload completes (not during construction) so that:
+   * 1. We can first check compatibility with the OLD metadata from previous run
+   * 2. Only after checking, we overwrite with the new/current config
+   * 3. On next restart, this saved metadata will be used for compatibility check
    */
   protected void persistLocalSnapshotMetadata() {
     try {
@@ -1199,11 +1202,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     LocalValidDocIdsSnapshotMetadata metadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(_tableIndexDir, _partitionId);
     if (metadata == null) {
-      // For backward compatibility, if no metadata exists, we allow using the snapshots.
+      // For backward compatibility, if no metadata exists, we do not allow using the snapshots in the first run.
       // This can happen for existing deployments that haven't taken snapshots with the new metadata yet.
       _logger.info("No local validDocIds snapshot metadata found for partition: {}, allowing preload for backward "
           + "compatibility", _partitionId);
-      return true;
+      return false;
     }
     return metadata.isCompatibleWith(_context, _tableNameWithType);
   }

@@ -26,7 +26,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -48,6 +50,7 @@ public class LocalValidDocIdsSnapshotMetadataTest {
   private static final double METADATA_TTL = 86400.0;
   private static final double DELETED_KEYS_TTL = 172800.0;
   private static final int PARTITION_ID = 0;
+  private static final int NUM_PARTITIONS = 8;
 
   @BeforeMethod
   public void setUp()
@@ -64,6 +67,13 @@ public class LocalValidDocIdsSnapshotMetadataTest {
   private UpsertContext createMockUpsertContext(List<String> primaryKeyColumns, List<String> comparisonColumns,
       String deleteRecordColumn, HashFunction hashFunction, double metadataTTL, double deletedKeysTTL,
       UpsertConfig.Mode upsertMode) {
+    return createMockUpsertContext(primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction,
+        metadataTTL, deletedKeysTTL, upsertMode, NUM_PARTITIONS);
+  }
+
+  private UpsertContext createMockUpsertContext(List<String> primaryKeyColumns, List<String> comparisonColumns,
+      String deleteRecordColumn, HashFunction hashFunction, double metadataTTL, double deletedKeysTTL,
+      UpsertConfig.Mode upsertMode, int numPartitions) {
     UpsertContext context = mock(UpsertContext.class);
     when(context.getPrimaryKeyColumns()).thenReturn(primaryKeyColumns);
     when(context.getComparisonColumns()).thenReturn(comparisonColumns);
@@ -80,10 +90,19 @@ public class LocalValidDocIdsSnapshotMetadataTest {
       upsertConfig.setPartialUpsertStrategies(strategies);
     }
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+    TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.REALTIME)
         .setTableName("testTable")
-        .setUpsertConfig(upsertConfig)
-        .build();
+        .setUpsertConfig(upsertConfig);
+
+    // Add segment partition config if numPartitions > 0
+    if (numPartitions > 0) {
+      Map<String, ColumnPartitionConfig> columnPartitionMap = new HashMap<>();
+      columnPartitionMap.put("partitionColumn", new ColumnPartitionConfig("Murmur3", numPartitions));
+      SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(columnPartitionMap);
+      tableConfigBuilder.setSegmentPartitionConfig(segmentPartitionConfig);
+    }
+
+    TableConfig tableConfig = tableConfigBuilder.build();
     when(context.getTableConfig()).thenReturn(tableConfig);
 
     return context;
@@ -304,6 +323,28 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     // Create context with different upsert mode
     UpsertContext newContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
         DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.PARTIAL);
+
+    LocalValidDocIdsSnapshotMetadata readMetadata =
+        LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
+    assertNotNull(readMetadata);
+    assertFalse(readMetadata.isCompatibleWith(newContext, "testTable"));
+  }
+
+  @Test
+  public void testIsCompatibleWithDifferentNumPartitions()
+      throws IOException {
+    UpsertContext originalContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
+        DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL,
+        NUM_PARTITIONS);
+
+    LocalValidDocIdsSnapshotMetadata metadata =
+        LocalValidDocIdsSnapshotMetadata.fromUpsertContext(PARTITION_ID, originalContext);
+    metadata.persist(TEMP_DIR);
+
+    // Create context with different number of partitions
+    UpsertContext newContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
+        DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL,
+        NUM_PARTITIONS * 2);
 
     LocalValidDocIdsSnapshotMetadata readMetadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
