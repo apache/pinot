@@ -276,7 +276,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // metadataTTL, deletedKeysTTL, deleteColumn, etc. have changed.
     if (!isLocalSnapshotMetadataCompatible()) {
       _logger.warn("Local validDocIds snapshots are not compatible with current table configuration for partition: "
-          + "{}. Cleaning up stale snapshots and skipping preload.", _partitionId);
+          + "{}. Cleaning up stale snapshots and skipping preload using validDocIds snapshot.", _partitionId);
       // Clean up stale snapshot files since they're invalid with the new config.
       // Segments will be loaded normally (without preload) and added to _updatedSegmentsSinceLastSnapshot
       // so new snapshots will be taken with the current config.
