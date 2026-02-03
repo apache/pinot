@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -456,7 +457,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             .anySatisfy(exception -> Assertions.assertThat(exception.getMessage()).matches(pattern));
         return Optional.empty();
       }
-      Assert.assertNull(queryResult.getExceptions(),
+      List<QueryProcessingException> exceptions = queryResult.getExceptions();
+      Assert.assertTrue(exceptions == null || exceptions.isEmpty(),
           "Unexpected exception: " + JsonUtils.objectToPrettyString(queryResult.getExceptions()));
       Assert.assertNotNull(queryResult.getResultTable(),
           "Result table is null: " + JsonUtils.objectToPrettyString(queryResult));

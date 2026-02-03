@@ -171,7 +171,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    */
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
-    ResultTable resultTable = queryRunner(sql, false).getResultTable();
+    BrokerResponseNativeV2 response = queryRunner(sql, false);
+    Assert.assertEquals(response.getExceptions(), List.of());
+    ResultTable resultTable = response.getResultTable();
     Assert.assertEquals(resultTable.getRows().size(), expectedRows);
   }
 
