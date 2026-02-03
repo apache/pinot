@@ -38,11 +38,14 @@ import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
@@ -60,6 +63,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -175,6 +179,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _largestSeenComparisonValue = new AtomicDouble(TTL_WATERMARK_NOT_SET);
       WatermarkUtils.deleteWatermark(getWatermarkFile());
     }
+
+    // Persist local snapshot metadata with current table config so we can check compatibility during preload.
+    // This is done once during partition manager creation since table configs don't change during runtime.
+    if (_enableSnapshot) {
+      persistLocalSnapshotMetadata();
+    }
   }
 
   @Override
@@ -261,6 +271,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void doPreloadSegments(TableDataManager tableDataManager, IndexLoadingConfig indexLoadingConfig,
       HelixManager helixManager, ExecutorService segmentPreloadExecutor)
       throws Exception {
+    // Check if the local validDocIds snapshots are compatible with the current table configuration.
+    // This is to avoid using stale snapshots when table configs like primary keys, comparison columns,
+    // metadataTTL, deletedKeysTTL, deleteColumn, etc. have changed.
+    if (!isLocalSnapshotMetadataCompatible()) {
+      _logger.warn("Local validDocIds snapshots are not compatible with current table configuration for partition: "
+          + "{}. Cleaning up stale snapshots and skipping preload.", _partitionId);
+      // Clean up stale snapshot files since they're invalid with the new config.
+      // Segments will be loaded normally (without preload) and added to _updatedSegmentsSinceLastSnapshot
+      // so new snapshots will be taken with the current config.
+      cleanupStaleValidDocIdsSnapshots(tableDataManager, indexLoadingConfig.getTableConfig(), helixManager);
+      return;
+    }
     TableConfig tableConfig = indexLoadingConfig.getTableConfig();
     SegmentPreloadUtils.preloadSegments(tableDataManager, _partitionId, indexLoadingConfig, helixManager,
         segmentPreloadExecutor, (segmentName, segmentZKMetadata) -> {
@@ -271,6 +293,67 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           _logger.info("Skip segment: {} on tier: {} as it has no validDocIds snapshot", segmentName, tier);
           return false;
         });
+  }
+
+  /**
+   * Cleans up stale validDocIds and queryableDocIds snapshot files from segment directories.
+   * This is called when the saved snapshot metadata is incompatible with the current table config,
+   * indicating that the snapshot files are stale and should not be used.
+   */
+  protected void cleanupStaleValidDocIdsSnapshots(TableDataManager tableDataManager, TableConfig tableConfig,
+      HelixManager helixManager) {
+    try {
+      Map<String, SegmentZKMetadata> segmentMetadataMap = getSegmentsZKMetadata(helixManager);
+      String instanceId = tableDataManager.getInstanceDataManagerConfig().getInstanceId();
+      int cleanedCount = 0;
+
+      for (Map.Entry<String, SegmentZKMetadata> entry : segmentMetadataMap.entrySet()) {
+        String segmentName = entry.getKey();
+        SegmentZKMetadata segmentZKMetadata = entry.getValue();
+
+        // Only process segments for this partition
+        Integer partitionId = SegmentUtils.getSegmentPartitionId(segmentZKMetadata, null);
+        if (partitionId == null || partitionId != _partitionId) {
+          continue;
+        }
+
+        try {
+          String tier = segmentZKMetadata.getTier();
+          File indexDir = tableDataManager.getSegmentDataDir(segmentName, tier, tableConfig);
+          if (!indexDir.exists()) {
+            continue;
+          }
+
+          File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+          File validDocIdsSnapshot = new File(segmentDir, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+          File queryableDocIdsSnapshot = new File(segmentDir, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+
+          boolean deleted = false;
+          if (validDocIdsSnapshot.exists() && validDocIdsSnapshot.delete()) {
+            deleted = true;
+          }
+          if (queryableDocIdsSnapshot.exists() && queryableDocIdsSnapshot.delete()) {
+            deleted = true;
+          }
+          if (deleted) {
+            cleanedCount++;
+          }
+        } catch (Exception e) {
+          _logger.warn("Failed to clean up snapshot files for segment: {}", segmentName, e);
+        }
+      }
+
+      _logger.info("Cleaned up stale snapshot files from {} segments for partition: {}", cleanedCount, _partitionId);
+    } catch (Exception e) {
+      _logger.warn("Failed to clean up stale snapshot files for partition: {}", _partitionId, e);
+    }
+  }
+
+  private Map<String, SegmentZKMetadata> getSegmentsZKMetadata(HelixManager helixManager) {
+    Map<String, SegmentZKMetadata> segmentMetadataMap = new HashMap<>();
+    ZKMetadataProvider.getSegmentsZKMetadata(helixManager.getHelixPropertyStore(), _tableNameWithType)
+        .forEach(m -> segmentMetadataMap.put(m.getSegmentName(), m));
+    return segmentMetadataMap;
   }
 
   @Override
@@ -1086,6 +1169,43 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             ServerMeter.UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
       }
     }
+  }
+
+  /**
+   * Persists the local validDocIds snapshot metadata to the table index directory.
+   * This metadata contains the table configuration that was used when taking the snapshots,
+   * allowing us to check compatibility during preload.
+   *
+   * This is called once during partition manager creation since table configs don't change during runtime.
+   */
+  protected void persistLocalSnapshotMetadata() {
+    try {
+      LocalValidDocIdsSnapshotMetadata metadata =
+          LocalValidDocIdsSnapshotMetadata.fromUpsertContext(_partitionId, _context);
+      metadata.persist(_tableIndexDir);
+      _logger.info("Persisted local validDocIds snapshot metadata for partition: {}", _partitionId);
+    } catch (Exception e) {
+      _logger.warn("Failed to persist local validDocIds snapshot metadata for partition: {}", _partitionId, e);
+    }
+  }
+
+  /**
+   * Checks if the local validDocIds snapshots are compatible with the current table configuration.
+   * This is used during preload to determine if the snapshots can be safely used.
+   *
+   * @return true if compatible or no metadata exists (for backward compatibility), false otherwise
+   */
+  protected boolean isLocalSnapshotMetadataCompatible() {
+    LocalValidDocIdsSnapshotMetadata metadata =
+        LocalValidDocIdsSnapshotMetadata.fromDirectory(_tableIndexDir, _partitionId);
+    if (metadata == null) {
+      // For backward compatibility, if no metadata exists, we allow using the snapshots.
+      // This can happen for existing deployments that haven't taken snapshots with the new metadata yet.
+      _logger.info("No local validDocIds snapshot metadata found for partition: {}, allowing preload for backward "
+          + "compatibility", _partitionId);
+      return true;
+    }
+    return metadata.isCompatibleWith(_context, _tableNameWithType);
   }
 
   protected void deleteSnapshot(ImmutableSegmentImpl segment) {
