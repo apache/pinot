@@ -26,7 +26,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-
 import org.apache.helix.messaging.handling.MessageTask;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModelFactory;
