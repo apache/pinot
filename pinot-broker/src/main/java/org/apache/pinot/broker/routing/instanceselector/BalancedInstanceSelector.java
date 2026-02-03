@@ -45,8 +45,8 @@ import org.apache.pinot.common.utils.HashUtil;
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   @Override
-  public SelectionResult select(List<String> segments, int requestId, SegmentStates segmentStates,
-      Map<String, String> queryOptions) {
+  public Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+      SegmentStates segmentStates, Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
@@ -88,6 +88,6 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
       _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
         BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getKey()));
     }
-    return new SelectionResult(Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap), List.of(), 0);
+    return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 }

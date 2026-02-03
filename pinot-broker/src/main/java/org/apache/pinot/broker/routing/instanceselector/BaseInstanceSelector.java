@@ -31,6 +31,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -84,7 +85,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID
 public abstract class BaseInstanceSelector implements InstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
   // To prevent int overflow, reset the request id once it reaches this value
-  private static final long MAX_REQUEST_ID = 1_000_000_000;
+  protected static final long MAX_REQUEST_ID = 1_000_000_000;
 
   protected TableConfig _tableConfig;
   protected String _tableNameWithType;
@@ -100,15 +101,15 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   protected int _tableNameHashForFixedReplicaRouting;
 
   // These 3 variables are the cached states to help accelerate the change processing
-  Set<String> _enabledInstances;
+  protected Set<String> _enabledInstances;
   // For old segments, all candidates are online
   // Reduce this map to reduce garbage
-  final Map<String, List<SegmentInstanceCandidate>> _oldSegmentCandidatesMap = new HashMap<>();
-  Map<String, NewSegmentState> _newSegmentStateMap;
+  protected final Map<String, List<SegmentInstanceCandidate>> _oldSegmentCandidatesMap = new HashMap<>();
+  protected Map<String, NewSegmentState> _newSegmentStateMap;
 
   // _segmentStates is needed for instance selection (multi-threaded), so it is made volatile.
-  private volatile SegmentStates _segmentStates;
-  private Map<String, ServerInstance> _enabledServerStore;
+  protected volatile SegmentStates _segmentStates;
+  protected Map<String, ServerInstance> _enabledServerStore;
 
   @Override
   public void init(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -466,18 +467,21 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     // Copy the volatile reference so that segmentToInstanceMap and unavailableSegments can have a consistent view of
     // the state.
     SegmentStates segmentStates = _segmentStates;
-    SelectionResult selectionResult = select(segments, requestIdInt, segmentStates, queryOptions);
+    Pair<Map<String, String>, Map<String, String>> segmentToInstanceMap =
+        select(segments, requestIdInt, segmentStates, queryOptions);
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
-    if (!unavailableSegments.isEmpty()) {
-      Set<String> unavailableSegmentsForRequest = new HashSet<>(selectionResult.getUnavailableSegments());
+
+    if (unavailableSegments.isEmpty()) {
+      return new SelectionResult(segmentToInstanceMap, Collections.emptyList(), 0);
+    } else {
+      List<String> unavailableSegmentsForRequest = new ArrayList<>();
       for (String segment : segments) {
         if (unavailableSegments.contains(segment)) {
           unavailableSegmentsForRequest.add(segment);
         }
       }
-      selectionResult.setUnavailableSegments(new ArrayList<>(unavailableSegmentsForRequest));
+      return new SelectionResult(segmentToInstanceMap, unavailableSegmentsForRequest, 0);
     }
-    return selectionResult;
   }
 
   @Override
@@ -502,9 +506,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
    * Selects the server instances for the given segments based on the request id and segment states. Returns two maps
    * from segment to selected server instance hosting the segment. The 2nd map is for optional segments. The optional
    * segments are used to get the new segments that are not online yet. Instead of simply skipping them by broker at
-   * routing time, we can send them to servers and let servers decide how to handle them. List of unavailable segments
-   * can also be included.
+   * routing time, we can send them to servers and let servers decide how to handle them.
    */
-  protected abstract SelectionResult select(List<String> segments,
+  protected abstract Pair<Map<String, String>, Map<String, String>/*optional segments*/> select(List<String> segments,
       int requestId, SegmentStates segmentStates, Map<String, String> queryOptions);
 }

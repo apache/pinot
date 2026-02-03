@@ -32,7 +32,10 @@ public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
   private final int _pool;
-  private int _idealStateReplicaId = -1;
+  // Represents the index of the server in the ideal state assignment for the segment. For example, if the ideal state
+  // assignment for a segment is [server1, server2, server3] and this candidate represents server2, then the
+  // idealStateReplicaId will be 1 (regardless of which replicas are available/online).
+  private final int _idealStateReplicaId;
 
   @VisibleForTesting
   public SegmentInstanceCandidate(String instance, boolean online) {
@@ -40,6 +43,7 @@ public class SegmentInstanceCandidate {
     _online = online;
     // no group
     _pool = FALLBACK_POOL_ID;
+    _idealStateReplicaId = -1;
   }
 
   public SegmentInstanceCandidate(String instance, boolean online, int pool, int idealStateReplicaId) {

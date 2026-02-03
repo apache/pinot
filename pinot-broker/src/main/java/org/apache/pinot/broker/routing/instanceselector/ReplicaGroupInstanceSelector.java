@@ -71,7 +71,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupInstanceSelector.class);
 
   @Override
-  public SelectionResult select(List<String> segments, int requestId,
+  public Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
     if (_adaptiveServerSelector != null) {
@@ -85,14 +85,10 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       for (int idx = 0; idx < serverRankList.size(); idx++) {
         serverRankMap.put(serverRankList.get(idx), idx);
       }
-      Pair<Map<String, String>, Map<String, String>> selectedServers =
-          selectServers(segments, requestId, segmentStates, serverRankMap, ctx);
-      return new SelectionResult(selectedServers, List.of(), 0);
+      return selectServers(segments, requestId, segmentStates, serverRankMap, ctx);
     } else {
       // Adaptive Server Selection is NOT enabled.
-      Pair<Map<String, String>, Map<String, String>> selectedServers =
-          selectServers(segments, requestId, segmentStates, null, ctx);
-      return new SelectionResult(selectedServers, List.of(), 0);
+      return selectServers(segments, requestId, segmentStates, null, ctx);
     }
   }
 
