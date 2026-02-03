@@ -432,7 +432,8 @@ public class StreamingBrokerResponseJacksonSerializerTest {
     public ObjectNode asJson() {
       ObjectNode json = JsonUtils.newObjectNode();
       json.set("exceptions", JsonUtils.objectToJsonNode(_exceptions));
-      _additionalFields.fieldNames().forEachRemaining(fieldName -> json.set(fieldName, _additionalFields.get(fieldName)));
+      _additionalFields.fieldNames()
+          .forEachRemaining(fieldName -> json.set(fieldName, _additionalFields.get(fieldName)));
       return json;
     }
   }
