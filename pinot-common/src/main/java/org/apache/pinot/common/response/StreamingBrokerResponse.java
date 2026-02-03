@@ -19,6 +19,7 @@
 package org.apache.pinot.common.response;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
@@ -228,6 +229,8 @@ public interface StreamingBrokerResponse extends AutoCloseable {
 
       @Override
       public Object get(int colIdx) {
+        Preconditions.checkState(_currentId > 0 && _currentId < getNumRows(),
+            "Cannot get value for row %s before calling next() or after reaching end of stream", _currentId);
         return _rows.get(_currentId - 1)[colIdx];
       }
 

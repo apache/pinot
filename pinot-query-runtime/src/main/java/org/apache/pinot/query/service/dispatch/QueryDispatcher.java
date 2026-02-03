@@ -45,6 +45,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -537,8 +538,6 @@ public class QueryDispatcher {
         mailboxService, queryOptions, stageMetadata, workerMetadata.get(0), null, true);
 
     MultiStageOperator rootOp = PlanNodeToOpChain.convertToOperator(rootNode, opChainExecutionContext);
-    Preconditions.checkState(rootOp instanceof BaseMailboxReceiveOperator,
-        "Root operator is not MailboxReceiveOperator but %S", rootOp.getClass().getName());
 
     LazyBrokerResponse lazyBrokerResponse = new LazyBrokerResponse(resultSchema, rootOp);
 
@@ -679,19 +678,21 @@ public class QueryDispatcher {
         throws InterruptedException {
       BrokerResponseNativeV2 oldResponse = new BrokerResponseNativeV2();
 
-      ArrayList<Object[]> rows;
+      ArrayList<Object[]> rows = new ArrayList<>();
       DataSchema dataSchema = getDataSchema();
-      if (dataSchema == null) {
-        rows = new ArrayList<>();
-      } else {
+      if (dataSchema != null) {
         int width = dataSchema.size();
-        rows = new ArrayList<>();
+        AtomicInteger blockCount = new AtomicInteger();
         consume(data -> {
-          Object[] row = new Object[width];
-          for (int colIdx = 0; colIdx < dataSchema.size(); colIdx++) {
-            row[colIdx] = data.get(colIdx);
+          blockCount.incrementAndGet();
+          while (data.next()) {
+            Object[] row = new Object[width];
+            for (int colIdx = 0; colIdx < dataSchema.size(); colIdx++) {
+              row[colIdx] = data.get(colIdx);
+            }
+            rows.add(row);
           }
-          rows.add(row);
+          LOGGER.warn("Reducing data block #{} with {} rows", blockCount.get(), data.getNumRows());
         }, oldResponse);
       }
       oldResponse.setResultTable(new ResultTable(dataSchema, rows));

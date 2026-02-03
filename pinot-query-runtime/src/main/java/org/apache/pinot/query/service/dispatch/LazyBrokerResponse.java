@@ -162,7 +162,7 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
     public StreamingBrokerResponse.Data visit(SerializedDataBlock block, DataSchema arg) {
       DataBlock dataBlock = block.getDataBlock();
       return new StreamingBrokerResponse.Data() {
-        private int _currentId = 0;
+        private int _currentId = -1;
         @Override
         public int getNumRows() {
           return dataBlock.getNumberOfRows();
@@ -170,6 +170,8 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
 
         @Override
         public Object get(int colIdx) {
+          Preconditions.checkState(_currentId >= 0 && _currentId < getNumRows(),
+              "Cannot get value for row %s before calling next() or after reaching end of stream", _currentId);
           DataSchema.ColumnDataType columnDataType = arg.getColumnDataType(colIdx);
           Object internal = getInternal(colIdx, columnDataType);
           return columnDataType.toExternal(internal);
@@ -179,31 +181,31 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
           switch (columnDataType.getStoredType()) {
             // TODO: Verify if more types are needed
             case INT:
-              return dataBlock.getInt(0, colIdx);
+              return dataBlock.getInt(_currentId, colIdx);
             case LONG:
-              return dataBlock.getLong(0, colIdx);
+              return dataBlock.getLong(_currentId, colIdx);
             case FLOAT:
-              return dataBlock.getFloat(0, colIdx);
+              return dataBlock.getFloat(_currentId, colIdx);
             case DOUBLE:
-              return dataBlock.getDouble(0, colIdx);
+              return dataBlock.getDouble(_currentId, colIdx);
             case BIG_DECIMAL:
-              return dataBlock.getBigDecimal(0, colIdx);
+              return dataBlock.getBigDecimal(_currentId, colIdx);
             case STRING:
-              return dataBlock.getString(0, colIdx);
+              return dataBlock.getString(_currentId, colIdx);
             case BYTES:
-              return dataBlock.getBytes(0, colIdx);
+              return dataBlock.getBytes(_currentId, colIdx);
             case INT_ARRAY:
-              return dataBlock.getIntArray(0, colIdx);
+              return dataBlock.getIntArray(_currentId, colIdx);
             case LONG_ARRAY:
-              return dataBlock.getLongArray(0, colIdx);
+              return dataBlock.getLongArray(_currentId, colIdx);
             case FLOAT_ARRAY:
-              return dataBlock.getFloatArray(0, colIdx);
+              return dataBlock.getFloatArray(_currentId, colIdx);
             case DOUBLE_ARRAY:
-              return dataBlock.getDoubleArray(0, colIdx);
+              return dataBlock.getDoubleArray(_currentId, colIdx);
             case STRING_ARRAY:
-              return dataBlock.getStringArray(0, colIdx);
+              return dataBlock.getStringArray(_currentId, colIdx);
             case MAP:
-              return dataBlock.getMap(0, colIdx);
+              return dataBlock.getMap(_currentId, colIdx);
             default:
               throw new UnsupportedOperationException("Column " + arg.getColumnName(colIdx)
                   + " has unsupported storage type " + columnDataType.getStoredType());
@@ -212,7 +214,8 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
 
         @Override
         public boolean next() {
-          return _currentId++ < getNumRows();
+          _currentId++;
+          return _currentId < getNumRows();
         }
       };
     }
