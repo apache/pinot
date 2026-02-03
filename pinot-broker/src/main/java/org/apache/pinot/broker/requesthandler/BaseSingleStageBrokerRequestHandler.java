@@ -159,14 +159,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       Map.entry("sum", "summv"),
       Map.entry("minmaxrange", "minmaxrangemv"),
       Map.entry("distinctcounthllplus", "distinctcounthllplusmv"),
-      Map.entry("distinctcountrawhllplus", "distinctcountrawhllplusmv"),
-      Map.entry("percentile", "percentilemv"),
-      Map.entry("percentileest", "percentileestmv"),
-      Map.entry("percentilerawest", "percentilerawestmv"),
-      Map.entry("percentiletdigest", "percentiletdigestmv"),
-      Map.entry("percentilerawtdigest", "percentilerawtdigestmv"),
-      Map.entry("percentilekll", "percentilekllmv"),
-      Map.entry("percentilerawkll", "percentilerawkllmv")
+      Map.entry("distinctcountrawhllplus", "distinctcountrawhllplusmv")
   );
 
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();

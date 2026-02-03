@@ -63,17 +63,12 @@ public class ValueAggregatorFactory {
       case MINMAXRANGE:
         return new MinMaxRangeValueAggregator();
       case DISTINCTCOUNTBITMAP:
-      case DISTINCTCOUNTBITMAPMV:
         return new DistinctCountBitmapValueAggregator();
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTRAWHLL:
-      case DISTINCTCOUNTHLLMV:
-      case DISTINCTCOUNTRAWHLLMV:
         return new DistinctCountHLLValueAggregator(arguments);
       case DISTINCTCOUNTHLLPLUS:
       case DISTINCTCOUNTRAWHLLPLUS:
-      case DISTINCTCOUNTHLLPLUSMV:
-      case DISTINCTCOUNTRAWHLLPLUSMV:
         return new DistinctCountHLLPlusValueAggregator(arguments);
       case DISTINCTCOUNTULL:
       case DISTINCTCOUNTRAWULL:
@@ -91,13 +86,9 @@ public class ValueAggregatorFactory {
         return new DistinctCountCPCSketchValueAggregator(arguments);
       case PERCENTILEEST:
       case PERCENTILERAWEST:
-      case PERCENTILEESTMV:
-      case PERCENTILERAWESTMV:
         return new PercentileEstValueAggregator();
       case PERCENTILETDIGEST:
       case PERCENTILERAWTDIGEST:
-      case PERCENTILETDIGESTMV:
-      case PERCENTILERAWTDIGESTMV:
         return new PercentileTDigestValueAggregator(arguments);
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
@@ -133,30 +124,21 @@ public class ValueAggregatorFactory {
       case MINMAXRANGE:
         return MinMaxRangeValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTBITMAP:
-      case DISTINCTCOUNTBITMAPMV:
         return DistinctCountBitmapValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTRAWHLL:
-      case DISTINCTCOUNTHLLMV:
-      case DISTINCTCOUNTRAWHLLMV:
         return DistinctCountHLLValueAggregator.AGGREGATED_VALUE_TYPE;
       case PERCENTILEEST:
       case PERCENTILERAWEST:
-      case PERCENTILEESTMV:
-      case PERCENTILERAWESTMV:
         return PercentileEstValueAggregator.AGGREGATED_VALUE_TYPE;
       case PERCENTILETDIGEST:
       case PERCENTILERAWTDIGEST:
-      case PERCENTILETDIGESTMV:
-      case PERCENTILERAWTDIGESTMV:
         return PercentileTDigestValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTTHETASKETCH:
       case DISTINCTCOUNTRAWTHETASKETCH:
         return DistinctCountThetaSketchValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTHLLPLUS:
       case DISTINCTCOUNTRAWHLLPLUS:
-      case DISTINCTCOUNTHLLPLUSMV:
-      case DISTINCTCOUNTRAWHLLPLUSMV:
         return DistinctCountHLLPlusValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTTUPLESKETCH:
       case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
