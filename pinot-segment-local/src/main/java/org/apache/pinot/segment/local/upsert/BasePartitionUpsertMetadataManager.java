@@ -1174,7 +1174,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /**
    * Persists the local validDocIds snapshot metadata to the table index directory.
    * This metadata contains the table configuration that was used when taking the snapshots,
-   * allowing us to check compatibility during preload.
+   * allowing us to check compatibility while preloading using validdoc id snapshot on disk.
    *
    * This is called AFTER preload completes (not during construction) so that:
    * 1. We can first check compatibility with the OLD metadata from previous run
