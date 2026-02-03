@@ -54,44 +54,18 @@ public class LocalValidDocIdsSnapshotMetadata {
 
   public static final String METADATA_FILE_NAME = "upsert.snapshot.metadata.partition.";
   public static final int CURRENT_VERSION = 1;
-
-  // Version for backward compatibility
   private int _version = CURRENT_VERSION;
-
-  // Partition information
   private int _partitionId;
-
-  // Timestamp when the metadata was created
   private long _creationTime;
-
-  // Primary key columns - changes to these invalidate the snapshot
   private List<String> _primaryKeyColumns;
-
-  // Comparison columns - changes to these invalidate the snapshot
   private List<String> _comparisonColumns;
-
-  // Delete record column - changes to this invalidate the snapshot
   private String _deleteRecordColumn;
-
-  // Hash function used to hash primary keys
   private HashFunction _hashFunction;
-
-  // Metadata TTL - changes to this invalidate the snapshot
   private double _metadataTTL;
-
-  // Deleted keys TTL - changes to this invalidate the snapshot
   private double _deletedKeysTTL;
-
-  // Upsert mode (FULL, PARTIAL)
   private UpsertConfig.Mode _upsertMode;
-
-  // Partial upsert strategies (only applicable for PARTIAL mode)
   private Map<String, UpsertConfig.Strategy> _partialUpsertStrategies;
-
-  // Default partial upsert strategy (only applicable for PARTIAL mode)
   private UpsertConfig.Strategy _defaultPartialUpsertStrategy;
-
-  // Number of partitions - changes to this invalidate the snapshot
   private int _numPartitions;
 
   public LocalValidDocIdsSnapshotMetadata() {
@@ -197,49 +171,39 @@ public class LocalValidDocIdsSnapshotMetadata {
    */
   @JsonIgnore
   public boolean isCompatibleWith(UpsertContext context, String tableName) {
-    // Check primary key columns
     if (!Objects.equals(_primaryKeyColumns, context.getPrimaryKeyColumns())) {
       LOGGER.info("Previous snapshot used primary keys: {} different from current: {} for table: {}, partition: {}",
           _primaryKeyColumns, context.getPrimaryKeyColumns(), tableName, _partitionId);
       return false;
     }
-
-    // Check comparison columns
     if (!Objects.equals(_comparisonColumns, context.getComparisonColumns())) {
-      LOGGER.info("Previous snapshot used comparison columns: {} different from current: {} for table: {}, "
-          + "partition: {}", _comparisonColumns, context.getComparisonColumns(), tableName, _partitionId);
+      LOGGER.info(
+          "Previous snapshot used comparison columns: {} different from current: {} for table: {}, " + "partition: {}",
+          _comparisonColumns, context.getComparisonColumns(), tableName, _partitionId);
       return false;
     }
 
-    // Check delete record column
     if (!StringUtils.equals(_deleteRecordColumn, context.getDeleteRecordColumn())) {
-      LOGGER.info("Previous snapshot used deleteRecordColumn: {} different from current: {} for table: {}, "
-          + "partition: {}", _deleteRecordColumn, context.getDeleteRecordColumn(), tableName, _partitionId);
+      LOGGER.info(
+          "Previous snapshot used deleteRecordColumn: {} different from current: {} for table: {}, " + "partition: {}",
+          _deleteRecordColumn, context.getDeleteRecordColumn(), tableName, _partitionId);
       return false;
     }
-
-    // Check hash function
     if (_hashFunction != context.getHashFunction()) {
       LOGGER.info("Previous snapshot used hash function: {} different from current: {} for table: {}, partition: {}",
           _hashFunction, context.getHashFunction(), tableName, _partitionId);
       return false;
     }
-
-    // Check metadata TTL
     if (Double.compare(_metadataTTL, context.getMetadataTTL()) != 0) {
       LOGGER.info("Previous snapshot used metadataTTL: {} different from current: {} for table: {}, partition: {}",
           _metadataTTL, context.getMetadataTTL(), tableName, _partitionId);
       return false;
     }
-
-    // Check deleted keys TTL
     if (Double.compare(_deletedKeysTTL, context.getDeletedKeysTTL()) != 0) {
       LOGGER.info("Previous snapshot used deletedKeysTTL: {} different from current: {} for table: {}, partition: {}",
           _deletedKeysTTL, context.getDeletedKeysTTL(), tableName, _partitionId);
       return false;
     }
-
-    // Check upsert mode and partial upsert strategies
     TableConfig tableConfig = context.getTableConfig();
     if (tableConfig != null) {
       UpsertConfig.Mode currentUpsertMode = tableConfig.getUpsertMode();
@@ -255,22 +219,22 @@ public class LocalValidDocIdsSnapshotMetadata {
           if (_defaultPartialUpsertStrategy != null
               && _defaultPartialUpsertStrategy != upsertConfig.getDefaultPartialUpsertStrategy()) {
             LOGGER.info("Previous snapshot used default partial strategy: {} different from current: {} for table: "
-                + "{}, partition: {}", _defaultPartialUpsertStrategy, upsertConfig.getDefaultPartialUpsertStrategy(),
+                    + "{}, partition: {}", _defaultPartialUpsertStrategy,
+                upsertConfig.getDefaultPartialUpsertStrategy(),
                 tableName, _partitionId);
             return false;
           }
 
-          if (_partialUpsertStrategies != null
-              && !_partialUpsertStrategies.equals(upsertConfig.getPartialUpsertStrategies())) {
+          if (_partialUpsertStrategies != null && !_partialUpsertStrategies.equals(
+              upsertConfig.getPartialUpsertStrategies())) {
             LOGGER.info("Previous snapshot used partial upsert strategies: {} different from current: {} for table: "
-                + "{}, partition: {}", _partialUpsertStrategies, upsertConfig.getPartialUpsertStrategies(),
-                tableName, _partitionId);
+                    + "{}, partition: {}", _partialUpsertStrategies, upsertConfig.getPartialUpsertStrategies(),
+                tableName,
+                _partitionId);
             return false;
           }
         }
       }
-
-      // Check number of partitions
       int currentNumPartitions = getNumPartitionsFromTableConfig(tableConfig);
       if (_numPartitions != 0 && currentNumPartitions != 0 && _numPartitions != currentNumPartitions) {
         LOGGER.info("Previous snapshot used numPartitions: {} different from current: {} for table: {}, partition: {}",
