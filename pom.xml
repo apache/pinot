@@ -178,8 +178,8 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.41.18</aws.sdk.version>
-    <azure.sdk.version>1.3.3</azure.sdk.version>
+    <aws.sdk.version>2.41.19</aws.sdk.version>
+    <azure.sdk.version>1.3.4</azure.sdk.version>
     <azure.msal4j.version>1.23.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
@@ -197,7 +197,7 @@
     <spark3.version>3.5.8</spark3.version>
     <kafka2.version>2.8.2</kafka2.version>
     <kafka3.version>3.9.1</kafka3.version>
-    <confluent.version>7.7.0</confluent.version>
+    <confluent.version>7.9.5</confluent.version>
     <pulsar.version>4.0.8</pulsar.version>
     <flink.version>1.20.3</flink.version>
 
@@ -295,7 +295,7 @@
     <picocli.version>4.7.7</picocli.version>
     <tyrus-standalone-client.version>2.2.2</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
-    <ipaddress.version>5.5.1</ipaddress.version>
+    <ipaddress.version>5.6.1</ipaddress.version>
     <openhft.chronicle-bom.version>2.27ea100</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <maven.version>3.9.12</maven.version>
@@ -2830,6 +2830,13 @@
             <exclude>**/.project</exclude>
             <exclude>**/.classpath</exclude>
             <exclude>.externalToolBuilders/**</exclude>
+
+            <!-- GenAI Config files -->
+            <exclude>.codex/**</exclude>
+            <exclude>.continue/**</exclude>
+            <exclude>.copilot/**</exclude>
+            <exclude>.openai/**</exclude>
+            <exclude>.ollama/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>helm/**</exclude>
