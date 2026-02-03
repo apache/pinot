@@ -1208,7 +1208,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           + "compatibility", _partitionId);
       return false;
     }
-    return metadata.isCompatibleWith(_context, _tableNameWithType);
+    return metadata.isCompatible(_context, _tableNameWithType);
   }
 
   protected void deleteSnapshot(ImmutableSegmentImpl segment) {

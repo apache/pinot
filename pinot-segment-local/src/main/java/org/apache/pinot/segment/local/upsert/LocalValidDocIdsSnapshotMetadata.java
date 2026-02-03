@@ -170,7 +170,7 @@ public class LocalValidDocIdsSnapshotMetadata {
    * @return true if compatible, false otherwise
    */
   @JsonIgnore
-  public boolean isCompatibleWith(UpsertContext context, String tableName) {
+  public boolean isCompatible(UpsertContext context, String tableName) {
     if (!Objects.equals(_primaryKeyColumns, context.getPrimaryKeyColumns())) {
       LOGGER.info("Previous snapshot used primary keys: {} different from current: {} for table: {}, partition: {}",
           _primaryKeyColumns, context.getPrimaryKeyColumns(), tableName, _partitionId);

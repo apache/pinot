@@ -174,7 +174,7 @@ public class LocalValidDocIdsSnapshotMetadataTest {
   }
 
   @Test
-  public void testIsCompatibleWithSameConfig()
+  public void testIsCompatibleSameConfig()
       throws IOException {
     UpsertContext context = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS, DELETE_RECORD_COLUMN,
         HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL);
@@ -186,11 +186,11 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     LocalValidDocIdsSnapshotMetadata readMetadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
     assertNotNull(readMetadata);
-    assertTrue(readMetadata.isCompatibleWith(context, "testTable"));
+    assertTrue(readMetadata.isCompatible(context, "testTable"));
   }
 
   @Test
-  public void testIsCompatibleWithDifferentPrimaryKeys()
+  public void testIsCompatibleDifferentPrimaryKeys()
       throws IOException {
     UpsertContext originalContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
         DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL);
@@ -206,11 +206,11 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     LocalValidDocIdsSnapshotMetadata readMetadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
     assertNotNull(readMetadata);
-    assertFalse(readMetadata.isCompatibleWith(newContext, "testTable"));
+    assertFalse(readMetadata.isCompatible(newContext, "testTable"));
   }
 
   @Test
-  public void testIsCompatibleWithDifferentComparisonColumns()
+  public void testIsCompatibleDifferentComparisonColumns()
       throws IOException {
     UpsertContext originalContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
         DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL);
@@ -227,11 +227,11 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     LocalValidDocIdsSnapshotMetadata readMetadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
     assertNotNull(readMetadata);
-    assertFalse(readMetadata.isCompatibleWith(newContext, "testTable"));
+    assertFalse(readMetadata.isCompatible(newContext, "testTable"));
   }
 
   @Test
-  public void testIsCompatibleWithDifferentDeleteRecordColumn()
+  public void testIsCompatibleDifferentDeleteRecordColumn()
       throws IOException {
     UpsertContext originalContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
         DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL);
@@ -247,11 +247,11 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     LocalValidDocIdsSnapshotMetadata readMetadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
     assertNotNull(readMetadata);
-    assertFalse(readMetadata.isCompatibleWith(newContext, "testTable"));
+    assertFalse(readMetadata.isCompatible(newContext, "testTable"));
   }
 
   @Test
-  public void testIsCompatibleWithDifferentMetadataTTL()
+  public void testIsCompatibleDifferentMetadataTTL()
       throws IOException {
     UpsertContext originalContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
         DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL);
@@ -267,11 +267,11 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     LocalValidDocIdsSnapshotMetadata readMetadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
     assertNotNull(readMetadata);
-    assertFalse(readMetadata.isCompatibleWith(newContext, "testTable"));
+    assertFalse(readMetadata.isCompatible(newContext, "testTable"));
   }
 
   @Test
-  public void testIsCompatibleWithDifferentDeletedKeysTTL()
+  public void testIsCompatibleDifferentDeletedKeysTTL()
       throws IOException {
     UpsertContext originalContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
         DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL);
@@ -287,11 +287,11 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     LocalValidDocIdsSnapshotMetadata readMetadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
     assertNotNull(readMetadata);
-    assertFalse(readMetadata.isCompatibleWith(newContext, "testTable"));
+    assertFalse(readMetadata.isCompatible(newContext, "testTable"));
   }
 
   @Test
-  public void testIsCompatibleWithDifferentHashFunction()
+  public void testIsCompatibleDifferentHashFunction()
       throws IOException {
     UpsertContext originalContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
         DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL);
@@ -307,11 +307,11 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     LocalValidDocIdsSnapshotMetadata readMetadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
     assertNotNull(readMetadata);
-    assertFalse(readMetadata.isCompatibleWith(newContext, "testTable"));
+    assertFalse(readMetadata.isCompatible(newContext, "testTable"));
   }
 
   @Test
-  public void testIsCompatibleWithDifferentUpsertMode()
+  public void testIsCompatibleDifferentUpsertMode()
       throws IOException {
     UpsertContext originalContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
         DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL);
@@ -327,11 +327,11 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     LocalValidDocIdsSnapshotMetadata readMetadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
     assertNotNull(readMetadata);
-    assertFalse(readMetadata.isCompatibleWith(newContext, "testTable"));
+    assertFalse(readMetadata.isCompatible(newContext, "testTable"));
   }
 
   @Test
-  public void testIsCompatibleWithDifferentNumPartitions()
+  public void testIsCompatibleDifferentNumPartitions()
       throws IOException {
     UpsertContext originalContext = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS,
         DELETE_RECORD_COLUMN, HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL,
@@ -349,7 +349,7 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     LocalValidDocIdsSnapshotMetadata readMetadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(TEMP_DIR, PARTITION_ID);
     assertNotNull(readMetadata);
-    assertFalse(readMetadata.isCompatibleWith(newContext, "testTable"));
+    assertFalse(readMetadata.isCompatible(newContext, "testTable"));
   }
 
   @Test
