@@ -126,15 +126,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.SEGMENT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.SEGMENT_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotSegmentUploadDownloadRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadDownloadRestletResource.class);
@@ -580,7 +583,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
     try {
       int entryCount = 0;
-      for (Map.Entry<String, SegmentMetadataInfo> entry: segmentsMetadataInfoMap.entrySet()) {
+      for (Map.Entry<String, SegmentMetadataInfo> entry : segmentsMetadataInfoMap.entrySet()) {
         String segmentName = entry.getKey();
         SegmentMetadataInfo segmentMetadataInfo = entry.getValue();
         segmentNames.add(segmentName);
@@ -808,7 +811,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, false,
           enableParallelPushProtection, allowRefresh, headers, request));
@@ -847,7 +850,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
           enableParallelPushProtection, allowRefresh, headers, request));
@@ -895,7 +898,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean allowRefresh,
       @Context HttpHeaders headers,
       @Context Request request,
-      @Suspended final AsyncResponse asyncResponse) {
+      @Suspended AsyncResponse asyncResponse) {
     if (StringUtils.isEmpty(tableName)) {
       throw new ControllerApplicationException(LOGGER,
           "tableName is a required field while uploading segments in batch mode.", Response.Status.BAD_REQUEST);
@@ -949,7 +952,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, true, enableParallelPushProtection,
@@ -989,7 +992,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
           enableParallelPushProtection, allowRefresh, headers, request));
@@ -1004,12 +1007,14 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Start to replace segments", notes = "Start to replace segments")
-  public Response startReplaceSegments(
+  @ManagedAsync
+  public void startReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
       @ApiParam(value = "Fields belonging to start replace segment request", required = true)
-      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders headers) {
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders headers,
+      @Suspended AsyncResponse asyncResponse) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
@@ -1022,10 +1027,12 @@ public class PinotSegmentUploadDownloadRestletResource {
       String segmentLineageEntryId = _pinotHelixResourceManager.startReplaceSegments(tableNameWithType,
           startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup,
           startReplaceSegmentsRequest.getCustomMap());
-      return Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build();
+      asyncResponse.resume(
+          Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build());
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_START_REPLACE_FAILURE, 1);
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      asyncResponse.resume(
+          new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
     }
   }
 
@@ -1035,7 +1042,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "End to replace segments", notes = "End to replace segments")
-  public Response endReplaceSegments(
+  @ManagedAsync
+  public void endReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
@@ -1043,7 +1051,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Trigger an immediate segment cleanup") @QueryParam("cleanup") @DefaultValue("false")
       boolean cleanupSegments,
       @ApiParam(value = "Fields belonging to end replace segment request")
-      EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers) {
+      EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers,
+      @Suspended AsyncResponse asyncResponse) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
@@ -1060,10 +1069,11 @@ public class PinotSegmentUploadDownloadRestletResource {
       if (cleanupSegments) {
         _pinotHelixResourceManager.invokeControllerPeriodicTask(tableNameWithType, RetentionManager.TASK_NAME, null);
       }
-      return Response.ok().build();
+      asyncResponse.resume(Response.ok().build());
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      asyncResponse.resume(
+          new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
     }
   }
 
@@ -1073,7 +1083,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Revert segments replacement", notes = "Revert segments replacement")
-  public Response revertReplaceSegments(
+  @ManagedAsync
+  public void revertReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Segment lineage entry id to revert", required = true) @QueryParam("segmentLineageEntryId")
@@ -1081,7 +1092,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Force revert in case the user knows that the lineage entry is interrupted")
       @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert,
       @ApiParam(value = "Fields belonging to revert replace segment request")
-      RevertReplaceSegmentsRequest revertReplaceSegmentsRequest, @Context HttpHeaders headers) {
+      RevertReplaceSegmentsRequest revertReplaceSegmentsRequest, @Context HttpHeaders headers,
+      @Suspended AsyncResponse asyncResponse) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
@@ -1095,10 +1107,11 @@ public class PinotSegmentUploadDownloadRestletResource {
       Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
       _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert,
           revertReplaceSegmentsRequest);
-      return Response.ok().build();
+      asyncResponse.resume(Response.ok().build());
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      asyncResponse.resume(
+          new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e));
     }
   }
 
@@ -1184,8 +1197,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   }
 
   // The multipart input would contain a single multipart and this part would contain the segment metadata
-  // files (creation.meta, metadata.properties), and an additional mapping file names 'all_segments_metadata' which
-  // would contain the mappings from segment names to segment download URI's.
+// files (creation.meta, metadata.properties), and an additional mapping file names 'all_segments_metadata' which
+// would contain the mappings from segment names to segment download URI's.
   private static Map<String, SegmentMetadataInfo> createSegmentsMetadataInfoMap(FormDataMultiPart multiPart) {
     List<BodyPart> bodyParts = multiPart.getBodyParts();
     validateMultiPartForBatchSegmentUpload(bodyParts);
@@ -1217,7 +1230,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
 
     Map<String, SegmentMetadataInfo> segmentsMetadataInfoMap = new HashMap<>();
-    for (File file: segmentsMetadataFiles) {
+    for (File file : segmentsMetadataFiles) {
       String fileName = file.getName();
       if (fileName.equalsIgnoreCase(SegmentUploadConstants.ALL_SEGMENTS_METADATA_FILENAME)) {
         try (InputStream inputStream = FileUtils.openInputStream(file)) {
