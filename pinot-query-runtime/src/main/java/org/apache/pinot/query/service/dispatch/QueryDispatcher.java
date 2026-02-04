@@ -544,12 +544,23 @@ public class QueryDispatcher {
     return new DispatcherStreamingBrokerResponse(lazyBrokerResponse, rootOp, subPlan, queryDispatcher);
   }
 
+  public BrokerResponseNativeV2 submitAndReduceForTest(DispatchableSubPlan subPlan, Map<String, String> queryOptions)
+      throws InterruptedException {
+    return submitAndReduceForTest(subPlan, queryOptions, _mailboxService, this);
+  }
+
+
   @VisibleForTesting
   public static BrokerResponseNativeV2 submitAndReduceForTest(DispatchableSubPlan subPlan,
       Map<String, String> queryOptions, MailboxService mailboxService) {
-    try {
-      DispatcherStreamingBrokerResponse streamingQueryResult =
-          getStreamingQueryResult(subPlan, queryOptions, mailboxService, null);
+    return submitAndReduceForTest(subPlan, queryOptions, mailboxService, null);
+  }
+
+  @VisibleForTesting
+  public static BrokerResponseNativeV2 submitAndReduceForTest(DispatchableSubPlan subPlan,
+      Map<String, String> queryOptions, MailboxService mailboxService, @Nullable QueryDispatcher queryDispatcher) {
+    try (DispatcherStreamingBrokerResponse streamingQueryResult =
+        getStreamingQueryResult(subPlan, queryOptions, mailboxService, queryDispatcher)) {
       return streamingQueryResult.reduceForTests();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

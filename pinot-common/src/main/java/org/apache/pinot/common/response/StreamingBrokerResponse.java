@@ -210,16 +210,46 @@ public interface StreamingBrokerResponse extends AutoCloseable {
     ///
     /// The returned value must be compatible with the
     /// [external type of the column](org.apache.pinot.common.utils.DataSchema.ColumnDataType#toExternal(Object))
+    @Nullable
     Object get(int colIdx);
 
     boolean next();
 
+    /// A [Data] implementation that wraps a list of object arrays.
+    ///
+    /// It is assumed that each object array represents a row, and each element in the array represents a column value,
+    /// in [external formal][org.apache.pinot.common.utils.DataSchema.ColumnDataType#toExternal(Object)].
+    /// In case your rows are in internal format, use [FromObjectArrList#fromInternal] to create a [Data] that
+    /// returns values in internal format.
     class FromObjectArrList implements Data {
       private final List<Object[]> _rows;
       private int _currentId = 0;
 
+      /// Creates a new [FromObjectArrList] with the given rows.
+      ///
+      /// It is assumed that each object array represents a row, and each element in the array represents a column value,
+      /// in [external formal][org.apache.pinot.common.utils.DataSchema.ColumnDataType#toExternal(Object)].
+      /// In case your rows are in internal format, use [FromObjectArrList#fromInternal] to create a [Data] that
+      /// returns values in internal format.
       public FromObjectArrList(List<Object[]> rows) {
         _rows = rows;
+      }
+
+      public static FromObjectArrList fromInternal(DataSchema schema, List<Object[]> rows) {
+        return fromInternal(schema.getColumnDataTypes(), rows);
+      }
+
+      public static FromObjectArrList fromInternal(DataSchema.ColumnDataType[] colTypes, List<Object[]> rows) {
+        return new FromObjectArrList(rows) {
+          @Override
+          public Object get(int colIdx) {
+            Object value = super.get(colIdx);
+            if (value == null) {
+              return null;
+            }
+            return colTypes[colIdx].toExternal(value);
+          }
+        };
       }
 
       @Override
@@ -229,8 +259,10 @@ public interface StreamingBrokerResponse extends AutoCloseable {
 
       @Override
       public Object get(int colIdx) {
-        Preconditions.checkState(_currentId > 0 && _currentId < getNumRows(),
-            "Cannot get value for row %s before calling next() or after reaching end of stream", _currentId);
+        Preconditions.checkState(_currentId > 0,
+            "Cannot get value for row %s before calling next()", _currentId);
+        Preconditions.checkState(_currentId <= getNumRows(),
+            "Cannot get value for row %s after reaching end of stream", _currentId);
         return _rows.get(_currentId - 1)[colIdx];
       }
 

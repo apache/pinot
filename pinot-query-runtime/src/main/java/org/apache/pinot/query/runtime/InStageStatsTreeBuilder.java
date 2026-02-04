@@ -204,11 +204,15 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
 
   @Override
   public ObjectNode visitJoin(JoinNode node, Context context) {
-    if (node.getJoinStrategy() == JoinNode.JoinStrategy.HASH) {
-      return recursiveCase(node, MultiStageOperator.Type.HASH_JOIN, context);
-    } else {
-      assert node.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP;
-      return recursiveCase(node, MultiStageOperator.Type.LOOKUP_JOIN, context);
+    switch (node.getJoinStrategy()) {
+      case HASH:
+        return recursiveCase(node, MultiStageOperator.Type.HASH_JOIN, context);
+      case LOOKUP:
+        return recursiveCase(node, MultiStageOperator.Type.LOOKUP_JOIN, context);
+      case ASOF:
+        return recursiveCase(node, MultiStageOperator.Type.ASOF_JOIN, context);
+      default:
+        throw new IllegalStateException("Unexpected join strategy: " + node.getJoinStrategy());
     }
   }
 
