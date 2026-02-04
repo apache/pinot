@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -231,7 +232,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     spec.setPushJobSpec(pushJobSpec);
     spec.setTableSpec(tableSpec);
     spec.setPinotClusterSpecs(pinotClusterSpecs);
-    spec.setAuthToken(taskConfigs.get(BatchConfigProperties.AUTH_TOKEN));
+    spec.setAuthToken(AuthProviderUtils.toStaticToken(resolveAuthProvider(taskConfigs)));
 
     return spec;
   }
@@ -295,7 +296,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
           BatchConfigProperties.RECORD_READER_PROP_PREFIX));
       taskSpec.setRecordReaderSpec(recordReaderSpec);
 
-      String authToken = taskConfigs.get(BatchConfigProperties.AUTH_TOKEN);
+      String authToken = AuthProviderUtils.toStaticToken(resolveAuthProvider(taskConfigs));
 
       String tableNameWithType = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
       Schema schema;

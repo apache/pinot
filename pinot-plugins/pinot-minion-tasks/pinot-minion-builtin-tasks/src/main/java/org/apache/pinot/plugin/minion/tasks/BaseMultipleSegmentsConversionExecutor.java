@@ -570,7 +570,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     spec.setPushJobSpec(pushJobSpec);
     spec.setTableSpec(tableSpec);
     spec.setPinotClusterSpecs(pinotClusterSpecs);
-    spec.setAuthToken(taskConfigs.get(BatchConfigProperties.AUTH_TOKEN));
+    spec.setAuthToken(AuthProviderUtils.toStaticToken(resolveAuthProvider(taskConfigs)));
 
     return spec;
   }
