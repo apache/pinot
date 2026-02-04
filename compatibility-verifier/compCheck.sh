@@ -527,7 +527,6 @@ if [ -f "${SERVER_CONF_2}" ]; then
   stopService server2
   startService server2 "$oldTargetDir" "$SERVER_CONF_2"
   waitForServer2Ready
-  sleep 300
 
   if [ -f $testSuiteDir/post-server-2-rollback.yaml ]; then
     echo "Running tests after server 2 downgrade"
