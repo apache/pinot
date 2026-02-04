@@ -307,10 +307,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     DimensionTableDataManager.registerDimensionTable(offlineTableName, mockDimManager);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown() {
     // Restore the original default timezone
-    TimeZone.setDefault(_currentSystemTimeZone);
+    if (_currentSystemTimeZone != null) {
+      TimeZone.setDefault(_currentSystemTimeZone);
+    }
     for (QueryServerEnclosure server : _servers.values()) {
       server.shutDown();
     }

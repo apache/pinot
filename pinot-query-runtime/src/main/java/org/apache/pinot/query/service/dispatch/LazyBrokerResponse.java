@@ -27,6 +27,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
@@ -34,6 +35,7 @@ import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 
 
@@ -155,7 +157,7 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
 
     @Override
     public StreamingBrokerResponse.Data visit(RowHeapDataBlock block, DataSchema arg) {
-      return new StreamingBrokerResponse.Data.FromObjectArrList(block.getRows());
+      return StreamingBrokerResponse.Data.FromObjectArrList.fromInternal(arg, block.getRows());
     }
 
     @Override
@@ -163,6 +165,9 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
       DataBlock dataBlock = block.getDataBlock();
       return new StreamingBrokerResponse.Data() {
         private int _currentId = -1;
+        private final boolean[] _bitmapInitialized = new boolean[arg.getColumnDataTypes().length];
+        private RoaringBitmap[] _bitmaps;
+
         @Override
         public int getNumRows() {
           return dataBlock.getNumberOfRows();
@@ -170,46 +175,28 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
 
         @Override
         public Object get(int colIdx) {
-          Preconditions.checkState(_currentId >= 0 && _currentId < getNumRows(),
-              "Cannot get value for row %s before calling next() or after reaching end of stream", _currentId);
+          Preconditions.checkState(_currentId >= 0,
+              "Cannot get value for row %s before calling next()", _currentId);
+          Preconditions.checkState(_currentId < getNumRows(),
+              "Cannot get value for row %s after reaching end of stream", _currentId);
+          if (isNull(colIdx)) {
+            return null;
+          }
           DataSchema.ColumnDataType columnDataType = arg.getColumnDataType(colIdx);
-          Object internal = getInternal(colIdx, columnDataType);
+          DataSchema.ColumnDataType storedType = columnDataType.getStoredType();
+          Object internal = DataBlockExtractUtils.extractValue(dataBlock, storedType, _currentId, colIdx);
           return columnDataType.toExternal(internal);
         }
 
-        private Object getInternal(int colIdx, DataSchema.ColumnDataType columnDataType) {
-          switch (columnDataType.getStoredType()) {
-            // TODO: Verify if more types are needed
-            case INT:
-              return dataBlock.getInt(_currentId, colIdx);
-            case LONG:
-              return dataBlock.getLong(_currentId, colIdx);
-            case FLOAT:
-              return dataBlock.getFloat(_currentId, colIdx);
-            case DOUBLE:
-              return dataBlock.getDouble(_currentId, colIdx);
-            case BIG_DECIMAL:
-              return dataBlock.getBigDecimal(_currentId, colIdx);
-            case STRING:
-              return dataBlock.getString(_currentId, colIdx);
-            case BYTES:
-              return dataBlock.getBytes(_currentId, colIdx);
-            case INT_ARRAY:
-              return dataBlock.getIntArray(_currentId, colIdx);
-            case LONG_ARRAY:
-              return dataBlock.getLongArray(_currentId, colIdx);
-            case FLOAT_ARRAY:
-              return dataBlock.getFloatArray(_currentId, colIdx);
-            case DOUBLE_ARRAY:
-              return dataBlock.getDoubleArray(_currentId, colIdx);
-            case STRING_ARRAY:
-              return dataBlock.getStringArray(_currentId, colIdx);
-            case MAP:
-              return dataBlock.getMap(_currentId, colIdx);
-            default:
-              throw new UnsupportedOperationException("Column " + arg.getColumnName(colIdx)
-                  + " has unsupported storage type " + columnDataType.getStoredType());
+        private boolean isNull(int colIdx) {
+          if (!_bitmapInitialized[colIdx]) {
+            _bitmapInitialized[colIdx] = true;
+            if (_bitmaps == null) {
+              _bitmaps = new RoaringBitmap[arg.getColumnDataTypes().length];
+            }
+            _bitmaps[colIdx] = dataBlock.getNullRowIds(colIdx);
           }
+          return _bitmaps[colIdx] != null && _bitmaps[colIdx].contains(_currentId);
         }
 
         @Override
