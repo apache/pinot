@@ -260,8 +260,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _preloadLock.unlock();
       // Persist snapshot metadata AFTER preload completes (whether successful or not).
       // This ensures we first check compatibility with OLD metadata before overwriting with new config.
-      // The metadata will be used on the next restart to check if snapshots are still compatible.
+      // The metadata will be used on the next restart to check if validDocId snapshots are still compatible.
       if (_enableSnapshot) {
+        deleteStaleSnapshotMetadataFile();
         persistLocalSnapshotMetadata();
       }
     }
@@ -304,7 +305,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       HelixManager helixManager) {
     try {
       Map<String, SegmentZKMetadata> segmentMetadataMap = getSegmentsZKMetadata(helixManager);
-      String instanceId = tableDataManager.getInstanceDataManagerConfig().getInstanceId();
       int cleanedCount = 0;
 
       for (Map.Entry<String, SegmentZKMetadata> entry : segmentMetadataMap.entrySet()) {
@@ -325,6 +325,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           }
 
           File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+          if (segmentDir == null) {
+            _logger.debug("Could not find segment directory for segment: {}, skipping cleanup", segmentName);
+            continue;
+          }
+
           File validDocIdsSnapshot = new File(segmentDir, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
           File queryableDocIdsSnapshot = new File(segmentDir, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
 
@@ -342,10 +347,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           _logger.warn("Failed to clean up snapshot files for segment: {}", segmentName, e);
         }
       }
-
       _logger.info("Cleaned up stale snapshot files from {} segments for partition: {}", cleanedCount, _partitionId);
     } catch (Exception e) {
       _logger.warn("Failed to clean up stale snapshot files for partition: {}", _partitionId, e);
+    }
+  }
+
+  /**
+   * Deletes the stale snapshot metadata file for this partition.
+   */
+  private void deleteStaleSnapshotMetadataFile() {
+    File metadataFile = new File(_tableIndexDir, LocalValidDocIdsSnapshotMetadata.METADATA_FILE_NAME + _partitionId);
+    if (metadataFile.exists()) {
+      if (metadataFile.delete()) {
+        _logger.info("Deleted stale snapshot metadata file for partition: {}", _partitionId);
+      } else {
+        _logger.warn("Failed to delete stale snapshot metadata file for partition: {}", _partitionId);
+      }
     }
   }
 
@@ -1202,8 +1220,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     LocalValidDocIdsSnapshotMetadata metadata =
         LocalValidDocIdsSnapshotMetadata.fromDirectory(_tableIndexDir, _partitionId);
     if (metadata == null) {
-      // For backward compatibility, if no metadata exists, we do not allow using the snapshots in the first run.
-      // This can happen for existing deployments that haven't taken snapshots with the new metadata yet.
+      // In the initial restart, the preload might take longer as the metadata file wouldn't exist to compare
+      // To take the worst case approach, the snapshot was made in compatible
       _logger.info("No local validDocIds snapshot metadata found for partition: {}, allowing preload for backward "
           + "compatibility", _partitionId);
       return false;
