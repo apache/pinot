@@ -227,8 +227,8 @@ public interface StreamingBrokerResponse extends AutoCloseable {
 
       /// Creates a new [FromObjectArrList] with the given rows.
       ///
-      /// It is assumed that each object array represents a row, and each element in the array represents a column value,
-      /// in [external formal][org.apache.pinot.common.utils.DataSchema.ColumnDataType#toExternal(Object)].
+      /// It is assumed that each object array represents a row, and each element in the array represents a column
+      /// value, in [external formal][org.apache.pinot.common.utils.DataSchema.ColumnDataType#toExternal(Object)].
       /// In case your rows are in internal format, use [FromObjectArrList#fromInternal] to create a [Data] that
       /// returns values in internal format.
       public FromObjectArrList(List<Object[]> rows) {

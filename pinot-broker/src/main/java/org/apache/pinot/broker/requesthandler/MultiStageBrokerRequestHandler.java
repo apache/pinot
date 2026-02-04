@@ -466,9 +466,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   /// Prepares query plan and validates access and quotas.
-  private InternalQueryResponseContext prepareQueryPlan(long requestId, String query, RequesterIdentity requesterIdentity,
-      RequestContext requestContext, HttpHeaders httpHeaders, Timer timer, QueryEnvironment.CompiledQuery compiledQuery,
-      boolean queryWasLogged)
+  private InternalQueryResponseContext prepareQueryPlan(long requestId, String query,
+      RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
+      QueryEnvironment.CompiledQuery compiledQuery, boolean queryWasLogged)
       throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query,
         () -> compiledQuery.planQuery(requestId), timer);
@@ -516,11 +516,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   /// Post-processes broker response with unavailable segments, multi-cluster exceptions, metrics, and logging.
   private void postProcessBrokerResponse(BrokerResponseNativeV2 brokerResponse, InternalQueryResponseContext context) {
-    brokerResponse.setClientRequestId(context.clientRequestId);
-    brokerResponse.setTablesQueried(context.tableNames);
+    brokerResponse.setClientRequestId(context._clientRequestId);
+    brokerResponse.setTablesQueried(context._tableNames);
 
     Set<QueryServerInstance> servers = new HashSet<>();
-    for (DispatchablePlanFragment planFragment : context.dispatchableSubPlan.getQueryStageMap().values()) {
+    for (DispatchablePlanFragment planFragment : context._dispatchableSubPlan.getQueryStageMap().values()) {
       servers.addAll(planFragment.getServerInstances());
     }
     // MSE cannot finish if a single queried server did not respond, so we can use the same count for
@@ -531,8 +531,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Attach unavailable segments (unless configured to ignore missing segments)
     int numUnavailableSegments = 0;
-    if (!QueryOptionsUtils.isIgnoreMissingSegments(context.queryOptions)) {
-      for (Map.Entry<String, Set<String>> entry : context.dispatchableSubPlan.getTableToUnavailableSegmentsMap()
+    if (!QueryOptionsUtils.isIgnoreMissingSegments(context._queryOptions)) {
+      for (Map.Entry<String, Set<String>> entry : context._dispatchableSubPlan.getTableToUnavailableSegmentsMap()
           .entrySet()) {
         String tableName = entry.getKey();
         Set<String> unavailableSegments = entry.getValue();
@@ -544,10 +544,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         brokerResponse.addException(errMsg);
       }
     }
-    context.requestContext.setNumUnavailableSegments(numUnavailableSegments);
+    context._requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
     // Add warnings for unavailable remote clusters in multi-cluster routing
-    if (_multiClusterRoutingContext != null && QueryOptionsUtils.isMultiClusterRoutingEnabled(context.queryOptions,
+    if (_multiClusterRoutingContext != null && QueryOptionsUtils.isMultiClusterRoutingEnabled(context._queryOptions,
         false)) {
       for (QueryProcessingException clusterException
           : _multiClusterRoutingContext.getUnavailableClusterExceptions()) {
@@ -555,10 +555,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
     }
 
-    long totalTimeMs = System.currentTimeMillis() - context.requestContext.getRequestArrivalTimeMillis();
+    long totalTimeMs = System.currentTimeMillis() - context._requestContext.getRequestArrivalTimeMillis();
     _brokerMetrics.addTimedValue(BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
 
-    for (String table : context.tableNames) {
+    for (String table : context._tableNames) {
       _brokerMetrics.addTimedTableValue(
           table, BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
       if (brokerResponse.isNumGroupsLimitReached()) {
@@ -570,16 +570,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     brokerResponse.setTimeUsedMs(totalTimeMs);
-    augmentStatistics(context.requestContext, brokerResponse);
-    if (QueryOptionsUtils.shouldDropResults(context.queryOptions)) {
+    augmentStatistics(context._requestContext, brokerResponse);
+    if (QueryOptionsUtils.shouldDropResults(context._queryOptions)) {
       brokerResponse.setResultTable(null);
     }
 
     // Log query and stats
     _queryLogger.logQueryCompleted(
-        new QueryLogger.QueryLogParams(context.requestContext, context.tableNames.toString(), brokerResponse,
-            QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, context.requesterIdentity, null),
-        context.queryWasLogged);
+        new QueryLogger.QueryLogParams(context._requestContext, context._tableNames.toString(), brokerResponse,
+            QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, context._requesterIdentity, null),
+        context._queryWasLogged);
   }
 
   /// Decorates a given response to apply an additional layer of decoration to the response to handle logging and error
@@ -809,7 +809,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     InternalQueryResponseContext context = prepareQueryPlan(requestId, query.getTextQuery(), requesterIdentity,
         requestContext, httpHeaders, timer, query, queryWasLogged);
 
-    int estimatedNumQueryThreads = context.dispatchableSubPlan.getEstimatedNumQueryThreads();
+    int estimatedNumQueryThreads = context._dispatchableSubPlan.getEstimatedNumQueryThreads();
     try {
       if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, timer.getRemainingTimeMs(),
           TimeUnit.MILLISECONDS)) {
@@ -825,13 +825,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
     }
 
-    int stageCount = context.dispatchableSubPlan.getQueryStageMap().size();
-    int opChainCount = context.dispatchableSubPlan.getQueryStageMap().values().stream()
+    int stageCount = context._dispatchableSubPlan.getQueryStageMap().size();
+    int opChainCount = context._dispatchableSubPlan.getQueryStageMap().values().stream()
         .mapToInt(stage -> stage.getWorkerMetadataList().size())
         .sum();
 
     try {
-      onQueryStart(requestId, context.clientRequestId, query.getTextQuery());
+      onQueryStart(requestId, context._clientRequestId, query.getTextQuery());
       long executionStartTimeNs = System.nanoTime();
 
       _stagesStartedMeter.mark(stageCount);
@@ -839,8 +839,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       QueryDispatcher.QueryResult queryResults;
       try {
-        queryResults = _queryDispatcher.submitAndReduce(requestContext, context.dispatchableSubPlan,
-            timer.getRemainingTimeMs(), context.queryOptions);
+        queryResults = _queryDispatcher.submitAndReduce(requestContext, context._dispatchableSubPlan,
+            timer.getRemainingTimeMs(), context._queryOptions);
       } catch (QueryException e) {
         throw e;
       } catch (Throwable t) {
@@ -862,7 +862,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         brokerResponse.addException(processingException);
         QueryErrorCode errorCode = QueryErrorCode.fromErrorCode(processingException.getErrorCode());
         if (errorCode == QueryErrorCode.EXECUTION_TIMEOUT) {
-          for (String table : context.tableNames) {
+          for (String table : context._tableNames) {
             _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
           }
           LOGGER.warn("Timed out executing request {}: {}", requestId, query);
@@ -871,14 +871,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       } else {
         brokerResponse.setResultTable(queryResults.getResultTable());
         long executionEndTimeNs = System.nanoTime();
-        updatePhaseTimingForTables(context.tableNames, BrokerQueryPhase.QUERY_EXECUTION,
+        updatePhaseTimingForTables(context._tableNames, BrokerQueryPhase.QUERY_EXECUTION,
             executionEndTimeNs - executionStartTimeNs);
       }
 
       brokerResponse.setResultTable(queryResults.getResultTable());
       brokerResponse.setBrokerReduceTimeMs(queryResults.getBrokerReduceTimeMs());
       QueryDispatcher.fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(),
-          context.dispatchableSubPlan);
+          context._dispatchableSubPlan);
 
       postProcessBrokerResponse(brokerResponse, context);
 
@@ -900,7 +900,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     InternalQueryResponseContext context = prepareQueryPlan(requestId, query.getTextQuery(), requesterIdentity,
         requestContext, httpHeaders, timer, query, queryWasLogged);
 
-    int estimatedNumQueryThreads = context.dispatchableSubPlan.getEstimatedNumQueryThreads();
+    int estimatedNumQueryThreads = context._dispatchableSubPlan.getEstimatedNumQueryThreads();
     try {
       if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, timer.getRemainingTimeMs(),
           TimeUnit.MILLISECONDS)) {
@@ -916,13 +916,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return StreamingBrokerResponse.error(QueryErrorCode.EXECUTION_TIMEOUT);
     }
 
-    _stagesStartedMeter.mark(countStages(context.dispatchableSubPlan));
-    _opchainsStartedMeter.mark(countOpChain(context.dispatchableSubPlan));
+    _stagesStartedMeter.mark(countStages(context._dispatchableSubPlan));
+    _opchainsStartedMeter.mark(countOpChain(context._dispatchableSubPlan));
 
-    onQueryStart(requestId, context.clientRequestId, query.getTextQuery());
+    onQueryStart(requestId, context._clientRequestId, query.getTextQuery());
     try {
       QueryDispatcher.DispatcherStreamingBrokerResponse dispatcherResponse = _queryDispatcher.submit(
-          requestContext, context.dispatchableSubPlan, timer.getRemainingTimeMs(), context.queryOptions);
+          requestContext, context._dispatchableSubPlan, timer.getRemainingTimeMs(), context._queryOptions);
       return new MseHandlerStreamingBrokerResponse(dispatcherResponse, context, estimatedNumQueryThreads);
     } catch (QueryException e) {
       onQueryFinish(requestId);
@@ -978,18 +978,18 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         // Here is when the reduction phase actually happens
         metainfo = delegate.consumeData(consumer);
       } catch (InterruptedException e) {
-        LOGGER.warn("Request {} interrupted while reducing results", _context.requestContext.getRequestId(), e);
+        LOGGER.warn("Request {} interrupted while reducing results", _context._requestContext.getRequestId(), e);
         throw e;
       } catch (QueryException e) {
         return new Metainfo.Error(e.getErrorCode(), ExceptionUtils.consolidateExceptionMessages(e));
       } catch (Exception e) {
-        LOGGER.warn("Request {} failed while reducing results", _context.requestContext.getRequestId(), e);
+        LOGGER.warn("Request {} failed while reducing results", _context._requestContext.getRequestId(), e);
         return new Metainfo.Error(QueryErrorCode.INTERNAL, ExceptionUtils.consolidateExceptionMessages(e));
       } finally {
         _queryThrottler.release(_estimatedNumQueryThreads);
         _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
             _queryThrottler.currentQueryServerThreads());
-        onQueryFinish(_context.requestContext.getRequestId());
+        onQueryFinish(_context._requestContext.getRequestId());
       }
 
       if (!(metainfo.getBrokerResponse() instanceof BrokerResponseNativeV2)) {
@@ -999,7 +999,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         try {
           postExecution(brokerResponse);
         } catch (Exception e) {
-          LOGGER.warn("Request {} failed during post reduction", _context.requestContext.getRequestId(), e);
+          LOGGER.warn("Request {} failed during post reduction", _context._requestContext.getRequestId(), e);
           QueryProcessingException error =
               new QueryProcessingException(QueryErrorCode.INTERNAL, "Error during post processing");
           brokerResponse.addException(error);
@@ -1010,8 +1010,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     private void postExecution(BrokerResponseNativeV2 brokerResponse) {
-      _stagesFinishedMeter.mark(countStages(_context.dispatchableSubPlan));
-      _opchainsCompletedMeter.mark(countOpChain(_context.dispatchableSubPlan));
+      _stagesFinishedMeter.mark(countStages(_context._dispatchableSubPlan));
+      _opchainsCompletedMeter.mark(countOpChain(_context._dispatchableSubPlan));
 
       long executionStartTimeNs = System.nanoTime();
 
@@ -1019,17 +1019,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         brokerResponse.addException(processingException);
         QueryErrorCode errorCode = QueryErrorCode.fromErrorCode(processingException.getErrorCode());
         if (errorCode == QueryErrorCode.EXECUTION_TIMEOUT) {
-          for (String table : _context.tableNames) {
+          for (String table : _context._tableNames) {
             _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
           }
-          LOGGER.warn("Timed out executing request {}: {}", _context.requestId, _context.compiledQuery);
+          LOGGER.warn("Timed out executing request {}: {}", _context._requestId, _context._compiledQuery);
         }
-        _context.requestContext.setErrorCode(errorCode);
+        _context._requestContext.setErrorCode(errorCode);
       }
       if (brokerResponse.getExceptions().isEmpty()) {
         brokerResponse.setResultTable(brokerResponse.getResultTable());
         long executionEndTimeNs = System.nanoTime();
-        updatePhaseTimingForTables(_context.tableNames, BrokerQueryPhase.QUERY_EXECUTION,
+        updatePhaseTimingForTables(_context._tableNames, BrokerQueryPhase.QUERY_EXECUTION,
             executionEndTimeNs - executionStartTimeNs);
       }
 
@@ -1164,33 +1164,33 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   /// Internal context used during query execution to hold common state between eager and streaming response paths.
   private static class InternalQueryResponseContext {
-    final long requestId;
-    final String clientRequestId;
-    final QueryEnvironment.CompiledQuery compiledQuery;
-    final DispatchableSubPlan dispatchableSubPlan;
-    final Set<String> tableNames;
-    final RequesterIdentity requesterIdentity;
-    final RequestContext requestContext;
-    final Timer timer;
-    final boolean queryWasLogged;
-    final Map<String, String> queryOptions;
-    final HttpHeaders httpHeaders;
+    final long _requestId;
+    final String _clientRequestId;
+    final QueryEnvironment.CompiledQuery _compiledQuery;
+    final DispatchableSubPlan _dispatchableSubPlan;
+    final Set<String> _tableNames;
+    final RequesterIdentity _requesterIdentity;
+    final RequestContext _requestContext;
+    final Timer _timer;
+    final boolean _queryWasLogged;
+    final Map<String, String> _queryOptions;
+    final HttpHeaders _httpHeaders;
 
     InternalQueryResponseContext(long requestId, String clientRequestId, QueryEnvironment.CompiledQuery compiledQuery,
         DispatchableSubPlan dispatchableSubPlan, Set<String> tableNames, RequesterIdentity requesterIdentity,
         RequestContext requestContext, Timer timer, boolean queryWasLogged, Map<String, String> queryOptions,
         HttpHeaders httpHeaders) {
-      this.requestId = requestId;
-      this.clientRequestId = clientRequestId;
-      this.compiledQuery = compiledQuery;
-      this.dispatchableSubPlan = dispatchableSubPlan;
-      this.tableNames = tableNames;
-      this.requesterIdentity = requesterIdentity;
-      this.requestContext = requestContext;
-      this.timer = timer;
-      this.queryWasLogged = queryWasLogged;
-      this.queryOptions = queryOptions;
-      this.httpHeaders = httpHeaders;
+      _requestId = requestId;
+      _clientRequestId = clientRequestId;
+      _compiledQuery = compiledQuery;
+      _dispatchableSubPlan = dispatchableSubPlan;
+      _tableNames = tableNames;
+      _requesterIdentity = requesterIdentity;
+      _requestContext = requestContext;
+      _timer = timer;
+      _queryWasLogged = queryWasLogged;
+      _queryOptions = queryOptions;
+      _httpHeaders = httpHeaders;
     }
   }
 }
