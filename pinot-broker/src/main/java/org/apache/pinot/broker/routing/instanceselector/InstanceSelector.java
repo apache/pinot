@@ -92,7 +92,7 @@ public interface InstanceSelector {
 
   class SelectionResult {
     private final Pair<Map<String, String>, Map<String, String>/*optional segments*/> _segmentToInstanceMap;
-    private List<String> _unavailableSegments;
+    private final List<String> _unavailableSegments;
     private int _numPrunedSegments;
 
     public SelectionResult(Pair<Map<String, String>, Map<String, String>> segmentToInstanceMap,
@@ -122,13 +122,6 @@ public interface InstanceSelector {
      */
     public List<String> getUnavailableSegments() {
       return _unavailableSegments;
-    }
-
-    /**
-     * Sets the unavailable segments
-     */
-    public void setUnavailableSegments(List<String> unavailableSegments) {
-      _unavailableSegments = unavailableSegments;
     }
 
     /**
