@@ -77,9 +77,7 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        if (value != null) {
-          digest.add(toLong(value));
-        }
+        digest.add(toLong(value));
       }
     } else {
       digest.add(toLong(rawValue));

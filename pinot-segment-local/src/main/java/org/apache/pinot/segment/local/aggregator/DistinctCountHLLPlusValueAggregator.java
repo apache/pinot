@@ -103,9 +103,7 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        if (value != null) {
-          hll.offer(value);
-        }
+        hll.offer(value);
       }
     } else {
       hll.offer(rawValue);

@@ -74,9 +74,7 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        if (value != null) {
-          bitmap.add(value.hashCode());
-        }
+        bitmap.add(value.hashCode());
       }
     } else {
       bitmap.add(rawValue.hashCode());

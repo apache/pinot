@@ -87,9 +87,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        if (value != null) {
-          digest.add(ValueAggregatorUtils.toDouble(value));
-        }
+        digest.add(ValueAggregatorUtils.toDouble(value));
       }
     } else {
       digest.add(ValueAggregatorUtils.toDouble(rawValue));
