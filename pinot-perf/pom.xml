@@ -54,6 +54,10 @@
       <artifactId>pinot-kafka-2.0</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-protobuf</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -209,6 +213,10 @@
             <program>
               <mainClass>org.apache.pinot.perf.BenchmarkJsonParsing</mainClass>
               <name>pinot-BenchmarkJsonParsing</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkProtoBufRecordExtractor</mainClass>
+              <name>pinot-BenchmarkProtoBufRecordExtractor</name>
             </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>
