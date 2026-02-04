@@ -2235,32 +2235,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testPipelineBreakerWithoutKeepingStats()
       throws Exception {
-    // lets try several times to give helix time to propagate the config change
-    for (int i = 0; i < 10; i++) {
-      try {
-        String query = "select * from mytable "
-            + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
-        JsonNode response = postQuery(query);
-        assertNotNull(response.get("stageStats"), "Should have stage stats");
+    // let's try several times to give helix time to propagate the config change
+    String erroMsg = "Failed to verify absence of pipeline breaker stats after multiple attempts after 10 attempts";
+    TestUtils.waitForCondition(() -> {
+      String query = "select * from mytable "
+          + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
+      JsonNode response = postQuery(query);
+      assertNotNull(response.get("stageStats"), "Should have stage stats");
 
-        JsonNode receiveNode = response.get("stageStats");
-        Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+      JsonNode receiveNode = response.get("stageStats");
+      Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
 
-        JsonNode sendNode = receiveNode.get("children").get(0);
-        Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
+      JsonNode sendNode = receiveNode.get("children").get(0);
+      Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
 
-        JsonNode mytableLeaf = sendNode.get("children").get(0);
-        Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
-        Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
+      JsonNode mytableLeaf = sendNode.get("children").get(0);
+      Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
+      Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
 
-        Assert.assertNull(mytableLeaf.get("children"), "When pipeline breaker stats are not kept, "
-            + "there should be no children under the leaf node");
-        return;
-      } catch (AssertionError e) {
-        Thread.sleep(100);
-      }
-    }
-    fail("Failed to verify absence of pipeline breaker stats after multiple attempts after 10 attempts");
+      Assert.assertNull(mytableLeaf.get("children"), "When pipeline breaker stats are not kept, "
+          + "there should be no children under the leaf node");
+      return true;
+    }, 100, 10_000L, erroMsg, true, Duration.ofSeconds(1));
   }
 
   @AfterClass
