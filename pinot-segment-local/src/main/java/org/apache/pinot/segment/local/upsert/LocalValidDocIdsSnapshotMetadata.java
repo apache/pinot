@@ -247,8 +247,6 @@ public class LocalValidDocIdsSnapshotMetadata {
     return true;
   }
 
-  // Getters and setters
-
   public int getVersion() {
     return _version;
   }
