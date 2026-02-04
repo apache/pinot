@@ -256,39 +256,42 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testFilterMvScalarFunctionInt() {
+    FilterMvScalarFunction function = new FilterMvScalarFunction();
     // Test the scalar function INT overload directly
     int[] values = new int[]{1, 2, 3, 4, 5};
-    int[] filtered = FilterMvScalarFunction.filterMv(values, "v > 3");
+    int[] filtered = function.filterMv(values, "v > 3");
     assertEquals(filtered.length, 2);
     assertEquals(filtered[0], 4);
     assertEquals(filtered[1], 5);
 
     // No match
-    int[] filteredNone = FilterMvScalarFunction.filterMv(values, "v > 100");
+    int[] filteredNone = function.filterMv(values, "v > 100");
     assertEquals(filteredNone.length, 0);
 
     // All match
-    int[] filteredAll = FilterMvScalarFunction.filterMv(values, "v > 0");
+    int[] filteredAll = function.filterMv(values, "v > 0");
     assertEquals(filteredAll.length, 5);
   }
 
   @Test
   public void testFilterMvScalarFunctionLong() {
+    FilterMvScalarFunction function = new FilterMvScalarFunction();
     long[] values = new long[]{10L, 20L, 30L, 40L, 50L};
-    long[] filtered = FilterMvScalarFunction.filterMv(values, "v > 25");
+    long[] filtered = function.filterMv(values, "v > 25");
     assertEquals(filtered.length, 3);
     assertEquals(filtered[0], 30L);
     assertEquals(filtered[1], 40L);
     assertEquals(filtered[2], 50L);
 
-    long[] filteredNone = FilterMvScalarFunction.filterMv(values, "v > 100");
+    long[] filteredNone = function.filterMv(values, "v > 100");
     assertEquals(filteredNone.length, 0);
   }
 
   @Test
   public void testFilterMvScalarFunctionFloat() {
+    FilterMvScalarFunction function = new FilterMvScalarFunction();
     float[] values = new float[]{1.1f, 2.2f, 3.3f, 4.4f};
-    float[] filtered = FilterMvScalarFunction.filterMv(values, "v > 2.5");
+    float[] filtered = function.filterMv(values, "v > 2.5");
     assertEquals(filtered.length, 2);
     assertEquals(filtered[0], 3.3f);
     assertEquals(filtered[1], 4.4f);
@@ -296,8 +299,9 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testFilterMvScalarFunctionDouble() {
+    FilterMvScalarFunction function = new FilterMvScalarFunction();
     double[] values = new double[]{1.1, 2.2, 3.3, 4.4};
-    double[] filtered = FilterMvScalarFunction.filterMv(values, "v > 2.5");
+    double[] filtered = function.filterMv(values, "v > 2.5");
     assertEquals(filtered.length, 2);
     assertEquals(filtered[0], 3.3);
     assertEquals(filtered[1], 4.4);
@@ -305,14 +309,15 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testFilterMvScalarFunctionString() {
+    FilterMvScalarFunction function = new FilterMvScalarFunction();
     String[] values = new String[]{"apple", "banana", "cherry", "date"};
-    String[] filtered = FilterMvScalarFunction.filterMv(values, "v IN ('apple', 'cherry')");
+    String[] filtered = function.filterMv(values, "v IN ('apple', 'cherry')");
     assertEquals(filtered.length, 2);
     assertEquals(filtered[0], "apple");
     assertEquals(filtered[1], "cherry");
 
     // REGEXP_LIKE
-    String[] filteredRegex = FilterMvScalarFunction.filterMv(values, "REGEXP_LIKE(v, '^[a-b].*')");
+    String[] filteredRegex = function.filterMv(values, "REGEXP_LIKE(v, '^[a-b].*')");
     assertEquals(filteredRegex.length, 2);
     assertEquals(filteredRegex[0], "apple");
     assertEquals(filteredRegex[1], "banana");
@@ -326,17 +331,19 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     byte[] val3 = BytesUtils.toBytes("eeff");
     byte[][] values = new byte[][]{val1, val2, val3};
 
+    FilterMvScalarFunction function = new FilterMvScalarFunction();
+
     // Positive match: filter to values equal to 'ccdd'
-    byte[][] filtered = FilterMvScalarFunction.filterMv(values, "v = 'ccdd'");
+    byte[][] filtered = function.filterMv(values, "v = 'ccdd'");
     assertEquals(filtered.length, 1);
     assertEquals(filtered[0], val2);
 
     // Negative match: filter to values equal to non-existent value
-    byte[][] filteredNone = FilterMvScalarFunction.filterMv(values, "v = '0000'");
+    byte[][] filteredNone = function.filterMv(values, "v = '0000'");
     assertEquals(filteredNone.length, 0);
 
     // All match: always-true predicate returns original array
-    byte[][] filteredAll = FilterMvScalarFunction.filterMv(values, "v != '0000'");
+    byte[][] filteredAll = function.filterMv(values, "v != '0000'");
     assertEquals(filteredAll.length, 3);
   }
 
