@@ -67,6 +67,7 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.EagerToLazyBrokerResponseAdaptor;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -611,8 +612,15 @@ public class PinotClientRequest {
       case DQL:
         try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
           requestContext.setRequestArrivalTimeMillis(requestArrivalTimeMs);
-          StreamingBrokerResponse streamingBrokerResponse = _requestHandler.handleStreamingRequest(
-              sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext, httpHeaders);
+          StreamingBrokerResponse streamingBrokerResponse;
+          if (useStreaming(sqlNodeAndOptions)) {
+            streamingBrokerResponse = _requestHandler.handleStreamingRequest(
+                sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext, httpHeaders);
+          } else {
+            BrokerResponse eagerResponse = _requestHandler.handleRequest(
+                sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext, httpHeaders);
+            return new EagerToLazyBrokerResponseAdaptor(eagerResponse);;
+          }
           return streamingBrokerResponse;
         } catch (Exception e) {
           LOGGER.error("Error handling DQL request:\n{}", sqlRequestJson, e);
@@ -870,6 +878,11 @@ public class PinotClientRequest {
       }
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.getQueryErrorMeter(queryErrorCode), 1);
     }
+  }
+
+  private boolean useStreaming(SqlNodeAndOptions sqlNodeAndOptions) {
+    // TODO: We should use query options and the default value stored in configs to determine whether to use streaming.
+    return true;
   }
 
   public static class KeysComparator implements Comparator<String> {
