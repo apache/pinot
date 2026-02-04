@@ -248,21 +248,14 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
 
-      // Build mapping from instance to position in ideal state (ideal state replica ID)
-      Map<String, Integer> instanceToIdealStateReplicaId = new HashMap<>();
-      int idealStateReplicaId = 0;
-      for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
-        instanceToIdealStateReplicaId.put(instance, idealStateReplicaId);
-        idealStateReplicaId++;
-      }
-
       Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
-      for (String instance : onlineInstances) {
-        if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance),
-              instanceToIdealStateReplicaId.get(instance)));
+      int idealStateReplicaId = 0;
+      for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
+        if (onlineInstances.contains(instance) && !unavailableInstances.contains(instance)) {
+          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance), idealStateReplicaId));
         }
+        idealStateReplicaId++;
       }
       _oldSegmentCandidatesMap.put(segment, candidates);
     }
@@ -272,22 +265,17 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
       Map<String, String> sortedIdealStateInstanceStateMap = convertToSortedMap(idealStateInstanceStateMap);
-      // Build mapping from instance to position in ideal state (ideal state replica ID)
-      Map<String, Integer> instanceToIdealStateReplicaId = new HashMap<>();
-      int idealStateReplicaId = 0;
-      for (String instance : sortedIdealStateInstanceStateMap.keySet()) {
-        instanceToIdealStateReplicaId.put(instance, idealStateReplicaId);
-        idealStateReplicaId++;
-      }
 
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Collections.emptySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
+      int idealStateReplicaId = 0;
       for (String instance : sortedIdealStateInstanceStateMap.keySet()) {
         if (!unavailableInstances.contains(instance)) {
           candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance),
-              instanceToIdealStateReplicaId.get(instance)));
+              idealStateReplicaId));
         }
+        idealStateReplicaId++;
       }
       _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));
     }

@@ -266,24 +266,17 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       Long newSegmentCreationTimeMs = newSegmentCreationTimeMap.get(segment);
       Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
 
-      // Build mapping from instance to position in ideal state (ideal state replica ID)
-      Map<String, Integer> instanceToIdealStateReplicaId = new HashMap<>();
-      int idealStateReplicaId = 0;
-      for (String instance : sortedIdealStateMap.keySet()) {
-        instanceToIdealStateReplicaId.put(instance, idealStateReplicaId);
-        idealStateReplicaId++;
-      }
-
       if (externalViewInstanceStateMap == null) {
         if (newSegmentCreationTimeMs != null) {
           // New segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
+          int idealStateReplicaId = 0;
           for (Map.Entry<String, String> entry : sortedIdealStateMap.entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
-              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance),
-                  instanceToIdealStateReplicaId.get(instance)));
+              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance), idealStateReplicaId));
             }
+            idealStateReplicaId++;
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
         } else {
@@ -295,21 +288,26 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         if (newSegmentCreationTimeMs != null) {
           // New segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
+          int idealStateReplicaId = 0;
           for (Map.Entry<String, String> entry : sortedIdealStateMap.entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
               candidates.add(
                   new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance),
-                      instanceToIdealStateReplicaId.get(instance)));
+                      idealStateReplicaId));
             }
+            idealStateReplicaId++;
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
         } else {
           // Old segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
-          for (String instance : onlineInstances) {
-            candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance),
-                instanceToIdealStateReplicaId.get(instance)));
+          int idealStateReplicaId = 0;
+          for (String instance : sortedIdealStateMap.keySet()) {
+            if (onlineInstances.contains(instance)) {
+              candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance), idealStateReplicaId));
+            }
+            idealStateReplicaId++;
           }
           _oldSegmentCandidatesMap.put(segment, candidates);
         }
