@@ -67,7 +67,7 @@ public class PipelineBreakerOperator extends MultiStageOperator {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
     _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
-    // This is actually innecessary given that pipeline breaker does not emit any rows upstream.
+    // This is actually unnecessary given that pipeline breaker does not emit any rows upstream.
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
