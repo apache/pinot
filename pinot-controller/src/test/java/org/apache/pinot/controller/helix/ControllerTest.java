@@ -1266,7 +1266,7 @@ public class ControllerTest {
 
     // Used in PinotTableRestletResourceTest
     properties.put(ControllerConf.TABLE_MIN_REPLICAS, DEFAULT_MIN_NUM_REPLICAS);
-
+    properties.put("auth.provider.type", "static");
     // Used in PinotControllerAppConfigsTest to test obfuscation
     properties.put("controller.segment.fetcher.auth.token", "*personal*");
     properties.put("controller.admin.access.control.principals.user.password", "*personal*");

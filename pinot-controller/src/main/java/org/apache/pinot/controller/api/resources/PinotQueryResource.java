@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.ApiOperation;
@@ -30,10 +28,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -45,26 +40,24 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.rel2sql.RelToSqlConverter;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.calcite.sql.dialect.PrestoSqlDialect;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.net.URIBuilder;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.config.provider.StaticTableCache;
-import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -80,9 +73,9 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.parser.utils.ParserUtils;
+import org.apache.pinot.spi.config.table.MaterializedViewConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -94,12 +87,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
-import org.apache.pinot.sql.parsers.parser.TableNameExtractor;
-import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
-import org.apache.pinot.tsdb.planner.TimeSeriesTableMetadataProvider;
-import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
-import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
-import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,212 +142,13 @@ public class PinotQueryResource {
   }
 
   @GET
-  @Path("/timeseries/api/v1/query_range")
+  @Path("timeseries/api/v1/query_range")
   @ManualAuthorization
   @ApiOperation(value = "Prometheus Compatible API for Pinot's Time Series Engine")
   public StreamingOutput handleTimeSeriesQueryRange(@QueryParam("language") String language,
     @QueryParam("query") String query, @QueryParam("start") String start, @QueryParam("end") String end,
     @QueryParam("step") String step, @Context HttpHeaders httpHeaders) {
     return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step);
-  }
-
-  @POST
-  @Path("/query/timeseries")
-  @ManualAuthorization
-  @ApiOperation(value = "Query Pinot using the Time Series Engine (Broker Compatible API)")
-  @Consumes(MediaType.APPLICATION_JSON)
-  public StreamingOutput handleTimeSeriesQueryPost(String requestBody, @Context HttpHeaders httpHeaders) {
-    try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(requestBody);
-      if (!requestJson.has("query")) {
-        return constructQueryExceptionResponse(QueryErrorCode.JSON_PARSING,
-            "Payload is missing the query string field 'query'");
-      }
-      String language = requestJson.has("language") ? requestJson.get("language").asText() : null;
-      String query = requestJson.get("query").asText();
-      String start = requestJson.has("start") ? requestJson.get("start").asText() : null;
-      String end = requestJson.has("end") ? requestJson.get("end").asText() : null;
-      String step = requestJson.has("step") ? requestJson.get("step").asText() : null;
-      String mode = requestJson.has("mode") ? requestJson.get("mode").asText() : null;
-
-      Map<String, String> queryOptions = new HashMap<>();
-      if (requestJson.has("queryOptions") && requestJson.get("queryOptions").isObject()) {
-        requestJson.get("queryOptions").fields().forEachRemaining(entry -> {
-          queryOptions.put(entry.getKey(), entry.getValue().asText());
-        });
-      }
-
-      return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, queryOptions, mode, true);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing POST timeseries request", e);
-      return constructQueryExceptionResponse(QueryErrorCode.INTERNAL, e.getMessage());
-    }
-  }
-
-  @POST
-  @Path("validateMultiStageQuery")
-  public List<MultiStageQueryValidationResponse> validateMultiStageQuery(MultiStageQueryValidationRequest request,
-      @Context HttpHeaders httpHeaders) {
-
-    List<String> sqlQueries = request.getSqls();
-    String sql = request.getSql();
-    List<MultiStageQueryValidationResponse> multiStageQueryValidationResponses = new ArrayList<>();
-    if ((sql == null || sql.isEmpty()) && (sqlQueries == null || sqlQueries.isEmpty())) {
-      MultiStageQueryValidationResponse multiStageQueryValidationResponse =
-          new MultiStageQueryValidationResponse(false, "Request is missing the queries string field 'sql'", null, null);
-      multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
-    }
-    if (sqlQueries == null || sqlQueries.isEmpty()) {
-      sqlQueries = new ArrayList<>();
-      sqlQueries.add(sql);
-    }
-    for (String sqlQuery : sqlQueries) {
-      Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
-      String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
-      try {
-        TableCache tableCache;
-        if (CollectionUtils.isNotEmpty(request.getTableConfigs()) && CollectionUtils.isNotEmpty(request.getSchemas())) {
-          tableCache =
-              new StaticTableCache(request.getTableConfigs(), request.getSchemas(), request.getLogicalTableConfigs(),
-                  request.isIgnoreCase());
-          LOGGER.info("Validating multi-stage query: {} compilation using static table cache ", sqlQuery);
-        } else {
-          // Use TableCache from environment if static fields are not specified
-          tableCache = _pinotHelixResourceManager.getTableCache();
-          LOGGER.info("Validating multi-stage query: {} compilation using Zk table cache", sqlQuery);
-        }
-        try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
-            sqlQuery)) {
-          MultiStageQueryValidationResponse multiStageQueryValidationResponse =
-              new MultiStageQueryValidationResponse(true, null, null, sqlQuery);
-          multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
-        }
-      } catch (QueryException e) {
-        LOGGER.error("Caught exception while compiling multi-stage query: {}", e.getMessage());
-        MultiStageQueryValidationResponse multiStageQueryValidationResponse =
-            new MultiStageQueryValidationResponse(false, e.getMessage(), e.getErrorCode(), sqlQuery);
-        multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while validating multi-stage query: {}", e.getMessage());
-        MultiStageQueryValidationResponse multiStageQueryValidationResponse =
-            new MultiStageQueryValidationResponse(false, "Unexpected error: " + e.getMessage(), QueryErrorCode.UNKNOWN,
-                sqlQuery);
-        multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
-      }
-    }
-    return multiStageQueryValidationResponses;
-  }
-
-  @POST
-  @Path("query/tableNames")
-  @Consumes(MediaType.APPLICATION_JSON)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Extract table names from SQL queries")
-  public Set<String> extractTableNames(List<String> sqlQueries, @Context HttpHeaders httpHeaders) {
-
-    Set<String> allTableNames = new HashSet<>();
-
-    if ((sqlQueries == null || sqlQueries.isEmpty())) {
-      return allTableNames;
-    }
-
-    for (String sqlQuery : sqlQueries) {
-      try {
-        String[] tableNamesArray = TableNameExtractor.resolveTableName(sqlQuery);
-        if (tableNamesArray != null) {
-          Collections.addAll(allTableNames, tableNamesArray);
-        }
-      } catch (Exception e) {
-        LOGGER.error("Failed to extract table names from query: {}", sqlQuery, e);
-        throw e;
-      }
-    }
-    return allTableNames;
-  }
-
-  public static class MultiStageQueryValidationResponse {
-    private final boolean _compiledSuccessfully;
-    private final String _errorMessage;
-    private final QueryErrorCode _errorCode;
-    private final String _sql;
-
-    public MultiStageQueryValidationResponse(boolean compiledSuccessfully, @Nullable String errorMessage,
-        @Nullable QueryErrorCode errorCode, String sql) {
-      _compiledSuccessfully = compiledSuccessfully;
-      _errorMessage = errorMessage;
-      _errorCode = errorCode;
-      _sql = sql;
-    }
-
-    public boolean isCompiledSuccessfully() {
-      return _compiledSuccessfully;
-    }
-
-    @Nullable
-    public String getErrorMessage() {
-      return _errorMessage;
-    }
-
-    @Nullable
-    public QueryErrorCode getErrorCode() {
-      return _errorCode;
-    }
-
-    public String getSql() {
-      return _sql;
-    }
-  }
-
-  public static class MultiStageQueryValidationRequest {
-    private final String _sql;
-    private final List<TableConfig> _tableConfigs;
-    private final List<Schema> _schemas;
-    private final List<LogicalTableConfig> _logicalTableConfigs;
-    private final boolean _ignoreCase;
-    private final List<String> _sqls;
-
-    @JsonCreator
-    public MultiStageQueryValidationRequest(@JsonProperty("sql") String sql,
-        @JsonProperty("tableConfigs") @Nullable List<TableConfig> tableConfigs,
-        @JsonProperty("schemas") @Nullable List<Schema> schemas,
-        @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
-        @JsonProperty("sqls") List<String> sqls, @JsonProperty("ignoreCase") boolean ignoreCase) {
-      _sql = sql;
-      _tableConfigs = tableConfigs;
-      _schemas = schemas;
-      _logicalTableConfigs = logicalTableConfigs;
-      _ignoreCase = ignoreCase;
-      _sqls = sqls;
-    }
-
-    @Nullable
-    public List<String> getSqls() {
-      return _sqls;
-    }
-
-    @Nullable
-    public String getSql() {
-      return _sql;
-    }
-
-    @Nullable
-    public List<TableConfig> getTableConfigs() {
-      return _tableConfigs;
-    }
-
-    @Nullable
-    public List<Schema> getSchemas() {
-      return _schemas;
-    }
-
-    @Nullable
-    public List<LogicalTableConfig> getLogicalTableConfigs() {
-      return _logicalTableConfigs;
-    }
-
-    public boolean isIgnoreCase() {
-      return _ignoreCase;
-    }
   }
 
   private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
@@ -488,12 +276,24 @@ public class PinotQueryResource {
 
   private StreamingOutput getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled,
       String queryOptions, HttpHeaders httpHeaders) {
+    /* START GENAI@CLINE */
+    // Check if query has "explain plan for" suffix and handle it
+    boolean isExplainPlan = false;
+    String originalQuery = query;
+
     // Get resource table name.
     String tableName;
-    Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
+    SqlNodeAndOptions sqlNodeAndOptions1 = RequestUtils.parseQuery(query);
+    Map<String, String> queryOptionsMap = sqlNodeAndOptions1.getOptions();
     if (queryOptions != null) {
       queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
     }
+    // Check if query starts with "explain plan for" (case insensitive)
+    if (sqlNodeAndOptions1.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
+      isExplainPlan = true;
+      LOGGER.debug("Detected explain plan query. Extracted query: {}", query);
+    }
+    /* END GENAI@CLINE */
     String database;
     try {
       database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
@@ -505,6 +305,77 @@ public class PinotQueryResource {
           sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
               .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
       tableName = _pinotHelixResourceManager.getActualTableName(inputTableName, database);
+      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
+      if (offlineTableConfig != null) {
+        /* START GENAI@CLINE */
+        // Check if this table is an MV table itself - if so, skip MV rewriting
+        if (offlineTableConfig.isMVTable()) {
+          LOGGER.debug("Skipping MV rewriting for table {} as it is itself an MV table", tableName);
+        } else {
+          // Get materialized view configuration from the new MaterializedViewConfig
+          MaterializedViewConfig mvConfig = offlineTableConfig.getMaterializedViewConfig();
+          if (mvConfig != null && mvConfig.isEnabled() && mvConfig.getMaterializedViewMappings() != null
+              && !mvConfig.getMaterializedViewMappings().isEmpty()) {
+            QueryEnvironment queryEnvironment =
+                new QueryEnvironment(database, _pinotHelixResourceManager.getTableCache(), null);
+            queryEnvironment.setUseBuiltinColumns(false);
+            RelNode optimized = queryEnvironment.getRewritenQuery(query, mvConfig.getMaterializedViewMappings());
+
+            // Check if MV rewriting was successful
+            if (optimized != null) {
+              RelToSqlConverter relToSqlConverter = new RelToSqlConverter(PrestoSqlDialect.DEFAULT);
+              String optimizedQuery =
+                  relToSqlConverter.visitRoot(optimized).asStatement().toSqlString(PrestoSqlDialect.DEFAULT).getSql();
+              /* START GENAI@CLINE */
+              // If this was an explain plan query and query was rewritten, add back the explain plan prefix
+              if (isExplainPlan) {
+                optimizedQuery = "EXPLAIN PLAN FOR " + optimizedQuery;
+                LOGGER.debug("Added back explain plan prefix to rewritten query: {}", optimizedQuery);
+              }
+              // Preserve query options by prefixing them as SET statements to the rewritten query
+              if (queryOptionsMap != null && !queryOptionsMap.isEmpty()) {
+                StringBuilder queryWithOptions = new StringBuilder();
+                for (Map.Entry<String, String> option : queryOptionsMap.entrySet()) {
+                  queryWithOptions.append("SET ").append(option.getKey()).append("=")
+                      .append(option.getValue()).append("; ");
+                }
+                queryWithOptions.append(optimizedQuery);
+                optimizedQuery = queryWithOptions.toString();
+                LOGGER.debug("Added SET query options to rewritten query: {}", queryOptionsMap);
+              }
+              /* END GENAI@CLINE */
+              query = optimizedQuery;
+              SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(optimizedQuery);
+              String mvInputTableName =
+                  sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(
+                      sqlNodeAndOptions.getSqlNode())).iterator().next()
+                      : CalciteSqlCompiler.compileToBrokerRequest(optimizedQuery).getQuerySource().getTableName();
+              tableName = _pinotHelixResourceManager.getActualTableName(mvInputTableName, database);
+              LOGGER.info("Successfully rewrote query using materialized view. Original table: {}, MV table: {}",
+                  inputTableName, tableName);
+            } else {
+              LOGGER.warn("MV rewriting returned null for query: {}. Using original query.", query);
+              /* START GENAI@CLINE */
+              // If MV rewriting failed and this was an explain plan query, restore original query
+              if (isExplainPlan) {
+                query = originalQuery;
+                LOGGER.debug("MV rewriting failed, restored original explain plan query: {}", query);
+              }
+              /* END GENAI@CLINE */
+            }
+          } else {
+            LOGGER.debug("No materialized view configuration found or disabled for table: {}", tableName);
+            /* START GENAI@CLINE */
+            // If no MV config and this was an explain plan query, restore original query
+            if (isExplainPlan) {
+              query = originalQuery;
+              LOGGER.debug("No MV config found, restored original explain plan query: {}", query);
+            }
+            /* END GENAI@CLINE */
+          }
+        }
+        /* END GENAI@CLINE */
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
 
@@ -696,18 +567,11 @@ public class PinotQueryResource {
 
   private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
     String start, String end, String step) {
-    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, Map.of(), null, false);
-  }
-
-  private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
-    String start, String end, String step, Map<String, String> queryOptions, String mode,
-    boolean useBrokerCompatibleApi) {
     try {
-      LOGGER.debug("Language: {}, Query: {}, Start: {}, End: {}, Step: {}, UseBrokerAPI: {}",
-          language, query, start, end, step, useBrokerCompatibleApi);
-      String instanceId = retrieveBrokerForTimeSeriesQuery(query, language, start, end);
-      return sendTimeSeriesRequestToBroker(language, query, start, end, step, queryOptions, mode, instanceId,
-          httpHeaders, useBrokerCompatibleApi);
+      return executeTimeSeriesQuery(httpHeaders, language, query, start, end, step);
+    } catch (ProcessingException pe) {
+      LOGGER.error("Caught exception while processing timeseries request {}", pe.getMessage());
+      return constructQueryExceptionResponse(QueryErrorCode.fromErrorCode(pe.getErrorCode()), pe.getMessage());
     } catch (QueryException ex) {
       LOGGER.warn("Caught exception while processing timeseries request {}", ex.getMessage());
       return constructQueryExceptionResponse(ex.getErrorCode(), ex.getMessage());
@@ -720,61 +584,32 @@ public class PinotQueryResource {
     }
   }
 
-  private String retrieveBrokerForTimeSeriesQuery(String query, String language, String start, String end) {
-    TimeSeriesLogicalPlanner planner = TimeSeriesQueryEnvironment.buildLogicalPlanner(language, _controllerConf);
-    TimeSeriesLogicalPlanResult planResult = planner.plan(
-        new RangeTimeSeriesRequest(language, query, Integer.parseInt(start), Long.parseLong(end),
-            60L, Duration.ofMinutes(1), 100, 100, "", Map.of()),
-        new TimeSeriesTableMetadataProvider(_pinotHelixResourceManager.getTableCache()));
-    String tableName = planner.getTableName(planResult);
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
-    return selectRandomInstanceId(instanceIds);
+  private StreamingOutput executeTimeSeriesQuery(HttpHeaders httpHeaders, String language, String query,
+    String start, String end, String step) throws Exception {
+    LOGGER.debug("Language: {}, Query: {}, Start: {}, End: {}, Step: {}", language, query, start, end, step);
+
+    // Get available broker instances for timeseries queries
+    List<String> instanceIds = _pinotHelixResourceManager.getAllBrokerInstances();
+    if (instanceIds.isEmpty()) {
+      throw QueryErrorCode.BROKER_INSTANCE_MISSING.asException("No online broker found for timeseries query");
+    }
+
+    String instanceId = selectRandomInstanceId(instanceIds);
+    return sendTimeSeriesRequestToBroker(language, query, start, end, step, instanceId, httpHeaders);
   }
 
-
   private StreamingOutput sendTimeSeriesRequestToBroker(String language, String query, String start, String end,
-    String step, Map<String, String> queryOptions, String mode, String instanceId, HttpHeaders httpHeaders,
-    boolean useBrokerCompatibleApi) {
+    String step, String instanceId, HttpHeaders httpHeaders) {
     InstanceConfig instanceConfig = getInstanceConfig(instanceId);
     String hostName = getHost(instanceConfig);
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int port = getPort(instanceConfig);
+    String url = getTimeSeriesQueryURL(protocol, hostName, port, language, query, start, end, step);
 
     // Forward client-supplied headers
     Map<String, String> headers = extractHeaders(httpHeaders);
 
-    if (useBrokerCompatibleApi) {
-      // Use POST /query/timeseries endpoint (broker compatible API)
-      String url = String.format("%s://%s:%d/query/timeseries", protocol, hostName, port);
-      ObjectNode requestJson = JsonUtils.newObjectNode();
-      requestJson.put("query", query);
-      if (language != null && !language.isEmpty()) {
-        requestJson.put("language", language);
-      }
-      if (start != null && !start.isEmpty()) {
-        requestJson.put("start", start);
-      }
-      if (end != null && !end.isEmpty()) {
-        requestJson.put("end", end);
-      }
-      if (step != null && !step.isEmpty()) {
-        requestJson.put("step", step);
-      }
-      if (mode != null && !mode.isEmpty()) {
-        requestJson.put("mode", mode);
-      }
-      if (queryOptions != null && !queryOptions.isEmpty()) {
-        ObjectNode queryOptionsNode = JsonUtils.newObjectNode();
-        queryOptions.forEach(queryOptionsNode::put);
-        requestJson.set("queryOptions", queryOptionsNode);
-      }
-      return sendRequestRaw(url, "POST", query, requestJson, headers);
-    } else {
-      // Use GET /timeseries/api/v1/query_range endpoint (Prometheus compatible API)
-      String url = getTimeSeriesQueryURL(protocol, hostName, port, language, query, start, end, step);
-      return sendRequestRaw(url, "GET", query, JsonUtils.newObjectNode(), headers);
-    }
+    return sendRequestRaw(url, "GET", query, JsonUtils.newObjectNode(), headers);
   }
 
   private String getTimeSeriesQueryURL(String protocol, String hostName, int port, String language, String query,
