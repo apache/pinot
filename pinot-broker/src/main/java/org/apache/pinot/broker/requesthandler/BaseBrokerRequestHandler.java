@@ -284,7 +284,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * @deprecated use handleStreamingRequest instead
    */
-  @Deprecated
   protected abstract BrokerResponse handleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
