@@ -2255,7 +2255,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
         Assert.assertNull(mytableLeaf.get("children"), "When pipeline breaker stats are not kept, "
             + "there should be no children under the leaf node");
-        System.out.println("Successfully verified absence of pipeline breaker stats on attempt " + (i + 1));
         return;
       } catch (AssertionError e) {
         Thread.sleep(100);

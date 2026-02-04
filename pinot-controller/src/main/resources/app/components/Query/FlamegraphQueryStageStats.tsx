@@ -21,7 +21,6 @@ import { Typography, useTheme } from "@material-ui/core";
 import "react-flow-renderer/dist/style.css";
 import isEmpty from "lodash/isEmpty";
 import { FlameGraph } from 'react-flame-graph';
-import {act} from "react-dom/test-utils";
 
 
 /**
