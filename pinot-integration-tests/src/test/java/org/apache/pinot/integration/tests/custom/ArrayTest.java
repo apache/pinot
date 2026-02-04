@@ -54,6 +54,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   private static final String BOOLEAN_FROM_STRING_ARRAY_COLUMN = "booleanArrayColFromStringArray";
   private static final String LONG_ARRAY_COLUMN = "longArrayCol";
   private static final String DOUBLE_ARRAY_COLUMN = "doubleArrayCol";
+  private static final String STRING_ARRAY_COLUMN = "stringArrayCol";
 
   @Override
   protected long getCountStarResult() {
@@ -728,6 +729,176 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvLongArrayFilterValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT filterMv(%s, 'v > 1') FROM %s WHERE %s = 0 LIMIT 1", LONG_ARRAY_COLUMN,
+        getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "LONG_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    JsonNode values = row.get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).longValue(), 2L);
+    assertEquals(values.get(1).longValue(), 3L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvLongArrayFilterPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT COUNT(*) FROM %s WHERE arrayLength(filterMv(%s, 'v > 1')) = 2",
+        getTableName(), LONG_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvRegexpLikeFilterValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT filterMv(%s, 'REGEXP_LIKE(v, ''^/api/.*'')') FROM %s WHERE %s = 0 LIMIT 1",
+        STRING_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "STRING_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    JsonNode values = row.get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).textValue(), "/api/v1");
+    assertEquals(values.get(1).textValue(), "/api/v2");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvRegexpLikeFilterPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT COUNT(*) FROM %s WHERE arrayLength(filterMv(%s, 'REGEXP_LIKE(v, ''^/api/.*'')')) = 2",
+        getTableName(), STRING_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvBooleanArrayFilterValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // BOOLEAN_ARRAY_COLUMN contains [true, true, false, false] for all rows
+    // Filter to only true values
+    String query = String.format("SELECT filterMv(%s, 'v = 1') FROM %s WHERE %s = 0 LIMIT 1",
+        BOOLEAN_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "BOOLEAN_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode values = rows.get(0).get(0);
+    assertEquals(values.size(), 2);
+    assertTrue(values.get(0).asBoolean());
+    assertTrue(values.get(1).asBoolean());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvBooleanArrayFilterPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // All rows have [true, true, false, false], so filterMv(col, 'v = 1') returns [true, true] with length 2
+    String query = String.format(
+        "SELECT COUNT(*) FROM %s WHERE arrayLength(filterMv(%s, 'v = 1')) = 2",
+        getTableName(), BOOLEAN_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvDoubleArrayFilterValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // DOUBLE_ARRAY_COLUMN contains [0.0, 0.1, 0.2, 0.3] for all rows
+    // Filter to values > 0.15
+    String query = String.format("SELECT filterMv(%s, 'v > 0.15') FROM %s WHERE %s = 0 LIMIT 1",
+        DOUBLE_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "DOUBLE_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode values = rows.get(0).get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).doubleValue(), 0.2);
+    assertEquals(values.get(1).doubleValue(), 0.3);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvDoubleArrayFilterPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // All rows have [0.0, 0.1, 0.2, 0.3], so filterMv(col, 'v > 0.15') returns [0.2, 0.3] with length 2
+    String query = String.format(
+        "SELECT COUNT(*) FROM %s WHERE arrayLength(filterMv(%s, 'v > 0.15')) = 2",
+        getTableName(), DOUBLE_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvLongArrayInPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // LONG_ARRAY_COLUMN contains [0, 1, 2, 3] for all rows
+    // Filter to values IN (1, 3)
+    String query = String.format("SELECT filterMv(%s, 'v IN (1, 3)') FROM %s WHERE %s = 0 LIMIT 1",
+        LONG_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "LONG_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode values = rows.get(0).get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).longValue(), 1L);
+    assertEquals(values.get(1).longValue(), 3L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvStringArrayNotEqPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // STRING_ARRAY_COLUMN contains ["/api/v1", "/home", "/api/v2", "/metrics"]
+    // Filter to values != '/home'
+    String query = String.format(
+        "SELECT filterMv(%s, 'v != ''/home''') FROM %s WHERE %s = 0 LIMIT 1",
+        STRING_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "STRING_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode values = rows.get(0).get(0);
+    assertEquals(values.size(), 3);
+    assertEquals(values.get(0).textValue(), "/api/v1");
+    assertEquals(values.get(1).textValue(), "/api/v2");
+    assertEquals(values.get(2).textValue(), "/metrics");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterMvLongArrayCompoundPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // LONG_ARRAY_COLUMN contains [0, 1, 2, 3]
+    // Filter to values > 0 AND v < 3
+    String query = String.format("SELECT filterMv(%s, 'v > 0 AND v < 3') FROM %s WHERE %s = 0 LIMIT 1",
+        LONG_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode values = result.get("rows").get(0).get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).longValue(), 1L);
+    assertEquals(values.get(1).longValue(), 2L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testStringArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -1099,6 +1270,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         .addMultiValueDimension(BOOLEAN_FROM_STRING_ARRAY_COLUMN, FieldSpec.DataType.BOOLEAN)
         .addMultiValueDimension(LONG_ARRAY_COLUMN, FieldSpec.DataType.LONG)
         .addMultiValueDimension(DOUBLE_ARRAY_COLUMN, FieldSpec.DataType.DOUBLE)
+        .addMultiValueDimension(STRING_ARRAY_COLUMN, FieldSpec.DataType.STRING)
         .build();
   }
 
@@ -1149,6 +1321,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             null, null),
         new org.apache.avro.Schema.Field(DOUBLE_ARRAY_COLUMN,
             org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE)),
+            null, null),
+        new org.apache.avro.Schema.Field(STRING_ARRAY_COLUMN,
+            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING)),
             null, null)
     ));
 
@@ -1177,6 +1352,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
                   record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, List.of("true", "true", "false", "false"));
                   record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
                   record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
+                  record.put(STRING_ARRAY_COLUMN, List.of("/api/v1", "/home", "/api/v2", "/metrics"));
                   return record;
                 }
             ));
