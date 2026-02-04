@@ -25,7 +25,8 @@ import org.apache.pinot.spi.auth.AuthProvider;
 
 
 /**
- * Auth provider for static client tokens, typically used for job specs or when mimicking legacy behavior.
+ * Auth provider for static client tokens.
+ * This provider is typically used for job specs or when mimicking legacy behavior.
  */
 public class StaticTokenAuthProvider implements AuthProvider {
   public static final String HEADER = "header";
@@ -35,11 +36,21 @@ public class StaticTokenAuthProvider implements AuthProvider {
   protected final String _taskToken;
   protected final Map<String, Object> _requestHeaders;
 
+  /**
+   * Constructor that accepts a token directly.
+   *
+   * @param token the authentication token
+   */
   public StaticTokenAuthProvider(String token) {
     _taskToken = token;
     _requestHeaders = Collections.singletonMap(HttpHeaders.AUTHORIZATION, token);
   }
 
+  /**
+   * Constructor that extracts token from AuthConfig.
+   *
+   * @param authConfig the authentication configuration
+   */
   public StaticTokenAuthProvider(AuthConfig authConfig) {
     String header = AuthProviderUtils.getOrDefault(authConfig, HEADER, HttpHeaders.AUTHORIZATION);
     String prefix = AuthProviderUtils.getOrDefault(authConfig, PREFIX, "Basic");
@@ -59,6 +70,13 @@ public class StaticTokenAuthProvider implements AuthProvider {
     return _taskToken;
   }
 
+  /**
+   * Creates a token with the specified prefix if not already present.
+   *
+   * @param prefix the prefix to add (e.g., "Basic", "Bearer")
+   * @param token the token value
+   * @return the formatted token with prefix
+   */
   private static String makeToken(String prefix, String token) {
     if (token.startsWith(prefix)) {
       return token;
