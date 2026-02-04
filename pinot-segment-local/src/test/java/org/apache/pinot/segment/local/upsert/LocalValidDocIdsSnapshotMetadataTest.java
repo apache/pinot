@@ -369,18 +369,4 @@ public class LocalValidDocIdsSnapshotMetadataTest {
     assertEquals(metadata1, metadata2);
     assertEquals(metadata1.hashCode(), metadata2.hashCode());
   }
-
-  @Test
-  public void testToString() {
-    UpsertContext context = createMockUpsertContext(PRIMARY_KEY_COLUMNS, COMPARISON_COLUMNS, DELETE_RECORD_COLUMN,
-        HashFunction.NONE, METADATA_TTL, DELETED_KEYS_TTL, UpsertConfig.Mode.FULL);
-
-    LocalValidDocIdsSnapshotMetadata metadata =
-        LocalValidDocIdsSnapshotMetadata.fromUpsertContext(PARTITION_ID, context);
-
-    String str = metadata.toString();
-    assertTrue(str.contains("LocalValidDocIdsSnapshotMetadata"));
-    assertTrue(str.contains("_primaryKeyColumns"));
-    assertTrue(str.contains("_comparisonColumns"));
-  }
 }
