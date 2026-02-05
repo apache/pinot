@@ -43,6 +43,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -155,6 +156,7 @@ import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -1570,6 +1572,8 @@ public class PinotHelixResourceManager {
       LOGGER.info("New schema: {} is the same as the existing schema, not updating it", schemaName);
       return;
     }
+
+    validatePrimaryKeyColumnsUpdate(schemaName, oldSchema, schema);
     boolean isBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema);
     if (!isBackwardCompatible) {
       if (forceTableSchemaUpdate) {
@@ -1629,6 +1633,37 @@ public class PinotHelixResourceManager {
     }
     ZKMetadataProvider.setSchema(_propertyStore, schema);
     LOGGER.info("Updated schema: {}", schemaName);
+  }
+
+  /**
+   * Validates that primary key columns are not changed for upsert tables.
+   * Changing primary key columns can lead to data inconsistencies between replicas.
+   *
+   * @param schemaName the name of the schema
+   * @param oldSchema the existing schema
+   * @param newSchema the new schema being applied
+   * @throws IllegalArgumentException if primary key columns are changed and forceUpdate is false
+   */
+  private void validatePrimaryKeyColumnsUpdate(String schemaName, Schema oldSchema, Schema newSchema) {
+    String rawTableName = schemaName;
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    TableConfig realtimeTableConfig = getTableConfig(realtimeTableName);
+    if (realtimeTableConfig.isUpsertEnabled()) {
+      List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
+      List<String> newPrimaryKeys = newSchema.getPrimaryKeyColumns();
+      // If neither has primary keys, nothing to validate
+      if ((oldPrimaryKeys == null || oldPrimaryKeys.isEmpty()) && (newPrimaryKeys == null
+          || newPrimaryKeys.isEmpty())) {
+        return;
+      }
+      // Check if primary key columns have changed
+      if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
+        String errorMsg = String.format("Failed to update schema '%s': Cannot change primaryKeyColumns from %s to %s "
+            + "as it may lead to data inconsistencies. Please create a new table instead.",
+            schemaName, oldPrimaryKeys, newPrimaryKeys);
+        throw new IllegalArgumentException(errorMsg);
+      }
+    }
   }
 
   /**
@@ -2228,6 +2263,16 @@ public class PinotHelixResourceManager {
    */
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion) {
     String tableNameWithType = tableConfig.getTableName();
+
+    TableConfig existingTableConfig = getTableConfig(tableNameWithType);
+    if (existingTableConfig != null) {
+      try {
+        TableConfigUtils.validateUpsertConfigUpdate(existingTableConfig, tableConfig, null, null);
+      } catch (IllegalArgumentException e) {
+        throw new InvalidTableConfigException(e.getMessage(), e);
+      }
+    }
+
     if (!ZKMetadataProvider.setTableConfig(_propertyStore, tableConfig, expectedVersion)) {
       throw new RuntimeException(
           "Failed to update table config in Zookeeper for table: " + tableNameWithType + " with" + " expected version: "

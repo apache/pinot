@@ -1174,6 +1174,72 @@ public final class TableConfigUtils {
   }
 
   /**
+   * Validates that critical upsert configuration fields are not changed during table config update.
+   * Changing these fields can lead to data inconsistencies between replicas.
+   *
+   * @param existingConfig the existing table config
+   * @param newConfig the new table config being applied
+   * @param existingSchema the existing schema (optional, for primary key validation)
+   * @param newSchema the new schema (optional, for primary key validation)
+   * @throws IllegalArgumentException if any critical upsert config field is changed
+   */
+  public static void validateUpsertConfigUpdate(TableConfig existingConfig, TableConfig newConfig,
+      @Nullable Schema existingSchema, @Nullable Schema newSchema) {
+    UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
+    UpsertConfig newUpsertConfig = newConfig.getUpsertConfig();
+    if (existingUpsertConfig == null && newUpsertConfig == null) {
+      return;
+    }
+
+    if (existingUpsertConfig == null || newUpsertConfig == null) {
+      throw new IllegalArgumentException(String.format(
+          "Failed to update table '%s': Cannot add or remove upsertConfig as it may lead to data inconsistencies. "
+              + "Please create a new table instead.", existingConfig.getTableName()));
+    }
+
+    String tableName = existingConfig.getTableName();
+    List<String> violations = new ArrayList<>();
+
+    // Check upsert mode
+    if (existingUpsertConfig.getMode() != newUpsertConfig.getMode()) {
+      violations.add(String.format("mode (%s -> %s)", existingUpsertConfig.getMode(), newUpsertConfig.getMode()));
+    }
+
+    // Check hash function
+    if (existingUpsertConfig.getHashFunction() != newUpsertConfig.getHashFunction()) {
+      violations.add(String.format("hashFunction (%s -> %s)", existingUpsertConfig.getHashFunction(),
+          newUpsertConfig.getHashFunction()));
+    }
+
+    // Check comparison columns
+    if (!java.util.Objects.equals(existingUpsertConfig.getComparisonColumns(),
+        newUpsertConfig.getComparisonColumns())) {
+      violations.add(String.format("comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
+          newUpsertConfig.getComparisonColumns()));
+    }
+
+    // Check partial upsert strategies (only for PARTIAL mode)
+    if (existingUpsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
+      if (!java.util.Objects.equals(existingUpsertConfig.getPartialUpsertStrategies(),
+          newUpsertConfig.getPartialUpsertStrategies())) {
+        violations.add(
+            String.format("partialUpsertStrategies (%s -> %s)", existingUpsertConfig.getPartialUpsertStrategies(),
+                newUpsertConfig.getPartialUpsertStrategies()));
+      }
+      if (existingUpsertConfig.getDefaultPartialUpsertStrategy() != newUpsertConfig.getDefaultPartialUpsertStrategy()) {
+        violations.add(String.format("defaultPartialUpsertStrategy (%s -> %s)",
+            existingUpsertConfig.getDefaultPartialUpsertStrategy(), newUpsertConfig.getDefaultPartialUpsertStrategy()));
+      }
+    }
+
+    if (!violations.isEmpty()) {
+      throw new IllegalArgumentException(String.format(
+          "Failed to update table '%s': Cannot modify %s as it may lead to data inconsistencies. "
+              + "Please create a new table instead.", tableName, violations));
+    }
+  }
+
+  /**
    * Validates task configuration to ensure no conflicting task types are configured.
    */
   @VisibleForTesting
