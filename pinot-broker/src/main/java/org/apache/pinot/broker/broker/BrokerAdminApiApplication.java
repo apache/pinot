@@ -27,6 +27,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.SocketConfig;
@@ -65,9 +66,11 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerAdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String BROKER_INSTANCE_ID = "brokerInstanceId";
+  public static final String SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
 
   public static final String START_TIME = "brokerStartTime";
 
+  private final AtomicBoolean _shutdownInProgress = new AtomicBoolean();
   private final String _brokerResourcePackages;
   private final boolean _useHttps;
   private final boolean _swaggerBrokerEnabled;
@@ -102,6 +105,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     register(new AbstractBinder() {
       @Override
       protected void configure() {
+        bind(_shutdownInProgress).named(SHUTDOWN_IN_PROGRESS).to(AtomicBoolean.class);
         bind(connMgr).to(HttpClientConnectionManager.class);
         bind(_executorService).to(Executor.class);
         bind(helixManager).to(HelixManager.class);
@@ -166,6 +170,10 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     int queueSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE,
         CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE);
     return new BrokerManagedAsyncExecutorProvider(corePoolSize, maximumPoolSize, queueSize, brokerMetrics);
+  }
+
+  public void startShuttingDown() {
+    _shutdownInProgress.set(true);
   }
 
   public void stop() {
