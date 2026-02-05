@@ -737,7 +737,10 @@ public class PinotTableRestletResource {
   public ConfigSuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders headers,
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
+      @ApiParam(value = "Force config changes")
+      @QueryParam("forceConfigUpdate") @DefaultValue("false") boolean forceConfigUpdate,
+      @Context HttpHeaders headers,
       String tableConfigString)
       throws Exception {
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
@@ -781,7 +784,7 @@ public class PinotTableRestletResource {
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
-      _pinotHelixResourceManager.updateTableConfig(tableConfig);
+      _pinotHelixResourceManager.updateTableConfig(tableConfig, forceConfigUpdate);
     } catch (InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);

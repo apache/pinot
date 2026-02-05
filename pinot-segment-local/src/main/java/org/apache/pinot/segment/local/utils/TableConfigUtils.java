@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -1175,67 +1176,158 @@ public final class TableConfigUtils {
 
   /**
    * Validates that critical upsert configuration fields are not changed during table config update.
-   * Changing these fields can lead to data inconsistencies between replicas.
+   * Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
+   * deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn,
+   * partialUpsertStrategies, defaultPartialUpsertStrategy.
    *
    * @param existingConfig the existing table config
    * @param newConfig the new table config being applied
-   * @param existingSchema the existing schema (optional, for primary key validation)
-   * @param newSchema the new schema (optional, for primary key validation)
-   * @throws IllegalArgumentException if any critical upsert config field is changed
+   * @param force if true, logs a warning instead of throwing an exception
+   * @throws IllegalArgumentException if any critical config field is changed and force is false
    */
-  public static void validateUpsertConfigUpdate(TableConfig existingConfig, TableConfig newConfig,
-      @Nullable Schema existingSchema, @Nullable Schema newSchema) {
-    UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
-    UpsertConfig newUpsertConfig = newConfig.getUpsertConfig();
-    if (existingUpsertConfig == null && newUpsertConfig == null) {
-      return;
-    }
-
-    if (existingUpsertConfig == null || newUpsertConfig == null) {
-      throw new IllegalArgumentException(String.format(
-          "Failed to update table '%s': Cannot add or remove upsertConfig as it may lead to data inconsistencies. "
-              + "Please create a new table instead.", existingConfig.getTableName()));
-    }
-
+  public static void validateUpsertConfigUpdate(TableConfig existingConfig, TableConfig newConfig, boolean force) {
     String tableName = existingConfig.getTableName();
     List<String> violations = new ArrayList<>();
 
-    // Check upsert mode
-    if (existingUpsertConfig.getMode() != newUpsertConfig.getMode()) {
-      violations.add(String.format("mode (%s -> %s)", existingUpsertConfig.getMode(), newUpsertConfig.getMode()));
-    }
-
-    // Check hash function
-    if (existingUpsertConfig.getHashFunction() != newUpsertConfig.getHashFunction()) {
-      violations.add(String.format("hashFunction (%s -> %s)", existingUpsertConfig.getHashFunction(),
-          newUpsertConfig.getHashFunction()));
-    }
-
-    // Check comparison columns
-    if (!java.util.Objects.equals(existingUpsertConfig.getComparisonColumns(),
-        newUpsertConfig.getComparisonColumns())) {
-      violations.add(String.format("comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
-          newUpsertConfig.getComparisonColumns()));
-    }
-
-    // Check partial upsert strategies (only for PARTIAL mode)
-    if (existingUpsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
-      if (!java.util.Objects.equals(existingUpsertConfig.getPartialUpsertStrategies(),
-          newUpsertConfig.getPartialUpsertStrategies())) {
+    UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
+    UpsertConfig newUpsertConfig = newConfig.getUpsertConfig();
+    if (existingConfig.isUpsertEnabled() && newConfig.isUpsertEnabled()) {
+      // Check upsert mode
+      if (existingUpsertConfig.getMode() != newUpsertConfig.getMode()) {
         violations.add(
-            String.format("partialUpsertStrategies (%s -> %s)", existingUpsertConfig.getPartialUpsertStrategies(),
-                newUpsertConfig.getPartialUpsertStrategies()));
+            String.format("upsertConfig.mode (%s -> %s)", existingUpsertConfig.getMode(), newUpsertConfig.getMode()));
       }
-      if (existingUpsertConfig.getDefaultPartialUpsertStrategy() != newUpsertConfig.getDefaultPartialUpsertStrategy()) {
-        violations.add(String.format("defaultPartialUpsertStrategy (%s -> %s)",
-            existingUpsertConfig.getDefaultPartialUpsertStrategy(), newUpsertConfig.getDefaultPartialUpsertStrategy()));
+      if (existingUpsertConfig.getHashFunction() != newUpsertConfig.getHashFunction()) {
+        violations.add(String.format("upsertConfig.hashFunction (%s -> %s)", existingUpsertConfig.getHashFunction(),
+            newUpsertConfig.getHashFunction()));
       }
+      if (!Objects.equals(existingUpsertConfig.getComparisonColumns(),
+          newUpsertConfig.getComparisonColumns())) {
+        violations.add(
+            String.format("upsertConfig.comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
+                newUpsertConfig.getComparisonColumns()));
+      }
+      List<String> existingComparisonColumns = existingUpsertConfig.getComparisonColumns();
+      if (existingComparisonColumns == null || existingComparisonColumns.isEmpty()) {
+        String existingTimeColumn =
+            existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
+                : null;
+        String newTimeColumn =
+            newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
+        if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
+          violations.add(
+              String.format("timeColumnName (%s -> %s) - used as default comparison column", existingTimeColumn,
+                  newTimeColumn));
+        }
+      }
+      if (!Objects.equals(existingUpsertConfig.getDeleteRecordColumn(),
+          newUpsertConfig.getDeleteRecordColumn())) {
+        violations.add(
+            String.format("upsertConfig.deleteRecordColumn (%s -> %s)", existingUpsertConfig.getDeleteRecordColumn(),
+                newUpsertConfig.getDeleteRecordColumn()));
+      }
+      if (existingUpsertConfig.isDropOutOfOrderRecord() != newUpsertConfig.isDropOutOfOrderRecord()) {
+        violations.add(
+            String.format("upsertConfig.dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
+                newUpsertConfig.isDropOutOfOrderRecord()));
+      }
+      if (!Objects.equals(existingUpsertConfig.getOutOfOrderRecordColumn(),
+          newUpsertConfig.getOutOfOrderRecordColumn())) {
+        violations.add(String.format("upsertConfig.outOfOrderRecordColumn (%s -> %s)",
+            existingUpsertConfig.getOutOfOrderRecordColumn(), newUpsertConfig.getOutOfOrderRecordColumn()));
+      }
+      if (existingUpsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
+        if (!Objects.equals(existingUpsertConfig.getPartialUpsertStrategies(),
+            newUpsertConfig.getPartialUpsertStrategies())) {
+          violations.add(String.format("upsertConfig.partialUpsertStrategies (%s -> %s)",
+              existingUpsertConfig.getPartialUpsertStrategies(), newUpsertConfig.getPartialUpsertStrategies()));
+        }
+        if (existingUpsertConfig.getDefaultPartialUpsertStrategy()
+            != newUpsertConfig.getDefaultPartialUpsertStrategy()) {
+          violations.add(String.format("upsertConfig.defaultPartialUpsertStrategy (%s -> %s)",
+              existingUpsertConfig.getDefaultPartialUpsertStrategy(),
+              newUpsertConfig.getDefaultPartialUpsertStrategy()));
+        }
+      }
+    } else if (!existingConfig.isUpsertEnabled() || !newConfig.isUpsertEnabled()) {
+      // Removing upsert config from an existing upsert table
+      violations.add(
+          String.format("upsertConfig cannot be added or removed from existing upsert table: %s", tableName));
+    }
+    handleViolations(tableName, violations, force, "upsert");
+  }
+
+  /**
+   * Validates that critical dedup configuration fields are not changed during table config update.
+   * Checks: dedupEnabled, hashFunction, dedupTimeColumn, timeColumnName (when dedupTimeColumn not specified).
+   *
+   * @param existingConfig the existing table config
+   * @param newConfig the new table config being applied
+   * @param force if true, logs a warning instead of throwing an exception
+   * @throws IllegalArgumentException if any critical config field is changed and force is false
+   */
+  public static void validateDedupConfigUpdate(TableConfig existingConfig, TableConfig newConfig, boolean force) {
+    String tableName = existingConfig.getTableName();
+    List<String> violations = new ArrayList<>();
+
+    if (existingConfig.isDedupEnabled() && newConfig.isDedupEnabled()) {
+      DedupConfig existingDedupConfig = existingConfig.getDedupConfig();
+      DedupConfig newDedupConfig = newConfig.getDedupConfig();
+      if (newDedupConfig == null) {
+        // Removing dedup config from an existing dedup table
+        violations.add("dedupConfig (cannot remove from existing dedup table)");
+      } else {
+        if (existingDedupConfig.isDedupEnabled() != newDedupConfig.isDedupEnabled()) {
+          violations.add(String.format("dedupConfig.dedupEnabled (%s -> %s)", existingDedupConfig.isDedupEnabled(),
+              newDedupConfig.isDedupEnabled()));
+        }
+
+        if (existingDedupConfig.getHashFunction() != newDedupConfig.getHashFunction()) {
+          violations.add(String.format("dedupConfig.hashFunction (%s -> %s)", existingDedupConfig.getHashFunction(),
+              newDedupConfig.getHashFunction()));
+        }
+
+        if (!Objects.equals(existingDedupConfig.getDedupTimeColumn(), newDedupConfig.getDedupTimeColumn())) {
+          violations.add(
+              String.format("dedupConfig.dedupTimeColumn (%s -> %s)", existingDedupConfig.getDedupTimeColumn(),
+                  newDedupConfig.getDedupTimeColumn()));
+        }
+
+        String existingDedupTimeColumn = existingDedupConfig.getDedupTimeColumn();
+        if (existingDedupTimeColumn == null || existingDedupTimeColumn.isEmpty()) {
+          String existingTimeColumn =
+              existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
+                  : null;
+          String newTimeColumn =
+              newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
+          if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
+            violations.add(
+                String.format("timeColumnName (%s -> %s) - used as default dedup time column", existingTimeColumn,
+                    newTimeColumn));
+          }
+        }
+      }
+    } else if (!newConfig.isDedupEnabled() || !existingConfig.isDedupEnabled()) {
+      violations.add(String.format("dedupConfig cannot be added or removed from existing upsert table: %s",
+          existingConfig.getTableName()));
     }
 
+    handleViolations(existingConfig.getTableName(), violations, force, "dedup");
+  }
+
+  private static void handleViolations(String tableName, List<String> violations, boolean force, String configType) {
     if (!violations.isEmpty()) {
-      throw new IllegalArgumentException(String.format(
-          "Failed to update table '%s': Cannot modify %s as it may lead to data inconsistencies. "
-              + "Please create a new table instead.", tableName, violations));
+      if (force) {
+        LOGGER.warn("Force updating {} config for table '{}' with changes: {}. "
+                + "This could lead to data inconsistencies or data loss. Be careful during server restarts and while "
+                + "running compaction tasks. If unsure, please recreate the table with new configs.", configType,
+            tableName,
+            violations);
+      } else {
+        throw new IllegalArgumentException(String.format(
+            "Failed to update table '%s': Cannot modify %s as it may lead to data inconsistencies. "
+                + "Please create a new table instead.", tableName, violations));
+      }
     }
   }
 

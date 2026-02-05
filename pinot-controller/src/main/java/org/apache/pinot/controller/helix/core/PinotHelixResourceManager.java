@@ -2190,9 +2190,20 @@ public class PinotHelixResourceManager {
    */
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
+    updateTableConfig(tableConfig, false);
+  }
+
+  /**
+   * Validate the table config and update it
+   * @param tableConfig the table config to update
+   * @param forceConfigUpdate if true, allows upsert/dedup config changes with a warning
+   * @throws IOException
+   */
+  public void updateTableConfig(TableConfig tableConfig, boolean forceConfigUpdate)
+      throws IOException {
     validateTableTenantConfig(tableConfig);
     validateTableTaskMinionInstanceTagConfig(tableConfig);
-    setExistingTableConfig(tableConfig);
+    setExistingTableConfig(tableConfig, -1, forceConfigUpdate);
   }
 
   /**
@@ -2262,12 +2273,23 @@ public class PinotHelixResourceManager {
    * version. If the expected version is -1, the version check is ignored.
    */
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion) {
-    String tableNameWithType = tableConfig.getTableName();
+    setExistingTableConfig(tableConfig, expectedVersion, false);
+  }
 
+  /**
+   * Sets the given table config into zookeeper with the expected version.
+   *
+   * @param tableConfig the table config to set
+   * @param expectedVersion the expected version (-1 to ignore version check)
+   * @param forceConfigUpdate if true, allows upsert/dedup config changes with a warning
+   */
+  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean forceConfigUpdate) {
+    String tableNameWithType = tableConfig.getTableName();
     TableConfig existingTableConfig = getTableConfig(tableNameWithType);
     if (existingTableConfig != null) {
       try {
-        TableConfigUtils.validateUpsertConfigUpdate(existingTableConfig, tableConfig, null, null);
+        TableConfigUtils.validateUpsertConfigUpdate(existingTableConfig, tableConfig, forceConfigUpdate);
+        TableConfigUtils.validateDedupConfigUpdate(existingTableConfig, tableConfig, forceConfigUpdate);
       } catch (IllegalArgumentException e) {
         throw new InvalidTableConfigException(e.getMessage(), e);
       }
