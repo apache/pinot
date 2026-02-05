@@ -551,62 +551,14 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int index) {
-    // Optimized implementation to reduce memory allocation
-    // For positive indices, we can find the part without creating the full array
-    if (index >= 0) {
-      return splitPartOptimizedPositive(input, delimiter, index);
+    String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
+    if (index >= 0 && index < splitString.length) {
+      return splitString[index];
+    } else if (index < 0 && index >= -splitString.length) {
+      return splitString[splitString.length + index];
     } else {
-      // For negative indices, we need to know the total count, so fall back to full split
-      String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
-      if (index >= -splitString.length) {
-        return splitString[splitString.length + index];
-      } else {
-        return "null";
-      }
+      return "null";
     }
-  }
-
-  /**
-   * Optimized helper method for positive indices to reduce memory allocation.
-   * Instead of splitting the entire string, we find only the part we need.
-   */
-  private static String splitPartOptimizedPositive(String input, String delimiter, int index) {
-    // Handle case where string doesn't contain delimiter
-    if (!input.contains(delimiter)) {
-      return index == 0 ? input : "null";
-    }
-
-    int currentIndex = 0;
-    int searchStart = 0;
-    int delimiterLength = delimiter.length();
-
-    // Handle empty delimiter case
-    if (delimiterLength == 0) {
-      return index < input.length() ? String.valueOf(input.charAt(index)) : "null";
-    }
-
-    // Find the start position of the desired part
-    while (currentIndex < index) {
-      int delimiterPos = input.indexOf(delimiter, searchStart);
-      if (delimiterPos == -1) {
-        return "null"; // Index is beyond available parts
-      }
-      searchStart = delimiterPos + delimiterLength;
-      currentIndex++;
-    }
-
-    // Find the end position of the desired part
-    int endPos = input.indexOf(delimiter, searchStart);
-    if (endPos == -1) {
-      endPos = input.length();
-    }
-
-    String result = input.substring(searchStart, endPos);
-
-    // Match original behavior: if result is empty and index > 0, check if this is expected
-    // For consecutive delimiters, empty strings should be returned as empty, not null
-    // But the test seems to expect "null" for certain cases - let's examine why
-    return result;
   }
 
   /**
