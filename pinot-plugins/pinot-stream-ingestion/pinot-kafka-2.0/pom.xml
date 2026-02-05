@@ -66,6 +66,13 @@
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Kafka 2.0 is deprecated - kafka20.KafkaConsumerFactory redirects to kafka30 -->
+    <!-- This dependency is needed for tests to validate the deprecation path -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-kafka-3.0</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <profiles>

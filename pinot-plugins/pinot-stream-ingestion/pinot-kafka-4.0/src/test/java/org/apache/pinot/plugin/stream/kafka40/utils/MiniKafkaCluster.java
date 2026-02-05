@@ -106,11 +106,13 @@ public final class MiniKafkaCluster implements Closeable {
     }
   }
 
-  public void deleteRecordsBeforeOffset(String topicName, int partitionId, long offset) {
+  public void deleteRecordsBeforeOffset(String topicName, int partitionId, long offset)
+      throws ExecutionException, InterruptedException {
     try (AdminClient adminClient = getOrCreateAdminClient()) {
       Map<TopicPartition, RecordsToDelete> recordsToDelete = new HashMap<>();
       recordsToDelete.put(new TopicPartition(topicName, partitionId), RecordsToDelete.beforeOffset(offset));
-      adminClient.deleteRecords(recordsToDelete);
+      // Wait for the deletion to complete
+      adminClient.deleteRecords(recordsToDelete).all().get();
     }
   }
 }

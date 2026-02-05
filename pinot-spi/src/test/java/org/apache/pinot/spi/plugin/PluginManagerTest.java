@@ -189,9 +189,12 @@ public class PluginManagerTest {
         "org.apache.pinot.spi.filesystem.LocalPinotFS");
 
     // StreamConsumerFactory
-    // Kafka 2.0 is deprecated - old kafka2 class names now redirect to kafka30
+    // Kafka 2.0 is deprecated - both old-style and new-style kafka2/kafka20 class names redirect to kafka30
     Assert.assertEquals(PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory"),
+        "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+    Assert.assertEquals(PluginManager
+            .loadClassWithBackwardCompatibleCheck("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory"),
         "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
   }
 

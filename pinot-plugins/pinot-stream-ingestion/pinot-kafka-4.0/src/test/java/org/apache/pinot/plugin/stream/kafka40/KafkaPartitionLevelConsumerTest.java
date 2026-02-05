@@ -38,6 +38,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.common.utils.Bytes;
@@ -466,16 +467,16 @@ public class KafkaPartitionLevelConsumerTest {
       @Override
       protected Consumer<String, Bytes> createConsumer(Properties consumerProp) {
         Consumer<String, Bytes> mockConsumer = mock(Consumer.class);
-        // Mock records using Kafka 4.x compatible constructor
+        // Mock records using Kafka 4.x compatible constructor (headers cannot be null in Kafka 4.x)
         ConsumerRecord<String, Bytes> record1 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, 4,
-                5, "key1", new Bytes("value1".getBytes(StandardCharsets.UTF_8)), null, null);
+                5, "key1", new Bytes("value1".getBytes(StandardCharsets.UTF_8)), new RecordHeaders(), null);
         ConsumerRecord<String, Bytes> record2 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, 4,
-                9, "key2", new Bytes("value2".getBytes(StandardCharsets.UTF_8)), null, null);
+                9, "key2", new Bytes("value2".getBytes(StandardCharsets.UTF_8)), new RecordHeaders(), null);
         ConsumerRecord<String, Bytes> record3 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, 4,
-                -1, "key2", new Bytes("value2".getBytes(StandardCharsets.UTF_8)), null, null);
+                -1, "key2", new Bytes("value2".getBytes(StandardCharsets.UTF_8)), new RecordHeaders(), null);
         // Mock return of poll()
         ConsumerRecords<String, Bytes> consumerRecords = new ConsumerRecords<>(
             Map.of(topicPartition, List.of(record1, record2, record3))
