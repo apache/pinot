@@ -191,7 +191,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
       PlanNode currentNode = nodeStack.remove(nodeStack.size() - 1);
       if (currentNode instanceof JoinNode) {
         JoinNode joinNode = (JoinNode) currentNode;
-        if (joinNode.getInputs().size() > 1 && joinNode.getJoinType() == JoinRelType.SEMI) {
+        if (joinNode.getInputs().size() > 1 && isPipelineBreakerNode(joinNode)) {
           PlanNode planNode = joinNode.getInputs().get(1);
           if (planNode instanceof MailboxReceiveNode) {
             return (MailboxReceiveNode) planNode;
@@ -201,6 +201,10 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
       nodeStack.addAll(currentNode.getInputs());
     }
     return null;
+  }
+
+  private boolean isPipelineBreakerNode(JoinNode joinNode) {
+    return joinNode.getJoinType() == JoinRelType.SEMI || joinNode.getJoinType() == JoinRelType.ANTI;
   }
 
   private ObjectNode recursiveCase(BasePlanNode node, MultiStageOperator.Type expectedType, Context context) {
