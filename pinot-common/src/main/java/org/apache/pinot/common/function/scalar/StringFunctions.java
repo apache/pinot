@@ -74,6 +74,40 @@ public class StringFunctions {
   }
 
   /**
+   * Converts the first letter of each word to uppercase and the rest to lowercase.
+   * Words are delimited by whitespace characters.
+   * This is a standard SQL function for title case conversion.
+   *
+   * @param input the input string to convert
+   * @return string with the first letter of each word capitalized and the rest in lowercase
+   */
+  @ScalarFunction
+  public static String initcap(String input) {
+    if (input == null || input.isEmpty()) {
+      return input;
+    }
+
+    StringBuilder result = new StringBuilder(input.length());
+    boolean capitalizeNext = true;
+
+    for (int i = 0; i < input.length(); i++) {
+      char currentChar = input.charAt(i);
+
+      if (Character.isWhitespace(currentChar)) {
+        result.append(currentChar);
+        capitalizeNext = true;
+      } else if (capitalizeNext) {
+        result.append(Character.toUpperCase(currentChar));
+        capitalizeNext = false;
+      } else {
+        result.append(Character.toLowerCase(currentChar));
+      }
+    }
+
+    return result.toString();
+  }
+
+  /**
    * @see String#substring(int)
    * @param input Parent string
    * @param beginIndex index from which substring should be created
