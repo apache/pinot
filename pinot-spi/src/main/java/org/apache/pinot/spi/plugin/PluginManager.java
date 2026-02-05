@@ -95,10 +95,9 @@ public class PluginManager {
       put("org.apache.pinot.filesystem.LocalPinotFS", "org.apache.pinot.spi.filesystem.LocalPinotFS");
 
       // StreamConsumerFactory
-      // Kafka 2.0 is deprecated - redirect to Kafka 3.0
+      // Old-style class names (org.apache.pinot.core.realtime.impl.*) are mapped to new plugin packages
+      // Note: kafka2 old-style names redirect to kafka30 since kafka-2.0 is deprecated
       put("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
-      put("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
           "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
       put("org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory",
           "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
