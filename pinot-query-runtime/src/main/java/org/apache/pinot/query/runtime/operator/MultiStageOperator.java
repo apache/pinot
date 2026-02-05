@@ -115,8 +115,13 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         checkTermination();
         nextBlock = getNextBlock();
       } catch (Exception e) {
-        logger().warn("Operator {}: Exception while processing next block", _operatorId, e);
-        nextBlock = ErrorMseBlock.fromException(e);
+        MseBlock handled = handleException(e);
+        if (handled != null) {
+          nextBlock = handled;
+        } else {
+          logger().warn("Operator {}: Exception while processing next block", _operatorId, e);
+          nextBlock = ErrorMseBlock.fromException(e);
+        }
       }
       int numRows = nextBlock instanceof MseBlock.Data ? ((MseBlock.Data) nextBlock).getNumRows() : 0;
       long memoryUsedBytes = resourceSnapshot.getAllocatedBytes();
@@ -133,6 +138,18 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
   // Make it protected because we should always call nextBlock()
   protected abstract MseBlock getNextBlock()
       throws Exception;
+
+  /**
+   * Gives operator implementations a chance to translate an exception into a result block instead of bubbling the
+   * error up to the caller.
+   *
+   * @return a {@link MseBlock} that should be returned to the caller, or {@code null} to keep the default behavior of
+   *         returning an {@link ErrorMseBlock}.
+   */
+  @Nullable
+  protected MseBlock handleException(Exception e) {
+    return null;
+  }
 
   /**
    * Signals the operator to terminate early.
@@ -275,6 +292,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(HashJoinOperator.StatKey.EMITTED_ROWS));
         response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
+        response.mergeTimeoutOverflowReached(stats.getBoolean(HashJoinOperator.StatKey.TIMEOUT_OVERFLOW_REACHED));
       }
 
       @Override

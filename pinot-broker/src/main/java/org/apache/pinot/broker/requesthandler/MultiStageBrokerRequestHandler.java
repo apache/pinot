@@ -788,11 +788,40 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
         }
       }
+
+      if (isLeafStageMissingStats(queryStageMap, queryStats)) {
+        brokerResponse.mergeTimeoutOverflowReached(true);
+      }
     } catch (Exception e) {
       LOGGER.warn("Error encountered while collecting multi-stage stats", e);
       brokerResponse.setStageStats(JsonNodeFactory.instance.objectNode()
           .put("error", "Error encountered while collecting multi-stage stats - " + e));
     }
+  }
+
+  private boolean isLeafStageMissingStats(Map<Integer, DispatchablePlanFragment> queryStageMap,
+      List<MultiStageQueryStats.StageStats.Closed> queryStats) {
+    for (Map.Entry<Integer, DispatchablePlanFragment> entry : queryStageMap.entrySet()) {
+      int stageId = entry.getKey();
+      DispatchablePlanFragment fragment = entry.getValue();
+      if (!isLeafStage(fragment)) {
+        continue;
+      }
+      MultiStageQueryStats.StageStats.Closed stageStats =
+          stageId < queryStats.size() ? queryStats.get(stageId) : null;
+      if (stageStats == null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean isLeafStage(DispatchablePlanFragment fragment) {
+    Map<String, String> customProperties = fragment.getCustomProperties();
+    if (customProperties.containsKey(DispatchablePlanFragment.TABLE_NAME_KEY)) {
+      return true;
+    }
+    return !fragment.getWorkerIdToSegmentsMap().isEmpty();
   }
 
   private BrokerResponse constructMultistageExplainPlan(String sql, String plan, Map<String, String> extraFields) {
