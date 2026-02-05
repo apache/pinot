@@ -98,6 +98,23 @@ public class MinionTaskUtils {
     return runtimeProvider;
   }
 
+  /**
+   * Resolves the auth token string to use for Minion tasks (e.g. for specs that accept a token string).
+   * If AUTH_TOKEN is already present in task configs, returns it without creating an AuthProvider.
+   * Otherwise resolves via {@link #resolveAuthProvider} and returns its static token.
+   *
+   * @param taskConfigs task config map (may contain MinionConstants.AUTH_TOKEN)
+   * @return auth token string, or null if none
+   */
+  @Nullable
+  public static String resolveAuthToken(Map<String, String> taskConfigs) {
+    String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
+    if (StringUtils.isNotBlank(explicitToken)) {
+      return explicitToken;
+    }
+    return AuthProviderUtils.toStaticToken(resolveAuthProvider(taskConfigs));
+  }
+
   public static PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI)
       throws Exception {
     String fileURIScheme = fileURI.getScheme();
