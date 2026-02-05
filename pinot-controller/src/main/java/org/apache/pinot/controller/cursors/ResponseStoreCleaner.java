@@ -154,10 +154,6 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
     for (Map.Entry<String, List<CursorResponseNative>> entry : brokerCursorsMap.entrySet()) {
       String brokerKey = entry.getKey();
       InstanceInfo broker = brokers.get(brokerKey);
-      if (broker == null) {
-        LOGGER.warn("Broker not found for key: {}", brokerKey);
-        continue;
-      }
 
       // Collect URLs for expired responses for THIS broker only
       List<String> brokerUrls = new ArrayList<>();
@@ -230,7 +226,7 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
     }
 
     if (!errMessages.isEmpty()) {
-      throw new Exception("Some delete operations failed: " + StringUtils.join(errMessages, ", "));
+      throw new RuntimeException("Some delete operations failed: " + StringUtils.join(errMessages, ", "));
     }
     return responseMap;
   }
@@ -289,7 +285,7 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
       LOGGER.warn("Some brokers failed to respond: {}", errMessages);
       // Only throw if ALL brokers failed - allow partial success
       if (responseMap.isEmpty()) {
-        throw new Exception("All brokers failed to respond: " + StringUtils.join(errMessages, ", "));
+        throw new RuntimeException("All brokers failed to respond: " + StringUtils.join(errMessages, ", "));
       }
     }
 

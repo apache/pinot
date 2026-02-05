@@ -83,6 +83,7 @@ public class ResponseStoreCleanerTest {
       server.stop();
     }
     _brokerServers.clear();
+    _connectionManager.close();
   }
 
   private FakeBrokerServer createBrokerServer(List<CursorResponseNative> responses, int deleteStatusCode)
