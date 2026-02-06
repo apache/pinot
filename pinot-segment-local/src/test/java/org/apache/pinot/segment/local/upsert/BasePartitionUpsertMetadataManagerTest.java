@@ -1051,10 +1051,6 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
 
     @Override
-    protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
-    }
-
-    @Override
     protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     }
 
@@ -1064,16 +1060,21 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
 
     @Override
+    protected void revertAndRemoveSegment(IndexSegment segment,
+        Iterator<Map.Entry<Integer, PrimaryKey>> primaryKeyIterator) {
+    }
+
+    @Override
+    protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    }
+
+    @Override
     protected void doRemoveExpiredPrimaryKeys() {
     }
 
     @Override
-    protected void revertCurrentSegmentUpsertMetadata(IndexSegment oldSegment,
-        ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds) {
-    }
-
-    @Override
-    protected void eraseKeyToPreviousLocationMap() {
+    protected int getPrevKeyToRecordLocationSize() {
+      return 0;
     }
   }
 }
