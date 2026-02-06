@@ -226,7 +226,7 @@
     <javax.annotation-api.version>1.3.2</javax.annotation-api.version>      <!-- DO NOT UPGRADE -->
     <jakarta.validation-api.version>2.0.2</jakarta.validation-api.version>  <!-- DO NOT UPGRADE -->
     <javax.validation-api.version>2.0.1.Final</javax.validation-api.version><!-- DO NOT UPGRADE -->
-    <jakarta.xml.bind-api.version>2.3.3</jakarta.xml.bind-api.version>      <!-- DO NOT UPGRADE -->
+    <jakarta.xml.bind-api.version>4.0.5</jakarta.xml.bind-api.version>      <!-- DO NOT UPGRADE -->
     <javax.jaxb-api.version>2.3.1</javax.jaxb-api.version>                  <!-- DO NOT UPGRADE -->
     <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>            <!-- DO NOT UPGRADE -->
     <javax.ws.rs-api.version>2.1.1</javax.ws.rs-api.version>                <!-- DO NOT UPGRADE -->
