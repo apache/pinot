@@ -1205,16 +1205,16 @@ public final class TableConfigUtils {
 
       if (existingUpsertConfig.getMode() != newUpsertConfig.getMode()) {
         violations.add(
-            String.format("upsertConfig.mode (%s -> %s)", existingUpsertConfig.getMode(), newUpsertConfig.getMode()));
+            String.format("mode (%s -> %s)", existingUpsertConfig.getMode(), newUpsertConfig.getMode()));
       }
       if (existingUpsertConfig.getHashFunction() != newUpsertConfig.getHashFunction()) {
-        violations.add(String.format("upsertConfig.hashFunction (%s -> %s)", existingUpsertConfig.getHashFunction(),
+        violations.add(String.format("hashFunction (%s -> %s)", existingUpsertConfig.getHashFunction(),
             newUpsertConfig.getHashFunction()));
       }
       if (!Objects.equals(existingUpsertConfig.getComparisonColumns(),
           newUpsertConfig.getComparisonColumns())) {
         violations.add(
-            String.format("upsertConfig.comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
+            String.format("comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
                 newUpsertConfig.getComparisonColumns()));
       }
       List<String> existingComparisonColumns = existingUpsertConfig.getComparisonColumns();
@@ -1233,28 +1233,28 @@ public final class TableConfigUtils {
       if (!Objects.equals(existingUpsertConfig.getDeleteRecordColumn(),
           newUpsertConfig.getDeleteRecordColumn())) {
         violations.add(
-            String.format("upsertConfig.deleteRecordColumn (%s -> %s)", existingUpsertConfig.getDeleteRecordColumn(),
+            String.format("deleteRecordColumn (%s -> %s)", existingUpsertConfig.getDeleteRecordColumn(),
                 newUpsertConfig.getDeleteRecordColumn()));
       }
       if (existingUpsertConfig.isDropOutOfOrderRecord() != newUpsertConfig.isDropOutOfOrderRecord()) {
         violations.add(
-            String.format("upsertConfig.dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
+            String.format("dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
                 newUpsertConfig.isDropOutOfOrderRecord()));
       }
       if (!Objects.equals(existingUpsertConfig.getOutOfOrderRecordColumn(),
           newUpsertConfig.getOutOfOrderRecordColumn())) {
-        violations.add(String.format("upsertConfig.outOfOrderRecordColumn (%s -> %s)",
+        violations.add(String.format("outOfOrderRecordColumn (%s -> %s)",
             existingUpsertConfig.getOutOfOrderRecordColumn(), newUpsertConfig.getOutOfOrderRecordColumn()));
       }
       if (existingUpsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
         if (!Objects.equals(existingUpsertConfig.getPartialUpsertStrategies(),
             newUpsertConfig.getPartialUpsertStrategies())) {
-          violations.add(String.format("upsertConfig.partialUpsertStrategies (%s -> %s)",
+          violations.add(String.format("partialUpsertStrategies (%s -> %s)",
               existingUpsertConfig.getPartialUpsertStrategies(), newUpsertConfig.getPartialUpsertStrategies()));
         }
         if (existingUpsertConfig.getDefaultPartialUpsertStrategy()
             != newUpsertConfig.getDefaultPartialUpsertStrategy()) {
-          violations.add(String.format("upsertConfig.defaultPartialUpsertStrategy (%s -> %s)",
+          violations.add(String.format("defaultPartialUpsertStrategy (%s -> %s)",
               existingUpsertConfig.getDefaultPartialUpsertStrategy(),
               newUpsertConfig.getDefaultPartialUpsertStrategy()));
         }
@@ -1280,25 +1280,21 @@ public final class TableConfigUtils {
     boolean newDedupEnabled = newConfig.isDedupEnabled();
     if (existingDedupEnabled != newDedupEnabled) {
       if (existingDedupEnabled) {
-        violations.add("dedupConfig (cannot remove from existing dedup table)");
+        violations.add("dedupConfig cannot remove from existing dedup table");
       } else {
-        violations.add("dedupConfig (cannot add to existing non-dedup table, requires server restart)");
+        violations.add("dedupConfig cannot add to existing non-dedup table");
       }
     } else if (existingDedupEnabled) {
       DedupConfig existingDedupConfig = existingConfig.getDedupConfig();
       DedupConfig newDedupConfig = newConfig.getDedupConfig();
-      if (existingDedupConfig.isDedupEnabled() != newDedupConfig.isDedupEnabled()) {
-        violations.add(String.format("dedupConfig.dedupEnabled (%s -> %s)", existingDedupConfig.isDedupEnabled(),
-            newDedupConfig.isDedupEnabled()));
-      }
 
       if (existingDedupConfig.getHashFunction() != newDedupConfig.getHashFunction()) {
-        violations.add(String.format("dedupConfig.hashFunction (%s -> %s)", existingDedupConfig.getHashFunction(),
+        violations.add(String.format("hashFunction (%s -> %s)", existingDedupConfig.getHashFunction(),
             newDedupConfig.getHashFunction()));
       }
 
       if (!Objects.equals(existingDedupConfig.getDedupTimeColumn(), newDedupConfig.getDedupTimeColumn())) {
-        violations.add(String.format("dedupConfig.dedupTimeColumn (%s -> %s)", existingDedupConfig.getDedupTimeColumn(),
+        violations.add(String.format("dedupTimeColumn (%s -> %s)", existingDedupConfig.getDedupTimeColumn(),
             newDedupConfig.getDedupTimeColumn()));
       }
       String existingDedupTimeColumn = existingDedupConfig.getDedupTimeColumn();
