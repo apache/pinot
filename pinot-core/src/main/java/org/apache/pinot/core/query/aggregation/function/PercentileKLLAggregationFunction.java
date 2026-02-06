@@ -116,14 +116,36 @@ public class PercentileKLLAggregationFunction
           sketch.merge(deserializedSketches[i]);
         }
       });
-    } else {
-      double[] values = valueSet.getDoubleValuesSV();
-      forEachNotNull(length, valueSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          sketch.update(values[i]);
-        }
-      });
+      return;
     }
+
+    if (valueSet.isSingleValue()) {
+      aggregateSV(length, aggregationResultHolder, valueSet, sketch);
+    } else {
+      aggregateMV(length, aggregationResultHolder, valueSet, sketch);
+    }
+  }
+
+  protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet valueSet,
+      KllDoublesSketch sketch) {
+    double[] values = valueSet.getDoubleValuesSV();
+    forEachNotNull(length, valueSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        sketch.update(values[i]);
+      }
+    });
+  }
+
+  protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet valueSet,
+      KllDoublesSketch sketch) {
+    double[][] values = valueSet.getDoubleValuesMV();
+    forEachNotNull(length, valueSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (double val : values[i]) {
+          sketch.update(val);
+        }
+      }
+    });
   }
 
   @Override
@@ -141,15 +163,38 @@ public class PercentileKLLAggregationFunction
           sketch.merge(deserializedSketches[i]);
         }
       });
-    } else {
-      double[] values = valueSet.getDoubleValuesSV();
-      forEachNotNull(length, valueSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
-          sketch.update(values[i]);
-        }
-      });
+      return;
     }
+
+    if (valueSet.isSingleValue()) {
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, valueSet);
+    } else {
+      aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, valueSet);
+    }
+  }
+
+  protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet valueSet) {
+    double[] values = valueSet.getDoubleValuesSV();
+    forEachNotNull(length, valueSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
+        sketch.update(values[i]);
+      }
+    });
+  }
+
+  protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet valueSet) {
+    double[][] values = valueSet.getDoubleValuesMV();
+    forEachNotNull(length, valueSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
+        for (double val : values[i]) {
+          sketch.update(val);
+        }
+      }
+    });
   }
 
   @Override
@@ -169,17 +214,42 @@ public class PercentileKLLAggregationFunction
           }
         }
       });
+      return;
+    }
+
+    if (valueSet.isSingleValue()) {
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, valueSet);
     } else {
-      double[] values = valueSet.getDoubleValuesSV();
-      forEachNotNull(length, valueSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          for (int groupKey : groupKeysArray[i]) {
-            KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
-            sketch.update(values[i]);
+      aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, valueSet);
+    }
+  }
+
+  protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet valueSet) {
+    double[] values = valueSet.getDoubleValuesSV();
+    forEachNotNull(length, valueSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
+          sketch.update(values[i]);
+        }
+      }
+    });
+  }
+
+  protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet valueSet) {
+    double[][] values = valueSet.getDoubleValuesMV();
+    forEachNotNull(length, valueSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
+          for (double val : values[i]) {
+            sketch.update(val);
           }
         }
-      });
-    }
+      }
+    });
   }
 
   /**
