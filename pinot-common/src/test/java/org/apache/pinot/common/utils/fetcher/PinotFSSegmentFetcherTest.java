@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.fetcher;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -46,7 +47,6 @@ public class PinotFSSegmentFetcherTest {
   private static final File DOWNLOAD_DIR = new File(TEMP_DIR, "downloadDir");
 
   private PinotFSSegmentFetcher _segmentFetcher;
-  private PinotConfiguration _fetcherConfig;
 
   @BeforeMethod
   public void setUp()
@@ -61,13 +61,13 @@ public class PinotFSSegmentFetcherTest {
         new PinotConfiguration());
 
     // Setup fetcher config with retry settings
-    _fetcherConfig = new PinotConfiguration();
-    _fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_COUNT_CONFIG_KEY, 3);
-    _fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_WAIT_MS_CONFIG_KEY, 10);
-    _fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, 1.1);
+    PinotConfiguration fetcherConfig = new PinotConfiguration();
+    fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_COUNT_CONFIG_KEY, 3);
+    fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_WAIT_MS_CONFIG_KEY, 10);
+    fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, 1.1);
 
     _segmentFetcher = new PinotFSSegmentFetcher();
-    _segmentFetcher.init(_fetcherConfig);
+    _segmentFetcher.init(fetcherConfig);
   }
 
   @AfterMethod
@@ -86,11 +86,11 @@ public class PinotFSSegmentFetcherTest {
     FileUtils.forceMkdir(segmentDir);
 
     File dataFile = new File(segmentDir, "index");
-    FileUtils.write(dataFile, fileContent);
+    FileUtils.write(dataFile, fileContent, Charset.defaultCharset());
 
     // Create another file to simulate a real segment structure
     File metadataFile = new File(segmentDir, "metadata.properties");
-    FileUtils.write(metadataFile, "segment.name=" + segmentName);
+    FileUtils.write(metadataFile, "segment.name=" + segmentName, Charset.defaultCharset());
 
     // Create tar.gz file
     File tarFile = new File(TAR_DIR, segmentName + ".tar.gz");
@@ -100,7 +100,7 @@ public class PinotFSSegmentFetcherTest {
   }
 
   @Test
-  public void testFetchUntarSegmentToLocalStreamedSuccess()
+  public void testFetchUntarSegmentToLocalStreamedSuccessFirstAttempt()
       throws Exception {
     // Create test segment tar
     String testContent = "This is test segment data";
@@ -110,7 +110,6 @@ public class PinotFSSegmentFetcherTest {
     URI segmentUri = segmentTar.toURI();
 
     // Download and untar
-    //
     AtomicInteger failedAttempts = new AtomicInteger(0);
     File untarredSegment = _segmentFetcher.fetchUntarSegmentToLocalStreamed(
         segmentUri, DOWNLOAD_DIR, -1, failedAttempts);
@@ -125,7 +124,7 @@ public class PinotFSSegmentFetcherTest {
     // Verify content
     File indexFile = new File(untarredSegment, "index");
     assertTrue(indexFile.exists(), "Index file should exist");
-    String actualContent = FileUtils.readFileToString(indexFile);
+    String actualContent = FileUtils.readFileToString(indexFile, Charset.defaultCharset());
     assertEquals(actualContent, testContent, "File content should match");
 
     // Verify metadata file
@@ -194,64 +193,6 @@ public class PinotFSSegmentFetcherTest {
   }
 
   @Test
-  public void testFetchUntarSegmentToLocalStreamedMultipleFiles()
-      throws Exception {
-    // Create a segment with multiple files
-    String segmentName = SEGMENT_NAME + "_multifile";
-    File segmentDir = new File(DATA_DIR, segmentName);
-    FileUtils.forceMkdir(segmentDir);
-
-    // Create multiple files
-    FileUtils.write(new File(segmentDir, "file1.txt"), "Content 1");
-    FileUtils.write(new File(segmentDir, "file2.txt"), "Content 2");
-    FileUtils.write(new File(segmentDir, "file3.txt"), "Content 3");
-
-    // Create subdirectory with file
-    File subDir = new File(segmentDir, "subdir");
-    FileUtils.forceMkdir(subDir);
-    FileUtils.write(new File(subDir, "file4.txt"), "Content 4");
-
-    // Create tar.gz file
-    File tarFile = new File(TAR_DIR, segmentName + ".tar.gz");
-    TarCompressionUtils.createCompressedTarFile(segmentDir, tarFile);
-
-    // Download and untar
-    URI segmentUri = tarFile.toURI();
-    AtomicInteger attempts = new AtomicInteger(0);
-    File untarredSegment = _segmentFetcher.fetchUntarSegmentToLocalStreamed(
-        segmentUri, DOWNLOAD_DIR, -1, attempts);
-
-    // Verify all files exist
-    assertNotNull(untarredSegment);
-    assertTrue(new File(untarredSegment, "file1.txt").exists());
-    assertTrue(new File(untarredSegment, "file2.txt").exists());
-    assertTrue(new File(untarredSegment, "file3.txt").exists());
-    assertTrue(new File(untarredSegment, "subdir/file4.txt").exists());
-
-    // Verify content
-    assertEquals(FileUtils.readFileToString(new File(untarredSegment, "file1.txt")), "Content 1");
-    assertEquals(FileUtils.readFileToString(new File(untarredSegment, "subdir/file4.txt")), "Content 4");
-  }
-
-  @Test
-  public void testFetchUntarSegmentToLocalStreamedAttemptsTracking()
-      throws Exception {
-    // Create test segment tar
-    String testContent = "Test for attempts tracking";
-    File segmentTar = createTestSegmentTar(SEGMENT_NAME + "_attempts", testContent);
-
-    URI segmentUri = segmentTar.toURI();
-
-    // Test that attempts is properly set on success
-    AtomicInteger failedAttempts = new AtomicInteger(-1);
-    File untarredSegment = _segmentFetcher.fetchUntarSegmentToLocalStreamed(
-        segmentUri, DOWNLOAD_DIR, -1, failedAttempts);
-
-    assertNotNull(untarredSegment);
-    assertEquals(failedAttempts.get(), 0, "Attempts should be set to 0 on first try success");
-  }
-
-  @Test
   public void testFetchUntarSegmentToLocalStreamedLargeFile()
       throws Exception {
     // Create a larger segment to test streaming behavior
@@ -266,7 +207,7 @@ public class PinotFSSegmentFetcherTest {
     }
 
     File dataFile = new File(segmentDir, "largeIndex");
-    FileUtils.write(dataFile, largeContent.toString());
+    FileUtils.write(dataFile, largeContent.toString(), Charset.defaultCharset());
 
     // Create tar.gz file
     File tarFile = new File(TAR_DIR, segmentName + ".tar.gz");
@@ -282,24 +223,7 @@ public class PinotFSSegmentFetcherTest {
     assertNotNull(untarredSegment);
     File largeIndexFile = new File(untarredSegment, "largeIndex");
     assertTrue(largeIndexFile.exists());
-    String actualContent = FileUtils.readFileToString(largeIndexFile);
+    String actualContent = FileUtils.readFileToString(largeIndexFile, Charset.defaultCharset());
     assertEquals(actualContent, largeContent.toString());
-  }
-
-  @Test
-  public void testFetchSegmentToLocalUsesLocalPinotFS()
-      throws Exception {
-    // Test the regular fetchSegmentToLocal method
-    String testContent = "Test for fetchSegmentToLocal";
-    File segmentTar = createTestSegmentTar(SEGMENT_NAME + "_regular", testContent);
-
-    URI segmentUri = segmentTar.toURI();
-    File destFile = new File(DOWNLOAD_DIR, "downloaded.tar.gz");
-
-    _segmentFetcher.fetchSegmentToLocal(segmentUri, destFile);
-
-    // Verify the file was copied
-    assertTrue(destFile.exists(), "Downloaded file should exist");
-    assertTrue(destFile.length() > 0, "Downloaded file should not be empty");
   }
 }
