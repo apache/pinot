@@ -1189,10 +1189,20 @@ public final class TableConfigUtils {
     String tableName = existingConfig.getTableName();
     List<String> violations = new ArrayList<>();
 
-    UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
-    UpsertConfig newUpsertConfig = newConfig.getUpsertConfig();
-    if (existingConfig.isUpsertEnabled() && newConfig.isUpsertEnabled()) {
-      // Check upsert mode
+    boolean existingUpsertEnabled = existingConfig.isUpsertEnabled();
+    boolean newUpsertEnabled = newConfig.isUpsertEnabled();
+
+    // Check if upsert is being added or removed
+    if (existingUpsertEnabled != newUpsertEnabled) {
+      if (existingUpsertEnabled) {
+        violations.add("upsertConfig cannot remove from existing upsert table");
+      } else {
+        violations.add("upsertConfig cannot add to existing non-upsert table");
+      }
+    } else if (existingUpsertEnabled) {
+      UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
+      UpsertConfig newUpsertConfig = newConfig.getUpsertConfig();
+
       if (existingUpsertConfig.getMode() != newUpsertConfig.getMode()) {
         violations.add(
             String.format("upsertConfig.mode (%s -> %s)", existingUpsertConfig.getMode(), newUpsertConfig.getMode()));
@@ -1249,10 +1259,6 @@ public final class TableConfigUtils {
               newUpsertConfig.getDefaultPartialUpsertStrategy()));
         }
       }
-    } else if (!existingConfig.isUpsertEnabled() || !newConfig.isUpsertEnabled()) {
-      // Removing upsert config from an existing upsert table
-      violations.add(
-          String.format("upsertConfig cannot be added or removed from existing upsert table: %s", tableName));
     }
     handleViolations(tableName, violations, force, "upsert");
   }
@@ -1270,59 +1276,56 @@ public final class TableConfigUtils {
     String tableName = existingConfig.getTableName();
     List<String> violations = new ArrayList<>();
 
-    if (existingConfig.isDedupEnabled() && newConfig.isDedupEnabled()) {
-      DedupConfig existingDedupConfig = existingConfig.getDedupConfig();
-      DedupConfig newDedupConfig = newConfig.getDedupConfig();
-      if (newDedupConfig == null) {
-        // Removing dedup config from an existing dedup table
+    boolean existingDedupEnabled = existingConfig.isDedupEnabled();
+    boolean newDedupEnabled = newConfig.isDedupEnabled();
+    if (existingDedupEnabled != newDedupEnabled) {
+      if (existingDedupEnabled) {
         violations.add("dedupConfig (cannot remove from existing dedup table)");
       } else {
-        if (existingDedupConfig.isDedupEnabled() != newDedupConfig.isDedupEnabled()) {
-          violations.add(String.format("dedupConfig.dedupEnabled (%s -> %s)", existingDedupConfig.isDedupEnabled(),
-              newDedupConfig.isDedupEnabled()));
-        }
+        violations.add("dedupConfig (cannot add to existing non-dedup table, requires server restart)");
+      }
+    } else if (existingDedupEnabled) {
+      DedupConfig existingDedupConfig = existingConfig.getDedupConfig();
+      DedupConfig newDedupConfig = newConfig.getDedupConfig();
+      if (existingDedupConfig.isDedupEnabled() != newDedupConfig.isDedupEnabled()) {
+        violations.add(String.format("dedupConfig.dedupEnabled (%s -> %s)", existingDedupConfig.isDedupEnabled(),
+            newDedupConfig.isDedupEnabled()));
+      }
 
-        if (existingDedupConfig.getHashFunction() != newDedupConfig.getHashFunction()) {
-          violations.add(String.format("dedupConfig.hashFunction (%s -> %s)", existingDedupConfig.getHashFunction(),
-              newDedupConfig.getHashFunction()));
-        }
+      if (existingDedupConfig.getHashFunction() != newDedupConfig.getHashFunction()) {
+        violations.add(String.format("dedupConfig.hashFunction (%s -> %s)", existingDedupConfig.getHashFunction(),
+            newDedupConfig.getHashFunction()));
+      }
 
-        if (!Objects.equals(existingDedupConfig.getDedupTimeColumn(), newDedupConfig.getDedupTimeColumn())) {
+      if (!Objects.equals(existingDedupConfig.getDedupTimeColumn(), newDedupConfig.getDedupTimeColumn())) {
+        violations.add(String.format("dedupConfig.dedupTimeColumn (%s -> %s)", existingDedupConfig.getDedupTimeColumn(),
+            newDedupConfig.getDedupTimeColumn()));
+      }
+      String existingDedupTimeColumn = existingDedupConfig.getDedupTimeColumn();
+      if (existingDedupTimeColumn == null || existingDedupTimeColumn.isEmpty()) {
+        String existingTimeColumn =
+            existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
+                : null;
+        String newTimeColumn =
+            newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
+        if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
           violations.add(
-              String.format("dedupConfig.dedupTimeColumn (%s -> %s)", existingDedupConfig.getDedupTimeColumn(),
-                  newDedupConfig.getDedupTimeColumn()));
-        }
-
-        String existingDedupTimeColumn = existingDedupConfig.getDedupTimeColumn();
-        if (existingDedupTimeColumn == null || existingDedupTimeColumn.isEmpty()) {
-          String existingTimeColumn =
-              existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
-                  : null;
-          String newTimeColumn =
-              newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
-          if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
-            violations.add(
-                String.format("timeColumnName (%s -> %s) - used as default dedup time column", existingTimeColumn,
-                    newTimeColumn));
-          }
+              String.format("timeColumnName (%s -> %s) - used as default dedup time column", existingTimeColumn,
+                  newTimeColumn));
         }
       }
-    } else if (!newConfig.isDedupEnabled() || !existingConfig.isDedupEnabled()) {
-      violations.add(String.format("dedupConfig cannot be added or removed from existing upsert table: %s",
-          existingConfig.getTableName()));
     }
-
-    handleViolations(existingConfig.getTableName(), violations, force, "dedup");
+    handleViolations(tableName, violations, force, "dedup");
   }
 
   private static void handleViolations(String tableName, List<String> violations, boolean force, String configType) {
     if (!violations.isEmpty()) {
       if (force) {
-        LOGGER.warn("Force updating {} config for table '{}' with changes: {}. "
-                + "This could lead to data inconsistencies or data loss. Be careful during server restarts and while "
-                + "running compaction tasks. If unsure, please recreate the table with new configs.", configType,
-            tableName,
-            violations);
+        LOGGER.warn("Forcing a config: {} update for table {} with changes: {}."
+                + "This may cause data inconsistencies or data loss. Be cautious during restarts and compaction, and "
+                + "pause consumption beforehand. If in doubt, recreate the table with the new configuration.",
+            configType,
+            tableName, violations);
       } else {
         throw new IllegalArgumentException(String.format(
             "Failed to update table '%s': Cannot modify %s as it may lead to data inconsistencies. "
