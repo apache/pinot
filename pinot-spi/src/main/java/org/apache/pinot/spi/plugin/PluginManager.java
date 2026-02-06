@@ -100,8 +100,6 @@ public class PluginManager {
           "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
       put("org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory",
           "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
-      put("org.apache.pinot.core.realtime.impl.kafka4.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
     }
   };
 

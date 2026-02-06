@@ -44,13 +44,11 @@ public final class MiniKafkaCluster implements Closeable {
   private static final String KAFKA_IMAGE = "apache/kafka:4.0.0";
 
   private final KafkaContainer _kafkaContainer;
-  private final AdminClient _adminClient;
 
   public MiniKafkaCluster(String brokerId)
       throws Exception {
     // Use apache/kafka image which supports KRaft mode
     _kafkaContainer = new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE));
-    _adminClient = null; // Will be initialized after start
   }
 
   public void start()
@@ -61,9 +59,6 @@ public final class MiniKafkaCluster implements Closeable {
   @Override
   public void close()
       throws IOException {
-    if (_adminClient != null) {
-      _adminClient.close();
-    }
     _kafkaContainer.stop();
   }
 

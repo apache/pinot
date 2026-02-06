@@ -252,7 +252,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic);
     Map<TopicPartition, Long> startOffsets = _consumer.beginningOffsets(
         partitionInfos.stream()
-            .filter(info -> info != null)
             .map(info -> new TopicPartition(_topic, info.partition()))
             .collect(Collectors.toList()));
     return startOffsets.entrySet().stream().collect(
@@ -266,12 +265,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public Map<String, StreamPartitionMsgOffset> getStreamEndOffsets() {
     List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic);
-    Map<TopicPartition, Long> startOffsets = _consumer.endOffsets(
+    Map<TopicPartition, Long> endOffsets = _consumer.endOffsets(
         partitionInfos.stream()
-            .filter(info -> info != null)
             .map(info -> new TopicPartition(_topic, info.partition()))
             .collect(Collectors.toList()));
-    return startOffsets.entrySet().stream().collect(
+    return endOffsets.entrySet().stream().collect(
         Collectors.toMap(
             entry -> String.valueOf(entry.getKey().partition()),
             entry -> new LongMsgOffset(entry.getValue()),
