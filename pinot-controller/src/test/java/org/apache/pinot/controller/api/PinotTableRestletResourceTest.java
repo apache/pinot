@@ -1201,14 +1201,16 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
         .forStopMinionTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
     waitForTaskState(taskName, TaskState.STOPPED);
-    // resume the task queue again to avoid affecting other tests
-    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
-        .forResumeMinionTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
-
-    // Delete table - should succeed and clean up tasks
-    String deleteResponse = sendDeleteRequest(
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
-    assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
+    try {
+      // Delete table while the queue is stopped to ensure task cleanup succeeds
+      String deleteResponse = sendDeleteRequest(
+          DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+      assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
+    } finally {
+      // resume the task queue again to avoid affecting other tests
+      sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
+          .forResumeMinionTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
+    }
   }
 
   private static void waitForTaskState(String taskName, TaskState expectedState) {
