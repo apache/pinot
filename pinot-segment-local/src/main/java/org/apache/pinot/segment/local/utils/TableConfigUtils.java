@@ -1312,10 +1312,10 @@ public final class TableConfigUtils {
     if (!violations.isEmpty()) {
       if (force) {
         LOGGER.warn("Forcing a config: {} update for table {} with changes: {}."
-            + "This may cause data inconsistencies or data loss. Be cautious during restarts and compaction, and "
-            + "pause consumption beforehand and disable SNAPSHOT mode in upsertConfig. If in doubt, recreate the "
-            + "table with the "
-            + "new configuration.", configType, tableName, violations);
+                + "This may cause data inconsistencies or data loss. Be cautious during compactions, and "
+                + "pause consumption beforehand and disable SNAPSHOT mode in upsertConfig and restart for the changes"
+                + " to kick in. If in doubt, recreate the table with the new configuration.", configType, tableName,
+            violations);
       } else {
         throw new IllegalArgumentException(String.format(
             "Failed to update table '%s': Cannot modify %s as it may lead to data inconsistencies. "
