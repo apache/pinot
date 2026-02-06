@@ -1648,7 +1648,7 @@ public class PinotHelixResourceManager {
     String rawTableName = schemaName;
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TableConfig realtimeTableConfig = getTableConfig(realtimeTableName);
-    if (realtimeTableConfig.isUpsertEnabled()) {
+    if (realtimeTableConfig.isUpsertEnabled() || realtimeTableConfig.isDedupEnabled()) {
       List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
       List<String> newPrimaryKeys = newSchema.getPrimaryKeyColumns();
       // If neither has primary keys, nothing to validate
@@ -1658,9 +1658,10 @@ public class PinotHelixResourceManager {
       }
       // Check if primary key columns have changed
       if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
-        String errorMsg = String.format("Failed to update schema '%s': Cannot change primaryKeyColumns from %s to %s "
-            + "as it may lead to data inconsistencies. Please create a new table instead.",
-            schemaName, oldPrimaryKeys, newPrimaryKeys);
+        String errorMsg = String.format(
+            "Failed to update schema '%s': Cannot change primaryKeyColumns from %s to %s for upsert/dedup tables "
+                + "as it may lead to data inconsistencies. Please create a new table instead.", schemaName,
+            oldPrimaryKeys, newPrimaryKeys);
         throw new IllegalArgumentException(errorMsg);
       }
     }
