@@ -98,7 +98,8 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
       }
     } else {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = Math.signum(leftValues[i]) * Math.floor(Math.abs(leftValues[i]));
+        // Keep behavior consistent with truncate(value, 0), including canonical +0.0 for values truncated to zero.
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(0, RoundingMode.DOWN).doubleValue();
       }
     }
     return _doubleValuesSV;

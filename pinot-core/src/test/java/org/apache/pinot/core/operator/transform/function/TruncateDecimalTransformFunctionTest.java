@@ -62,6 +62,15 @@ public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionT
       expectedValues[i] = truncate(_doubleSVValues[i], 0);
     }
     testTransformFunction(transformFunction, expectedValues);
+
+    // Regression for signed-zero handling: truncate(value) should match truncate(value, 0).
+    expression = RequestContextUtils.getExpression("truncate(-0.4)");
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = 0.0d;
+    }
+    testTransformFunction(transformFunction, expectedValues);
   }
 
   public Double truncate(double a, int b) {
