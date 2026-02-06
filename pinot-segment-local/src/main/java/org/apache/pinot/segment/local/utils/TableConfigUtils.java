@@ -1230,12 +1230,6 @@ public final class TableConfigUtils {
                   newTimeColumn));
         }
       }
-      if (!Objects.equals(existingUpsertConfig.getDeleteRecordColumn(),
-          newUpsertConfig.getDeleteRecordColumn())) {
-        violations.add(
-            String.format("deleteRecordColumn (%s -> %s)", existingUpsertConfig.getDeleteRecordColumn(),
-                newUpsertConfig.getDeleteRecordColumn()));
-      }
       if (existingUpsertConfig.isDropOutOfOrderRecord() != newUpsertConfig.isDropOutOfOrderRecord()) {
         violations.add(
             String.format("dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
