@@ -42,6 +42,8 @@ public class StringFunctionsTest {
         {"org.apache.pinot.common.function", ".", 3, 3, "common", "null"},
         {"+++++", "+", 0, 100, "", ""},
         {"+++++", "+", 1, 100, "null", "null"},
+        {"+++++org++apache++", "", 1, 100, "null", "null"},
+        {"+++++org++apache++", "", 0, 100, "+++++org++apache++", "+++++org++apache++"},
         // note that splitPart will split with limit first, then lookup by index from START or END.
         {"org.apache.pinot.common.function", ".", -1, 100, "function", "function"},
         {"org.apache.pinot.common.function", ".", -10, 100, "null", "null"},
