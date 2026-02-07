@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Arrays;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -67,9 +68,7 @@ public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionT
     expression = RequestContextUtils.getExpression("truncate(-0.4)");
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 0.0d;
-    }
+    Arrays.fill(expectedValues, 0.0d);
     testTransformFunction(transformFunction, expectedValues);
   }
 

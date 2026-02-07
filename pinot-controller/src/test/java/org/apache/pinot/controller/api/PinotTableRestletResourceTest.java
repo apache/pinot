@@ -1201,8 +1201,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // task transition races while cleanup deletes Helix job metadata.
     sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
         .forStopMinionTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
-    waitForTaskState(taskName, TaskState.STOPPED);
     try {
+      waitForTaskState(taskName, TaskState.STOPPED);
       // Delete table - should succeed and clean up tasks
       String deleteResponse = sendDeleteRequest(
           DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
