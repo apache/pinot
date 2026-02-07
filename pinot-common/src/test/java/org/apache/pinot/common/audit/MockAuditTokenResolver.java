@@ -21,6 +21,7 @@ package org.apache.pinot.common.audit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.audit.AuditTokenResolver;
+import org.apache.pinot.spi.audit.AuditUserIdentity;
 
 
 /**
@@ -70,18 +71,19 @@ public class MockAuditTokenResolver implements AuditTokenResolver {
 
   @Override
   @Nullable
-  public String resolve(String authHeaderValue) {
+  public AuditUserIdentity resolve(String authHeaderValue) {
     // Record the auth header atomically before any return path
     MockConfig config = STATIC_CONFIG.updateAndGet(c -> new MockConfig(c._returnValue, authHeaderValue));
 
     // If instantiated with a specific return value, use it
     if (_returnValue != null) {
-      return _returnValue;
+      return () -> _returnValue;
     }
 
     // For PluginManager-loaded instances, check prefix and use static config
     if (authHeaderValue != null && authHeaderValue.startsWith(TEST_PREFIX)) {
-      return config._returnValue;
+      String principal = config._returnValue;
+      return () -> principal;
     }
     return null;
   }

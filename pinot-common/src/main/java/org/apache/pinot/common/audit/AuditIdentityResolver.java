@@ -30,6 +30,7 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.audit.AuditTokenResolver;
+import org.apache.pinot.spi.audit.AuditUserIdentity;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,9 +110,9 @@ public class AuditIdentityResolver {
     // Priority 2: Try custom token resolver
     AuditTokenResolver resolver = getTokenResolver(config);
     if (resolver != null) {
-      String principal = resolver.resolve(authHeader);
-      if (StringUtils.isNotBlank(principal)) {
-        return new AuditEvent.UserIdentity().setPrincipal(principal);
+      AuditUserIdentity identity = resolver.resolve(authHeader);
+      if (identity != null && StringUtils.isNotBlank(identity.getPrincipal())) {
+        return new AuditEvent.UserIdentity().setPrincipal(identity.getPrincipal());
       }
     }
 

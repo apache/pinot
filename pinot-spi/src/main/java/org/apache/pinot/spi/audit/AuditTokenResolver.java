@@ -35,17 +35,17 @@ import javax.annotation.Nullable;
 public interface AuditTokenResolver {
 
   /**
-   * Resolves the principal from an authorization header value.
+   * Resolves the user identity from an authorization header value.
    * <p>
    * The implementation should:
    * <ul>
-   *   <li>Return the principal (user identifier) if it can handle the token format</li>
+   *   <li>Return an {@link AuditUserIdentity} if it can handle the token format</li>
    *   <li>Return null if it cannot handle the token format (to allow fallback)</li>
    * </ul>
    *
    * @param authHeaderValue the full Authorization header value (e.g., "Bearer &lt;token&gt;")
-   * @return the principal if resolved, null otherwise
+   * @return the resolved identity, or null if this resolver cannot handle the token
    */
   @Nullable
-  String resolve(String authHeaderValue);
+  AuditUserIdentity resolve(String authHeaderValue);
 }
