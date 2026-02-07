@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.audit;
 
-import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.audit.AuditTokenResolver;
 import org.apache.pinot.spi.audit.AuditUserIdentity;
@@ -38,29 +37,11 @@ public class MockAuditTokenResolver implements AuditTokenResolver {
   private static final String TEST_PREFIX = "Bearer test-";
   private static final String DEFAULT_PRINCIPAL = "mock-resolved-user";
 
-  private static final class MockConfig {
-    final String _returnValue;
-    final String _lastAuthHeader;
-
-    MockConfig(@Nullable String returnValue, @Nullable String lastAuthHeader) {
-      _returnValue = returnValue;
-      _lastAuthHeader = lastAuthHeader;
-    }
-  }
-
-  private static final AtomicReference<MockConfig> STATIC_CONFIG =
-      new AtomicReference<>(new MockConfig(DEFAULT_PRINCIPAL, null));
+  private static String _staticReturnValue = DEFAULT_PRINCIPAL;
+  private static String _lastAuthHeader;
 
   @Nullable
   private final String _returnValue;
-
-  /**
-   * No-arg constructor for PluginManager loading.
-   * Uses static configuration via {@link #setStaticReturnValue(String)}.
-   */
-  public MockAuditTokenResolver() {
-    _returnValue = null;
-  }
 
   /**
    * Constructor for direct instantiation with configurable return value.
@@ -72,8 +53,7 @@ public class MockAuditTokenResolver implements AuditTokenResolver {
   @Override
   @Nullable
   public AuditUserIdentity resolve(String authHeaderValue) {
-    // Record the auth header atomically before any return path
-    MockConfig config = STATIC_CONFIG.updateAndGet(c -> new MockConfig(c._returnValue, authHeaderValue));
+    _lastAuthHeader = authHeaderValue;
 
     // If instantiated with a specific return value, use it
     if (_returnValue != null) {
@@ -81,25 +61,19 @@ public class MockAuditTokenResolver implements AuditTokenResolver {
     }
 
     // For PluginManager-loaded instances, check prefix and use static config
-    if (authHeaderValue != null && authHeaderValue.startsWith(TEST_PREFIX)) {
-      String principal = config._returnValue;
+    if (authHeaderValue.startsWith(TEST_PREFIX)) {
+      String principal = _staticReturnValue;
       return () -> principal;
     }
     return null;
   }
 
   /**
-   * Sets the return value for PluginManager-loaded instances.
-   */
-  public static void setStaticReturnValue(@Nullable String value) {
-    STATIC_CONFIG.updateAndGet(c -> new MockConfig(value, c._lastAuthHeader));
-  }
-
-  /**
    * Resets static state to defaults.
    */
   public static void reset() {
-    STATIC_CONFIG.set(new MockConfig(DEFAULT_PRINCIPAL, null));
+    _staticReturnValue = DEFAULT_PRINCIPAL;
+    _lastAuthHeader = null;
   }
 
   /**
@@ -107,6 +81,6 @@ public class MockAuditTokenResolver implements AuditTokenResolver {
    */
   @Nullable
   public static String getLastAuthHeader() {
-    return STATIC_CONFIG.get()._lastAuthHeader;
+    return _lastAuthHeader;
   }
 }

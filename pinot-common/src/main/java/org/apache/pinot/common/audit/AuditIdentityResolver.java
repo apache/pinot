@@ -146,7 +146,8 @@ public class AuditIdentityResolver {
       }
 
       AuditTokenResolver newResolver = loadTokenResolver(resolverClass);
-      _resolverHolder.set(new ResolverHolder(newResolver, resolverClass));
+      // Don't cache the instance if it does not exist. Occasionally, we can run into loading failures.
+      _resolverHolder.set(new ResolverHolder(newResolver, newResolver != null ? resolverClass : null));
       return newResolver;
     }
   }
