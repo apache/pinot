@@ -18,14 +18,19 @@
  */
 package org.apache.pinot.common.audit;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.audit.AuditTokenResolver;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +41,7 @@ import org.slf4j.LoggerFactory;
  * This resolver supports multiple identity resolution strategies in order of priority:
  * <ol>
  *   <li>Custom identity header - as configured in the audit configuration</li>
+ *   <li>Custom token resolver (via SPI) - for proprietary token formats</li>
  *   <li>JWT token in Authorization header - extracting principal from JWT claims</li>
  * </ol>
  * <p>
@@ -51,10 +57,17 @@ public class AuditIdentityResolver {
   private static final String BEARER_PREFIX = "Bearer ";
 
   private final AuditConfigManager _configManager;
+  private final AtomicReference<ResolverHolder> _resolverHolder = new AtomicReference<>(new ResolverHolder());
 
   @Inject
   public AuditIdentityResolver(AuditConfigManager configManager) {
     _configManager = configManager;
+  }
+
+  @VisibleForTesting
+  AuditIdentityResolver(AuditConfigManager configManager, @Nullable AuditTokenResolver tokenResolver) {
+    _configManager = configManager;
+    _resolverHolder.set(new ResolverHolder(tokenResolver));
   }
 
   /**
@@ -63,6 +76,7 @@ public class AuditIdentityResolver {
    * The resolution follows a priority order:
    * <ol>
    *   <li>Check for a custom identity header as specified in the audit configuration</li>
+   *   <li>Use custom token resolver (if configured) to resolve from Authorization header</li>
    *   <li>Extract principal from JWT token in the Authorization header</li>
    * </ol>
    * <p>
@@ -73,6 +87,7 @@ public class AuditIdentityResolver {
    * @return a {@link AuditEvent.UserIdentity} containing the resolved principal, or {@code null} if no identity
    * could be resolved
    */
+  @Nullable
   public AuditEvent.UserIdentity resolveIdentity(ContainerRequestContext requestContext) {
     AuditConfig config = _configManager.getCurrentConfig();
 
@@ -85,9 +100,23 @@ public class AuditIdentityResolver {
       }
     }
 
-    // Priority 2: Check JWT in Authorization header
+    // Get Authorization header for subsequent checks
     String authHeader = requestContext.getHeaderString(HttpHeaders.AUTHORIZATION);
-    if (StringUtils.isNotBlank(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
+    if (StringUtils.isBlank(authHeader)) {
+      return null;
+    }
+
+    // Priority 2: Try custom token resolver
+    AuditTokenResolver resolver = getTokenResolver(config);
+    if (resolver != null) {
+      String principal = resolver.resolve(authHeader);
+      if (StringUtils.isNotBlank(principal)) {
+        return new AuditEvent.UserIdentity().setPrincipal(principal);
+      }
+    }
+
+    // Priority 3: Fallback to JWT parsing
+    if (authHeader.startsWith(BEARER_PREFIX)) {
       String token = authHeader.substring(BEARER_PREFIX.length()).trim();
       String principal = extractJwtPrincipal(token, config.getUseridJwtClaimName());
       if (StringUtils.isNotBlank(principal)) {
@@ -95,8 +124,42 @@ public class AuditIdentityResolver {
       }
     }
 
-    // Return null instead of anonymous
     return null;
+  }
+
+  @Nullable
+  private AuditTokenResolver getTokenResolver(AuditConfig config) {
+    String resolverClass = config.getTokenResolverClass();
+    ResolverHolder currentHolder = _resolverHolder.get();
+
+    // If no resolver class configured or already loaded, return current resolver
+    if (StringUtils.isBlank(resolverClass) || currentHolder.isLoaded(resolverClass)) {
+      return currentHolder.getResolver();
+    }
+
+    // Need to load new resolver - use synchronized to prevent concurrent loading
+    synchronized (this) {
+      currentHolder = _resolverHolder.get();
+      if (currentHolder.isLoaded(resolverClass)) {
+        return currentHolder.getResolver();
+      }
+
+      AuditTokenResolver newResolver = loadTokenResolver(resolverClass);
+      _resolverHolder.set(new ResolverHolder(newResolver, resolverClass));
+      return newResolver;
+    }
+  }
+
+  @Nullable
+  private AuditTokenResolver loadTokenResolver(String className) {
+    try {
+      AuditTokenResolver resolver = PluginManager.get().createInstance(className);
+      LOG.info("Successfully loaded AuditTokenResolver: {}", className);
+      return resolver;
+    } catch (Exception e) {
+      LOG.error("Failed to load AuditTokenResolver: {}", className, e);
+      return null;
+    }
   }
 
   private String extractJwtPrincipal(String token, String claimName) {
@@ -117,6 +180,40 @@ public class AuditIdentityResolver {
     } catch (Exception e) {
       LOG.error("Failed to parse JWT token", e);
       return null;
+    }
+  }
+
+  /**
+   * Immutable holder for resolver and its class name to enable atomic updates.
+   */
+  private static final class ResolverHolder {
+    @Nullable
+    private final AuditTokenResolver _resolver;
+    @Nullable
+    private final String _className;
+
+    ResolverHolder() {
+      _resolver = null;
+      _className = null;
+    }
+
+    ResolverHolder(@Nullable AuditTokenResolver resolver) {
+      _resolver = resolver;
+      _className = resolver != null ? resolver.getClass().getName() : null;
+    }
+
+    ResolverHolder(@Nullable AuditTokenResolver resolver, @Nullable String className) {
+      _resolver = resolver;
+      _className = className;
+    }
+
+    @Nullable
+    AuditTokenResolver getResolver() {
+      return _resolver;
+    }
+
+    boolean isLoaded(@Nullable String className) {
+      return className != null && className.equals(_className);
     }
   }
 }
