@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.operator.join.JoinedRowView;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -58,6 +59,7 @@ public class LookupJoinOperator extends MultiStageOperator {
       Set.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.SEMI, JoinRelType.ANTI);
 
   private final MultiStageOperator _leftInput;
+  private final int _leftColumnSize;
   private final LeafOperator _rightInput;
   private final JoinRelType _joinType;
   private final int[] _leftKeyIds;
@@ -68,10 +70,11 @@ public class LookupJoinOperator extends MultiStageOperator {
   private final List<TransformOperand> _nonEquiEvaluators;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public LookupJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput,
+  public LookupJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
     super(context);
     _leftInput = leftInput;
+    _leftColumnSize = leftSchema.size();
     Preconditions.checkState(rightInput instanceof LeafOperator, "Right input must be leaf operator");
     _rightInput = (LeafOperator) rightInput;
     _joinType = node.getJoinType();
@@ -169,11 +172,11 @@ public class LookupJoinOperator extends MultiStageOperator {
       PrimaryKey key = getKey(leftRow);
       Object[] rightRow = _rightTable.lookupValues(key, _rightColumns);
       if (rightRow != null) {
-        // TODO: Optimize this to avoid unnecessary object copy.
-        Object[] resultRow = joinRow(leftRow, rightRow);
+        List<Object> resultRow = JoinedRowView.of(leftRow, rightRow, _resultColumnSize, _leftColumnSize);
         if (_nonEquiEvaluators.isEmpty() || _nonEquiEvaluators.stream()
             .allMatch(evaluator -> BooleanUtils.isTrueInternalValue(evaluator.apply(resultRow)))) {
-          rows.add(resultRow);
+          // defer copying of the content until row matches
+          rows.add(resultRow.toArray());
           continue;
         }
       }

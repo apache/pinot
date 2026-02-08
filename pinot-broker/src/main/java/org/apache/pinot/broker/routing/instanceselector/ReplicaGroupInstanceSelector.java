@@ -247,12 +247,15 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       // NOTE: onlineInstances is either a TreeSet or an EmptySet (sorted)
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+
       Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
-      for (String instance : onlineInstances) {
-        if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance)));
+      int idealStateReplicaId = 0;
+      for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
+        if (onlineInstances.contains(instance) && !unavailableInstances.contains(instance)) {
+          candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance), idealStateReplicaId));
         }
+        idealStateReplicaId++;
       }
       _oldSegmentCandidatesMap.put(segment, candidates);
     }
@@ -261,13 +264,18 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       String segment = entry.getKey();
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Map<String, String> sortedIdealStateInstanceStateMap = convertToSortedMap(idealStateInstanceStateMap);
+
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Collections.emptySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-      for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
+      int idealStateReplicaId = 0;
+      for (String instance : sortedIdealStateInstanceStateMap.keySet()) {
         if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance)));
+          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance),
+              idealStateReplicaId));
         }
+        idealStateReplicaId++;
       }
       _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));
     }
