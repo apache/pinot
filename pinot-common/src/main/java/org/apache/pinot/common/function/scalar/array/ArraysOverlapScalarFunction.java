@@ -38,7 +38,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-@ScalarFunction(names = {"ARRAYS_OVERLAP", "ARRAYSOVERLAP"})
+@ScalarFunction(names = {"ARRAYS_OVERLAP"})
 public class ArraysOverlapScalarFunction implements PinotScalarFunction {
 
   private static final Map<DataSchema.ColumnDataType, FunctionInfo>

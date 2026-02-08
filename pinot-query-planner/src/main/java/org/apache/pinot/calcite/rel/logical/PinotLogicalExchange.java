@@ -72,7 +72,12 @@ public class PinotLogicalExchange extends Exchange {
 
   public static PinotLogicalExchange create(RelNode input, RelDistribution distribution,
       PinotRelExchangeType exchangeType) {
-    return create(input, distribution, exchangeType, distribution.getKeys(), null);
+    return create(input, distribution, exchangeType, null);
+  }
+
+  public static PinotLogicalExchange create(RelNode input, RelDistribution distribution,
+      PinotRelExchangeType exchangeType, @Nullable Boolean prePartitioned) {
+    return create(input, distribution, exchangeType, distribution.getKeys(), prePartitioned);
   }
 
   public static PinotLogicalExchange create(RelNode input, RelDistribution distribution,

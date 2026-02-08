@@ -193,7 +193,7 @@ public final class TableConfigUtils {
     validateTaskConfig(tableConfig);
 
     if (_enforcePoolBasedAssignment) {
-      validateInstancePoolsNReplicaGroups(tableConfig);
+      validateInstancePoolsAndReplicaGroups(tableConfig);
     }
   }
 
@@ -221,7 +221,17 @@ public final class TableConfigUtils {
     return status;
   }
 
-  public static void validateInstancePoolsNReplicaGroups(TableConfig tableConfig) {
+  public static void validateInstancePoolsAndReplicaGroups(TableConfig tableConfig) {
+    // Instance pools / replica groups aren't relevant for dimension tables
+    if (tableConfig.isDimTable()) {
+      return;
+    }
+    // If the table is set up to point to a pre-existing instance partitions (like that of a reference table to support
+    // colocated joins), we don't need to validate instance pools and replica groups since that check should be done on
+    // the reference source.
+    if (tableConfig.getInstancePartitionsMap() != null) {
+      return;
+    }
     Preconditions.checkState(isTableUsingInstancePoolAndReplicaGroup(tableConfig),
         "Instance pool and replica group configurations must be enabled");
   }
@@ -871,6 +881,18 @@ public final class TableConfigUtils {
         Preconditions.checkState(upsertConfig.getNewSegmentTrackingTimeMs() > 0,
             "Positive newSegmentTrackingTimeMs is required to enable consistency mode: "
                 + upsertConfig.getConsistencyMode());
+        // dropOutOfOrderRecord and outOfOrderRecordColumn are not supported with SYNC/SNAPSHOT consistency mode
+        // because records must be indexed before metadata is updated. By the time we know if a record is
+        // out-of-order, it's already indexed - As of today, we can't skip indexing or update the
+        // out-of-order column value.
+        Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
+            "dropOutOfOrderRecord cannot be enabled when consistencyMode is %s. "
+                + "Out-of-order records can only be dropped in NONE consistency mode.",
+            upsertConfig.getConsistencyMode());
+        Preconditions.checkState(upsertConfig.getOutOfOrderRecordColumn() == null,
+            "outOfOrderRecordColumn cannot be configured when consistencyMode is %s. "
+                + "Out-of-order record marking is only supported in NONE consistency mode.",
+            upsertConfig.getConsistencyMode());
       }
     }
 
@@ -881,6 +903,18 @@ public final class TableConfigUtils {
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
     validateTTLForDedupConfig(tableConfig, schema);
+  }
+
+  /**
+   * Checks if a data type is valid for time-based comparison operations (upsert/dedup).
+   * Valid types include numeric types and types with stored data as a numeric type:
+   *   e.g. TIMESTAMP which is stored as LONG internally.
+   *
+   * @param dataType the data type to check
+   * @return true if the data type can be used for time-based comparison, false otherwise
+   */
+  private static boolean isValidTimeComparisonType(DataType dataType) {
+    return dataType.isNumeric() || dataType.getStoredType().isNumeric();
   }
 
   /**
@@ -899,15 +933,15 @@ public final class TableConfigUtils {
           "MetadataTTL / DeletedKeysTTL does not work with multiple comparison columns");
       String comparisonColumn = comparisonColumns.get(0);
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s",
+          comparisonColumn, comparisonColumnDataType);
     } else {
       String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
+          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s",
+          comparisonColumn, comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
@@ -935,14 +969,15 @@ public final class TableConfigUtils {
     String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
     if (dedupTimeColumn != null && !dedupTimeColumn.isEmpty()) {
       DataType comparisonColumnDataType = schema.getFieldSpecFor(dedupTimeColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+      Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
           "MetadataTTL must have dedupTimeColumn: %s in numeric type, found: %s", dedupTimeColumn,
           comparisonColumnDataType);
     } else {
       String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType timeColumnDataType = schema.getFieldSpecFor(timeColumn).getDataType();
-      Preconditions.checkState(timeColumnDataType.isNumeric(),
-          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn, timeColumnDataType);
+      Preconditions.checkState(isValidTimeComparisonType(timeColumnDataType),
+          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn,
+          timeColumnDataType);
     }
     if (tableConfig.getTierConfigsList() != null) {
       validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
@@ -1222,6 +1257,9 @@ public final class TableConfigUtils {
       for (FieldConfig fieldConfig : fieldConfigs) {
         String column = fieldConfig.getName();
         Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
+
+        // Validate DELTA / DELTADELTA compression codecs compatibility
+        validateGorillaCompressionCodecIfPresent(fieldConfig, schema.getFieldSpecFor(column));
       }
       validateIndexingConfigAndFieldConfigListCompatibility(indexingConfig, fieldConfigs);
     }
@@ -1581,9 +1619,22 @@ public final class TableConfigUtils {
     }
   }
 
-  public static boolean checkForPartialUpsertWithReplicas(TableConfig tableConfig) {
-    return tableConfig != null && tableConfig.getReplication() > 1 && tableConfig.getUpsertConfig() != null
-        && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL;
+  /**
+   * Checks if the table config has inconsistent state configurations that could cause
+   * data inconsistency during force commit/reload operations.
+   *
+   * @param tableConfig the table config to check, may be null
+   * @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
+   */
+  public static boolean checkForInconsistentStateConfigs(@Nullable TableConfig tableConfig) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig == null) {
+      return false;
+    }
+    return tableConfig.getReplication() > 1 && (
+        upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL
+            || (upsertConfig.isDropOutOfOrderRecord()
+            && upsertConfig.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
   }
 
   // enum of all the skip-able validation types.
@@ -1893,5 +1944,25 @@ public final class TableConfigUtils {
     Set<String> relevantTenants =
         getRelevantTags(tableConfig).stream().map(TagNameUtils::getTenantFromTag).collect(Collectors.toSet());
     return relevantTenants.contains(tenantName);
+  }
+
+  private static void validateGorillaCompressionCodecIfPresent(FieldConfig fieldConfig, FieldSpec fieldSpec) {
+    if (fieldConfig.getCompressionCodec() == null) {
+      return;
+    }
+    switch (fieldConfig.getCompressionCodec()) {
+      case DELTA:
+      case DELTADELTA:
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "Compression codec %s can only be used on single-value columns, found multi-value column: %s",
+            fieldConfig.getCompressionCodec(), fieldConfig.getName());
+        DataType storedType = fieldSpec.getDataType().getStoredType();
+        Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
+            "Compression codec %s can only be used on INT/LONG data types, found %s for column: %s",
+            fieldConfig.getCompressionCodec(), storedType, fieldConfig.getName());
+        break;
+      default:
+        // no-op for other codecs
+    }
   }
 }

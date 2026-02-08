@@ -95,6 +95,7 @@ public class PluginManager {
       put("org.apache.pinot.filesystem.LocalPinotFS", "org.apache.pinot.spi.filesystem.LocalPinotFS");
 
       // StreamConsumerFactory
+      // Old-style class names mapped to current plugin packages
       put("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
           "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
       put("org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory",
@@ -121,6 +122,7 @@ public class PluginManager {
           put("avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig");
           put("csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig");
           put("protobuf", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig");
+          put("parquet", "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReaderConfig");
           put("thrift", "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig");
         }
       };

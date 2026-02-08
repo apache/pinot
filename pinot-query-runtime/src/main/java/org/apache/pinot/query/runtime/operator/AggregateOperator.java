@@ -256,7 +256,7 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   @Override
-  protected StatMap<?> copyStatMaps() {
+  public StatMap<StatKey> copyStatMaps() {
     return new StatMap<>(_statMap);
   }
 
@@ -351,7 +351,9 @@ public class AggregateOperator extends MultiStageOperator {
       List<Object[]> rows = block.asRowHeap().getRows();
       int numRows = rows.size();
       for (int rowId = 0; rowId < numRows; rowId++) {
-        if ((int) rows.get(rowId)[filterArgId] == 1) {
+        // Treat NULL filter values as non-matching (SQL WHERE clause semantics).
+        Object filterValue = rows.get(rowId)[filterArgId];
+        if (filterValue != null && (int) filterValue == 1) {
           matchedBitmap.add(rowId);
         }
       }

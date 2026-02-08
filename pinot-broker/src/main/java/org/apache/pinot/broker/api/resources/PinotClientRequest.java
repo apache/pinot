@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.io.CountingOutputStream;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -69,6 +70,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -82,6 +84,7 @@ import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -155,7 +158,7 @@ public class PinotClientRequest {
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -192,7 +195,7 @@ public class PinotClientRequest {
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
               getCursor, numRows);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -205,6 +208,41 @@ public class PinotClientRequest {
                   .status(Response.Status.INTERNAL_SERVER_ERROR)
                   .entity(e.getMessage())
                   .build()));
+    }
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query/sql/queryFingerprint")
+  @ApiOperation(value = "Generate query fingerprint for a SQL query",
+      notes = "Returns the query fingerprint containing queryHash and normalized fingerprint string. "
+          + "Supports both single-stage and multi-stage queries.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Query fingerprint"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  @ManualAuthorization
+  public Response getQueryFingerprint(String query,
+      @Context org.glassfish.grizzly.http.server.Request requestContext,
+      @Context HttpHeaders httpHeaders) {
+    try {
+      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      if (!requestJson.has(Request.SQL)) {
+        throw new IllegalStateException("Payload is missing the query string field 'sql'");
+      }
+
+      QueryFingerprint fingerprint = generateQueryFingerprint((ObjectNode) requestJson);
+
+      return Response.ok(fingerprint).build();
+    } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
+      throw wae;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while generating query fingerprint for POST request", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("{\"error\": \"" + e.getMessage() + "\"}")
+          .build();
     }
   }
 
@@ -228,7 +266,7 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -265,7 +303,7 @@ public class PinotClientRequest {
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
               getCursor, numRows);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -287,14 +325,30 @@ public class PinotClientRequest {
   @Path("query/timeseries")
   @ApiOperation(value = "Query Pinot using the Time Series Engine")
   @ManualAuthorization
-  public void processTimeSeriesQueryEngine(Map<String, String> queryParams, @Suspended AsyncResponse asyncResponse,
+  public void processTimeSeriesQueryEngine(JsonNode requestJson, @Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestCtx, @Context HttpHeaders httpHeaders) {
     try {
-      if (!queryParams.containsKey(Request.QUERY)) {
+      if (!requestJson.has(Request.QUERY)) {
         throw new IllegalStateException("Payload is missing the query string field 'query'");
       }
-      String language = queryParams.get(Request.LANGUAGE);
-      String queryString = queryParams.get(Request.QUERY);
+      String language = requestJson.has(Request.LANGUAGE) ? requestJson.get(Request.LANGUAGE).asText() : null;
+      String queryString = requestJson.get(Request.QUERY).asText();
+      Map<String, String> queryParams = new HashMap<>();
+      requestJson.fields().forEachRemaining(entry -> {
+          if (entry.getValue().isTextual()) {
+            queryParams.put(entry.getKey(), entry.getValue().asText());
+          } else {
+            queryParams.put(entry.getKey(), entry.getValue().toString());
+          }
+      });
+
+      if (isExplainMode(requestJson)) {
+        BrokerResponse explainResponse = _requestHandler.handleExplainTimeSeriesRequest(language, queryString,
+          queryParams);
+        asyncResponse.resume(explainResponse);
+        return;
+      }
+
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         TimeSeriesBlock timeSeriesBlock = executeTimeSeriesQuery(language, queryString, queryParams,
             requestContext, makeHttpIdentity(requestCtx), httpHeaders);
@@ -565,11 +619,37 @@ public class PinotClientRequest {
     }
   }
 
+  private QueryFingerprint generateQueryFingerprint(ObjectNode sqlRequestJson) throws Exception {
+    SqlNodeAndOptions sqlNodeAndOptions;
+    try {
+      sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
+    } catch (Exception e) {
+      throw new Exception("SQL parsing failed: " + e.getMessage(), e);
+    }
+
+    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
+    if (sqlType != PinotSqlType.DQL) {
+      throw new Exception("Only DQL queries are supported for fingerprinting, got: " + sqlType);
+    }
+
+    QueryFingerprint fingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+
+    if (fingerprint == null) {
+      throw new Exception("Failed to generate query fingerprint");
+    }
+
+    return fingerprint;
+  }
+
   private TimeSeriesBlock executeTimeSeriesQuery(String language, String queryString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
       HttpHeaders httpHeaders) throws QueryException {
     return _requestHandler.handleTimeSeriesRequest(language, queryString, queryParams, requestContext,
         requesterIdentity, httpHeaders);
+  }
+
+  private static boolean isExplainMode(JsonNode requestJson) {
+    return requestJson.has("mode") && "explain".equalsIgnoreCase(requestJson.get("mode").asText());
   }
 
   public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
@@ -587,20 +667,35 @@ public class PinotClientRequest {
    * Generate Response object from the BrokerResponse object with 'X-Pinot-Error-Code' header value
    *
    * If the query is successful the 'X-Pinot-Error-Code' header value is set to -1
-   * otherwise, the first error code of the broker response exception array will become the header value
+   * otherwise, the first error code of the broker response exception array will become the header value.
    *
-   * @param brokerResponse
+   * By default, returns HTTP 200 OK even for errors. If the request header
+   * 'Pinot-Use-Http-Status-For-Errors' is set to 'true', returns appropriate HTTP status
+   * codes based on the error type from QueryErrorCode.getHttpResponseStatus().
+   *
+   * @param brokerResponse The broker response containing query results or errors
+   * @param httpHeaders The HTTP headers from the request
    * @return Response
    * @throws Exception
    */
   @VisibleForTesting
-  public static Response getPinotQueryResponse(BrokerResponse brokerResponse)
+  public static Response getPinotQueryResponse(BrokerResponse brokerResponse, HttpHeaders httpHeaders,
+      BrokerMetrics brokerMetrics)
       throws Exception {
     int queryErrorCodeHeaderValue = -1; // default value of the header.
+    Response.Status httpStatus = Response.Status.OK;
+
     List<QueryProcessingException> exceptions = brokerResponse.getExceptions();
     if (!exceptions.isEmpty()) {
       // set the header value as first exception error code value.
       queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
+
+      // Check if the client wants actual HTTP error codes instead of 200 OK
+      if (Boolean.parseBoolean(httpHeaders.getHeaderString(
+          CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER))) {
+        QueryErrorCode queryErrorCode = QueryErrorCode.fromErrorCode(queryErrorCodeHeaderValue);
+        httpStatus = queryErrorCode.getHttpResponseStatus();
+      }
 
       // do log with the exception flagged with a particular marker for filtering
       MDC.put("queryErrorCode", Integer.toString(queryErrorCodeHeaderValue));
@@ -613,10 +708,15 @@ public class PinotClientRequest {
       MDC.remove("queryErrorCode");
     }
 
-    // returning the Response with OK status and header value.
-    return Response.ok()
+    // returning the Response with appropriate status and header value.
+    return Response.status(httpStatus)
         .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
-        .entity((StreamingOutput) brokerResponse::toOutputStream).type(MediaType.APPLICATION_JSON)
+        .type(MediaType.APPLICATION_JSON)
+        .entity((StreamingOutput) outputStream -> {
+          CountingOutputStream countingOutputStream = new CountingOutputStream(outputStream);
+          brokerResponse.toOutputStream(countingOutputStream);
+          brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES, countingOutputStream.getCount());
+        })
         .build();
   }
 

@@ -64,6 +64,7 @@ import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
@@ -81,7 +82,6 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -801,7 +801,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         failedSegments.add(segmentName);
         sampleException.set(t);
         if (reloadJobId != null) {
-          _reloadJobStatusCache.getOrCreate(reloadJobId).incrementAndGetFailureCount();
+          _reloadJobStatusCache.recordFailure(reloadJobId, segmentName, t);
         }
       }
     }, _segmentReloadRefreshExecutor)).toArray(CompletableFuture[]::new)).get();
@@ -819,18 +819,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-        // For partial upsert tables, force-committing consuming segments is disabled.
-        // In some cases (especially when replication > 1), the server with fewer consumed rows
-        // was incorrectly chosen as the winner, causing other servers to reconsume rows
-        // and leading to inconsistent data.
-        // TODO: Temporarily disabled until a proper fix is implemented.
+        // Force-committing consuming segments is enabled by default.
+        // For partial-upsert tables or upserts with out-of-order events enabled (notably when replication > 1),
+        // winner selection could incorrectly favor replicas with fewer consumed rows.
+        // This triggered unnecessary reconsumption and resulted in inconsistent upsert state.
+        // The new fix restores and correct segment metadata after inconsistencies are noticed.
+        // To toggle, existing Force commit behavior dynamically use the cluster config
+        // `pinot.server.upsert.force.commit.reload` without restarting servers.
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-        if (TableConfigUtils.checkForPartialUpsertWithReplicas(tableConfig)) {
-          _logger.warn("Skipping reload (force committing) on consuming segment: {} for a Partial Upsert Table with "
-              + "replication > 1", segmentName);
-        } else {
+        UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
+        if (tableConfig != null && config.isForceCommitReloadAllowed(tableConfig)) {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
           ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+        } else {
+          _logger.warn("Skipping reload (force commit) on consuming segment: {} due to inconsistent state config. "
+              + "Control via cluster config: {}", segmentName, config.getConfigKey());
         }
       } else {
         _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
@@ -1338,6 +1341,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         IndexSegment segment = segmentDataManager.getSegment();
         if (segment instanceof ImmutableSegmentImpl) {
           ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+          indexLoadingConfig.setSegmentTier(immutableSegment.getTier());
           if (immutableSegment.isReloadNeeded(indexLoadingConfig)) {
             needReload = true;
             break;
@@ -1655,8 +1659,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
   }
 
+  // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
+  // useDataCRC.
   private static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
-    return zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc());
+    if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
+      return true;
+    }
+    return zkMetadata.isUseDataCrc()
+            && zkMetadata.getDataCrc() >= 0
+            && Long.parseLong(localMetadata.getDataCrc()) >= 0
+            && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
   }
 
   private static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {

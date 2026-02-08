@@ -78,6 +78,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private String _segmentName;
   private final Schema _schema;
   private long _crc = Long.MIN_VALUE;
+  private long _dataCrc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
   private long _zkCreationTime = Long.MIN_VALUE;  // ZooKeeper creation time for upsert consistency
   private String _timeColumn;
@@ -189,10 +190,15 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private void loadCreationMeta(File crcFile)
       throws IOException {
     if (crcFile.exists()) {
-      final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
-      _crc = ds.readLong();
-      _creationTime = ds.readLong();
-      ds.close();
+      try (DataInputStream ds = new DataInputStream(new FileInputStream(crcFile))) {
+        _crc = ds.readLong();
+        _creationTime = ds.readLong();
+        try {
+          _dataCrc = ds.readLong();
+        } catch (IOException e) {
+          LOGGER.debug("Could not find data crc, falling back to default LONG_MIN value");
+        }
+      }
     }
   }
 
@@ -201,6 +207,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     try (DataInputStream ds = new DataInputStream(crcFileInputStream)) {
       _crc = ds.readLong();
       _creationTime = ds.readLong();
+      try {
+        _dataCrc = ds.readLong();
+      } catch (IOException e) {
+        LOGGER.debug("Could not find data crc, falling back to default LONG_MIN value");
+      }
     }
   }
 
@@ -364,6 +375,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
+  public String getDataCrc() {
+    return String.valueOf(_dataCrc);
+  }
+
+  @Override
   public SegmentVersion getVersion() {
     return _segmentVersion;
   }
@@ -467,6 +483,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     segmentMetadata.put("segmentName", _segmentName);
     segmentMetadata.put("schemaName", _schema != null ? _schema.getSchemaName() : null);
     segmentMetadata.put("crc", _crc);
+    if (_dataCrc != Long.MIN_VALUE) {
+      segmentMetadata.put("dataCrc", _dataCrc);
+    }
     segmentMetadata.put("creationTimeMillis", _creationTime);
     TimeZone timeZone = TimeZone.getTimeZone("UTC");
     DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");

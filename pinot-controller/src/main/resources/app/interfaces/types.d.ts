@@ -24,6 +24,11 @@ declare module 'Models' {
     component?: JSX.Element
   }
 
+  export type InstanceStatusCell = {
+    value: InstanceStatus,
+    tooltip: string,
+  }
+
   export type LoadingRecord = {
     customRenderer: JSX.Element
   }
@@ -72,6 +77,7 @@ declare module 'Models' {
     queryServicePort: number;
     queryMailboxPort: number;
     queriesDisabled: boolean;
+    shutdownInProgress?: boolean;
     tags: Array<string>;
     pools?: string;
   };
@@ -213,7 +219,7 @@ declare module 'Models' {
     numEntriesScannedPostFilter: number
     numGroupsLimitReached: boolean
     numGroupsWarningLimitReached: boolean
-    partialResponse?: number
+    partialResult?: boolean
     minConsumingFreshnessTimeMs: number
     offlineThreadCpuTimeNs: number
     realtimeThreadCpuTimeNs: number
@@ -404,6 +410,14 @@ declare module 'Models' {
   export const enum InstanceState {
     ENABLE = "enable",
     DISABLE = "disable"
+  }
+
+  export const enum InstanceStatus {
+    DEAD = "Dead",
+    UNHEALTHY = "Unhealthy",
+    INSTANCE_DISABLED = "Disabled",
+    QUERIES_DISABLED = "Queries Disabled",
+    HEALTHY = "Healthy",
   }
 
   export const enum InstanceType {

@@ -46,12 +46,12 @@ public class MaxValueAggregator implements ValueAggregator<Object, Double> {
     if (rawValue == null) {
       return Double.NEGATIVE_INFINITY;
     }
-    return ValueAggregatorUtils.toDouble(rawValue, sourceDataType);
+    return processRawValue(rawValue, sourceDataType);
   }
 
   @Override
   public Double applyRawValue(Double value, Object rawValue, @Nullable DataType sourceDataType) {
-    return Math.max(value, ValueAggregatorUtils.toDouble(rawValue, sourceDataType));
+    return Math.max(value, processRawValue(rawValue, sourceDataType));
   }
 
   @Override
@@ -87,5 +87,22 @@ public class MaxValueAggregator implements ValueAggregator<Object, Double> {
   @Override
   public Double deserializeAggregatedValue(byte[] bytes) {
     throw new UnsupportedOperationException();
+  }
+
+  protected Double processRawValue(Object rawValue) {
+    return processRawValue(rawValue, null);
+  }
+
+  protected Double processRawValue(Object rawValue, @Nullable DataType sourceDataType) {
+    if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      double max = Double.NEGATIVE_INFINITY;
+      for (Object value : values) {
+        max = Math.max(max, ValueAggregatorUtils.toDouble(value, sourceDataType));
+      }
+      return max;
+    } else {
+      return ValueAggregatorUtils.toDouble(rawValue, sourceDataType);
+    }
   }
 }

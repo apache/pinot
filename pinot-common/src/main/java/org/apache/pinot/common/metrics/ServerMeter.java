@@ -19,6 +19,7 @@
 package org.apache.pinot.common.metrics;
 
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.PinotMeter;
 
 
 /**
@@ -55,6 +56,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
   STREAM_CONSUMER_CREATE_EXCEPTIONS("exceptions", false),
   REALTIME_ROWS_AHEAD_OF_ZK("rows", false),
+  REALTIME_UPSERT_INCONSISTENT_ROWS("rows", false),
   // number of times partition of a record did not match the partition of the stream
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
@@ -245,7 +247,24 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   TRANSFORMATION_ERROR_COUNT("rows", false),
   DROPPED_RECORD_COUNT("rows", false),
-  CORRUPTED_RECORD_COUNT("rows", false);
+  CORRUPTED_RECORD_COUNT("rows", false),
+
+  /// Number of multi-stage execution opchains started.
+  /// This is equal to the number of stages times the average parallelism
+  MSE_OPCHAINS_STARTED("opchains", true),
+  /// Number of multi-stage execution opchains completed.
+  /// This is equal to the number of stages times the average parallelism
+  MSE_OPCHAINS_COMPLETED("opchains", true),
+
+  /// Total execution time spent in multi-stage execution on CPU in milliseconds.
+  /// This is equal to the sum of the executionTimeMs reported by the root of all the opchains executed in the server.
+  MSE_CPU_EXECUTION_TIME_MS("milliseconds", true),
+  /// Total memory allocated in bytes for multi-stage execution.
+  /// This is equal to the sum of the allocatedMemoryBytes reported by all the opchains executed in the server.
+  MSE_MEMORY_ALLOCATED_BYTES("bytes", true),
+  /// Total number of rows emitted by multi-stage execution.
+  /// This is equal to the sum of the emittedRows reported by the root of all the opchains executed in the server.
+  MSE_EMITTED_ROWS("rows", true);
 
   private final String _meterName;
   private final String _unit;
@@ -286,5 +305,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   @Override
   public String getDescription() {
     return _description;
+  }
+
+  public PinotMeter getGlobalMeter() {
+    return ServerMetrics.get().getMeteredValue(this);
   }
 }

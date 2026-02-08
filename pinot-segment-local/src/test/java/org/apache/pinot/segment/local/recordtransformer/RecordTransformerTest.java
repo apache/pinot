@@ -164,6 +164,20 @@ public class RecordTransformerTest {
       // expected
     }
 
+    // invalid function at runtime
+    ingestionConfig.setFilterConfig(new FilterConfig("svInt = 'abc'"));
+    transformer = new FilterTransformer(tableConfig);
+    try {
+      transformer.transform(List.of(genericRow));
+      fail("Should have failed executing function");
+    } catch (Exception e) {
+      // expected
+    }
+    ingestionConfig.setContinueOnError(true);
+    transformer = new FilterTransformer(tableConfig);
+    assertFalse(transformer.transform(List.of(genericRow)).isEmpty());
+    assertEquals(transformer.getNumRecordsFiltered(), 0);
+
     // multi value column
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({svFloat.max() < 500}, svFloat)"));
     transformer = new FilterTransformer(tableConfig);

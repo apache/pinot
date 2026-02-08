@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -34,6 +35,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -124,7 +126,7 @@ public class WorkerManager {
       // TODO: Revisit this logic and see if we can generalize this
       // For LOOKUP join, join is leaf stage because there is no exchange added to the right side of the join. When we
       // find a single local exchange child in the leaf stage, assign workers based on the local exchange child.
-      if (children.size() == 1 && isLocalExchange(children.get(0), context)) {
+      if (isLookupJoin(children)) {
         DispatchablePlanMetadata childMetadata = metadataMap.get(children.get(0).getFragmentId());
         Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = assignWorkersForLocalExchange(childMetadata);
         metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
@@ -144,6 +146,20 @@ public class WorkerManager {
     } else {
       assignWorkersToIntermediateFragment(fragment, context);
     }
+  }
+
+  private boolean isLookupJoin(List<PlanFragment> children) {
+    if (children.size() != 1) {
+      return false;
+    }
+    PlanNode planNode = children.get(0).getFragmentRoot();
+    if (!(planNode instanceof MailboxSendNode)) {
+      return false;
+    }
+    MailboxSendNode mailboxSendNode = (MailboxSendNode) planNode;
+    // NOTE: Exclude colocated semi-join which also contains a single SINGLETON exchange.
+    return mailboxSendNode.getDistributionType() == RelDistribution.Type.SINGLETON
+        && mailboxSendNode.getExchangeType() != PinotRelExchangeType.PIPELINE_BREAKER;
   }
 
   private boolean isLocalExchange(PlanFragment fragment, DispatchablePlanContext context) {
@@ -241,6 +257,10 @@ public class WorkerManager {
     List<QueryServerInstance> candidateServers = null;
     if (workerIdToServerInstanceMap == null) {
       candidateServers = getCandidateServers(context);
+      // Sort to ensure deterministic worker ID assignment across stages.
+      // This is critical for pre-partitioned exchanges where worker ID N on one stage should to the same physical
+      // server as worker ID N on another stage.
+      candidateServers.sort(Comparator.comparing(QueryServerInstance::getInstanceId));
       int stageParallelism = Integer.parseInt(
           context.getPlannerContext().getOptions().getOrDefault(QueryOptionKey.STAGE_PARALLELISM, "1"));
       workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(candidateServers.size() * stageParallelism);
@@ -341,8 +361,22 @@ public class WorkerManager {
     List<QueryServerInstance> candidateServers;
     if (context.isUseLeafServerForIntermediateStage()) {
       Set<QueryServerInstance> leafServerInstances = context.getLeafServerInstances();
-      assert !leafServerInstances.isEmpty();
-      candidateServers = new ArrayList<>(leafServerInstances);
+      if (leafServerInstances.isEmpty()) {
+        // Fall back to use all enabled servers if no leaf server is found (e.g., when querying an empty table).
+        LOGGER.warn("[RequestId: {}] No leaf server found with useLeafServerForIntermediateStage enabled, "
+            + "falling back to all enabled servers", context.getRequestId());
+        Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
+        candidateServers = new ArrayList<>(enabledServerInstanceMap.size());
+        for (ServerInstance serverInstance : enabledServerInstanceMap.values()) {
+          candidateServers.add(new QueryServerInstance(serverInstance));
+        }
+        if (candidateServers.isEmpty()) {
+          LOGGER.error("[RequestId: {}] No server instance found for intermediate stage", context.getRequestId());
+          throw new IllegalStateException("No server instance found for intermediate stage");
+        }
+      } else {
+        candidateServers = new ArrayList<>(leafServerInstances);
+      }
     } else {
       candidateServers = getCandidateServersPerTables(context);
     }
@@ -486,14 +520,28 @@ public class WorkerManager {
         metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
       }
     }
-    int workerId = 0;
-    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
-    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
-    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : serverInstanceToSegmentsMap.entrySet()) {
-      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
-      workerIdToSegmentsMap.put(workerId, entry.getValue());
-      workerId++;
+    // Sort server instances to ensure deterministic worker ID assignment.
+    // This is critical for pre-partitioned exchanges where worker ID N on one stage
+    // must map to the same physical server as worker ID N on another stage.
+    List<Map.Entry<ServerInstance, Map<String, List<String>>>> sortedServerInstanceToSegmentsMap =
+        new ArrayList<>(serverInstanceToSegmentsMap.entrySet());
+    sortedServerInstanceToSegmentsMap.sort(Comparator.comparing(entry -> entry.getKey().getInstanceId()));
+
+    // Assign 1 worker per server
+    int numWorkers = sortedServerInstanceToSegmentsMap.size();
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
+    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numWorkers);
+
+    for (int workerId = 0; workerId < numWorkers; workerId++) {
+      Map.Entry<ServerInstance, Map<String, List<String>>> serverEntry =
+          sortedServerInstanceToSegmentsMap.get(workerId);
+      QueryServerInstance server = new QueryServerInstance(serverEntry.getKey());
+      Map<String, List<String>> segmentsMap = serverEntry.getValue();
+
+      workerIdToServerInstanceMap.put(workerId, server);
+      workerIdToSegmentsMap.put(workerId, segmentsMap);
     }
+
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
   }
@@ -641,14 +689,27 @@ public class WorkerManager {
       }
     }
 
-    int workerId = 0;
-    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
-    Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
-    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry
-        : serverInstanceToLogicalSegmentsMap.entrySet()) {
-      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
-      workerIdToLogicalTableSegmentsMap.put(workerId, entry.getValue());
-      workerId++;
+    // Sort server instances to ensure deterministic worker ID assignment.
+    // This is critical for pre-partitioned exchanges where worker ID N on one stage
+    // must map to the same physical server as worker ID N on another stage.
+    List<Map.Entry<ServerInstance, Map<String, List<String>>>> sortedServerInstanceToSegmentsMap =
+        new ArrayList<>(serverInstanceToLogicalSegmentsMap.entrySet());
+    sortedServerInstanceToSegmentsMap.sort(Comparator.comparing(entry -> entry.getKey().getInstanceId()));
+
+    // Assign 1 worker per server
+    int numWorkers = sortedServerInstanceToSegmentsMap.size();
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
+    Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap =
+        Maps.newHashMapWithExpectedSize(numWorkers);
+
+    for (int workerId = 0; workerId < numWorkers; workerId++) {
+      Map.Entry<ServerInstance, Map<String, List<String>>> serverEntry =
+          sortedServerInstanceToSegmentsMap.get(workerId);
+      QueryServerInstance server = new QueryServerInstance(serverEntry.getKey());
+      Map<String, List<String>> segmentsMap = serverEntry.getValue();
+
+      workerIdToServerInstanceMap.put(workerId, server);
+      workerIdToLogicalTableSegmentsMap.put(workerId, segmentsMap);
     }
 
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
@@ -950,7 +1011,7 @@ public class WorkerManager {
       if (!tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty()) {
         throw new IllegalStateException(
             "Find " + tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().size()
-            + " segments with invalid partition");
+                + " segments with invalid partition");
       }
 
       int numPartitions = tablePartitionReplicatedServersInfo.getNumPartitions();

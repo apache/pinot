@@ -80,15 +80,7 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      long[] longValues = blockValSet.getLongValuesSV();
-      QuantileDigest quantileDigest = getDefaultQuantileDigest(aggregationResultHolder);
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          quantileDigest.add(longValues[i]);
-        }
-      });
-    } else {
+    if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized QuantileDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       foldNotNull(length, blockValSet, (QuantileDigest) aggregationResultHolder.getResult(), (quantile, from, toEx) -> {
@@ -107,21 +99,43 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
         }
         return quantileDigest;
       });
+      return;
     }
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(length, aggregationResultHolder, blockValSet);
+    } else {
+      aggregateMV(length, aggregationResultHolder, blockValSet);
+    }
+  }
+
+  protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    long[] longValues = blockValSet.getLongValuesSV();
+    QuantileDigest quantileDigest = getDefaultQuantileDigest(aggregationResultHolder);
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        quantileDigest.add(longValues[i]);
+      }
+    });
+  }
+
+  protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+    QuantileDigest quantileDigest = getDefaultQuantileDigest(aggregationResultHolder);
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (long value : valuesArray[i]) {
+          quantileDigest.add(value);
+        }
+      }
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      long[] longValues = blockValSet.getLongValuesSV();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          getDefaultQuantileDigest(groupByResultHolder, groupKeyArray[i]).add(longValues[i]);
-        }
-      });
-    } else {
+    if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized QuantileDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -136,24 +150,44 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
           }
         }
       });
+      return;
     }
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    }
+  }
+
+  protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    long[] longValues = blockValSet.getLongValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        getDefaultQuantileDigest(groupByResultHolder, groupKeyArray[i]).add(longValues[i]);
+      }
+    });
+  }
+
+  protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        QuantileDigest quantileDigest = getDefaultQuantileDigest(groupByResultHolder, groupKeyArray[i]);
+        for (long value : valuesArray[i]) {
+          quantileDigest.add(value);
+        }
+      }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      long[] longValues = blockValSet.getLongValuesSV();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          long value = longValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            getDefaultQuantileDigest(groupByResultHolder, groupKey).add(value);
-          }
-        }
-      });
-    } else {
+    if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized QuantileDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -171,7 +205,43 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
           }
         }
       });
+      return;
     }
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    }
+  }
+
+  protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    long[] longValues = blockValSet.getLongValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        long value = longValues[i];
+        for (int groupKey : groupKeysArray[i]) {
+          getDefaultQuantileDigest(groupByResultHolder, groupKey).add(value);
+        }
+      }
+    });
+  }
+
+  protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    long[][] valuesArray = blockValSet.getLongValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        long[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          QuantileDigest quantileDigest = getDefaultQuantileDigest(groupByResultHolder, groupKey);
+          for (long value : values) {
+            quantileDigest.add(value);
+          }
+        }
+      }
+    });
   }
 
   @Override

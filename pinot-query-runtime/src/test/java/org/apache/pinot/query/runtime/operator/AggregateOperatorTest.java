@@ -186,6 +186,34 @@ public class AggregateOperatorTest {
   }
 
   @Test
+  public void testFilteredAggregateWithNullValues() {
+    // Given:
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(getSum(new RexExpression.InputRef(1)), getSum(new RexExpression.InputRef(1)));
+    List<Integer> filterArgs = List.of(-1, 2);
+    List<Integer> groupKeys = List.of(0);
+    DataSchema inSchema =
+        new DataSchema(new String[]{"group", "arg", "filterArg"}, new ColumnDataType[]{INT, DOUBLE, BOOLEAN});
+    // null for the filterArg should be treated as false
+    when(_input.nextBlock()).thenReturn(
+            OperatorTestUtil.block(inSchema, new Object[]{2, 1.0, null}, new Object[]{2, 2.0, 1}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 3.0, 1}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "sum", "sumWithFilter"}, new ColumnDataType[]{INT, DOUBLE, DOUBLE});
+    AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{2, 6.0, 5.0},
+        "Expected three columns (group by key, agg value, agg value with filter), agg value is final result");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
   public void testGroupByAggregateWithHashCollision() {
     _input = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
 

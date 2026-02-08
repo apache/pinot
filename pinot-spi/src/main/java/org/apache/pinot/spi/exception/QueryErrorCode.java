@@ -19,8 +19,10 @@
 package org.apache.pinot.spi.exception;
 
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
 import javax.annotation.Nonnegative;
+import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,43 +31,61 @@ import org.slf4j.LoggerFactory;
 /// When updated, remember to update Query.tsx in pinot-ui as well.
 public enum QueryErrorCode {
   /// Request in JSON format is incorrect. For example, doesn't contain the expected 'sql' field.
-  JSON_PARSING(100, "JsonParsingError"),
+  JSON_PARSING(100, "JsonParsingError", Response.Status.BAD_REQUEST),
   /// Error detected at parsing time. For example, syntax error.
-  SQL_PARSING(150, "SQLParsingError"),
-  TIMESERIES_PARSING(155, "TimeseriesParsingError"),
-  SQL_RUNTIME(160, "SQLRuntimeError"),
-  ACCESS_DENIED(180, "AccessDenied"),
-  TABLE_DOES_NOT_EXIST(190, "TableDoesNotExistError"),
-  TABLE_IS_DISABLED(191, "TableIsDisabledError"),
+  SQL_PARSING(150, "SQLParsingError", Response.Status.BAD_REQUEST),
+  TIMESERIES_PARSING(155, "TimeseriesParsingError", Response.Status.BAD_REQUEST),
+  SQL_RUNTIME(160, "SQLRuntimeError", Response.Status.INTERNAL_SERVER_ERROR),
+  ACCESS_DENIED(180, "AccessDenied", Response.Status.FORBIDDEN),
+  TABLE_DOES_NOT_EXIST(190, "TableDoesNotExistError", Response.Status.NOT_FOUND),
+  TABLE_IS_DISABLED(191, "TableIsDisabledError", Response.Status.NOT_FOUND),
   /// Error at query execution time. For example, String column cast to int when contains a non-integer value.
-  QUERY_EXECUTION(200, "QueryExecutionError"),
-  SERVER_SHUTTING_DOWN(210, "ServerShuttingDown"),
-  SERVER_OUT_OF_CAPACITY(211, "ServerOutOfCapacity"),
-  SERVER_TABLE_MISSING(230, "ServerTableMissing"),
-  SERVER_SEGMENT_MISSING(235, "ServerSegmentMissing"),
-  QUERY_SCHEDULING_TIMEOUT(240, "QuerySchedulingTimeoutError"),
-  SERVER_RESOURCE_LIMIT_EXCEEDED(245, "ServerResourceLimitExceededError"),
-  EXECUTION_TIMEOUT(250, "ExecutionTimeoutError"),
-  BROKER_SEGMENT_UNAVAILABLE(305, ""),
-  BROKER_TIMEOUT(400, "BrokerTimeoutError"),
-  BROKER_RESOURCE_MISSING(410, "BrokerResourceMissingError"),
-  BROKER_INSTANCE_MISSING(420, "BrokerInstanceMissingError"),
-  BROKER_REQUEST_SEND(425, "BrokerRequestSend"),
-  SERVER_NOT_RESPONDING(427, "ServerNotResponding"),
-  TOO_MANY_REQUESTS(429, "TooManyRequests"),
-  WORKLOAD_BUDGET_EXCEEDED(429, "WorkloadBudgetExceededError"),
-  INTERNAL(450, "InternalError"),
-  MERGE_RESPONSE(500, "MergeResponseError"),
-  QUERY_CANCELLATION(503, "QueryCancellationError"),
+  QUERY_EXECUTION(200, "QueryExecutionError", Response.Status.INTERNAL_SERVER_ERROR),
+  SERVER_SHUTTING_DOWN(210, "ServerShuttingDown", Response.Status.SERVICE_UNAVAILABLE),
+  SERVER_OUT_OF_CAPACITY(211, "ServerOutOfCapacity", Response.Status.SERVICE_UNAVAILABLE),
+  SERVER_TABLE_MISSING(230, "ServerTableMissing", Response.Status.NOT_FOUND),
+  SERVER_SEGMENT_MISSING(235, "ServerSegmentMissing", Response.Status.NOT_FOUND),
+  QUERY_SCHEDULING_TIMEOUT(240, "QuerySchedulingTimeoutError", Response.Status.REQUEST_TIMEOUT),
+  SERVER_RESOURCE_LIMIT_EXCEEDED(245, "ServerResourceLimitExceededError", Response.Status.SERVICE_UNAVAILABLE),
+  EXECUTION_TIMEOUT(250, "ExecutionTimeoutError", Response.Status.REQUEST_TIMEOUT),
+  BROKER_SEGMENT_UNAVAILABLE(305, "", Response.Status.SERVICE_UNAVAILABLE),
+  BROKER_TIMEOUT(400, "BrokerTimeoutError", Response.Status.REQUEST_TIMEOUT),
+  BROKER_RESOURCE_MISSING(410, "BrokerResourceMissingError", Response.Status.SERVICE_UNAVAILABLE),
+  BROKER_INSTANCE_MISSING(420, "BrokerInstanceMissingError", Response.Status.SERVICE_UNAVAILABLE),
+  BROKER_REQUEST_SEND(425, "BrokerRequestSend", Response.Status.SERVICE_UNAVAILABLE),
+  SERVER_NOT_RESPONDING(427, "ServerNotResponding", Response.Status.SERVICE_UNAVAILABLE),
+  TOO_MANY_REQUESTS(429, "TooManyRequests", Response.Status.TOO_MANY_REQUESTS),
+  WORKLOAD_BUDGET_EXCEEDED(429, "WorkloadBudgetExceededError", Response.Status.TOO_MANY_REQUESTS),
+  INTERNAL(450, "InternalError", Response.Status.INTERNAL_SERVER_ERROR),
+  MERGE_RESPONSE(500, "MergeResponseError", Response.Status.INTERNAL_SERVER_ERROR),
+  QUERY_CANCELLATION(503, "QueryCancellationError", Response.Status.SERVICE_UNAVAILABLE),
+  REMOTE_CLUSTER_UNAVAILABLE(510, "RemoteClusterUnavailable", Response.Status.SERVICE_UNAVAILABLE),
   /// Error detected at validation time. For example, type mismatch.
-  QUERY_VALIDATION(700, "QueryValidationError"),
-  UNKNOWN_COLUMN(710, "UnknownColumnError"),
+  QUERY_VALIDATION(700, "QueryValidationError", Response.Status.BAD_REQUEST),
+  UNKNOWN_COLUMN(710, "UnknownColumnError", Response.Status.BAD_REQUEST),
   ///  Error while planning the query. For example, trying to run a colocated join on non-colocated tables.
-  QUERY_PLANNING(720, "QueryPlanningError"),
-  UNKNOWN(1000, "UnknownError");
+  QUERY_PLANNING(720, "QueryPlanningError", Response.Status.BAD_REQUEST),
+  UNKNOWN(1000, "UnknownError", Response.Status.INTERNAL_SERVER_ERROR);
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryErrorCode.class);
 
   private static final QueryErrorCode[] BY_ID;
+
+  // Static set of SLA-critical (system) error codes
+  private static final EnumSet<QueryErrorCode> CRITICAL_ERROR_CODES = EnumSet.of(
+      SQL_RUNTIME,
+      INTERNAL,
+      QUERY_SCHEDULING_TIMEOUT,
+      EXECUTION_TIMEOUT,
+      BROKER_TIMEOUT,
+      SERVER_SEGMENT_MISSING,
+      BROKER_SEGMENT_UNAVAILABLE,
+      SERVER_NOT_RESPONDING,
+      BROKER_REQUEST_SEND,
+      MERGE_RESPONSE,
+      QUERY_CANCELLATION,
+      SERVER_SHUTTING_DOWN,
+      QUERY_PLANNING
+  );
 
   static {
     int maxId = -1;
@@ -80,10 +100,16 @@ public enum QueryErrorCode {
   @Nonnegative
   private final int _id;
   private final String _defaultMessage;
+  private final Response.Status _httpResponseStatus;
 
   QueryErrorCode(int errorCode, String defaultMessage) {
+    this(errorCode, defaultMessage, Response.Status.INTERNAL_SERVER_ERROR);
+  }
+
+  QueryErrorCode(int errorCode, String defaultMessage, Response.Status httpResponseStatus) {
     _id = errorCode;
     _defaultMessage = defaultMessage;
+    _httpResponseStatus = httpResponseStatus;
   }
 
   public int getId() {
@@ -92,6 +118,10 @@ public enum QueryErrorCode {
 
   public String getDefaultMessage() {
     return _defaultMessage;
+  }
+
+  public Response.Status getHttpResponseStatus() {
+    return _httpResponseStatus;
   }
 
   /**
@@ -161,5 +191,13 @@ public enum QueryErrorCode {
       default:
         return false;
     }
+  }
+
+  /**
+   * Returns true if the error is considered critical for SLA accounting.
+   * Critical errors represent system-side failures (timeouts, internal errors, infra issues, etc.).
+   */
+  public boolean isCriticalError() {
+    return CRITICAL_ERROR_CODES.contains(this);
   }
 }

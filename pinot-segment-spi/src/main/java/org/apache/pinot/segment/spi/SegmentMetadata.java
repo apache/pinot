@@ -64,6 +64,8 @@ public interface SegmentMetadata {
 
   String getCrc();
 
+  String getDataCrc();
+
   SegmentVersion getVersion();
 
   Schema getSchema();

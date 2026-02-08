@@ -174,6 +174,30 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.CRC, crc);
   }
 
+  public long getDataCrc() {
+    return _znRecord.getLongField(Segment.DATA_CRC, -1);
+  }
+
+  public void setDataCrc(long dataCrc) {
+    setNonNegativeValue(Segment.DATA_CRC, dataCrc);
+  }
+
+  public boolean isUseDataCrc() {
+    String useDataCrcString = _simpleFields.get(Segment.USE_DATA_CRC);
+    return Boolean.parseBoolean(useDataCrcString);
+  }
+
+  // useDataCrc is set for consuming segments in realtime table
+  // that signal replica server to use Data CRC when available for doing any replacement
+  // of segments
+  public void setUseDataCrc(boolean useDataCrc) {
+    if (useDataCrc) {
+      _simpleFields.put(Segment.USE_DATA_CRC, "true");
+    } else {
+      _simpleFields.remove(Segment.USE_DATA_CRC);
+    }
+  }
+
   public String getTier() {
     return _simpleFields.get(Segment.TIER);
   }

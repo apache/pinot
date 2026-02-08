@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -41,6 +42,12 @@ import org.apache.pinot.spi.data.Schema;
 public interface ColumnReaderFactory extends Closeable, Serializable {
 
   /**
+   * Configuration key to enable random access mode for column readers.
+   * When set to "true", implementations may cache data to support non-sequential access patterns.
+   */
+  String CONFIG_ENABLE_RANDOM_ACCESS = "enableRandomAccess";
+
+  /**
    * Initialize the factory with the data source and target schema.
    *
    * @param targetSchema Target schema for the output segment
@@ -48,6 +55,27 @@ public interface ColumnReaderFactory extends Closeable, Serializable {
    */
   void init(Schema targetSchema)
       throws IOException;
+
+  /**
+   * Initialize the factory with the data source, target schema, and specific target columns.
+   * @param targetSchema Target schema for the output segment
+   * @param colsToRead Set of target columns to read
+   * @throws IOException If initialization fails
+   */
+  void init(Schema targetSchema, Set<String> colsToRead)
+      throws IOException;
+
+  /**
+   * Initialize the factory with the data source, target schema, specific columns, and configuration.
+   * @param targetSchema Target schema for the output segment
+   * @param colsToRead Set of target columns to read
+   * @param configs Configuration map for implementation-specific settings
+   * @throws IOException If initialization fails
+   */
+  default void init(Schema targetSchema, Set<String> colsToRead, Map<String, String> configs)
+      throws IOException {
+    init(targetSchema, colsToRead);
+  }
 
   /**
    * Get the set of column names available in the source data.
@@ -61,11 +89,10 @@ public interface ColumnReaderFactory extends Closeable, Serializable {
    * Implementations may cache and reuse readers for efficiency.
    *
    * @param columnName Name of the column to read
+   *                   Can return null if column doesn't exist in the source
    * @return ColumnReader instance for the specified column (may be cached)
-   * @throws IOException If the column reader cannot be obtained
    */
-  ColumnReader getColumnReader(String columnName)
-      throws IOException;
+  @Nullable ColumnReader getColumnReader(String columnName);
 
   /**
    * Get all column readers for the target schema.

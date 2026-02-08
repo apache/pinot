@@ -42,6 +42,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.MailboxInfo;
@@ -272,6 +273,11 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   @Override
   public StringBuilder visitExplained(ExplainedNode node, Context context) {
     return appendInfo(node, context);
+  }
+
+  @Override
+  public StringBuilder visitUnnest(UnnestNode node, Context context) {
+    return visitSimpleNode(node, context);
   }
 
   static class Context {

@@ -62,6 +62,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -4277,6 +4278,49 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
+  /**
+   * Test SQL string literal escaping behavior.
+   *
+   * In SQL, single quotes within string literals are escaped by doubling them:
+   * - 'It''s' represents the string "It's" (2 quotes = 1 quote in result)
+   *
+   * The Calcite parser handles this escaping correctly. This test disables the legacy SSE behavior of double escaping
+   * quotes. With the legacy behavior disabled, both SSE and MSE have the same standard behavior.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStringLiteralEscaping(boolean useMultiStageQueryEngine)
+      throws Exception {
+    RequestUtils.setUseLegacyLiteralUnescaping(false);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test 1: Simple escaped quote (2 quotes in SQL = 1 quote in result)
+    // SQL: 'It''s a test' should result in "It's a test"
+    String query = "SELECT 'It''s a test' FROM mytable LIMIT 1";
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "It's a test");
+
+    // Test 2: String literal in WHERE clause with comparison
+    // Query for carriers where we compare against a literal with escaped quotes
+    // Note: No carrier has quotes in its name, so we just verify the query doesn't error
+    query = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'doesn''t exist'";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asLong(), 0); // No matches expected
+
+    // Test 3: Multiple escaped quotes in same query
+    query = "SELECT 'He said ''''hello'''' and ''goodbye''' FROM mytable LIMIT 1";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty());
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asText(), "He said ''hello'' and 'goodbye'");
+  }
+
   private void reloadAndWait(String tableNameWithType, @Nullable String segmentName) throws Exception {
     String response = (segmentName != null)
         ? reloadOfflineSegment(tableNameWithType, segmentName, true)
@@ -4331,5 +4375,80 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }
     Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAnyValueFunctionality(boolean useMultiStageQueryEngine) throws Exception {
+    // Test 1: Basic ANY_VALUE functionality with GROUP BY
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT Carrier, ANY_VALUE(Origin), COUNT(*) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 5";
+    JsonNode response = postQuery(query);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Should have results");
+
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      assertNotNull(row.get(0).asText(), "Carrier should not be null");
+      assertNotNull(row.get(1).asText(), "ANY_VALUE(Origin) should not be null");
+      assertTrue(row.get(2).asInt() > 0, "COUNT should be greater than 0");
+    }
+
+    // Test 2: ANY_VALUE without GROUP BY - should return single values
+    query = "SELECT ANY_VALUE(Carrier), ANY_VALUE(Origin), COUNT(*) FROM mytable";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1, "Should have 1 row without GROUP BY");
+
+    JsonNode row = rows.get(0);
+    assertNotNull(row.get(0).asText(), "ANY_VALUE(Carrier) should not be null");
+    assertNotNull(row.get(1).asText(), "ANY_VALUE(Origin) should not be null");
+    assertTrue(row.get(2).asInt() > 0, "COUNT should be greater than 0");
+
+    // Test 3: ANY_VALUE with multiple GROUP BY columns
+    query = "SELECT Carrier, Origin, ANY_VALUE(Dest), COUNT(*) FROM mytable"
+        + " GROUP BY Carrier, Origin ORDER BY Carrier, Origin LIMIT 10";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Should have results for multiple GROUP BY");
+
+    for (int i = 0; i < rows.size(); i++) {
+      row = rows.get(i);
+      assertNotNull(row.get(0).asText(), "Carrier should not be null");
+      assertNotNull(row.get(1).asText(), "Origin should not be null");
+      assertNotNull(row.get(2).asText(), "ANY_VALUE(Dest) should not be null");
+      assertTrue(row.get(3).asInt() > 0, "COUNT should be greater than 0");
+    }
+
+    // Test 4: ANY_VALUE with different data types
+    query = "SELECT ANY_VALUE(Carrier) as StringValue, ANY_VALUE(AirlineID) as IntValue,"
+        + " ANY_VALUE(FlightNum) as IntValue2, ANY_VALUE(ArrDelay) as DoubleValue FROM mytable";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1, "Should have 1 row for data types test");
+
+    row = rows.get(0);
+    assertNotNull(row.get(0).asText(), "String ANY_VALUE should not be null");
+    assertTrue(row.get(1).asInt() >= 0, "Int ANY_VALUE should be valid");
+    assertTrue(row.get(2).asInt() >= 0, "Int ANY_VALUE should be valid");
+    // ArrDelay can be negative, so just check it's a valid number
+    assertNotNull(row.get(3), "Double ANY_VALUE should not be null");
+
+    // Test 5: ANY_VALUE in complex query with multiple aggregations
+    query = "SELECT Origin, ANY_VALUE(Carrier) as SampleCarrier, ANY_VALUE(Dest) as SampleDest,"
+        + " COUNT(*) as FlightCount, AVG(ArrDelay) as AvgDelay FROM mytable"
+        + " GROUP BY Origin ORDER BY FlightCount DESC LIMIT 5";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Should have results for complex query");
+
+    for (int i = 0; i < rows.size(); i++) {
+      row = rows.get(i);
+      assertNotNull(row.get(0).asText(), "Origin should not be null");
+      assertNotNull(row.get(1).asText(), "ANY_VALUE(Carrier) should not be null");
+      assertNotNull(row.get(2).asText(), "ANY_VALUE(Dest) should not be null");
+      assertTrue(row.get(3).asInt() > 0, "FlightCount should be positive");
+      // AvgDelay can be negative, so just verify it's a number
+      assertNotNull(row.get(4), "AvgDelay should not be null");
+    }
   }
 }

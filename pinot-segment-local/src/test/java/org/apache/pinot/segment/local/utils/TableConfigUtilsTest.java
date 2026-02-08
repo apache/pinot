@@ -1175,6 +1175,26 @@ public class TableConfigUtilsTest {
 
     try {
       FieldConfig fieldConfig =
+          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, CompressionCodec.DELTADELTA, null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      assertEquals(e.getMessage(),
+          "Compression codec DELTADELTA can only be used on INT/LONG data types, found STRING for column: myCol1");
+    }
+
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, null, null, CompressionCodec.DELTADELTA, null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      assertEquals(e.getMessage(),
+          "Compression codec DELTADELTA can only be used on single-value columns, found multi-value column: myCol2");
+    }
+
+    try {
+      FieldConfig fieldConfig =
           new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
@@ -2004,6 +2024,24 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "A table can have either Upsert or Dedup enabled, but not both");
     }
+
+    // Valid TIMESTAMP dedupTimeColumn
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(10);
+    dedupConfig.setDedupTimeColumn(TIME_COLUMN);
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(streamConfigs)
+        .build();
+    // Should not throw an exception - TIMESTAMP is a valid type for dedupTimeColumn
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
   }
 
   @Test
@@ -2029,28 +2067,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       fail();
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "MetadataTTL must have time column: timeColumn in numeric type, found: STRING");
-    }
-
-    // Invalid TIMESTAMP dedupTimeColumn
-    dedupConfig.setDedupTimeColumn(TIME_COLUMN);
-    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(dedupConfig)
-        .setRoutingConfig(
-            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
-        .setStreamConfigs(streamConfigs)
-        .build();
-    try {
-      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
-      fail();
-    } catch (IllegalStateException e) {
       assertEquals(e.getMessage(),
-          "MetadataTTL must have dedupTimeColumn: timeColumn in numeric type, found: TIMESTAMP");
+          "MetadataTTL must have time column: timeColumn in numeric type, found: STRING");
     }
   }
 
@@ -2482,6 +2500,121 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
     }
+
+    // test dropOutOfOrderRecord cannot be enabled with SYNC consistency mode
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
+        .build();
+    streamConfigs = getStreamConfigs();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDropOutOfOrderRecord(true);
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.SYNC);
+    upsertConfig.setNewSegmentTrackingTimeMs(60000L);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Expected IllegalStateException for dropOutOfOrderRecord with SYNC consistency mode");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("dropOutOfOrderRecord cannot be enabled when consistencyMode is SYNC"));
+    }
+
+    // test dropOutOfOrderRecord cannot be enabled with SNAPSHOT consistency mode
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDropOutOfOrderRecord(true);
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.SNAPSHOT);
+    upsertConfig.setNewSegmentTrackingTimeMs(60000L);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Expected IllegalStateException for dropOutOfOrderRecord with SNAPSHOT consistency mode");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("dropOutOfOrderRecord cannot be enabled when consistencyMode is SNAPSHOT"));
+    }
+
+    // test dropOutOfOrderRecord is allowed with NONE consistency mode (should not throw)
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDropOutOfOrderRecord(true);
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
+    // test outOfOrderRecordColumn cannot be enabled with SYNC consistency mode
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("isOutOfOrder", FieldSpec.DataType.BOOLEAN)
+        .build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setOutOfOrderRecordColumn("isOutOfOrder");
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.SYNC);
+    upsertConfig.setNewSegmentTrackingTimeMs(60000L);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Expected IllegalStateException for outOfOrderRecordColumn with SYNC consistency mode");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("outOfOrderRecordColumn cannot be configured when consistencyMode is SYNC"));
+    }
+
+    // test outOfOrderRecordColumn cannot be enabled with SNAPSHOT consistency mode
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setOutOfOrderRecordColumn("isOutOfOrder");
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.SNAPSHOT);
+    upsertConfig.setNewSegmentTrackingTimeMs(60000L);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Expected IllegalStateException for outOfOrderRecordColumn with SNAPSHOT consistency mode");
+    } catch (IllegalStateException e) {
+      assertTrue(
+          e.getMessage().contains("outOfOrderRecordColumn cannot be configured when consistencyMode is SNAPSHOT"));
+    }
+
+    // test outOfOrderRecordColumn is allowed with NONE consistency mode (should not throw)
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("isOutOfOrder", FieldSpec.DataType.BOOLEAN)
+        .build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setOutOfOrderRecordColumn("isOutOfOrder");
+    upsertConfig.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
 
     // test enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
@@ -2926,7 +3059,7 @@ public class TableConfigUtilsTest {
       // Expected
     }
 
-    // Invalid TIMESTAMP time column
+    // Valid TIMESTAMP time column
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
@@ -2935,16 +3068,13 @@ public class TableConfigUtilsTest {
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setMetadataTTL(3600);
     upsertConfig.setSnapshot(Enablement.ENABLE);
-    tableConfigWithInvalidTTLConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+    TableConfig tableConfigWithValidTimestampTTLConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)
         .setUpsertConfig(upsertConfig)
         .build();
-    try {
-      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidTTLConfig, schema);
-      fail();
-    } catch (IllegalStateException e) {
-      // Expected
-    }
+    // Should not throw an exception - TIMESTAMP is a valid type for time column with TTL
+    TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithValidTimestampTTLConfig, schema);
   }
 
   @Test
@@ -3085,7 +3215,7 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void testValidIGnRGOfflineTable() {
+  public void testValidateInstancePoolsAndReplicaGroupsForValidOfflineTable() {
     InstanceAssignmentConfig config =
         new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", true, 0, null), null,
             new InstanceReplicaGroupPartitionConfig(true, 0, 0, 0, 0, 0, false, null), null, false);
@@ -3096,11 +3226,12 @@ public class TableConfigUtilsTest {
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
             null);
 
-    assertTrue(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+    // Should not throw
+    TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
   }
 
   @Test
-  public void testValidIGnRGRealtimeTable() {
+  public void testValidateInstancePoolsAndReplicaGroupsForValidRealtimeTable() {
     InstanceAssignmentConfig config =
         new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", true, 0, null), null,
             new InstanceReplicaGroupPartitionConfig(true, 0, 0, 0, 0, 0, false, null), null, false);
@@ -3111,31 +3242,34 @@ public class TableConfigUtilsTest {
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
             null);
 
-    assertTrue(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+    // Should not throw
+    TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
   }
 
   @Test
-  public void testNoIACOfflineTable() {
+  public void testValidateInstancePoolsAndReplicaGroupsForNoIACOfflineTable() {
     TableConfig tableConfig =
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, null, null, null, null, null, null, null, false, null, null, null);
 
-    assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+    assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
   }
 
   @Test
-  public void testNoIACRealtimeTable() {
+  public void testValidateInstancePoolsAndReplicaGroupsForNoIACRealtimeTable() {
     TableConfig tableConfig =
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, null, null, null, null, null, null, null, false, null, null, null);
 
-    assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+    assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
   }
 
   @Test
-  public void testNoPoolsOfflineTable() {
+  public void testValidateInstancePoolsAndReplicaGroupsForNoPoolsOfflineTable() {
     InstanceAssignmentConfig config =
         new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", false, 0, null), null,
             new InstanceReplicaGroupPartitionConfig(true, 0, 0, 0, 0, 0, false, null), null, false);
@@ -3146,11 +3280,12 @@ public class TableConfigUtilsTest {
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
             null);
 
-    assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+    assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
   }
 
   @Test
-  public void testNoPoolsRealtimeTable() {
+  public void testValidateInstancePoolsAndReplicaGroupsForNoPoolsRealtimeTable() {
     InstanceAssignmentConfig config =
         new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", false, 0, null), null,
             new InstanceReplicaGroupPartitionConfig(true, 0, 0, 0, 0, 0, false, null), null, false);
@@ -3161,11 +3296,12 @@ public class TableConfigUtilsTest {
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
             null);
 
-    assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+    assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
   }
 
   @Test
-  public void testNoRgOfflineTable() {
+  public void testValidateInstancePoolsAndReplicaGroupsForNoRgOfflineTable() {
     InstanceAssignmentConfig config =
         new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", true, 0, null), null,
             new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
@@ -3176,11 +3312,12 @@ public class TableConfigUtilsTest {
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
             null);
 
-    assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+    assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
   }
 
   @Test
-  public void testNoRGRealtimeTable() {
+  public void testValidateInstancePoolsAndReplicaGroupsForNoRGRealtimeTable() {
     InstanceAssignmentConfig config =
         new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", true, 0, null), null,
             new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
@@ -3191,7 +3328,32 @@ public class TableConfigUtilsTest {
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
             null);
 
-    assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+    assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
+  }
+
+  @Test
+  public void testValidateInstancePoolsAndReplicaGroupsForDimensionTable() {
+    TableConfig tableConfig =
+        new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
+            null, null, null, null, null, null, null, null, null, null, null, true, null, null, null);
+
+    // Should not throw
+    TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
+  }
+
+  @Test
+  public void testValidateInstancePoolsAndReplicaGroupsForColocatedTable() {
+    Map<InstancePartitionsType, String> instancePartitionsMap =
+        Map.of(InstancePartitionsType.CONSUMING, "referenceTable_CONSUMING");
+    TableConfig tableConfig =
+        new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
+            null, null, null, null, null, null, null, null, null, null, null, true, null, instancePartitionsMap, null);
+
+    // Should not throw
+    TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
   }
 
   @SuppressWarnings("deprecation")
