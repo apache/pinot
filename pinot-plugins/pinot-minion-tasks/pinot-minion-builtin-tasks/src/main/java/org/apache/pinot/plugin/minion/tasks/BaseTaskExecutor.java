@@ -23,6 +23,7 @@ import java.io.File;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -35,6 +36,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
@@ -109,6 +111,13 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     _minionMetrics.addMeteredGlobalValue(meter, unitCount);
     _minionMetrics.addMeteredTableValue(tableName, meter, unitCount);
     _minionMetrics.addMeteredTableValue(tableName, taskType, meter, unitCount);
+  }
+
+  /**
+   * Resolves the AuthProvider for Minion task executors. Delegates to {@link MinionTaskUtils#resolveAuthProvider}.
+   */
+  protected static AuthProvider resolveAuthProvider(Map<String, String> taskConfigs) {
+    return MinionTaskUtils.resolveAuthProvider(taskConfigs);
   }
 
   protected File downloadSegmentToLocalAndUntar(String tableNameWithType, String segmentName, String deepstoreURL,

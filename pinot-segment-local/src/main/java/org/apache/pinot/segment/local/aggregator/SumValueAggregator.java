@@ -87,9 +87,7 @@ public class SumValueAggregator implements ValueAggregator<Object, Double> {
       Object[] values = (Object[]) rawValue;
       double sum = 0.0;
       for (Object value : values) {
-        if (value != null) {
-          sum += ValueAggregatorUtils.toDouble(value);
-        }
+        sum += ValueAggregatorUtils.toDouble(value);
       }
       return sum;
     } else {

@@ -22,12 +22,12 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.instance.context.BrokerContext;
+import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.context.BrokerContext;
-import org.apache.pinot.query.runtime.context.ServerContext;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
@@ -202,15 +202,13 @@ public class OpChainExecutionContext {
 
   private static QueryOperatorFactoryProvider getDefaultQueryOperatorFactoryProvider() {
     // Prefer server context when explicitly configured, otherwise fall back to broker, then default.
-    QueryOperatorFactoryProvider serverProvider =
-        ServerContext.getInstance().getQueryOperatorFactoryProvider();
-    if (serverProvider != null) {
-      return serverProvider;
+    Object serverProvider = ServerContext.getInstance().getQueryOperatorFactoryProvider();
+    if (serverProvider instanceof QueryOperatorFactoryProvider) {
+      return (QueryOperatorFactoryProvider) serverProvider;
     }
-    QueryOperatorFactoryProvider brokerProvider =
-        BrokerContext.getInstance().getQueryOperatorFactoryProvider();
-    if (brokerProvider != null) {
-      return brokerProvider;
+    Object brokerProvider = BrokerContext.getInstance().getQueryOperatorFactoryProvider();
+    if (brokerProvider instanceof QueryOperatorFactoryProvider) {
+      return (QueryOperatorFactoryProvider) brokerProvider;
     }
     return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }
