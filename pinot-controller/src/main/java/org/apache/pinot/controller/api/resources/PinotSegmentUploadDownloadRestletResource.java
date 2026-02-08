@@ -31,6 +31,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -77,7 +78,9 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -743,9 +746,14 @@ public class PinotSegmentUploadDownloadRestletResource {
     try {
       SegmentFetcherFactory.fetchSegmentToLocal(currentSegmentLocationURI, destFile);
     } catch (Exception e) {
-      if (isFileNotFoundException(e)) {
+      if (ExceptionUtils.isCauseInstanceOf(e, FileNotFoundException.class)) {
         throw new ControllerApplicationException(LOGGER,
             "Segment file not found at URI: " + currentSegmentLocationURI, Response.Status.NOT_FOUND, e);
+      }
+      HttpErrorStatusException httpErr = ExceptionUtils.getFirstCauseOfType(e, HttpErrorStatusException.class);
+      if (httpErr != null && httpErr.getStatusCode() == Response.Status.NOT_FOUND.getStatusCode()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Segment not found at URI: " + currentSegmentLocationURI, Response.Status.NOT_FOUND, e);
       }
       throw e;
     }
