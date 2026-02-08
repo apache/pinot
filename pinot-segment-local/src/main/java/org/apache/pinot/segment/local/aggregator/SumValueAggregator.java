@@ -89,19 +89,21 @@ public class SumValueAggregator implements ValueAggregator<Object, Double> {
     throw new UnsupportedOperationException();
   }
 
-  protected Double processRawValue(@Nullable Object rawValue) {
+  protected Double processRawValue(Object rawValue) {
     return processRawValue(rawValue, null);
   }
 
   /**
    * Processes a raw value (single number or multi-value array) and returns the sum.
    */
-  protected Double processRawValue(@Nullable Object rawValue, @Nullable DataType sourceDataType) {
+  protected Double processRawValue(Object rawValue, @Nullable DataType sourceDataType) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
       double sum = 0.0;
       for (Object value : values) {
-        sum += ValueAggregatorUtils.toDouble(value, sourceDataType);
+        if (value != null) {
+          sum += ValueAggregatorUtils.toDouble(value, sourceDataType);
+        }
       }
       return sum;
     } else {
