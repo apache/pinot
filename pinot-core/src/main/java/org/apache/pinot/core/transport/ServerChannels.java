@@ -136,18 +136,17 @@ public class ServerChannels {
 
     // Create a single shared allocator with limits for all channels
     PooledByteBufAllocator defaultAllocator = PooledByteBufAllocator.DEFAULT;
-    PooledByteBufAllocatorMetric metric = defaultAllocator.metric();
-    _bufAllocatorWithLimits = PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric);
-    PooledByteBufAllocatorMetric bufAllocatorMetric = _bufAllocatorWithLimits.metric();
+    _bufAllocatorWithLimits = PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(defaultAllocator.metric());
+    PooledByteBufAllocatorMetric metric = _bufAllocatorWithLimits.metric();
     // Register metrics for the shared allocator
-    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, bufAllocatorMetric::usedDirectMemory);
-    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY, bufAllocatorMetric::usedHeapMemory);
-    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT, bufAllocatorMetric::numDirectArenas);
-    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_HEAP, bufAllocatorMetric::numHeapArenas);
-    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_SMALL, bufAllocatorMetric::smallCacheSize);
-    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, bufAllocatorMetric::normalCacheSize);
-    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_THREADLOCALCACHE, bufAllocatorMetric::numThreadLocalCaches);
-    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, bufAllocatorMetric::chunkSize);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_HEAP, metric::numHeapArenas);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_SMALL, metric::smallCacheSize);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
   }
 
   public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
