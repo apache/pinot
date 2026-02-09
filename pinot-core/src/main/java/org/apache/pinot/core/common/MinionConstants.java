@@ -197,8 +197,9 @@ public class MinionConstants {
     public static final String MATERIALIZED_VIEW_SEGMENTS_TASK_TYPE = "taskType";
     public static final String SELECTED_DIMENSION_LIST = "selectedDimensionList";
     public static final String FILTER_FUNCTION = "filterFunction";
-    public static final String MATERIALIZED_VIEW_MARK = "mvMark";
     public static final String MATERIALIZED_VIEW_NAME = "mvName";
+    public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
+        EnumSet.of(MIN, MAX, SUM);
   }
 
   /**

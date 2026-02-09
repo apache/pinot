@@ -96,23 +96,24 @@ public class MaterializedViewTaskExecutor extends BaseMultipleSegmentsConversion
   public void preProcess(PinotTaskConfig pinotTaskConfig) {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String taskType = pinotTaskConfig.getTaskType();
-    String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
-    String mvTableName = configs.get(MaterializedViewTask.MATERIALIZED_VIEW_MARK);
+    String baseTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
+    String mvTableNameWithType = configs.get(MaterializedViewTask.MATERIALIZED_VIEW_NAME);
+    String rawMvName = TableNameBuilder.extractRawTableName(mvTableNameWithType);
 
     ZNRecord materializedViewTaskZNRecord =
-        _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName, taskType);
+        _minionTaskZkMetadataManager.getTaskMetadataZNRecord(baseTableName, taskType);
     Preconditions.checkState(materializedViewTaskZNRecord != null,
         "MaterializedViewTaskMetadata ZNRecord for table: %s should not be null. Exiting task.",
-        realtimeTableName);
+        baseTableName);
 
     MaterializedViewTaskMetadata materializedViewTaskMetadata =
         MaterializedViewTaskMetadata.fromZNRecord(materializedViewTaskZNRecord);
     long windowStartMs = Long.parseLong(configs.get(MaterializedViewTask.WINDOW_START_MS_KEY));
-    Preconditions.checkState(materializedViewTaskMetadata.getWatermarkMap().get(mvTableName) == windowStartMs,
+    Preconditions.checkState(materializedViewTaskMetadata.getWatermarkMap().get(rawMvName) == windowStartMs,
         "watermarkMs in MaterializedViewTask metadata: %s does not match windowStartMs: %d in task configs "
             + "for table: %s. "
             + "ZNode may have been modified by another task", materializedViewTaskMetadata, windowStartMs,
-        realtimeTableName);
+        baseTableName);
 
     _expectedVersion = materializedViewTaskZNRecord.getVersion();
   }
@@ -215,17 +216,19 @@ public class MaterializedViewTaskExecutor extends BaseMultipleSegmentsConversion
   public void postProcess(PinotTaskConfig pinotTaskConfig) {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String taskType = pinotTaskConfig.getTaskType();
-    String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
-    String mvName = configs.get(MaterializedViewTask.MATERIALIZED_VIEW_MARK);
+    String baseTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
+    String mvTableNameWithType = configs.get(MaterializedViewTask.MATERIALIZED_VIEW_NAME);
+    String rawMvName = TableNameBuilder.extractRawTableName(mvTableNameWithType);
+
     ZNRecord materializedViewTaskZNRecord =
-        _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName, taskType);
+        _minionTaskZkMetadataManager.getTaskMetadataZNRecord(baseTableName, taskType);
     Preconditions.checkState(materializedViewTaskZNRecord != null,
         "MaterializedViewTask ZNRecord for table: %s should not be null. Exiting task.",
-        realtimeTableName);
+        baseTableName);
     MaterializedViewTaskMetadata newMinionMetadata =
         MaterializedViewTaskMetadata.fromZNRecord(materializedViewTaskZNRecord);
     long waterMarkMs = Long.parseLong(configs.get(MaterializedViewTask.WINDOW_END_MS_KEY));
-    newMinionMetadata.getWatermarkMap().put(mvName, waterMarkMs);
+    newMinionMetadata.getWatermarkMap().put(rawMvName, waterMarkMs);
     _minionTaskZkMetadataManager.setTaskMetadataZNRecord(newMinionMetadata, taskType, _expectedVersion);
   }
 

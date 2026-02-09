@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.materializedview;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -32,7 +33,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MaterializedViewTaskMetadata;
-import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
+import org.apache.pinot.common.minion.MaterializedViewTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
@@ -40,10 +41,14 @@ import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtil
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.MaterializedViewTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.core.segment.processing.framework.MergeType;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -141,6 +146,21 @@ public class MaterializedViewTaskGenerator extends BaseTaskGenerator {
       TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
       Preconditions.checkState(tableTaskConfig != null);
       Map<String, String> taskConfigs = tableTaskConfig.getConfigsForTaskType(taskType);
+      Preconditions.checkState(taskConfigs != null, "Task config shouldn't be null for table: %s", realtimeTableName);
+      String mvName = taskConfigs.get(MaterializedViewTask.MATERIALIZED_VIEW_NAME);
+      if (mvName == null || mvName.trim().isEmpty()) {
+        String msg = "Task config must contain materialized view offline table name under key: "
+            + MaterializedViewTask.MATERIALIZED_VIEW_NAME;
+        LOGGER.error(msg);
+        throw new IllegalStateException(msg);
+      }
+
+      if (!_clusterInfoAccessor.hasOfflineTable(mvName)) {
+        String msg = "Materialized view offline table does not exist: " + mvName
+            + ". Please create the offline table before triggering MV task.";
+        LOGGER.error(msg);
+        throw new IllegalStateException(msg);
+      }
 
       // Get the bucket size and buffer
       String bucketTimePeriod =
@@ -158,9 +178,8 @@ public class MaterializedViewTaskGenerator extends BaseTaskGenerator {
           .stream().map(s -> s.trim()).filter(s -> StringUtils.isNotBlank(s)).collect(Collectors.toList());
 
       selectedDimensionListStr = selectedDimensionList.stream().collect(Collectors.joining(","));
-      String mvName = taskConfigs.get(MaterializedViewTask.MATERIALIZED_VIEW_NAME);
 
-      // Get watermark from RealtimeToOfflineSegmentsTaskMetadata ZNode. WindowStart = watermark. WindowEnd =
+      // Get watermark from MaterializedViewTaskMetadata ZNode. WindowStart = watermark. WindowEnd =
       // windowStart + bucket.
       long windowStartMs = getWatermarkMs(completedSegmentsZKMetadata, materializedViewTaskMetadata, bucketMs,
           mvName);
@@ -240,7 +259,6 @@ public class MaterializedViewTaskGenerator extends BaseTaskGenerator {
       if (roundBucketTimePeriod != null) {
         configs.put(MaterializedViewTask.ROUND_BUCKET_TIME_PERIOD_KEY, roundBucketTimePeriod);
       }
-      configs.put(MaterializedViewTask.MATERIALIZED_VIEW_MARK, mvName);
 
       configs.put(MaterializedViewTask.SELECTED_DIMENSION_LIST, selectedDimensionListStr);
       configs.put(MaterializedViewTask.MATERIALIZED_VIEW_NAME, mvName + "_OFFLINE");
@@ -338,5 +356,123 @@ public class MaterializedViewTaskGenerator extends BaseTaskGenerator {
           MaterializedViewTask.TASK_TYPE, -1);
     }
     return materializedViewTaskMetadata.getWatermarkMap().get(mvName);
+  }
+
+
+  @Override
+  public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
+    // Validate time periods are not malformed
+    TimeUtils.convertPeriodToMillis(
+        taskConfigs.getOrDefault(MinionConstants.MaterializedViewTask.BUFFER_TIME_PERIOD_KEY, "2d"));
+    TimeUtils.convertPeriodToMillis(
+        taskConfigs.getOrDefault(MinionConstants.MaterializedViewTask.BUCKET_TIME_PERIOD_KEY, "1d"));
+    TimeUtils.convertPeriodToMillis(
+        taskConfigs.getOrDefault(MinionConstants.MaterializedViewTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1s"));
+
+    // Validate mergeType is supported for MaterializedViewTask
+    String mergeType = taskConfigs.getOrDefault(
+        MinionConstants.MaterializedViewTask.MERGE_TYPE_KEY,
+        MergeType.MV_ROLLUP.name()).toUpperCase();
+
+    Preconditions.checkState(
+        MergeType.MV_ROLLUP.name().equals(mergeType),
+        "MaterializedViewTask only supports mergeType: MV_ROLLUP");
+
+    // Validate base schema is present
+    Preconditions.checkNotNull(schema, "Schema should not be null!");
+
+    // Validate required MV configs are present
+    String mvName = taskConfigs.get(MinionConstants.MaterializedViewTask.MATERIALIZED_VIEW_NAME);
+    Preconditions.checkState(StringUtils.isNotBlank(mvName),
+        "Task config must contain mvName under key: " + MinionConstants.MaterializedViewTask.MATERIALIZED_VIEW_NAME);
+
+    String selectedDimensionStr = taskConfigs.get(MinionConstants.MaterializedViewTask.SELECTED_DIMENSION_LIST);
+    Preconditions.checkState(StringUtils.isNotBlank(selectedDimensionStr),
+        "Task config must contain selectedDimensionList under key: "
+            + MinionConstants.MaterializedViewTask.SELECTED_DIMENSION_LIST);
+
+    // Validate selectedDimensionList columns exist in base schema
+    Set<String> baseColumns = schema.getColumnNames();
+    for (String dim : selectedDimensionStr.split(",")) {
+      String col = dim.trim();
+      if (col.isEmpty()) {
+        continue;
+      }
+      Preconditions.checkState(baseColumns.contains(col),
+          String.format("selectedDimensionList column \"%s\" not found in base table schema!", col));
+    }
+
+    // Validate aggregation configs: source column exists in base schema + aggregation type is valid and supported
+    for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+
+      if (key.endsWith(MinionConstants.MaterializedViewTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
+        String sourceColumn =
+            StringUtils.removeEnd(key, MinionConstants.MaterializedViewTask.AGGREGATION_TYPE_KEY_SUFFIX);
+
+        Preconditions.checkState(baseColumns.contains(sourceColumn),
+            String.format("Aggregation source column \"%s\" not found in base table schema!", sourceColumn));
+
+        try {
+          AggregationFunctionType aft = AggregationFunctionType.getAggregationFunctionType(value);
+          if (!MinionConstants.MaterializedViewTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
+            throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft);
+          }
+        } catch (IllegalArgumentException e) {
+          throw new IllegalStateException(
+              String.format("Column \"%s\" has invalid aggregate type: %s", key, value));
+        }
+      }
+    }
+
+    // Validate MV table existence and MV schema compatibility
+    validateMvSchema(taskConfigs);
+  }
+
+  private void validateMvSchema(Map<String, String> taskConfigs) {
+    String mvName = taskConfigs.get(MinionConstants.MaterializedViewTask.MATERIALIZED_VIEW_NAME);
+
+    // Normalize MV name to offline table name
+    String mvOfflineTableName = mvName.endsWith("_OFFLINE") ? mvName : (mvName + "_OFFLINE");
+
+    // Validate MV offline table exists
+    // TODO: Add logic to auto-create MV table if it does not exist
+    Preconditions.checkState(_clusterInfoAccessor.hasOfflineTable(mvOfflineTableName),
+        "Materialized view offline table does not exist: " + mvOfflineTableName
+            + ". Please create the offline table before triggering MV task.");
+
+    // Fetch MV schema for further validation
+    Schema mvSchema = _clusterInfoAccessor.getTableSchema(mvOfflineTableName);
+    Preconditions.checkNotNull(mvSchema, "MV schema should not be null for table: " + mvOfflineTableName);
+
+    Set<String> mvColumns = mvSchema.getColumnNames();
+
+    // Validate selectedDimensionList columns exist in MV schema
+    String selectedDimensionStr = taskConfigs.get(MinionConstants.MaterializedViewTask.SELECTED_DIMENSION_LIST);
+    for (String dim : selectedDimensionStr.split(",")) {
+      String col = dim.trim();
+      if (col.isEmpty()) {
+        continue;
+      }
+      Preconditions.checkState(mvColumns.contains(col),
+          String.format("selectedDimensionList column \"%s\" not found in MV table schema!", col));
+    }
+
+    // Validate aggregation output columns exist in MV schema
+    for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
+      String key = entry.getKey();
+      if (key.endsWith(MinionConstants.MaterializedViewTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
+        String sourceColumn =
+            StringUtils.removeEnd(key, MinionConstants.MaterializedViewTask.AGGREGATION_TYPE_KEY_SUFFIX);
+
+        // By default, MV output column name is the same as the source column name
+        // TODO: Once Query AS is supported, allow user-defined output column names
+        String outputColumn = sourceColumn;
+
+        Preconditions.checkState(mvColumns.contains(outputColumn),
+            String.format("Aggregation output column \"%s\" not found in MV table schema!", outputColumn));
+      }
+    }
   }
 }

@@ -344,4 +344,8 @@ public class ClusterInfoAccessor {
   public PinotHelixTaskResourceManager getPinotHelixTaskResourceManager() {
     return _pinotHelixTaskResourceManager;
   }
+
+  public boolean hasOfflineTable(String rawTableName) {
+    return _pinotHelixResourceManager.hasOfflineTable(rawTableName);
+  }
 }
