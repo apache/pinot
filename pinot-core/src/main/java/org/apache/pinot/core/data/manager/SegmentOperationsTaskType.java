@@ -26,10 +26,10 @@ public class SegmentOperationsTaskType {
       new SegmentOperationsTaskType("CONSUMER_THREAD");
   public static final SegmentOperationsTaskType STATE_TRANSITION =
       new SegmentOperationsTaskType("STATE_TRANSITION");
-  public static final SegmentOperationsTaskType RELOAD_THREAD =
-      new SegmentOperationsTaskType("RELOAD_THREAD");
-  public static final SegmentOperationsTaskType REFRESH_THREAD =
-      new SegmentOperationsTaskType("REFRESH_THREAD");
+  public static final SegmentOperationsTaskType REFRESH_RELOAD_THREAD =
+      new SegmentOperationsTaskType("REFRESH_RELOAD_THREAD");
+  public static final SegmentOperationsTaskType PRELOAD_THREAD =
+      new SegmentOperationsTaskType("PRELOAD_THREAD");
 
   private final String _name;
 
