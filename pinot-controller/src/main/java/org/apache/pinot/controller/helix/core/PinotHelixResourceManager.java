@@ -1648,6 +1648,10 @@ public class PinotHelixResourceManager {
     String rawTableName = schemaName;
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TableConfig realtimeTableConfig = getTableConfig(realtimeTableName);
+    // Skip validation if no realtime table exists (e.g., offline-only tables or schema created before table)
+    if (realtimeTableConfig == null) {
+      return;
+    }
     if (realtimeTableConfig.isUpsertEnabled() || realtimeTableConfig.isDedupEnabled()) {
       List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
       List<String> newPrimaryKeys = newSchema.getPrimaryKeyColumns();
