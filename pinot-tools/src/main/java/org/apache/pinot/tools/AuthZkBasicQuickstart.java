@@ -59,8 +59,8 @@ public class AuthZkBasicQuickstart extends Quickstart {
     properties.put("pinot.server.segment.uploader.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
     // minion
-    properties.put("segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
-    properties.put("task.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("pinot.minion.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("pinot.minion.task.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
     return properties;
   }

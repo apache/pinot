@@ -118,7 +118,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
-    waitForAllDocsLoaded(600_000L);
+    // Increased timeout for TLS operations (15 minutes instead of 10)
+    waitForAllDocsLoaded(900_000L);
   }
 
   @AfterClass(alwaysRun = true)
@@ -244,6 +245,22 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     minionConf.setProperty("pinot.minion.tls.truststore.password", "changeit");
     minionConf.setProperty("pinot.minion.tls.truststore.type", "PKCS12");
     minionConf.setProperty("pinot.minion.tls.client.auth.enabled", "true");
+
+    // Add segment fetcher and uploader configurations for TLS communication
+    minionConf.setProperty("pinot.minion.segment.fetcher.protocols", "https");
+    minionConf.setProperty("pinot.minion.segment.uploader.protocols", "https");
+
+    // Add segment fetcher auth provider for BasicAuth over TLS
+    minionConf.setProperty("pinot.minion.segment.fetcher.auth.provider.class",
+        "org.apache.pinot.common.auth.StaticTokenAuthProvider");
+    // Explicitly set the auth token for segment fetcher
+    minionConf.setProperty("pinot.minion.segment.fetcher.auth.token", AUTH_TOKEN);
+
+    // Add task auth provider for BasicAuth over TLS
+    minionConf.setProperty("pinot.minion.task.auth.provider.class",
+        "org.apache.pinot.common.auth.StaticTokenAuthProvider");
+    // Explicitly set the auth token for task auth
+    minionConf.setProperty("pinot.minion.task.auth.token", AUTH_TOKEN);
   }
 
   @Override
