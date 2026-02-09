@@ -551,6 +551,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int index) {
+    // compare with {@link BenchmarkSplitPart} for future changes
     int delimLen = delimiter.length();
     if (delimLen == 0) {
       return index == 0 || index == -1 ? input : "null";
@@ -561,6 +562,11 @@ public class StringFunctions {
     int len = input.length();
     while (start < len && input.startsWith(delimiter, start)) {
       start += delimLen;
+    }
+    // optimization for negative index with single-char delimiter since common case
+    // multi-char delimiter with negative index can be handled in future since less common and more complex
+    if (index < 0 && delimLen == 1) {
+      return splitPartNegativeIdxSingleCharDelim(input, delimiter.charAt(0), -index, len, start);
     }
 
     // convert negative index to positive by counting total fields
@@ -585,7 +591,6 @@ public class StringFunctions {
       }
     }
 
-    // navigate forward to the target field
     for (int i = 0; i < adjustedIndex; i++) {
       int end = input.indexOf(delimiter, start);
       if (end == -1) {
@@ -598,9 +603,57 @@ public class StringFunctions {
       }
     }
 
-    // Extract the target field
     int end = input.indexOf(delimiter, start);
     return end == -1 ? input.substring(start) : input.substring(start, end);
+  }
+
+  private static String splitPartNegativeIdxSingleCharDelim(
+      String input, char delimiter, int index, int len, int start) {
+    // input is empty or contains only delimiters
+    if (start == len) {
+      return index == 1 ? "" : "null";
+    }
+
+    // scan backwards and handle trailing delimiters
+    int end = len;
+    while (end > start && input.charAt(end - 1) == delimiter) {
+      end--;
+    }
+
+    // handle trailing delimiters
+    int resultIdx = index;
+    if (end < len) {
+      if (index == 1) {
+        return "";
+      }
+      resultIdx--;
+    }
+
+    int curEnd = end;
+    for (int i = 1; i <= resultIdx; i++) {
+      // handle left out of bound index
+      if (curEnd <= start) {
+        return "null";
+      }
+
+      // scan left until no delimiter
+      int curStart = curEnd - 1;
+      while (curStart >= start && input.charAt(curStart) != delimiter) {
+        curStart--;
+      }
+
+      if (i == resultIdx) {
+        return input.substring(curStart + 1, curEnd);
+      }
+
+      // skip consecutive delimiters
+      curEnd = curStart;
+      while (curEnd > start && input.charAt(curEnd - 1) == delimiter) {
+        curEnd--;
+      }
+    }
+
+    return "null";
   }
 
   /**
