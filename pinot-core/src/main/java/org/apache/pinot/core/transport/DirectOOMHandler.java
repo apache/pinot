@@ -70,6 +70,10 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
     if (_silentShutDown) {
       return;
     }
+    // Remove from _allChannels on server side so we don't leak channel references when brokers disconnect
+    if (_allChannels != null) {
+      _allChannels.remove(ctx.channel());
+    }
     ctx.fireChannelInactive();
   }
 

@@ -92,6 +92,9 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1);
+      // Propagate so the pipeline closes the channel and channelInactive runs (markServerDown), otherwise
+      // the query would hang waiting for a response that will never be delivered.
+      ctx.fireExceptionCaught(e);
     }
   }
 
@@ -99,5 +102,8 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
     LOGGER.error("Caught exception while handling response from server: {}", _serverRoutingInstance, cause);
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESPONSE_FETCH_EXCEPTIONS, 1);
+    // Propagate so the pipeline can close the channel and release resources; otherwise the channel
+    // may be left in an inconsistent state and leak.
+    ctx.fireExceptionCaught(cause);
   }
 }

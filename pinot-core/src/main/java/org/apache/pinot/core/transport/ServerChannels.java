@@ -85,6 +85,7 @@ public class ServerChannels {
 
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
+  private final PooledByteBufAllocator _bufAllocatorWithLimits;
 
   /**
    * Create a server channel with TLS config
@@ -125,6 +126,28 @@ public class ServerChannels {
     _queryRouter = queryRouter;
     _tlsConfig = tlsConfig;
     _threadAccountant = threadAccountant;
+
+
+    // Notice here we assume there is a single ServerChannels per JVM. If that is not true (ie quickstarts with multiple
+    // brokers), we:
+    // 1. Will have one allocator per broker, which may cause higher memory usage, and may cause OOM.
+    // 2. Will have multiple sets of gauges for each allocator, which means the last one will win and override the
+    //    previous ones.
+
+    // Create a single shared allocator with limits for all channels
+    PooledByteBufAllocator defaultAllocator = PooledByteBufAllocator.DEFAULT;
+    PooledByteBufAllocatorMetric metric = defaultAllocator.metric();
+    _bufAllocatorWithLimits = PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric);
+    PooledByteBufAllocatorMetric bufAllocatorMetric = _bufAllocatorWithLimits.metric();
+    // Register metrics for the shared allocator
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, bufAllocatorMetric::usedDirectMemory);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY, bufAllocatorMetric::usedHeapMemory);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT, bufAllocatorMetric::numDirectArenas);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_HEAP, bufAllocatorMetric::numHeapArenas);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_SMALL, bufAllocatorMetric::smallCacheSize);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, bufAllocatorMetric::normalCacheSize);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_THREADLOCALCACHE, bufAllocatorMetric::numThreadLocalCaches);
+    _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, bufAllocatorMetric::chunkSize);
   }
 
   public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
@@ -159,22 +182,9 @@ public class ServerChannels {
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
-      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
-      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
-      PooledByteBufAllocator bufAllocatorWithLimits =
-          PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric);
-      metric = bufAllocatorWithLimits.metric();
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_HEAP, metric::numHeapArenas);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_SMALL, metric::smallCacheSize);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
-      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
-
+      // Use the shared allocator from the outer class
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
-          .option(ChannelOption.ALLOCATOR, bufAllocatorWithLimits).group(_eventLoopGroup).channel(_channelClass)
+          .option(ChannelOption.ALLOCATOR, _bufAllocatorWithLimits).group(_eventLoopGroup).channel(_channelClass)
           .option(ChannelOption.SO_KEEPALIVE, true).handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {

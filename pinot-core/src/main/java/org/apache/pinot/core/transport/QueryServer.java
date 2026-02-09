@@ -120,6 +120,11 @@ public class QueryServer {
       PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
       PooledByteBufAllocatorMetric metric = bufAllocator.metric();
       ServerMetrics metrics = ServerMetrics.get();
+      // Notice here we assume there is a single QueryServer per JVM. If that is not true (ie quickstarts with multiple
+      // servers), we:
+      // 1. Will have one allocator per server, which may cause higher memory usage, and may cause OOM.
+      // 2. Will have multiple sets of gauges for each allocator, which means the last one will win and override the
+      //    previous ones.
       PooledByteBufAllocator bufAllocatorWithLimits =
           PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric);
       metric = bufAllocatorWithLimits.metric();

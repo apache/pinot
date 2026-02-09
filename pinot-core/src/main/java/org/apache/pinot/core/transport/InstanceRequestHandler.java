@@ -136,6 +136,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       // Do not send error response because request id is unknown.
       LOGGER.error("Failed to deserialize instance request: {}", BytesUtils.toHexString(requestBytes), e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
+      // Propagate so the pipeline closes the channel; otherwise the broker may keep a broken connection.
+      ctx.fireExceptionCaught(e);
       return;
     }
     try {
@@ -231,6 +233,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     LOGGER.error(message, cause);
     sendErrorResponse(ctx, 0, null, System.currentTimeMillis(), DataTableBuilderFactory.getEmptyDataTable(),
         new Exception(message, cause));
+    // Propagate so the pipeline can close the channel and release resources.
+    ctx.fireExceptionCaught(cause);
   }
 
   /**
