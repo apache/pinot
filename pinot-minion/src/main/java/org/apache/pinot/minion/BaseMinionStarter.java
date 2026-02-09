@@ -258,8 +258,26 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     }
 
     // initialize authentication
-    minionContext.setTaskAuthProvider(
-        AuthProviderUtils.extractAuthProvider(_config, CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE));
+    // Try the new namespace first; fall back to the legacy "task.auth" namespace for backward compatibility.
+    PinotConfiguration taskAuthConfig = _config.subset(CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE);
+    if (taskAuthConfig.isEmpty()) {
+      PinotConfiguration deprecatedTaskAuthConfig =
+          _config.subset(CommonConstants.Minion.DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE);
+      if (!deprecatedTaskAuthConfig.isEmpty()) {
+        LOGGER.warn("Minion task auth is configured under the deprecated namespace '{}'. "
+                + "Please migrate to the new namespace '{}'.",
+            CommonConstants.Minion.DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE,
+            CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE);
+        minionContext.setTaskAuthProvider(AuthProviderUtils.extractAuthProvider(_config,
+            CommonConstants.Minion.DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE));
+      } else {
+        minionContext.setTaskAuthProvider(
+            AuthProviderUtils.extractAuthProvider(_config, CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE));
+      }
+    } else {
+      minionContext.setTaskAuthProvider(
+          AuthProviderUtils.extractAuthProvider(_config, CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE));
+    }
 
     // Start all components
     LOGGER.info("Initializing PinotFSFactory");
