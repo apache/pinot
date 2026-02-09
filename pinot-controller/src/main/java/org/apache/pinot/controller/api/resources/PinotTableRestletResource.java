@@ -739,7 +739,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @ApiParam(value = "Force config changes")
-      @QueryParam("forceConfigUpdate") @DefaultValue("false") boolean forceConfigUpdate,
+      @QueryParam("force") @DefaultValue("false") boolean force,
       @Context HttpHeaders headers,
       String tableConfigString)
       throws Exception {
