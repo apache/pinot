@@ -58,8 +58,8 @@ public class AuthUtils {
     properties.put("pinot.server.instance.auth.token", DEFAULT_AUTH_TOKEN);
 
     // minion
-    properties.put("segment.fetcher.auth.token", DEFAULT_AUTH_TOKEN);
-    properties.put("task.auth.token", DEFAULT_AUTH_TOKEN);
+    properties.put("pinot.minion.segment.fetcher.auth.token", DEFAULT_AUTH_TOKEN);
+    properties.put("pinot.minion.task.auth.token", DEFAULT_AUTH_TOKEN);
 
     // loggers
     properties.put("pinot.controller.logger.root.dir", "logs");
