@@ -33,6 +33,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
@@ -41,7 +43,9 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -69,6 +73,46 @@ public class MinionTaskUtils {
   public static final String UTC = "UTC";
 
   private MinionTaskUtils() {
+  }
+
+  /**
+   * Resolves the AuthProvider to use for Minion tasks.
+   * Priority order:
+   * 1. If AUTH_TOKEN is explicitly provided in task configs (by Controller), use it for this specific task
+   * 2. Otherwise, fall back to the runtime AuthProvider from MinionContext (enables per-request token rotation)
+   *
+   * This allows any minion task or util to resolve auth from task configs without requiring callers to pass
+   * AuthProvider explicitly.
+   */
+  public static AuthProvider resolveAuthProvider(Map<String, String> taskConfigs) {
+    String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
+    if (StringUtils.isNotBlank(explicitToken)) {
+      return AuthProviderUtils.makeAuthProvider(explicitToken);
+    }
+
+    AuthProvider runtimeProvider = MinionContext.getInstance().getTaskAuthProvider();
+    if (runtimeProvider == null || runtimeProvider instanceof NullAuthProvider) {
+      return new NullAuthProvider();
+    }
+
+    return runtimeProvider;
+  }
+
+  /**
+   * Resolves the auth token string to use for Minion tasks (e.g. for specs that accept a token string).
+   * If AUTH_TOKEN is already present in task configs, returns it without creating an AuthProvider.
+   * Otherwise resolves via {@link #resolveAuthProvider} and returns its static token.
+   *
+   * @param taskConfigs task config map (may contain MinionConstants.AUTH_TOKEN)
+   * @return auth token string, or null if none
+   */
+  @Nullable
+  public static String resolveAuthToken(Map<String, String> taskConfigs) {
+    String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
+    if (StringUtils.isNotBlank(explicitToken)) {
+      return explicitToken;
+    }
+    return AuthProviderUtils.toStaticToken(resolveAuthProvider(taskConfigs));
   }
 
   public static PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI)

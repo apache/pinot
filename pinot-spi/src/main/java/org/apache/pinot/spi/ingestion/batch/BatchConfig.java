@@ -71,7 +71,7 @@ public class BatchConfig {
 
     String inputFormat = batchConfigsMap.get(BatchConfigProperties.INPUT_FORMAT);
     if (inputFormat != null) {
-      _inputFormat = FileFormat.valueOf(inputFormat.toUpperCase());
+      _inputFormat = FileFormat.fromString(inputFormat);
     } else {
       _inputFormat = null;
     }

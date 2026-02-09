@@ -221,7 +221,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // The progress of a certain table rebalance job of a table
   TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false),
   // HTTP thread utilization
-  HTTP_THREAD_UTILIZATION("httpThreadUtilization", true);
+  HTTP_THREAD_UTILIZATION("httpThreadUtilization", true),
+  // Track the concurrent executions of the API resources that use @ManagedAsync
+  MANAGED_ASYNC_ACTIVE_THREADS("threads", true);
 
 
   private final String _gaugeName;
