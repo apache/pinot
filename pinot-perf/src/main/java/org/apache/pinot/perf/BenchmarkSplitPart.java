@@ -74,14 +74,14 @@ public class BenchmarkSplitPart {
         break;
       case "negative_index":
         // Extract last element from 100-field string
-        _input = buildString(100, ",");
         _delimiter = ",";
+        _input = buildString(100, _delimiter);
         _index = -1;
         break;
       case "large_negative_index":
         // Extract last element from 100-field string
-        _input = buildString(10000, ",");
         _delimiter = ",";
+        _input = buildString(10000, _delimiter);
         _index = -7242;
         break;
       case "adjacent_delimiters":
@@ -92,8 +92,8 @@ public class BenchmarkSplitPart {
         break;
       case "many_fields":
         // Extract 5th element from 1000-field string
-        _input = buildString(10000, "|");
-        _delimiter = "|";
+        _delimiter = ",";
+        _input = buildString(10000, _delimiter);
         _index = 4;
         break;
       case "multi_char_delim":
