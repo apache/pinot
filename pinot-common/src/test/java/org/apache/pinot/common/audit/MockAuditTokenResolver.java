@@ -44,6 +44,13 @@ public class MockAuditTokenResolver implements AuditTokenResolver {
   private final String _returnValue;
 
   /**
+   * No-arg constructor for PluginManager loading.
+   */
+  public MockAuditTokenResolver() {
+    _returnValue = null;
+  }
+
+  /**
    * Constructor for direct instantiation with configurable return value.
    */
   public MockAuditTokenResolver(@Nullable String returnValue) {
