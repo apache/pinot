@@ -25,9 +25,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
+import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.UriInfo;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -45,10 +48,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -61,6 +64,10 @@ public class PinotTaskRestletResourceTest {
   ControllerConf _controllerConf;
   @Mock
   UriInfo _uriInfo;
+  @Mock
+  Executor _executor;
+  @Mock
+  HttpClientConnectionManager _connectionManager;
 
   @InjectMocks
   PinotTaskRestletResource _pinotTaskRestletResource;
@@ -108,13 +115,18 @@ public class PinotTaskRestletResourceTest {
     when(_pinotHelixResourceManager.getAllMinionInstanceConfigs()).thenReturn(List.of(minion1, minion2));
     HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
     when(httpHeaders.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(_controllerConf.getMinionAdminRequestTimeoutSeconds()).thenReturn(10);
+    @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> minionWorkerEndpointsCaptor = ArgumentCaptor.forClass(Map.class);
     when(_pinotHelixTaskResourceManager.getSubtaskOnWorkerProgress(anyString(), any(), any(),
         minionWorkerEndpointsCaptor.capture(), anyMap(), anyInt()))
         .thenReturn(Collections.emptyMap());
-    String progress =
-        _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", minionWorkerIds);
-    assertEquals(progress, "{}");
+    AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
+    ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
+    _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", minionWorkerIds, asyncResponse);
+
+    verify(asyncResponse).resume(responseCaptor.capture());
+    assertEquals(responseCaptor.getValue(), "{}");
     return minionWorkerEndpointsCaptor.getValue();
   }
 
@@ -131,11 +143,16 @@ public class PinotTaskRestletResourceTest {
     when(_pinotHelixResourceManager.getAllMinionInstanceConfigs()).thenReturn(Collections.emptyList());
     HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
     when(httpHeaders.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(_controllerConf.getMinionAdminRequestTimeoutSeconds()).thenReturn(10);
     when(_pinotHelixTaskResourceManager
         .getSubtaskOnWorkerProgress(anyString(), any(), any(), anyMap(), anyMap(), anyInt()))
         .thenThrow(new RuntimeException());
-    assertThrows(ControllerApplicationException.class,
-        () -> _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", null));
+    AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
+    ArgumentCaptor<Throwable> responseCaptor = ArgumentCaptor.forClass(Throwable.class);
+    _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", null, asyncResponse);
+
+    verify(asyncResponse).resume(responseCaptor.capture());
+    assertTrue(responseCaptor.getValue() instanceof ControllerApplicationException);
   }
 
   @Test
@@ -146,8 +163,14 @@ public class PinotTaskRestletResourceTest {
 
     when(_pinotHelixTaskResourceManager.getTasksSummary(null)).thenReturn(emptyResponse);
 
-    PinotHelixTaskResourceManager.TaskSummaryResponse response = _pinotTaskRestletResource.getTasksSummary(null);
+    AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
+    ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
+    _pinotTaskRestletResource.getTasksSummary(null, asyncResponse);
 
+    verify(asyncResponse).resume(responseCaptor.capture());
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response =
+        (PinotHelixTaskResourceManager.TaskSummaryResponse) responseCaptor.getValue();
     assertNotNull(response);
     assertEquals(response.getTotalRunningTasks(), 0);
     assertEquals(response.getTotalWaitingTasks(), 0);
@@ -183,8 +206,14 @@ public class PinotTaskRestletResourceTest {
 
     when(_pinotHelixTaskResourceManager.getTasksSummary(null)).thenReturn(response);
 
-    PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse = _pinotTaskRestletResource.getTasksSummary(null);
+    AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
+    ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
+    _pinotTaskRestletResource.getTasksSummary(null, asyncResponse);
 
+    verify(asyncResponse).resume(responseCaptor.capture());
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse =
+        (PinotHelixTaskResourceManager.TaskSummaryResponse) responseCaptor.getValue();
     assertNotNull(actualResponse);
     assertEquals(actualResponse.getTotalRunningTasks(), 150);
     assertEquals(actualResponse.getTotalWaitingTasks(), 50);
@@ -228,9 +257,14 @@ public class PinotTaskRestletResourceTest {
 
     when(_pinotHelixTaskResourceManager.getTasksSummary("defaultTenant")).thenReturn(response);
 
-    PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse =
-        _pinotTaskRestletResource.getTasksSummary("defaultTenant");
+    AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
+    ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
+    _pinotTaskRestletResource.getTasksSummary("defaultTenant", asyncResponse);
 
+    verify(asyncResponse).resume(responseCaptor.capture());
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse actualResponse =
+        (PinotHelixTaskResourceManager.TaskSummaryResponse) responseCaptor.getValue();
     assertNotNull(actualResponse);
     assertEquals(actualResponse.getTotalRunningTasks(), 100);
     assertEquals(actualResponse.getTotalWaitingTasks(), 30);

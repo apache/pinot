@@ -119,7 +119,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getStreamPartitionId()).thenReturn(0);
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
+    when(segMngrA0.getSegmentName()).thenReturn(segA0);
+    when(segMngrA1.getSegmentName()).thenReturn(segA1);
+    when(segMngrB0.getSegmentName()).thenReturn(segB0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(200)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(2000)));
@@ -174,7 +180,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
     when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
     when(segMngrA0.getStreamPartitionId()).thenReturn(0);
+    when(segMngrA0.getSegmentName()).thenReturn(segA0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
 
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
@@ -247,7 +255,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getStreamPartitionId()).thenReturn(0);
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
+    when(segMngrA0.getSegmentName()).thenReturn(segA0);
+    when(segMngrA1.getSegmentName()).thenReturn(segA1);
+    when(segMngrB0.getSegmentName()).thenReturn(segB0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(200)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(2000)));
@@ -325,7 +339,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getStreamPartitionId()).thenReturn(0);
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
+    when(segMngrA0.getSegmentName()).thenReturn(segA0);
+    when(segMngrA1.getSegmentName()).thenReturn(segA1);
+    when(segMngrB0.getSegmentName()).thenReturn(segB0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(20)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
@@ -414,7 +434,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getStreamPartitionId()).thenReturn(0);
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
+    when(segMngrA0.getSegmentName()).thenReturn(segA0);
+    when(segMngrA1.getSegmentName()).thenReturn(segA1);
+    when(segMngrB0.getSegmentName()).thenReturn(segB0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(20)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
@@ -479,7 +505,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getStreamPartitionId()).thenReturn(0);
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
+    when(segMngrA0.getSegmentName()).thenReturn(segA0);
+    when(segMngrA1.getSegmentName()).thenReturn(segA1);
+    when(segMngrB0.getSegmentName()).thenReturn(segB0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(200)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(2000)));
@@ -555,7 +587,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getStreamPartitionId()).thenReturn(0);
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
+    when(segMngrA0.getSegmentName()).thenReturn(segA0);
+    when(segMngrA1.getSegmentName()).thenReturn(segA1);
+    when(segMngrB0.getSegmentName()).thenReturn(segB0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(200)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of());
@@ -580,6 +618,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // segB0              0                       0                      100               0
     setupLatestIngestionTimestamp(segMngrA0, 89L);
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(0)));
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
@@ -620,9 +659,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getSegmentName()).thenReturn(segA0);
     when(segMngrA1.getSegmentName()).thenReturn(segA1);
 
-    // segA0 provider throws TimeoutException - this should be caught and handled gracefully
-    when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong()))
-        .thenThrow(new TimeoutException("Timeout fetching latest stream offset"));
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    // segA0 provider throws RuntimeException - this should be caught and handled gracefully
+    // In practice, RealtimeSegmentMetadataUtils wraps TimeoutException in RuntimeException
+    when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenThrow(
+        new RuntimeException("Failed to fetch latest stream offset for segment: " + segA0,
+            new TimeoutException("Timeout fetching latest stream offset")));
     // segA1 provider works normally
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(20)));
 

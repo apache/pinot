@@ -361,8 +361,22 @@ public class WorkerManager {
     List<QueryServerInstance> candidateServers;
     if (context.isUseLeafServerForIntermediateStage()) {
       Set<QueryServerInstance> leafServerInstances = context.getLeafServerInstances();
-      assert !leafServerInstances.isEmpty();
-      candidateServers = new ArrayList<>(leafServerInstances);
+      if (leafServerInstances.isEmpty()) {
+        // Fall back to use all enabled servers if no leaf server is found (e.g., when querying an empty table).
+        LOGGER.warn("[RequestId: {}] No leaf server found with useLeafServerForIntermediateStage enabled, "
+            + "falling back to all enabled servers", context.getRequestId());
+        Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
+        candidateServers = new ArrayList<>(enabledServerInstanceMap.size());
+        for (ServerInstance serverInstance : enabledServerInstanceMap.values()) {
+          candidateServers.add(new QueryServerInstance(serverInstance));
+        }
+        if (candidateServers.isEmpty()) {
+          LOGGER.error("[RequestId: {}] No server instance found for intermediate stage", context.getRequestId());
+          throw new IllegalStateException("No server instance found for intermediate stage");
+        }
+      } else {
+        candidateServers = new ArrayList<>(leafServerInstances);
+      }
     } else {
       candidateServers = getCandidateServersPerTables(context);
     }
