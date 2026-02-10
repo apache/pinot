@@ -30,8 +30,6 @@ import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -41,7 +39,6 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Stable
 public interface StreamMetadataProvider extends Closeable {
 
-  Logger LOGGER = LoggerFactory.getLogger(StreamMetadataProvider.class);
   /**
    * Fetches the number of partitions for a topic given the stream configs
    * @param timeoutMillis Fetch timeout
@@ -92,28 +89,7 @@ public interface StreamMetadataProvider extends Closeable {
   default List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
       throws IOException, TimeoutException {
-
-    int partitionCount;
-    try {
-      partitionCount = fetchPartitionCount(timeoutMillis);
-    } catch (RuntimeException e) {
-      LOGGER.warn("Failed to fetch partition count for stream config: {}. "
-          + "Skipping stream and using existing partitions only. Error: {}",
-          streamConfig.getTopicName(), e.getMessage(), e);
-      // Return only the existing partition groups if we can't fetch partition count
-      // Add a PartitionGroupMetadata into the list, foreach partition already present in current.
-      // Setting endOffset (exclusive) as the startOffset for new partition group.
-      // If partition group is still in progress, this value will be null
-      List<PartitionGroupMetadata> existingPartitionGroupMetadataList =
-      new ArrayList<>(partitionGroupConsumptionStatuses.size());
-      for (PartitionGroupConsumptionStatus currentPartitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
-        existingPartitionGroupMetadataList.add(
-            new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getStreamPartitionGroupId(),
-                currentPartitionGroupConsumptionStatus.getEndOffset()));
-      }
-      return existingPartitionGroupMetadataList;
-    }
-
+    int partitionCount = fetchPartitionCount(timeoutMillis);
     List<PartitionGroupMetadata> newPartitionGroupMetadataList = new ArrayList<>(partitionCount);
 
     // Add a PartitionGroupMetadata into the list, foreach partition already present in current.

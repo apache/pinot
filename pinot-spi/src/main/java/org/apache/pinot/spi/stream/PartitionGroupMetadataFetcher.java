@@ -140,9 +140,9 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         _exception = e;
         return Boolean.FALSE;
       } catch (Exception e) {
-        LOGGER.warn("Could not get partition count for topic {}", topicName, e);
+        LOGGER.warn("Could not get partition count for topic {}. This topic will be skipped from ingestion.",
+            _topicNames.get(i), e);
         _exception = e;
-        throw e;
       }
     }
     return Boolean.TRUE;
