@@ -438,6 +438,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return Long.MIN_VALUE;
   }
 
+  @Override
+  public long getMinimumIngestionLagMs() {
+    return Long.MAX_VALUE;
+  }
+
   @Nullable
   @Override
   public List<StarTreeV2Metadata> getStarTreeV2MetadataList() {
