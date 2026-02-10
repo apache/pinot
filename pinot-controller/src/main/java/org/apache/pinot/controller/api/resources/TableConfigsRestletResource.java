@@ -369,7 +369,7 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "Force update the table schema") @DefaultValue("false") @QueryParam("forceTableSchemaUpdate")
       boolean forceTableSchemaUpdate,
       @ApiParam(value = "Force update config changes")
-      @QueryParam("forceConfigUpdate") @DefaultValue("false") boolean forceConfigUpdate,
+      @QueryParam("force") @DefaultValue("false") boolean force,
       String tableConfigsStr, @Context HttpHeaders headers)
       throws Exception {
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(headers);
@@ -408,7 +408,7 @@ public class TableConfigsRestletResource {
       if (offlineTableConfig != null) {
         tuneConfig(offlineTableConfig, schema);
         if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          _pinotHelixResourceManager.updateTableConfig(offlineTableConfig, forceConfigUpdate);
+          _pinotHelixResourceManager.updateTableConfig(offlineTableConfig, force);
           LOGGER.info("Updated offline table config: {}", tableName);
         } else {
           _pinotHelixResourceManager.addTable(offlineTableConfig);
@@ -418,7 +418,7 @@ public class TableConfigsRestletResource {
       if (realtimeTableConfig != null) {
         tuneConfig(realtimeTableConfig, schema);
         if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig, forceConfigUpdate);
+          _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig, force);
           LOGGER.info("Updated realtime table config: {}", tableName);
         } else {
           _pinotHelixResourceManager.addTable(realtimeTableConfig);

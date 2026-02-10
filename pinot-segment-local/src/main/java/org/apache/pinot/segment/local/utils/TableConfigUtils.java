@@ -43,7 +43,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -1181,7 +1180,7 @@ public final class TableConfigUtils {
    *
    * @param newConfig the new table config being applied
    * @param existingConfig the existing table config
-   * @throws TableConfigBackwardIncompatibleException if any critical config field is changed
+   * @return list of violations (empty if no violations)
    */
   public static List<String> validateBackwardCompatibility(TableConfig newConfig, TableConfig existingConfig) {
     List<String> violations = new ArrayList<>();
