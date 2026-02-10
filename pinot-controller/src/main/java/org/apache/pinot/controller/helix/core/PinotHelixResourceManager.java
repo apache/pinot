@@ -2261,8 +2261,7 @@ public class PinotHelixResourceManager {
    * @param expectedVersion the expected version (-1 to ignore version check)
    * @param force if true, allows upsert/dedup config changes with a warning
    */
-  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
-      throws TableConfigBackwardIncompatibleException {
+  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force) {
     String tableNameWithType = tableConfig.getTableName();
     TableConfig existingTableConfig = getTableConfig(tableNameWithType);
     if (existingTableConfig != null) {
@@ -2275,7 +2274,7 @@ public class PinotHelixResourceManager {
               + "pause consumption beforehand and disable SNAPSHOT mode in upsertConfig and restart for the changes"
               + " to kick in. If in doubt, recreate the table with the new configuration.", tableName, violations);
         } else {
-          throw new TableConfigBackwardIncompatibleException(String.format(
+          throw new InvalidTableConfigException(String.format(
               "Failed to update table '%s': Cannot modify %s as it may lead to data inconsistencies. "
                   + "Please create a new table instead.", tableName, violations));
         }
