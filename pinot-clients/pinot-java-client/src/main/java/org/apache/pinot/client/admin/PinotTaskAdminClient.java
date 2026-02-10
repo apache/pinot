@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,8 +157,8 @@ public class PinotTaskAdminClient {
    * @return Task counts as JSON string
    * @throws PinotAdminException If the request fails
    */
-  public String getTaskCounts(String taskType, String state, String tableNameWithType,
-      Integer minNumSubtasks)
+  public String getTaskCounts(String taskType, @Nullable String state, @Nullable String tableNameWithType,
+      @Nullable Integer minNumSubtasks)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     if (state != null) {
@@ -239,7 +240,7 @@ public class PinotTaskAdminClient {
    * @return Task debug information as JSON string
    * @throws PinotAdminException If the request fails
    */
-  public String getTaskDebugInfo(String taskName, int verbosity, String tableNameWithType)
+  public String getTaskDebugInfo(String taskName, int verbosity, @Nullable String tableNameWithType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
     queryParams.put("verbosity", String.valueOf(verbosity));
@@ -290,6 +291,40 @@ public class PinotTaskAdminClient {
     JsonNode response =
         _transport.executeGet(_controllerAddress, "/tasks/subtask/" + taskName + "/state", null, _headers);
     return PinotAdminTransport.getObjectMapper().convertValue(response.get("subtaskStates"), Map.class);
+  }
+
+  /**
+   * Stops the task queue for a given task type.
+   */
+  public String stopTaskQueue(String taskType)
+      throws PinotAdminException {
+    JsonNode response =
+        _transport.executePut(_controllerAddress, "/tasks/" + taskType + "/stop", null, null, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Resumes the task queue for a given task type.
+   */
+  public String resumeTaskQueue(String taskType)
+      throws PinotAdminException {
+    JsonNode response =
+        _transport.executePut(_controllerAddress, "/tasks/" + taskType + "/resume", null, null, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Deletes a task by name.
+   *
+   * @param taskName Task name
+   * @param forceDelete Whether to force delete an active task
+   */
+  public String deleteTask(String taskName, boolean forceDelete)
+      throws PinotAdminException {
+    Map<String, String> queryParams = Map.of("forceDelete", String.valueOf(forceDelete));
+    JsonNode response =
+        _transport.executeDelete(_controllerAddress, "/tasks/task/" + taskName, queryParams, _headers);
+    return response.toString();
   }
 
   // Async versions of key methods

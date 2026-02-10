@@ -22,14 +22,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,65 +85,88 @@ public class TableOp extends BaseOp {
 
   @Override
   boolean runOp(int generationNumber) {
-    switch (_op) {
-      case CREATE:
-        if (!createSchema()) {
-          return false;
-        }
-        return createTable();
-      case DELETE:
-        return deleteTable();
-      case UPDATE_CONFIG:
-        LOGGER.info("Updating table config to {}", _tableConfigFileName);
-        break;
-      case UPDATE_SCHEMA:
-        LOGGER.info("Updating schema to {}", _schemaFileName);
-        break;
-      default:
-        break;
+    try (PinotAdminClient adminClient = createPinotAdminClient()) {
+      switch (_op) {
+        case CREATE:
+          if (!createSchema(adminClient)) {
+            return false;
+          }
+          return createTable(adminClient);
+        case DELETE:
+          return deleteTable(adminClient);
+        case UPDATE_CONFIG:
+          return updateTableConfig(adminClient);
+        case UPDATE_SCHEMA:
+          return updateSchema(adminClient);
+        default:
+          return true;
+      }
+    } catch (Exception e) {
+      LOGGER.error("Failed to run table op {}", _op, e);
+      return false;
     }
-    return true;
   }
 
-  private boolean createSchema() {
+  private boolean createSchema(PinotAdminClient adminClient) {
     try {
-      Map<String, String> headers = new HashMap<>() {{
-        put("Content-type", "application/json");
-      }};
-      ControllerTest.sendPostRequestRaw(
-          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl()).forSchemaCreate(),
-          FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName)), Charset.defaultCharset()),
-          headers);
+      String schemaJson = FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName)),
+          Charset.defaultCharset());
+      adminClient.getSchemaClient().createSchema(schemaJson, true, false);
       return true;
-    } catch (IOException e) {
+    } catch (IOException | PinotAdminException e) {
       LOGGER.error("Failed to create schema with file: {}", _schemaFileName, e);
       return false;
     }
   }
 
-  private boolean createTable() {
+  private boolean createTable(PinotAdminClient adminClient) {
     try {
-      ControllerTest.sendPostRequestRaw(
-          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl()).forTableCreate(),
+      adminClient.getTableClient().createTable(
           FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName)), Charset.defaultCharset()),
-          Collections.emptyMap());
+          null);
       return true;
-    } catch (IOException e) {
+    } catch (IOException | PinotAdminException e) {
       LOGGER.error("Failed to create table with file: {}", _tableConfigFileName, e);
       return false;
     }
   }
 
-  private boolean deleteTable() {
+  private boolean deleteTable(PinotAdminClient adminClient) {
     try {
       TableConfig tableConfig =
           JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
-      ControllerTest.sendDeleteRequest(
-          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
-              .forTableDelete(tableConfig.getTableName()));
+      adminClient.getTableClient().deleteTable(tableConfig.getTableName());
       return true;
-    } catch (IOException e) {
+    } catch (IOException | PinotAdminException e) {
       LOGGER.error("Failed to delete table with file: {}", _tableConfigFileName, e);
+      return false;
+    }
+  }
+
+  private boolean updateTableConfig(PinotAdminClient adminClient) {
+    try {
+      String tableConfigJson =
+          FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName)), Charset.defaultCharset());
+      TableConfig tableConfig = JsonUtils.stringToObject(tableConfigJson, TableConfig.class);
+      String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+      adminClient.getTableClient().updateTableConfig(rawTableName, tableConfigJson);
+      return true;
+    } catch (IOException | PinotAdminException e) {
+      LOGGER.error("Failed to update table config from {}", _tableConfigFileName, e);
+      return false;
+    }
+  }
+
+  private boolean updateSchema(PinotAdminClient adminClient) {
+    try {
+      String schemaJson =
+          FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName)), Charset.defaultCharset());
+      org.apache.pinot.spi.data.Schema schema =
+          org.apache.pinot.spi.data.Schema.fromString(schemaJson);
+      adminClient.getSchemaClient().updateSchema(schema.getSchemaName(), schemaJson);
+      return true;
+    } catch (IOException | PinotAdminException e) {
+      LOGGER.error("Failed to update schema from {}", _schemaFileName, e);
       return false;
     }
   }

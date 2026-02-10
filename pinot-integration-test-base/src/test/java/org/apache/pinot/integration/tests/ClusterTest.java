@@ -446,7 +446,7 @@ public abstract class ClusterTest extends ControllerTest {
     int numSegments = segmentTarFiles.size();
     assertTrue(numSegments > 0);
 
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getOrCreateAdminClient().getSegmentUploadUrl());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles.get(0);
@@ -820,9 +820,8 @@ public abstract class ClusterTest extends ControllerTest {
 
   public JsonNode cancelQuery(String clientQueryId)
       throws Exception {
-    URI cancelURI = URI.create(getControllerRequestURLBuilder().forCancelQueryByClientId(clientQueryId));
-    Object o = _httpClient.sendDeleteRequest(cancelURI);
-    return null; // TODO
+    String response = getOrCreateAdminClient().getClusterClient().cancelQueryByClientId(clientQueryId);
+    return JsonUtils.stringToJsonNode(response);
   }
 
   /**

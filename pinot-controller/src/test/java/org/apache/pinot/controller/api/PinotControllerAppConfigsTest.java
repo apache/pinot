@@ -50,11 +50,11 @@ public class PinotControllerAppConfigsTest {
    */
   @Test
   public void testControllerAppConfigs()
-      throws IOException {
+      throws Exception {
     ControllerConf expectedControllerConf = TEST_INSTANCE.getControllerConfig();
     PinotAppConfigs expected = new PinotAppConfigs(expectedControllerConf);
 
-    String configsJson = ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forAppConfigs());
+    String configsJson = TEST_INSTANCE.getOrCreateAdminClient().getClusterClient().getAppConfigs();
     PinotAppConfigs actual = JsonUtils.stringToObject(configsJson, PinotAppConfigs.class);
 
     // RuntimeConfig is not checked as it has information that can change during the test run.

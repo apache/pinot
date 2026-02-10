@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client.admin;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -65,8 +67,13 @@ public class PinotAdminTransport implements AutoCloseable {
   private final String _scheme;
   private final Map<String, String> _defaultHeaders;
   private final int _requestTimeoutMs;
+  private final SSLContext _sslContext;
 
   public PinotAdminTransport(Properties properties, Map<String, String> authHeaders) {
+    this(properties, authHeaders, null);
+  }
+
+  public PinotAdminTransport(Properties properties, Map<String, String> authHeaders, SSLContext sslContext) {
     _defaultHeaders = authHeaders != null ? authHeaders : Map.of();
 
     // Extract timeout configuration
@@ -77,6 +84,8 @@ public class PinotAdminTransport implements AutoCloseable {
     _scheme = scheme;
 
     // Build HTTP client
+    _sslContext = sslContext;
+
     Builder builder = Dsl.config()
         .setRequestTimeout(Duration.ofMillis(_requestTimeoutMs))
         .setReadTimeout(Duration.ofMillis(_requestTimeoutMs))
@@ -86,8 +95,8 @@ public class PinotAdminTransport implements AutoCloseable {
     // Configure SSL if needed
     if (CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(scheme)) {
       try {
-        SSLContext sslContext = SSLContext.getDefault();
-        builder.setSslContext(new io.netty.handler.ssl.JdkSslContext(sslContext, true,
+        SSLContext contextToUse = _sslContext != null ? _sslContext : SSLContext.getDefault();
+        builder.setSslContext(new io.netty.handler.ssl.JdkSslContext(contextToUse, true,
             io.netty.handler.ssl.ClientAuth.OPTIONAL));
       } catch (Exception e) {
         LOGGER.warn("Failed to configure SSL context, proceeding without SSL", e);
@@ -96,6 +105,20 @@ public class PinotAdminTransport implements AutoCloseable {
 
     _httpClient = Dsl.asyncHttpClient(builder.build());
     LOGGER.info("Initialized Pinot admin transport with scheme: {}, timeout: {}ms", scheme, _requestTimeoutMs);
+  }
+
+  /**
+   * Returns the scheme (http/https) used by this transport.
+   */
+  public String getScheme() {
+    return _scheme;
+  }
+
+  /**
+   * Returns the SSL context used by this transport, or {@code null} if SSL is not configured.
+   */
+  SSLContext getSslContext() {
+    return _sslContext;
   }
 
   /**
@@ -115,6 +138,39 @@ public class PinotAdminTransport implements AutoCloseable {
       return executeGetAsync(controllerAddress, path, queryParams, headers).get(_requestTimeoutMs,
           java.util.concurrent.TimeUnit.MILLISECONDS);
     } catch (Exception e) {
+      PinotAdminException pinotAdminException = unwrapPinotAdminException(e);
+      if (pinotAdminException != null) {
+        throw pinotAdminException;
+      }
+      if (e.getCause() instanceof RuntimeException) {
+        throw (RuntimeException) e.getCause();
+      }
+      throw new PinotAdminException("Failed to execute GET request to " + path, e);
+    }
+  }
+
+  /**
+   * Executes a GET request to the specified path and returns the raw bytes.
+   *
+   * @param controllerAddress Controller address
+   * @param path Request path
+   * @param queryParams Query parameters
+   * @param headers Additional headers
+   * @return Response body as bytes
+   * @throws PinotAdminException If the request fails
+   */
+  public byte[] executeGetBinary(String controllerAddress, String path, Map<String, String> queryParams,
+      Map<String, String> headers)
+      throws PinotAdminException {
+    try {
+      Response response = executeRequestAsync(controllerAddress, path, "GET", null, queryParams, headers)
+          .get(_requestTimeoutMs, TimeUnit.MILLISECONDS);
+      return response.getResponseBodyAsBytes();
+    } catch (Exception e) {
+      PinotAdminException pinotAdminException = unwrapPinotAdminException(e);
+      if (pinotAdminException != null) {
+        throw pinotAdminException;
+      }
       if (e.getCause() instanceof RuntimeException) {
         throw (RuntimeException) e.getCause();
       }
@@ -133,12 +189,19 @@ public class PinotAdminTransport implements AutoCloseable {
    */
   public CompletableFuture<JsonNode> executeGetAsync(String controllerAddress, String path,
       Map<String, String> queryParams, Map<String, String> headers) {
-    return executeRequestAsync(controllerAddress, path, "GET", null, queryParams, headers)
-        .thenApply(this::parseResponse)
-        .exceptionally(throwable -> {
-          LOGGER.error("Failed to execute GET request to " + path, throwable);
-          throw new RuntimeException("Failed to execute GET request", throwable);
-        });
+    return executeRequestAsync(controllerAddress, path, "GET", null, queryParams, headers).thenCompose(response -> {
+      try {
+        return CompletableFuture.completedFuture(parseResponse(response));
+      } catch (PinotAdminException e) {
+        CompletableFuture<JsonNode> future = new CompletableFuture<>();
+        future.completeExceptionally(e);
+        return future;
+      }
+    }).whenComplete((ignoredResult, throwable) -> {
+      if (throwable != null) {
+        LOGGER.error("Failed to execute GET request to {}", path, throwable);
+      }
+    });
   }
 
   /**
@@ -157,8 +220,12 @@ public class PinotAdminTransport implements AutoCloseable {
       throws PinotAdminException {
     try {
       return executePostAsync(controllerAddress, path, body, queryParams, headers).get(_requestTimeoutMs,
-          java.util.concurrent.TimeUnit.MILLISECONDS);
+          TimeUnit.MILLISECONDS);
     } catch (Exception e) {
+      PinotAdminException pinotAdminException = unwrapPinotAdminException(e);
+      if (pinotAdminException != null) {
+        throw pinotAdminException;
+      }
       if (e.getCause() instanceof RuntimeException) {
         throw (RuntimeException) e.getCause();
       }
@@ -178,12 +245,19 @@ public class PinotAdminTransport implements AutoCloseable {
    */
   public CompletableFuture<JsonNode> executePostAsync(String controllerAddress, String path, Object body,
       Map<String, String> queryParams, Map<String, String> headers) {
-    return executeRequestAsync(controllerAddress, path, "POST", body, queryParams, headers)
-        .thenApply(this::parseResponse)
-        .exceptionally(throwable -> {
-          LOGGER.error("Failed to execute POST request to " + path, throwable);
-          throw new RuntimeException("Failed to execute POST request", throwable);
-        });
+    return executeRequestAsync(controllerAddress, path, "POST", body, queryParams, headers).thenCompose(response -> {
+      try {
+        return CompletableFuture.completedFuture(parseResponse(response));
+      } catch (PinotAdminException e) {
+        CompletableFuture<JsonNode> future = new CompletableFuture<>();
+        future.completeExceptionally(e);
+        return future;
+      }
+    }).whenComplete((ignoredResult, throwable) -> {
+      if (throwable != null) {
+        LOGGER.error("Failed to execute POST request to {}", path, throwable);
+      }
+    });
   }
 
   /**
@@ -204,6 +278,10 @@ public class PinotAdminTransport implements AutoCloseable {
       return executePutAsync(controllerAddress, path, body, queryParams, headers).get(_requestTimeoutMs,
           java.util.concurrent.TimeUnit.MILLISECONDS);
     } catch (Exception e) {
+      PinotAdminException pinotAdminException = unwrapPinotAdminException(e);
+      if (pinotAdminException != null) {
+        throw pinotAdminException;
+      }
       if (e.getCause() instanceof RuntimeException) {
         throw (RuntimeException) e.getCause();
       }
@@ -223,12 +301,19 @@ public class PinotAdminTransport implements AutoCloseable {
    */
   public CompletableFuture<JsonNode> executePutAsync(String controllerAddress, String path, Object body,
       Map<String, String> queryParams, Map<String, String> headers) {
-    return executeRequestAsync(controllerAddress, path, "PUT", body, queryParams, headers)
-        .thenApply(this::parseResponse)
-        .exceptionally(throwable -> {
-          LOGGER.error("Failed to execute PUT request to " + path, throwable);
-          throw new RuntimeException("Failed to execute PUT request", throwable);
-        });
+    return executeRequestAsync(controllerAddress, path, "PUT", body, queryParams, headers).thenCompose(response -> {
+      try {
+        return CompletableFuture.completedFuture(parseResponse(response));
+      } catch (PinotAdminException e) {
+        CompletableFuture<JsonNode> future = new CompletableFuture<>();
+        future.completeExceptionally(e);
+        return future;
+      }
+    }).whenComplete((ignoredResult, throwable) -> {
+      if (throwable != null) {
+        LOGGER.error("Failed to execute PUT request to {}", path, throwable);
+      }
+    });
   }
 
   /**
@@ -248,6 +333,10 @@ public class PinotAdminTransport implements AutoCloseable {
       return executeDeleteAsync(controllerAddress, path, queryParams, headers).get(_requestTimeoutMs,
           java.util.concurrent.TimeUnit.MILLISECONDS);
     } catch (Exception e) {
+      PinotAdminException pinotAdminException = unwrapPinotAdminException(e);
+      if (pinotAdminException != null) {
+        throw pinotAdminException;
+      }
       if (e.getCause() instanceof RuntimeException) {
         throw (RuntimeException) e.getCause();
       }
@@ -266,12 +355,19 @@ public class PinotAdminTransport implements AutoCloseable {
    */
   public CompletableFuture<JsonNode> executeDeleteAsync(String controllerAddress, String path,
       Map<String, String> queryParams, Map<String, String> headers) {
-    return executeRequestAsync(controllerAddress, path, "DELETE", null, queryParams, headers)
-        .thenApply(this::parseResponse)
-        .exceptionally(throwable -> {
-          LOGGER.error("Failed to execute DELETE request to " + path, throwable);
-          throw new RuntimeException("Failed to execute DELETE request", throwable);
-        });
+    return executeRequestAsync(controllerAddress, path, "DELETE", null, queryParams, headers).thenCompose(response -> {
+      try {
+        return CompletableFuture.completedFuture(parseResponse(response));
+      } catch (PinotAdminException e) {
+        CompletableFuture<JsonNode> future = new CompletableFuture<>();
+        future.completeExceptionally(e);
+        return future;
+      }
+    }).whenComplete((ignoredResult, throwable) -> {
+      if (throwable != null) {
+        LOGGER.error("Failed to execute DELETE request to {}", path, throwable);
+      }
+    });
   }
 
   private CompletableFuture<Response> executeRequestAsync(String controllerAddress, String path, String method,
@@ -382,7 +478,8 @@ public class PinotAdminTransport implements AutoCloseable {
     }
   }
 
-  private JsonNode parseResponse(Response response) {
+  private JsonNode parseResponse(Response response)
+      throws PinotAdminException {
     try {
       int statusCode = response.getStatusCode();
       String responseBody = response.getResponseBody();
@@ -391,7 +488,12 @@ public class PinotAdminTransport implements AutoCloseable {
         if (responseBody == null || responseBody.trim().isEmpty()) {
           return OBJECT_MAPPER.createObjectNode();
         }
-        return OBJECT_MAPPER.readTree(responseBody);
+        try {
+          return OBJECT_MAPPER.readTree(responseBody);
+        } catch (JsonProcessingException e) {
+          // Some endpoints return plain text payloads; wrap them into a JSON node so callers can continue.
+          return OBJECT_MAPPER.createObjectNode().put("response", responseBody);
+        }
       } else {
         // Handle specific error cases
         if (statusCode == 401) {
@@ -403,30 +505,28 @@ public class PinotAdminTransport implements AutoCloseable {
         } else if (statusCode >= 400 && statusCode < 500) {
           throw new PinotAdminValidationException("Client error (status: " + statusCode + "): " + responseBody);
         } else {
-          throw new PinotAdminException("HTTP request failed with status: " + statusCode
-              + ", body: " + responseBody);
+          String uri = response.getUri() != null ? response.getUri().toString() : "unknown";
+          throw new PinotAdminException(
+              "HTTP request failed with status: " + statusCode + ", url: " + uri + ", body: " + responseBody);
         }
       }
+    } catch (PinotAdminException e) {
+      throw e;
     } catch (Exception e) {
-      int statusCode = -1;
-      String responseBodyExcerpt = "";
-      try {
-        if (response != null) {
-          statusCode = response.getStatusCode();
-          String body = response.getResponseBody();
-          if (body != null) {
-            responseBodyExcerpt = body.length() > 200 ? body.substring(0, 200) + "..." : body;
-          }
-        }
-      } catch (Exception inner) {
-        // Ignore, use defaults
-      }
-      LOGGER.warn("Failed to parse response (status: {}, body excerpt: '{}')", statusCode, responseBodyExcerpt, e);
-      throw new RuntimeException(
-          "Failed to parse response (status: " + statusCode + ", body excerpt: '" + responseBodyExcerpt
-              + "', exception: " + e.getClass().getSimpleName() + ")",
-          e);
+      LOGGER.warn("Unrecognized error: {}", e.getCause(), e);
+      throw new PinotAdminException(e);
     }
+  }
+
+  private static PinotAdminException unwrapPinotAdminException(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      if (current instanceof PinotAdminException) {
+        return (PinotAdminException) current;
+      }
+      current = current.getCause();
+    }
+    return null;
   }
 
   @Override

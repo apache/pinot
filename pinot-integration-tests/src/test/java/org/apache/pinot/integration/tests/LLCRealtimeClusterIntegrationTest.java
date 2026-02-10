@@ -142,7 +142,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       TestUtils.waitForCondition(() -> isOffline(partition, seqNum), 5000L, timeoutMs,
           "Failed to find offline segment in partition " + partition + " seqNum ", true,
           Duration.ofMillis(timeoutMs / 10));
-      getControllerRequestClient().runPeriodicTask("RealtimeSegmentValidationManager");
+      getOrCreateAdminClient().getClusterClient().runPeriodicTask("RealtimeSegmentValidationManager");
     }
   }
 
@@ -222,7 +222,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     if (onlyFirstSegment) {
       numSegments = 1;
     }
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getOrCreateAdminClient().getSegmentUploadUrl());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles[0];
@@ -442,16 +442,14 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
 
   private String forceCommit(String tableName)
       throws Exception {
-    String response = sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName), null);
+    String response = getOrCreateAdminClient().getTableClient().forceCommit(tableName);
     return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
   }
 
   private String forceCommit(String tableName, int batchSize, int batchIntervalSec, int batchTimeoutSec)
       throws Exception {
-    String response = sendPostRequest(
-        _controllerRequestURLBuilder.forTableForceCommit(tableName) + "?batchSize=" + batchSize
-            + "&batchStatusCheckIntervalSec=" + batchIntervalSec + "&batchStatusCheckTimeoutSec=" + batchTimeoutSec,
-        null);
+    String response = getOrCreateAdminClient().getTableClient()
+        .forceCommit(tableName, batchSize, batchIntervalSec, batchTimeoutSec);
     return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
   }
 
@@ -482,7 +480,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
 
   public boolean isForceCommitJobCompleted(String forceCommitJobId)
       throws Exception {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forForceCommitJobStatus(forceCommitJobId));
+    String jobStatusResponse = getOrCreateAdminClient().getTableClient().getForceCommitJobStatus(forceCommitJobId);
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
 
     assertEquals(jobStatus.get("jobId").asText(), forceCommitJobId);

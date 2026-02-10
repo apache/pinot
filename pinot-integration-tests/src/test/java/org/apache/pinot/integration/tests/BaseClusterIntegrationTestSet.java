@@ -23,7 +23,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URL;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -33,13 +33,10 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.http.HttpStatus;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
@@ -693,16 +690,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   public String reloadTableAndValidateResponse(String tableName, TableType tableType, boolean forceDownload)
-      throws IOException {
+      throws Exception {
     String response =
-        sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload), null);
+        getOrCreateAdminClient().getSegmentClient().reloadTable(tableName, tableType.name(), forceDownload);
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     JsonNode responseJson = JsonUtils.stringToJsonNode(response);
     JsonNode tableLevelDetails = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
     String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
     assertEquals(isZKWriteSuccess, "SUCCESS");
     String jobId = tableLevelDetails.get("reloadJobId").asText();
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forSegmentReloadStatus(jobId));
+    String jobStatusResponse = getOrCreateAdminClient().getSegmentClient().getSegmentReloadStatus(jobId);
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
 
     // Validate all fields are present
@@ -714,7 +711,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   public boolean isReloadJobCompleted(String reloadJobId)
       throws Exception {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forSegmentReloadStatus(reloadJobId));
+    String jobStatusResponse = getOrCreateAdminClient().getSegmentClient().getSegmentReloadStatus(reloadJobId);
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
 
     assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
@@ -911,25 +908,39 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     return new MetricFieldSpec(column, dataType);
   }
 
+  protected String triggerTableRebalance(RebalanceConfig rebalanceConfig, TableType tableType)
+      throws IOException {
+    try {
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("type", tableType.toString());
+      String[] params = rebalanceConfig.toQueryString().split("&");
+      for (String param : params) {
+        String[] kv = param.split("=", 2);
+        if (kv.length == 2) {
+          queryParams.put(kv[0], kv[1]);
+        }
+      }
+      JsonNode response = getOrCreateAdminClient().executeRequest("POST",
+          "/tables/" + getTableName() + "/rebalance", null, queryParams, null);
+      return response.toString();
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
+  }
+
+  @Deprecated
   protected String getTableRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
-    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
-        + "?type=" + tableType.toString() + "&" + rebalanceConfig.toQueryString();
+    return controllerUrl(StringUtil.join("/", "tables", getTableName(), "rebalance"))
+        + "?type=" + tableType + "&" + rebalanceConfig.toQueryString();
   }
 
   protected void waitForRebalanceToComplete(String rebalanceJobId, long timeoutMs) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(rebalanceJobId);
-        SimpleHttpResponse httpResponse =
-            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
+        String response = getOrCreateAdminClient().getClusterClient().getRebalanceStatus(rebalanceJobId);
         ServerRebalanceJobStatusResponse rebalanceStatus =
-            JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
+            JsonUtils.stringToObject(response, ServerRebalanceJobStatusResponse.class);
         return rebalanceStatus.getTableRebalanceProgressStats().getStatus() == RebalanceResult.Status.DONE;
-      } catch (HttpErrorStatusException e) {
-        if (e.getStatusCode() != HttpStatus.SC_NOT_FOUND) {
-          Assert.fail("Caught unexpected HTTP error while waiting for rebalance to complete: " + e.getMessage(), e);
-        }
-        return null;
       } catch (Exception e) {
         Assert.fail("Caught exception while waiting for rebalance to complete", e);
         return null;
@@ -940,16 +951,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   protected void waitForTableEVISConverge(String tableName, long timeoutMs) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forIdealState(tableName);
-        SimpleHttpResponse httpResponse =
-            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-        TableViews.TableView idealState =
-            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
+        String idealStateJson = getOrCreateAdminClient().getTableClient().getIdealState(tableName);
+        TableViews.TableView idealState = JsonUtils.stringToObject(idealStateJson, TableViews.TableView.class);
 
-        requestUrl = getControllerRequestURLBuilder().forExternalView(tableName);
-        httpResponse = getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null);
-        TableViews.TableView externalView =
-            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
+        String externalViewJson = getOrCreateAdminClient().getTableClient().getExternalView(tableName);
+        TableViews.TableView externalView = JsonUtils.stringToObject(externalViewJson, TableViews.TableView.class);
         return idealState._realtime.equals(externalView._realtime) && idealState._offline.equals(externalView._offline);
       } catch (Exception e) {
         Assert.fail("Caught exception while waiting for table EV and IS to converge", e);
@@ -1005,7 +1011,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     rebalanceConfig.setForceCommit(true);
 
     // Execute rebalance
-    String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    String response = triggerTableRebalance(rebalanceConfig, TableType.REALTIME);
     RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
 
     // Get original consuming segments (if present)
@@ -1028,7 +1034,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Check if segments were committed (only if there were consuming segments to move)
     if (originalConsumingSegmentsToMove != null && !originalConsumingSegmentsToMove.isEmpty()) {
-      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
+      response = getOrCreateAdminClient().getTableClient().getConsumingSegmentsInfo(getTableName());
       ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
           JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
       LLCSegmentName consumingSegmentNow = new LLCSegmentName(

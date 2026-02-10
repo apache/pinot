@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -179,11 +178,10 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   }
 
   private Map<String, TableStaleSegmentResponse> getStaleSegmentsResponse()
-      throws IOException {
-    return JsonUtils.stringToObject(sendGetRequest(
-            _controllerRequestURLBuilder.forStaleSegments(
-                TableNameBuilder.OFFLINE.tableNameWithType(getTableName()))),
-        new TypeReference<Map<String, TableStaleSegmentResponse>>() { });
+      throws Exception {
+    String response = getOrCreateAdminClient().getSegmentClient()
+        .getStaleSegments(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()));
+    return JsonUtils.stringToObject(response, new TypeReference<Map<String, TableStaleSegmentResponse>>() { });
   }
 
   @AfterClass

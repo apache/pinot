@@ -94,7 +94,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
-    getControllerRequestClient().addSchema(schema);
+    addSchema(schema);
     TableConfig offlineTableConfig = createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
 

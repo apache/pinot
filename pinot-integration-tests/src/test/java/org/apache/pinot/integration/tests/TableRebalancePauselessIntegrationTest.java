@@ -131,7 +131,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       rebalanceConfig.setIncludeConsuming(true);
       rebalanceConfig.setMinAvailableReplicas(0);
 
-      String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      String response = triggerTableRebalance(rebalanceConfig, TableType.REALTIME);
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
       RebalanceSummaryResult summary = rebalanceResult.getRebalanceSummaryResult();
       assertEquals(
@@ -185,9 +185,9 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       // notice that this could get an HTTP 409 CONFLICT, when the test failed due to the timeout waiting on the table
       // to converge, and try to rebalance again here. So we need to cancel the original job first.
       sendDeleteRequest(
-          StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
+          controllerUrl(StringUtil.join("/", "tables", getTableName(), "rebalance"))
               + "?type=" + tableConfig.getTableType().toString());
-      String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      String response = triggerTableRebalance(rebalanceConfig, TableType.REALTIME);
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
       waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       serverStarter0.stop();

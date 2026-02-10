@@ -31,7 +31,6 @@ import org.apache.pinot.common.auth.UrlAuthProvider;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -150,7 +149,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   public void testUnauthenticatedFailure()
       throws IOException {
     sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType("mytable")));
+        getControllerBaseApiUrl() + "/tables/" + TableNameBuilder.REALTIME.tableNameWithType("mytable"));
   }
 
   @Test
@@ -167,7 +166,8 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
     // wait for offline segments
     List<String> offlineSegments = TestUtils.waitForResult(() -> {
       List<String> currentOfflineSegments =
-          getControllerRequestClient().listSegments(getTableName(), TableType.OFFLINE.name(), false);
+          getOrCreateAdminClient().getSegmentClient()
+              .listSegments(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), false);
       Assert.assertFalse(currentOfflineSegments.isEmpty());
       return currentOfflineSegments;
     }, 30000);
@@ -178,9 +178,9 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
 
     // download and sanity-check size of offline segment(s)
     for (String segment : offlineSegments) {
-      Assert.assertTrue(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
-              > 200000); // download segment
+      byte[] segmentBytes = getOrCreateAdminClient().getSegmentApiClient()
+          .downloadSegment(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), segment);
+      Assert.assertTrue(segmentBytes.length > 200000); // download segment
     }
   }
 }

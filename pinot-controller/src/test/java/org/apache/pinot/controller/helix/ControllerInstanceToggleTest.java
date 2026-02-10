@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix;
 
 import java.io.IOException;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -50,15 +51,15 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   @Test
   public void testInstanceToggle()
       throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     // Create schema
-    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(),
-        createDummySchema(RAW_TABLE_NAME).toPrettyJsonString());
+    adminClient.getSchemaClient().createSchema(createDummySchema(RAW_TABLE_NAME).toPrettyJsonString());
 
     // Create an offline table
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(DEFAULT_MIN_NUM_REPLICAS)
             .build();
-    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
+    adminClient.getTableClient().createTable(tableConfig.toJsonString(), null);
     assertEquals(DEFAULT_INSTANCE.getHelixAdmin()
         .getResourceIdealState(DEFAULT_INSTANCE.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
         .getPartitionSet().size(), 1);
@@ -110,19 +111,24 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     }
 
     // Delete table
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(RAW_TABLE_NAME));
+    adminClient.getTableClient().deleteTable(RAW_TABLE_NAME);
     assertEquals(DEFAULT_INSTANCE.getHelixAdmin()
         .getResourceIdealState(DEFAULT_INSTANCE.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
         .getPartitionSet().size(), 0);
   }
 
   private void toggleInstanceState(String instanceName, String state) {
+    PinotAdminClient adminClient;
+    try {
+      adminClient = getOrCreateAdminClient();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
     // It may take time for an instance to toggle the state.
     TestUtils.waitForCondition(aVoid -> {
       try {
-        sendPutRequest(
-            DEFAULT_INSTANCE.getControllerRequestURLBuilder().forInstanceState(instanceName) + "?state=" + state);
-      } catch (IOException ioe) {
+        adminClient.getInstanceClient().setInstanceState(instanceName, state);
+      } catch (Exception ioe) {
         // receive non-200 status code
         return false;
       }

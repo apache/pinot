@@ -32,11 +32,9 @@ import org.apache.pinot.client.grpc.GrpcConnection;
 import org.apache.pinot.client.grpc.GrpcUtils;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -99,10 +97,9 @@ public class IntegrationUdfTestCluster extends BaseClusterIntegrationTest
 
   @Override
   public void addTable(Schema schema, TableConfig tableConfig) {
-    ControllerRequestClient client = getControllerRequestClient();
     try {
-      client.addSchema(schema);
-      client.addTableConfig(tableConfig);
+      addSchema(schema);
+      addTableConfig(tableConfig);
     } catch (Exception e) {
       throw new RuntimeException("Failed to add table: " + tableConfig.getTableName(), e);
     }
@@ -111,8 +108,7 @@ public class IntegrationUdfTestCluster extends BaseClusterIntegrationTest
   @Override
   public void addRows(String tableName, Schema schema, Stream<GenericRow> rows) {
     try {
-      ControllerRequestClient client = getControllerRequestClient();
-      TableConfig tableConfig = client.getTableConfig(tableName, TableType.OFFLINE);
+      TableConfig tableConfig = getOfflineTableConfig(tableName);
 
       int numRows = 0;
       File tempFile = File.createTempFile(tableName, ".avro");

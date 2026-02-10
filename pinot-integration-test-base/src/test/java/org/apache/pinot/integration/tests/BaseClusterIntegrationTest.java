@@ -839,8 +839,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void resetTable(String tableName, TableType tableType, @Nullable String targetInstance)
       throws IOException {
-    getControllerRequestClient().resetTable(TableNameBuilder.forType(tableType).tableNameWithType(tableName),
-        targetInstance);
+    try {
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+      getOrCreateAdminClient().getSegmentClient().resetSegments(tableNameWithType, false, targetInstance);
+    } catch (org.apache.pinot.client.admin.PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   /**
@@ -884,9 +888,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected JsonNode getColumnIndexSize(String column)
       throws Exception {
-    return JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(), List.of(column))))
-        .get("columnIndexSizeMap").get(column);
+    String response = getOrCreateAdminClient().getTableClient()
+        .getAggregateMetadata(getTableName(), String.join(",", List.of(column)));
+    return JsonUtils.stringToJsonNode(response).get("columnIndexSizeMap").get(column);
   }
 
   /**
@@ -894,16 +898,15 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected List<String> getSegmentNames(String tableName, @Nullable String tableType)
       throws Exception {
-    return getControllerRequestClient().listSegments(tableName, tableType, true);
+    return getOrCreateAdminClient().getSegmentClient().listSegments(tableName, tableType, true);
   }
 
   protected List<ValidDocIdsMetadataInfo> getValidDocIdsMetadata(String tableNameWithType,
       ValidDocIdsType validDocIdsType)
       throws Exception {
 
-    StringBuilder urlBuilder = new StringBuilder(
-        _controllerRequestURLBuilder.forValidDocIdsMetadata(tableNameWithType, validDocIdsType.toString()));
-    String responseString = sendGetRequest(urlBuilder.toString());
+    String responseString = getOrCreateAdminClient().getTableClient()
+        .getValidDocIdsMetadata(tableNameWithType, validDocIdsType.toString());
     return JsonUtils.stringToObject(responseString, new TypeReference<>() { });
   }
 }
