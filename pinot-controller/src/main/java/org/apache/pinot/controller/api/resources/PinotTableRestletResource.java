@@ -784,7 +784,7 @@ public class PinotTableRestletResource {
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
-      _pinotHelixResourceManager.updateTableConfig(tableConfig, forceConfigUpdate);
+      _pinotHelixResourceManager.updateTableConfig(tableConfig, force);
     } catch (InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
