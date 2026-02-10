@@ -526,7 +526,8 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     // to allow change propagation to QueryQuotaManager
   }
 
-  private static String getLogicalTableName() {
+  @Override
+  protected String getLogicalTableName() {
     return "logical_table";
   }
 

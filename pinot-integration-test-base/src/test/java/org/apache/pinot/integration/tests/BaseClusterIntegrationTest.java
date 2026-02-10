@@ -63,12 +63,15 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
@@ -84,6 +87,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   // Default settings
   protected static final String DEFAULT_TABLE_NAME = "mytable";
+  protected static final String DEFAULT_LOGICAL_TABLE_NAME = "mytable_logical";
   protected static final String DEFAULT_SCHEMA_NAME = "mytable";
   protected static final String DEFAULT_SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
@@ -121,6 +125,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected String getTableName() {
     return DEFAULT_TABLE_NAME;
+  }
+
+  protected String getLogicalTableName() {
+    return DEFAULT_LOGICAL_TABLE_NAME;
   }
 
   protected String getSchemaFileName() {
@@ -395,6 +403,38 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     return getTableConfigBuilder(TableType.REALTIME).build();
+  }
+
+  /**
+   * Creates a LogicalTableConfig backed by the OFFLINE and REALTIME physical tables.
+   */
+  protected LogicalTableConfig createLogicalTableConfig() {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    physicalTableConfigMap.put(offlineTableName, new PhysicalTableConfig());
+    physicalTableConfigMap.put(realtimeTableName, new PhysicalTableConfig());
+
+    return new LogicalTableConfigBuilder()
+        .setTableName(getLogicalTableName())
+        .setBrokerTenant(getBrokerTenant())
+        .setRefOfflineTableName(offlineTableName)
+        .setRefRealtimeTableName(realtimeTableName)
+        .setPhysicalTableConfigMap(physicalTableConfigMap)
+        .build();
+  }
+
+  /**
+   * Registers a logical table backed by the OFFLINE and REALTIME physical tables.
+   * The schema for the logical table should be created separately before calling this method.
+   */
+  protected void createLogicalTable()
+      throws IOException {
+    LogicalTableConfig logicalTableConfig = createLogicalTableConfig();
+    sendPostRequest(
+        _controllerRequestURLBuilder.forLogicalTableCreate(),
+        logicalTableConfig.toSingleLineJsonString());
   }
 
   // TODO - Use this method to create table config for all table types to avoid redundant code
