@@ -79,6 +79,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
+import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -785,6 +786,10 @@ public class PinotTableRestletResource {
         throw new InvalidTableConfigException(e);
       }
       _pinotHelixResourceManager.updateTableConfig(tableConfig, force);
+    } catch (TableConfigBackwardIncompatibleException e) {
+      String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
     } catch (InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);

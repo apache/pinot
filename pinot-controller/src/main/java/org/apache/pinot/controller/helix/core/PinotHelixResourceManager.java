@@ -2165,9 +2165,10 @@ public class PinotHelixResourceManager {
   /**
    * Validate the table config and update it
    * @throws IOException
+   * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible
    */
   public void updateTableConfig(TableConfig tableConfig)
-      throws IOException {
+      throws IOException, TableConfigBackwardIncompatibleException {
     updateTableConfig(tableConfig, false);
   }
 
@@ -2176,9 +2177,10 @@ public class PinotHelixResourceManager {
    * @param tableConfig the table config to update
    * @param force if true, allows upsert/dedup config changes with a warning
    * @throws IOException
+   * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
    */
   public void updateTableConfig(TableConfig tableConfig, boolean force)
-      throws IOException {
+      throws IOException, TableConfigBackwardIncompatibleException {
     validateTableTenantConfig(tableConfig);
     validateTableTaskMinionInstanceTagConfig(tableConfig);
     setExistingTableConfig(tableConfig, -1, force);
@@ -2188,7 +2190,7 @@ public class PinotHelixResourceManager {
    * Sets the given table config into zookeeper
    */
   public void setExistingTableConfig(TableConfig tableConfig)
-      throws IOException {
+      throws IOException, TableConfigBackwardIncompatibleException {
     setExistingTableConfig(tableConfig, -1);
   }
 
@@ -2249,8 +2251,11 @@ public class PinotHelixResourceManager {
   /**
    * Sets the given table config into zookeeper with the expected version, which is the previous tableConfig znRecord
    * version. If the expected version is -1, the version check is ignored.
+   *
+   * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible
    */
-  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion) {
+  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion)
+      throws TableConfigBackwardIncompatibleException {
     setExistingTableConfig(tableConfig, expectedVersion, false);
   }
 
@@ -2260,8 +2265,10 @@ public class PinotHelixResourceManager {
    * @param tableConfig the table config to set
    * @param expectedVersion the expected version (-1 to ignore version check)
    * @param force if true, allows upsert/dedup config changes with a warning
+   * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
    */
-  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force) {
+  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
+      throws TableConfigBackwardIncompatibleException {
     String tableNameWithType = tableConfig.getTableName();
     TableConfig existingTableConfig = getTableConfig(tableNameWithType);
     if (existingTableConfig != null) {
@@ -2274,7 +2281,7 @@ public class PinotHelixResourceManager {
               + "pause consumption beforehand and disable SNAPSHOT mode in upsertConfig and restart for the changes"
               + " to kick in. If in doubt, recreate the table with the new configuration.", tableName, violations);
         } else {
-          throw new InvalidTableConfigException(String.format(
+          throw new TableConfigBackwardIncompatibleException(String.format(
               "Failed to update table '%s': Cannot modify %s as it may lead to data inconsistencies. "
                   + "Please create a new table instead.", tableName, violations));
         }

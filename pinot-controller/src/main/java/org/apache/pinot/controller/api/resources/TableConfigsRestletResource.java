@@ -60,6 +60,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
@@ -425,6 +426,10 @@ public class TableConfigsRestletResource {
           LOGGER.info("Created realtime table config: {}", tableName);
         }
       }
+    } catch (TableConfigBackwardIncompatibleException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Invalid TableConfigs for: %s, %s", tableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
     } catch (InvalidTableConfigException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
