@@ -87,6 +87,8 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.NettyInspector;
+import org.apache.pinot.core.transport.NettyInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
@@ -218,6 +220,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
 
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
+
+    NettyInspector.logAllChecks();
   }
 
   /// Can be overridden to apply custom configs to the broker conf.
@@ -522,6 +526,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
 
     _defaultClusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+
+    NettyInstance.registerMetrics(_brokerMetrics);
 
     LOGGER.info("Finish starting Pinot broker");
   }
