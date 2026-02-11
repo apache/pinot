@@ -131,6 +131,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
+    dropLogicalTable(getLogicalTableName());
+    dropOfflineTable(getTableName());
     dropRealtimeTable(getTableName());
     stopMinion();
     stopServer();
@@ -298,6 +300,20 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
           ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
     }
     return _pinotConnection;
+  }
+
+  @Override
+  public void dropLogicalTable(String logicalTableName)
+      throws IOException {
+    sendDeleteRequest(_controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName), AUTH_HEADER);
+  }
+
+  @Override
+  public void dropOfflineTable(String tableName)
+      throws IOException {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)),
+        AUTH_HEADER);
   }
 
   @Override

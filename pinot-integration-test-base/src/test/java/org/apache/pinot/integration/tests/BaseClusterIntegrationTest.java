@@ -66,6 +66,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
@@ -422,6 +423,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRefOfflineTableName(offlineTableName)
         .setRefRealtimeTableName(realtimeTableName)
         .setPhysicalTableConfigMap(physicalTableConfigMap)
+        .setTimeBoundaryConfig(
+            new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableConfigMap.keySet())))
         .build();
   }
 
