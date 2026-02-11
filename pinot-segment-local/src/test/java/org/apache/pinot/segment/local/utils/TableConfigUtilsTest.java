@@ -3734,4 +3734,162 @@ public class TableConfigUtilsTest {
     // Should not throw
     TableConfigUtils.validateTaskConfig(tableConfigOnlyCompactMerge);
   }
+
+  // ==================== Validation Types Tests ====================
+
+  @Test
+  public void testShouldValidate_NoParameters() {
+    // When both parameters are null, all validation types should run
+    assertTrue(TableConfigUtils.shouldValidate(null, null, TableConfigUtils.ValidationType.TASK));
+    assertTrue(TableConfigUtils.shouldValidate(null, null, TableConfigUtils.ValidationType.UPSERT));
+    assertTrue(TableConfigUtils.shouldValidate(null, null, TableConfigUtils.ValidationType.SCHEMA));
+    assertTrue(TableConfigUtils.shouldValidate(null, null, TableConfigUtils.ValidationType.INGESTION));
+    assertTrue(TableConfigUtils.shouldValidate(null, null, TableConfigUtils.ValidationType.INDEXING));
+    assertTrue(TableConfigUtils.shouldValidate(null, null, TableConfigUtils.ValidationType.TIER));
+    assertTrue(TableConfigUtils.shouldValidate(null, null, TableConfigUtils.ValidationType.RETENTION));
+    assertTrue(TableConfigUtils.shouldValidate(null, null, TableConfigUtils.ValidationType.INSTANCE_ASSIGNMENT));
+  }
+
+  @Test
+  public void testShouldValidate_SkipSingleType() {
+    // Skip TASK, others should run
+    assertFalse(TableConfigUtils.shouldValidate("TASK", null, TableConfigUtils.ValidationType.TASK));
+    assertTrue(TableConfigUtils.shouldValidate("TASK", null, TableConfigUtils.ValidationType.UPSERT));
+    assertTrue(TableConfigUtils.shouldValidate("TASK", null, TableConfigUtils.ValidationType.SCHEMA));
+    assertTrue(TableConfigUtils.shouldValidate("TASK", null, TableConfigUtils.ValidationType.INGESTION));
+  }
+
+  @Test
+  public void testShouldValidate_SkipMultipleTypes() {
+    // Skip TASK and INGESTION
+    String typesToSkip = "TASK,INGESTION";
+    assertFalse(TableConfigUtils.shouldValidate(typesToSkip, null, TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate(typesToSkip, null, TableConfigUtils.ValidationType.INGESTION));
+    assertTrue(TableConfigUtils.shouldValidate(typesToSkip, null, TableConfigUtils.ValidationType.UPSERT));
+    assertTrue(TableConfigUtils.shouldValidate(typesToSkip, null, TableConfigUtils.ValidationType.SCHEMA));
+    assertTrue(TableConfigUtils.shouldValidate(typesToSkip, null, TableConfigUtils.ValidationType.TIER));
+  }
+
+  @Test
+  public void testShouldValidate_SkipAll() {
+    // Skip ALL - nothing should run
+    assertFalse(TableConfigUtils.shouldValidate("ALL", null, TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate("ALL", null, TableConfigUtils.ValidationType.UPSERT));
+    assertFalse(TableConfigUtils.shouldValidate("ALL", null, TableConfigUtils.ValidationType.SCHEMA));
+    assertFalse(TableConfigUtils.shouldValidate("ALL", null, TableConfigUtils.ValidationType.INGESTION));
+    assertFalse(TableConfigUtils.shouldValidate("ALL", null, TableConfigUtils.ValidationType.INDEXING));
+    assertFalse(TableConfigUtils.shouldValidate("ALL", null, TableConfigUtils.ValidationType.TIER));
+    assertFalse(TableConfigUtils.shouldValidate("ALL", null, TableConfigUtils.ValidationType.RETENTION));
+    assertFalse(TableConfigUtils.shouldValidate("ALL", null, TableConfigUtils.ValidationType.INSTANCE_ASSIGNMENT));
+  }
+
+  @Test
+  public void testShouldValidate_ValidateOnlySingleType() {
+    // Only validate SCHEMA, skip others
+    assertTrue(TableConfigUtils.shouldValidate(null, "SCHEMA", TableConfigUtils.ValidationType.SCHEMA));
+    assertFalse(TableConfigUtils.shouldValidate(null, "SCHEMA", TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate(null, "SCHEMA", TableConfigUtils.ValidationType.UPSERT));
+    assertFalse(TableConfigUtils.shouldValidate(null, "SCHEMA", TableConfigUtils.ValidationType.INGESTION));
+  }
+
+  @Test
+  public void testShouldValidate_ValidateOnlyMultipleTypes() {
+    // Only validate SCHEMA and TIER
+    String validateOnly = "SCHEMA,TIER";
+    assertTrue(TableConfigUtils.shouldValidate(null, validateOnly, TableConfigUtils.ValidationType.SCHEMA));
+    assertTrue(TableConfigUtils.shouldValidate(null, validateOnly, TableConfigUtils.ValidationType.TIER));
+    assertFalse(TableConfigUtils.shouldValidate(null, validateOnly, TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate(null, validateOnly, TableConfigUtils.ValidationType.UPSERT));
+    assertFalse(TableConfigUtils.shouldValidate(null, validateOnly, TableConfigUtils.ValidationType.INGESTION));
+  }
+
+  @Test
+  public void testShouldValidate_ValidateOnlyAll() {
+    // Validate ALL - everything should run (equivalent to no parameters)
+    assertTrue(TableConfigUtils.shouldValidate(null, "ALL", TableConfigUtils.ValidationType.TASK));
+    assertTrue(TableConfigUtils.shouldValidate(null, "ALL", TableConfigUtils.ValidationType.UPSERT));
+    assertTrue(TableConfigUtils.shouldValidate(null, "ALL", TableConfigUtils.ValidationType.SCHEMA));
+    assertTrue(TableConfigUtils.shouldValidate(null, "ALL", TableConfigUtils.ValidationType.INGESTION));
+    assertTrue(TableConfigUtils.shouldValidate(null, "ALL", TableConfigUtils.ValidationType.INDEXING));
+    assertTrue(TableConfigUtils.shouldValidate(null, "ALL", TableConfigUtils.ValidationType.TIER));
+    assertTrue(TableConfigUtils.shouldValidate(null, "ALL", TableConfigUtils.ValidationType.RETENTION));
+    assertTrue(TableConfigUtils.shouldValidate(null, "ALL", TableConfigUtils.ValidationType.INSTANCE_ASSIGNMENT));
+  }
+
+  @Test
+  public void testShouldValidate_MutuallyExclusive() {
+    // Providing both skip and validateOnly should throw exception
+    try {
+      TableConfigUtils.shouldValidate("TASK", "SCHEMA", TableConfigUtils.ValidationType.TASK);
+      fail("Should have thrown IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Cannot specify both"));
+    }
+  }
+
+  @Test
+  public void testShouldValidate_CaseInsensitive() {
+    // Test case insensitivity
+    assertFalse(TableConfigUtils.shouldValidate("task", null, TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate("TASK", null, TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate("TaSk", null, TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate("task,ingestion", null, TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate("task,ingestion", null, TableConfigUtils.ValidationType.INGESTION));
+  }
+
+  @Test
+  public void testShouldValidate_WithWhitespace() {
+    // Test whitespace handling
+    String typesWithSpaces = "TASK, INGESTION , TIER";
+    assertFalse(TableConfigUtils.shouldValidate(typesWithSpaces, null, TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate(typesWithSpaces, null, TableConfigUtils.ValidationType.INGESTION));
+    assertFalse(TableConfigUtils.shouldValidate(typesWithSpaces, null, TableConfigUtils.ValidationType.TIER));
+    assertTrue(TableConfigUtils.shouldValidate(typesWithSpaces, null, TableConfigUtils.ValidationType.UPSERT));
+  }
+
+  @Test
+  public void testShouldValidate_EmptyStrings() {
+    // Test handling of empty strings in comma-separated list
+    String typesWithEmpty = "TASK,,,INGESTION";
+    assertFalse(TableConfigUtils.shouldValidate(typesWithEmpty, null, TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate(typesWithEmpty, null, TableConfigUtils.ValidationType.INGESTION));
+    assertTrue(TableConfigUtils.shouldValidate(typesWithEmpty, null, TableConfigUtils.ValidationType.UPSERT));
+  }
+
+  @Test
+  public void testShouldValidate_DuplicateTypes() {
+    // Test handling of duplicate types (should work fine due to Set)
+    String typesWithDuplicates = "TASK,TASK,INGESTION,TASK";
+    assertFalse(TableConfigUtils.shouldValidate(typesWithDuplicates, null, TableConfigUtils.ValidationType.TASK));
+    assertFalse(TableConfigUtils.shouldValidate(typesWithDuplicates, null, TableConfigUtils.ValidationType.INGESTION));
+    assertTrue(TableConfigUtils.shouldValidate(typesWithDuplicates, null, TableConfigUtils.ValidationType.UPSERT));
+  }
+
+  @Test
+  public void testShouldValidate_InvalidType() {
+    // Test invalid validation type
+    try {
+      TableConfigUtils.shouldValidate("INVALID_TYPE", null, TableConfigUtils.ValidationType.TASK);
+      fail("Should have thrown IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Invalid validation type"));
+      assertTrue(e.getMessage().contains("INVALID_TYPE"));
+      assertTrue(e.getMessage().contains("Valid types are"));
+    }
+  }
+
+  @Test
+  public void testShouldValidate_AllValidationTypes() {
+    // Test all validation types work correctly
+    for (TableConfigUtils.ValidationType type : TableConfigUtils.ValidationType.values()) {
+      if (type != TableConfigUtils.ValidationType.ALL) {
+        // Skip the type
+        assertFalse(TableConfigUtils.shouldValidate(type.name(), null, type),
+            "Type " + type + " should be skipped");
+        // Validate only the type
+        assertTrue(TableConfigUtils.shouldValidate(null, type.name(), type),
+            "Type " + type + " should be validated");
+      }
+    }
+  }
 }

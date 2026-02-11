@@ -150,7 +150,7 @@ public final class TableConfigUtils {
    * @see TableConfigUtils#validate(TableConfig, Schema, String)
    */
   public static void validate(TableConfig tableConfig, Schema schema) {
-    validate(tableConfig, schema, null);
+    validate(tableConfig, schema, null, null);
   }
 
   /**
@@ -164,37 +164,84 @@ public final class TableConfigUtils {
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
-  public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip, @Nullable String validateOnlyTypes) {
     Preconditions.checkArgument(schema != null, "Schema should not be null");
-    Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
-    if (skipTypes.contains(ValidationType.ALL)) {
-      return;
+    // validate retention and validation config
+    if (shouldValidate(typesToSkip, validateOnlyTypes, ValidationType.RETENTION)) {
+      validateValidationConfig(tableConfig, schema);
     }
 
-    validateValidationConfig(tableConfig, schema);
-    validateIngestionConfig(tableConfig, schema);
-    if (tableConfig.getTableType() == TableType.REALTIME) {
-      validateStreamConfigMaps(tableConfig);
+    // validate ingestion config
+    if (shouldValidate(typesToSkip, validateOnlyTypes, ValidationType.INGESTION)) {
+      validateIngestionConfig(tableConfig, schema);
+      if (tableConfig.getTableType() == TableType.REALTIME) {
+        validateStreamConfigMaps(tableConfig);
+      }
     }
-    validateTierConfigList(tableConfig.getTierConfigsList());
-    validateIndexingConfigAndFieldConfigList(tableConfig, schema);
-    validateInstancePartitionsTypeMapConfig(tableConfig);
-    validatePartitionedReplicaGroupInstance(tableConfig);
-    validateInstanceAssignmentConfigs(tableConfig);
+   
+    // validate tier config
+    if (shouldValidate(typesToSkip, validateOnlyTypes, ValidationType.TIER)) {
+      validateTierConfigList(tableConfig.getTierConfigsList());
+    }
 
-    if (!skipTypes.contains(ValidationType.UPSERT)) {
+    // validate indexing config
+    if (shouldValidate(typesToSkip, validateOnlyTypes, ValidationType.INDEXING)) {
+      validateIndexingConfigAndFieldConfigList(tableConfig, schema);
+    }
+
+    // validate upsert config
+    if (shouldValidate(typesToSkip, validateOnlyTypes, ValidationType.UPSERT)) {
       validateUpsertAndDedupConfig(tableConfig, schema);
       validatePartialUpsertStrategies(tableConfig, schema);
     }
 
-    validateTaskConfig(tableConfig);
-
-    if (_enforcePoolBasedAssignment) {
-      validateInstancePoolsAndReplicaGroups(tableConfig);
+    // validate task config
+    if (shouldValidate(typesToSkip, validateOnlyTypes, ValidationType.TASK)) {
+      validateTaskConfig(tableConfig);
     }
+
+    // validate instance pool and replica group
+    if (shouldValidate(typesToSkip, validateOnlyTypes, ValidationType.INSTANCE_ASSIGNMENT)) {
+      if (_enforcePoolBasedAssignment) {
+        validateInstancePoolsAndReplicaGroups(tableConfig);
+      }
+      validateInstancePartitionsTypeMapConfig(tableConfig);
+      validatePartitionedReplicaGroupInstance(tableConfig);
+      validateInstanceAssignmentConfigs(tableConfig);
+    }
+  }
+
+  public static boolean shouldValidate(@Nullable String typesToSkip, @Nullable String validateOnlyTypes,
+      ValidationType validationType) {
+    Set<ValidationType> skipTypes = parseValidationTypesFromStringToSet(typesToSkip);
+    Set<ValidationType> includeTypes = parseValidationTypesFromStringToSet(validateOnlyTypes); // renamed
+
+    // If both are provided, throw exception (mutually exclusive)
+    if (!skipTypes.isEmpty() && !includeTypes.isEmpty()) {
+      throw new IllegalArgumentException("Cannot specify both validationTypesToSkip and validationTypesToValidateOnly");
+    }
+
+    // Both empty: validate everything
+    if (skipTypes.isEmpty() && includeTypes.isEmpty()) {
+      return true;
+    }
+
+    // Include mode: only return true if type is in includeTypes (or ALL is in
+    // includeTypes)
+    if (!includeTypes.isEmpty()) {
+      return includeTypes.contains(ValidationType.ALL) || includeTypes.contains(validationType);
+    }
+
+    // Skip mode: return false if type is in skipTypes (or ALL is in skipTypes)
+    if (!skipTypes.isEmpty()) {
+      return !skipTypes.contains(ValidationType.ALL) && !skipTypes.contains(validationType);
+    }
+
+    // Both empty: validate everything
+    return true;
   }
 
   /**
@@ -236,10 +283,24 @@ public final class TableConfigUtils {
         "Instance pool and replica group configurations must be enabled");
   }
 
-  private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
-    return typesToSkip == null ? Collections.emptySet()
-        : Arrays.stream(typesToSkip.split(",")).map(s -> ValidationType.valueOf(s.toUpperCase()))
-            .collect(Collectors.toSet());
+  private static Set<ValidationType> parseValidationTypesFromStringToSet(@Nullable String typesToSkip) {
+    if (typesToSkip == null) {
+      return Collections.emptySet();
+    }
+    
+    return Arrays.stream(typesToSkip.split(","))
+        .map(String::trim)
+        .filter(s -> !s.isEmpty())
+        .map(s -> {
+          try {
+            return ValidationType.valueOf(s.toUpperCase());
+          } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                String.format("Invalid validation type: '%s'. Valid types are: %s", 
+                    s, Arrays.toString(ValidationType.values())), e);
+          }
+        })
+        .collect(Collectors.toSet());
   }
 
   /**
@@ -1637,9 +1698,9 @@ public final class TableConfigUtils {
             && upsertConfig.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
   }
 
-  // enum of all the skip-able validation types.
+  // enum of all the skip or validate only types.
   public enum ValidationType {
-    ALL, TASK, UPSERT
+    ALL, TASK, UPSERT, INGESTION, INDEXING, TIER, RETENTION, INSTANCE_ASSIGNMENT, SCHEMA
   }
 
   /**
