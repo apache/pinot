@@ -143,6 +143,7 @@ const generateFlameGraphData = (stats, highlightedStage : Number = null, mode : 
   }
 
   const getPipelineBreakerNode = (children, currentStage: number) => {
+    if (!children || children.length === 0) return null;
     const stack = [...children];
     while (stack.length > 0) {
       const node = stack.pop();
