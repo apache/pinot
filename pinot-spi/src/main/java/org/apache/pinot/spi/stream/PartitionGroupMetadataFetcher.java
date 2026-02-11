@@ -122,6 +122,20 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
               .collect(Collectors.toList());
       try (StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(
           StreamConsumerFactory.getUniqueClientId(clientId))) {
+
+        // Check if the topic exists before fetching partition metadata
+        try {
+          List<StreamMetadataProvider.TopicMetadata> topics = streamMetadataProvider.getTopics();
+          boolean topicExists = topics.stream().anyMatch(t -> t.getName().equals(topicName));
+          if (!topicExists) {
+            LOGGER.warn("Topic {} does not exist. Skipping this topic from ingestion.", topicName);
+            continue;
+          }
+        } catch (Exception e) {
+          // getTopics() not supported by this stream type, proceed without topic existence validation
+          LOGGER.debug("Topic existence check not supported for stream type, proceeding for topic: {}", topicName);
+        }
+
         _newPartitionGroupMetadataList.addAll(
             streamMetadataProvider.computePartitionGroupMetadata(clientId,
                     streamConfig, topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000,
@@ -140,9 +154,9 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         _exception = e;
         return Boolean.FALSE;
       } catch (Exception e) {
-        LOGGER.warn("Could not get partition count for topic {}. This topic will be skipped from ingestion.",
-            _topicNames.get(i), e);
+        LOGGER.warn("Could not get partition count for topic {}", topicName, e);
         _exception = e;
+        throw e;
       }
     }
     return Boolean.TRUE;

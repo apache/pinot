@@ -124,6 +124,8 @@ public class PartitionGroupMetadataFetcherTest {
     PartitionGroupMetadata mockedMetadata2 = new PartitionGroupMetadata(1, mock(StreamPartitionMsgOffset.class));
 
     StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    // Mock getTopics() to throw UnsupportedOperationException (bypasses topic existence check)
+    when(metadataProvider.getTopics()).thenThrow(new UnsupportedOperationException("Not supported"));
     when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
         any(List.class), anyInt(), anyBoolean()))
         .thenReturn(Arrays.asList(mockedMetadata1, mockedMetadata2));
@@ -174,6 +176,8 @@ public class PartitionGroupMetadataFetcherTest {
     PartitionGroupMetadata mockedMetadata2 = new PartitionGroupMetadata(1, mock(StreamPartitionMsgOffset.class));
 
     StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    // Mock getTopics() to throw UnsupportedOperationException (bypasses topic existence check)
+    when(metadataProvider.getTopics()).thenThrow(new UnsupportedOperationException("Not supported"));
     when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
         any(List.class), anyInt(), anyBoolean()))
         .thenReturn(Arrays.asList(mockedMetadata1, mockedMetadata2));
@@ -312,6 +316,185 @@ public class PartitionGroupMetadataFetcherTest {
       // Verify: TransientConsumerException should return FALSE immediately
       Assert.assertFalse(result);
       Assert.assertTrue(fetcher.getException() instanceof TransientConsumerException);
+    }
+  }
+
+  @Test
+  public void testFetchMultipleStreamsSkipsNonExistentTopic()
+      throws Exception {
+    // Setup: 3 streams where the second topic does not exist
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2-nonexistent", "test-table", false);
+    StreamConfig streamConfig3 = createMockStreamConfig("topic3", "test-table", false);
+    List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2, streamConfig3);
+
+    List<PartitionGroupConsumptionStatus> statusList = Collections.emptyList();
+
+    PartitionGroupMetadata mockedMetadata = new PartitionGroupMetadata(0, mock(StreamPartitionMsgOffset.class));
+
+    // Create topic metadata for existing topics only (topic1 and topic3)
+    StreamMetadataProvider.TopicMetadata topic1Metadata = mock(StreamMetadataProvider.TopicMetadata.class);
+    when(topic1Metadata.getName()).thenReturn("topic1");
+    StreamMetadataProvider.TopicMetadata topic3Metadata = mock(StreamMetadataProvider.TopicMetadata.class);
+    when(topic3Metadata.getName()).thenReturn("topic3");
+
+    // Provider for topic1 - topic exists
+    StreamMetadataProvider provider1 = mock(StreamMetadataProvider.class);
+    when(provider1.getTopics()).thenReturn(Arrays.asList(topic1Metadata, topic3Metadata));
+    when(provider1.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt()))
+        .thenReturn(Collections.singletonList(mockedMetadata));
+
+    // Provider for topic2 - topic does NOT exist (getTopics returns list without topic2)
+    StreamMetadataProvider provider2 = mock(StreamMetadataProvider.class);
+    when(provider2.getTopics()).thenReturn(Arrays.asList(topic1Metadata, topic3Metadata));
+
+    // Provider for topic3 - topic exists
+    StreamMetadataProvider provider3 = mock(StreamMetadataProvider.class);
+    when(provider3.getTopics()).thenReturn(Arrays.asList(topic1Metadata, topic3Metadata));
+    when(provider3.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt()))
+        .thenReturn(Collections.singletonList(mockedMetadata));
+
+    StreamConsumerFactory factory1 = mock(StreamConsumerFactory.class);
+    when(factory1.createStreamMetadataProvider(anyString())).thenReturn(provider1);
+
+    StreamConsumerFactory factory2 = mock(StreamConsumerFactory.class);
+    when(factory2.createStreamMetadataProvider(anyString())).thenReturn(provider2);
+
+    StreamConsumerFactory factory3 = mock(StreamConsumerFactory.class);
+    when(factory3.createStreamMetadataProvider(anyString())).thenReturn(provider3);
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedProvider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(streamConfig1)).thenReturn(factory1);
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(streamConfig2)).thenReturn(factory2);
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(streamConfig3)).thenReturn(factory3);
+
+      PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
+          streamConfigs, statusList, Collections.emptyList());
+
+      // Execute
+      Boolean result = fetcher.call();
+
+      // Verify: should return TRUE, non-existent topic is skipped
+      Assert.assertTrue(result);
+      Assert.assertNull(fetcher.getException());
+
+      // Verify: metadata only from topic1 (index 0) and topic3 (index 2)
+      List<PartitionGroupMetadata> resultMetadata = fetcher.getPartitionGroupMetadataList();
+      Assert.assertEquals(resultMetadata.size(), 2);
+
+      List<Integer> partitionIds = resultMetadata.stream()
+          .map(PartitionGroupMetadata::getPartitionGroupId)
+          .sorted()
+          .collect(Collectors.toList());
+
+      // Partition IDs: 0 from topic1 (index 0), 20000 from topic3 (index 2)
+      Assert.assertEquals(partitionIds, Arrays.asList(0, 20000));
+    }
+  }
+
+  @Test
+  public void testFetchMultipleStreamsProceedsWhenGetTopicsUnsupported()
+      throws Exception {
+    // Setup: getTopics() throws UnsupportedOperationException, should proceed without validation
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
+    List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
+
+    List<PartitionGroupConsumptionStatus> statusList = Collections.emptyList();
+
+    PartitionGroupMetadata mockedMetadata = new PartitionGroupMetadata(0, mock(StreamPartitionMsgOffset.class));
+
+    StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    // getTopics() throws UnsupportedOperationException (default behavior for non-Kafka streams)
+    when(metadataProvider.getTopics()).thenThrow(new UnsupportedOperationException("Not supported"));
+    when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt()))
+        .thenReturn(Collections.singletonList(mockedMetadata));
+
+    StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+    when(factory.createStreamMetadataProvider(anyString())).thenReturn(metadataProvider);
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedProvider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
+
+      PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
+          streamConfigs, statusList, Collections.emptyList());
+
+      // Execute
+      Boolean result = fetcher.call();
+
+      // Verify: should return TRUE, processing continues despite UnsupportedOperationException
+      Assert.assertTrue(result);
+      Assert.assertNull(fetcher.getException());
+
+      // Verify: metadata from both topics should be collected
+      List<PartitionGroupMetadata> resultMetadata = fetcher.getPartitionGroupMetadataList();
+      Assert.assertEquals(resultMetadata.size(), 2);
+
+      List<Integer> partitionIds = resultMetadata.stream()
+          .map(PartitionGroupMetadata::getPartitionGroupId)
+          .sorted()
+          .collect(Collectors.toList());
+
+      Assert.assertEquals(partitionIds, Arrays.asList(0, 10000));
+    }
+  }
+
+  @Test
+  public void testFetchMultipleStreamsTopicExistsCheckPasses()
+      throws Exception {
+    // Setup: All topics exist, processing should proceed normally
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
+    List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
+
+    List<PartitionGroupConsumptionStatus> statusList = Collections.emptyList();
+
+    PartitionGroupMetadata mockedMetadata = new PartitionGroupMetadata(0, mock(StreamPartitionMsgOffset.class));
+
+    // Create topic metadata for both topics
+    StreamMetadataProvider.TopicMetadata topic1Metadata = mock(StreamMetadataProvider.TopicMetadata.class);
+    when(topic1Metadata.getName()).thenReturn("topic1");
+    StreamMetadataProvider.TopicMetadata topic2Metadata = mock(StreamMetadataProvider.TopicMetadata.class);
+    when(topic2Metadata.getName()).thenReturn("topic2");
+
+    StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    when(metadataProvider.getTopics()).thenReturn(Arrays.asList(topic1Metadata, topic2Metadata));
+    when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
+        any(List.class), anyInt()))
+        .thenReturn(Collections.singletonList(mockedMetadata));
+
+    StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+    when(factory.createStreamMetadataProvider(anyString())).thenReturn(metadataProvider);
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedProvider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
+
+      PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
+          streamConfigs, statusList, Collections.emptyList());
+
+      // Execute
+      Boolean result = fetcher.call();
+
+      // Verify: should return TRUE
+      Assert.assertTrue(result);
+      Assert.assertNull(fetcher.getException());
+
+      // Verify: metadata from both topics should be collected
+      List<PartitionGroupMetadata> resultMetadata = fetcher.getPartitionGroupMetadataList();
+      Assert.assertEquals(resultMetadata.size(), 2);
+
+      List<Integer> partitionIds = resultMetadata.stream()
+          .map(PartitionGroupMetadata::getPartitionGroupId)
+          .sorted()
+          .collect(Collectors.toList());
+
+      Assert.assertEquals(partitionIds, Arrays.asList(0, 10000));
     }
   }
 
