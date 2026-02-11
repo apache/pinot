@@ -2233,10 +2233,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testPipelineBreakerWithoutKeepingStats()
-      throws Exception {
+  public void testPipelineBreakerWithoutKeepingStats() {
     // let's try several times to give helix time to propagate the config change
-    String erroMsg = "Failed to verify absence of pipeline breaker stats after multiple attempts after 10 attempts";
+    String errorMsg = "Failed to verify absence of pipeline breaker stats after multiple attempts after 10 attempts";
     TestUtils.waitForCondition(() -> {
       String query = "select * from mytable "
           + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
@@ -2256,7 +2255,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       Assert.assertNull(mytableLeaf.get("children"), "When pipeline breaker stats are not kept, "
           + "there should be no children under the leaf node");
       return true;
-    }, 100, 10_000L, erroMsg, true, Duration.ofSeconds(1));
+    }, 100, 10_000L, errorMsg, true, Duration.ofSeconds(1));
   }
 
   @AfterClass
