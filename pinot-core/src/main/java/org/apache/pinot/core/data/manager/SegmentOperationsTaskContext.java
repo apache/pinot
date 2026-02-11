@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager;
 
+import java.util.concurrent.Callable;
 import javax.annotation.Nullable;
 
 /**
@@ -47,6 +48,36 @@ public final class SegmentOperationsTaskContext {
   public static String getTableNameWithType() {
     Context context = CONTEXT.get();
     return context != null ? context._tableNameWithType : null;
+  }
+
+  /**
+   * Wraps a runnable task with segment operations context.
+   */
+  public static Runnable wrap(Runnable runnable, SegmentOperationsTaskType taskType,
+      @Nullable String tableNameWithType) {
+    return () -> {
+      set(taskType, tableNameWithType);
+      try {
+        runnable.run();
+      } finally {
+        clear();
+      }
+    };
+  }
+
+  /**
+   * Wraps a callable task with segment operations context.
+   */
+  public static <T> Callable<T> wrap(Callable<T> callable, SegmentOperationsTaskType taskType,
+      @Nullable String tableNameWithType) {
+    return () -> {
+      set(taskType, tableNameWithType);
+      try {
+        return callable.call();
+      } finally {
+        clear();
+      }
+    };
   }
 
   private static final class Context {

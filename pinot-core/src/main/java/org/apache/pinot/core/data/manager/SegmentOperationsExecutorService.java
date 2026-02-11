@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.manager;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.executor.DecoratorExecutorService;
 
 
@@ -40,11 +39,11 @@ public class SegmentOperationsExecutorService extends DecoratorExecutorService {
 
   @Override
   protected <T> Callable<T> decorate(Callable<T> task) {
-    return SegmentOperationsTaskWrapper.wrap(task, _taskType, _tableNameWithType);
+    return SegmentOperationsTaskContext.wrap(task, _taskType, _tableNameWithType);
   }
 
   @Override
   protected Runnable decorate(Runnable task) {
-    return SegmentOperationsTaskWrapper.wrap(task, _taskType, _tableNameWithType);
+    return SegmentOperationsTaskContext.wrap(task, _taskType, _tableNameWithType);
   }
 }

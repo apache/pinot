@@ -29,8 +29,8 @@ import javax.annotation.Nullable;
 import org.apache.helix.messaging.handling.MessageTask;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModelFactory;
+import org.apache.pinot.core.data.manager.SegmentOperationsTaskContext;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
-import org.apache.pinot.core.data.manager.SegmentOperationsTaskWrapper;
 
 
 /**
@@ -80,7 +80,7 @@ public class DefaultStateTransitionThreadPoolManager implements StateTransitionT
       Message message = task instanceof MessageTask ? ((MessageTask) task).getMessage() : null;
       String tableNameWithType = message != null ? message.getResourceName() : null;
       return super.submit(
-          SegmentOperationsTaskWrapper.wrap(task, SegmentOperationsTaskType.STATE_TRANSITION, tableNameWithType));
+          SegmentOperationsTaskContext.wrap(task, SegmentOperationsTaskType.STATE_TRANSITION, tableNameWithType));
     }
   }
 }
