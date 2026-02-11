@@ -68,7 +68,7 @@ public class KeepPipelineBreakerStatsPredicate implements PinotClusterConfigChan
       String valueStr = value.trim();
       _skip = Boolean.parseBoolean(valueStr);
       if (oldSkip != _skip) {
-        LOGGER.info("Updated {} from: {} to: {}, parsed as {}", key, valueStr, oldSkip, _skip);
+        LOGGER.info("Updated {} from: {} to: {}, parsed as {}", key, oldSkip, valueStr, _skip);
       } else {
         LOGGER.info("{} kept as {}", key, value);
       }
