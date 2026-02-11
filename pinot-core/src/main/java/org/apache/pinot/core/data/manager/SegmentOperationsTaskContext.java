@@ -30,7 +30,7 @@ public final class SegmentOperationsTaskContext {
   private SegmentOperationsTaskContext() {
   }
 
-  public static void set(SegmentOperationsTaskType taskType, @Nullable String tableNameWithType) {
+  public static void set(SegmentOperationsTaskType taskType, String tableNameWithType) {
     CONTEXT.set(new Context(taskType, tableNameWithType));
   }
 
@@ -84,7 +84,7 @@ public final class SegmentOperationsTaskContext {
     private final SegmentOperationsTaskType _taskType;
     private final String _tableNameWithType;
 
-    private Context(SegmentOperationsTaskType taskType, @Nullable String tableNameWithType) {
+    private Context(SegmentOperationsTaskType taskType, String tableNameWithType) {
       _taskType = taskType;
       _tableNameWithType = tableNameWithType;
     }
