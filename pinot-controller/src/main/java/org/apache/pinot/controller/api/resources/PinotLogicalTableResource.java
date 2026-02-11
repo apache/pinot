@@ -64,6 +64,7 @@ import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.LogicalTableConfigUtils.translatePhysicalTableNamesWithDB;
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -146,26 +147,6 @@ public class PinotLogicalTableResource {
     translatePhysicalTableNamesWithDB(logicalTableConfig, httpHeaders);
     SuccessResponse successResponse = addLogicalTable(logicalTableConfig);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
-  }
-
-  public static void translatePhysicalTableNamesWithDB(LogicalTableConfig logicalTableConfig, HttpHeaders headers) {
-    // Translate physical table names to include the database name
-    Map<String, PhysicalTableConfig> physicalTableConfigMap = logicalTableConfig.getPhysicalTableConfigMap().entrySet()
-        .stream()
-        .map(entry -> Map.entry(DatabaseUtils.translateTableName(entry.getKey(), headers), entry.getValue()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-    logicalTableConfig.setPhysicalTableConfigMap(physicalTableConfigMap);
-
-    // Translate refOfflineTableName and refRealtimeTableName to include the database name
-    String refOfflineTableName = logicalTableConfig.getRefOfflineTableName();
-    if (refOfflineTableName != null) {
-      logicalTableConfig.setRefOfflineTableName(DatabaseUtils.translateTableName(refOfflineTableName, headers));
-    }
-    String refRealtimeTableName = logicalTableConfig.getRefRealtimeTableName();
-    if (refRealtimeTableName != null) {
-      logicalTableConfig.setRefRealtimeTableName(DatabaseUtils.translateTableName(refRealtimeTableName, headers));
-    }
   }
 
   @PUT
