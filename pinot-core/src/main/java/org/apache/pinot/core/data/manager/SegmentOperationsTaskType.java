@@ -20,16 +20,20 @@ package org.apache.pinot.core.data.manager;
 
 /**
  * Labels the task type for segment operations throttler binding.
+ *
+ * <p>This is implemented as a class with static instances (type-safe enum pattern) rather than a Java enum
+ * to allow extensibility. Extend this class to define additional custom task types while maintaining compatibility
+ * with the base task types defined here.</p>
  */
 public class SegmentOperationsTaskType {
-  public static final SegmentOperationsTaskType CONSUMER_THREAD =
-      new SegmentOperationsTaskType("CONSUMER_THREAD");
+  public static final SegmentOperationsTaskType CONSUMER =
+      new SegmentOperationsTaskType("CONSUMER");
   public static final SegmentOperationsTaskType STATE_TRANSITION =
       new SegmentOperationsTaskType("STATE_TRANSITION");
-  public static final SegmentOperationsTaskType REFRESH_RELOAD_THREAD =
-      new SegmentOperationsTaskType("REFRESH_RELOAD_THREAD");
-  public static final SegmentOperationsTaskType PRELOAD_THREAD =
-      new SegmentOperationsTaskType("PRELOAD_THREAD");
+  public static final SegmentOperationsTaskType REFRESH_OR_RELOAD =
+      new SegmentOperationsTaskType("REFRESH_OR_RELOAD");
+  public static final SegmentOperationsTaskType PRELOAD =
+      new SegmentOperationsTaskType("PRELOAD");
 
   private final String _name;
 
