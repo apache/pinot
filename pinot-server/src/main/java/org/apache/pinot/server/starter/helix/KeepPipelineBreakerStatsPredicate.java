@@ -64,11 +64,11 @@ public class KeepPipelineBreakerStatsPredicate implements PinotClusterConfigChan
           CommonConstants.MultiStageQueryRunner.DEFAULT_SKIP_PIPELINE_BREAKER_STATS);
       _skip = CommonConstants.MultiStageQueryRunner.DEFAULT_SKIP_PIPELINE_BREAKER_STATS;
     } else {
-      boolean oldEnabled = _skip;
+      boolean oldSkip = _skip;
       String valueStr = value.trim();
       _skip = Boolean.parseBoolean(valueStr);
-      if (oldEnabled != _skip) {
-        LOGGER.info("Updated {} from: {} to: {}, parsed as {}", key, valueStr, oldEnabled, _skip);
+      if (oldSkip != _skip) {
+        LOGGER.info("Updated {} from: {} to: {}, parsed as {}", key, valueStr, oldSkip, _skip);
       } else {
         LOGGER.info("{} kept as {}", key, value);
       }
