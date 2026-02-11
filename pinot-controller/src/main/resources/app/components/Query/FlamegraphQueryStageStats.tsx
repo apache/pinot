@@ -169,7 +169,7 @@ const generateFlameGraphData = (stats, highlightedStage : Number = null, mode : 
         ? children.map(node => processNode(node, stage)).filter(child => child !== null)
         : [];
     if (pipelineBreakerNode) {
-      value = getNodeValue(node) + pipelineBreakerNode.value || 0;
+      value = getNodeValue(node) + (pipelineBreakerNode.value || 0);
       childrenNodes.push(pipelineBreakerNode);
     } else {
       value = getNodeValue(node)
