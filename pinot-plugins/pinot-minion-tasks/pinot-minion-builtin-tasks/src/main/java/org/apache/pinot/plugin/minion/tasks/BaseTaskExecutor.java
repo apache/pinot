@@ -261,7 +261,7 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
 
   /**
    * Returns HTTP headers for segment metadata push (ZK metadata custom map modifier + auth). Used when pushing
-   * segment URI and metadata to the controller instead of uploading the tar via HTTP.
+   * metadata to the controller instead of uploading the tar via HTTP.
    *
    * @param segmentConversionResult the conversion result for the segment; may be null when building headers for
    *                                 multiple segments where a single modifier does not apply

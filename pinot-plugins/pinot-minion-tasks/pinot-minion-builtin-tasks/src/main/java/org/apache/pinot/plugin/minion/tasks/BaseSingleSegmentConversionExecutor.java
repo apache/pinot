@@ -203,7 +203,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
                 uploadURL, convertedTarredSegmentFile);
             break;
           case METADATA:
-          case URI:
             uploadSegmentWithMetadata(configs, pinotTaskConfig, segmentConversionResult, authProvider, parameters,
                 tableNameWithType, convertedTarredSegmentFile);
             break;
