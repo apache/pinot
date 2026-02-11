@@ -30,7 +30,6 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -47,6 +46,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -58,13 +58,11 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
-import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.LogicalTableConfigUtils.translatePhysicalTableNamesWithDB;
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -144,7 +142,7 @@ public class PinotLogicalTableResource {
     ResourceUtils.checkPermissionAndAccess(tableName, request, httpHeaders, AccessType.CREATE,
         Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
-    translatePhysicalTableNamesWithDB(logicalTableConfig, httpHeaders);
+    LogicalTableConfigUtils.translatePhysicalTableNamesWithDB(logicalTableConfig, httpHeaders);
     SuccessResponse successResponse = addLogicalTable(logicalTableConfig);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
   }
@@ -174,7 +172,7 @@ public class PinotLogicalTableResource {
 
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     logicalTableConfig.setTableName(tableName);
-    translatePhysicalTableNamesWithDB(logicalTableConfig, headers);
+    LogicalTableConfigUtils.translatePhysicalTableNamesWithDB(logicalTableConfig, headers);
     SuccessResponse successResponse = updateLogicalTable(logicalTableConfig);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
   }
