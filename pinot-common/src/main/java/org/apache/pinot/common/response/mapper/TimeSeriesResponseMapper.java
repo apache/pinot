@@ -159,6 +159,7 @@ public class TimeSeriesResponseMapper {
     map.merge(BrokerResponseNativeV2.StatKey.TOTAL_DOCS,
         getLongMetadataValue(metadata, DataTable.MetadataKey.TOTAL_DOCS));
     brokerResponse.addBrokerStats(map);
+    brokerResponse.setTimeUsedMs(getLongMetadataValue(metadata, DataTable.MetadataKey.TIME_USED_MS));
   }
 
   public static void setStatsInRequestContext(RequestContext requestContext, Map<String, String> metadata) {

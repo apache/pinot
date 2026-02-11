@@ -46,6 +46,7 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -166,6 +167,9 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
 
       timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
           timeSeriesRequest.getTimeout().toMillis(), requestContext);
+
+      long endToEndTimeMs = System.currentTimeMillis() - queryStartTime;
+      timeSeriesBlock.getMetadata().put(DataTable.MetadataKey.TIME_USED_MS.getName(), String.valueOf(endToEndTimeMs));
       TimeSeriesResponseMapper.setStatsInRequestContext(requestContext, timeSeriesBlock.getMetadata());
       setExceptionsFromBlockToRequestContext(timeSeriesBlock, requestContext);
       return timeSeriesBlock;
