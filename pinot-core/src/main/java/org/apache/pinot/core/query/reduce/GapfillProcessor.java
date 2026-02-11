@@ -51,14 +51,28 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
   private final Set<Key> _groupByKeys;
   private final Map<String, ExpressionContext> _fillExpressions;
+  private final boolean _formatResults;
+  private final boolean _useInputSchema;
   private int[] _sourceColumnIndexForResultSchema = null;
+  private Map<Integer, ExpressionContext> _fillExpressionsByIndex;
 
   GapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
+    this(queryContext, gapfillType, true, false);
+  }
+
+  GapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType, boolean formatResults) {
+    this(queryContext, gapfillType, formatResults, false);
+  }
+
+  GapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType, boolean formatResults,
+      boolean useInputSchema) {
     super(queryContext, gapfillType);
 
     _fillExpressions = GapfillUtils.getFillExpressions(_gapFillSelection);
 
     _groupByKeys = new HashSet<>();
+    _formatResults = formatResults;
+    _useInputSchema = useInputSchema;
   }
 
   /**
@@ -84,12 +98,31 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     for (int i = 0; i < columns.length; i++) {
       indexes.put(columns[i], i);
     }
+    _fillExpressionsByIndex = buildFillExpressionIndexMap(dataSchema, indexes);
 
     _isGroupBySelections = new boolean[dataSchema.getColumnDataTypes().length];
 
     // The first one argument of timeSeries is time column. The left ones are defining entity.
     for (ExpressionContext entityColum : _timeSeries) {
-      int index = indexes.get(entityColum.getIdentifier());
+      Integer index = indexes.get(entityColum.getIdentifier());
+      if (index == null) {
+        index = findColumnIndexIgnoreCase(indexes, entityColum.getIdentifier());
+      }
+      if (index == null) {
+        // Qualified column name match (e.g. "tbl.col" vs "col").
+        String suffix = "." + entityColum.getIdentifier();
+        for (Map.Entry<String, Integer> entry : indexes.entrySet()) {
+          if (entry.getKey().endsWith(suffix)) {
+            index = entry.getValue();
+            break;
+          }
+        }
+      }
+      if (index == null) {
+        index = findSelectionIndex(entityColum.getIdentifier(), dataSchema);
+      }
+      Preconditions.checkState(index != null, "Gapfill TIMESERIESON column not found in result schema: %s",
+          entityColum.getIdentifier());
       _isGroupBySelections[index] = true;
     }
 
@@ -114,6 +147,14 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
     List<Object[]> resultRows = gapFillAndAggregate(timeBucketedRawRows, resultTableSchema, dataSchema);
     brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
+  }
+
+  @Override
+  protected DataSchema getResultTableDataSchema(DataSchema dataSchema) {
+    if (_useInputSchema) {
+      return dataSchema;
+    }
+    return super.getResultTableDataSchema(dataSchema);
   }
 
   private List<Object[]> gapFillAndAggregate(List<Object[]>[] timeBucketedRawRows,
@@ -147,7 +188,10 @@ public class GapfillProcessor extends BaseGapfillProcessor {
       } else if (index % _aggregationSize == _aggregationSize - 1) {
         if (bucketedResult.size() > 0) {
           Object timeCol;
-          if (resultColumnDataTypes[_timeBucketColumnIndex] == ColumnDataType.LONG) {
+          ColumnDataType timeBucketType = resultColumnDataTypes[_timeBucketColumnIndex];
+          if (timeBucketType == ColumnDataType.TIMESTAMP) {
+            timeCol = start;
+          } else if (timeBucketType == ColumnDataType.LONG) {
             timeCol = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(start));
           } else {
             timeCol = _dateTimeFormatter.fromMillisToFormat(start);
@@ -177,8 +221,10 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
     if (rawRowsForBucket != null) {
       for (Object[] resultRow : rawRowsForBucket) {
-        for (int i = 0; i < resultColumnDataTypes.length; i++) {
-          resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
+        if (_formatResults) {
+          for (int i = 0; i < resultColumnDataTypes.length; i++) {
+            resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
+          }
         }
 
         long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRow[_timeBucketColumnIndex]));
@@ -204,7 +250,10 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     for (Key key : keys) {
       Object[] gapfillRow = new Object[numResultColumns];
       int keyIndex = 0;
-      if (resultColumnDataTypes[_timeBucketColumnIndex] == ColumnDataType.LONG) {
+      ColumnDataType timeBucketType = resultColumnDataTypes[_timeBucketColumnIndex];
+      if (timeBucketType == ColumnDataType.TIMESTAMP) {
+        gapfillRow[_timeBucketColumnIndex] = bucketTime;
+      } else if (timeBucketType == ColumnDataType.LONG) {
         gapfillRow[_timeBucketColumnIndex] = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(bucketTime));
       } else {
         gapfillRow[_timeBucketColumnIndex] = _dateTimeFormatter.fromMillisToFormat(bucketTime);
@@ -306,8 +355,107 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     return aggregatedResult;
   }
 
+  private Map<Integer, ExpressionContext> buildFillExpressionIndexMap(DataSchema dataSchema,
+      Map<String, Integer> indexes) {
+    if (_fillExpressions.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<Integer, ExpressionContext> fillByIndex = new HashMap<>();
+    for (Map.Entry<String, ExpressionContext> entry : _fillExpressions.entrySet()) {
+      String columnName = entry.getKey();
+      Integer index = indexes.get(columnName);
+      if (index == null) {
+        index = findColumnIndexIgnoreCase(indexes, columnName);
+      }
+      if (index == null) {
+        index = findFillExpressionIndex(columnName);
+      }
+      if (index != null && index >= 0 && index < dataSchema.size()) {
+        fillByIndex.put(index, entry.getValue());
+      }
+    }
+    return fillByIndex;
+  }
+
+  private Integer findColumnIndexIgnoreCase(Map<String, Integer> indexes, String columnName) {
+    for (Map.Entry<String, Integer> entry : indexes.entrySet()) {
+      if (entry.getKey().equalsIgnoreCase(columnName)) {
+        return entry.getValue();
+      }
+    }
+    return null;
+  }
+
+  private Integer findSelectionIndex(String columnName, DataSchema dataSchema) {
+    QueryContext selectionQueryContext;
+    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL
+        || _gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
+      selectionQueryContext = _queryContext;
+    } else {
+      selectionQueryContext = _queryContext.getSubquery();
+    }
+    if (selectionQueryContext == null) {
+      return null;
+    }
+    List<ExpressionContext> selectExpressions = selectionQueryContext.getSelectExpressions();
+    List<String> aliasList = selectionQueryContext.getAliasList();
+    if (selectExpressions == null) {
+      return null;
+    }
+    int limit = Math.min(selectExpressions.size(), dataSchema.size());
+    for (int i = 0; i < limit; i++) {
+      if (aliasList != null && aliasList.size() > i && aliasList.get(i) != null
+          && aliasList.get(i).equalsIgnoreCase(columnName)) {
+        return i;
+      }
+      ExpressionContext expressionContext = selectExpressions.get(i);
+      if (GapfillUtils.isGapfill(expressionContext)) {
+        expressionContext = expressionContext.getFunction().getArguments().get(0);
+      }
+      if (expressionContext.getType() == ExpressionContext.Type.IDENTIFIER
+          && expressionContext.getIdentifier().equalsIgnoreCase(columnName)) {
+        return i;
+      }
+      if (expressionContext.toString().equalsIgnoreCase(columnName)) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  private Integer findFillExpressionIndex(String columnName) {
+    List<ExpressionContext> selections = _queryContext.getSelectExpressions();
+    List<String> aliasList = _queryContext.getAliasList();
+    for (int i = 0; i < selections.size(); i++) {
+      if (aliasList != null && aliasList.size() > i && aliasList.get(i) != null
+          && aliasList.get(i).equalsIgnoreCase(columnName)) {
+        return i;
+      }
+      ExpressionContext selection = selections.get(i);
+      if (selection.getType() == ExpressionContext.Type.IDENTIFIER
+          && selection.getIdentifier().equalsIgnoreCase(columnName)) {
+        return i;
+      }
+    }
+    return null;
+  }
+
   private Object getFillValue(int columnIndex, String columnName, Object key, ColumnDataType dataType) {
-    ExpressionContext expressionContext = _fillExpressions.get(columnName);
+    ExpressionContext expressionContext = null;
+    if (_fillExpressionsByIndex != null) {
+      expressionContext = _fillExpressionsByIndex.get(columnIndex);
+    }
+    if (expressionContext == null) {
+      expressionContext = _fillExpressions.get(columnName);
+    }
+    if (expressionContext == null && !_fillExpressions.isEmpty()) {
+      for (Map.Entry<String, ExpressionContext> entry : _fillExpressions.entrySet()) {
+        if (entry.getKey().equalsIgnoreCase(columnName)) {
+          expressionContext = entry.getValue();
+          break;
+        }
+      }
+    }
     if (expressionContext != null && expressionContext.getFunction() != null && GapfillUtils
         .isFill(expressionContext)) {
       List<ExpressionContext> args = expressionContext.getFunction().getArguments();

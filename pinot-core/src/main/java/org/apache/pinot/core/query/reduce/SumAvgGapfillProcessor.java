@@ -190,7 +190,9 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
         Object[] aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
         for (int i = 0; i < _columnTypes.length; i++) {
           if (_columnTypes[i] == 0) {
-            if (dataSchema.getColumnDataType(_timeBucketColumnIndex) == DataSchema.ColumnDataType.LONG) {
+            DataSchema.ColumnDataType timeBucketType = dataSchema.getColumnDataType(_timeBucketColumnIndex);
+            if (timeBucketType == DataSchema.ColumnDataType.LONG
+                || timeBucketType == DataSchema.ColumnDataType.TIMESTAMP) {
               aggregatedRow[i] = time - (_aggregationSize - 1) * _gapfillTimeBucketSize;
             } else {
               aggregatedRow[i] = _dateTimeFormatter.fromMillisToFormat(
