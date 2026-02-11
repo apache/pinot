@@ -54,8 +54,8 @@ import org.slf4j.LoggerFactory;
 /// `io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent`, as you may think reading this class, the shaded
 /// version of this class will look for
 /// `io.grpc.netty.shaded.org.apache.pinot.shaded.io.netty.util.internal.PlatformDependent`.
-/// To avoid shading this class, make sure to exclude it from the shade plugin configuration (see pom.xml on the root of
-/// the project).
+/// At the moment this is written, Pinot _does not_ shade Netty, so it is safe. Just to be sure, this class should be
+/// excluded in the maven shade plugin configuration (see pom.xml on the root of the project).
 public class NettyInstance {
   private static final Logger LOGGER = LoggerFactory.getLogger(NettyInstance.class);
   /// We use a CopyOnWriteArrayList to allow dynamic addition of Netty instances at runtime,
@@ -66,21 +66,9 @@ public class NettyInstance {
     List<NettyInstance> instances = new ArrayList<>(3);
     NettyInstance unshaded = NettyInstance.create("Unshaded", "");
     if (unshaded != null) {
-      LOGGER.warn("Unshaded Netty instance found on the classpath. "
-          + "This is not expected in production and may lead to suboptimal performance. "
-          + "Make sure to exclude unshaded Netty from the classpath and use the shaded version instead.");
       instances.add(unshaded);
     } else {
-      // Usually we don't have unshaded Netty on the classpath when Pinot runs in production, so we don't need to log
-      // this as a warning, but we can log it as debug for troubleshooting purposes.
-      LOGGER.debug("Unshaded Netty instance not found, unable to inspect Netty constants.");
-    }
-    NettyInstance pinot = NettyInstance.create("Pinot", "org.apache.pinot.shaded.");
-    if (pinot != null) {
-      instances.add(pinot);
-    } else {
-      LOGGER.warn("Pinot-shaded Netty instance not found, unable to inspect Netty constants for Pinot-shaded Netty. "
-          + "Make sure the shade profile is enabled and the Netty classes are included in the shade.");
+      LOGGER.warn("Unshaded Netty instance not found, if Netty is shade we need to add a new NettyInstance.");
     }
     NettyInstance gRPC = NettyInstance.create("gRPC", "io.grpc.netty.shaded.");
     if (gRPC != null) {
@@ -107,11 +95,8 @@ public class NettyInstance {
   ///             something short and without spaces like "Unshaded", "Pinot", "gRPC".
   ///             Add underscores if you need to separate words, but avoid other special characters.
   /// @param shadePrefix The prefix of the package where the Netty classes are located.
-  ///             For example, for unshaded Netty it would be "", for Pinot-shaded Netty it would be
-  ///             "org.apache.pinot.shaded.". Remember this literal may be shaded by the shade plugin, so if you call
-  ///             this constructor with a literal string, make sure to disable exclude the caller class from shading,
-  ///             otherwise the literal will be shaded too and the reflection will fail.
-  ///             (see pom.xml on the root of the project).
+  ///             For example, for unshaded Netty it would be `""`, for grpc-shaded Netty it would be
+  ///             `"io.grpc.netty.shaded."`.
   public NettyInstance(String name, String shadePrefix)
       throws ClassNotFoundException {
     _name = name;
@@ -151,7 +136,9 @@ public class NettyInstance {
   }
 
   private static String humanReadableByteCount(long bytes) {
-    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024) {
+      return bytes + " B";
+    }
     int exp = (int) (Math.log(bytes) / Math.log(1024));
     String pre = "KMGTPE".charAt(exp - 1) + "B";
     return String.format("%.1f %s", bytes / Math.pow(1024, exp), pre);

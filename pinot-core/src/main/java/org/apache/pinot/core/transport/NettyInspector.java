@@ -45,6 +45,10 @@ public class NettyInspector {
     );
   }
 
+  private NettyInspector() {
+    // Private constructor to prevent instantiation
+  }
+
   /// Logs the values of all constants for all Netty instances, and logs warnings if any checks fail.
   public static void logAllChecks() {
     for (Map.Entry<NettyInstance, List<CheckResult>> entry : checkAllConstants().entrySet()) {
@@ -60,6 +64,9 @@ public class NettyInspector {
             break;
           case UNKNOWN:
             LOGGER.warn("Netty instance '{}' check unknown: {}", instance.getName(), result._message);
+            break;
+          default:
+            LOGGER.warn("Netty instance '{}' check returned unexpected status: {}", instance.getName(), result._status);
             break;
         }
       }
