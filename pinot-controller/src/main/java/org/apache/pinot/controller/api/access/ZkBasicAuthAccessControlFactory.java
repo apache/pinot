@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.auth.BasicAuthTokenUtils;
@@ -82,10 +83,11 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders,
+        HttpServletRequest request, String endpointUrl) {
       return getPrincipal(httpHeaders).filter(
-          p -> p.hasTable(TableNameBuilder.extractRawTableName(tableName))
-              && p.hasPermission(Objects.toString(accessType))).isPresent();
+          p -> p.hasTable(TableNameBuilder.extractRawTableName(tableName)) && p.hasPermission(
+              Objects.toString(accessType))).isPresent();
     }
 
     @Override
@@ -94,7 +96,8 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, HttpServletRequest request,
+        String endpointUrl) {
       return getPrincipal(httpHeaders).isPresent();
     }
 

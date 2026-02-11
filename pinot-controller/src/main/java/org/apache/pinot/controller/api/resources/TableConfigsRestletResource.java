@@ -60,6 +60,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.access.GrizzlyRequestAdapter;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
@@ -229,9 +230,10 @@ public class TableConfigsRestletResource {
       // validate permission
       String endpointUrl = request.getRequestURL().toString();
       AccessControl accessControl = _accessControlFactory.create();
-      AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders, endpointUrl,
-          accessControl);
-      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.CREATE_TABLE)) {
+      AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders,
+          GrizzlyRequestAdapter.wrap(request), endpointUrl, accessControl);
+      if (!accessControl.hasAccess(httpHeaders, GrizzlyRequestAdapter.wrap(request), TargetType.TABLE, rawTableName,
+          Actions.Table.CREATE_TABLE)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -468,8 +470,10 @@ public class TableConfigsRestletResource {
     // validate permission
     String endpointUrl = request.getRequestURL().toString();
     AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils.validatePermission(rawTableName, AccessType.READ, httpHeaders, endpointUrl, accessControl);
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
+    AccessControlUtils.validatePermission(rawTableName, AccessType.READ, httpHeaders,
+        GrizzlyRequestAdapter.wrap(request), endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, GrizzlyRequestAdapter.wrap(request), TargetType.TABLE, rawTableName,
+        Actions.Table.VALIDATE_TABLE_CONFIGS)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 

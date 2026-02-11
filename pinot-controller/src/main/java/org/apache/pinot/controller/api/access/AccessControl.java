@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.access;
 
 import javax.annotation.Nullable;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.core.auth.FineGrainedAccessControl;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -40,6 +41,7 @@ public interface AccessControl extends FineGrainedAccessControl {
    * @param endpointUrl the request url for which this access control is called
    * @return whether the client has permission
    */
+  @Deprecated
   default boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders,
       String endpointUrl) {
     return true;
@@ -53,8 +55,38 @@ public interface AccessControl extends FineGrainedAccessControl {
    * @param endpointUrl the request url for which this access control is called
    * @return whether the client has permission
    */
+  @Deprecated
   default boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
     return hasAccess(null, accessType, httpHeaders, endpointUrl);
+  }
+
+  /**
+   * Return whether the client has permission to the given table
+   *
+   * @param tableName   name of the table to be accessed
+   * @param accessType  type of the access
+   * @param httpHeaders HTTP headers containing requester identity
+   * @param request     the request for which this access control is called
+   * @param endpointUrl the request url for which this access control is called
+   * @return whether the client has permission
+   */
+  default boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders,
+      @Nullable HttpServletRequest request, @Nullable String endpointUrl) {
+    return hasAccess(tableName, accessType, httpHeaders, endpointUrl);
+  }
+
+  /**
+   * Return whether the client has permission to access the endpoints with are not table level
+   *
+   * @param accessType  type of the access
+   * @param httpHeaders HTTP headers
+   * @param request     the request for which this access control is called
+   * @param endpointUrl the request url for which this access control is called
+   * @return whether the client has permission
+   */
+  default boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, @Nullable HttpServletRequest request,
+      @Nullable String endpointUrl) {
+    return hasAccess(null, accessType, httpHeaders, request, endpointUrl);
   }
 
   /**

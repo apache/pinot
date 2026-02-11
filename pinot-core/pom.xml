@@ -38,6 +38,11 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-local</artifactId>
     </dependency>
+    <dependency>
+      <groupId>javax.servlet</groupId>
+      <artifactId>javax.servlet-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- Netty dependencies -->
     <dependency>
