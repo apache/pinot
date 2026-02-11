@@ -24,12 +24,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 
 
 /**
@@ -151,6 +154,72 @@ public class LogicalTableConfig extends BaseJsonConfig {
 
   public void setTimeBoundaryConfig(TimeBoundaryConfig timeBoundaryConfig) {
     _timeBoundaryConfig = timeBoundaryConfig;
+  }
+
+  public static LogicalTableConfig fromZNRecord(ZNRecord record)
+      throws IOException {
+    LogicalTableConfigBuilder builder = new LogicalTableConfigBuilder()
+        .setTableName(record.getSimpleField(LOGICAL_TABLE_NAME_KEY))
+        .setBrokerTenant(record.getSimpleField(BROKER_TENANT_KEY));
+
+    if (record.getSimpleField(QUERY_CONFIG_KEY) != null) {
+      builder.setQueryConfig(JsonUtils.stringToObject(record.getSimpleField(QUERY_CONFIG_KEY), QueryConfig.class));
+    }
+    if (record.getSimpleField(QUOTA_CONFIG_KEY) != null) {
+      builder.setQuotaConfig(JsonUtils.stringToObject(record.getSimpleField(QUOTA_CONFIG_KEY), QuotaConfig.class));
+    }
+    if (record.getSimpleField(REF_OFFLINE_TABLE_NAME_KEY) != null) {
+      builder.setRefOfflineTableName(record.getSimpleField(REF_OFFLINE_TABLE_NAME_KEY));
+    }
+    if (record.getSimpleField(REF_REALTIME_TABLE_NAME_KEY) != null) {
+      builder.setRefRealtimeTableName(record.getSimpleField(REF_REALTIME_TABLE_NAME_KEY));
+    }
+    String timeBoundaryConfigJson = record.getSimpleField(TIME_BOUNDARY_CONFIG_KEY);
+    if (timeBoundaryConfigJson != null) {
+      builder.setTimeBoundaryConfig(JsonUtils.stringToObject(timeBoundaryConfigJson, TimeBoundaryConfig.class));
+    }
+
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    for (Map.Entry<String, String> entry : record.getMapField(PHYSICAL_TABLE_CONFIG_KEY).entrySet()) {
+      String physicalTableName = entry.getKey();
+      String physicalTableConfigJson = entry.getValue();
+      physicalTableConfigMap.put(physicalTableName,
+          JsonUtils.stringToObject(physicalTableConfigJson, PhysicalTableConfig.class));
+    }
+    builder.setPhysicalTableConfigMap(physicalTableConfigMap);
+    return builder.build();
+  }
+
+  public ZNRecord toZNRecord()
+      throws JsonProcessingException {
+    Map<String, String> physicalTableConfigMap = new HashMap<>();
+    for (Map.Entry<String, PhysicalTableConfig> entry : getPhysicalTableConfigMap().entrySet()) {
+      String physicalTableName = entry.getKey();
+      PhysicalTableConfig physicalTableConfig = entry.getValue();
+      physicalTableConfigMap.put(physicalTableName, physicalTableConfig.toJsonString());
+    }
+
+    ZNRecord record = new ZNRecord(getTableName());
+    record.setSimpleField(LOGICAL_TABLE_NAME_KEY, getTableName());
+    record.setSimpleField(BROKER_TENANT_KEY, getBrokerTenant());
+    record.setMapField(PHYSICAL_TABLE_CONFIG_KEY, physicalTableConfigMap);
+
+    if (getQueryConfig() != null) {
+      record.setSimpleField(QUERY_CONFIG_KEY, getQueryConfig().toJsonString());
+    }
+    if (getQuotaConfig() != null) {
+      record.setSimpleField(QUOTA_CONFIG_KEY, getQuotaConfig().toJsonString());
+    }
+    if (getRefOfflineTableName() != null) {
+      record.setSimpleField(REF_OFFLINE_TABLE_NAME_KEY, getRefOfflineTableName());
+    }
+    if (getRefRealtimeTableName() != null) {
+      record.setSimpleField(REF_REALTIME_TABLE_NAME_KEY, getRefRealtimeTableName());
+    }
+    if (getTimeBoundaryConfig() != null) {
+      record.setSimpleField(TIME_BOUNDARY_CONFIG_KEY, getTimeBoundaryConfig().toJsonString());
+    }
+    return record;
   }
 
   private JsonNode toJsonObject() {

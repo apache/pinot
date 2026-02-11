@@ -32,9 +32,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
-import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -132,7 +130,7 @@ public class LogicalTableMetadataCache {
       if (data != null) {
         ZNRecord znRecord = (ZNRecord) data;
         try {
-          TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
+          TableConfig tableConfig = TableConfig.fromZNRecord(znRecord);
           _tableConfigMap.put(tableConfig.getTableName(), tableConfig);
         } catch (Exception e) {
           LOGGER.error("Caught exception while refreshing table config for ZNRecord: {}", znRecord.getId(), e);
@@ -206,7 +204,7 @@ public class LogicalTableMetadataCache {
         ZNRecord znRecord = _propertyStore.get(path, null, AccessOption.PERSISTENT);
         if (znRecord != null) {
           try {
-            LogicalTableConfig logicalTableConfig = LogicalTableConfigUtils.fromZNRecord(znRecord);
+            LogicalTableConfig logicalTableConfig = LogicalTableConfig.fromZNRecord(znRecord);
             String logicalTableName = logicalTableConfig.getTableName();
 
             if (logicalTableConfig.getRefOfflineTableName() != null) {
@@ -252,7 +250,7 @@ public class LogicalTableMetadataCache {
 
     private synchronized void updateLogicalTableConfig(ZNRecord znRecord) {
       try {
-        LogicalTableConfig logicalTableConfig = LogicalTableConfigUtils.fromZNRecord(znRecord);
+        LogicalTableConfig logicalTableConfig = LogicalTableConfig.fromZNRecord(znRecord);
         String logicalTableName = logicalTableConfig.getTableName();
         LogicalTableConfig oldLogicalTableConfig = _logicalTableConfigMap.get(logicalTableName);
         Preconditions.checkArgument(oldLogicalTableConfig != null,

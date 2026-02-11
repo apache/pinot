@@ -40,11 +40,9 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
-import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -186,7 +184,7 @@ public class ZKMetadataProvider {
     String tableConfigPath = constructPropertyStorePathForResourceConfig(tableNameWithType);
     ZNRecord tableConfigZNRecord;
     try {
-      tableConfigZNRecord = TableConfigSerDeUtils.toZNRecord(tableConfig);
+      tableConfigZNRecord = tableConfig.toZNRecord();
     } catch (Exception e) {
       LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
       return false;
@@ -215,7 +213,7 @@ public class ZKMetadataProvider {
     String tableNameWithType = tableConfig.getTableName();
     ZNRecord tableConfigZNRecord;
     try {
-      tableConfigZNRecord = TableConfigSerDeUtils.toZNRecord(tableConfig);
+      tableConfigZNRecord = tableConfig.toZNRecord();
     } catch (Exception e) {
       LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
       return false;
@@ -632,7 +630,7 @@ public class ZKMetadataProvider {
       return null;
     }
     try {
-      TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
+      TableConfig tableConfig = TableConfig.fromZNRecord(znRecord);
       TableConfig processedTableConfig = replaceVariables
           ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
       return applyDecorator ? TableConfigDecoratorRegistry.applyDecorator(processedTableConfig) : tableConfig;
@@ -903,7 +901,7 @@ public class ZKMetadataProvider {
   public static void setLogicalTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
       LogicalTableConfig logicalTableConfig) {
     try {
-      ZNRecord znRecord = LogicalTableConfigUtils.toZNRecord(logicalTableConfig);
+      ZNRecord znRecord = logicalTableConfig.toZNRecord();
       String path = constructPropertyStorePathForLogical(logicalTableConfig.getTableName());
       propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
     } catch (JsonProcessingException e) {
@@ -917,7 +915,7 @@ public class ZKMetadataProvider {
     if (znRecords != null) {
       return znRecords.stream().map(znRecord -> {
         try {
-          return LogicalTableConfigUtils.fromZNRecord(znRecord);
+          return LogicalTableConfig.fromZNRecord(znRecord);
         } catch (IOException e) {
           LOGGER.error("Caught exception while converting ZNRecord to LogicalTable: {}", znRecord.getId(), e);
           return null;
@@ -936,7 +934,7 @@ public class ZKMetadataProvider {
       if (logicalTableZNRecord == null) {
         return null;
       }
-      return LogicalTableConfigUtils.fromZNRecord(logicalTableZNRecord);
+      return LogicalTableConfig.fromZNRecord(logicalTableZNRecord);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting logical table: {}", tableName, e);
       return null;

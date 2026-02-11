@@ -27,7 +27,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
-import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -133,7 +132,7 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
             CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     List<String> tables = new ArrayList<>(128);
     for (ZNRecord znRecord : tableConfigs) {
-      TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
+      TableConfig tableConfig = TableConfig.fromZNRecord(znRecord);
       if (tableConfig.getTenantConfig().getServer().equals(_tenantName)) {
         tables.add(tableConfig.getTableName());
       }

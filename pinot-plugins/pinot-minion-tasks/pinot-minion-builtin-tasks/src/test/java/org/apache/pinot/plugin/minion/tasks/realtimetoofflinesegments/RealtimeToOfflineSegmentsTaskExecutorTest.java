@@ -30,7 +30,7 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
-import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
+
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
@@ -192,16 +192,16 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     @SuppressWarnings("unchecked")
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfig));
+        .thenReturn(tableConfig.toZNRecord());
     Mockito
         .when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_PARTITIONING, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigWithPartitioning));
+        .thenReturn(tableConfigWithPartitioning.toZNRecord());
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_SORTED_COL, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigWithSortedCol));
+        .thenReturn(tableConfigWithSortedCol.toZNRecord());
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_EPOCH_HOURS, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigEpochHours));
+        .thenReturn(tableConfigEpochHours.toZNRecord());
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_SDF, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigSDF));
+        .thenReturn(tableConfigSDF.toZNRecord());
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTable", null, AccessOption.PERSISTENT))
         .thenReturn(SchemaSerDeUtils.toZNRecord(schema));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableWithPartitioning", null, AccessOption.PERSISTENT))

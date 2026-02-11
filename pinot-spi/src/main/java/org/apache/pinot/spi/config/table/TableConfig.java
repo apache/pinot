@@ -22,15 +22,21 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -404,6 +410,211 @@ public class TableConfig extends BaseJsonConfig {
 
   public void setSegmentAssignmentConfigMap(Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap) {
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
+  }
+
+  private static final String FIELD_MISSING_MESSAGE_TEMPLATE = "Mandatory field '%s' is missing";
+
+  public static TableConfig fromZNRecord(ZNRecord znRecord)
+      throws IOException {
+    Map<String, String> simpleFields = znRecord.getSimpleFields();
+
+    // Mandatory fields
+    String tableName = znRecord.getId();
+
+    String tableType = simpleFields.get(TABLE_TYPE_KEY);
+    boolean isDimTable = Boolean.parseBoolean(simpleFields.get(IS_DIM_TABLE_KEY));
+    Preconditions.checkState(tableType != null, FIELD_MISSING_MESSAGE_TEMPLATE, TABLE_TYPE_KEY);
+
+    String validationConfigString = simpleFields.get(VALIDATION_CONFIG_KEY);
+    Preconditions.checkState(validationConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, VALIDATION_CONFIG_KEY);
+    SegmentsValidationAndRetentionConfig validationConfig =
+        JsonUtils.stringToObject(validationConfigString, SegmentsValidationAndRetentionConfig.class);
+
+    String tenantConfigString = simpleFields.get(TENANT_CONFIG_KEY);
+    Preconditions.checkState(tenantConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, TENANT_CONFIG_KEY);
+    TenantConfig tenantConfig = JsonUtils.stringToObject(tenantConfigString, TenantConfig.class);
+
+    String indexingConfigString = simpleFields.get(INDEXING_CONFIG_KEY);
+    Preconditions.checkState(indexingConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, INDEXING_CONFIG_KEY);
+    IndexingConfig indexingConfig = JsonUtils.stringToObject(indexingConfigString, IndexingConfig.class);
+
+    String customConfigString = simpleFields.get(CUSTOM_CONFIG_KEY);
+    Preconditions.checkState(customConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, CUSTOM_CONFIG_KEY);
+    TableCustomConfig customConfig = JsonUtils.stringToObject(customConfigString, TableCustomConfig.class);
+
+    // Optional fields
+    QuotaConfig quotaConfig = null;
+    String quotaConfigString = simpleFields.get(QUOTA_CONFIG_KEY);
+    if (quotaConfigString != null) {
+      quotaConfig = JsonUtils.stringToObject(quotaConfigString, QuotaConfig.class);
+    }
+
+    TableTaskConfig taskConfig = null;
+    String taskConfigString = simpleFields.get(TASK_CONFIG_KEY);
+    if (taskConfigString != null) {
+      taskConfig = JsonUtils.stringToObject(taskConfigString, TableTaskConfig.class);
+    }
+
+    RoutingConfig routingConfig = null;
+    String routingConfigString = simpleFields.get(ROUTING_CONFIG_KEY);
+    if (routingConfigString != null) {
+      routingConfig = JsonUtils.stringToObject(routingConfigString, RoutingConfig.class);
+    }
+
+    QueryConfig queryConfig = null;
+    String queryConfigString = simpleFields.get(QUERY_CONFIG_KEY);
+    if (queryConfigString != null) {
+      queryConfig = JsonUtils.stringToObject(queryConfigString, QueryConfig.class);
+    }
+
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = null;
+    String instanceAssignmentConfigMapString = simpleFields.get(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY);
+    if (instanceAssignmentConfigMapString != null) {
+      instanceAssignmentConfigMap = JsonUtils.stringToObject(instanceAssignmentConfigMapString, new TypeReference<>() {
+      });
+    }
+
+    List<FieldConfig> fieldConfigList = null;
+    String fieldConfigListString = simpleFields.get(FIELD_CONFIG_LIST_KEY);
+    if (fieldConfigListString != null) {
+      fieldConfigList = JsonUtils.stringToObject(fieldConfigListString, new TypeReference<>() {
+      });
+    }
+
+    UpsertConfig upsertConfig = null;
+    String upsertConfigString = simpleFields.get(UPSERT_CONFIG_KEY);
+    if (upsertConfigString != null) {
+      upsertConfig = JsonUtils.stringToObject(upsertConfigString, UpsertConfig.class);
+    }
+
+    DedupConfig dedupConfig = null;
+    String dedupConfigString = simpleFields.get(DEDUP_CONFIG_KEY);
+    if (dedupConfigString != null) {
+      dedupConfig = JsonUtils.stringToObject(dedupConfigString, DedupConfig.class);
+    }
+
+    DimensionTableConfig dimensionTableConfig = null;
+    String dimensionTableConfigString = simpleFields.get(DIMENSION_TABLE_CONFIG_KEY);
+    if (dimensionTableConfigString != null) {
+      dimensionTableConfig = JsonUtils.stringToObject(dimensionTableConfigString, DimensionTableConfig.class);
+    }
+
+    IngestionConfig ingestionConfig = null;
+    String ingestionConfigString = simpleFields.get(INGESTION_CONFIG_KEY);
+    if (ingestionConfigString != null) {
+      ingestionConfig = JsonUtils.stringToObject(ingestionConfigString, IngestionConfig.class);
+    }
+
+    List<TierConfig> tierConfigList = null;
+    String tierConfigListString = simpleFields.get(TIER_CONFIGS_LIST_KEY);
+    if (tierConfigListString != null) {
+      tierConfigList = JsonUtils.stringToObject(tierConfigListString, new TypeReference<>() {
+      });
+    }
+
+    List<TunerConfig> tunerConfigList = null;
+    String tunerConfigListString = simpleFields.get(TUNER_CONFIG_LIST_KEY);
+    if (tunerConfigListString != null) {
+      tunerConfigList = JsonUtils.stringToObject(tunerConfigListString, new TypeReference<>() {
+      });
+    }
+
+    Map<InstancePartitionsType, String> instancePartitionsMap = null;
+    String instancePartitionsMapString = simpleFields.get(INSTANCE_PARTITIONS_MAP_CONFIG_KEY);
+    if (instancePartitionsMapString != null) {
+      instancePartitionsMap = JsonUtils.stringToObject(instancePartitionsMapString, new TypeReference<>() {
+      });
+    }
+
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = null;
+    String segmentAssignmentConfigMapString = simpleFields.get(SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY);
+    if (segmentAssignmentConfigMapString != null) {
+      segmentAssignmentConfigMap = JsonUtils.stringToObject(segmentAssignmentConfigMapString, new TypeReference<>() {
+      });
+    }
+
+    return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
+        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
+        dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList,
+        instancePartitionsMap, segmentAssignmentConfigMap);
+  }
+
+  public ZNRecord toZNRecord()
+      throws JsonProcessingException {
+    Map<String, String> simpleFields = new HashMap<>();
+
+    // Mandatory fields
+    simpleFields.put(TABLE_NAME_KEY, getTableName());
+    simpleFields.put(TABLE_TYPE_KEY, getTableType().toString());
+    simpleFields.put(VALIDATION_CONFIG_KEY, getValidationConfig().toJsonString());
+    simpleFields.put(TENANT_CONFIG_KEY, getTenantConfig().toJsonString());
+    simpleFields.put(INDEXING_CONFIG_KEY, getIndexingConfig().toJsonString());
+    simpleFields.put(CUSTOM_CONFIG_KEY, getCustomConfig().toJsonString());
+    simpleFields.put(IS_DIM_TABLE_KEY, Boolean.toString(isDimTable()));
+
+    // Optional fields
+    QuotaConfig quotaConfig = getQuotaConfig();
+    if (quotaConfig != null) {
+      simpleFields.put(QUOTA_CONFIG_KEY, quotaConfig.toJsonString());
+    }
+    TableTaskConfig taskConfig = getTaskConfig();
+    if (taskConfig != null) {
+      simpleFields.put(TASK_CONFIG_KEY, taskConfig.toJsonString());
+    }
+    RoutingConfig routingConfig = getRoutingConfig();
+    if (routingConfig != null) {
+      simpleFields.put(ROUTING_CONFIG_KEY, routingConfig.toJsonString());
+    }
+    QueryConfig queryConfig = getQueryConfig();
+    if (queryConfig != null) {
+      simpleFields.put(QUERY_CONFIG_KEY, queryConfig.toJsonString());
+    }
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = getInstanceAssignmentConfigMap();
+    if (instanceAssignmentConfigMap != null) {
+      simpleFields.put(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY,
+          JsonUtils.objectToString(instanceAssignmentConfigMap));
+    }
+    List<FieldConfig> fieldConfigList = getFieldConfigList();
+    if (fieldConfigList != null) {
+      simpleFields.put(FIELD_CONFIG_LIST_KEY, JsonUtils.objectToString(fieldConfigList));
+    }
+    UpsertConfig upsertConfig = getUpsertConfig();
+    if (upsertConfig != null) {
+      simpleFields.put(UPSERT_CONFIG_KEY, JsonUtils.objectToString(upsertConfig));
+    }
+    DedupConfig dedupConfig = getDedupConfig();
+    if (dedupConfig != null) {
+      simpleFields.put(DEDUP_CONFIG_KEY, JsonUtils.objectToString(dedupConfig));
+    }
+    DimensionTableConfig dimensionTableConfig = getDimensionTableConfig();
+    if (dimensionTableConfig != null) {
+      simpleFields.put(DIMENSION_TABLE_CONFIG_KEY, JsonUtils.objectToString(dimensionTableConfig));
+    }
+    IngestionConfig ingestionConfig = getIngestionConfig();
+    if (ingestionConfig != null) {
+      simpleFields.put(INGESTION_CONFIG_KEY, JsonUtils.objectToString(ingestionConfig));
+    }
+    List<TierConfig> tierConfigList = getTierConfigsList();
+    if (tierConfigList != null) {
+      simpleFields.put(TIER_CONFIGS_LIST_KEY, JsonUtils.objectToString(tierConfigList));
+    }
+    List<TunerConfig> tunerConfigList = getTunerConfigsList();
+    if (tunerConfigList != null) {
+      simpleFields.put(TUNER_CONFIG_LIST_KEY, JsonUtils.objectToString(tunerConfigList));
+    }
+    if (getInstancePartitionsMap() != null) {
+      simpleFields.put(INSTANCE_PARTITIONS_MAP_CONFIG_KEY,
+          JsonUtils.objectToString(getInstancePartitionsMap()));
+    }
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = getSegmentAssignmentConfigMap();
+    if (segmentAssignmentConfigMap != null) {
+      simpleFields.put(SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY,
+          JsonUtils.objectToString(segmentAssignmentConfigMap));
+    }
+
+    ZNRecord znRecord = new ZNRecord(getTableName());
+    znRecord.setSimpleFields(simpleFields);
+    return znRecord;
   }
 
   @JsonIgnore
