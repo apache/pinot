@@ -33,10 +33,8 @@ import org.slf4j.LoggerFactory;
 /// Represents an instance of Netty, allowing access to certain static properties via reflection, with support for
 /// shaded Netty versions.
 ///
-/// We know 3 common Netty instances:
+/// We know 2 common Netty instances:
 /// - Unshaded Netty, which uses the standard `io.netty` package
-/// - Pinot-shaded Netty, shaded by Pinot (only when the shade profile is enabled).
-///     It uses `org.apache.pinot.shaded.io.netty` package.
 /// - gRPC-shaded Netty, shaded by gRPC and included as a dependency. It uses `io.grpc.netty.shaded.io.netty` package.
 ///
 /// This is important because Netty defines is not designed to be shade, and it uses some static attributes to determine
