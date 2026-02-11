@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
