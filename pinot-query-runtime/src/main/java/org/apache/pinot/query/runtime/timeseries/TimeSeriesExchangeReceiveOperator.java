@@ -64,7 +64,15 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
     DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED,
     DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED,
     DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED,
-    DataTable.MetadataKey.TOTAL_DOCS
+    DataTable.MetadataKey.TOTAL_DOCS,
+    DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
+    DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID,
+    DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT,
+    DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE
+  );
+
+  private static final List<DataTable.MetadataKey> MIN_STATS_KEYS = List.of(
+    DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS
   );
 
   /**
@@ -205,6 +213,21 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
           long newLong = Long.parseLong(newValue);
           long existingLong = Long.parseLong(existingValue);
           aggregatedStats.put(key, Long.toString(existingLong + newLong));
+        } catch (NumberFormatException e) {
+          // Ignore malformed stats
+        }
+      }
+    }
+
+    for (DataTable.MetadataKey statKey : MIN_STATS_KEYS) {
+      String key = statKey.getName();
+      String existingValue = aggregatedStats.getOrDefault(key, "0");
+      String newValue = metadata.get(key);
+      if (newValue != null) {
+        try {
+          long newLong = Long.parseLong(newValue);
+          long existingLong = Long.parseLong(existingValue);
+          aggregatedStats.put(key, Long.toString(Math.min(existingLong, newLong)));
         } catch (NumberFormatException e) {
           // Ignore malformed stats
         }
