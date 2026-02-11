@@ -379,8 +379,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             MAX_STATE_TRANSITIONS_PER_RESOURCE, constraintItemResource);
   }
 
-  protected void addUtilizationChecker(UtilizationChecker utilizationChecker) {
-    _utilizationCheckers.add(utilizationChecker);
+  protected void maybeAddUtilizationChecker(UtilizationChecker utilizationChecker,
+      boolean isSpecificUtilizationCheckerEnabled) {
+    // Add utilization checker if:
+    // 1. All resource utilization checkers are enabled, OR
+    // 2. This specific utilization checker is enabled, OR
+    // 3. The legacy resource utilization check config is enabled (backwards compatibility)
+    if (_config.isAllResourceUtilizationCheckersEnabled() || isSpecificUtilizationCheckerEnabled
+        || _config.isResourceUtilizationCheckEnabled()) {
+      _utilizationCheckers.add(utilizationChecker);
+    }
   }
 
   /**
@@ -616,7 +624,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       throw new RuntimeException("Failed to register cluster config change handler", e);
     }
 
-
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
 
     _segmentCompletionManager =
@@ -637,7 +644,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         _helixResourceManager, _config);
 
     _diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
-    addUtilizationChecker(_diskUtilizationChecker);
+    maybeAddUtilizationChecker(_diskUtilizationChecker, _config.isDiskUtilizationCheckerEnabled());
     _resourceUtilizationManager = new ResourceUtilizationManager(_config, _utilizationCheckers);
     _rebalancePreChecker = RebalancePreCheckerFactory.create(_config.getRebalancePreCheckerClass());
     _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getRebalanceDiskUtilizationThreshold());
