@@ -19,16 +19,15 @@
 package org.apache.pinot.core.transport;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /// Utility class to inspect Netty constants and log their values, with the ability to check for specific conditions
 /// and log warnings if they are not met.
@@ -36,6 +35,9 @@ public class NettyInspector {
   private static final Logger LOGGER = LoggerFactory.getLogger(NettyInspector.class);
   /// We use a CopyOnWriteArrayList to allow dynamic addition of checks at runtime, if needed.
   public static final CopyOnWriteArrayList<Check> CHECKS;
+  /// We use a CopyOnWriteArrayList to allow dynamic addition of Netty instances at runtime,
+  /// if needed (e.g. if we want to support other shaded versions of Netty).
+  public static final CopyOnWriteArrayList<NettyInstance> KNOWN_INSTANCES;
 
   static {
     CHECKS = new CopyOnWriteArrayList<>(
@@ -43,10 +45,49 @@ public class NettyInspector {
             NettyInspector::checkDirectMemory
         }
     );
+    KNOWN_INSTANCES = new CopyOnWriteArrayList<>(new NettyInstance[] {
+        new NettyInstance.UnshadedNettyInstance(),
+        new NettyInstance.GrpcNettyInstance()
+    });
   }
 
   private NettyInspector() {
     // Private constructor to prevent instantiation
+  }
+
+  public static void registerMetrics(AbstractMetrics<?, ?, ?, ?> metrics) {
+    for (NettyInstance instance : KNOWN_INSTANCES) {
+      metrics.setOrUpdateGauge(instance.getName() + "_netty_direct_memory_used",
+          instance::getUsedDirectMemory);
+      metrics.setOrUpdateGauge(instance.getName() + "_netty_direct_memory_max",
+          instance::getMaxDirectMemory);
+    }
+  }
+
+  /// Logs the memory used by each known Netty instance as long as the max memory it can use.
+  /// It also logs the total memory used by all Netty instances and its max memory.
+  public static void logMemory() {
+    long totalUsedMemory = 0;
+    long totalMaxMemory = 0;
+    for (NettyInstance instance : KNOWN_INSTANCES) {
+      long usedMemory = instance.getUsedDirectMemory();
+      long maxMemory = instance.getMaxDirectMemory();
+      totalUsedMemory += usedMemory;
+      totalMaxMemory += maxMemory;
+      LOGGER.info("Netty instance '{}' is using {} of direct memory (max {}).", instance.getName(),
+          humanReadableByteCount(usedMemory), humanReadableByteCount(maxMemory));
+    }
+    LOGGER.info("Total direct memory used by all Netty instances: {} (max {}).",
+        humanReadableByteCount(totalUsedMemory), humanReadableByteCount(totalMaxMemory));
+  }
+
+  private static String humanReadableByteCount(long bytes) {
+    if (bytes < 1024) {
+      return bytes + " B";
+    }
+    int exp = (int) (Math.log(bytes) / Math.log(1024));
+    String pre = "KMGTPE".charAt(exp - 1) + "B";
+    return String.format("%.1f %s", bytes / Math.pow(1024, exp), pre);
   }
 
   /// Logs the values of all constants for all Netty instances, and logs warnings if any checks fail.
@@ -76,7 +117,7 @@ public class NettyInspector {
   /// Checks all constants for all Netty instances and returns a map of instances to their check results.
   public static Map<NettyInstance, List<CheckResult>> checkAllConstants() {
     Map<NettyInstance, List<CheckResult>> results = new HashMap<>();
-    for (NettyInstance instance : NettyInstance.KNOWN_INSTANCES) {
+    for (NettyInstance instance : KNOWN_INSTANCES) {
       for (Check check : CHECKS) {
         CheckResult result = check.apply(instance);
         results.computeIfAbsent(instance, k -> new ArrayList<>()).add(result);
@@ -86,11 +127,7 @@ public class NettyInspector {
   }
 
   public static CheckResult checkDirectMemory(NettyInstance instance) {
-    Optional<Boolean> accessible = instance.isExplicitTryReflectionSetAccessible();
-    if (accessible.isEmpty()) {
-      return new CheckResult("Could not determine reflection access setting.", CheckResult.Status.UNKNOWN);
-    }
-    if (accessible.get()) {
+    if (instance.isExplicitTryReflectionSetAccessible()) {
       return CheckResult.SUCCESS;
     } else {
       String message = "Reflection access is disabled on the " + instance.getName() + " Netty instance. "
