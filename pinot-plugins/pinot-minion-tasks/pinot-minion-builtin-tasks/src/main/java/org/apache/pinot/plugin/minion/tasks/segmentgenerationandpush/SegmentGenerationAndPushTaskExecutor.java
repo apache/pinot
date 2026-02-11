@@ -231,7 +231,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     spec.setPushJobSpec(pushJobSpec);
     spec.setTableSpec(tableSpec);
     spec.setPinotClusterSpecs(pinotClusterSpecs);
-    spec.setAuthToken(taskConfigs.get(BatchConfigProperties.AUTH_TOKEN));
+    spec.setAuthToken(MinionTaskUtils.resolveAuthToken(taskConfigs));
 
     return spec;
   }
@@ -286,7 +286,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
           BatchConfigProperties.RECORD_READER_PROP_PREFIX));
       taskSpec.setRecordReaderSpec(recordReaderSpec);
 
-      String authToken = taskConfigs.get(BatchConfigProperties.AUTH_TOKEN);
+      String authToken = MinionTaskUtils.resolveAuthToken(taskConfigs);
 
       String tableNameWithType = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
       Schema schema;
