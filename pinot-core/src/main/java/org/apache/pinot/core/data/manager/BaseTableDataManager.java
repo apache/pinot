@@ -181,9 +181,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _segmentLocks = segmentLocks;
     _segmentReloadSemaphore = segmentReloadSemaphore;
     _segmentReloadRefreshExecutor = new SegmentOperationsExecutorService(segmentReloadRefreshExecutor,
-        SegmentOperationsTaskType.REFRESH_RELOAD_THREAD, tableConfig.getTableName());
+        SegmentOperationsTaskType.REFRESH_OR_RELOAD, tableConfig.getTableName());
     _segmentPreloadExecutor = segmentPreloadExecutor != null
-        ? new SegmentOperationsExecutorService(segmentPreloadExecutor, SegmentOperationsTaskType.PRELOAD_THREAD,
+        ? new SegmentOperationsExecutorService(segmentPreloadExecutor, SegmentOperationsTaskType.PRELOAD,
         tableConfig.getTableName())
         : null;
     _enableAsyncSegmentRefresh = enableAsyncSegmentRefresh;

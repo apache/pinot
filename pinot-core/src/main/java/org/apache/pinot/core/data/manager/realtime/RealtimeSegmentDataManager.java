@@ -1636,7 +1636,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public void startConsumption() {
     Runnable consumer =
-        SegmentOperationsTaskContext.wrap(new PartitionConsumer(), SegmentOperationsTaskType.CONSUMER_THREAD,
+        SegmentOperationsTaskContext.wrap(new PartitionConsumer(), SegmentOperationsTaskType.CONSUMER,
             _tableNameWithType);
     _consumerThread = new Thread(consumer, _segmentNameStr);
     _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this);
