@@ -148,7 +148,7 @@ public class PinotLogicalTableResource {
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
   }
 
-  private void translatePhysicalTableNamesWithDB(LogicalTableConfig logicalTableConfig, HttpHeaders headers) {
+  public static void translatePhysicalTableNamesWithDB(LogicalTableConfig logicalTableConfig, HttpHeaders headers) {
     // Translate physical table names to include the database name
     Map<String, PhysicalTableConfig> physicalTableConfigMap = logicalTableConfig.getPhysicalTableConfigMap().entrySet()
         .stream()
