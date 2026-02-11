@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Arrays;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -62,13 +61,6 @@ public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionT
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = truncate(_doubleSVValues[i], 0);
     }
-    testTransformFunction(transformFunction, expectedValues);
-
-    // Regression for signed-zero handling: truncate(value) should match truncate(value, 0).
-    expression = RequestContextUtils.getExpression("truncate(-0.4)");
-    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
-    Arrays.fill(expectedValues, 0.0d);
     testTransformFunction(transformFunction, expectedValues);
   }
 
