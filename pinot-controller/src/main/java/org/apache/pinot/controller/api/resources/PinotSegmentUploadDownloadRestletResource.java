@@ -96,7 +96,7 @@ import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
-import org.apache.pinot.controller.validation.DiskUtilizationChecker;
+import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.controller.validation.UtilizationChecker;
 import org.apache.pinot.core.auth.Actions;
@@ -162,7 +162,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   AccessControlFactory _accessControlFactory;
 
   @Inject
-  DiskUtilizationChecker _diskUtilizationChecker;
+  ResourceUtilizationManager _resourceUtilizationManager;
 
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -413,19 +413,20 @@ public class PinotSegmentUploadDownloadRestletResource {
 
       // Perform resource utilization checks
       UtilizationChecker.CheckResult isDiskUtilizationWithinLimits =
-          _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableNameWithType,
+          _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
               UtilizationChecker.CheckPurpose.OFFLINE_SEGMENT_UPLOAD);
       if (isDiskUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
         _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
             1L);
         throw new ControllerApplicationException(LOGGER,
-            String.format("Disk utilization limit exceeded for table: %s, rejecting upload for segment: %s",
+            String.format("Resource utilization limit exceeded for table: %s, rejecting upload for segment: %s",
                 tableNameWithType,
                 segmentName),
             Response.Status.FORBIDDEN);
       } else if (isDiskUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) {
         LOGGER.warn(
-            "Disk utilization status could not be determined for table: {}. Will allow segment upload to proceed.",
+            "Resource utilization status could not be determined for table: {}. Will allow segment upload to "
+                + "proceed.",
             tableNameWithType);
       }
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
