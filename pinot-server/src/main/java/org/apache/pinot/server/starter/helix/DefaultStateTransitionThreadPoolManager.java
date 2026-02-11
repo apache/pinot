@@ -31,18 +31,34 @@ import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskContext;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
  * Default state transition thread pool manager backed by a fixed-size pool.
+ *
+ * <p>This replaces the Helix-managed state transition thread pool to provide explicit context tracking
+ * for segment operations. The pool size is configurable via
+ * {@link org.apache.pinot.spi.utils.CommonConstants.Server#CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE}.</p>
+ *
+ * <p><b>Migration from Helix configuration:</b> Previously, the thread pool size was configured in ZooKeeper
+ * using the key "STATE_TRANSITION.maxThreads" at either the participant or cluster config level.
+ * This configuration replaces that mechanism.</p>
  */
 public class DefaultStateTransitionThreadPoolManager implements StateTransitionThreadPoolManager {
-  private static final int DEFAULT_POOL_SIZE = 40;
-
   private final ExecutorService _executorService;
 
-  public DefaultStateTransitionThreadPoolManager() {
-    _executorService = new ContextWrappingExecutor(DEFAULT_POOL_SIZE, DEFAULT_POOL_SIZE, 0L, TimeUnit.MILLISECONDS,
+  /**
+   * Creates a state transition thread pool manager with the default pool size configuration.
+   * The pool size is read from the server configuration.
+   *
+   * @param serverConf the server configuration
+   */
+  public DefaultStateTransitionThreadPoolManager(PinotConfiguration serverConf) {
+    int poolSize = serverConf.getProperty(
+        org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE,
+        org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_STATE_TRANSITION_THREAD_POOL_SIZE);
+    _executorService = new ContextWrappingExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS,
         new LinkedBlockingQueue<>(), new ThreadFactoryBuilder().setNameFormat("state-transition-%d").build());
   }
 
