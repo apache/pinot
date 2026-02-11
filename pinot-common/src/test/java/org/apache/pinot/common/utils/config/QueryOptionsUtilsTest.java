@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.fail;
 
 
@@ -62,10 +63,17 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
-  public void shouldResolveSamplerAliasToTableSamplerOption() {
-    Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("sampler", "firstOnly"));
+  public void shouldResolveSamplerOptionCaseInsensitively() {
+    Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("SAMPLER", "firstOnly"));
 
     assertEquals(resolved.get(TABLE_SAMPLER), "firstOnly");
+  }
+
+  @Test
+  public void shouldExtractTableSamplerOption() {
+    assertEquals(QueryOptionsUtils.getTableSampler(Map.of(TABLE_SAMPLER, "firstOnly")), "firstOnly");
+    assertNull(QueryOptionsUtils.getTableSampler(Map.of()));
+    assertNull(QueryOptionsUtils.getTableSampler(null));
   }
 
   @Test

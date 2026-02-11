@@ -22,7 +22,6 @@ import java.lang.reflect.Constructor;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -39,7 +38,6 @@ import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadata
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
-import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.core.routing.TablePartitionInfo;
@@ -57,7 +55,6 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -235,11 +232,7 @@ public class BrokerRoutingManagerTest {
     when(partitionMetadataManager.getTablePartitionInfo()).thenReturn(expectedPartitionInfo);
     when(partitionMetadataManager.getTablePartitionReplicatedServersInfo()).thenReturn(expectedReplicatedServersInfo);
 
-    TableSampler sampler = mock(TableSampler.class);
-    when(sampler.sampleSegments(anySet())).thenReturn(Set.of("segment_0"));
-    Object routingEntry =
-        createRoutingEntry(TEST_TABLE, timeBoundaryManager, partitionMetadataManager, Map.of("firsttwo", sampler),
-            Set.of("segment_0"));
+    Object routingEntry = createRoutingEntry(TEST_TABLE, timeBoundaryManager, partitionMetadataManager, Map.of());
     putRoutingEntry(TEST_TABLE, routingEntry);
 
     assertSame(_routingManager.getTimeBoundaryInfo(TEST_TABLE), expectedTimeBoundaryInfo);
@@ -248,20 +241,19 @@ public class BrokerRoutingManagerTest {
   }
 
   private static Object createRoutingEntry(String tableNameWithType, TimeBoundaryManager timeBoundaryManager,
-      SegmentPartitionMetadataManager partitionMetadataManager, Map<String, TableSampler> samplers,
-      Set<String> preSelectedOnlineSegments)
+      SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos)
       throws Exception {
     Class<?> routingEntryClass = Class.forName(BaseBrokerRoutingManager.class.getName() + "$RoutingEntry");
     Constructor<?> constructor = routingEntryClass.getDeclaredConstructor(String.class, String.class, String.class,
         SegmentPreSelector.class, SegmentSelector.class, List.class, InstanceSelector.class, int.class, int.class,
         SegmentZkMetadataFetcher.class, TimeBoundaryManager.class, SegmentPartitionMetadataManager.class, Long.class,
-        Map.class, Set.class, boolean.class);
+        Map.class, boolean.class);
     constructor.setAccessible(true);
     return constructor.newInstance(tableNameWithType, "/IDEALSTATES/" + tableNameWithType,
         "/EXTERNALVIEW/" + tableNameWithType, mock(SegmentPreSelector.class), mock(SegmentSelector.class),
         Collections.<SegmentPruner>emptyList(), mock(InstanceSelector.class), 1, 1,
-        mock(SegmentZkMetadataFetcher.class), timeBoundaryManager, partitionMetadataManager, null, samplers,
-        preSelectedOnlineSegments, false);
+        mock(SegmentZkMetadataFetcher.class), timeBoundaryManager, partitionMetadataManager, null, samplerInfos,
+        false);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})

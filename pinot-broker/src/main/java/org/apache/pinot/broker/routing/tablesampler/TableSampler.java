@@ -42,7 +42,7 @@ public interface TableSampler {
    * Selects a subset of segments from the provided online segments.
    *
    * <p>Implementations must not mutate the input set because the same pre-selected segment set can be reused by
-   * multiple samplers.
+   * multiple samplers. Implementations must return a non-null set.
    */
   Set<String> sampleSegments(Set<String> onlineSegments);
 }

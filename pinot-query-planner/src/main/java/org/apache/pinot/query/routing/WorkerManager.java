@@ -40,6 +40,7 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -588,7 +589,7 @@ public class WorkerManager {
     BrokerRequest brokerRequest =
         CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableNameWithType + "\"");
     if (MapUtils.isNotEmpty(queryOptions) && brokerRequest.isSetPinotQuery()) {
-      // Ensure query options (e.g. tableSampler) are visible to routing selection.
+      // Ensure query options (e.g. sampler) are visible to routing selection.
       brokerRequest.getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
     }
     return _routingManager.getRoutingTable(brokerRequest, requestId);
@@ -624,7 +625,7 @@ public class WorkerManager {
    * TODO: It doesn't handle unavailable segments.
    */
   private Map<String, List<String>> getSegments(String tableName, Map<String, String> queryOptions) {
-    String samplerName = MapUtils.isNotEmpty(queryOptions) ? queryOptions.get(QueryOptionKey.TABLE_SAMPLER) : null;
+    String samplerName = MapUtils.isNotEmpty(queryOptions) ? QueryOptionsUtils.getTableSampler(queryOptions) : null;
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
       // Raw table name

@@ -650,7 +650,7 @@ public class CommonConstants {
         public static final String USE_STAR_TREE = "useStarTree";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
         public static final String ROUTING_OPTIONS = "routingOptions";
-        public static final String TABLE_SAMPLER = "tableSampler";
+        public static final String TABLE_SAMPLER = "sampler";
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String COLLECT_GC_STATS = "collectGCStats";

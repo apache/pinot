@@ -41,7 +41,6 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOv
  * Utils to parse query options.
  */
 public class QueryOptionsUtils {
-
   private QueryOptionsUtils() {
   }
 
@@ -68,8 +67,6 @@ public class QueryOptionsUtils {
           }
         }
       }
-      // Backward-compatible alias used by SQL SET syntax: SET sampler='x'
-      configResolver.put("sampler", QueryOptionKey.TABLE_SAMPLER);
     } catch (IllegalAccessException e) {
       // prefer rethrowing this during runtime instead of a ClassNotFoundException
       configResolver = null;
@@ -111,6 +108,14 @@ public class QueryOptionsUtils {
   public static Long getTimeoutMs(Map<String, String> queryOptions) {
     String timeoutMsString = queryOptions.get(QueryOptionKey.TIMEOUT_MS);
     return checkedParseLongPositive(QueryOptionKey.TIMEOUT_MS, timeoutMsString);
+  }
+
+  @Nullable
+  public static String getTableSampler(@Nullable Map<String, String> queryOptions) {
+    if (queryOptions == null || queryOptions.isEmpty()) {
+      return null;
+    }
+    return queryOptions.get(QueryOptionKey.TABLE_SAMPLER);
   }
 
   @Nullable
