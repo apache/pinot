@@ -63,10 +63,11 @@ import org.slf4j.LoggerFactory;
  */
 public class MultiClusterQuickstart extends QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiClusterQuickstart.class);
-  private static final int NUM_CLUSTERS = 3;
+  private static final int NUM_CLUSTERS = 2;
   private static final String LOGICAL_TABLE = "unified_orders";
   private static final String SCHEMA_PATH = "/examples/logicalTables/orders_schema.json";
   private static final String DATA_PATH = "/examples/batch/orders/ordersUS/rawdata/ordersUS_sample.csv";
+  private static final int STABILIZATION_PERIOD_MS = 3000; // Wait 3 seconds for count to stabilize
 
   private final List<Cluster> _clusters = new ArrayList<>();
   private File _tmpDir;
@@ -241,7 +242,73 @@ public class MultiClusterQuickstart extends QuickStartBase {
       printStatus(Quickstart.Color.GREEN, "  Logical table on " + c._name);
     }
 
-    Thread.sleep(5000); // Wait for tables to be ready
+    waitForTablesReady();
+  }
+
+  /**
+   * Wait for all tables to be ready by checking table size stabilizes.
+   * This replaces the fixed-time sleep with condition-based waiting.
+   */
+  private void waitForTablesReady() throws Exception {
+    printStatus(Quickstart.Color.CYAN, "Waiting for physical tables to be ready...");
+
+    // Wait for each physical table and sum their counts
+    long expectedTotal = _clusters.stream()
+        .mapToLong(c -> {
+          try {
+            String sql = "SELECT COUNT(*) FROM " + c._tableName;
+            long count = waitForStableCount(c, sql, null);
+            printStatus(Quickstart.Color.GREEN, "  " + c._name + "/" + c._tableName + " ready (" + count + " rows)");
+            return count;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        })
+        .sum();
+
+    // Wait for logical table to show aggregated count
+    printStatus(Quickstart.Color.CYAN, "Waiting for logical table to be ready...");
+    String sql = "SET enableMultiClusterRouting=true; SELECT COUNT(*) FROM " + LOGICAL_TABLE;
+    long logicalCount = waitForStableCount(_clusters.get(0), sql, expectedTotal);
+    printStatus(Quickstart.Color.GREEN,
+        "  Logical table ready: " + logicalCount + " rows (sum of all " + _clusters.size() + " clusters)");
+  }
+
+  /**
+   * Wait for a table's count to stabilize (remain constant for STABILIZATION_PERIOD_MS).
+   * @param cluster the cluster to query
+   * @param sql the SQL to execute for counting rows
+   * @param expectedCount if not null, wait for count to match this value before stabilizing
+   * @return the stable row count
+   */
+  private long waitForStableCount(Cluster cluster, String sql, Long expectedCount) throws Exception {
+    Long lastCount = null;
+    long stableStart = 0;
+    long deadline = System.currentTimeMillis() + 60 * 1000; // 60 second timeout
+
+    while (System.currentTimeMillis() < deadline) {
+      try {
+        long currentCount = Long.parseLong(getCount(query(cluster, sql)));
+        boolean meetsExpectation = currentCount > 0 && (expectedCount == null || currentCount == expectedCount);
+
+        if (meetsExpectation && lastCount != null && currentCount == lastCount) {
+          if (stableStart == 0) {
+            stableStart = System.currentTimeMillis();
+          } else if (System.currentTimeMillis() - stableStart >= STABILIZATION_PERIOD_MS) {
+            return currentCount;
+          }
+        } else {
+          stableStart = 0;
+          lastCount = currentCount;
+        }
+      } catch (Exception e) {
+        LOGGER.error("Query failed for {}", sql, e);
+      }
+
+      Thread.sleep(1000);
+    }
+
+    throw new Exception("Table did not stabilize within the allotted time");
   }
 
   private void runQueries() throws Exception {
