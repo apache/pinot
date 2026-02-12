@@ -195,13 +195,13 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
         .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfig));
     Mockito
         .when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_PARTITIONING, null, AccessOption.PERSISTENT))
-        .thenReturn(tableConfigWithPartitioning.toZNRecord());
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigWithPartitioning));
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_SORTED_COL, null, AccessOption.PERSISTENT))
-        .thenReturn(tableConfigWithSortedCol.toZNRecord());
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigWithSortedCol));
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_EPOCH_HOURS, null, AccessOption.PERSISTENT))
-        .thenReturn(tableConfigEpochHours.toZNRecord());
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigEpochHours));
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_SDF, null, AccessOption.PERSISTENT))
-        .thenReturn(tableConfigSDF.toZNRecord());
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigSDF));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTable", null, AccessOption.PERSISTENT))
         .thenReturn(SchemaSerDeUtils.toZNRecord(schema));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableWithPartitioning", null, AccessOption.PERSISTENT))

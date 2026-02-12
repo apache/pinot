@@ -36,8 +36,8 @@ public class ConfigRecord {
   public ConfigRecord(String id, Map<String, String> simpleFields,
       Map<String, Map<String, String>> mapFields) {
     _id = id;
-    _simpleFields = simpleFields != null ? simpleFields : Collections.emptyMap();
-    _mapFields = mapFields != null ? mapFields : Collections.emptyMap();
+    _simpleFields = simpleFields != null ? Collections.unmodifiableMap(simpleFields) : Collections.emptyMap();
+    _mapFields = mapFields != null ? Collections.unmodifiableMap(mapFields) : Collections.emptyMap();
   }
 
   public ConfigRecord(String id, Map<String, String> simpleFields) {

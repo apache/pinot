@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.config;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.ConfigRecord;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -47,6 +48,9 @@ public class TableConfigSerDeUtils {
     ConfigRecord record = tableConfig.toConfigRecord();
     ZNRecord znRecord = new ZNRecord(record.getId());
     znRecord.setSimpleFields(new HashMap<>(record.getSimpleFields()));
+    for (Map.Entry<String, Map<String, String>> entry : record.getMapFields().entrySet()) {
+      znRecord.setMapField(entry.getKey(), new HashMap<>(entry.getValue()));
+    }
     return znRecord;
   }
 }
