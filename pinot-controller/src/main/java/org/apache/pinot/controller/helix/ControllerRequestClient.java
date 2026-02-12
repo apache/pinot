@@ -209,6 +209,30 @@ public class ControllerRequestClient {
     }
   }
 
+  public String getLogicalTable(String logicalTableName)
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendGetRequest(
+              new URI(_controllerRequestURLBuilder.forLogicalTableGet(logicalTableName)), _headers));
+      return response.getResponse();
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public List<String> getLogicalTableNames()
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendGetRequest(
+              new URI(_controllerRequestURLBuilder.forLogicalTableNamesGet()), _headers));
+      return JsonUtils.stringToObject(response.getResponse(), List.class);
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   public TableConfig getTableConfig(String tableName, TableType tableType)
       throws IOException {
     try {

@@ -165,7 +165,7 @@ public final class TableConfigUtils {
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
   public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
-    Preconditions.checkArgument(schema != null, "Schema should not be null");
+    Preconditions.checkArgument(schema != null, "Schema should not be null for table: %s", tableConfig.getTableName());
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     // Sanitize the table config before validation
     sanitize(tableConfig);
