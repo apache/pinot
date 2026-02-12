@@ -63,6 +63,7 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -116,6 +117,12 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     addTableConfig(createRealtimeTableConfig(avroFiles.get(0)));
     addTableConfig(createOfflineTableConfig());
 
+    // Create a logical table backed by the physical tables
+    Schema logicalTableSchema = createSchema(getSchemaFileName());
+    logicalTableSchema.setSchemaName(getLogicalTableName());
+    addSchema(logicalTableSchema);
+    createLogicalTable();
+
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
     waitForAllDocsLoaded(600_000L);
@@ -124,6 +131,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
+    dropLogicalTable(getLogicalTableName());
+    dropOfflineTable(getTableName());
     dropRealtimeTable(getTableName());
     stopMinion();
     stopServer();
@@ -270,6 +279,16 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
+  protected void createLogicalTable()
+      throws IOException {
+    LogicalTableConfig logicalTableConfig = createLogicalTableConfig();
+    sendPostRequest(
+        _controllerRequestURLBuilder.forLogicalTableCreate(),
+        logicalTableConfig.toSingleLineJsonString(),
+        AUTH_HEADER);
+  }
+
+  @Override
   protected Connection getPinotConnection() {
     if (_pinotConnection == null) {
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
@@ -281,6 +300,20 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
           ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
     }
     return _pinotConnection;
+  }
+
+  @Override
+  public void dropLogicalTable(String logicalTableName)
+      throws IOException {
+    sendDeleteRequest(_controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName), AUTH_HEADER);
+  }
+
+  @Override
+  public void dropOfflineTable(String tableName)
+      throws IOException {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)),
+        AUTH_HEADER);
   }
 
   @Override
@@ -502,6 +535,30 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       Assert.assertTrue(
           sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
               > 200000); // download segment
+    }
+  }
+
+  @Test
+  public void testLogicalTableTlsRouting()
+      throws Exception {
+    String query = "SELECT count(*) FROM " + getLogicalTableName();
+
+    // Query via Pinot connection (TLS-enabled)
+    ResultSetGroup resultSetGroup = getPinotConnection().execute(query);
+    Assert.assertTrue(resultSetGroup.getResultSet(0).getLong(0) > 0);
+
+    // Query via external broker TLS endpoint
+    try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_EMPTY_JKS, TLS_STORE_JKS)) {
+      HttpPost request = new HttpPost("https://localhost:" + _externalBrokerPort + "/query/sql");
+      request.addHeader(CLIENT_HEADER);
+      request.setEntity(
+          new StringEntity("{\"sql\":\"SELECT count(*) FROM " + getLogicalTableName() + "\"}"));
+      try (CloseableHttpResponse response = client.execute(request)) {
+        Assert.assertEquals(response.getCode(), 200);
+        JsonNode resultTable =
+            JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
+        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 0);
+      }
     }
   }
 
