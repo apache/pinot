@@ -32,8 +32,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
- * Utility class that encapsulates table config validation logic shared across
- * {@link PinotTableRestletResource} and StarTree's managed logical table resource.
+ * Utility class that encapsulates table config validation logic.
  *
  * <p>This lives in {@code pinot-controller} (not {@code pinot-segment-local}'s {@code TableConfigUtils})
  * because validation requires controller-level dependencies like {@link PinotHelixResourceManager},
