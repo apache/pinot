@@ -95,6 +95,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
+import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -155,6 +156,7 @@ import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -1570,6 +1572,7 @@ public class PinotHelixResourceManager {
       LOGGER.info("New schema: {} is the same as the existing schema, not updating it", schemaName);
       return;
     }
+
     boolean isBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema);
     if (!isBackwardCompatible) {
       if (forceTableSchemaUpdate) {
@@ -1580,6 +1583,14 @@ public class PinotHelixResourceManager {
         errorMsg.append("New schema: ").append(schemaName)
             .append(" is not backward-compatible with the existing schema.");
         errorMsg.append("\n\nIncompatibility Details:");
+
+        // Check for primary key column changes
+        List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
+        List<String> newPrimaryKeys = schema.getPrimaryKeyColumns();
+        if (oldPrimaryKeys != null && !oldPrimaryKeys.isEmpty() && !oldPrimaryKeys.equals(newPrimaryKeys)) {
+          errorMsg.append("\n- Primary key columns changed (").append(oldPrimaryKeys).append(" -> ")
+              .append(newPrimaryKeys).append(")");
+        }
 
         // Check for missing columns
         Set<String> newSchemaColumns = schema.getColumnNames();
@@ -1620,9 +1631,10 @@ public class PinotHelixResourceManager {
         errorMsg.append("\n\nSuggestions to fix:");
         errorMsg.append("\n1. Ensure all columns from the existing schema are retained in the new schema");
         errorMsg.append("\n2. Do not change the data type or field type of existing columns");
-        errorMsg.append("\n3. New columns should be added as optional fields with default values");
-        errorMsg.append("\n4. If you must make breaking changes, consider creating a new schema version or use "
-            + "forceTableSchemaUpdate=true (use with caution)");
+        errorMsg.append("\n3. Do not change primary key columns");
+        errorMsg.append("\n4. New columns should be added as optional fields with default values");
+        errorMsg.append("\n5. If you must make breaking changes, consider creating a new schema version or use "
+            + "force=true (use with caution)");
 
         throw new SchemaBackwardIncompatibleException(errorMsg.toString());
       }
@@ -2152,19 +2164,32 @@ public class PinotHelixResourceManager {
   /**
    * Validate the table config and update it
    * @throws IOException
+   * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible
    */
   public void updateTableConfig(TableConfig tableConfig)
-      throws IOException {
+      throws IOException, TableConfigBackwardIncompatibleException {
+    updateTableConfig(tableConfig, false);
+  }
+
+  /**
+   * Validate the table config and update it
+   * @param tableConfig the table config to update
+   * @param force if true, allows upsert/dedup config changes with a warning
+   * @throws IOException
+   * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
+   */
+  public void updateTableConfig(TableConfig tableConfig, boolean force)
+      throws IOException, TableConfigBackwardIncompatibleException {
     validateTableTenantConfig(tableConfig);
     validateTableTaskMinionInstanceTagConfig(tableConfig);
-    setExistingTableConfig(tableConfig);
+    setExistingTableConfig(tableConfig, -1, force);
   }
 
   /**
    * Sets the given table config into zookeeper
    */
   public void setExistingTableConfig(TableConfig tableConfig)
-      throws IOException {
+      throws IOException, TableConfigBackwardIncompatibleException {
     setExistingTableConfig(tableConfig, -1);
   }
 
@@ -2225,9 +2250,43 @@ public class PinotHelixResourceManager {
   /**
    * Sets the given table config into zookeeper with the expected version, which is the previous tableConfig znRecord
    * version. If the expected version is -1, the version check is ignored.
+   *
+   * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible
    */
-  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion) {
+  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion)
+      throws TableConfigBackwardIncompatibleException {
+    setExistingTableConfig(tableConfig, expectedVersion, false);
+  }
+
+  /**
+   * Sets the given table config into zookeeper with the expected version.
+   *
+   * @param tableConfig the table config to set
+   * @param expectedVersion the expected version (-1 to ignore version check)
+   * @param force if true, allows upsert/dedup config changes with a warning
+   * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
+   */
+  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
+      throws TableConfigBackwardIncompatibleException {
     String tableNameWithType = tableConfig.getTableName();
+    TableConfig existingTableConfig = getTableConfig(tableNameWithType);
+    if (existingTableConfig != null) {
+      List<String> violations = TableConfigUtils.validateBackwardCompatibility(tableConfig, existingTableConfig);
+      if (!violations.isEmpty()) {
+        String tableName = tableConfig.getTableName();
+        if (force) {
+          LOGGER.warn("Forcing a config update for table: {} with violations: {}."
+              + "This may cause data inconsistencies or data loss. Be cautious during compactions, and "
+              + "pause consumption beforehand and disable SNAPSHOT mode in upsertConfig and restart for the changes"
+              + " to kick in. If in doubt, recreate the table with the new configuration.", tableName, violations);
+        } else {
+          throw new TableConfigBackwardIncompatibleException(String.format(
+              "Failed to update table '%s': Cannot modify %s as it may lead to data inconsistencies. "
+                  + "Please create a new table instead.", tableName, violations));
+        }
+      }
+    }
+
     if (!ZKMetadataProvider.setTableConfig(_propertyStore, tableConfig, expectedVersion)) {
       throw new RuntimeException(
           "Failed to update table config in Zookeeper for table: " + tableNameWithType + " with" + " expected version: "

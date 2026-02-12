@@ -49,6 +49,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -367,7 +368,10 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload,
       @ApiParam(value = "Force update the table schema") @DefaultValue("false") @QueryParam("forceTableSchemaUpdate")
-      boolean forceTableSchemaUpdate, String tableConfigsStr, @Context HttpHeaders headers)
+      boolean forceTableSchemaUpdate,
+      @ApiParam(value = "Force update config changes")
+      @QueryParam("force") @DefaultValue("false") boolean force,
+      String tableConfigsStr, @Context HttpHeaders headers)
       throws Exception {
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(headers);
     tableName = DatabaseUtils.translateTableName(tableName, databaseName);
@@ -405,7 +409,7 @@ public class TableConfigsRestletResource {
       if (offlineTableConfig != null) {
         tuneConfig(offlineTableConfig, schema);
         if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          _pinotHelixResourceManager.updateTableConfig(offlineTableConfig);
+          _pinotHelixResourceManager.updateTableConfig(offlineTableConfig, force);
           LOGGER.info("Updated offline table config: {}", tableName);
         } else {
           _pinotHelixResourceManager.addTable(offlineTableConfig);
@@ -415,13 +419,17 @@ public class TableConfigsRestletResource {
       if (realtimeTableConfig != null) {
         tuneConfig(realtimeTableConfig, schema);
         if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig);
+          _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig, force);
           LOGGER.info("Updated realtime table config: {}", tableName);
         } else {
           _pinotHelixResourceManager.addTable(realtimeTableConfig);
           LOGGER.info("Created realtime table config: {}", tableName);
         }
       }
+    } catch (TableConfigBackwardIncompatibleException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Invalid TableConfigs for: %s, %s", tableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
     } catch (InvalidTableConfigException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
