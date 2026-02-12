@@ -36,6 +36,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
@@ -97,10 +98,10 @@ public class TableSizeReaderTest {
         .thenAnswer((Answer) invocationOnMock -> {
           String path = (String) invocationOnMock.getArguments()[0];
           if (path.contains("realtime_REALTIME")) {
-            return tableConfig.toZNRecord();
+            return TableConfigSerDeUtils.toZNRecord(tableConfig);
           }
           if (path.contains("offline_OFFLINE")) {
-            return tableConfig.toZNRecord();
+            return TableConfigSerDeUtils.toZNRecord(tableConfig);
           }
           return null;
         });

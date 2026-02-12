@@ -35,7 +35,9 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
@@ -330,7 +332,7 @@ public class ZkTableCache implements TableCache {
 
   private void putTableConfig(ZNRecord znRecord)
     throws IOException {
-    TableConfig tableConfig = TableConfig.fromZNRecord(znRecord);
+    TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
@@ -345,7 +347,7 @@ public class ZkTableCache implements TableCache {
 
   private void putLogicalTableConfig(ZNRecord znRecord)
     throws IOException {
-    LogicalTableConfig logicalTableConfig = LogicalTableConfig.fromZNRecord(znRecord);
+    LogicalTableConfig logicalTableConfig = LogicalTableConfigUtils.fromZNRecord(znRecord);
     String logicalTableName = logicalTableConfig.getTableName();
     _logicalTableConfigInfoMap.put(logicalTableName, new LogicalTableConfigInfo(logicalTableConfig));
     if (_ignoreCase) {

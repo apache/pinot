@@ -30,8 +30,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.ConfigRecord;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
@@ -414,12 +414,12 @@ public class TableConfig extends BaseJsonConfig {
 
   private static final String FIELD_MISSING_MESSAGE_TEMPLATE = "Mandatory field '%s' is missing";
 
-  public static TableConfig fromZNRecord(ZNRecord znRecord)
+  public static TableConfig fromConfigRecord(ConfigRecord configRecord)
       throws IOException {
-    Map<String, String> simpleFields = znRecord.getSimpleFields();
+    Map<String, String> simpleFields = configRecord.getSimpleFields();
 
     // Mandatory fields
-    String tableName = znRecord.getId();
+    String tableName = configRecord.getId();
 
     String tableType = simpleFields.get(TABLE_TYPE_KEY);
     boolean isDimTable = Boolean.parseBoolean(simpleFields.get(IS_DIM_TABLE_KEY));
@@ -539,7 +539,7 @@ public class TableConfig extends BaseJsonConfig {
         instancePartitionsMap, segmentAssignmentConfigMap);
   }
 
-  public ZNRecord toZNRecord()
+  public ConfigRecord toConfigRecord()
       throws JsonProcessingException {
     Map<String, String> simpleFields = new HashMap<>();
 
@@ -612,9 +612,7 @@ public class TableConfig extends BaseJsonConfig {
           JsonUtils.objectToString(segmentAssignmentConfigMap));
     }
 
-    ZNRecord znRecord = new ZNRecord(getTableName());
-    znRecord.setSimpleFields(simpleFields);
-    return znRecord;
+    return new ConfigRecord(getTableName(), simpleFields);
   }
 
   @JsonIgnore

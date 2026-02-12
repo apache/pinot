@@ -33,6 +33,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -168,7 +169,7 @@ public class DimensionTableDataManagerTest {
       throws JsonProcessingException {
     HelixManager helixManager = mock(HelixManager.class);
     when(propertyStoreMock.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
-        tableConfig.toZNRecord());
+        TableConfigSerDeUtils.toZNRecord(tableConfig));
     when(propertyStoreMock.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
         SchemaSerDeUtils.toZNRecord(schema));
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStoreMock);

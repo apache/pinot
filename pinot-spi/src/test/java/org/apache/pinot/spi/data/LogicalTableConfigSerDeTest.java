@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.spi.config.ConfigRecord;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -53,7 +53,7 @@ public class LogicalTableConfigSerDeTest {
     checkMinimalConfig(fromJson);
 
     // ZNRecord round-trip
-    LogicalTableConfig fromZN = LogicalTableConfig.fromZNRecord(config.toZNRecord());
+    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
     checkMinimalConfig(fromZN);
   }
 
@@ -87,7 +87,7 @@ public class LogicalTableConfigSerDeTest {
     LogicalTableConfig fromJson = JsonUtils.stringToObject(config.toSingleLineJsonString(), LogicalTableConfig.class);
     checkQuotaConfig(fromJson);
 
-    LogicalTableConfig fromZN = LogicalTableConfig.fromZNRecord(config.toZNRecord());
+    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
     checkQuotaConfig(fromZN);
   }
 
@@ -114,7 +114,7 @@ public class LogicalTableConfigSerDeTest {
     LogicalTableConfig fromJson = JsonUtils.stringToObject(config.toSingleLineJsonString(), LogicalTableConfig.class);
     checkQueryConfig(fromJson);
 
-    LogicalTableConfig fromZN = LogicalTableConfig.fromZNRecord(config.toZNRecord());
+    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
     checkQueryConfig(fromZN);
   }
 
@@ -143,7 +143,7 @@ public class LogicalTableConfigSerDeTest {
     LogicalTableConfig fromJson = JsonUtils.stringToObject(config.toSingleLineJsonString(), LogicalTableConfig.class);
     checkRefTableNames(fromJson);
 
-    LogicalTableConfig fromZN = LogicalTableConfig.fromZNRecord(config.toZNRecord());
+    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
     checkRefTableNames(fromZN);
   }
 
@@ -176,7 +176,7 @@ public class LogicalTableConfigSerDeTest {
     LogicalTableConfig fromJson = JsonUtils.stringToObject(config.toSingleLineJsonString(), LogicalTableConfig.class);
     checkTimeBoundaryConfig(fromJson);
 
-    LogicalTableConfig fromZN = LogicalTableConfig.fromZNRecord(config.toZNRecord());
+    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
     checkTimeBoundaryConfig(fromZN);
   }
 
@@ -207,7 +207,7 @@ public class LogicalTableConfigSerDeTest {
     LogicalTableConfig fromJson = JsonUtils.stringToObject(config.toSingleLineJsonString(), LogicalTableConfig.class);
     checkMultiClusterConfig(fromJson);
 
-    LogicalTableConfig fromZN = LogicalTableConfig.fromZNRecord(config.toZNRecord());
+    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
     checkMultiClusterConfig(fromZN);
   }
 
@@ -249,7 +249,7 @@ public class LogicalTableConfigSerDeTest {
     checkFullConfig(fromJson);
 
     // ZNRecord round-trip
-    LogicalTableConfig fromZN = LogicalTableConfig.fromZNRecord(config.toZNRecord());
+    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
     checkFullConfig(fromZN);
   }
 
@@ -282,7 +282,7 @@ public class LogicalTableConfigSerDeTest {
   }
 
   @Test
-  public void testZNRecordFieldMapping()
+  public void testConfigRecordFieldMapping()
       throws IOException {
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
     physicalTableConfigMap.put("table_OFFLINE", new PhysicalTableConfig());
@@ -294,19 +294,19 @@ public class LogicalTableConfigSerDeTest {
         .setRefOfflineTableName("table_OFFLINE")
         .build();
 
-    ZNRecord znRecord = config.toZNRecord();
+    ConfigRecord configRecord = config.toConfigRecord();
 
-    // Verify ZNRecord structure
-    assertEquals(znRecord.getId(), "logicalTable");
-    assertEquals(znRecord.getSimpleField(LogicalTableConfig.LOGICAL_TABLE_NAME_KEY), "logicalTable");
-    assertEquals(znRecord.getSimpleField(LogicalTableConfig.BROKER_TENANT_KEY), "testTenant");
-    assertEquals(znRecord.getSimpleField(LogicalTableConfig.REF_OFFLINE_TABLE_NAME_KEY), "table_OFFLINE");
-    assertNull(znRecord.getSimpleField(LogicalTableConfig.REF_REALTIME_TABLE_NAME_KEY));
-    assertNull(znRecord.getSimpleField(LogicalTableConfig.QUERY_CONFIG_KEY));
-    assertNull(znRecord.getSimpleField(LogicalTableConfig.QUOTA_CONFIG_KEY));
-    assertNull(znRecord.getSimpleField(LogicalTableConfig.TIME_BOUNDARY_CONFIG_KEY));
+    // Verify ConfigRecord structure
+    assertEquals(configRecord.getId(), "logicalTable");
+    assertEquals(configRecord.getSimpleField(LogicalTableConfig.LOGICAL_TABLE_NAME_KEY), "logicalTable");
+    assertEquals(configRecord.getSimpleField(LogicalTableConfig.BROKER_TENANT_KEY), "testTenant");
+    assertEquals(configRecord.getSimpleField(LogicalTableConfig.REF_OFFLINE_TABLE_NAME_KEY), "table_OFFLINE");
+    assertNull(configRecord.getSimpleField(LogicalTableConfig.REF_REALTIME_TABLE_NAME_KEY));
+    assertNull(configRecord.getSimpleField(LogicalTableConfig.QUERY_CONFIG_KEY));
+    assertNull(configRecord.getSimpleField(LogicalTableConfig.QUOTA_CONFIG_KEY));
+    assertNull(configRecord.getSimpleField(LogicalTableConfig.TIME_BOUNDARY_CONFIG_KEY));
 
-    Map<String, String> mapField = znRecord.getMapField(LogicalTableConfig.PHYSICAL_TABLE_CONFIG_KEY);
+    Map<String, String> mapField = configRecord.getMapField(LogicalTableConfig.PHYSICAL_TABLE_CONFIG_KEY);
     assertNotNull(mapField);
     assertEquals(mapField.size(), 1);
     assertTrue(mapField.containsKey("table_OFFLINE"));

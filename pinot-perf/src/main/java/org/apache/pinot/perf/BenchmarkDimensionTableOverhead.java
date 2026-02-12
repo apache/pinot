@@ -35,6 +35,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.queries.BaseQueriesTest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -176,7 +177,7 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
         .thenReturn(SchemaSerDeUtils.toZNRecord(SCHEMA));
 
     Mockito.when(propertyStore.get("/CONFIGS/TABLE/MyTable_OFFLINE", null, AccessOption.PERSISTENT))
-        .thenReturn(tableConfig.toZNRecord());
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfig));
 
     Mockito.when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 

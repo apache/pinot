@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.spi.config.ConfigRecord;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -38,6 +42,24 @@ public class LogicalTableConfigUtils {
 
   private LogicalTableConfigUtils() {
     // Utility class
+  }
+
+  public static LogicalTableConfig fromZNRecord(ZNRecord znRecord)
+      throws IOException {
+    ConfigRecord record = new ConfigRecord(
+        znRecord.getId(), znRecord.getSimpleFields(), znRecord.getMapFields());
+    return LogicalTableConfig.fromConfigRecord(record);
+  }
+
+  public static ZNRecord toZNRecord(LogicalTableConfig logicalTableConfig)
+      throws JsonProcessingException {
+    ConfigRecord record = logicalTableConfig.toConfigRecord();
+    ZNRecord znRecord = new ZNRecord(record.getId());
+    znRecord.setSimpleFields(new HashMap<>(record.getSimpleFields()));
+    for (Map.Entry<String, Map<String, String>> entry : record.getMapFields().entrySet()) {
+      znRecord.setMapField(entry.getKey(), new HashMap<>(entry.getValue()));
+    }
+    return znRecord;
   }
 
   public static void validateLogicalTableConfig(

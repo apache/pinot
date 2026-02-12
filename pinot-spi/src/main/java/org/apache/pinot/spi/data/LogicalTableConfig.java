@@ -27,8 +27,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.ConfigRecord;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -156,7 +156,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
     _timeBoundaryConfig = timeBoundaryConfig;
   }
 
-  public static LogicalTableConfig fromZNRecord(ZNRecord record)
+  public static LogicalTableConfig fromConfigRecord(ConfigRecord record)
       throws IOException {
     LogicalTableConfigBuilder builder = new LogicalTableConfigBuilder()
         .setTableName(record.getSimpleField(LOGICAL_TABLE_NAME_KEY))
@@ -180,46 +180,50 @@ public class LogicalTableConfig extends BaseJsonConfig {
     }
 
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
-    for (Map.Entry<String, String> entry : record.getMapField(PHYSICAL_TABLE_CONFIG_KEY).entrySet()) {
-      String physicalTableName = entry.getKey();
-      String physicalTableConfigJson = entry.getValue();
-      physicalTableConfigMap.put(physicalTableName,
-          JsonUtils.stringToObject(physicalTableConfigJson, PhysicalTableConfig.class));
+    Map<String, String> physicalTableMapField = record.getMapField(PHYSICAL_TABLE_CONFIG_KEY);
+    if (physicalTableMapField != null) {
+      for (Map.Entry<String, String> entry : physicalTableMapField.entrySet()) {
+        String physicalTableName = entry.getKey();
+        String physicalTableConfigJson = entry.getValue();
+        physicalTableConfigMap.put(physicalTableName,
+            JsonUtils.stringToObject(physicalTableConfigJson, PhysicalTableConfig.class));
+      }
     }
     builder.setPhysicalTableConfigMap(physicalTableConfigMap);
     return builder.build();
   }
 
-  public ZNRecord toZNRecord()
+  public ConfigRecord toConfigRecord()
       throws JsonProcessingException {
-    Map<String, String> physicalTableConfigMap = new HashMap<>();
-    for (Map.Entry<String, PhysicalTableConfig> entry : getPhysicalTableConfigMap().entrySet()) {
-      String physicalTableName = entry.getKey();
-      PhysicalTableConfig physicalTableConfig = entry.getValue();
-      physicalTableConfigMap.put(physicalTableName, physicalTableConfig.toJsonString());
-    }
-
-    ZNRecord record = new ZNRecord(getTableName());
-    record.setSimpleField(LOGICAL_TABLE_NAME_KEY, getTableName());
-    record.setSimpleField(BROKER_TENANT_KEY, getBrokerTenant());
-    record.setMapField(PHYSICAL_TABLE_CONFIG_KEY, physicalTableConfigMap);
+    Map<String, String> simpleFields = new HashMap<>();
+    simpleFields.put(LOGICAL_TABLE_NAME_KEY, getTableName());
+    simpleFields.put(BROKER_TENANT_KEY, getBrokerTenant());
 
     if (getQueryConfig() != null) {
-      record.setSimpleField(QUERY_CONFIG_KEY, getQueryConfig().toJsonString());
+      simpleFields.put(QUERY_CONFIG_KEY, getQueryConfig().toJsonString());
     }
     if (getQuotaConfig() != null) {
-      record.setSimpleField(QUOTA_CONFIG_KEY, getQuotaConfig().toJsonString());
+      simpleFields.put(QUOTA_CONFIG_KEY, getQuotaConfig().toJsonString());
     }
     if (getRefOfflineTableName() != null) {
-      record.setSimpleField(REF_OFFLINE_TABLE_NAME_KEY, getRefOfflineTableName());
+      simpleFields.put(REF_OFFLINE_TABLE_NAME_KEY, getRefOfflineTableName());
     }
     if (getRefRealtimeTableName() != null) {
-      record.setSimpleField(REF_REALTIME_TABLE_NAME_KEY, getRefRealtimeTableName());
+      simpleFields.put(REF_REALTIME_TABLE_NAME_KEY, getRefRealtimeTableName());
     }
     if (getTimeBoundaryConfig() != null) {
-      record.setSimpleField(TIME_BOUNDARY_CONFIG_KEY, getTimeBoundaryConfig().toJsonString());
+      simpleFields.put(TIME_BOUNDARY_CONFIG_KEY, getTimeBoundaryConfig().toJsonString());
     }
-    return record;
+
+    Map<String, String> physicalTableConfigMapField = new HashMap<>();
+    for (Map.Entry<String, PhysicalTableConfig> entry : getPhysicalTableConfigMap().entrySet()) {
+      physicalTableConfigMapField.put(entry.getKey(), entry.getValue().toJsonString());
+    }
+
+    Map<String, Map<String, String>> mapFields = new HashMap<>();
+    mapFields.put(PHYSICAL_TABLE_CONFIG_KEY, physicalTableConfigMapField);
+
+    return new ConfigRecord(getTableName(), simpleFields, mapFields);
   }
 
   private JsonNode toJsonObject() {
