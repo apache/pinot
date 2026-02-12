@@ -140,13 +140,14 @@ public class QueryRunner {
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
   private BooleanSupplier _sendStats;
+  private BooleanSupplier _keepPipelineBreakerStats;
 
   /**
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
   public void init(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
-      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats) {
+      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats) {
     String hostname = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
@@ -236,6 +237,7 @@ public class QueryRunner {
     }
 
     _sendStats = sendStats;
+    _keepPipelineBreakerStats = keepPipelineBreakerStats;
 
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
   }
@@ -273,9 +275,9 @@ public class QueryRunner {
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
-    PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService,
-            workerMetadata, stagePlan, opChainMetadata, _sendStats.getAsBoolean());
+    PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
+        _opChainScheduler, _mailboxService, workerMetadata, stagePlan, opChainMetadata,
+        _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -287,7 +289,7 @@ public class QueryRunner {
     // run OpChain
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-            pipelineBreakerResult, _sendStats.getAsBoolean());
+            pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
     try {
       OpChain opChain;
       if (workerMetadata.isLeafStageWorker()) {
@@ -543,7 +545,7 @@ public class QueryRunner {
     // compile OpChain
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata, null,
-            false);
+            false, false);
 
     OpChain opChain =
         ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
