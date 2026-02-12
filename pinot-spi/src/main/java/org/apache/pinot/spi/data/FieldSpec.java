@@ -535,10 +535,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
         case MAP:
-          jsonNode.put(key, JsonUtils.objectToJsonNode(_defaultNullValue));
-          break;
         case LIST:
-          jsonNode.put(key, JsonUtils.objectToJsonNode(_defaultNullValue));
+          try {
+            jsonNode.put(key, JsonUtils.objectToString(_defaultNullValue));
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException("Caught exception serializing default null value: " + _defaultNullValue, e);
+          }
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + this);
