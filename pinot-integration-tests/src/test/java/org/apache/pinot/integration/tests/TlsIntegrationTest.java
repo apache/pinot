@@ -482,6 +482,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks(new TaskSchedulingContext()));
 
     // wait for offline segments
+    // Increased timeout from 30s to 90s to account for CI resource contention when running parallel test sets
     JsonNode offlineSegments = TestUtils.waitForResult(() -> {
       JsonNode segmentSets = JsonUtils.stringToJsonNode(
           sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
@@ -490,7 +491,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
               .map(s -> s.get("OFFLINE")).findFirst().get();
       Assert.assertFalse(currentOfflineSegments.isEmpty());
       return currentOfflineSegments;
-    }, 30000);
+    }, 90000);
 
     // Verify constant row count
     ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);

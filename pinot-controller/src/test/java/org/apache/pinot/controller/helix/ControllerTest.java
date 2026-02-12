@@ -1268,7 +1268,7 @@ public class ControllerTest {
     properties.put(ControllerConf.TABLE_MIN_REPLICAS, DEFAULT_MIN_NUM_REPLICAS);
 
     // Used in PinotControllerAppConfigsTest to test obfuscation
-    properties.put("controller.segment.fetcher.auth.token", "*personal*");
+    properties.put("pinot.controller.segment.fetcher.auth.token", "*personal*");
     properties.put("controller.admin.access.control.principals.user.password", "*personal*");
 
     return properties;
