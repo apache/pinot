@@ -241,6 +241,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
     _config = new ControllerConf(pinotConfiguration.toMap());
+
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
     _controllerMode = _config.getControllerMode();
@@ -301,6 +302,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
 
     ControllerJobTypes.init(_config);
+      // Initialize authentication provider using factory
+      org.apache.pinot.common.auth.AuthProviderFactory.create(pinotConfiguration);
+      /* END GENAI@CLINE */
   }
 
   /// Returns the default cluster configs to be stored in ZK as Helix cluster config. These configs will then be

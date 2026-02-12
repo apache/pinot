@@ -65,7 +65,6 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
     return _socketTimeoutMs;
   }
 
-
   @Override
   protected void doInit(PinotConfiguration config) {
     if (_httpClient == null) {
@@ -99,6 +98,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
         if (!InetAddresses.isInetAddress(hostName)) {
           httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
         }
+
         int statusCode = _httpClient.downloadFile(uri, dest, _authProvider, httpHeaders, _connectionRequestTimeoutMs,
             _socketTimeoutMs);
         _logger.info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest,
@@ -106,6 +106,12 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
         return true;
       } catch (HttpErrorStatusException e) {
         int statusCode = e.getStatusCode();
+
+        if (statusCode == HttpStatus.SC_FORBIDDEN) {
+          _logger.error("Authentication failure (403): Permission denied while downloading segment from: {} to: {}",
+              uri, dest, e);
+        }
+
         if (statusCode == HttpStatus.SC_NOT_FOUND || statusCode >= 500) {
           // Temporary exception
           // 404 is treated as a temporary exception, as the downloadURI may be backed by multiple hosts,
@@ -160,12 +166,19 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
               if (!InetAddresses.isInetAddress(hostName)) {
                 httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
               }
+
               ret.set(_httpClient.downloadUntarFileStreamed(uri, dest, _authProvider, httpHeaders, maxStreamRateInByte,
                   _connectionRequestTimeoutMs, _socketTimeoutMs));
 
               return true;
             } catch (HttpErrorStatusException e) {
               int statusCode = e.getStatusCode();
+
+              if (statusCode == HttpStatus.SC_FORBIDDEN) {
+                _logger.error("Authentication failure (403) in streamed download: Permission denied while downloading "
+                    + "segment from: {} to: {}", uri, dest, e);
+              }
+
               if (statusCode == HttpStatus.SC_NOT_FOUND || statusCode >= 500) {
                 // Temporary exception
                 // 404 is treated as a temporary exception, as the downloadURI may be backed by multiple hosts,
@@ -175,9 +188,8 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
                 return false;
               } else {
                 // Permanent exception
-                _logger.error(
-                    "Got permanent error status code: {} while downloading segment from: {} to: {}, won't retry",
-                    statusCode, uri, dest, e);
+                _logger.error("Got permanent error status code: {} while downloading segment from: {} to: {}, "
+                    + "won't retry", statusCode, uri, dest, e);
                 throw e;
               }
             } catch (IOException e) {
@@ -209,6 +221,10 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
           dest.length(), statusCode);
       // In case of download failure, throw exception.
       if (statusCode >= 300) {
+        if (statusCode == HttpStatus.SC_FORBIDDEN) {
+          _logger.error("Authentication failure (403) in download without retry: Permission denied while downloading "
+              + "segment from: {} to: {}", uri, dest);
+        }
         throw new HttpErrorStatusException("Failed to download segment", statusCode);
       }
     } catch (Exception e) {
