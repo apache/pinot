@@ -23,6 +23,7 @@ import org.apache.pinot.tools.EmptyQuickstart;
 import org.apache.pinot.tools.HybridQuickstart;
 import org.apache.pinot.tools.JoinQuickStart;
 import org.apache.pinot.tools.JsonIndexQuickStart;
+import org.apache.pinot.tools.MultiClusterQuickstart;
 import org.apache.pinot.tools.OfflineComplexTypeHandlingQuickStart;
 import org.apache.pinot.tools.QuickStartBase;
 import org.apache.pinot.tools.Quickstart;
@@ -70,7 +71,6 @@ public class TestQuickStartCommand {
     Assert.assertEquals(quickStartClassFor("REALTIME-MINION"), RealtimeQuickStartWithMinion.class);
 
     Assert.assertEquals(quickStartClassFor("REALTIME"), RealtimeQuickStart.class);
-    Assert.assertEquals(quickStartClassFor("REALTIME"), RealtimeQuickStart.class);
 
     Assert.assertEquals(quickStartClassFor("HYBRID"), HybridQuickstart.class);
 
@@ -111,6 +111,11 @@ public class TestQuickStartCommand {
 
     Assert.assertEquals(quickStartClassFor("TIMESTAMP"),
         TimestampIndexQuickstart.class);
+
+    Assert.assertEquals(quickStartClassFor("MULTI_CLUSTER"),
+        MultiClusterQuickstart.class);
+    Assert.assertEquals(quickStartClassFor("MULTICLUSTER"),
+        MultiClusterQuickstart.class);
   }
 
   private Class<? extends QuickStartBase> quickStartClassFor(String type)
