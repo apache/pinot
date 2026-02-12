@@ -26,13 +26,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -40,6 +38,7 @@ import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
@@ -229,8 +228,8 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
       throws Exception {
     URI outputSegmentDirURI = URI.create(configs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, outputSegmentDirURI)) {
-      URI outputSegmentTarURI =
-          URI.create(MinionTaskUtils.normalizeDirectoryURI(outputSegmentDirURI) + localSegmentTarFile.getName());
+      URI outputSegmentTarURI = URI.create(MinionTaskUtils.normalizeDirectoryURI(outputSegmentDirURI)
+          + URIUtils.encode(localSegmentTarFile.getName()));
       if (!Boolean.parseBoolean(configs.get(BatchConfigProperties.OVERWRITE_OUTPUT))
           && outputFileFS.exists(outputSegmentTarURI)) {
         throw new RuntimeException("Output file: " + outputSegmentTarURI + " already exists. Set 'overwriteOutput' to "

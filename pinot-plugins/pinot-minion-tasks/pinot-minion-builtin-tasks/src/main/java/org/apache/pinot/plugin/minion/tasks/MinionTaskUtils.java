@@ -72,6 +72,12 @@ public class MinionTaskUtils {
   public static final String DATETIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
   public static final String UTC = "UTC";
 
+  /**
+   * When true, allows METADATA push mode with local FS output dir. Intended for integration tests only.
+   * Production should leave this unset (defaults to false); local FS then always uses TAR push.
+   */
+  public static final String ALLOW_METADATA_PUSH_WITH_LOCAL_FS = "allowMetadataPushWithLocalFs";
+
   private MinionTaskUtils() {
   }
 
@@ -191,9 +197,20 @@ public class MinionTaskUtils {
             break;
         }
       } else {
-        LOGGER.warn("Local output dir found, defaulting to TAR: {}.", outputSegmentDirURI);
-        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
-            BatchConfigProperties.SegmentPushType.TAR.toString());
+        boolean allowMetadataPushWithLocalFs = Boolean.parseBoolean(
+            taskConfigs.getOrDefault(ALLOW_METADATA_PUSH_WITH_LOCAL_FS, "false"));
+        if (allowMetadataPushWithLocalFs && pushMode != null) {
+          // Override for integration tests: respect explicit push mode with local FS
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI,
+              outputSegmentDirURI.toString());
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+              segmentPushType.toString());
+        } else {
+          // Production: default to TAR for local output dir
+          LOGGER.warn("Local output dir found, defaulting to TAR: {}.", outputSegmentDirURI);
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+              BatchConfigProperties.SegmentPushType.TAR.toString());
+        }
       }
 
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI,
