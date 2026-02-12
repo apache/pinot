@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import org.apache.commons.io.IOUtils;
@@ -257,13 +258,19 @@ public class SegmentGenerationUtils {
         HttpsURLConnection httpsConn = (HttpsURLConnection) connection;
 
         if (tlsSpec != null) {
+          KeyManager[] keyManagers = null;
+          if (tlsSpec.getKeyStorePath() != null) {
+            keyManagers = TlsUtils.createKeyManagerFactory(
+                tlsSpec.getKeyStorePath(), tlsSpec.getKeyStorePassword(), tlsSpec.getKeyStoreType())
+                .getKeyManagers();
+          }
           TrustManagerFactory tmf = TlsUtils.createTrustManagerFactory(
               tlsSpec.getTrustStorePath(),
               tlsSpec.getTrustStorePassword(),
               tlsSpec.getTrustStoreType());
 
           SSLContext sslContext = SSLContext.getInstance("TLS");
-          sslContext.init(null, tmf.getTrustManagers(), new SecureRandom());
+          sslContext.init(keyManagers, tmf.getTrustManagers(), new SecureRandom());
 
           httpsConn.setSSLSocketFactory(sslContext.getSocketFactory());
           httpsConn.setConnectTimeout(tlsSpec.getConnectTimeout());
