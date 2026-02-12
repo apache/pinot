@@ -26,6 +26,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.AbstractMetrics;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,19 +76,10 @@ public class NettyInspector {
       totalUsedMemory += usedMemory;
       totalMaxMemory += maxMemory;
       LOGGER.info("Netty instance '{}' is using {} of direct memory (max {}).", instance.getName(),
-          humanReadableByteCount(usedMemory), humanReadableByteCount(maxMemory));
+          DataSizeUtils.fromBytes(usedMemory), DataSizeUtils.fromBytes(maxMemory));
     }
     LOGGER.info("Total direct memory used by all Netty instances: {} (max {}).",
-        humanReadableByteCount(totalUsedMemory), humanReadableByteCount(totalMaxMemory));
-  }
-
-  private static String humanReadableByteCount(long bytes) {
-    if (bytes < 1024) {
-      return bytes + " B";
-    }
-    int exp = (int) (Math.log(bytes) / Math.log(1024));
-    String pre = "KMGTPE".charAt(exp - 1) + "B";
-    return String.format("%.1f %s", bytes / Math.pow(1024, exp), pre);
+        DataSizeUtils.fromBytes(totalUsedMemory), DataSizeUtils.fromBytes(totalMaxMemory));
   }
 
   /// Logs the values of all constants for all Netty instances, and logs warnings if any checks fail.
