@@ -49,7 +49,6 @@ import org.slf4j.LoggerFactory;
 /// At the moment this is written, Pinot _does not_ shade Netty, so it is safe. Just to be sure, this class should be
 /// excluded in the maven shade plugin configuration (see pom.xml on the root of the project).
 public abstract class NettyInstance {
-  private static final Logger LOGGER = LoggerFactory.getLogger(NettyInstance.class);
   private static final Constructor<DummyClass> CONSTRUCTOR;
 
   static {

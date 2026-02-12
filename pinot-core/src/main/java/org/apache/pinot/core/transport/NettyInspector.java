@@ -57,9 +57,9 @@ public class NettyInspector {
 
   public static void registerMetrics(AbstractMetrics<?, ?, ?, ?> metrics) {
     for (NettyInstance instance : KNOWN_INSTANCES) {
-      metrics.setOrUpdateGauge(instance.getName() + "_netty_direct_memory_used",
+      metrics.setOrUpdateGauge(instance.getName() + "NettyDirectMemoryUsed",
           instance::getUsedDirectMemory);
-      metrics.setOrUpdateGauge(instance.getName() + "_netty_direct_memory_max",
+      metrics.setOrUpdateGauge(instance.getName() + "NettyDirectMemoryMax",
           instance::getMaxDirectMemory);
     }
   }
