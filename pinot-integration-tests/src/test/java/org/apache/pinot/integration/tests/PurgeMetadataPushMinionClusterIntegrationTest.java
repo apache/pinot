@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import java.io.File;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,8 +25,6 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -37,15 +34,6 @@ import org.testng.annotations.Test;
  * Only {@link #testFirstRunPurge()} is enabled; other tests from the base class are disabled.
  */
 public class PurgeMetadataPushMinionClusterIntegrationTest extends PurgeMinionClusterIntegrationTest {
-
-  @Override
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    super.setUp();
-    File outputSegmentDir = new File(_tempDir, "metadataPushOutput");
-    TestUtils.ensureDirectoriesExistAndEmpty(outputSegmentDir);
-  }
 
   @Override
   protected TableTaskConfig getPurgeTaskConfig() {
