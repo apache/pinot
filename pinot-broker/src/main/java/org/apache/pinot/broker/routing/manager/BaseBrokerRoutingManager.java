@@ -19,12 +19,14 @@
 package org.apache.pinot.broker.routing.manager;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,6 +40,8 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -63,12 +67,15 @@ import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPrunerFactory;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelectorFactory;
+import org.apache.pinot.broker.routing.tablesampler.TableSampler;
+import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
@@ -83,6 +90,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -448,14 +456,15 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
     // Update routing entry for all tables
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
+      String tableNameWithType = routingEntry.getTableNameWithType();
       try {
-        Object tableLock = getRoutingTableBuildLock(routingEntry.getTableNameWithType());
+        Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
           routingEntry.onInstancesChange(_routableServers, changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry on instances change for table: {}",
-            routingEntry.getTableNameWithType(), e);
+            tableNameWithType, e);
       }
     }
     long updateRoutingEntriesEndTimeMs = System.currentTimeMillis();
@@ -524,14 +533,15 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _routableServers = routableServers;
     List<String> changedServers = Collections.singletonList(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
+      String tableNameWithType = routingEntry.getTableNameWithType();
       try {
-        Object tableLock = getRoutingTableBuildLock(routingEntry.getTableNameWithType());
+        Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
           routingEntry.onInstancesChange(_routableServers, changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry when excluding server: {} for table: {}",
-            instanceId, routingEntry.getTableNameWithType(), e);
+            instanceId, tableNameWithType, e);
       }
     }
     LOGGER.info("Excluded server: {} from routing in {}ms (updated {} routing entries)", instanceId,
@@ -568,14 +578,15 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _routableServers = routableServers;
     List<String> changedServers = Collections.singletonList(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
+      String tableNameWithType = routingEntry.getTableNameWithType();
       try {
-        Object tableLock = getRoutingTableBuildLock(routingEntry.getTableNameWithType());
+        Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
           routingEntry.onInstancesChange(_routableServers, changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry when including server: {} for table: {}",
-            instanceId, routingEntry.getTableNameWithType(), e);
+            instanceId, tableNameWithType, e);
       }
     }
     LOGGER.info("Included server: {} to routing in {}ms (updated {} routing entries)", instanceId,
@@ -810,10 +821,52 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       }
       segmentZkMetadataFetcher.init(idealState, externalView, preSelectedOnlineSegments);
 
+      // Build table sampler contexts keyed by normalized sampler name.
+      Map<String, SamplerInfo> samplerInfos = Map.of();
+      List<TableSamplerConfig> tableSamplerConfigs = tableConfig.getTableSamplers();
+      if (CollectionUtils.isNotEmpty(tableSamplerConfigs)) {
+        Map<String, SamplerInfo> configuredSamplerInfos = Maps.newHashMapWithExpectedSize(tableSamplerConfigs.size());
+        for (TableSamplerConfig samplerConfig : tableSamplerConfigs) {
+          String samplerName = samplerConfig.getName();
+          String samplerType = samplerConfig.getType();
+          if (StringUtils.isBlank(samplerName) || StringUtils.isBlank(samplerType)) {
+            LOGGER.warn("Skipping invalid table sampler config for table: {}, samplerName: {}, samplerType: {}",
+                tableNameWithType, samplerName, samplerType);
+            continue;
+          }
+          String normalizedSamplerName = normalizeSamplerName(samplerName);
+          if (configuredSamplerInfos.containsKey(normalizedSamplerName)) {
+            LOGGER.warn("Skipping duplicate normalized table sampler name: '{}' for table: {}", samplerName,
+                tableNameWithType);
+            continue;
+          }
+          try {
+            TableSampler sampler = TableSamplerFactory.create(samplerType);
+            sampler.init(tableConfig, samplerConfig, _propertyStore);
+            Set<String> samplerPreSelectedOnlineSegments = sampler.sampleSegments(preSelectedOnlineSegments);
+            SegmentSelector samplerSegmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
+            samplerSegmentSelector.init(idealState, externalView, samplerPreSelectedOnlineSegments);
+            InstanceSelector samplerInstanceSelector =
+                InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
+                    adaptiveServerSelector, _pinotConfig, _routableServers, _enabledServerInstanceMap,
+                    idealState, externalView, samplerPreSelectedOnlineSegments);
+            configuredSamplerInfos.put(normalizedSamplerName,
+                new SamplerInfo(sampler, samplerSegmentSelector, samplerInstanceSelector));
+          } catch (Exception e) {
+            LOGGER.error("Caught unexpected exception while building routing for table sampler: {} for table: {}",
+                samplerName, tableNameWithType, e);
+          }
+        }
+        if (!configuredSamplerInfos.isEmpty()) {
+          samplerInfos = configuredSamplerInfos;
+        }
+      }
+
       RoutingEntry routingEntry =
           new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
               segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, segmentZkMetadataFetcher,
-              timeBoundaryManager, partitionMetadataManager, queryTimeoutMs, !idealState.isEnabled());
+              timeBoundaryManager, partitionMetadataManager, queryTimeoutMs, samplerInfos,
+              !idealState.isEnabled());
       if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
         LOGGER.info("Built routing for table: {}", tableNameWithType);
       } else {
@@ -1048,7 +1101,9 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     if (routingEntry == null) {
       return null;
     }
-    InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest, requestId);
+    String samplerName = extractSamplerName(brokerRequest);
+    InstanceSelector.SelectionResult selectionResult =
+        routingEntry.calculateRouting(brokerRequest, requestId, samplerName);
     return new RoutingTable(getServerInstanceToSegmentsMap(tableNameWithType, selectionResult),
         selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
   }
@@ -1086,9 +1141,30 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   @Nullable
   @Override
   public List<String> getSegments(BrokerRequest brokerRequest) {
+    return getSegments(brokerRequest, extractSamplerName(brokerRequest));
+  }
+
+  @Nullable
+  @Override
+  public List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
     String tableNameWithType = brokerRequest.getQuerySource().getTableName();
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
-    return routingEntry != null ? routingEntry.getSegments(brokerRequest) : null;
+    if (routingEntry == null) {
+      return null;
+    }
+    return routingEntry.getSegments(brokerRequest, samplerName);
+  }
+
+  private static String normalizeSamplerName(String samplerName) {
+    return samplerName.trim().toLowerCase(Locale.ROOT);
+  }
+
+  @Nullable
+  static String extractSamplerName(BrokerRequest brokerRequest) {
+    if (!brokerRequest.isSetPinotQuery()) {
+      return null;
+    }
+    return QueryOptionsUtils.getTableSampler(brokerRequest.getPinotQuery().getQueryOptions());
   }
 
   @Override
@@ -1172,6 +1248,18 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
+  private static final class SamplerInfo {
+    final TableSampler _tableSampler;
+    final SegmentSelector _segmentSelector;
+    final InstanceSelector _instanceSelector;
+
+    SamplerInfo(TableSampler tableSampler, SegmentSelector segmentSelector, InstanceSelector instanceSelector) {
+      _tableSampler = tableSampler;
+      _segmentSelector = segmentSelector;
+      _instanceSelector = instanceSelector;
+    }
+  }
+
   private static class RoutingEntry {
     final String _tableNameWithType;
     final String _idealStatePath;
@@ -1182,6 +1270,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     final SegmentPartitionMetadataManager _partitionMetadataManager;
     final InstanceSelector _instanceSelector;
     final Long _queryTimeoutMs;
+    final Map<String, SamplerInfo> _samplerInfos;
     final SegmentZkMetadataFetcher _segmentZkMetadataFetcher;
 
     // Cache IdealState and ExternalView version for the last update
@@ -1197,7 +1286,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
         SegmentZkMetadataFetcher segmentZkMetadataFetcher, @Nullable TimeBoundaryManager timeBoundaryManager,
         @Nullable SegmentPartitionMetadataManager partitionMetadataManager, @Nullable Long queryTimeoutMs,
-        boolean disabled) {
+        Map<String, SamplerInfo> samplerInfos, boolean disabled) {
       _tableNameWithType = tableNameWithType;
       _idealStatePath = idealStatePath;
       _externalViewPath = externalViewPath;
@@ -1210,6 +1299,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       _timeBoundaryManager = timeBoundaryManager;
       _partitionMetadataManager = partitionMetadataManager;
       _queryTimeoutMs = queryTimeoutMs;
+      _samplerInfos = samplerInfos;
       _segmentZkMetadataFetcher = segmentZkMetadataFetcher;
       _disabled = disabled;
     }
@@ -1248,6 +1338,40 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       return _disabled;
     }
 
+    private void updateSamplerInfos(IdealState idealState, ExternalView externalView,
+        Set<String> preSelectedOnlineSegments) {
+      if (_samplerInfos.isEmpty()) {
+        return;
+      }
+      for (Map.Entry<String, SamplerInfo> entry : _samplerInfos.entrySet()) {
+        String samplerName = entry.getKey();
+        SamplerInfo samplerInfo = entry.getValue();
+        try {
+          Set<String> samplerPreSelectedOnlineSegments =
+              samplerInfo._tableSampler.sampleSegments(preSelectedOnlineSegments);
+          samplerInfo._segmentSelector.onAssignmentChange(idealState, externalView, samplerPreSelectedOnlineSegments);
+          samplerInfo._instanceSelector.onAssignmentChange(idealState, externalView, samplerPreSelectedOnlineSegments);
+        } catch (Exception e) {
+          LOGGER.error("Caught unexpected exception while sampling segments for sampler: {} for table: {}", samplerName,
+              _tableNameWithType, e);
+        }
+      }
+    }
+
+    @Nullable
+    private SamplerInfo getSamplerInfo(@Nullable String samplerName) {
+      if (StringUtils.isBlank(samplerName)) {
+        return null;
+      }
+      SamplerInfo samplerInfo = _samplerInfos.get(normalizeSamplerName(samplerName));
+      if (samplerInfo != null) {
+        return samplerInfo;
+      }
+      LOGGER.warn("Requested sampler '{}' not found for table '{}'; falling back to default routing entry",
+          samplerName, _tableNameWithType);
+      return null;
+    }
+
     // NOTE: The change gets applied in sequence, and before change applied to all components, there could be some
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
@@ -1260,6 +1384,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       if (_timeBoundaryManager != null) {
         _timeBoundaryManager.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       }
+      updateSamplerInfos(idealState, externalView, preSelectedOnlineSegments);
       _lastUpdateIdealStateVersion = idealState.getStat().getVersion();
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
       _disabled = !idealState.isEnabled();
@@ -1267,6 +1392,11 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
     void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {
       _instanceSelector.onInstancesChange(enabledInstances, changedInstances);
+      if (!_samplerInfos.isEmpty()) {
+        for (SamplerInfo samplerInfo : _samplerInfos.values()) {
+          samplerInfo._instanceSelector.onInstancesChange(enabledInstances, changedInstances);
+        }
+      }
     }
 
     void refreshSegment(String segment) {
@@ -1276,8 +1406,12 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       }
     }
 
-    InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest, long requestId) {
-      Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
+    InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest, long requestId,
+        @Nullable String samplerName) {
+      SamplerInfo samplerInfo = getSamplerInfo(samplerName);
+      SegmentSelector segmentSelector = samplerInfo != null ? samplerInfo._segmentSelector : _segmentSelector;
+      InstanceSelector instanceSelector = samplerInfo != null ? samplerInfo._instanceSelector : _instanceSelector;
+      Set<String> selectedSegments = segmentSelector.select(brokerRequest);
       int numTotalSelectedSegments = selectedSegments.size();
       if (!selectedSegments.isEmpty()) {
         for (SegmentPruner segmentPruner : _segmentPruners) {
@@ -1287,7 +1421,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       int numPrunedSegments = numTotalSelectedSegments - selectedSegments.size();
       if (!selectedSegments.isEmpty()) {
         InstanceSelector.SelectionResult selectionResult =
-            _instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments), requestId);
+            instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments), requestId);
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
@@ -1296,8 +1430,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       }
     }
 
-    List<String> getSegments(BrokerRequest brokerRequest) {
-      Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
+    List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
+      SamplerInfo samplerInfo = getSamplerInfo(samplerName);
+      SegmentSelector segmentSelector = samplerInfo != null ? samplerInfo._segmentSelector : _segmentSelector;
+      Set<String> selectedSegments = segmentSelector.select(brokerRequest);
       if (!selectedSegments.isEmpty()) {
         for (SegmentPruner segmentPruner : _segmentPruners) {
           selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);

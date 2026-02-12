@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.broker.routing.manager;
 
+import java.lang.reflect.Constructor;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -30,7 +32,17 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
+import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher;
+import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadataManager;
+import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
+import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
+import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
+import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.core.routing.TablePartitionInfo;
+import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -49,6 +61,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -57,6 +70,7 @@ public class BrokerRoutingManagerTest {
   private static final String SERVER_HOST = "localhost";
   private static final int SERVER_PORT = 8000;
   private static final String INSTANCE_CONFIGS_PATH = "/CONFIGS/PARTICIPANT";
+  private static final String TEST_TABLE = "testTable_OFFLINE";
 
   private AutoCloseable _mocks;
 
@@ -202,6 +216,50 @@ public class BrokerRoutingManagerTest {
 
     // Verify callback was NOT invoked (server was never excluded)
     verify(_serverReenableCallback, never()).accept(any());
+  }
+
+  @Test
+  public void testSamplerContextSharesTimeBoundaryAndPartitionMetadata()
+      throws Exception {
+    TimeBoundaryManager timeBoundaryManager = mock(TimeBoundaryManager.class);
+    SegmentPartitionMetadataManager partitionMetadataManager = mock(SegmentPartitionMetadataManager.class);
+    TimeBoundaryInfo expectedTimeBoundaryInfo = new TimeBoundaryInfo("DaysSinceEpoch", "20000");
+    TablePartitionInfo expectedPartitionInfo =
+        new TablePartitionInfo(TEST_TABLE, "partitionCol", "Modulo", 2,
+            List.of(Collections.emptyList(), Collections.emptyList()), Collections.emptyList());
+    TablePartitionReplicatedServersInfo expectedReplicatedServersInfo = mock(TablePartitionReplicatedServersInfo.class);
+    when(timeBoundaryManager.getTimeBoundaryInfo()).thenReturn(expectedTimeBoundaryInfo);
+    when(partitionMetadataManager.getTablePartitionInfo()).thenReturn(expectedPartitionInfo);
+    when(partitionMetadataManager.getTablePartitionReplicatedServersInfo()).thenReturn(expectedReplicatedServersInfo);
+
+    Object routingEntry = createRoutingEntry(TEST_TABLE, timeBoundaryManager, partitionMetadataManager, Map.of());
+    putRoutingEntry(TEST_TABLE, routingEntry);
+
+    assertSame(_routingManager.getTimeBoundaryInfo(TEST_TABLE), expectedTimeBoundaryInfo);
+    assertSame(_routingManager.getTablePartitionInfo(TEST_TABLE), expectedPartitionInfo);
+    assertSame(_routingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE), expectedReplicatedServersInfo);
+  }
+
+  private static Object createRoutingEntry(String tableNameWithType, TimeBoundaryManager timeBoundaryManager,
+      SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos)
+      throws Exception {
+    Class<?> routingEntryClass = Class.forName(BaseBrokerRoutingManager.class.getName() + "$RoutingEntry");
+    Constructor<?> constructor = routingEntryClass.getDeclaredConstructor(String.class, String.class, String.class,
+        SegmentPreSelector.class, SegmentSelector.class, List.class, InstanceSelector.class, int.class, int.class,
+        SegmentZkMetadataFetcher.class, TimeBoundaryManager.class, SegmentPartitionMetadataManager.class, Long.class,
+        Map.class, boolean.class);
+    constructor.setAccessible(true);
+    return constructor.newInstance(tableNameWithType, "/IDEALSTATES/" + tableNameWithType,
+        "/EXTERNALVIEW/" + tableNameWithType, mock(SegmentPreSelector.class), mock(SegmentSelector.class),
+        Collections.<SegmentPruner>emptyList(), mock(InstanceSelector.class), 1, 1,
+        mock(SegmentZkMetadataFetcher.class), timeBoundaryManager, partitionMetadataManager, null, samplerInfos,
+        false);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private void putRoutingEntry(String tableNameWithType, Object routingEntry) {
+    Map routingEntries = _routingManager._routingEntryMap;
+    routingEntries.put(tableNameWithType, routingEntry);
   }
 
   /**
