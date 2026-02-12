@@ -102,7 +102,7 @@ public abstract class NettyInstance {
   public static class GrpcNettyInstance extends NettyInstance {
     @Override
     public String getName() {
-      return "gRPC-shaded";
+      return "gRPC";
     }
 
     @Override
