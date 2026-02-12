@@ -46,24 +46,6 @@ public final class TableConfigValidationUtils {
   /**
    * Validates a table config against the given schema and controller configuration.
    *
-   * <p>Performs the following validations in order:</p>
-   * <ol>
-   *   <li>Core validation ({@link TableConfigUtils#validate})</li>
-   *   <li>Table name validation ({@link TableConfigUtils#validateTableName})</li>
-   *   <li>Min replicas enforcement</li>
-   *   <li>Storage quota constraints</li>
-   *   <li>Hybrid table config check (if both OFFLINE and REALTIME versions exist)</li>
-   *   <li>Task config validation (skipped if {@code taskManager} is null)</li>
-   *   <li>Instance assignment validation</li>
-   * </ol>
-   *
-   * <p><b>NOT included</b> (caller responsibility):</p>
-   * <ul>
-   *   <li>Schema retrieval — caller resolves it</li>
-   *   <li>Tuner config application — CREATE-only, mutates config</li>
-   *   <li>Active tasks check — caller-specific</li>
-   * </ul>
-   *
    * @param tableConfig   the table config to validate
    * @param schema        the schema for the table (must not be null)
    * @param typesToSkip   comma-separated list of validation types to skip (ALL|TASK|UPSERT), or null
@@ -106,7 +88,7 @@ public final class TableConfigValidationUtils {
     } catch (Exception e) {
       throw new RuntimeException(
           "Failed to calculate instance partitions for table: " + tableConfig.getTableName() + ", reason: "
-              + e.getMessage());
+              + e.getMessage(), e);
     }
   }
 }
