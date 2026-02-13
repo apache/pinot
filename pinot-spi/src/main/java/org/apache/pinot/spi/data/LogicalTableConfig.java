@@ -32,7 +32,6 @@ import org.apache.pinot.spi.config.ConfigRecord;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 
 
 /**
@@ -158,39 +157,42 @@ public class LogicalTableConfig extends BaseJsonConfig {
 
   public static LogicalTableConfig fromConfigRecord(ConfigRecord record)
       throws IOException {
-    LogicalTableConfigBuilder builder = new LogicalTableConfigBuilder()
-        .setTableName(record.getSimpleField(LOGICAL_TABLE_NAME_KEY))
-        .setBrokerTenant(record.getSimpleField(BROKER_TENANT_KEY));
+    LogicalTableConfig config = new LogicalTableConfig();
+    config.populateFromConfigRecord(record);
+    return config;
+  }
+
+  protected void populateFromConfigRecord(ConfigRecord record)
+      throws IOException {
+    setTableName(record.getSimpleField(LOGICAL_TABLE_NAME_KEY));
+    setBrokerTenant(record.getSimpleField(BROKER_TENANT_KEY));
 
     if (record.getSimpleField(QUERY_CONFIG_KEY) != null) {
-      builder.setQueryConfig(JsonUtils.stringToObject(record.getSimpleField(QUERY_CONFIG_KEY), QueryConfig.class));
+      setQueryConfig(JsonUtils.stringToObject(record.getSimpleField(QUERY_CONFIG_KEY), QueryConfig.class));
     }
     if (record.getSimpleField(QUOTA_CONFIG_KEY) != null) {
-      builder.setQuotaConfig(JsonUtils.stringToObject(record.getSimpleField(QUOTA_CONFIG_KEY), QuotaConfig.class));
+      setQuotaConfig(JsonUtils.stringToObject(record.getSimpleField(QUOTA_CONFIG_KEY), QuotaConfig.class));
     }
     if (record.getSimpleField(REF_OFFLINE_TABLE_NAME_KEY) != null) {
-      builder.setRefOfflineTableName(record.getSimpleField(REF_OFFLINE_TABLE_NAME_KEY));
+      setRefOfflineTableName(record.getSimpleField(REF_OFFLINE_TABLE_NAME_KEY));
     }
     if (record.getSimpleField(REF_REALTIME_TABLE_NAME_KEY) != null) {
-      builder.setRefRealtimeTableName(record.getSimpleField(REF_REALTIME_TABLE_NAME_KEY));
+      setRefRealtimeTableName(record.getSimpleField(REF_REALTIME_TABLE_NAME_KEY));
     }
     String timeBoundaryConfigJson = record.getSimpleField(TIME_BOUNDARY_CONFIG_KEY);
     if (timeBoundaryConfigJson != null) {
-      builder.setTimeBoundaryConfig(JsonUtils.stringToObject(timeBoundaryConfigJson, TimeBoundaryConfig.class));
+      setTimeBoundaryConfig(JsonUtils.stringToObject(timeBoundaryConfigJson, TimeBoundaryConfig.class));
     }
 
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
     Map<String, String> physicalTableMapField = record.getMapField(PHYSICAL_TABLE_CONFIG_KEY);
     if (physicalTableMapField != null) {
       for (Map.Entry<String, String> entry : physicalTableMapField.entrySet()) {
-        String physicalTableName = entry.getKey();
-        String physicalTableConfigJson = entry.getValue();
-        physicalTableConfigMap.put(physicalTableName,
-            JsonUtils.stringToObject(physicalTableConfigJson, PhysicalTableConfig.class));
+        physicalTableConfigMap.put(entry.getKey(),
+            JsonUtils.stringToObject(entry.getValue(), PhysicalTableConfig.class));
       }
     }
-    builder.setPhysicalTableConfigMap(physicalTableConfigMap);
-    return builder.build();
+    setPhysicalTableConfigMap(physicalTableConfigMap);
   }
 
   public ConfigRecord toConfigRecord()
