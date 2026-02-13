@@ -63,6 +63,7 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -259,6 +260,34 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
 
     return tableAuthorizationResult;
+  }
+
+  /**
+   * Validates that physical tables are not being queried with enableMultiClusterRouting=true.
+   * Physical tables are cluster-specific and should never be federated across clusters.
+   * Only logical tables support multi-cluster routing.
+   *
+   * @param tableNames Set of table names to validate
+   * @param queryOptions Map of query options
+   * @throws QueryException if any physical table is queried with enableMultiClusterRouting=true
+   */
+  protected void validatePhysicalTablesWithMultiClusterRouting(Set<String> tableNames,
+      Map<String, String> queryOptions) {
+    // Check if multi-cluster routing is enabled
+    boolean isMultiClusterRoutingEnabled = queryOptions.containsKey(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING)
+        && Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING));
+
+    if (isMultiClusterRoutingEnabled) {
+      // Validate each table - physical tables cannot be queried with multi-cluster routing
+      for (String tableName : tableNames) {
+        if (!_tableCache.isLogicalTable(tableName)) {
+          throw QueryErrorCode.QUERY_VALIDATION.asException(
+              "Physical table '" + tableName + "' cannot be queried with enableMultiClusterRouting=true. "
+              + "Multi-cluster routing is only supported for logical tables. "
+              + "Please remove the enableMultiClusterRouting query option or use a logical table instead.");
+        }
+      }
+    }
   }
 
   /**
