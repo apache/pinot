@@ -104,6 +104,14 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @BeforeClass
   public void setUp()
       throws Exception {
+    initCluster();
+    List<File> avroFiles = unpackAvroData(_tempDir);
+    initTables(avroFiles);
+    initOtherDependencies(avroFiles);
+  }
+
+  protected void initCluster()
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -121,20 +129,23 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     startBroker();
     startServer();
     setupTenants();
+  }
 
+  protected void initTables(List<File> avroFiles)
+      throws Exception {
     // Create and upload the schema and table config
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig tableConfig = createOfflineTableConfig();
     addTableConfig(tableConfig);
 
-    // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
-
     // Create and upload segments
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(getTableName(), _tarDir);
+  }
 
+  protected void initOtherDependencies(List<File> avroFiles)
+      throws Exception {
     // Set up the H2 connection
     setUpH2Connection(avroFiles);
 
@@ -1014,7 +1025,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @DataProvider(name = "polymorphicScalarComparisonFunctionsDataProvider")
-  Object[][] polymorphicScalarComparisonFunctionsDataProvider() {
+  protected Object[][] polymorphicScalarComparisonFunctionsDataProvider() {
     List<Object[]> inputs = new ArrayList<>();
 
     inputs.add(new Object[]{"STRING", "'test'", "'abc'", "test"});
@@ -1164,6 +1175,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testBetween()
       throws Exception {
+    testBetween(true);
+  }
+
+  protected void testBetween(boolean testExplainPlanForNotBetween)
+      throws Exception {
     String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE AirTime BETWEEN 10 AND 50";
     JsonNode jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
@@ -1215,18 +1231,20 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNoError(jsonNode);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 58538);
 
-    explainQuery =
-        "SET " + CommonConstants.Broker.Request.QueryOptionKey.EXPLAIN_ASKING_SERVERS + "=true; EXPLAIN PLAN FOR "
-            + sqlQuery;
-    jsonNode = postQuery(explainQuery);
-    assertNoError(jsonNode);
-    plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
-    // Ensure that the BETWEEN filter predicate was not converted. Also ensure that the NOT filter is added.
-    Assert.assertTrue(plan.contains("BETWEEN"));
-    Assert.assertTrue(plan.contains("FilterNot"));
-    Assert.assertFalse(plan.contains(">="));
-    Assert.assertFalse(plan.contains("<="));
-    Assert.assertFalse(plan.contains("Sarg"));
+    if (testExplainPlanForNotBetween) {
+      explainQuery =
+          "SET " + CommonConstants.Broker.Request.QueryOptionKey.EXPLAIN_ASKING_SERVERS + "=true; EXPLAIN PLAN FOR "
+              + sqlQuery;
+      jsonNode = postQuery(explainQuery);
+      assertNoError(jsonNode);
+      plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
+      // Ensure that the BETWEEN filter predicate was not converted. Also ensure that the NOT filter is added.
+      Assert.assertTrue(plan.contains("BETWEEN"));
+      Assert.assertTrue(plan.contains("FilterNot"));
+      Assert.assertFalse(plan.contains(">="));
+      Assert.assertFalse(plan.contains("<="));
+      Assert.assertFalse(plan.contains("Sarg"));
+    }
   }
 
   @Test
@@ -1405,6 +1423,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Override
   protected String getTableName() {
     return _tableName;
+  }
+
+  protected List<String> getOfflineTablesCreated() {
+    return Collections.singletonList(_tableName);
   }
 
   @Test
@@ -2152,7 +2174,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropOfflineTable(DEFAULT_TABLE_NAME);
+    for (String tableName : getOfflineTablesCreated()) {
+      dropOfflineTable(tableName);
+    }
     dropOfflineTable(TABLE_NAME_WITH_DATABASE);
     dropOfflineTable(DIM_TABLE);
 

@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -48,6 +49,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
@@ -436,26 +438,63 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return getTableConfigBuilder(TableType.REALTIME).build();
   }
 
+  private List<String> getTimeBoundaryTable(List<String> offlineTables) {
+    String timeBoundaryTable = null;
+    long maxEndTimeMillis = Long.MIN_VALUE;
+    try {
+      for (String tableName : offlineTables) {
+        String url = _controllerRequestURLBuilder.forSegmentMetadata(tableName, TableType.OFFLINE);
+        String response = ControllerTest.sendGetRequest(url);
+        JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
+        Iterator<String> stringIterator = jsonNode.fieldNames();
+        while (stringIterator.hasNext()) {
+          String segmentName = stringIterator.next();
+          JsonNode segmentJsonNode = jsonNode.get(segmentName);
+          long endTimeMillis = segmentJsonNode.get("endTimeMillis").asLong();
+          if (endTimeMillis > maxEndTimeMillis) {
+            maxEndTimeMillis = endTimeMillis;
+            timeBoundaryTable = tableName;
+          }
+        }
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to get the time boundary table", e);
+    }
+    return timeBoundaryTable != null ? List.of(TableNameBuilder.OFFLINE.tableNameWithType(timeBoundaryTable))
+        : List.of();
+  }
+
+  protected LogicalTableConfig createLogicalTableConfig(List<String> offlineTables, List<String> realtimeTables) {
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    for (String physicalTableName : offlineTables) {
+      physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
+    }
+    for (String physicalTableName : realtimeTables) {
+      physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
+    }
+    String offlineTableName = offlineTables.stream().findFirst().orElse(null);
+    String realtimeTableName = realtimeTables.stream().findFirst().orElse(null);
+    LogicalTableConfigBuilder builder =
+        new LogicalTableConfigBuilder().setTableName(getLogicalTableName())
+            .setBrokerTenant(getBrokerTenant())
+            .setRefOfflineTableName(offlineTableName)
+            .setRefRealtimeTableName(realtimeTableName)
+            .setPhysicalTableConfigMap(physicalTableConfigMap);
+    if (!offlineTables.isEmpty() && !realtimeTables.isEmpty()) {
+      builder.setTimeBoundaryConfig(
+          new TimeBoundaryConfig("min", Map.of("includedTables", getTimeBoundaryTable(offlineTables)))
+      );
+    }
+    return builder.build();
+  }
+
   /**
    * Creates a LogicalTableConfig backed by the OFFLINE and REALTIME physical tables.
    */
   protected LogicalTableConfig createLogicalTableConfig() {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-
-    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
-    physicalTableConfigMap.put(offlineTableName, new PhysicalTableConfig());
-    physicalTableConfigMap.put(realtimeTableName, new PhysicalTableConfig());
-
-    return new LogicalTableConfigBuilder()
-        .setTableName(getLogicalTableName())
-        .setBrokerTenant(getBrokerTenant())
-        .setRefOfflineTableName(offlineTableName)
-        .setRefRealtimeTableName(realtimeTableName)
-        .setPhysicalTableConfigMap(physicalTableConfigMap)
-        .setTimeBoundaryConfig(
-            new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableConfigMap.keySet())))
-        .build();
+    return createLogicalTableConfig(List.of(offlineTableName), List.of(realtimeTableName));
   }
 
   protected void createLogicalTableAndSchema()
@@ -711,9 +750,37 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return unpackTarData(getAvroTarFileName(), outputDir);
   }
 
+  protected void uploadDataToOfflineTables(List<String> tableNames, List<File> avroFiles)
+      throws Exception {
+    Map<String, List<File>> offlineTableDataFiles = distributeFilesToTables(tableNames, avroFiles);
+    for (Map.Entry<String, List<File>> entry : offlineTableDataFiles.entrySet()) {
+      String tableName = entry.getKey();
+      List<File> avroFilesForTable = entry.getValue();
+
+      File tarDir = new File(_tarDir, tableName);
+
+      TestUtils.ensureDirectoriesExistAndEmpty(tarDir);
+
+      // Create and upload the schema and table config
+      Schema schema = createSchema(getSchemaFileName());
+      schema.setSchemaName(tableName);
+      addSchema(schema);
+      TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+      addTableConfig(offlineTableConfig);
+
+      // Create and upload segments
+      ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFilesForTable, offlineTableConfig, schema, 0, _segmentDir,
+          tarDir);
+      uploadSegments(tableName, tarDir);
+    }
+  }
+
   // Distributes the given Avro files to the given table names in a round-robin manner and
   // returns the mapping from table name to list of Avro files.
   protected Map<String, List<File>> distributeFilesToTables(List<String> tableNames, List<File> avroFiles) {
+    if (tableNames.isEmpty()) {
+      return Map.of();
+    }
     Map<String, List<File>> tableNameToFilesMap = new HashMap<>();
 
     // Initialize the map with empty lists for each table name

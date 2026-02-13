@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,13 +36,10 @@ import org.apache.pinot.integration.tests.QueryAssert;
 import org.apache.pinot.integration.tests.QueryGenerator;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -116,27 +112,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     }
 
     _avroFiles = getAllAvroFiles();
-    Map<String, List<File>> offlineTableDataFiles = getOfflineTableDataFiles();
-    for (Map.Entry<String, List<File>> entry : offlineTableDataFiles.entrySet()) {
-      String tableName = entry.getKey();
-      List<File> avroFilesForTable = entry.getValue();
-
-      File tarDir = new File(_tarDir, tableName);
-
-      TestUtils.ensureDirectoriesExistAndEmpty(tarDir);
-
-      // Create and upload the schema and table config
-      Schema schema = createSchema(getSchemaFileName());
-      schema.setSchemaName(tableName);
-      addSchema(schema);
-      TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
-      addTableConfig(offlineTableConfig);
-
-      // Create and upload segments
-      ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFilesForTable, offlineTableConfig, schema, 0, _segmentDir,
-          tarDir);
-      uploadSegments(tableName, tarDir);
-    }
+    uploadDataToOfflineTables(getOfflineTableNames(), _avroFiles);
 
     // create realtime table
     Map<String, List<File>> realtimeTableDataFiles = getRealtimeTableDataFiles();
@@ -184,40 +160,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     return List.of();
   }
 
-  protected Map<String, List<File>> getOfflineTableDataFiles() {
-    List<String> offlineTableNames = getOfflineTableNames();
-    return !offlineTableNames.isEmpty() ? distributeFilesToTables(offlineTableNames, _avroFiles) : Map.of();
-  }
-
   protected Map<String, List<File>> getRealtimeTableDataFiles() {
     List<String> realtimeTableNames = getRealtimeTableNames();
     return !realtimeTableNames.isEmpty() ? distributeFilesToTables(realtimeTableNames, _avroFiles) : Map.of();
-  }
-
-  private List<String> getTimeBoundaryTable() {
-    String timeBoundaryTable = null;
-    long maxEndTimeMillis = Long.MIN_VALUE;
-    try {
-      for (String tableName : getOfflineTableNames()) {
-        String url = _controllerRequestURLBuilder.forSegmentMetadata(tableName, TableType.OFFLINE);
-        String response = ControllerTest.sendGetRequest(url);
-        JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
-        Iterator<String> stringIterator = jsonNode.fieldNames();
-        while (stringIterator.hasNext()) {
-          String segmentName = stringIterator.next();
-          JsonNode segmentJsonNode = jsonNode.get(segmentName);
-          long endTimeMillis = segmentJsonNode.get("endTimeMillis").asLong();
-          if (endTimeMillis > maxEndTimeMillis) {
-            maxEndTimeMillis = endTimeMillis;
-            timeBoundaryTable = tableName;
-          }
-        }
-      }
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to get the time boundary table", e);
-    }
-    return timeBoundaryTable != null ? List.of(TableNameBuilder.OFFLINE.tableNameWithType(timeBoundaryTable))
-        : List.of();
   }
 
   protected List<String> getPhysicalTableNames() {
@@ -247,30 +192,6 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getLogicalTableName(), _h2Connection);
   }
 
-  public LogicalTableConfig getLogicalTableConfig(String tableName, List<String> physicalTableNames,
-      String brokerTenant) {
-    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
-    for (String physicalTableName : physicalTableNames) {
-      physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
-    }
-    String offlineTableName =
-        physicalTableNames.stream().filter(TableNameBuilder::isOfflineTableResource).findFirst().orElse(null);
-    String realtimeTableName =
-        physicalTableNames.stream().filter(TableNameBuilder::isRealtimeTableResource).findFirst().orElse(null);
-    LogicalTableConfigBuilder builder =
-        new LogicalTableConfigBuilder().setTableName(tableName)
-            .setBrokerTenant(brokerTenant)
-            .setRefOfflineTableName(offlineTableName)
-            .setRefRealtimeTableName(realtimeTableName)
-            .setPhysicalTableConfigMap(physicalTableConfigMap);
-    if (!getOfflineTableNames().isEmpty() && !getRealtimeTableNames().isEmpty()) {
-      builder.setTimeBoundaryConfig(
-          new TimeBoundaryConfig("min", Map.of("includedTables", getTimeBoundaryTable()))
-      );
-    }
-    return builder.build();
-  }
-
   private void createLogicalTableSchema()
       throws IOException {
     Schema logicalTableSchema = createSchema(getSchemaFileName());
@@ -281,8 +202,11 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   protected void createLogicalTable()
       throws IOException {
     String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
-    LogicalTableConfig logicalTable =
-        getLogicalTableConfig(getLogicalTableName(), getPhysicalTableNames(), getBrokerTenant());
+    List<String> offlineTableNames = getOfflineTableNames().stream()
+        .map(TableNameBuilder.OFFLINE::tableNameWithType).collect(Collectors.toList());
+    List<String> realtimeTableNames = getRealtimeTableNames().stream()
+        .map(TableNameBuilder.REALTIME::tableNameWithType).collect(Collectors.toList());
+    LogicalTableConfig logicalTable = createLogicalTableConfig(offlineTableNames, realtimeTableNames);
     String resp =
         ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTable.toSingleLineJsonString(), getHeaders());
     assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + getLogicalTableName()
