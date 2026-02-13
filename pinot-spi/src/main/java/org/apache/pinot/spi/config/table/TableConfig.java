@@ -188,7 +188,8 @@ public class TableConfig extends BaseJsonConfig {
     _tableSamplers = sanitizeAndValidateTableSamplers(tableSamplers);
   }
 
-  protected TableConfig(String tableName, String tableType, boolean isDimTable) {
+  // This constructor is only to be used from fromConfigRecord
+  private TableConfig(String tableName, String tableType, boolean isDimTable) {
     // NOTE: Handle lower case table type and raw table name for backward-compatibility
     _tableType = TableType.valueOf(tableType.toUpperCase());
     _tableName = TableNameBuilder.forType(_tableType).tableNameWithType(tableName);
