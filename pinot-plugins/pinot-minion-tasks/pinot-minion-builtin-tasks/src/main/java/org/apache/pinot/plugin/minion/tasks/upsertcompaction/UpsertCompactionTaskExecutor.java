@@ -77,7 +77,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     }
     RoaringBitmap validDocIds =
         MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
-            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator);
+            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator, tableConfig);
     if (validDocIds == null) {
       // no valid crc match found or no validDocIds obtained from all servers
       // error out the task instead of silently failing so that we can track it via task-error metrics
