@@ -270,7 +270,8 @@ public class MinionTaskUtils {
    * returns the bitmap with the highest cardinality (most valid docs) to minimize "primary keys not replaced"
    * warnings during segment replacement, which can occur due to replica inconsistencies.
    * <p>
-   * To avoid upsert replica inconsistencies (partial Upserts and dropOutOfOrder tables), this method requires from every server holding the segment:
+   * To avoid upsert replica inconsistencies (partial Upserts and dropOutOfOrder tables), this method requires from
+   * every server holding the segment:
    * (1) a successful validDocIds bitmap response, (2) segment CRC matching expectedCrc, and (3) server in READY
    * state. If any server fails any of these, this method throws exception and the caller must treat the task as
    * failed for the segment.
