@@ -169,7 +169,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     return timeoutProperties;
   }
 
-  protected void setupTableWithNonDefaultDatabase(List<File> avroFiles)
+  private void setupTableWithNonDefaultDatabase(List<File> avroFiles)
       throws Exception {
     _tableName = TABLE_NAME_WITH_DATABASE;
     String defaultCol = "ActualElapsedTime";

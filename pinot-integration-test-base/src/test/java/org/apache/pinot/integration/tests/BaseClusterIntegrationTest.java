@@ -335,40 +335,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Creates a new OFFLINE table config.
    */
-  protected TableConfig createOfflineTableConfig(String tableName) {
-    // @formatter:off
-    return new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(tableName)
-        .setTimeColumnName(getTimeColumnName())
-        .setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns())
-//        .setCreateInvertedIndexDuringSegmentGeneration(isCreateInvertedIndexDuringSegmentGeneration())
-        .setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns())
-        .setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs())
-        .setNumReplicas(getNumReplicas())
-        .setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode())
-        .setTaskConfig(getTaskConfig())
-        .setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant())
-        .setIngestionConfig(getIngestionConfig())
-        .setQueryConfig(getQueryConfig())
-        .setNullHandlingEnabled(getNullHandlingEnabled())
-        .setSegmentPartitionConfig(getSegmentPartitionConfig())
-//        .setOptimizeNoDictStatsCollection(true)
-        .build();
-    // @formatter:on
+  protected TableConfig createOfflineTableConfig() {
+    return createOfflineTableConfig(getTableName());
   }
 
   /**
    * Creates a new OFFLINE table config.
    */
-  protected TableConfig createOfflineTableConfig() {
+  protected TableConfig createOfflineTableConfig(String tableName) {
     // @formatter:off
     return new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(getTableName())
+        .setTableName(tableName)
         .setTimeColumnName(getTimeColumnName())
         .setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns())
