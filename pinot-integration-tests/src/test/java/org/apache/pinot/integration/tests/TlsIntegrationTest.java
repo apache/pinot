@@ -279,6 +279,12 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
+  protected LogicalTableConfig createLogicalTableConfig() {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    return createLogicalTableConfig(List.of(), List.of(realtimeTableName));
+  }
+
+  @Override
   protected void createLogicalTable()
       throws IOException {
     LogicalTableConfig logicalTableConfig = createLogicalTableConfig();

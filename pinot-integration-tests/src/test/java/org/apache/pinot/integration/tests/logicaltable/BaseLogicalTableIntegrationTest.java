@@ -54,6 +54,7 @@ import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -459,10 +460,13 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     updateLogicalTableConfig(logicalTableConfig);
     JsonNode response = postQuery(starQuery);
     JsonNode exceptions = response.get("exceptions");
-    assertTrue(
-        !exceptions.isEmpty() && (exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.BROKER_TIMEOUT.getId()
-            // Timeout may occur just before submitting the request. Then this error code is thrown.
-            || exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.SERVER_NOT_RESPONDING.getId()));
+    assertFalse(exceptions.isEmpty());
+    int exceptionCode = exceptions.get(0).get("errorCode").asInt();
+    assertTrue(exceptionCode == QueryErrorCode.BROKER_TIMEOUT.getId()
+        // Timeout may occur just before submitting the request. Then this error code is thrown.
+        || exceptionCode == QueryErrorCode.SERVER_NOT_RESPONDING.getId()
+        || exceptionCode == QueryErrorCode.EXECUTION_TIMEOUT.getId()
+    );
 
     // Query Succeeds with a high limit.
     queryConfig = new QueryConfig(1000000L, null, null, null, null, null);

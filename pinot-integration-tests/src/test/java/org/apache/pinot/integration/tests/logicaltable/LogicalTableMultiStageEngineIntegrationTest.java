@@ -91,6 +91,9 @@ public class LogicalTableMultiStageEngineIntegrationTest extends MultiStageEngin
     //  This needs to be fixed
   }
 
+  // These validate tests are applicable only for physical table and not logical table, so ignoring them here.
+  // These tests get the table config of the physical table and send it in the request,
+  // which doesn't work for logical table.
   @Override
   @Ignore
   public void testValidateQueryApiBatchMixedResults() {
