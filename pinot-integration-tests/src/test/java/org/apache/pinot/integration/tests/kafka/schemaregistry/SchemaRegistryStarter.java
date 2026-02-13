@@ -23,9 +23,9 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 
@@ -49,7 +49,7 @@ public class SchemaRegistryStarter {
 
   public static class KafkaSchemaRegistryInstance {
     private final int _port;
-    public KafkaContainer _kafkaContainer;
+    public ConfluentKafkaContainer _kafkaContainer;
     private Network _network;
     private GenericContainer _schemaRegistryContainer;
 
@@ -69,8 +69,9 @@ public class SchemaRegistryStarter {
 
       _network = Network.newNetwork();
 
-      _kafkaContainer = new KafkaContainer(KAFKA_DOCKER_IMAGE_NAME).withNetwork(_network).withNetworkAliases("kafka")
-          .withCreateContainerCmdModifier(it -> it.withHostName("kafka")).waitingFor(Wait.forListeningPort());
+      _kafkaContainer =
+          new ConfluentKafkaContainer(KAFKA_DOCKER_IMAGE_NAME).withNetwork(_network).withNetworkAliases("kafka")
+              .withCreateContainerCmdModifier(it -> it.withHostName("kafka")).waitingFor(Wait.forListeningPort());
       _kafkaContainer.start();
 
       Map<String, String> schemaRegistryProps = new HashMap<>();
