@@ -74,6 +74,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.GrizzlyRequestAdapter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
@@ -100,6 +101,7 @@ import org.apache.pinot.tsdb.planner.TimeSeriesTableMetadataProvider;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
+import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,6 +121,12 @@ public class PinotQueryResource {
 
   @Inject
   ControllerConf _controllerConf;
+
+  @Context
+  HttpHeaders _httpHeaders;
+
+  @Context
+  Request _request;
 
   @POST
   @Path("sql")
@@ -225,7 +233,6 @@ public class PinotQueryResource {
                   request.isIgnoreCase());
           LOGGER.info("Validating multi-stage query: {} compilation using static table cache ", sqlQuery);
         } else {
-          // Use TableCache from environment if static fields are not specified
           tableCache = _pinotHelixResourceManager.getTableCache();
           LOGGER.info("Validating multi-stage query: {} compilation using Zk table cache", sqlQuery);
         }
@@ -427,7 +434,7 @@ public class PinotQueryResource {
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(AccessType.READ, httpHeaders, "/sql")) {
+    if (!accessControl.hasAccess(AccessType.READ, httpHeaders, GrizzlyRequestAdapter.wrap(_request), "/sql")) {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -522,7 +529,8 @@ public class PinotQueryResource {
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
+    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, GrizzlyRequestAdapter.wrap(_request),
+        Actions.Table.QUERY)) {
       throw QueryErrorCode.ACCESS_DENIED.asException();
     }
 

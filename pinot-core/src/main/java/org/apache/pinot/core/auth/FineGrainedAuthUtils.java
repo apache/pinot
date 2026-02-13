@@ -20,6 +20,8 @@
 package org.apache.pinot.core.auth;
 
 import java.lang.reflect.Method;
+import javax.annotation.Nullable;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
@@ -76,7 +78,7 @@ public class FineGrainedAuthUtils {
    * @param accessControl to check the fine-grained authorization
    */
   public static void validateFineGrainedAuth(Method endpointMethod, UriInfo uriInfo, HttpHeaders httpHeaders,
-      FineGrainedAccessControl accessControl) {
+      @Nullable HttpServletRequest request, FineGrainedAccessControl accessControl) {
     if (endpointMethod.isAnnotationPresent(Authorize.class)) {
       final Authorize auth = endpointMethod.getAnnotation(Authorize.class);
       String targetId = null;
@@ -113,7 +115,7 @@ public class FineGrainedAuthUtils {
 
       boolean hasAccess;
       try {
-        hasAccess = accessControl.hasAccess(httpHeaders, auth.targetType(), targetId, auth.action());
+        hasAccess = accessControl.hasAccess(httpHeaders, request, auth.targetType(), targetId, auth.action());
       } catch (Throwable t) {
         // catch and log Throwable for NoSuchMethodError which can happen when there are classpath conflicts
         // otherwise, grizzly will return a 500 without any logs or indication of what failed
@@ -127,7 +129,7 @@ public class FineGrainedAuthUtils {
       if (!hasAccess) {
         throw new WebApplicationException(accessDeniedMsg, Response.Status.FORBIDDEN);
       }
-    } else if (!accessControl.defaultAccess(httpHeaders)) {
+    } else if (!accessControl.defaultAccess(httpHeaders, request)) {
       throw new WebApplicationException("Access denied - default authorization failed", Response.Status.FORBIDDEN);
     }
   }
