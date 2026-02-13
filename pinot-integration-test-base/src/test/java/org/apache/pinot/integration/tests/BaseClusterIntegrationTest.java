@@ -333,6 +333,36 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Creates a new OFFLINE table config.
    */
+  protected TableConfig createOfflineTableConfig(String tableName) {
+    // @formatter:off
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(tableName)
+        .setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns())
+//        .setCreateInvertedIndexDuringSegmentGeneration(isCreateInvertedIndexDuringSegmentGeneration())
+        .setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig())
+        .setQueryConfig(getQueryConfig())
+        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .setSegmentPartitionConfig(getSegmentPartitionConfig())
+//        .setOptimizeNoDictStatsCollection(true)
+        .build();
+    // @formatter:on
+  }
+
+  /**
+   * Creates a new OFFLINE table config.
+   */
   protected TableConfig createOfflineTableConfig() {
     // @formatter:off
     return new TableConfigBuilder(TableType.OFFLINE)
@@ -426,6 +456,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setTimeBoundaryConfig(
             new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableConfigMap.keySet())))
         .build();
+  }
+
+  protected void createLogicalTableAndSchema()
+      throws IOException {
+    Schema schema = createSchema(getSchemaFileName());
+    schema.setSchemaName(getTableName());
+    addSchema(schema);
+    createLogicalTable();
   }
 
   /**
@@ -671,6 +709,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected List<File> unpackAvroData(File outputDir)
       throws Exception {
     return unpackTarData(getAvroTarFileName(), outputDir);
+  }
+
+  // Distributes the given Avro files to the given table names in a round-robin manner and
+  // returns the mapping from table name to list of Avro files.
+  protected Map<String, List<File>> distributeFilesToTables(List<String> tableNames, List<File> avroFiles) {
+    Map<String, List<File>> tableNameToFilesMap = new HashMap<>();
+
+    // Initialize the map with empty lists for each table name
+    tableNames.forEach(table -> tableNameToFilesMap.put(table, new ArrayList<>()));
+
+    // Round-robin distribution of files to table names
+    for (int i = 0; i < avroFiles.size(); i++) {
+      String tableName = tableNames.get(i % tableNames.size());
+      tableNameToFilesMap.get(tableName).add(avroFiles.get(i));
+    }
+    return tableNameToFilesMap;
   }
 
   /**

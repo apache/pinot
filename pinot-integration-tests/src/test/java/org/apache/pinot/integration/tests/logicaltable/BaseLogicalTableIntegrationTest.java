@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests.logicaltable;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -46,7 +45,6 @@ import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
@@ -158,6 +156,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       pushAvroIntoKafka(avroFilesForTable);
     }
 
+    createLogicalTableSchema();
     createLogicalTable();
 
     // Set up the H2 connection
@@ -193,20 +192,6 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   protected Map<String, List<File>> getRealtimeTableDataFiles() {
     List<String> realtimeTableNames = getRealtimeTableNames();
     return !realtimeTableNames.isEmpty() ? distributeFilesToTables(realtimeTableNames, _avroFiles) : Map.of();
-  }
-
-  protected Map<String, List<File>> distributeFilesToTables(List<String> tableNames, List<File> avroFiles) {
-    Map<String, List<File>> tableNameToFilesMap = new HashMap<>();
-
-    // Initialize the map with empty lists for each table name
-    tableNames.forEach(table -> tableNameToFilesMap.put(table, new ArrayList<>()));
-
-    // Round-robin distribution of files to table names
-    for (int i = 0; i < avroFiles.size(); i++) {
-      String tableName = tableNames.get(i % tableNames.size());
-      tableNameToFilesMap.get(tableName).add(avroFiles.get(i));
-    }
-    return tableNameToFilesMap;
   }
 
   private List<String> getTimeBoundaryTable() {
@@ -262,34 +247,6 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getLogicalTableName(), _h2Connection);
   }
 
-  /**
-   * Creates a new OFFLINE table config.
-   */
-  protected TableConfig createOfflineTableConfig(String tableName) {
-    // @formatter:off
-    return new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(tableName)
-        .setTimeColumnName(getTimeColumnName())
-        .setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns())
-        .setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns())
-        .setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs())
-        .setNumReplicas(getNumReplicas())
-        .setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode())
-        .setTaskConfig(getTaskConfig())
-        .setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant())
-        .setIngestionConfig(getIngestionConfig())
-        .setQueryConfig(getQueryConfig())
-        .setNullHandlingEnabled(getNullHandlingEnabled())
-        .setSegmentPartitionConfig(getSegmentPartitionConfig())
-        .build();
-    // @formatter:on
-  }
-
   public LogicalTableConfig getLogicalTableConfig(String tableName, List<String> physicalTableNames,
       String brokerTenant) {
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
@@ -314,12 +271,16 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     return builder.build();
   }
 
-  protected void createLogicalTable()
+  private void createLogicalTableSchema()
       throws IOException {
-    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
     Schema logicalTableSchema = createSchema(getSchemaFileName());
     logicalTableSchema.setSchemaName(getLogicalTableName());
     addSchema(logicalTableSchema);
+  }
+
+  protected void createLogicalTable()
+      throws IOException {
+    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
     LogicalTableConfig logicalTable =
         getLogicalTableConfig(getLogicalTableName(), getPhysicalTableNames(), getBrokerTenant());
     String resp =
