@@ -97,8 +97,8 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
 
     _dummyServer = HttpServer.create();
     _dummyServer.bind(new InetSocketAddress("localhost", 0), 0);
-    _dummyServer.start();
     _dummyServer.createContext("/mock/ingestion", new SegmentAsCsvFileFromPublicUriHandler());
+    _dummyServer.start();
   }
 
   @Test
