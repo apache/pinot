@@ -56,7 +56,7 @@ import software.amazon.awssdk.services.s3.model.StorageClass;
 
 @Test
 public class S3PinotFSTest {
-  private static final String S3MOCK_VERSION = System.getProperty("s3mock.version", "2.12.2");
+  private static final String S3MOCK_VERSION = System.getProperty("s3mock.version", "4.11.0");
   private static final File TEMP_FILE = new File(FileUtils.getTempDirectory(), "S3PinotFSTest");
 
   private static final String S3_SCHEME = "s3";
