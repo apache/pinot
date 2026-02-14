@@ -680,9 +680,24 @@ public class PinotQueryResource {
     Map<String, String> headers) {
     return outputStream -> {
       final long startTime = System.currentTimeMillis();
-      sendRequestRaw(url, method, requestJson.toString(), headers, outputStream);
+
+      // Use a temporary buffer to capture the broker response
+      java.io.ByteArrayOutputStream tempBuffer = new java.io.ByteArrayOutputStream();
+      sendRequestRaw(url, method, requestJson.toString(), headers, tempBuffer);
       final long queryTime = System.currentTimeMillis() - startTime;
       LOGGER.info("Query: {} Time: {}ms", query, queryTime);
+
+      // Parse the broker response, add controller execution time, and write to output
+      try {
+        String brokerResponseStr = tempBuffer.toString(StandardCharsets.UTF_8.name());
+        BrokerResponseNative brokerResponse = JsonUtils.stringToObject(brokerResponseStr, BrokerResponseNative.class);
+        brokerResponse.setControllerExecutionTimeMs(queryTime);
+        brokerResponse.toOutputStream(outputStream);
+      } catch (Exception e) {
+        // If parsing fails, just write the original response
+        LOGGER.warn("Failed to parse broker response to add controller execution time", e);
+        outputStream.write(tempBuffer.toByteArray());
+      }
     };
   }
 

@@ -198,7 +198,11 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     );
     JsonNode result = getTimeseriesQuery(getControllerBaseApiUrl(), query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC,
         getHeaders());
-    assertEquals(result.get("status").asText(), "success");
+
+    // Add null check for status field
+    JsonNode statusNode = result.get("status");
+    assertNotNull(statusNode, "Status field should not be null in timeseries query response");
+    assertEquals(statusNode.asText(), "success");
 
     // Call /timeseries/languages.
     var statusCodeAndResponse = sendGetRequestWithStatusCode(
