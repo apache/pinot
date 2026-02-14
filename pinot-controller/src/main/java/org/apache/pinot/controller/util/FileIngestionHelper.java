@@ -122,7 +122,7 @@ public class FileIngestionHelper {
         }
         case PUBLIC_URI: {
           copyPublicURIToLocal(payload._uri, inputFile);
-          LOGGER.info("Copied from public URI: {} to local file: {}", payload._uri, inputDir.getAbsolutePath());
+          LOGGER.info("Copied from public URI: {} to local file: {}", payload._uri, inputFile.getAbsolutePath());
           break;
         }
         default: {
