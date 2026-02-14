@@ -166,12 +166,12 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     public void handle(HttpExchange exchange)
         throws IOException {
       exchange.sendResponseHeaders(200, 0);
-      OutputStream out = exchange.getResponseBody();
-      OutputStreamWriter writer = new OutputStreamWriter(out);
-      writer.append(_fileContent);
-      writer.flush();
-      out.flush();
-      out.close();
+      try (OutputStream out = exchange.getResponseBody();
+           OutputStreamWriter writer = new OutputStreamWriter(out)) {
+        writer.append(_fileContent);
+        writer.flush();
+        out.flush();
+      }
     }
   }
 }
