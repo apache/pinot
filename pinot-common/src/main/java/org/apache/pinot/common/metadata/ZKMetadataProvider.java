@@ -20,6 +20,7 @@ package org.apache.pinot.common.metadata;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -68,6 +70,8 @@ import org.slf4j.LoggerFactory;
 public class ZKMetadataProvider {
   private ZKMetadataProvider() {
   }
+
+  public static final int DEFAULT_SEGMENTS_ZK_METADATA_BATCH_SIZE = 1000;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ZKMetadataProvider.class);
   private static final String CLUSTER_TENANT_ISOLATION_ENABLED_KEY = "tenantIsolationEnabled";
@@ -722,6 +726,57 @@ public class ZKMetadataProvider {
     } else {
       LOGGER.warn("Path: {} does not exist", parentPath);
       return Collections.emptyList();
+    }
+  }
+
+  /**
+   * Iterates over the segment ZK metadata for the table and applies the provided consumer to each non-null segment
+   * metadata.
+   *
+   * @param propertyStore Helix property store from which segment metadata is read.
+   * @param tableNameWithType Table name with type suffix (e.g. {@code myTable_OFFLINE}).
+   * @param batchSize Batch size for ZK get calls.
+   * @param consumer Consumer invoked for each non-null segment metadata.
+   */
+  public static void forEachSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
+      int batchSize, Consumer<SegmentZKMetadata> consumer) {
+    Preconditions.checkArgument(batchSize > 0, "Segment metadata batchSize must be greater than 0: %s", batchSize);
+
+    String segmentsPath = constructPropertyStorePathForResource(tableNameWithType);
+    List<String> segmentNames = getSegments(propertyStore, tableNameWithType);
+    if (segmentNames == null || segmentNames.isEmpty()) {
+      LOGGER.debug("No segments found under path: {}", segmentsPath);
+      return;
+    }
+
+    for (int startIndex = 0; startIndex < segmentNames.size(); startIndex += batchSize) {
+      int endIndex = Math.min(startIndex + batchSize, segmentNames.size());
+      List<String> segmentNameBatch = segmentNames.subList(startIndex, endIndex);
+
+      List<String> segmentPathBatch = new ArrayList<>(segmentNameBatch.size());
+      for (String segmentName : segmentNameBatch) {
+        segmentPathBatch.add(constructPropertyStorePathForSegment(tableNameWithType, segmentName));
+      }
+
+      List<ZNRecord> znRecords = propertyStore.get(segmentPathBatch, null, AccessOption.PERSISTENT);
+      int numNullRecords = 0;
+      if (znRecords != null) {
+        for (int i = 0; i < segmentNameBatch.size(); i++) {
+          ZNRecord znRecord = i < znRecords.size() ? znRecords.get(i) : null;
+          if (znRecord == null) {
+            numNullRecords++;
+          } else {
+            consumer.accept(new SegmentZKMetadata(znRecord));
+          }
+        }
+      } else {
+        numNullRecords = segmentNameBatch.size();
+      }
+
+      if (numNullRecords > 0) {
+        LOGGER.warn("Failed to read {}/{} segment ZK metadata under path: {} for table: {}",
+            numNullRecords, segmentNameBatch.size(), segmentsPath, tableNameWithType);
+      }
     }
   }
 
