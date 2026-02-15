@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public class FunnelCompleteCountAggregationFunction extends FunnelBaseAggregationFunction<Integer> {
@@ -60,7 +61,10 @@ public class FunnelCompleteCountAggregationFunction extends FunnelBaseAggregatio
 
       int maxStep = 0;
       long previousTimestamp = -1;
+      int numEventsProcessed = 0;
       for (FunnelStepEvent event : slidingWindow) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numEventsProcessed++,
+            "FunnelCompleteCountAggregationFunction#extractFinalResult");
         int currentEventStep = event.getStep();
         // If the same condition holds for the sequence of events, then such repeating event interrupts further
         // processing.

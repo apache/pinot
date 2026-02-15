@@ -268,11 +268,14 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
    */
   protected void fillWindow(PriorityQueue<FunnelStepEvent> stepEvents, ArrayDeque<FunnelStepEvent> slidingWindow) {
     // Ensure for the sliding window, the first event is the first step
+    int numEventsProcessed = 0;
     while ((!slidingWindow.isEmpty()) && slidingWindow.peek().getStep() != 0) {
       slidingWindow.pollFirst();
     }
     if (slidingWindow.isEmpty()) {
       while (!stepEvents.isEmpty() && stepEvents.peek().getStep() != 0) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numEventsProcessed++,
+            "FunnelBaseAggregationFunction#fillWindow");
         stepEvents.poll();
       }
       if (stepEvents.isEmpty()) {
@@ -284,6 +287,8 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     long windowStart = slidingWindow.peek().getTimestamp();
     long windowEnd = windowStart + _windowSize;
     while (!stepEvents.isEmpty() && (stepEvents.peek().getTimestamp() < windowEnd)) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numEventsProcessed++,
+          "FunnelBaseAggregationFunction#fillWindow");
       if (_maxStepDuration > 0) {
         // When maxStepDuration > 0, we need to check if the event_to_add has a timestamp within the max duration
         // from the last event in the sliding window. If not, we break the loop.

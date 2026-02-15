@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
+import org.apache.pinot.spi.audit.AuditUserIdentity;
 
 
 /**
@@ -209,7 +210,7 @@ public class AuditEvent {
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public static class UserIdentity {
+  public static class UserIdentity implements AuditUserIdentity {
 
     @JsonProperty("principal")
     private String _principal;

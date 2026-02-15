@@ -336,6 +336,9 @@ public class CommonConstants {
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
     public static final String EVENT_LISTENER_CONFIG_PREFIX = "pinot.broker.event.listener";
+    // Prefix for table sampler configs:
+    // - pinot.broker.table.sampler.annotation.packages=<comma-separated packages>
+    public static final String TABLE_SAMPLER_CONFIG_PREFIX = "pinot.broker.table.sampler";
     public static final String CONFIG_OF_METRICS_NAME_PREFIX = "pinot.broker.metrics.prefix";
     public static final String DEFAULT_METRICS_NAME_PREFIX = "pinot.broker.";
 
@@ -647,6 +650,7 @@ public class CommonConstants {
         public static final String USE_STAR_TREE = "useStarTree";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
         public static final String ROUTING_OPTIONS = "routingOptions";
+        public static final String TABLE_SAMPLER = "sampler";
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String COLLECT_GC_STATS = "collectGCStats";
@@ -2030,6 +2034,14 @@ public class CommonConstants {
     /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
+
+    /// Used to indicate whether MSE pipeline breaker stats should be included in the queryStats field.
+    /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. Starting from 1.5.0,
+    /// they are not included by default but can be included by setting this flag to false (upper or lower case).
+    ///
+    /// It is expected that in 1.6.0 and later, MSE pipeline breaker stats will be included by default.
+    public static final String KEY_OF_SKIP_PIPELINE_BREAKER_STATS = "pinot.query.mse.skip.pipeline.breaker.stats";
+    public static final boolean DEFAULT_SKIP_PIPELINE_BREAKER_STATS = true;
 
     /// Used to indicate that MSE stats should be logged at INFO level for successful queries.
     ///

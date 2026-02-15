@@ -60,6 +60,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -94,6 +95,8 @@ public class LeafOperator extends MultiStageOperator {
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
   private final AtomicReference<ErrorMseBlock> _errorBlock = new AtomicReference<>();
   private final ResultsBlockStreamer _resultsBlockStreamer = this::addResultsBlock;
+  @Nullable
+  private final MultiStageQueryStats _pipelineBreakerStats;
 
   // Use a limit-sized BlockingQueue to store the results blocks and apply back pressure to the single-stage threads
   @VisibleForTesting
@@ -105,6 +108,16 @@ public class LeafOperator extends MultiStageOperator {
 
   public LeafOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests, DataSchema dataSchema,
       QueryExecutor queryExecutor, ExecutorService executorService) {
+    this(context, requests, dataSchema, queryExecutor, executorService, null);
+  }
+
+  public LeafOperator(
+      OpChainExecutionContext context,
+      List<ServerQueryRequest> requests,
+      DataSchema dataSchema,
+      QueryExecutor queryExecutor,
+      ExecutorService executorService,
+      @Nullable MultiStageQueryStats pipelineBreakerStats) {
     super(context);
     int numRequests = requests.size();
     Preconditions.checkArgument(numRequests == 1 || numRequests == 2, "Expected 1 or 2 requests, got: %s", numRequests);
@@ -118,6 +131,7 @@ public class LeafOperator extends MultiStageOperator {
     Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
+    _pipelineBreakerStats = pipelineBreakerStats;
   }
 
   public List<ServerQueryRequest> getRequests() {
@@ -149,6 +163,13 @@ public class LeafOperator extends MultiStageOperator {
   @Override
   public List<MultiStageOperator> getChildOperators() {
     return List.of();
+  }
+
+  @Override
+  protected MultiStageQueryStats calculateUpstreamStats() {
+    return _pipelineBreakerStats != null
+        ? _pipelineBreakerStats
+        : MultiStageQueryStats.emptyStats(_context.getStageId());
   }
 
   @Override
@@ -340,7 +361,7 @@ public class LeafOperator extends MultiStageOperator {
           _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
           break;
         case TIME_USED_MS:
-          _statMap.merge(StatKey.EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
+          _statMap.merge(StatKey.SSE_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
           break;
         case TRACE_INFO:
           LOGGER.debug("Skipping trace info: {}", entry.getValue());
@@ -723,7 +744,11 @@ public class LeafOperator extends MultiStageOperator {
     /**
      * Time spent on GC while this operator or its children in the same stage were running.
      */
-    GC_TIME_MS(StatMap.Type.LONG, null);
+    GC_TIME_MS(StatMap.Type.LONG, null),
+    /**
+     * Time spent in single-stage execution engine for this leaf stage.
+     */
+    SSE_EXECUTION_TIME_MS(StatMap.Type.LONG, null);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
     //  call the constructor that accepts a String as last argument and set it to null.
     //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will
