@@ -66,7 +66,7 @@ public class BaseRecordExtractorTest {
   }
 
   @Test
-  public void testUnwrapElementMapsInArray_listOfElementMaps() {
+  public void testUnwrapElementMapsInArrayListOfElementMaps() {
     TestExtractor extractor = new TestExtractor();
     Object[] result = extractor.callConvertMultiValue(
         Arrays.asList(
@@ -79,7 +79,7 @@ public class BaseRecordExtractorTest {
   }
 
   @Test
-  public void testUnwrapElementMapsInArray_objectArrayOfElementMaps() {
+  public void testUnwrapElementMapsInArrayObjectArrayOfElementMaps() {
     TestExtractor extractor = new TestExtractor();
     Object[] input = new Object[] {
         Collections.singletonMap("element", "abc"),
@@ -93,7 +93,7 @@ public class BaseRecordExtractorTest {
   }
 
   @Test
-  public void testNoUnwrap_whenNotAllMaps() {
+  public void testNoUnwrapWhenNotAllMaps() {
     TestExtractor extractor = new TestExtractor();
     Object[] result = extractor.callConvertMultiValue(
         Arrays.asList(
@@ -106,7 +106,7 @@ public class BaseRecordExtractorTest {
   }
 
   @Test
-  public void testNoUnwrap_whenMapHasMultipleKeys() {
+  public void testNoUnwrapWhenMapHasMultipleKeys() {
     TestExtractor extractor = new TestExtractor();
     Map<String, Object> twoKeys = new HashMap<>();
     twoKeys.put("element", "abc");
@@ -123,7 +123,7 @@ public class BaseRecordExtractorTest {
   }
 
   @Test
-  public void testNoUnwrap_whenMapHasDifferentSingleKey() {
+  public void testNoUnwrapWhenMapHasDifferentSingleKey() {
     TestExtractor extractor = new TestExtractor();
     Object[] result = extractor.callConvertMultiValue(
         Collections.singletonList(Collections.singletonMap("not_element", "v")));
@@ -133,7 +133,7 @@ public class BaseRecordExtractorTest {
   }
 
   @Test
-  public void testPrimitiveArray_notUnwrapped() {
+  public void testPrimitiveArrayNotUnwrapped() {
     TestExtractor extractor = new TestExtractor();
     int[] primitive = new int[] { 10, 20 };
     Object[] result = extractor.callConvertMultiValue(primitive);
@@ -144,7 +144,7 @@ public class BaseRecordExtractorTest {
   }
 
   @Test
-  public void testEmptyList_returnsEmptyArray() {
+  public void testEmptyListReturnsEmptyArray() {
     TestExtractor extractor = new TestExtractor();
     Object[] result = extractor.callConvertMultiValue(Collections.emptyList());
     Assert.assertNotNull(result);
@@ -152,7 +152,7 @@ public class BaseRecordExtractorTest {
   }
 
   @Test
-  public void testConvert_producesUnwrappedMultiValue() {
+  public void testConvertProducesUnwrappedMultiValue() {
     TestExtractor extractor = new TestExtractor();
     extractor.init(new HashSet<>(Collections.singletonList("tags")), null);
     GenericRow row = new GenericRow();
