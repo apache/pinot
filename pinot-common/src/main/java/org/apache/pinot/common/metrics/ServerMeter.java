@@ -140,6 +140,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RESPONSE_SER_MEM_ALLOCATED_BYTES("bytes", false),
   TOTAL_MEM_ALLOCATED_BYTES("bytes", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
+  /**
+   * Size of the serialized response sent from server to broker in bytes.
+   */
+  QUERY_RESPONSE_SIZE("bytes", false, "Size of the serialized response sent from server to broker in bytes"),
 
   GRPC_MEMORY_REJECTIONS("rejections", true, "Number of grpc requests rejected due to memory pressure"),
 
