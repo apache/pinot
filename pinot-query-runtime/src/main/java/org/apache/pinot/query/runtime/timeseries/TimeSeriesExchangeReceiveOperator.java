@@ -221,7 +221,7 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
 
     for (DataTable.MetadataKey statKey : MIN_STATS_KEYS) {
       String key = statKey.getName();
-      String existingValue = aggregatedStats.getOrDefault(key, "0");
+      String existingValue = aggregatedStats.getOrDefault(key, Long.toString(Long.MAX_VALUE));
       String newValue = metadata.get(key);
       if (newValue != null) {
         try {
