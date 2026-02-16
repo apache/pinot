@@ -632,6 +632,16 @@ public class CommonConstants {
     // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
     public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
 
+    /**
+     * Maximum number of elements allowed in an IN clause for multi-stage engine queries.
+     * Queries with IN clauses exceeding this limit will be rejected to prevent Calcite planner bottlenecks.
+     * A value of 0 or negative disables this validation.
+     * This value can always be overridden by {@link Request.QueryOptionKey#MSE_MAX_IN_CLAUSE_ELEMENTS} query option
+     */
+    public static final String CONFIG_OF_MSE_MAX_IN_CLAUSE_ELEMENTS =
+        "pinot.broker.multistage.max.in.clause.elements";
+    public static final int DEFAULT_MSE_MAX_IN_CLAUSE_ELEMENTS = 1000;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -883,6 +893,9 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
+
+        /// Option to customize the value of [Broker#CONFIG_OF_MSE_MAX_IN_CLAUSE_ELEMENTS]
+        public static final String MSE_MAX_IN_CLAUSE_ELEMENTS = "mseMaxInClauseElements";
       }
 
       public static class QueryOptionValue {
