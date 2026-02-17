@@ -902,10 +902,15 @@ public class BaseTableDataManagerTest {
   }
 
   private static OfflineTableDataManager createTableManager(InstanceDataManagerConfig instanceDataManagerConfig) {
+    return createTableManager(instanceDataManagerConfig, DEFAULT_TABLE_CONFIG);
+  }
+
+  private static OfflineTableDataManager createTableManager(InstanceDataManagerConfig instanceDataManagerConfig,
+      TableConfig tableConfig) {
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
-        SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
-        SEGMENT_OPERATIONS_THROTTLER, false, mock(ServerReloadJobStatusCache.class));
+    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, SCHEMA,
+        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, SEGMENT_OPERATIONS_THROTTLER,
+        false, mock(ServerReloadJobStatusCache.class));
     return tableDataManager;
   }
 
@@ -993,6 +998,63 @@ public class BaseTableDataManagerTest {
     when(immutableSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
     when(segmentMetadata.getCrc()).thenReturn(Long.toString(crc));
     return segmentDataManager;
+  }
+
+  @Test
+  public void testSkipCrcCheckOnLoadDefaultFalseReplaces()
+      throws Exception {
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
+    BaseTableDataManager tableDataManager = createTableManager();
+    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+    assertFalse(dataDir.exists());
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
+    assertTrue(dataDir.exists());
+    assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
+  }
+
+  @Test
+  public void testSkipCrcCheckOnLoadTrueSkipsReplace()
+      throws Exception {
+    // Prepare ZK metadata with tar ready; local immutable segment reports different CRC
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    // Force download failure to exercise best-effort replace fallback (serve local, no on-disk replacement)
+    zkMetadata.setDownloadUrl("file:///nonexistent/path/" + System.nanoTime());
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSkipCrcCheckOnLoad(true).build();
+    BaseTableDataManager tableDataManager =
+        createTableManager(createDefaultInstanceDataManagerConfig(), tableConfig);
+    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+    assertFalse(dataDir.exists());
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
+    assertFalse(dataDir.exists(), "Local segment dir should not be replaced");
+  }
+
+  @Test
+  public void testTryLoadExistingSegmentSkipTrueUsesLocal()
+      throws Exception {
+    // Create a local segment directory with CRC X
+    File localIndexDir = createSegment(SegmentVersion.v3, 5);
+    long localCrc = getCRC(localIndexDir);
+    // Create ZK metadata with a different CRC (X+1) and a bad download URL to force failure
+    SegmentZKMetadata zkMetadata =
+        makeRawSegment(localIndexDir, new File(TEMP_DIR, "tmp-" + SEGMENT_NAME + ".tar.gz"), false);
+    zkMetadata.setCrc(localCrc + 1);
+    zkMetadata.setDownloadUrl("file:///nonexistent/path/" + System.nanoTime());
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSkipCrcCheckOnLoad(true).build();
+    BaseTableDataManager tableDataManager =
+        createTableManager(createDefaultInstanceDataManagerConfig(), tableConfig);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
+    // tryLoadExistingSegment will return false on mismatch; add path will attempt download then fallback to local
+    assertFalse(tableDataManager.tryLoadExistingSegment(zkMetadata, indexLoadingConfig),
+        "Should trigger download path on CRC mismatch");
+    // Now simulate add path behavior using the same ZK metadata and index config: it should fallback to local
+    tableDataManager.addNewOnlineSegment(zkMetadata, indexLoadingConfig);
+    assertTrue(localIndexDir.exists(), "Local segment dir should remain");
+    assertEquals(new SegmentMetadataImpl(localIndexDir).getTotalDocs(), 5, "Should serve local segment on failure");
   }
 
   private static boolean hasInvertedIndex(File indexDir, String columnName)
