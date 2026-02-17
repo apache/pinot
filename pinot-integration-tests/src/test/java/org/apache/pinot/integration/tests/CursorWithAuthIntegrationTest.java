@@ -48,9 +48,9 @@ public class CursorWithAuthIntegrationTest extends CursorIntegrationTest {
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     BasicAuthTestUtils.addControllerConfiguration(properties);
-    properties.put("controller.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
-    properties.put("controller.segment.fetcher.auth.url", AUTH_URL);
-    properties.put("controller.segment.fetcher.auth.prefix", AUTH_PREFIX);
+    properties.put("pinot.controller.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
+    properties.put("pinot.controller.segment.fetcher.auth.url", AUTH_URL);
+    properties.put("pinot.controller.segment.fetcher.auth.prefix", AUTH_PREFIX);
     properties.put(ControllerConf.CONTROLLER_BROKER_AUTH_PREFIX + ".provider.class", AUTH_PROVIDER_CLASS);
     properties.put(ControllerConf.CONTROLLER_BROKER_AUTH_PREFIX + ".url", AUTH_URL);
     properties.put(ControllerConf.CONTROLLER_BROKER_AUTH_PREFIX + ".prefix", AUTH_PREFIX);
