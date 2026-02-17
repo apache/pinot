@@ -59,6 +59,8 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   private final Object2ObjectOpenHashMap<String, AbstractColumnStatisticsCollector> _keyStats =
       new Object2ObjectOpenHashMap<>(INITIAL_HASH_SET_SIZE);
   private final Map<String, Integer> _keyFrequencies = new Object2ObjectOpenHashMap<>(INITIAL_HASH_SET_SIZE);
+  private final Object2ObjectOpenHashMap<String, Object> _firstRawValuesByKey =
+      new Object2ObjectOpenHashMap<>(INITIAL_HASH_SET_SIZE);
   private String[] _sortedKeys;
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
@@ -107,6 +109,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
         if (keyStats == null) {
           keyStats = createKeyStatsCollector(key, value);
           _keyStats.put(key, keyStats);
+          _firstRawValuesByKey.put(key, value);
           if (isPartitionEnabled()) {
             updatePartition(key);
           }
@@ -131,8 +134,9 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
           try {
             keyStats.collect(new BigDecimal(value.toString()));
           } catch (NumberFormatException e) {
-            LOGGER.error("Failed to parse BigDecimal for key '{}', value '{}': {}", key, value, e.getMessage());
-            // Skip collecting this value for statistics
+            LOGGER.warn("Could not parse map key '{}' value '{}' as BIG_DECIMAL; promoting to STRING collector",
+                key, value);
+            keyStats = promoteNumericKeyStatsToStringCollector(key, value);
           }
           continue;
         }
@@ -156,19 +160,47 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
           }
         }
         if (keyStats instanceof IntColumnPreIndexStatsCollector) {
-          keyStats.collect(Integer.parseInt(value.toString()));
+          try {
+            keyStats.collect(Integer.parseInt(value.toString()));
+          } catch (NumberFormatException e) {
+            LOGGER.warn(
+                "Could not parse map key '{}' value '{}' as INT; promoting to STRING collector",
+                key, value);
+            keyStats = promoteNumericKeyStatsToStringCollector(key, value);
+          }
           continue;
         }
         if (keyStats instanceof LongColumnPreIndexStatsCollector) {
-          keyStats.collect(Long.parseLong(value.toString()));
+          try {
+            keyStats.collect(Long.parseLong(value.toString()));
+          } catch (NumberFormatException e) {
+            LOGGER.warn(
+                "Could not parse map key '{}' value '{}' as LONG; promoting to STRING collector",
+                key, value);
+            keyStats = promoteNumericKeyStatsToStringCollector(key, value);
+          }
           continue;
         }
         if (keyStats instanceof FloatColumnPreIndexStatsCollector) {
-          keyStats.collect(Float.parseFloat(value.toString()));
+          try {
+            keyStats.collect(Float.parseFloat(value.toString()));
+          } catch (NumberFormatException e) {
+            LOGGER.warn(
+                "Could not parse map key '{}' value '{}' as FLOAT; promoting to STRING collector",
+                key, value);
+            keyStats = promoteNumericKeyStatsToStringCollector(key, value);
+          }
           continue;
         }
         if (keyStats instanceof DoubleColumnPreIndexStatsCollector) {
-          keyStats.collect(Double.parseDouble(value.toString()));
+          try {
+            keyStats.collect(Double.parseDouble(value.toString()));
+          } catch (NumberFormatException e) {
+            LOGGER.warn(
+                "Could not parse map key '{}' value '{}' as DOUBLE; promoting to STRING collector",
+                key, value);
+            keyStats = promoteNumericKeyStatsToStringCollector(key, value);
+          }
           continue;
         }
         // Catch all
@@ -254,15 +286,19 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   private AbstractColumnStatisticsCollector createKeyStatsCollector(String key, Object value) {
     // Get the type of the value
     PinotDataType type = PinotDataType.getSingleValueType(value.getClass());
+    return createKeyStatsCollector(key, convertToDataType(type));
+  }
+
+  private AbstractColumnStatisticsCollector createKeyStatsCollector(String key, FieldSpec.DataType dataType) {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(key).build();
     Schema keySchema = new Schema.SchemaBuilder().setSchemaName(key)
-        .addField(new DimensionFieldSpec(key, convertToDataType(type), false)).build();
+        .addField(new DimensionFieldSpec(key, dataType, false)).build();
     StatsCollectorConfig config = new StatsCollectorConfig(tableConfig, keySchema, null);
 
     if (_createNoDictCollectorsForKeys) {
       return new NoDictColumnStatisticsCollector(key, config);
     }
-    switch (type) {
+    switch (dataType) {
       case INTEGER:
         return new IntColumnPreIndexStatsCollector(key, config);
       case LONG:
@@ -279,9 +315,31 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       case OBJECT:
         return new StringColumnPreIndexStatsCollector(key, config);
       default:
-        LOGGER.warn("Unknown data type {} for key {} and value type {}", type, key, value.getClass().getName());
+        LOGGER.warn("Unknown data type {} for key {}", dataType, key);
         return new StringColumnPreIndexStatsCollector(key, config);
+      }
+  }
+
+  private AbstractColumnStatisticsCollector promoteNumericKeyStatsToStringCollector(String key, Object value) {
+    Object firstRawValue = _firstRawValuesByKey.get(key);
+    _firstRawValuesByKey.putIfAbsent(key, value);
+
+    AbstractColumnStatisticsCollector stringKeyStats = createStringKeyStatsCollector(key);
+    _keyStats.put(key, stringKeyStats);
+    // Best-effort recovery: replay the first observed raw value as string to keep a partial history.
+    if (firstRawValue != null) {
+      stringKeyStats.collect(String.valueOf(firstRawValue));
     }
+    stringKeyStats.collect(String.valueOf(value));
+    return stringKeyStats;
+  }
+
+  private StringColumnPreIndexStatsCollector createStringKeyStatsCollector(String key) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(key).build();
+    Schema keySchema = new Schema.SchemaBuilder().setSchemaName(key)
+        .addField(new DimensionFieldSpec(key, FieldSpec.DataType.STRING, false)).build();
+    StatsCollectorConfig config = new StatsCollectorConfig(tableConfig, keySchema, null);
+    return new StringColumnPreIndexStatsCollector(key, config);
   }
 
   /**
