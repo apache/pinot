@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -37,10 +38,14 @@ public class HardLimitExecutorTest {
   @Test
   public void testHardLimit()
       throws Exception {
-    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool());
+    AtomicInteger rejectionCount = new AtomicInteger(0);
+    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(),
+        QueryThreadExceedStrategy.ERROR, rejectionCount::incrementAndGet);
     CyclicBarrier barrier = new CyclicBarrier(2);
 
     try {
+      assertEquals(rejectionCount.get(), 0);
+
       ex.execute(() -> {
         try {
           barrier.await();
@@ -60,6 +65,9 @@ public class HardLimitExecutorTest {
         // as expected
         assertEquals(e.getMessage(), "Tasks limit exceeded.");
       }
+
+      // Verify rejection counter was incremented
+      assertEquals(rejectionCount.get(), 1);
     } finally {
       ex.shutdownNow();
     }
@@ -68,7 +76,9 @@ public class HardLimitExecutorTest {
   @Test
   public void testHardLimitLogExceedStrategy()
       throws Exception {
-    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(), QueryThreadExceedStrategy.LOG);
+    AtomicInteger rejectionCount = new AtomicInteger(0);
+    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(), QueryThreadExceedStrategy.LOG,
+        rejectionCount::incrementAndGet);
     CyclicBarrier barrier = new CyclicBarrier(2);
 
     try {
@@ -86,6 +96,9 @@ public class HardLimitExecutorTest {
       ex.execute(() -> {
         // do nothing, we just don't want it to throw an exception
       });
+
+      // Verify rejection counter was NOT incremented (LOG mode doesn't reject tasks)
+      assertEquals(rejectionCount.get(), 0);
     } finally {
       ex.shutdownNow();
     }
@@ -126,5 +139,60 @@ public class HardLimitExecutorTest {
     Map<String, Object> configMap5 = new HashMap<>();
     PinotConfiguration config5 = new PinotConfiguration(configMap5);
     assertEquals(HardLimitExecutor.getMultiStageExecutorHardLimit(config5), -1);
+  }
+
+  @Test
+  public void testMetricsTracking()
+      throws Exception {
+    AtomicInteger rejectionCount = new AtomicInteger(0);
+
+    HardLimitExecutor ex = new HardLimitExecutor(2, Executors.newCachedThreadPool(),
+        QueryThreadExceedStrategy.ERROR,
+        rejectionCount::incrementAndGet);
+
+    CyclicBarrier barrier = new CyclicBarrier(3);
+
+    try {
+      assertEquals(ex.getCurrentThreadUsage(), 0);
+      assertEquals(rejectionCount.get(), 0);
+
+      ex.execute(() -> {
+        try {
+          barrier.await();
+          Thread.sleep(Long.MAX_VALUE);
+        } catch (InterruptedException | BrokenBarrierException e) {
+          // do nothing
+        }
+      });
+
+      ex.execute(() -> {
+        try {
+          barrier.await();
+          Thread.sleep(Long.MAX_VALUE);
+        } catch (InterruptedException | BrokenBarrierException e) {
+          // do nothing
+        }
+      });
+
+      barrier.await();
+
+      assertEquals(ex.getCurrentThreadUsage(), 2);
+      assertEquals(rejectionCount.get(), 0);
+
+      // Try to submit a third task, should be rejected
+      try {
+        ex.execute(() -> {
+          // do nothing
+        });
+        fail("Should have rejected the third task");
+      } catch (IllegalStateException e) {
+        assertEquals(e.getMessage(), "Tasks limit exceeded.");
+      }
+
+      // Verify rejection counter was incremented
+      assertEquals(rejectionCount.get(), 1);
+    } finally {
+      ex.shutdownNow();
+    }
   }
 }
