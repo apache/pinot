@@ -162,12 +162,12 @@ public abstract class QueryScheduler {
 
       // TODO: Perform this check sooner during the serialization of DataTable.
       Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
-      Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
-      if (maxResponseSizeBytes != null && responseBytes != null) {
+      if (responseBytes != null) {
         int responseSizeBytes = responseBytes.length;
         String tableNameWithType = queryRequest.getTableNameWithType();
         _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_RESPONSE_SIZE, responseSizeBytes);
-        if (responseSizeBytes > maxResponseSizeBytes) {
+        Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
+        if (maxResponseSizeBytes != null && responseSizeBytes > maxResponseSizeBytes) {
           String errMsg =
               "Serialized query response size " + responseSizeBytes + " exceeds threshold " + maxResponseSizeBytes
                   + " for requestId " + requestId + " from broker " + queryRequest.getBrokerId();
