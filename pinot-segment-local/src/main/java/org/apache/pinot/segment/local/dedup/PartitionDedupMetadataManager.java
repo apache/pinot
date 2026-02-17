@@ -90,6 +90,14 @@ public interface PartitionDedupMetadataManager extends Closeable {
   }
 
   /**
+   * Starts the metadata manager. This should be called after the manager is constructed and before it is used.
+   * Default implementation is a no-op for backward compatibility.
+   */
+  default void start() {
+    // No-op by default
+  }
+
+  /**
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
    */
   void stop();
