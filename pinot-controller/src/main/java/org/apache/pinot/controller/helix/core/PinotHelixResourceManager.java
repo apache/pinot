@@ -2840,6 +2840,11 @@ public class PinotHelixResourceManager {
 
   public Map<String, Pair<Integer, String>> reloadSegments(String tableNameWithType, boolean forceDownload,
       Map<String, List<String>> instanceToSegmentsMap) {
+    return reloadSegments(tableNameWithType, forceDownload, instanceToSegmentsMap, null);
+  }
+
+  public Map<String, Pair<Integer, String>> reloadSegments(String tableNameWithType, boolean forceDownload,
+      Map<String, List<String>> instanceToSegmentsMap, @Nullable String reloadJobId) {
     LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and instanceToSegmentsMap: {}",
         tableNameWithType, forceDownload, instanceToSegmentsMap);
 
@@ -2847,7 +2852,8 @@ public class PinotHelixResourceManager {
     Map<String, Pair<Integer, String>> instanceMsgInfoMap = new HashMap<>();
     for (Map.Entry<String, List<String>> entry : instanceToSegmentsMap.entrySet()) {
       String targetInstance = entry.getKey();
-      SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload);
+      SegmentReloadMessage message =
+          new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload, reloadJobId);
       int numMessagesSent =
           MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
       if (numMessagesSent > 0) {

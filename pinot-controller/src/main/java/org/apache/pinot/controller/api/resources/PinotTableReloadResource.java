@@ -62,7 +62,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *     POST requests:
  *     <ul>
  *       <li>"/segments/{tableName}/{segmentName}/reload": reload a specific segment</li>
- *       <li>"/segments/{tableName}/reload": reload all segments in a table</li>
+ *       <li>"/segments/{tableName}/reload": reload all segments in a table (optionally within a time range)</li>
  *     </ul>
  *   </li>
  *   <li>
@@ -128,7 +128,10 @@ public class PinotTableReloadResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload all segments in a table",
-      notes = "Reloads all segments for the specified table. Supports filtering by type, instance, or custom mapping.")
+      notes = "Reloads all segments for the specified table. Supports filtering by type, instance, "
+          + "custom mapping, or time range. Time range params are in milliseconds and the range is "
+          + "[startTimestamp, endTimestamp). When using time range params, do not specify targetInstance or "
+          + "instanceToSegmentsMap.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Reload jobs submitted successfully"),
       @ApiResponse(code = 404, message = "No segments found")
@@ -140,13 +143,19 @@ public class PinotTableReloadResource {
       String tableTypeStr,
       @ApiParam(value = "Force server to re-download segments from deep store", defaultValue = "false")
       @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Start timestamp (inclusive) in milliseconds")
+      @QueryParam("startTimestamp") String startTimestampStr,
+      @ApiParam(value = "End timestamp (exclusive) in milliseconds")
+      @QueryParam("endTimestamp") String endTimestampStr,
+      @ApiParam(value = "Whether to exclude segments overlapping the time range", defaultValue = "false")
+      @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping,
       @ApiParam(value = "Target specific server instance") @QueryParam("targetInstance") @Nullable
       String targetInstance,
       @ApiParam(value = "JSON map of instance to segment lists (overrides targetInstance)")
       @QueryParam("instanceToSegmentsMap") @Nullable String instanceToSegmentsMapInJson, @Context HttpHeaders headers)
       throws IOException {
     return _service.reloadAllSegments(tableName, tableTypeStr, forceDownload, targetInstance,
-        instanceToSegmentsMapInJson, headers);
+        instanceToSegmentsMapInJson, startTimestampStr, endTimestampStr, excludeOverlapping, headers);
   }
 
   @GET
