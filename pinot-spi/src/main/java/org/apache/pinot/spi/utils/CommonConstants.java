@@ -783,6 +783,15 @@ public class CommonConstants {
         public static final String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
         public static final String JOIN_OVERFLOW_MODE = "joinOverflowMode";
 
+        // Early terminate DISTINCT queries based on wall-clock execution time on server
+        public static final String MAX_EXECUTION_TIME_MS_IN_DISTINCT = "maxExecutionTimeMsInDistinct";
+
+        // Handle DISTINCT early termination
+        // Early terminate after scanning this many rows, regardless of whether the DISTINCT limit is satisfied.
+        public static final String MAX_ROWS_IN_DISTINCT = "maxRowsInDistinct";
+        // Early terminate after seeing no new distinct keys for this many scanned rows.
+        public static final String NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT = "numRowsWithoutChangeInDistinct";
+
         // Handle WINDOW Overflow
         public static final String MAX_ROWS_IN_WINDOW = "maxRowsInWindow";
         public static final String WINDOW_OVERFLOW_MODE = "windowOverflowMode";
