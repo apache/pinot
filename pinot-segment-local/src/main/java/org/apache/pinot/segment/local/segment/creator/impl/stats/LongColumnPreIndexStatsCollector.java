@@ -110,6 +110,10 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
     return _sealed ? _sortedValues.length : _values.size();
   }
 
+  long[] getValues() {
+    return _values.toLongArray();
+  }
+
   @Override
   public void seal() {
     if (!_sealed) {
