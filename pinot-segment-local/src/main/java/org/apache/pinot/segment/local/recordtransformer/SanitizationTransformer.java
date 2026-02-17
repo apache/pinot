@@ -132,7 +132,7 @@ public class SanitizationTransformer implements RecordTransformer {
         case TRIM_LENGTH:
           return Pair.of(sanitizedValue, true);
         case SUBSTITUTE_DEFAULT_VALUE:
-          return Pair.of(FieldSpec.getStringValue(sanitizedColumnInfo.getDefaultNullValue()), true);
+          return Pair.of((String) sanitizedColumnInfo.getDefaultNullValue(), true);
         case ERROR:
           index = value.indexOf(NULL_CHARACTER);
           if (index < 0) {

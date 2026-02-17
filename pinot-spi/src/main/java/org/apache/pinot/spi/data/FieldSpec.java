@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -336,19 +337,24 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return getStringValue(_defaultNullValue);
   }
 
-  /**
-   * Helper method to return the String value for the given object.
-   * This is required as not all data types have a toString() (e.g. byte[]).
-   *
-   * @param value Value for which String value needs to be returned
-   * @return String value for the object.
-   */
+  /// Returns the [String] representation of the given object.
+  /// The input value could be:
+  /// - Default null value deserialized from JSON [Schema]
+  /// - Default null value stored in [FieldSpec]
+  /// - Value from the records (post transform)
   public static String getStringValue(Object value) {
     if (value instanceof BigDecimal) {
       return ((BigDecimal) value).toPlainString();
     }
     if (value instanceof byte[]) {
       return BytesUtils.toHexString((byte[]) value);
+    }
+    if (value instanceof List || value instanceof Map) {
+      try {
+        return JsonUtils.objectToString(value);
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception serializing value: " + value, e);
+      }
     }
     return value.toString();
   }
@@ -535,10 +541,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
         case MAP:
-          jsonNode.put(key, JsonUtils.objectToJsonNode(_defaultNullValue));
-          break;
         case LIST:
-          jsonNode.put(key, JsonUtils.objectToJsonNode(_defaultNullValue));
+          try {
+            jsonNode.put(key, JsonUtils.objectToString(_defaultNullValue));
+          } catch (Exception e) {
+            throw new RuntimeException("Caught exception serializing default null value: " + _defaultNullValue, e);
+          }
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + this);
@@ -568,7 +576,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && Objects.equals(_maxLength, that._maxLength)
         && Objects.equals(_maxLengthExceedStrategy, that._maxLengthExceedStrategy)
         && _allowTrailingZeros == that._allowTrailingZeros
-        && getStringValue(_defaultNullValue).equals(getStringValue(that._defaultNullValue))
+        && _dataType.equals(_defaultNullValue, that._defaultNullValue)
         && Objects.equals(_transformFunction, that._transformFunction)
         && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider);
   }
@@ -576,7 +584,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   @Override
   public int hashCode() {
     return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
-        _allowTrailingZeros, getStringValue(_defaultNullValue), _transformFunction, _virtualColumnProvider);
+        _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider);
   }
 
   /**
@@ -718,6 +726,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       } catch (Exception e) {
         throw new IllegalArgumentException("Cannot convert value: '" + value + "' to type: " + this);
       }
+    }
+
+    public boolean equals(Object value1, Object value2) {
+      return this == BYTES ? Arrays.equals((byte[]) value1, (byte[]) value2) : value1.equals(value2);
+    }
+
+    public int hashCode(Object value) {
+      return this == BYTES ? Arrays.hashCode((byte[]) value) : value.hashCode();
     }
 
     /**
