@@ -367,7 +367,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     String column = spec.getName();
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
+    // Infer dictionary existence based on index
+    boolean dictionaryRequired = DictionaryIndexConfig.isDictionaryRequired(spec, fieldIndexConfigs);
     if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
+      if (dictionaryRequired) {
+        LOGGER.warn("Found indexes {} require dictionary, but dictionary is disabled explicitly.",
+            DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(spec, fieldIndexConfigs));
+      }
       return false;
     }
 

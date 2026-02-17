@@ -22,7 +22,6 @@ package org.apache.pinot.segment.local.segment.index.forward;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -41,6 +40,7 @@ import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexUtil;
@@ -167,6 +167,16 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   @Override
+  protected ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
+    // Forward index configs can be specified via indexes.* or legacy field config properties; allow fallback so both
+    // styles can coexist across columns without treating them as mutually exclusive.
+    ColumnConfigDeserializer<ForwardIndexConfig> fromIndexes =
+        IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
+    ColumnConfigDeserializer<ForwardIndexConfig> legacy = createDeserializerForLegacyConfigs();
+    return legacy != null ? fromIndexes.withFallbackAlternative(legacy) : fromIndexes;
+  }
+
+  @Override
   protected ColumnConfigDeserializer<ForwardIndexConfig> createDeserializerForLegacyConfigs() {
     // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
     return (tableConfig, schema) -> {
@@ -235,19 +245,22 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     return ForwardIndexReaderFactory.getInstance();
   }
 
-  public String getFileExtension(ColumnMetadata columnMetadata) {
+  /**
+   * Returns forward index file extensions applicable to the column.
+   */
+  public List<String> getFileExtension(ColumnMetadata columnMetadata) {
     if (columnMetadata.isSingleValue()) {
       if (!columnMetadata.hasDictionary()) {
-        return V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
+        return List.of(V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
       } else if (columnMetadata.isSorted()) {
-        return V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+        return List.of(V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       } else {
-        return V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+        return List.of(V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
     } else if (!columnMetadata.hasDictionary()) {
-      return V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
+      return List.of(V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     } else {
-      return V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
+      return List.of(V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
     }
   }
 
@@ -256,7 +269,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     if (columnMetadata == null) {
       return EXTENSIONS;
     }
-    return Collections.singletonList(getFileExtension(columnMetadata));
+    return getFileExtension(columnMetadata);
   }
 
   @Nullable

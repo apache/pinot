@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -129,7 +130,8 @@ public class DictionaryIndexType
             (accum, column) -> accum.put(column, DictionaryIndexConfig.DISABLED));
     ColumnConfigDeserializer<DictionaryIndexConfig> fromFieldConfigs =
         IndexConfigDeserializer.fromCollection(TableConfig::getFieldConfigList, (accum, fieldConfig) -> {
-          if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
+          if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
+              && !hasExplicitDictionaryConfig(fieldConfig)) {
             accum.put(fieldConfig.getName(), DictionaryIndexConfig.DISABLED);
           }
         });
@@ -152,6 +154,11 @@ public class DictionaryIndexType
     return fromNoDictionaryConfigs.withFallbackAlternative(fromNoDictionaryColumns)
         .withFallbackAlternative(fromFieldConfigs)
         .withFallbackAlternative(fromIndexingConfig);
+  }
+
+  private static boolean hasExplicitDictionaryConfig(FieldConfig fieldConfig) {
+    JsonNode indexes = fieldConfig.getIndexes();
+    return indexes != null && indexes.isObject() && indexes.has(StandardIndexes.DICTIONARY_ID);
   }
 
   @Override

@@ -135,6 +135,11 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
   }
 
   @Override
+  public void add(Object cellValue, int dictId) {
+    putString((String) cellValue);
+  }
+
+  @Override
   public boolean isSingleValue() {
     return true;
   }
@@ -256,7 +261,8 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
     _dataFile.truncate(totalSize);
   }
 
-  private void copyFileIntoBuffer(File file) throws IOException {
+  private void copyFileIntoBuffer(File file)
+      throws IOException {
     try (FileChannel from = (FileChannel.open(file.toPath(), StandardOpenOption.READ))) {
       _fileBuffer.put(from.map(FileChannel.MapMode.READ_ONLY, 0, file.length()));
     }
