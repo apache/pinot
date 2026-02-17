@@ -405,6 +405,11 @@ public class CommonConstants {
         Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
     // Same logic as CombineOperatorUtils
 
+    // Config for number of threads to use for system table query execution on the broker.
+    public static final String CONFIG_OF_SYSTEM_TABLE_EXECUTOR_POOL_SIZE =
+        "pinot.broker.systemtable.executor.pool.size";
+    public static final int DEFAULT_SYSTEM_TABLE_EXECUTOR_POOL_SIZE = 2;
+
     // Config for Jersey ThreadPoolExecutorProvider.
     // By default, Jersey uses the default unbounded thread pool to process queries.
     // By enabling it, BrokerManagedAsyncExecutorProvider will be used to create a bounded thread pool.
