@@ -199,6 +199,28 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch").toString(), "437222.2222222222");
   }
 
+  @Test
+  public void testImplicitMapTransformDoesNotOverrideExistingValuesWhenSourceMissing() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("mapDim1__KEYS", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mapDim1__VALUES", FieldSpec.DataType.INT)
+        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testImplicitMapTransformExisting").build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("mapDim1__KEYS", new String[]{"k1", "k2"});
+    row.putValue("mapDim1__VALUES", new Integer[]{1, 2});
+
+    expressionTransformer.transform(row);
+
+    Assert.assertEquals((Object[]) row.getValue("mapDim1__KEYS"), new Object[]{"k1", "k2"});
+    Assert.assertEquals((Object[]) row.getValue("mapDim1__VALUES"), new Object[]{1, 2});
+    Assert.assertFalse(row.isNullValue("mapDim1__KEYS"));
+    Assert.assertFalse(row.isNullValue("mapDim1__VALUES"));
+  }
+
   /**
    * If destination field already exists in the row, do not execute transform function
    */
@@ -267,6 +289,45 @@ public class ExpressionTransformerTest {
     Object transformedValue = genericRow.getValue("bids");
     Assert.assertTrue(transformedValue.getClass().isArray());
     Assert.assertEquals(Arrays.asList((Object[]) transformedValue), Arrays.asList(1, 2, 3));
+  }
+
+  @Test
+  public void testNullTransformMarksNullField() {
+    Schema schema =
+        new Schema.SchemaBuilder().addSingleValueDimension("fullName", FieldSpec.DataType.STRING).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("fullName", "Groovy({null})")));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testNullTransform").setIngestionConfig(ingestionConfig)
+            .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    expressionTransformer.transform(row);
+
+    Assert.assertNull(row.getValue("fullName"));
+    Assert.assertTrue(row.isNullValue("fullName"));
+    Assert.assertFalse(row.getFieldToValueMap().containsKey("fullName"));
+  }
+
+  @Test
+  public void testNullTransformMarksNullFieldWhenValueAlreadyExists() {
+    Schema schema =
+        new Schema.SchemaBuilder().addMultiValueDimension("tags", FieldSpec.DataType.STRING).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("tags", "Groovy({null})")));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testNullTransformExisting")
+            .setIngestionConfig(ingestionConfig).build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("tags", new String[]{"foo", "bar"});
+    expressionTransformer.transform(row);
+
+    Assert.assertNull(row.getValue("tags"));
+    Assert.assertTrue(row.isNullValue("tags"));
+    Assert.assertFalse(row.getFieldToValueMap().containsKey("tags"));
   }
 
   @Test
