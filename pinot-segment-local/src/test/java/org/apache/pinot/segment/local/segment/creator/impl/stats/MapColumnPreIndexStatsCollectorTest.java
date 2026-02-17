@@ -351,6 +351,29 @@ public class MapColumnPreIndexStatsCollectorTest {
     assertEquals(sObj.getMaxValue(), "{\"k1\":\"v1\",\"k2\":\"v2\"}");
   }
 
+  @Test
+  public void testNumericKeyTypePromotedToStringForMixedValues() {
+    Map<String, Object> r1 = new HashMap<>();
+    r1.put("traceId", 9876543210L);
+
+    Map<String, Object> r2 = new HashMap<>();
+    r2.put("traceId", "c69b6613-e174-49f1-ac47-4e9ab98e513f");
+
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+    col.collect(r1);
+    col.collect(r2);
+    col.seal();
+
+    AbstractColumnStatisticsCollector keyStats = col.getKeyStatistics("traceId");
+    assertNotNull(keyStats);
+    assertTrue(keyStats instanceof StringColumnPreIndexStatsCollector);
+    assertEquals(keyStats.getCardinality(), 2);
+    assertEquals(keyStats.getMinValue(), "9876543210");
+    assertEquals(keyStats.getMaxValue(), "c69b6613-e174-49f1-ac47-4e9ab98e513f");
+    assertEquals(keyStats.getTotalNumberOfEntries(), 2);
+  }
+
   @Test(expectedExceptions = UnsupportedOperationException.class)
   public void testUnsupportedEntryTypeThrows() {
     StatsCollectorConfig cfg = newConfig(false);
