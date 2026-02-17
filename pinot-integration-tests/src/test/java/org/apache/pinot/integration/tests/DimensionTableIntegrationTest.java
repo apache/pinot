@@ -161,7 +161,7 @@ public class DimensionTableIntegrationTest extends BaseClusterIntegrationTest {
   public TableConfig createOfflineTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(getTableName())
-        .setDimensionTableConfig(new DimensionTableConfig(false, false))
+        .setDimensionTableConfig(new DimensionTableConfig(false, false, false))
         .setIsDimTable(true)
         .build();
   }
