@@ -54,4 +54,9 @@ public class MinValueAggregator implements ValueAggregator {
     }
     return result;
   }
+
+  @Override
+  public String getValueType() {
+    return "min";
+  }
 }

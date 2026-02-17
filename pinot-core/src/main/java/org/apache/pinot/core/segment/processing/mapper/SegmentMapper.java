@@ -107,7 +107,7 @@ public class SegmentMapper {
 
     TableConfig tableConfig = processorConfig.getTableConfig();
     Schema schema = processorConfig.getSchema();
-    Pair<List<FieldSpec>, Integer> pair = SegmentProcessorUtils.getFieldSpecs(schema, processorConfig.getMergeType(),
+    Pair<List<FieldSpec>, Integer> pair = SegmentProcessorUtils.getFieldSpecs(schema, processorConfig,
         tableConfig.getIndexingConfig().getSortedColumn());
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();

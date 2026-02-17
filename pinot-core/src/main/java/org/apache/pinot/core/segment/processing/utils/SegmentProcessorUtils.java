@@ -23,10 +23,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
+import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
@@ -92,6 +95,80 @@ public final class SegmentProcessorUtils {
       default:
         throw new IllegalStateException("Unsupported merge type: " + mergeType);
     }
+
+    return new ImmutablePair<>(fieldSpecs, numSortFields);
+  }
+
+  public static Pair<List<FieldSpec>, Integer> getFieldSpecs(Schema schema, SegmentProcessorConfig processorConfig,
+      @Nullable List<String> sortOrder) {
+    if (sortOrder == null) {
+      sortOrder = Collections.emptyList();
+    }
+
+    MergeType mergeType = processorConfig.getMergeType();
+    if (mergeType != MergeType.MV_ROLLUP) {
+      return getFieldSpecs(schema, mergeType, sortOrder);
+    }
+
+    String timeColumn = TimeHandlerFactory.getTimeHandler(processorConfig).getTimeColumn();
+
+    List<String> excludedColumnList = new ArrayList<>();
+    Set<String> selectedDimensionList = processorConfig.getMaterializedViewProcessorConfig().getSelectedDimensions();
+    excludedColumnList.addAll(selectedDimensionList);
+
+    List<FieldSpec> fieldSpecs = new ArrayList<>();
+
+    for (String sortColumn : sortOrder) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(sortColumn);
+      Preconditions.checkArgument(fieldSpec != null, "Failed to find sort column: %s", sortColumn);
+      Preconditions.checkArgument(fieldSpec.isSingleValueField(), "Cannot sort on MV column: %s", sortColumn);
+      Preconditions.checkArgument(!fieldSpec.isVirtualColumn(), "Cannot sort on virtual column: %s", sortColumn);
+      Preconditions.checkArgument(
+          fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC || mergeType != MergeType.ROLLUP,
+          "For ROLLUP, cannot sort on metric column: %s", sortColumn);
+      fieldSpecs.add(fieldSpec);
+    }
+
+    List<FieldSpec> selectDimensionFieldSpecs = new ArrayList<>();
+    for (String selectDimensionColumn : selectedDimensionList) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(selectDimensionColumn);
+      selectDimensionFieldSpecs.add(fieldSpec);
+    }
+    fieldSpecs.addAll(selectDimensionFieldSpecs);
+
+    FieldSpec timeFieldSpec = schema.getFieldSpecFor(timeColumn);
+    fieldSpecs.add(timeFieldSpec);
+
+    List<FieldSpec> metricFieldSpecs = new ArrayList<>();
+    List<FieldSpec> nonMetricFieldSpecs = new ArrayList<>();
+    List<FieldSpec> otherDatetimeFieldSpecs = new ArrayList<>();
+
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      String name = fieldSpec.getName();
+      if (!fieldSpec.isVirtualColumn()
+          && !sortOrder.contains(name)
+          && !excludedColumnList.contains(name)
+          && !name.equals(timeColumn)) { // 关键：把 timeColumn 从后续列表里剔除，避免重复 & 保证位置
+
+        if (fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
+          metricFieldSpecs.add(fieldSpec);
+        } else if (fieldSpec.getFieldType() == FieldSpec.FieldType.DATE_TIME) {
+          otherDatetimeFieldSpecs.add(fieldSpec);
+        } else {
+          nonMetricFieldSpecs.add(fieldSpec);
+        }
+      }
+    }
+
+    fieldSpecs.addAll(otherDatetimeFieldSpecs);
+
+    nonMetricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
+    metricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
+
+    fieldSpecs.addAll(nonMetricFieldSpecs);
+    fieldSpecs.addAll(metricFieldSpecs);
+
+    int numSortFields = sortOrder.size() + selectedDimensionList.size() + 1;
 
     return new ImmutablePair<>(fieldSpecs, numSortFields);
   }
