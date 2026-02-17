@@ -20,8 +20,6 @@
 package org.apache.pinot.core.transport;
 
 import java.lang.reflect.Constructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /// Represents an instance of Netty, allowing access to certain static properties via reflection, with support for
 /// shaded Netty versions.
