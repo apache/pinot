@@ -29,6 +29,7 @@ import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,6 +42,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
@@ -53,6 +57,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.segment.local.constants.SegmentUploadConstants;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
@@ -65,6 +70,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -78,6 +84,35 @@ public class SegmentPushUtils implements Serializable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPushUtils.class);
   private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
+
+  static FileUploadDownloadClient getFileUploadDownloadClient(TlsSpec tlsSpec) {
+    if (tlsSpec == null) {
+      return FILE_UPLOAD_DOWNLOAD_CLIENT;
+    }
+    return new FileUploadDownloadClient(buildSSLContext(tlsSpec));
+  }
+
+  private static SSLContext buildSSLContext(TlsSpec tlsSpec) {
+    try {
+      KeyManager[] keyManagers = null;
+      if (tlsSpec.getKeyStorePath() != null) {
+        keyManagers = TlsUtils.createKeyManagerFactory(
+            tlsSpec.getKeyStorePath(), tlsSpec.getKeyStorePassword(), tlsSpec.getKeyStoreType())
+            .getKeyManagers();
+      }
+      TrustManager[] trustManagers = null;
+      if (tlsSpec.getTrustStorePath() != null) {
+        trustManagers = TlsUtils.createTrustManagerFactory(
+            tlsSpec.getTrustStorePath(), tlsSpec.getTrustStorePassword(), tlsSpec.getTrustStoreType())
+            .getTrustManagers();
+      }
+      SSLContext sslContext = SSLContext.getInstance("TLS");
+      sslContext.init(keyManagers, trustManagers, null);
+      return sslContext;
+    } catch (GeneralSecurityException e) {
+      throw new IllegalStateException("Failed to build SSLContext from TlsSpec", e);
+    }
+  }
 
   public static URI generateSegmentTarURI(URI dirURI, URI fileURI, String prefix, String suffix) {
     if (StringUtils.isEmpty(prefix) && StringUtils.isEmpty(suffix)) {
@@ -158,6 +193,7 @@ public class SegmentPushUtils implements Serializable {
   public static void pushSegments(SegmentGenerationJobSpec spec, PinotFS fileSystem, List<String> tarFilePaths,
       List<Header> headers, List<NameValuePair> parameters)
       throws RetriableOperationException, AttemptsExceededException {
+    FileUploadDownloadClient fileUploadDownloadClient = getFileUploadDownloadClient(spec.getTlsSpec());
     String tableName = spec.getTableSpec().getTableName();
     TableType tableType = tableName.endsWith("_" + TableType.REALTIME.name()) ? TableType.REALTIME : TableType.OFFLINE;
     boolean cleanUpOutputDir = spec.isCleanUpOutputDir();
@@ -189,7 +225,7 @@ public class SegmentPushUtils implements Serializable {
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
           try (InputStream inputStream = fileSystem.open(tarFileURI)) {
             SimpleHttpResponse response =
-                FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegment(FileUploadDownloadClient.getUploadSegmentURI(controllerURI),
+                fileUploadDownloadClient.uploadSegment(FileUploadDownloadClient.getUploadSegmentURI(controllerURI),
                     segmentName, inputStream, headers,
                     parameters, tableName, tableType);
             LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
@@ -221,6 +257,7 @@ public class SegmentPushUtils implements Serializable {
   public static void sendSegmentUris(SegmentGenerationJobSpec spec, List<String> segmentUris,
       List<Header> headers, List<NameValuePair> parameters)
       throws RetriableOperationException, AttemptsExceededException {
+    FileUploadDownloadClient fileUploadDownloadClient = getFileUploadDownloadClient(spec.getTlsSpec());
     String tableName = spec.getTableSpec().getTableName();
     LOGGER.info("Start sending table {} segment URIs: {} to locations: {}", tableName,
         Arrays.toString(segmentUris.subList(0, Math.min(5, segmentUris.size())).toArray()),
@@ -246,7 +283,7 @@ public class SegmentPushUtils implements Serializable {
         }
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
           try {
-            SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
+            SimpleHttpResponse response = fileUploadDownloadClient
                 .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentUri,
                     headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
             LOGGER.info("Response for pushing table {} segment uri {} to location {} - {}: {}", tableName, segmentUri,
@@ -292,6 +329,7 @@ public class SegmentPushUtils implements Serializable {
   public static void sendSegmentUriAndMetadata(SegmentGenerationJobSpec spec, PinotFS fileSystem,
       Map<String, String> segmentUriToTarPathMap, List<Header> headers, List<NameValuePair> parameters)
       throws Exception {
+    FileUploadDownloadClient fileUploadDownloadClient = getFileUploadDownloadClient(spec.getTlsSpec());
     String tableName = spec.getTableSpec().getTableName();
     LOGGER.info("Start pushing segment metadata: {} to locations: {} for table {}", segmentUriToTarPathMap,
         Arrays.toString(spec.getPinotClusterSpecs()), tableName);
@@ -347,7 +385,7 @@ public class SegmentPushUtils implements Serializable {
                     String.valueOf(spec.getPushJobSpec().getCopyToDeepStoreForMetadataPush())));
               }
 
-              SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegmentMetadata(
+              SimpleHttpResponse response = fileUploadDownloadClient.uploadSegmentMetadata(
                   FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName,
                   segmentMetadataFile, reqHttpHeaders, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
               LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
@@ -378,6 +416,7 @@ public class SegmentPushUtils implements Serializable {
   public static void sendSegmentsUriAndMetadata(SegmentGenerationJobSpec spec, PinotFS fileSystem,
       Map<String, String> segmentUriToTarPathMap, List<Header> headers, List<NameValuePair> parameters)
       throws Exception {
+    FileUploadDownloadClient fileUploadDownloadClient = getFileUploadDownloadClient(spec.getTlsSpec());
     String tableName = spec.getTableSpec().getTableName();
     ConcurrentHashMap<String, File> segmentMetadataFileMap = new ConcurrentHashMap<>();
     ConcurrentLinkedQueue<String> segmentURIs = new ConcurrentLinkedQueue<>();
@@ -419,7 +458,7 @@ public class SegmentPushUtils implements Serializable {
           try {
             addHeaders(spec, reqHttpHeaders);
             URI segmentUploadURI = getBatchSegmentUploadURI(controllerURI);
-            SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegmentMetadataFiles(segmentUploadURI,
+            SimpleHttpResponse response = fileUploadDownloadClient.uploadSegmentMetadataFiles(segmentUploadURI,
                 allSegmentsMetadataMap, reqHttpHeaders, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
             LOGGER.info("Response for pushing table {} segments {} to location {} - {}: {}", tableName,
                 segmentMetadataFileMap.keySet(), controllerURI, response.getStatusCode(), response.getResponse());
