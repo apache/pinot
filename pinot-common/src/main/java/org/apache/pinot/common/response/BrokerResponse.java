@@ -62,9 +62,11 @@ public interface BrokerResponse {
    */
   default String toMetadataJsonString()
       throws IOException {
-    ObjectNode objectNode = (ObjectNode) JsonUtils.objectToJsonNode(this);
-    objectNode.remove("resultTable");
-    return JsonUtils.objectToString(objectNode);
+    return JsonUtils.objectToString(toMetadataJsonNode());
+  }
+
+  default ObjectNode toMetadataJsonNode() {
+    return new EagerToLazyBrokerResponseAdaptor.EagerBrokerResponseToMetainfo(this).asJson();
   }
 
   /**
@@ -437,4 +439,8 @@ public interface BrokerResponse {
    * @return true if RLS filters were applied, false otherwise
    */
   boolean getRLSFiltersApplied();
+
+  default StreamingBrokerResponse toStreamingResponse() {
+    return new EagerToLazyBrokerResponseAdaptor(this);
+  }
 }

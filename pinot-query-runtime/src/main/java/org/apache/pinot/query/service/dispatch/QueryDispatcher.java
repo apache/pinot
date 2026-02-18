@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -44,6 +45,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -56,10 +58,14 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.response.EagerToLazyBrokerResponseAdaptor;
+import org.apache.pinot.common.response.StreamingBrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -76,6 +82,7 @@ import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
@@ -137,6 +144,29 @@ public class QueryDispatcher {
     _mailboxService.start();
   }
 
+  /// Submits a query to the server without waiting for the result.
+  /// Instead, it returns a streaming response.
+  ///
+  /// This method may fail fast if there are issues during query dispatching, but most _runtime_ query errors will be
+  /// lazily returned as metainformation when calling
+  /// [StreamingBrokerResponse#consumeData(StreamingBrokerResponse.DataConsumer)].
+  public DispatcherStreamingBrokerResponse submit(RequestContext context, DispatchableSubPlan dispatchableSubPlan,
+      long timeoutMs, Map<String, String> queryOptions
+  ) throws Exception {
+    long requestId = context.getRequestId();
+    Set<QueryServerInstance> servers = new HashSet<>();
+
+    try {
+      submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
+      return getStreamingQueryResult(dispatchableSubPlan, queryOptions, _mailboxService, this, servers);
+    } catch (Throwable e) {
+      cancel(requestId);
+      throw e;
+    } finally {
+      cleanupQueryServerTracking(requestId);
+    }
+  }
+
   /// Submits a query to the server and waits for the result.
   ///
   /// This method may throw almost any exception but QueryException or TimeoutException, which are caught and converted
@@ -146,6 +176,7 @@ public class QueryDispatcher {
       throws Exception {
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
+
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
       QueryResult result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
@@ -160,9 +191,14 @@ public class QueryDispatcher {
       cancel(requestId);
       throw e;
     } finally {
-      if (isQueryCancellationEnabled()) {
-        _serversByQuery.remove(requestId);
-      }
+      cleanupQueryServerTracking(requestId);
+    }
+  }
+
+  /// Removes query from server tracking if query cancellation is enabled.
+  private void cleanupQueryServerTracking(long requestId) {
+    if (isQueryCancellationEnabled()) {
+      _serversByQuery.remove(requestId);
     }
   }
 
@@ -451,6 +487,7 @@ public class QueryDispatcher {
     }
   }
 
+  /// Asynchronously cancels a request without waiting for the stats in the response.
   public boolean cancel(long requestId) {
     if (isQueryCancellationEnabled()) {
       return cancel(requestId, _serversByQuery.remove(requestId));
@@ -552,6 +589,87 @@ public class QueryDispatcher {
     brokerContext.setClientGrpcSslContext(built);
     return built;
   }
+
+  private static DispatcherStreamingBrokerResponse getStreamingQueryResult(DispatchableSubPlan subPlan,
+      Map<String, String> queryOptions, MailboxService mailboxService, @Nullable
+      QueryDispatcher queryDispatcher, @Nullable Set<QueryServerInstance> servers) {
+
+    // NOTE: Reduce stage is always stage 0
+    DispatchablePlanFragment stagePlan = subPlan.getQueryStageMap().get(0);
+    PlanFragment planFragment = stagePlan.getPlanFragment();
+    PlanNode rootNode = planFragment.getFragmentRoot();
+
+    DataSchema resultSchema = getResultSchema(rootNode, subPlan);
+
+    List<WorkerMetadata> workerMetadata = stagePlan.getWorkerMetadataList();
+    Preconditions.checkState(workerMetadata.size() == 1, "Expecting single worker for reduce stage, got: %s",
+        workerMetadata.size());
+
+    StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
+    OpChainExecutionContext opChainExecutionContext = OpChainExecutionContext.fromQueryContext(
+        mailboxService, queryOptions, stageMetadata, workerMetadata.get(0), null, true);
+
+    MultiStageOperator rootOp = PlanNodeToOpChain.convertToOperator(rootNode, opChainExecutionContext);
+
+    LazyBrokerResponse lazyBrokerResponse = new LazyBrokerResponse(resultSchema, rootOp);
+
+    return new DispatcherStreamingBrokerResponse(lazyBrokerResponse, rootOp, subPlan, queryDispatcher, servers);
+  }
+
+  public BrokerResponseNativeV2 submitAndReduceForTest(DispatchableSubPlan subPlan, Map<String, String> queryOptions)
+      throws InterruptedException {
+    return submitAndReduceForTest(subPlan, queryOptions, _mailboxService, this, null);
+  }
+
+  @VisibleForTesting
+  public static BrokerResponseNativeV2 submitAndReduceForTest(DispatchableSubPlan subPlan,
+      Map<String, String> queryOptions, MailboxService mailboxService) {
+    return submitAndReduceForTest(subPlan, queryOptions, mailboxService, null, null);
+  }
+
+  @VisibleForTesting
+  public static BrokerResponseNativeV2 submitAndReduceForTest(DispatchableSubPlan subPlan,
+      Map<String, String> queryOptions, MailboxService mailboxService,
+      @Nullable QueryDispatcher queryDispatcher, @Nullable Set<QueryServerInstance> servers) {
+    try (DispatcherStreamingBrokerResponse streamingQueryResult =
+        getStreamingQueryResult(subPlan, queryOptions, mailboxService, queryDispatcher, servers)) {
+      return streamingQueryResult.reduceForTests();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while executing query", e);
+    }
+  }
+
+  public static DataSchema getResultSchema(DispatchableSubPlan subPlan) {
+    DispatchablePlanFragment stagePlan = subPlan.getQueryStageMap().get(0);
+    PlanFragment planFragment = stagePlan.getPlanFragment();
+    PlanNode rootNode = planFragment.getFragmentRoot();
+    return getResultSchema(rootNode, subPlan);
+  }
+
+  private static DataSchema getResultSchema(PlanNode rootNode, DispatchableSubPlan subPlan) {
+    PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
+    DataSchema sourceSchema = rootNode.getDataSchema();
+    int numColumns = resultFields.size();
+    String[] columnNames = new String[numColumns];
+    ColumnDataType[] columnTypes = new ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      Map.Entry<Integer, String> field = resultFields.get(i);
+      columnNames[i] = field.getValue();
+      columnTypes[i] = sourceSchema.getColumnDataType(field.getKey());
+    }
+    return new DataSchema(columnNames, columnTypes);
+  }
+
+  public void shutdown() {
+    for (DispatchClient dispatchClient : _dispatchClientMap.values()) {
+      dispatchClient.getChannel().shutdown();
+    }
+    _dispatchClientMap.clear();
+    _mailboxService.shutdown();
+    _executorService.shutdown();
+  }
+
   /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
   /// [QueryThreadContext] must already be set up before calling this method.
   @VisibleForTesting
@@ -658,15 +776,22 @@ public class QueryDispatcher {
     return Integer.compare(errorCode1.getId(), errorCode2.getId());
   }
 
-  public void shutdown() {
-    for (DispatchClient dispatchClient : _dispatchClientMap.values()) {
-      dispatchClient.getChannel().shutdown();
+  /// Converts open MultiStageQueryStats into a closed list of stage stats.
+  private static List<MultiStageQueryStats.StageStats.Closed> closeQueryStats(MultiStageQueryStats openStats) {
+    Preconditions.checkArgument(openStats.getCurrentStageId() == 0, "Expecting query stats for stage 0, got: %s",
+        openStats.getCurrentStageId());
+    int numStages = openStats.getMaxStageId() + 1;
+    List<MultiStageQueryStats.StageStats.Closed> queryStats = new ArrayList<>(numStages);
+    queryStats.add(openStats.getCurrentStats().close());
+    for (int i = 1; i < numStages; i++) {
+      queryStats.add(openStats.getUpstreamStageStats(i));
     }
-    _dispatchClientMap.clear();
-    _mailboxService.shutdown();
-    _executorService.shutdown();
+    return queryStats;
   }
 
+  /// A class used to encapsulate the result of a query and any exception that occurred during processing.
+  ///
+  /// This should be removed once the streaming mode is the only mode supported.
   public static class QueryResult {
     @Nullable
     private final ResultTable _resultTable;
@@ -680,14 +805,7 @@ public class QueryDispatcher {
      */
     public QueryResult(ResultTable resultTable, MultiStageQueryStats queryStats, long brokerReduceTimeMs) {
       _resultTable = resultTable;
-      Preconditions.checkArgument(queryStats.getCurrentStageId() == 0, "Expecting query stats for stage 0, got: %s",
-          queryStats.getCurrentStageId());
-      int numStages = queryStats.getMaxStageId() + 1;
-      _queryStats = new ArrayList<>(numStages);
-      _queryStats.add(queryStats.getCurrentStats().close());
-      for (int i = 1; i < numStages; i++) {
-        _queryStats.add(queryStats.getUpstreamStageStats(i));
-      }
+      _queryStats = closeQueryStats(queryStats);
       _brokerReduceTimeMs = brokerReduceTimeMs;
       _processingException = null;
     }
@@ -702,14 +820,7 @@ public class QueryDispatcher {
       _processingException = processingException;
       _resultTable = null;
       _brokerReduceTimeMs = brokerReduceTimeMs;
-      Preconditions.checkArgument(queryStats.getCurrentStageId() == 0, "Expecting query stats for stage 0, got: %s",
-          queryStats.getCurrentStageId());
-      int numStages = queryStats.getMaxStageId() + 1;
-      _queryStats = new ArrayList<>(numStages);
-      _queryStats.add(queryStats.getCurrentStats().close());
-      for (int i = 1; i < numStages; i++) {
-        _queryStats.add(queryStats.getUpstreamStageStats(i));
-      }
+      _queryStats = closeQueryStats(queryStats);
     }
 
     @Nullable
@@ -734,5 +845,138 @@ public class QueryDispatcher {
   private interface SendRequest<R, E> {
     void send(DispatchClient dispatchClient, R request, QueryServerInstance serverInstance, Deadline deadline,
         Consumer<AsyncResponse<E>> callbackConsumer);
+  }
+
+  public static void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
+      List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan) {
+    try {
+      Map<Integer, DispatchablePlanFragment> queryStageMap = dispatchableSubPlan.getQueryStageMap();
+
+      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(queryStageMap, queryStats);
+      brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
+      for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
+        if (stageStats != null) { // for example pipeline breaker may not have stats
+          stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Error encountered while collecting multi-stage stats", e);
+      brokerResponse.setStageStats(JsonNodeFactory.instance.objectNode()
+          .put("error", "Error encountered while collecting multi-stage stats - " + e));
+    }
+  }
+
+  /// A StreamingBrokerResponse that also holds the query dispatcher and root operator to close them when done and
+  /// calculate the stats.
+  public static class DispatcherStreamingBrokerResponse
+      extends StreamingBrokerResponse.Delegator {
+    private final MultiStageOperator _rootOperator;
+    private final DispatchableSubPlan _dispatchableSubPlan;
+    /// The query dispatcher used to submit the query.
+    ///
+    /// If it is nullable, then the query won't be cancelled on error.
+    @Nullable
+    private final QueryDispatcher _dispatcher;
+    @Nullable
+    private final Set<QueryServerInstance> _servers;
+    private boolean _closed = false;
+
+    public DispatcherStreamingBrokerResponse(LazyBrokerResponse lazyBrokerResponse, MultiStageOperator rootOperator,
+        DispatchableSubPlan dispatchableSubPlan, @Nullable QueryDispatcher dispatcher,
+        @Nullable Set<QueryServerInstance> servers) {
+      super(lazyBrokerResponse);
+      _rootOperator = rootOperator;
+      _dispatchableSubPlan = dispatchableSubPlan;
+      _dispatcher = dispatcher;
+      _servers = servers;
+    }
+
+    @Override
+    public void close() {
+      if (!_closed) {
+        _closed = true;
+        super.close();
+        _rootOperator.close();
+        if (_dispatcher != null) {
+          _dispatcher.cancel(QueryThreadContext.get().getExecutionContext().getRequestId());
+        }
+      }
+    }
+
+    @Override
+    public EagerToLazyBrokerResponseAdaptor.EagerBrokerResponseToMetainfo consumeData(DataConsumer consumer)
+        throws InterruptedException {
+      // The reason why we allocate a new BrokerResponseNativeV2 here is to not break backward compatibility.
+      // Historically, we used MultiStageOperator.mergeInto(BrokerResponseNativeV2, StatMap) fills in the stats.
+      // That was a hack to keep using the old BrokerResponseNativeV2 while adding multi-stage stats.
+      // Following the StreamingBrokerResponse paradigm, we should modify mergeInto to decorate the Metainfo object
+      // but that change would break backward compatibility for any third party MultiStageOperator.
+      BrokerResponseNativeV2 oldResponse = new BrokerResponseNativeV2();
+      consume(consumer, oldResponse);
+
+      return new EagerToLazyBrokerResponseAdaptor.EagerBrokerResponseToMetainfo(oldResponse);
+    }
+
+    private void consume(DataConsumer consumer, BrokerResponseNativeV2 oldResponse)
+        throws InterruptedException {
+
+      long start = System.currentTimeMillis();
+      MultiStageQueryStats stats;
+      try {
+        Metainfo metainfo = _delegate.consumeData(consumer);
+        metainfo.getExceptions().forEach(oldResponse::addException);
+        stats = _rootOperator.calculateStats();
+      } catch (InterruptedException e) {
+        if (_dispatcher != null) {
+          // We cannot cancel with stats here because the current thread is already interrupted and we don't want to
+          // wait for the cancel responses.
+          _dispatcher.cancel(QueryThreadContext.get().getExecutionContext().getRequestId());
+        }
+        throw e;
+      } catch (RuntimeException e) {
+        String errorMsg = ExceptionUtils.consolidateExceptionMessages(e);
+        QueryErrorCode errorCode = e instanceof QueryException
+            ? ((QueryException) e).getErrorCode()
+            : QueryErrorCode.INTERNAL;
+        oldResponse.addException(new QueryProcessingException(errorCode, errorMsg));
+
+        if (_dispatcher != null) {
+          stats = _dispatcher.cancelWithStats(QueryThreadContext.get().getExecutionContext().getRequestId(), _servers);
+        } else {
+          stats = null;
+        }
+      }
+      long reduceTime = System.currentTimeMillis() - start;
+      if (stats != null) {
+        fillOldBrokerResponseStats(oldResponse, closeQueryStats(stats), _dispatchableSubPlan);
+      }
+      oldResponse.setBrokerReduceTimeMs(reduceTime);
+    }
+
+    private BrokerResponseNativeV2 reduceForTests()
+        throws InterruptedException {
+      BrokerResponseNativeV2 oldResponse = new BrokerResponseNativeV2();
+
+      ArrayList<Object[]> rows = new ArrayList<>();
+      DataSchema dataSchema = getDataSchema();
+      if (dataSchema != null) {
+        int width = dataSchema.size();
+        AtomicInteger blockCount = new AtomicInteger();
+        consume(data -> {
+          blockCount.incrementAndGet();
+          while (data.next()) {
+            Object[] row = new Object[width];
+            for (int colIdx = 0; colIdx < dataSchema.size(); colIdx++) {
+              row[colIdx] = data.get(colIdx);
+            }
+            rows.add(row);
+          }
+          LOGGER.warn("Reducing data block #{} with {} rows", blockCount.get(), data.getNumRows());
+        }, oldResponse);
+      }
+      oldResponse.setResultTable(new ResultTable(dataSchema, rows));
+
+      return oldResponse;
+    }
   }
 }
