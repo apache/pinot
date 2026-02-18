@@ -2930,7 +2930,7 @@
                 <!-- Solve NoClassDefFoundError. Borrowed from https://github.com/prometheus/jmx_exporter/issues/802 -->
                 <exclude>META-INF/versions/9/org/yaml/snakeyaml/internal/**</exclude>
 
-                <!-- Exclude NettyInstacne because it includes Netty package literals -->
+                <!-- Exclude NettyInstance because it includes Netty package literals -->
                 <exclude>src/main/java/org/apache/pinot/core/transport/NettyInstance.java</exclude>
               </excludes>
             </filter>
