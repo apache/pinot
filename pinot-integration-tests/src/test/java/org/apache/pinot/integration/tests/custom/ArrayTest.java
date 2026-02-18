@@ -54,6 +54,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   private static final String BOOLEAN_FROM_STRING_ARRAY_COLUMN = "booleanArrayColFromStringArray";
   private static final String LONG_ARRAY_COLUMN = "longArrayCol";
   private static final String DOUBLE_ARRAY_COLUMN = "doubleArrayCol";
+  private static final String STRING_ARRAY_COLUMN = "stringArrayCol";
 
   @Override
   protected long getCountStarResult() {
@@ -728,6 +729,63 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testEvalMvLongArrayFilterValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT evalMv(%s, '%s > 1') FROM %s LIMIT 1", LONG_ARRAY_COLUMN, LONG_ARRAY_COLUMN,
+        getTableName());
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "LONG_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    JsonNode values = row.get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).longValue(), 2L);
+    assertEquals(values.get(1).longValue(), 3L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testEvalMvLongArrayFilterPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT COUNT(*) FROM %s WHERE arrayLength(evalMv(%s, '%s > 1')) = 2",
+        getTableName(), LONG_ARRAY_COLUMN, LONG_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testEvalMvRegexpLikeFilterValues(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT evalMv(%s, 'REGEXP_LIKE(%s, ''^/api/.*'')') FROM %s LIMIT 1",
+        STRING_ARRAY_COLUMN, STRING_ARRAY_COLUMN, getTableName());
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "STRING_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    JsonNode values = row.get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).textValue(), "/api/v1");
+    assertEquals(values.get(1).textValue(), "/api/v2");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testEvalMvRegexpLikeFilterPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT COUNT(*) FROM %s WHERE arrayLength(evalMv(%s, 'REGEXP_LIKE(%s, ''^/api/.*'')')) = 2",
+        getTableName(), STRING_ARRAY_COLUMN, STRING_ARRAY_COLUMN);
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testStringArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -1099,6 +1157,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         .addMultiValueDimension(BOOLEAN_FROM_STRING_ARRAY_COLUMN, FieldSpec.DataType.BOOLEAN)
         .addMultiValueDimension(LONG_ARRAY_COLUMN, FieldSpec.DataType.LONG)
         .addMultiValueDimension(DOUBLE_ARRAY_COLUMN, FieldSpec.DataType.DOUBLE)
+        .addMultiValueDimension(STRING_ARRAY_COLUMN, FieldSpec.DataType.STRING)
         .build();
   }
 
@@ -1149,6 +1208,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             null, null),
         new org.apache.avro.Schema.Field(DOUBLE_ARRAY_COLUMN,
             org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE)),
+            null, null),
+        new org.apache.avro.Schema.Field(STRING_ARRAY_COLUMN,
+            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING)),
             null, null)
     ));
 
@@ -1177,6 +1239,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
                   record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, List.of("true", "true", "false", "false"));
                   record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
                   record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
+                  record.put(STRING_ARRAY_COLUMN, List.of("/api/v1", "/home", "/api/v2", "/metrics"));
                   return record;
                 }
             ));
