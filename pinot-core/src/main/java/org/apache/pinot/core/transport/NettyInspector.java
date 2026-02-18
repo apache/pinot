@@ -65,23 +65,6 @@ public class NettyInspector {
     }
   }
 
-  /// Logs the memory used by each known Netty instance as long as the max memory it can use.
-  /// It also logs the total memory used by all Netty instances and its max memory.
-  public static void logMemory() {
-    long totalUsedMemory = 0;
-    long totalMaxMemory = 0;
-    for (NettyInstance instance : KNOWN_INSTANCES) {
-      long usedMemory = instance.getUsedDirectMemory();
-      long maxMemory = instance.getMaxDirectMemory();
-      totalUsedMemory += usedMemory;
-      totalMaxMemory += maxMemory;
-      LOGGER.info("Netty instance '{}' is using {} of direct memory (max {}).", instance.getName(),
-          DataSizeUtils.fromBytes(usedMemory), DataSizeUtils.fromBytes(maxMemory));
-    }
-    LOGGER.info("Total direct memory used by all Netty instances: {} (max {}).",
-        DataSizeUtils.fromBytes(totalUsedMemory), DataSizeUtils.fromBytes(totalMaxMemory));
-  }
-
   /// Logs the values of all constants for all Netty instances, and logs warnings if any checks fail.
   public static void logAllChecks() {
     for (Map.Entry<NettyInstance, List<CheckResult>> entry : checkAllConstants().entrySet()) {
