@@ -44,7 +44,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "timeUsedMs", "requestId", "clientRequestId", "brokerId", "numDocsScanned",
+    "numGroupsWarningLimitReached", "timeUsedMs", "controllerExecutionTimeMs",
+    "requestId", "clientRequestId", "brokerId",
+    "numDocsScanned",
     "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
@@ -116,6 +118,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
+  private long _controllerExecutionTimeMs = -1L;
 
   public BrokerResponseNative() {
   }
@@ -598,5 +601,26 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public boolean getRLSFiltersApplied() {
     return _rlsFiltersApplied;
+  }
+
+  /**
+   * Get the controller execution time in milliseconds.
+   * Returns -1 if not set (when query doesn't go through controller).
+   * This field is only included in the JSON response when set (i.e., when queries go through the controller).
+   *
+   * @return controller execution time in milliseconds, or -1 if not applicable
+   */
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  public long getControllerExecutionTimeMs() {
+    return _controllerExecutionTimeMs;
+  }
+
+  /**
+   * Set the controller execution time in milliseconds.
+   *
+   * @param controllerExecutionTimeMs the execution time in milliseconds
+   */
+  public void setControllerExecutionTimeMs(long controllerExecutionTimeMs) {
+    _controllerExecutionTimeMs = controllerExecutionTimeMs;
   }
 }
