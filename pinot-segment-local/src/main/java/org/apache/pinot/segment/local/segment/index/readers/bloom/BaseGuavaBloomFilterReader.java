@@ -38,6 +38,7 @@ public abstract class BaseGuavaBloomFilterReader implements BloomFilterReader {
   private static final int NUM_LONGS_OFFSET = 2;
   private static final int HEADER_SIZE = 6;
 
+  private double _fpp;
   protected final int _numHashFunctions;
   protected final long _numBits;
   protected final PinotDataBuffer _valueBuffer;
@@ -48,6 +49,15 @@ public abstract class BaseGuavaBloomFilterReader implements BloomFilterReader {
     _numHashFunctions = dataBuffer.getByte(NUM_HASH_FUNCTIONS_OFFSET) & 0xFF;
     _numBits = (long) dataBuffer.getInt(NUM_LONGS_OFFSET) * Long.SIZE;
     _valueBuffer = dataBuffer.view(HEADER_SIZE, dataBuffer.size());
+  }
+
+  public void setFPP(double fpp) {
+    _fpp = fpp;
+  }
+
+  @Override
+  public double getFPP() {
+    return _fpp;
   }
 
   @Override
