@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.queries;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -95,6 +97,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
+  private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
   @Override
   protected String getFilter() {
@@ -271,6 +274,23 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     _indexSegments = List.of(segment, segment);
   }
 
+  /**
+   * Compares two JSON strings structurally, ignoring object key ordering.
+   *
+   * @param actual The JSON string produced by the code under test
+   * @param expected The expected JSON string structure
+   */
+  private void assertJsonEquals(String actual, String expected) {
+    try {
+      JsonNode expectedNode = JSON_MAPPER.readTree(expected);
+      JsonNode actualNode = JSON_MAPPER.readTree(actual);
+      Assert.assertTrue(expectedNode.equals(actualNode),
+          "JSON mismatch.\nExpected: " + expected + "\nActual: " + actual);
+    } catch (Exception e) {
+      Assert.fail("Failed to parse JSON: " + e.getMessage());
+    }
+  }
+
   /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */
   @Test
   public void testSimpleSelectOnJsonColumn() {
@@ -282,17 +302,27 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
     Assert.assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
 
-    List<String> expecteds = Arrays.asList("[1, daffy duck, [\"this\",\"is\",\"a\",\"test\"], \"UP\"]",
-        "[2, mickey mouse, {\"a\":\"1\",\"b\":\"2\"}, \"DOWN\"]", "[3, donald duck, {\"a\":\"1\",\"b\":\"2\"}, \"UP\"]",
-        "[4, scrooge mcduck, {\"a\":\"1\",\"b\":\"2\"}, \"LEFT\"]",
-        "[5, minney mouse, {\"name\":\"minney\",\"id\":1}, \"RIGHT\"]", "[6, pluto, \"test\", \"DOWN\"]",
-        "[7, scooby doo, {\"name\":\"scooby\",\"id\":7}, \"UP\"]");
+    Object[][] expecteds = {
+        {1, "daffy duck", "[\"this\",\"is\",\"a\",\"test\"]", "\"UP\""},
+        {2, "mickey mouse", "{\"a\":\"1\",\"b\":\"2\"}", "\"DOWN\""},
+        {3, "donald duck", "{\"a\":\"1\",\"b\":\"2\"}", "\"UP\""},
+        {4, "scrooge mcduck", "{\"a\":\"1\",\"b\":\"2\"}", "\"LEFT\""},
+        {5, "minney mouse", "{\"name\":\"minney\",\"id\":1}", "\"RIGHT\""},
+        {6, "pluto", "\"test\"", "\"DOWN\""},
+        {7, "scooby doo", "{\"name\":\"scooby\",\"id\":7}", "\"UP\""}
+    };
 
     int index = 0;
-    Iterator<Object[]> iterator = rows.iterator();
-    while (iterator.hasNext()) {
-      Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+    for (Object[] row : rows) {
+      Object[] expected = expecteds[index++];
+
+      // Compare non-JSON columns with regular equality
+      Assert.assertEquals(row[0], expected[0]);
+      Assert.assertEquals(row[1], expected[1]);
+      Assert.assertEquals(row[3], expected[3]);
+
+      // Compare JSON column structurally
+      assertJsonEquals(row[2].toString(), (String) expected[2]);
     }
   }
 
@@ -370,7 +400,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     Iterator<Object[]> iterator = rows.iterator();
     while (iterator.hasNext()) {
       Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+      assertJsonEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }
 
