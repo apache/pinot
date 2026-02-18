@@ -46,6 +46,7 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -158,7 +159,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
       // If there are no buckets in the logical plan, return an empty response.
       if (logicalPlanResult.getTimeBuckets().getNumBuckets() == 0) {
-        return new TimeSeriesBlock(logicalPlanResult.getTimeBuckets(), new HashMap<>());
+        timeSeriesBlock = new TimeSeriesBlock(logicalPlanResult.getTimeBuckets(), new HashMap<>());
+        return timeSeriesBlock;
       }
       TimeSeriesDispatchablePlan dispatchablePlan =
           _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
@@ -166,6 +168,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
 
       timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
           timeSeriesRequest.getTimeout().toMillis(), requestContext);
+
       TimeSeriesResponseMapper.setStatsInRequestContext(requestContext, timeSeriesBlock.getMetadata());
       setExceptionsFromBlockToRequestContext(timeSeriesBlock, requestContext);
       return timeSeriesBlock;
@@ -180,9 +183,12 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       requestContext.setErrorCode(qe.getErrorCode());
       throw qe;
     } finally {
-      _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, System.currentTimeMillis() - queryStartTime,
-          TimeUnit.MILLISECONDS);
+      long endToEndTimeMs = System.currentTimeMillis() - queryStartTime;
+      _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, endToEndTimeMs, TimeUnit.MILLISECONDS);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
+      if (timeSeriesBlock != null) {
+        timeSeriesBlock.getMetadata().put(DataTable.MetadataKey.TIME_USED_MS.getName(), String.valueOf(endToEndTimeMs));
+      }
     }
   }
 
