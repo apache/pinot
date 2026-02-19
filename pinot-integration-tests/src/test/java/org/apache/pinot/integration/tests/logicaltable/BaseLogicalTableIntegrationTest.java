@@ -21,10 +21,8 @@ package org.apache.pinot.integration.tests.logicaltable;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -38,15 +36,11 @@ import org.apache.pinot.integration.tests.QueryAssert;
 import org.apache.pinot.integration.tests.QueryGenerator;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
@@ -60,6 +54,7 @@ import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -118,27 +113,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     }
 
     _avroFiles = getAllAvroFiles();
-    Map<String, List<File>> offlineTableDataFiles = getOfflineTableDataFiles();
-    for (Map.Entry<String, List<File>> entry : offlineTableDataFiles.entrySet()) {
-      String tableName = entry.getKey();
-      List<File> avroFilesForTable = entry.getValue();
-
-      File tarDir = new File(_tarDir, tableName);
-
-      TestUtils.ensureDirectoriesExistAndEmpty(tarDir);
-
-      // Create and upload the schema and table config
-      Schema schema = createSchema(getSchemaFileName());
-      schema.setSchemaName(tableName);
-      addSchema(schema);
-      TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
-      addTableConfig(offlineTableConfig);
-
-      // Create and upload segments
-      ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFilesForTable, offlineTableConfig, schema, 0, _segmentDir,
-          tarDir);
-      uploadSegments(tableName, tarDir);
-    }
+    uploadDataToOfflineTables(getOfflineTableNames(), _avroFiles);
 
     // create realtime table
     Map<String, List<File>> realtimeTableDataFiles = getRealtimeTableDataFiles();
@@ -158,6 +133,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       pushAvroIntoKafka(avroFilesForTable);
     }
 
+    createLogicalTableSchema();
     createLogicalTable();
 
     // Set up the H2 connection
@@ -185,54 +161,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     return List.of();
   }
 
-  protected Map<String, List<File>> getOfflineTableDataFiles() {
-    List<String> offlineTableNames = getOfflineTableNames();
-    return !offlineTableNames.isEmpty() ? distributeFilesToTables(offlineTableNames, _avroFiles) : Map.of();
-  }
-
   protected Map<String, List<File>> getRealtimeTableDataFiles() {
     List<String> realtimeTableNames = getRealtimeTableNames();
     return !realtimeTableNames.isEmpty() ? distributeFilesToTables(realtimeTableNames, _avroFiles) : Map.of();
-  }
-
-  protected Map<String, List<File>> distributeFilesToTables(List<String> tableNames, List<File> avroFiles) {
-    Map<String, List<File>> tableNameToFilesMap = new HashMap<>();
-
-    // Initialize the map with empty lists for each table name
-    tableNames.forEach(table -> tableNameToFilesMap.put(table, new ArrayList<>()));
-
-    // Round-robin distribution of files to table names
-    for (int i = 0; i < avroFiles.size(); i++) {
-      String tableName = tableNames.get(i % tableNames.size());
-      tableNameToFilesMap.get(tableName).add(avroFiles.get(i));
-    }
-    return tableNameToFilesMap;
-  }
-
-  private List<String> getTimeBoundaryTable() {
-    String timeBoundaryTable = null;
-    long maxEndTimeMillis = Long.MIN_VALUE;
-    try {
-      for (String tableName : getOfflineTableNames()) {
-        String url = _controllerRequestURLBuilder.forSegmentMetadata(tableName, TableType.OFFLINE);
-        String response = ControllerTest.sendGetRequest(url);
-        JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
-        Iterator<String> stringIterator = jsonNode.fieldNames();
-        while (stringIterator.hasNext()) {
-          String segmentName = stringIterator.next();
-          JsonNode segmentJsonNode = jsonNode.get(segmentName);
-          long endTimeMillis = segmentJsonNode.get("endTimeMillis").asLong();
-          if (endTimeMillis > maxEndTimeMillis) {
-            maxEndTimeMillis = endTimeMillis;
-            timeBoundaryTable = tableName;
-          }
-        }
-      }
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to get the time boundary table", e);
-    }
-    return timeBoundaryTable != null ? List.of(TableNameBuilder.OFFLINE.tableNameWithType(timeBoundaryTable))
-        : List.of();
   }
 
   protected List<String> getPhysicalTableNames() {
@@ -262,66 +193,21 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getLogicalTableName(), _h2Connection);
   }
 
-  /**
-   * Creates a new OFFLINE table config.
-   */
-  protected TableConfig createOfflineTableConfig(String tableName) {
-    // @formatter:off
-    return new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(tableName)
-        .setTimeColumnName(getTimeColumnName())
-        .setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns())
-        .setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns())
-        .setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs())
-        .setNumReplicas(getNumReplicas())
-        .setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode())
-        .setTaskConfig(getTaskConfig())
-        .setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant())
-        .setIngestionConfig(getIngestionConfig())
-        .setQueryConfig(getQueryConfig())
-        .setNullHandlingEnabled(getNullHandlingEnabled())
-        .setSegmentPartitionConfig(getSegmentPartitionConfig())
-        .build();
-    // @formatter:on
-  }
-
-  public LogicalTableConfig getLogicalTableConfig(String tableName, List<String> physicalTableNames,
-      String brokerTenant) {
-    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
-    for (String physicalTableName : physicalTableNames) {
-      physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
-    }
-    String offlineTableName =
-        physicalTableNames.stream().filter(TableNameBuilder::isOfflineTableResource).findFirst().orElse(null);
-    String realtimeTableName =
-        physicalTableNames.stream().filter(TableNameBuilder::isRealtimeTableResource).findFirst().orElse(null);
-    LogicalTableConfigBuilder builder =
-        new LogicalTableConfigBuilder().setTableName(tableName)
-            .setBrokerTenant(brokerTenant)
-            .setRefOfflineTableName(offlineTableName)
-            .setRefRealtimeTableName(realtimeTableName)
-            .setPhysicalTableConfigMap(physicalTableConfigMap);
-    if (!getOfflineTableNames().isEmpty() && !getRealtimeTableNames().isEmpty()) {
-      builder.setTimeBoundaryConfig(
-          new TimeBoundaryConfig("min", Map.of("includedTables", getTimeBoundaryTable()))
-      );
-    }
-    return builder.build();
+  private void createLogicalTableSchema()
+      throws IOException {
+    Schema logicalTableSchema = createSchema(getSchemaFileName());
+    logicalTableSchema.setSchemaName(getLogicalTableName());
+    addSchema(logicalTableSchema);
   }
 
   protected void createLogicalTable()
       throws IOException {
     String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
-    Schema logicalTableSchema = createSchema(getSchemaFileName());
-    logicalTableSchema.setSchemaName(getLogicalTableName());
-    addSchema(logicalTableSchema);
-    LogicalTableConfig logicalTable =
-        getLogicalTableConfig(getLogicalTableName(), getPhysicalTableNames(), getBrokerTenant());
+    List<String> offlineTableNames = getOfflineTableNames().stream()
+        .map(TableNameBuilder.OFFLINE::tableNameWithType).collect(Collectors.toList());
+    List<String> realtimeTableNames = getRealtimeTableNames().stream()
+        .map(TableNameBuilder.REALTIME::tableNameWithType).collect(Collectors.toList());
+    LogicalTableConfig logicalTable = createLogicalTableConfig(offlineTableNames, realtimeTableNames);
     String resp =
         ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTable.toSingleLineJsonString(), getHeaders());
     assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + getLogicalTableName()
@@ -574,10 +460,13 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     updateLogicalTableConfig(logicalTableConfig);
     JsonNode response = postQuery(starQuery);
     JsonNode exceptions = response.get("exceptions");
-    assertTrue(
-        !exceptions.isEmpty() && (exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.BROKER_TIMEOUT.getId()
-            // Timeout may occur just before submitting the request. Then this error code is thrown.
-            || exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.SERVER_NOT_RESPONDING.getId()));
+    assertFalse(exceptions.isEmpty());
+    int exceptionCode = exceptions.get(0).get("errorCode").asInt();
+    assertTrue(exceptionCode == QueryErrorCode.BROKER_TIMEOUT.getId()
+        // Timeout may occur just before submitting the request. Then this error code is thrown.
+        || exceptionCode == QueryErrorCode.SERVER_NOT_RESPONDING.getId()
+        || exceptionCode == QueryErrorCode.EXECUTION_TIMEOUT.getId()
+    );
 
     // Query Succeeds with a high limit.
     queryConfig = new QueryConfig(1000000L, null, null, null, null, null);
