@@ -48,9 +48,7 @@ public class LogicalTableConfigUtils {
 
   public static LogicalTableConfig fromZNRecord(ZNRecord znRecord)
       throws IOException {
-    ConfigRecord record = new ConfigRecord(
-        znRecord.getId(), znRecord.getSimpleFields(), znRecord.getMapFields());
-    return LogicalTableConfig.fromConfigRecord(record);
+    return LogicalTableConfigSerDeProvider.getInstance().fromZNRecord(znRecord);
   }
 
   public static ZNRecord toZNRecord(LogicalTableConfig logicalTableConfig)
