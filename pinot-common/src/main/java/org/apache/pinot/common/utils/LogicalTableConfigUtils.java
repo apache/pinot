@@ -66,7 +66,6 @@ public class LogicalTableConfigUtils {
 
   public static void validateLogicalTableConfig(
       LogicalTableConfig logicalTableConfig,
-      Predicate<String> physicalTableExistsPredicate,
       Predicate<String> brokerTenantExistsPredicate,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
     String tableName = logicalTableConfig.getTableName();
@@ -109,12 +108,6 @@ public class LogicalTableConfigUtils {
               "Invalid logical table. Reason: '" + physicalTableName
                   + "' should have the same database name as logical table: " + databaseName + " != "
                   + physicalTableDatabaseName);
-        }
-
-        // validate physical table exists
-        if (!physicalTableExistsPredicate.test(physicalTableName)) {
-          throw new IllegalArgumentException(
-              "Invalid logical table. Reason: '" + physicalTableName + "' should be one of the existing tables");
         }
       }
 

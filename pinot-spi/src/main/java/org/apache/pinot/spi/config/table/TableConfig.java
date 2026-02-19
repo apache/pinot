@@ -273,7 +273,7 @@ public class TableConfig extends BaseJsonConfig {
 
   @JsonProperty(CUSTOM_CONFIG_KEY)
   public TableCustomConfig getCustomConfig() {
-    return (_customConfig == null) ? new TableCustomConfig(Map.of()) : _customConfig;
+    return (_customConfig == null) ? new TableCustomConfig(new HashMap<>()) : _customConfig;
   }
 
   public void setCustomConfig(TableCustomConfig customConfig) {
