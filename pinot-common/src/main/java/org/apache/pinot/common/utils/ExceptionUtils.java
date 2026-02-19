@@ -168,11 +168,11 @@ public class ExceptionUtils {
   /// @param clazz the class of the old throwable. If old throwable is null and this parameter is provided,
   ///                     we will check if the new throwable is already of the same type as the old throwable,
   ///                     and if so, we can directly return the new throwable without conversion.
-  public static <T1 extends Throwable, T2 extends Throwable> T1 suppress(
-      T2 newThrowable,
-      @Nullable T1 oldThrowable,
-      Function<T2, T1> exceptionConverter,
-      @Nullable Class<T1> clazz
+  public static <TO extends Throwable, TI extends Throwable> TO suppress(
+      TI newThrowable,
+      @Nullable TO oldThrowable,
+      Function<TI, TO> exceptionConverter,
+      @Nullable Class<TO> clazz
   ) {
     if (oldThrowable != null) {
       if (oldThrowable != newThrowable) {
@@ -185,9 +185,10 @@ public class ExceptionUtils {
       return oldThrowable;
     }
     if (clazz != null && clazz.isAssignableFrom(newThrowable.getClass())) {
-      // If the new throwable is already of the same type as the old throwable, we can directly return it without conversion.
-      // This is an optimization to avoid unnecessary exception conversion when the new throwable is already of the same type.
-      return (T1) newThrowable;
+      // If the new throwable is already of the same type as the old throwable, we can directly return it without
+      // conversion. This is an optimization to avoid unnecessary exception conversion when the new throwable is already
+      // of the same type.
+      return (TO) newThrowable;
     }
     return exceptionConverter.apply(newThrowable);
   }
