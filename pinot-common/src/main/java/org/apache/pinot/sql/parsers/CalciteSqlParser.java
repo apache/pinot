@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +53,9 @@ import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.request.ArrayJoinOperand;
+import org.apache.pinot.common.request.ArrayJoinSpec;
+import org.apache.pinot.common.request.ArrayJoinType;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -64,6 +68,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
+import org.apache.pinot.sql.parsers.parser.SqlArrayJoinTableFunction;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
@@ -465,7 +470,8 @@ public class CalciteSqlParser {
     // FROM
     SqlNode fromNode = selectNode.getFrom();
     if (fromNode != null) {
-      pinotQuery.setDataSource(compileToDataSource(fromNode));
+      SqlNode baseTableNode = extractArrayJoinSources(fromNode, pinotQuery);
+      pinotQuery.setDataSource(compileToDataSource(baseTableNode));
     }
     // WHERE
     SqlNode whereNode = selectNode.getWhere();
@@ -556,6 +562,80 @@ public class CalciteSqlParser {
         throw new IllegalStateException("Unsupported join condition type: " + sqlJoin.getConditionType());
     }
     return join;
+  }
+
+  private static SqlNode extractArrayJoinSources(SqlNode fromNode, PinotQuery pinotQuery) {
+    List<ArrayJoinSpec> arrayJoinSpecs = new ArrayList<>();
+    SqlNode cursor = fromNode;
+    while (cursor instanceof SqlJoin) {
+      SqlJoin join = (SqlJoin) cursor;
+      SqlNode rightNode = join.getRight();
+      if (rightNode.getKind() == SqlKind.AS) {
+        SqlBasicCall asCall = (SqlBasicCall) rightNode;
+        SqlNode aliasedNode = asCall.getOperandList().get(0);
+        if (aliasedNode instanceof SqlArrayJoinTableFunction) {
+          rightNode = aliasedNode;
+        }
+      }
+      if (!(rightNode instanceof SqlArrayJoinTableFunction)) {
+        if (!arrayJoinSpecs.isEmpty()) {
+          throw new SqlCompilationException("ARRAY JOIN cannot be combined with other JOIN types yet");
+        }
+        break;
+      }
+      arrayJoinSpecs.add(toArrayJoinSpec((SqlArrayJoinTableFunction) rightNode, join.getJoinType()));
+      cursor = join.getLeft();
+    }
+    if (!arrayJoinSpecs.isEmpty()) {
+      Collections.reverse(arrayJoinSpecs);
+      pinotQuery.setArrayJoinList(arrayJoinSpecs);
+    }
+    return cursor;
+  }
+
+  private static ArrayJoinSpec toArrayJoinSpec(SqlArrayJoinTableFunction function,
+      org.apache.calcite.sql.JoinType joinType) {
+    ArrayJoinSpec spec = new ArrayJoinSpec();
+    switch (joinType) {
+      case LEFT:
+        spec.setType(ArrayJoinType.LEFT);
+        break;
+      case INNER:
+        spec.setType(ArrayJoinType.INNER);
+        break;
+      default:
+        throw new SqlCompilationException("ARRAY JOIN supports only INNER or LEFT semantics, found: " + joinType);
+    }
+    List<ArrayJoinOperand> operands = new ArrayList<>(function.getOperandList().size());
+    for (SqlNode operandNode : function.getOperandList()) {
+      operands.add(buildArrayJoinOperand(operandNode));
+    }
+    if (operands.isEmpty()) {
+      throw new SqlCompilationException("ARRAY JOIN clause must contain at least one array expression");
+    }
+    spec.setOperands(operands);
+    return spec;
+  }
+
+  private static ArrayJoinOperand buildArrayJoinOperand(SqlNode operandNode) {
+    SqlNode expressionNode = operandNode;
+    String alias = null;
+    if (operandNode.getKind() == SqlKind.AS) {
+      SqlBasicCall asCall = (SqlBasicCall) operandNode;
+      List<SqlNode> operands = asCall.getOperandList();
+      expressionNode = operands.get(0);
+      SqlNode aliasNode = operands.get(1);
+      if (!(aliasNode instanceof SqlIdentifier)) {
+        throw new SqlCompilationException("ARRAY JOIN alias must be an identifier: " + aliasNode);
+      }
+      alias = ((SqlIdentifier) aliasNode).toString();
+    }
+    ArrayJoinOperand operand = new ArrayJoinOperand();
+    operand.setExpression(toExpression(expressionNode));
+    if (alias != null) {
+      operand.setAlias(alias);
+    }
+    return operand;
   }
 
   public static void queryRewrite(PinotQuery pinotQuery) {

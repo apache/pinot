@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +27,7 @@ import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.core.query.request.context.ArrayJoinContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -80,6 +82,10 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
   @Override
   boolean pruneSegmentWithPredicate(IndexSegment segment, Predicate predicate, Map<String, DataSource> dataSourceCache,
       ValueCache cachedValues, QueryContext query) {
+    if (predicate.getLhs().getType() == ExpressionContext.Type.IDENTIFIER
+        && isArrayJoinColumn(query, predicate.getLhs().getIdentifier())) {
+      return false;
+    }
     Predicate.Type predicateType = predicate.getType();
     if (predicateType == Predicate.Type.EQ) {
       return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues, query);
@@ -90,6 +96,26 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     } else {
       return false;
     }
+  }
+
+  private static boolean isArrayJoinColumn(QueryContext query, String column) {
+    List<ArrayJoinContext> arrayJoinContexts = query.getArrayJoinContexts();
+    if (arrayJoinContexts == null || arrayJoinContexts.isEmpty()) {
+      return false;
+    }
+    for (ArrayJoinContext context : arrayJoinContexts) {
+      for (ArrayJoinContext.Operand operand : context.getOperands()) {
+        if (column.equals(operand.getAlias())) {
+          return true;
+        }
+        Set<String> columns = new HashSet<>();
+        operand.getExpression().getColumns(columns);
+        if (columns.contains(column)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
