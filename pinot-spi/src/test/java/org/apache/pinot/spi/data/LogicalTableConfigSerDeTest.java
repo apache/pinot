@@ -53,7 +53,8 @@ public class LogicalTableConfigSerDeTest {
     checkMinimalConfig(fromJson);
 
     // ZNRecord round-trip
-    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
+    LogicalTableConfig fromZN = new LogicalTableConfig();
+    fromZN.populateFromConfigRecord(config.toConfigRecord());
     checkMinimalConfig(fromZN);
   }
 
@@ -87,7 +88,8 @@ public class LogicalTableConfigSerDeTest {
     LogicalTableConfig fromJson = JsonUtils.stringToObject(config.toSingleLineJsonString(), LogicalTableConfig.class);
     checkQuotaConfig(fromJson);
 
-    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
+    LogicalTableConfig fromZN = new LogicalTableConfig();
+    fromZN.populateFromConfigRecord(config.toConfigRecord());
     checkQuotaConfig(fromZN);
   }
 
@@ -114,7 +116,8 @@ public class LogicalTableConfigSerDeTest {
     LogicalTableConfig fromJson = JsonUtils.stringToObject(config.toSingleLineJsonString(), LogicalTableConfig.class);
     checkQueryConfig(fromJson);
 
-    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
+    LogicalTableConfig fromZN = new LogicalTableConfig();
+    fromZN.populateFromConfigRecord(config.toConfigRecord());
     checkQueryConfig(fromZN);
   }
 
@@ -143,7 +146,8 @@ public class LogicalTableConfigSerDeTest {
     LogicalTableConfig fromJson = JsonUtils.stringToObject(config.toSingleLineJsonString(), LogicalTableConfig.class);
     checkRefTableNames(fromJson);
 
-    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
+    LogicalTableConfig fromZN = new LogicalTableConfig();
+    fromZN.populateFromConfigRecord(config.toConfigRecord());
     checkRefTableNames(fromZN);
   }
 
@@ -176,7 +180,8 @@ public class LogicalTableConfigSerDeTest {
     LogicalTableConfig fromJson = JsonUtils.stringToObject(config.toSingleLineJsonString(), LogicalTableConfig.class);
     checkTimeBoundaryConfig(fromJson);
 
-    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
+    LogicalTableConfig fromZN = new LogicalTableConfig();
+    fromZN.populateFromConfigRecord(config.toConfigRecord());
     checkTimeBoundaryConfig(fromZN);
   }
 
@@ -207,7 +212,8 @@ public class LogicalTableConfigSerDeTest {
     LogicalTableConfig fromJson = JsonUtils.stringToObject(config.toSingleLineJsonString(), LogicalTableConfig.class);
     checkMultiClusterConfig(fromJson);
 
-    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
+    LogicalTableConfig fromZN = new LogicalTableConfig();
+    fromZN.populateFromConfigRecord(config.toConfigRecord());
     checkMultiClusterConfig(fromZN);
   }
 
@@ -249,7 +255,8 @@ public class LogicalTableConfigSerDeTest {
     checkFullConfig(fromJson);
 
     // ZNRecord round-trip
-    LogicalTableConfig fromZN = LogicalTableConfig.fromConfigRecord(config.toConfigRecord());
+    LogicalTableConfig fromZN = new LogicalTableConfig();
+    fromZN.populateFromConfigRecord(config.toConfigRecord());
     checkFullConfig(fromZN);
   }
 

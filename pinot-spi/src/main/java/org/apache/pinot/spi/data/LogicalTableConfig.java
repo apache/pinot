@@ -155,14 +155,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
     _timeBoundaryConfig = timeBoundaryConfig;
   }
 
-  public static LogicalTableConfig fromConfigRecord(ConfigRecord record)
-      throws IOException {
-    LogicalTableConfig config = new LogicalTableConfig();
-    config.populateFromConfigRecord(record);
-    return config;
-  }
-
-  protected void populateFromConfigRecord(ConfigRecord record)
+  public void populateFromConfigRecord(ConfigRecord record)
       throws IOException {
     setTableName(record.getSimpleField(LOGICAL_TABLE_NAME_KEY));
     setBrokerTenant(record.getSimpleField(BROKER_TENANT_KEY));
