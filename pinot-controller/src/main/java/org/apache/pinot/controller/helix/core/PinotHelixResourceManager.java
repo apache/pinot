@@ -2154,7 +2154,7 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Sets the given table config into zookeeper
+   * Sets the given table config into zookeeper bypassing validations in updateTableConfig
    * TODO - Make this private and always use updateTableConfig ?
    */
   public void setExistingTableConfig(TableConfig tableConfig)
@@ -2197,7 +2197,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("Updated logical table {}: Successfully updated table", tableName);
   }
 
-  private void validatePhysicalTablesExist(LogicalTableConfig logicalTableConfig) {
+  public void validatePhysicalTablesExist(LogicalTableConfig logicalTableConfig) {
     for (Map.Entry<String, PhysicalTableConfig> entry : logicalTableConfig.getPhysicalTableConfigMap().entrySet()) {
       PhysicalTableConfig physicalTableConfig = entry.getValue();
       String physicalTableName = entry.getKey();
