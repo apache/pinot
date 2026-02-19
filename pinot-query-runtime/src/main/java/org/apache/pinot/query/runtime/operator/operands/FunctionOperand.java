@@ -84,8 +84,12 @@ public class FunctionOperand implements TransformOperand {
         Preconditions.checkState(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
             parameterClasses[i], functionInfo.getMethod());
         if (!needsConversion) {
+          // For array-typed parameters, always require conversion: the runtime Java class may
+          // differ from the canonical stored type (e.g. Double[] vs double[] after DataBlock
+          // deserialization in the multi-stage engine), and Method.invoke does not autobox arrays.
           ColumnDataType parameterColumnType = FunctionUtils.getColumnDataType(parameterClasses[i]);
-          if (parameterColumnType == null || argumentTypes[i] != parameterColumnType) {
+          if (parameterColumnType == null || argumentTypes[i] != parameterColumnType
+              || parameterClasses[i].isArray()) {
             needsConversion = true;
           }
         }
