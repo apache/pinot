@@ -273,6 +273,9 @@ public class ControllerConf extends PinotConfiguration {
     public static final String AGED_SEGMENTS_DELETION_BATCH_SIZE =
         "controller.retentionManager.agedSegmentsDeletionBatchSize";
     public static final int DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE = 1000;
+    public static final String SEGMENTS_ZK_METADATA_BATCH_SIZE =
+        "controller.retentionManager.segmentsZkMetadataBatchSize";
+    public static final int DEFAULT_SEGMENTS_ZK_METADATA_BATCH_SIZE = 1000;
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
@@ -1224,6 +1227,15 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setAgedSegmentsDeletionBatchSize(int agedSegmentsDeletionBatchSize) {
     setProperty(ControllerPeriodicTasksConf.AGED_SEGMENTS_DELETION_BATCH_SIZE, agedSegmentsDeletionBatchSize);
+  }
+
+  public int getSegmentsZKMetadataBatchSize() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENTS_ZK_METADATA_BATCH_SIZE,
+        ControllerPeriodicTasksConf.DEFAULT_SEGMENTS_ZK_METADATA_BATCH_SIZE);
+  }
+
+  public void setSegmentsZKMetadataBatchSize(int segmentZKMetadataBatchSize) {
+    setProperty(ControllerPeriodicTasksConf.SEGMENTS_ZK_METADATA_BATCH_SIZE, segmentZKMetadataBatchSize);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {

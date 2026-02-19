@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.task.JobConfig;
@@ -161,32 +162,45 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
    * @return the list of segment zk metadata for available segments in the table.
    */
   public List<SegmentZKMetadata> getSegmentsZKMetadataForTable(String tableNameWithType) {
-    IdealState idealState = _clusterInfoAccessor.getIdealState(tableNameWithType);
-    Set<String> segmentsForTable = idealState.getPartitionSet();
-    List<SegmentZKMetadata> segmentZKMetadataList = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
-    List<SegmentZKMetadata> selectedSegmentZKMetadataList = new ArrayList<>();
-    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-      if (segmentsForTable.contains(segmentZKMetadata.getSegmentName())) {
-        selectedSegmentZKMetadataList.add(segmentZKMetadata);
-      }
-    }
-    return selectedSegmentZKMetadataList;
+    return getSegmentsZKMetadataInIdealState(tableNameWithType, null);
   }
 
   public List<SegmentZKMetadata> getNonConsumingSegmentsZKMetadataForRealtimeTable(String tableNameWithType) {
     IdealState idealState = _clusterInfoAccessor.getIdealState(tableNameWithType);
-    Set<String> idealStateSegments = idealState.getPartitionSet();
-    List<SegmentZKMetadata> segmentZKMetadataList = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
-    List<SegmentZKMetadata> selectedSegmentZKMetadataList = new ArrayList<>();
-    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+    if (idealState == null) {
+      return new ArrayList<>();
+    }
+    return getSegmentsZKMetadataInIdealState(tableNameWithType, segmentZKMetadata -> {
       String segmentName = segmentZKMetadata.getSegmentName();
-      if (idealStateSegments.contains(segmentName)
-          && segmentZKMetadata.getStatus().isCompleted() // skip consuming segments
-          && !idealState.getInstanceStateMap(segmentName).containsValue(SegmentStateModel.CONSUMING)) {
-        // The last check is for an edge case where
-        //   1. SegmentZKMetadata was updated to DONE in segment commit protocol, but
-        //   2. IdealState for the segment was not updated to ONLINE due to some issue in the controller.
-        // We avoid picking up such segments to allow RealtimeSegmentValidationManager to fix them.
+      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
+      return segmentZKMetadata.getStatus().isCompleted() // skip consuming segments
+          && instanceStateMap != null && !instanceStateMap.containsValue(SegmentStateModel.CONSUMING);
+      // The last check is for an edge case where
+      //   1. SegmentZKMetadata was updated to DONE in segment commit protocol, but
+      //   2. IdealState for the segment was not updated to ONLINE due to some issue in the controller.
+      // We avoid picking up such segments to allow RealtimeSegmentValidationManager to fix them.
+    });
+  }
+
+  private List<SegmentZKMetadata> getSegmentsZKMetadataInIdealState(String tableNameWithType,
+      Predicate<SegmentZKMetadata> segmentMetadataFilter) {
+    IdealState idealState = _clusterInfoAccessor.getIdealState(tableNameWithType);
+    if (idealState == null) {
+      return new ArrayList<>();
+    }
+    Set<String> segmentsForTable = idealState.getPartitionSet();
+    if (segmentsForTable == null || segmentsForTable.isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+    if (allSegments == null) {
+      return new ArrayList<>();
+    }
+    List<SegmentZKMetadata> selectedSegmentZKMetadataList = new ArrayList<>();
+    for (SegmentZKMetadata segmentZKMetadata : allSegments) {
+      if (segmentsForTable.contains(segmentZKMetadata.getSegmentName())
+          && (segmentMetadataFilter == null || segmentMetadataFilter.test(segmentZKMetadata))) {
         selectedSegmentZKMetadataList.add(segmentZKMetadata);
       }
     }

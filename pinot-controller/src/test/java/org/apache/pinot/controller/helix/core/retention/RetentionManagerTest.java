@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -190,7 +191,7 @@ public class RetentionManagerTest {
     }
 
     when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
-    when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    mockSegmentMetadataConsumer(pinotHelixResourceManager, OFFLINE_TABLE_NAME, segmentsZKMetadata);
     when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
 
     ControllerConf conf = new ControllerConf();
@@ -393,7 +394,7 @@ public class RetentionManagerTest {
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
 
     when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
-    when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    mockSegmentMetadataConsumer(pinotHelixResourceManager, OFFLINE_TABLE_NAME, segmentsZKMetadata);
     when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
 
     ControllerConf conf = new ControllerConf();
@@ -487,7 +488,7 @@ public class RetentionManagerTest {
     realtimeSeg2.setEndTime(86_400_000 * 8);
 
     List<SegmentZKMetadata> realtimeSegments = Arrays.asList(realtimeSeg1, realtimeSeg2);
-    when(mockPinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)).thenReturn(realtimeSegments);
+    mockSegmentMetadataConsumer(mockPinotHelixResourceManager, realtimeTableName, realtimeSegments);
 
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(mockResourceManager, controllerConf, null, null);
@@ -501,6 +502,21 @@ public class RetentionManagerTest {
 
     // verify
     verify(mockPinotHelixResourceManager, times(1)).deleteSegments(eq(realtimeTableName), anyList());
+  }
+
+  private void mockSegmentMetadataConsumer(PinotHelixResourceManager resourceManager, String tableNameWithType,
+      List<SegmentZKMetadata> segmentZKMetadata) {
+    when(resourceManager.getSegmentsZKMetadata(tableNameWithType)).thenReturn(segmentZKMetadata);
+    doAnswer(invocationOnMock -> {
+      Consumer<SegmentZKMetadata> consumer = invocationOnMock.getArgument(1);
+      segmentZKMetadata.forEach(consumer);
+      return null;
+    }).when(resourceManager).forEachSegmentsZKMetadata(eq(tableNameWithType), any(Consumer.class));
+    doAnswer(invocationOnMock -> {
+      Consumer<SegmentZKMetadata> consumer = invocationOnMock.getArgument(2);
+      segmentZKMetadata.forEach(consumer);
+      return null;
+    }).when(resourceManager).forEachSegmentsZKMetadata(eq(tableNameWithType), anyInt(), any(Consumer.class));
   }
 
   private TableConfig createOfflineTableConfig() {
@@ -762,7 +778,7 @@ public class RetentionManagerTest {
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
 
     when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
-    when(pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    mockSegmentMetadataConsumer(pinotHelixResourceManager, REALTIME_TABLE_NAME, segmentsZKMetadata);
     when(pinotHelixResourceManager.getHelixClusterName()).thenReturn(HELIX_CLUSTER_NAME);
 
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
@@ -805,7 +821,7 @@ public class RetentionManagerTest {
 
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
-    when(pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    mockSegmentMetadataConsumer(pinotHelixResourceManager, REALTIME_TABLE_NAME, segmentsZKMetadata);
     when(pinotHelixResourceManager.getHelixClusterName()).thenReturn(HELIX_CLUSTER_NAME);
     when(pinotHelixResourceManager.getLastLLCCompletedSegments(REALTIME_TABLE_NAME)).thenCallRealMethod();
 

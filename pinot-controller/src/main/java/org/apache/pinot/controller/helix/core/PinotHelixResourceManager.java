@@ -902,20 +902,17 @@ public class PinotHelixResourceManager {
       selectedSegments = new ArrayList<>(segmentSet);
     } else {
       selectedSegments = new ArrayList<>();
-      List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
       ArrayList<String> filteredSegments = new ArrayList<>();
-      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      forEachSegmentsZKMetadata(tableNameWithType, ZKMetadataProvider.DEFAULT_SEGMENTS_ZK_METADATA_BATCH_SIZE,
+          segmentZKMetadata -> {
         String segmentName = segmentZKMetadata.getSegmentName();
         // Compute the intersection of segmentZK metadata and idealstate for valid segments
         if (!segmentSet.contains(segmentName)) {
           filteredSegments.add(segmentName);
-          continue;
-        }
-        // Filter by time if the time range is specified
-        if (isSegmentWithinTimeStamps(segmentZKMetadata, startTimestamp, endTimestamp, excludeOverlapping)) {
+        } else if (isSegmentWithinTimeStamps(segmentZKMetadata, startTimestamp, endTimestamp, excludeOverlapping)) {
           selectedSegments.add(segmentName);
         }
-      }
+      });
       LOGGER.info(
           "Successfully computed the segments for table : {}. # of filtered segments: {}, the filtered segment list: "
               + "{}. Only showing up to 100 filtered segments.", tableNameWithType, filteredSegments.size(),
@@ -995,13 +992,23 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
   }
 
+  public void forEachSegmentsZKMetadata(String tableNameWithType, int batchSize,
+      Consumer<SegmentZKMetadata> segmentMetadataConsumer) {
+    ZKMetadataProvider.forEachSegmentZKMetadata(_propertyStore, tableNameWithType, batchSize, segmentMetadataConsumer);
+  }
+
+  public void forEachSegmentsZKMetadata(String tableNameWithType, Consumer<SegmentZKMetadata> segmentMetadataConsumer) {
+    ZKMetadataProvider.forEachSegmentZKMetadata(_propertyStore, tableNameWithType,
+        ZKMetadataProvider.DEFAULT_SEGMENTS_ZK_METADATA_BATCH_SIZE, segmentMetadataConsumer);
+  }
+
   public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType) {
     return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType);
   }
 
   public Collection<String> getLastLLCCompletedSegments(String tableNameWithType) {
     Map<Integer, String> partitionIdToLastLLCCompletedSegmentMap = new HashMap<>();
-    for (SegmentZKMetadata zkMetadata : getSegmentsZKMetadata(tableNameWithType)) {
+    forEachSegmentsZKMetadata(tableNameWithType, zkMetadata -> {
       if (zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
         LLCSegmentName llcName = LLCSegmentName.of(zkMetadata.getSegmentName());
         int partitionGroupId = llcName.getPartitionGroupId();
@@ -1012,7 +1019,7 @@ public class PinotHelixResourceManager {
           partitionIdToLastLLCCompletedSegmentMap.put(partitionGroupId, zkMetadata.getSegmentName());
         }
       }
-    }
+    });
     return partitionIdToLastLLCCompletedSegmentMap.values();
   }
 
@@ -1510,13 +1517,12 @@ public class PinotHelixResourceManager {
 
   public void updateSegmentsZKTimeInterval(String tableNameWithType, DateTimeFieldSpec timeColumnFieldSpec) {
     LOGGER.info("Updating segment time interval in ZK metadata for table: {}", tableNameWithType);
-
-    List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
-    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-      int version = segmentZKMetadata.toZNRecord().getVersion();
-      updateZkTimeInterval(segmentZKMetadata, timeColumnFieldSpec);
-      updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
-    }
+    forEachSegmentsZKMetadata(tableNameWithType,
+        ZKMetadataProvider.DEFAULT_SEGMENTS_ZK_METADATA_BATCH_SIZE, segmentZKMetadata -> {
+          int version = segmentZKMetadata.toZNRecord().getVersion();
+          updateZkTimeInterval(segmentZKMetadata, timeColumnFieldSpec);
+          updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
+        });
   }
 
   public void updateSchema(Schema schema, boolean reload, boolean forceTableSchemaUpdate)
