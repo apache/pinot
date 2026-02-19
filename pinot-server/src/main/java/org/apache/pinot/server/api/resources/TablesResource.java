@@ -153,6 +153,7 @@ public class TablesResource {
   @GET
   @Path("/tables")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE)
   //swagger annotations
   @ApiOperation(value = "List tables", notes = "List all the tables on this server")
   @ApiResponses(value = {
@@ -168,6 +169,7 @@ public class TablesResource {
   @GET
   @Path("/tables/{tableName}/segments")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT)
   @ApiOperation(value = "List table segments", notes = "List segments of table hosted on this server")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success", response = TableSegments.class),
@@ -195,6 +197,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/metadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @ApiOperation(value = "List metadata for all segments of a given table", notes = "List segments metadata of table "
       + "hosted on this server")
   @ApiResponses(value = {
@@ -319,6 +322,7 @@ public class TablesResource {
   @GET
   @Path("/tables/{tableName}/indexes")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @ApiOperation(value = "Provide index metadata", notes = "Provide index details for the table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -364,6 +368,7 @@ public class TablesResource {
   @GET
   @Path("/tables/{tableName}/segments/{segmentName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @ApiOperation(value = "Provide segment metadata", notes = "Provide segments metadata for the segment on server")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -400,6 +405,7 @@ public class TablesResource {
   @GET
   @Path("/tables/{tableName}/segments/metadata")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @ApiOperation(value = "Provide segments metadata", notes = "Provide segments metadata for the segments on server")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -446,6 +452,7 @@ public class TablesResource {
   @GET
   @Path("/tables/{tableName}/segments/crc")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @ApiOperation(value = "Provide segment crc information", notes = "Provide crc information for the segments on server")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -534,6 +541,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableNameWithType}/{segmentName}/validDocIdsBitmap")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_SEGMENT)
   @ApiOperation(value = "Download validDocIds bitmap for an REALTIME immutable segment", notes =
       "Download validDocIds for " + "an immutable segment in bitmap format.")
   public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
@@ -596,6 +604,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}/validDocIds")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_SEGMENT)
   @ApiOperation(value = "Download validDocIds for an REALTIME immutable segment", notes = "Download validDocIds for "
       + "an immutable segment in bitmap format.")
   public Response downloadValidDocIds(
@@ -652,6 +661,7 @@ public class TablesResource {
   @GET
   @Path("/tables/{tableNameWithType}/validDocIdMetadata")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
   @ApiOperation(value = "Provides segment validDocId metadata", notes = "Provides segment validDocId metadata")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -672,6 +682,7 @@ public class TablesResource {
   @POST
   @Path("/tables/{tableNameWithType}/validDocIdsMetadata")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
   @ApiOperation(value = "Provides segment validDocIds metadata", notes = "Provides segment validDocIds metadata")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -830,6 +841,7 @@ public class TablesResource {
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/upload")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "realtimeTableName", action = Actions.Table.UPLOAD_SEGMENT)
   @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url",
       notes = "Upload a low level consumer segment to segment store and return the segment download url")
   @ApiResponses(value = {
@@ -903,6 +915,8 @@ public class TablesResource {
   @POST
   @Path("/segments/{realtimeTableNameWithType}/{segmentName}/uploadLLCSegment")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "realtimeTableNameWithType",
+      action = Actions.Table.UPLOAD_SEGMENT)
   @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url,"
       + "crc and other segment metadata",
       notes = "Upload a low level consumer segment to segment store and return the segment download url, crc, data crc "
@@ -980,6 +994,7 @@ public class TablesResource {
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/uploadCommittedSegment")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "realtimeTableName", action = Actions.Table.UPLOAD_SEGMENT)
   @ApiOperation(value = "Upload a real-time committed segment to segment store and return the segment ZK metadata",
       notes = "Upload a real-time committed segment to segment store and return the segment ZK metadata")
   @ApiResponses(value = {
@@ -1088,6 +1103,8 @@ public class TablesResource {
   @GET
   @Path("tables/{realtimeTableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "realtimeTableName",
+      action = Actions.Table.GET_CONSUMING_SEGMENTS)
   @ApiOperation(value = "Get the info for consumers of this REALTIME table", notes =
       "Get consumers info from the table data manager. Note that the partitionToOffsetMap has been deprecated "
           + "and will be removed in the next release. The info is now embedded within each partition's state as "
@@ -1148,6 +1165,7 @@ public class TablesResource {
   @GET
   @Path("tables/{tableNameWithType}/allSegmentsLoaded")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_SEGMENT_STATUS)
   @ApiOperation(value = "Validates if the ideal state matches with the segment state on this server", notes =
       "Validates if the ideal state matches with the segment state on this server")
   public TableSegmentValidationInfo validateTableSegmentState(
@@ -1215,6 +1233,7 @@ public class TablesResource {
   @GET
   @Path("/tables/{tableName}/segments/needReload")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT)
   @ApiOperation(value = "Checks if reload is needed on any segment", notes = "Returns true if reload is required on"
       + " any segment in this server")
   @ApiResponses(value = {
@@ -1239,6 +1258,7 @@ public class TablesResource {
   @GET
   @Path("/tables/{tableName}/segments/isStale")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT)
   @ApiOperation(value = "Get the list of segments that are stale or deviated from table config.",
       notes = "Get the list of segments that are stale or deviated from table config")
   @ApiResponses(value = {
@@ -1260,6 +1280,7 @@ public class TablesResource {
   @DELETE
   @Path("/tables/{tableName}/ingestionMetrics")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_INGESTION_METRICS)
   @ApiOperation(value = "Remove ingestion metrics for partition(s)", notes = "Removes ingestion-related metrics for "
       + "the given table. If no partitionId is provided, metrics for all partitions hosted by this server will be "
       + "removed.")
