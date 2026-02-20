@@ -25,11 +25,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import javax.annotation.Nullable;
 
+/**
+ * Payload for the copy table request.
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CopyTablePayload {
 
   private String _sourceClusterUri;
   private Map<String, String> _headers;
+
+  private String _destinationClusterUri;
+  private Map<String, String> _destinationClusterHeaders;
   /**
    * Broker tenant for the new table.
    * MUST NOT contain the tenant type suffix, i.e. _BROKER.
@@ -40,6 +46,7 @@ public class CopyTablePayload {
    * MUST NOT contain the tenant type suffix, i.e. _REALTIME or _OFFLINE.
    */
   private String _serverTenant;
+  private Integer _backfillParallism;
 
   /**
    * The instanceAssignmentConfig's tagPoolConfig contains full tenant name. We will use this field to let user specify
@@ -51,14 +58,20 @@ public class CopyTablePayload {
   public CopyTablePayload(
       @JsonProperty(value = "sourceClusterUri", required = true) String sourceClusterUri,
       @JsonProperty("sourceClusterHeaders") Map<String, String> headers,
+      @JsonProperty(value = "destinationClusterUri", required = true) String destinationClusterUri,
+      @JsonProperty(value = "destinationClusterHeaders") Map<String, String> destinationClusterHeaders,
       @JsonProperty(value = "brokerTenant", required = true) String brokerTenant,
       @JsonProperty(value = "serverTenant", required = true) String serverTenant,
-      @JsonProperty("tagPoolReplacementMap") @Nullable Map<String, String> tagPoolReplacementMap) {
+      @JsonProperty("tagPoolReplacementMap") @Nullable Map<String, String> tagPoolReplacementMap,
+      @JsonProperty("backfillParallism") @Nullable Integer backfillParallism) {
     _sourceClusterUri = sourceClusterUri;
     _headers = headers;
+    _destinationClusterUri = destinationClusterUri;
+    _destinationClusterHeaders = destinationClusterHeaders;
     _brokerTenant = brokerTenant;
     _serverTenant = serverTenant;
     _tagPoolReplacementMap = tagPoolReplacementMap;
+    _backfillParallism = backfillParallism;
   }
 
   @JsonGetter("sourceClusterUri")
@@ -71,6 +84,16 @@ public class CopyTablePayload {
     return _headers;
   }
 
+  @JsonGetter("destinationClusterUri")
+  public String getDestinationClusterUri() {
+    return _destinationClusterUri;
+  }
+
+  @JsonGetter("destinationClusterHeaders")
+  public Map<String, String> getDestinationClusterHeaders() {
+    return _destinationClusterHeaders;
+  }
+
   @JsonGetter("brokerTenant")
   public String getBrokerTenant() {
     return _brokerTenant;
@@ -79,6 +102,11 @@ public class CopyTablePayload {
   @JsonGetter("serverTenant")
   public String getServerTenant() {
     return _serverTenant;
+  }
+
+  @JsonGetter("backfillParallism")
+  public Integer getBackfillParallism() {
+    return _backfillParallism;
   }
 
   @JsonGetter("tagPoolReplacementMap")
