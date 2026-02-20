@@ -139,6 +139,7 @@ public class PrimaryKeyCountTest {
     TableUpsertMetadataManager tableUpsertMetadataManager = mock(TableUpsertMetadataManager.class);
     when(tableUpsertMetadataManager.getPartitionToPrimaryKeyCount()).thenReturn(partitionToPrimaryKeyCountMap);
     when(realtimeTableDataManager.getTableUpsertMetadataManager()).thenReturn(tableUpsertMetadataManager);
+    when(realtimeTableDataManager.getPartitionToPrimaryKeyCount()).thenReturn(partitionToPrimaryKeyCountMap);
 
     // Mock the instance data manager
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
@@ -186,6 +187,7 @@ public class PrimaryKeyCountTest {
     TableDedupMetadataManager tableDedupMetadataManager = mock(TableDedupMetadataManager.class);
     when(tableDedupMetadataManager.getPartitionToPrimaryKeyCount()).thenReturn(partitionToPrimaryKeyCountMap);
     when(realtimeTableDataManager.getTableDedupMetadataManager()).thenReturn(tableDedupMetadataManager);
+    when(realtimeTableDataManager.getPartitionToPrimaryKeyCount()).thenReturn(partitionToPrimaryKeyCountMap);
 
     // Mock the instance data manager
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
@@ -244,11 +246,14 @@ public class PrimaryKeyCountTest {
     TableUpsertMetadataManager tableUpsertMetadataManager = mock(TableUpsertMetadataManager.class);
     when(tableUpsertMetadataManager.getPartitionToPrimaryKeyCount()).thenReturn(upsertPartitionToPrimaryKeyCountMap);
     when(upsertRealtimeTableDataManager.getTableUpsertMetadataManager()).thenReturn(tableUpsertMetadataManager);
+    when(upsertRealtimeTableDataManager.getPartitionToPrimaryKeyCount())
+        .thenReturn(upsertPartitionToPrimaryKeyCountMap);
 
     // Mock the dedup manager
     TableDedupMetadataManager tableDedupMetadataManager = mock(TableDedupMetadataManager.class);
     when(tableDedupMetadataManager.getPartitionToPrimaryKeyCount()).thenReturn(dedupPartitionToPrimaryKeyCountMap);
     when(dedupRealtimeTableDataManager.getTableDedupMetadataManager()).thenReturn(tableDedupMetadataManager);
+    when(dedupRealtimeTableDataManager.getPartitionToPrimaryKeyCount()).thenReturn(dedupPartitionToPrimaryKeyCountMap);
 
     // Mock the instance data manager
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
