@@ -65,6 +65,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeGroups;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -92,9 +94,12 @@ public class MultiClusterIntegrationTest extends ClusterTest {
   protected static final int TABLE_SIZE_CLUSTER_2 = 1000;
   protected static final int SEGMENTS_PER_CLUSTER = 3;
   protected static final String JOIN_COLUMN = "OriginCityName";
+  protected static final String UNAVAILABLE_CLUSTER_NAME = "UnavailableCluster";
+  protected static final String UNAVAILABLE_ZK_ADDRESS = "localhost:29999";
 
   protected ClusterComponents _cluster1;
   protected ClusterComponents _cluster2;
+  protected ClusterComponents _brokerWithUnavailableCluster;
   protected List<File> _cluster1AvroFiles;
   protected List<File> _cluster2AvroFiles;
 
@@ -122,7 +127,38 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     startCluster(_cluster1, _cluster2, CLUSTER_1_CONFIG);
     startCluster(_cluster2, _cluster1, CLUSTER_2_CONFIG);
 
+    // Start an alternate broker with one valid and one unavailable remote cluster
+    startBrokerWithUnavailableCluster();
+
     LOGGER.info("MultiClusterIntegrationTest setup complete");
+  }
+
+  /**
+   * Starts a broker configured with cluster2 (valid) and an unavailable cluster (invalid ZK).
+   */
+  private void startBrokerWithUnavailableCluster() throws Exception {
+    _brokerWithUnavailableCluster = new ClusterComponents();
+    _brokerWithUnavailableCluster._brokerPort = findAvailablePort(55000);
+
+    PinotConfiguration brokerConfig = new PinotConfiguration();
+    brokerConfig.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, _cluster1._zkUrl);
+    brokerConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, CLUSTER_1_NAME);
+    brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, ControllerTest.LOCAL_HOST);
+    brokerConfig.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, _brokerWithUnavailableCluster._brokerPort);
+    brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+    brokerConfig.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+    brokerConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+    brokerConfig.setProperty(Helix.CONFIG_OF_REMOTE_CLUSTER_NAMES,
+        CLUSTER_2_NAME + "," + UNAVAILABLE_CLUSTER_NAME);
+    brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, CLUSTER_2_NAME),
+        _cluster2._zkUrl);
+    brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, UNAVAILABLE_CLUSTER_NAME),
+        UNAVAILABLE_ZK_ADDRESS);
+
+    _brokerWithUnavailableCluster._brokerStarter = createBrokerStarter();
+    _brokerWithUnavailableCluster._brokerStarter.init(brokerConfig);
+    _brokerWithUnavailableCluster._brokerStarter.start();
+    LOGGER.info("Started broker with unavailable cluster on port {}", _brokerWithUnavailableCluster._brokerPort);
   }
 
   // TODO: Add more tests for cross-cluster queries in subsequent iterations.
@@ -165,27 +201,8 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     LOGGER.info("Multi-cluster broker test passed: both clusters started and queryable");
   }
 
-  @Test
-  public void testLogicalFederationTwoOfflineTablesSSE() throws Exception {
-    dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster1._controllerBaseApiUrl);
-    dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster2._controllerBaseApiUrl);
-    dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster1._controllerBaseApiUrl);
-    dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster2._controllerBaseApiUrl);
-    setupFirstLogicalFederatedTable();
-    createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME,
-        LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
-    cleanSegmentDirs();
-    _cluster1AvroFiles = createAvroData(TABLE_SIZE_CLUSTER_1, 1);
-    _cluster2AvroFiles = createAvroData(TABLE_SIZE_CLUSTER_2, 2);
-    loadDataIntoCluster(_cluster1AvroFiles, LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
-    loadDataIntoCluster(_cluster2AvroFiles, LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
-    long expectedTotal = TABLE_SIZE_CLUSTER_1 + TABLE_SIZE_CLUSTER_2;
-    assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster1, true), expectedTotal);
-    assertEquals(getCount(LOGICAL_TABLE_NAME, _cluster2, true), expectedTotal);
-  }
-
-  @Test
-  public void testLogicalFederationTwoLogicalTablesMSE() throws Exception {
+  @BeforeGroups("query")
+  public void setupTablesForQueryTests() throws Exception {
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster1._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME, _cluster2._controllerBaseApiUrl);
     dropLogicalTableIfExists(LOGICAL_TABLE_NAME_2, _cluster1._controllerBaseApiUrl);
@@ -193,24 +210,74 @@ public class MultiClusterIntegrationTest extends ClusterTest {
     setupFirstLogicalFederatedTable();
     setupSecondLogicalFederatedTable();
     createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME,
-        LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
+      LOGICAL_FEDERATION_CLUSTER_1_TABLE, LOGICAL_FEDERATION_CLUSTER_2_TABLE);
     createLogicalTableOnBothClusters(LOGICAL_TABLE_NAME_2,
-        LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, LOGICAL_FEDERATION_CLUSTER_2_TABLE_2);
+      LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, LOGICAL_FEDERATION_CLUSTER_2_TABLE_2);
     cleanSegmentDirs();
     loadDataIntoCluster(createAvroData(TABLE_SIZE_CLUSTER_1, 1), LOGICAL_FEDERATION_CLUSTER_1_TABLE, _cluster1);
     loadDataIntoCluster(createAvroData(TABLE_SIZE_CLUSTER_2, 2), LOGICAL_FEDERATION_CLUSTER_2_TABLE, _cluster2);
     loadDataIntoCluster(createAvroDataMultipleSegments(TABLE_SIZE_CLUSTER_1, 1, SEGMENTS_PER_CLUSTER),
-        LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, _cluster1);
+      LOGICAL_FEDERATION_CLUSTER_1_TABLE_2, _cluster1);
     loadDataIntoCluster(createAvroDataMultipleSegments(TABLE_SIZE_CLUSTER_2, 2, SEGMENTS_PER_CLUSTER),
-        LOGICAL_FEDERATION_CLUSTER_2_TABLE_2, _cluster2);
-    String joinQuery = "SET useMultistageEngine=true; SET enableMultiClusterRouting=true; "
-        + "SELECT t1." + JOIN_COLUMN + ", COUNT(*) as count FROM " + LOGICAL_TABLE_NAME + " t1 "
-        + "JOIN " + LOGICAL_TABLE_NAME_2 + " t2 ON t1." + JOIN_COLUMN + " = t2." + JOIN_COLUMN + " "
-        + "GROUP BY t1." + JOIN_COLUMN + " LIMIT 20";
-    String result = executeQuery(joinQuery, _cluster1);
-    assertNotNull(result);
-    assertTrue(result.contains("resultTable"));
-    assertResultRows(result);
+      LOGICAL_FEDERATION_CLUSTER_2_TABLE_2, _cluster2);
+  }
+
+  @Test(dataProvider = "queryModes", groups = "query")
+  public void testLogicalFederationQueries(String testName, String queryOptions, boolean isJoinQuery,
+      int brokerPort, boolean expectUnavailableException)
+      throws Exception {
+    LOGGER.info("Running {} on broker port {} (expectUnavailableException={})",
+        testName, brokerPort, expectUnavailableException);
+    long expectedTotal = TABLE_SIZE_CLUSTER_1 + TABLE_SIZE_CLUSTER_2;
+
+    if (isJoinQuery) {
+      // Join query test
+      String joinQuery = queryOptions
+          + "SELECT t1." + JOIN_COLUMN + ", COUNT(*) as count FROM " + LOGICAL_TABLE_NAME + " t1 "
+          + "JOIN " + LOGICAL_TABLE_NAME_2 + " t2 ON t1." + JOIN_COLUMN + " = t2." + JOIN_COLUMN + " "
+          + "GROUP BY t1." + JOIN_COLUMN + " LIMIT 20";
+      String result = executeQueryOnBrokerPort(joinQuery, brokerPort);
+      assertNotNull(result);
+      assertTrue(result.contains("resultTable"), "Expected resultTable in response: " + result);
+      assertResultRows(result);
+      verifyUnavailableClusterException(result, expectUnavailableException);
+    }
+
+    // Count query test (all modes)
+    String countQuery = queryOptions + "SELECT COUNT(*) as count FROM " + LOGICAL_TABLE_NAME;
+    String countResult = executeQueryOnBrokerPort(countQuery, brokerPort);
+    assertEquals(parseCountResult(countResult), expectedTotal);
+    verifyUnavailableClusterException(countResult, expectUnavailableException);
+  }
+
+  /**
+   * Data provider for all query mode combinations: broker mode x query engine/options.
+   * Each test case has: testName, queryOptions, isJoinQuery, brokerPort, expectUnavailableException
+   */
+  @DataProvider(name = "queryModes")
+  public Object[][] queryModes() {
+    int normalBroker = _cluster1._brokerPort;
+    int unavailableBroker = _brokerWithUnavailableCluster._brokerPort;
+
+    String sseOpts = "SET enableMultiClusterRouting=true; ";
+    String mseOpts = sseOpts + "SET useMultistageEngine=true; ";
+    String physOptOpts = mseOpts + "SET usePhysicalOptimizer=true; ";
+    String mseLiteOpts = physOptOpts + "SET runInBroker=true; ";
+
+    return new Object[][]{
+        // SSE tests (count only)
+        {"SSE-NormalBroker", sseOpts, false, normalBroker, false},
+        {"SSE-UnavailableBroker", sseOpts, false, unavailableBroker, true},
+        // MSE tests (join + count)
+        {"MSE-NormalBroker", mseOpts, true, normalBroker, false},
+        {"MSE-UnavailableBroker", mseOpts, true, unavailableBroker, true},
+        // Physical optimizer tests (join + count)
+        {"PhysicalOptimizer-NormalBroker", physOptOpts, true, normalBroker, false},
+        {"PhysicalOptimizer-UnavailableBroker", physOptOpts, true, unavailableBroker, true},
+        // MSELiteMode tests (join + count)
+        {"MSELiteMode-NormalBroker", mseLiteOpts, true, normalBroker, false},
+        {"MSELiteMode-UnavailableBroker", mseLiteOpts, true, unavailableBroker, true},
+    };
   }
 
   @Override
@@ -497,9 +564,32 @@ public class MultiClusterIntegrationTest extends ClusterTest {
   }
 
   protected String executeQuery(String query, ClusterComponents cluster) throws Exception {
+    return executeQueryOnBrokerPort(query, cluster._brokerPort);
+  }
+
+  protected String executeQueryOnBrokerPort(String query, int brokerPort) throws Exception {
     Map<String, Object> payload = Map.of("sql", query);
-    String url = "http://localhost:" + cluster._brokerPort + "/query/sql";
+    String url = "http://localhost:" + brokerPort + "/query/sql";
     return ControllerTest.sendPostRequest(url, JsonUtils.objectToPrettyString(payload));
+  }
+
+  protected void verifyUnavailableClusterException(String result, boolean expectException) throws Exception {
+    if (expectException) {
+      assertTrue(result.contains(UNAVAILABLE_CLUSTER_NAME),
+          "Response should mention unavailable cluster: " + UNAVAILABLE_CLUSTER_NAME);
+      JsonNode resultJson = JsonMapper.builder().build().readTree(result);
+      JsonNode exceptions = resultJson.get("exceptions");
+      assertNotNull(exceptions, "Exceptions array should exist");
+      boolean found = false;
+      for (JsonNode ex : exceptions) {
+        if (ex.get("errorCode").asInt() == 510
+            && ex.get("message").asText().contains(UNAVAILABLE_CLUSTER_NAME)) {
+          found = true;
+          break;
+        }
+      }
+      assertTrue(found, "Should find REMOTE_CLUSTER_UNAVAILABLE (510) exception");
+    }
   }
 
   protected long parseCountResult(String result) {
@@ -525,6 +615,14 @@ public class MultiClusterIntegrationTest extends ClusterTest {
 
   @AfterClass
   public void tearDown() throws Exception {
+    // Stop the alternate broker with unavailable cluster
+    if (_brokerWithUnavailableCluster != null && _brokerWithUnavailableCluster._brokerStarter != null) {
+      try {
+        _brokerWithUnavailableCluster._brokerStarter.stop();
+      } catch (Exception e) {
+        LOGGER.warn("Error stopping broker with unavailable cluster", e);
+      }
+    }
     stopCluster(_cluster1);
     stopCluster(_cluster2);
   }

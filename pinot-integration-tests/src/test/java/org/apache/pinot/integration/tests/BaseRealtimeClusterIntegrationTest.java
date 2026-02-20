@@ -74,6 +74,8 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     addSchema(schema);
     TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
     addTableConfig(tableConfig);
+    waitForAllRealtimePartitionsConsuming(TableNameBuilder.REALTIME.tableNameWithType(getTableName()),
+        getRealtimePartitionsReadyTimeoutMs());
 
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
@@ -90,7 +92,15 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     runValidationJob(600_000);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+    waitForAllDocsLoaded(getDocsLoadedTimeoutMs());
+  }
+
+  protected long getDocsLoadedTimeoutMs() {
+    return useKafkaTransaction() ? 900_000L : 600_000L;
+  }
+
+  protected long getRealtimePartitionsReadyTimeoutMs() {
+    return useKafkaTransaction() ? 300_000L : 120_000L;
   }
 
   protected void runValidationJob(long timeoutMs)

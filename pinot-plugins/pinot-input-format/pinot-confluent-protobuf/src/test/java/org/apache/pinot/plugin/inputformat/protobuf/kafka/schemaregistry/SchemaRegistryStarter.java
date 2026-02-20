@@ -69,7 +69,8 @@ public class SchemaRegistryStarter {
 
       _network = Network.newNetwork();
 
-      _kafkaContainer = new KafkaContainer(KAFKA_DOCKER_IMAGE_NAME).withNetwork(_network).withNetworkAliases("kafka")
+      _kafkaContainer = new KafkaContainer(KAFKA_DOCKER_IMAGE_NAME)
+          .withNetwork(_network).withNetworkAliases("kafka")
           .withCreateContainerCmdModifier(it -> it.withHostName("kafka")).waitingFor(Wait.forListeningPort());
       _kafkaContainer.start();
 

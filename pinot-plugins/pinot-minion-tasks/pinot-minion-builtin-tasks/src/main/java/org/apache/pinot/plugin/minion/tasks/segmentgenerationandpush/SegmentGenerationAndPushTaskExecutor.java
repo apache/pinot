@@ -231,27 +231,18 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     spec.setPushJobSpec(pushJobSpec);
     spec.setTableSpec(tableSpec);
     spec.setPinotClusterSpecs(pinotClusterSpecs);
-    spec.setAuthToken(taskConfigs.get(BatchConfigProperties.AUTH_TOKEN));
+    spec.setAuthToken(MinionTaskUtils.resolveAuthToken(taskConfigs));
 
     return spec;
   }
 
-  private URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile)
+  @Override
+  protected URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile)
       throws Exception {
     if (!taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       return localSegmentTarFile.toURI();
     }
-    URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
-      URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
-      if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
-          outputSegmentTarURI)) {
-        LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentTarURI));
-      } else {
-        outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
-      }
-      return outputSegmentTarURI;
-    }
+    return super.moveSegmentToOutputPinotFS(taskConfigs, localSegmentTarFile);
   }
 
   private File tarSegmentDir(SegmentGenerationTaskSpec taskSpec, String segmentName)
@@ -295,7 +286,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
           BatchConfigProperties.RECORD_READER_PROP_PREFIX));
       taskSpec.setRecordReaderSpec(recordReaderSpec);
 
-      String authToken = taskConfigs.get(BatchConfigProperties.AUTH_TOKEN);
+      String authToken = MinionTaskUtils.resolveAuthToken(taskConfigs);
 
       String tableNameWithType = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
       Schema schema;

@@ -1009,7 +1009,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private boolean startSegmentCommit() {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
-        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason);
+        .withNumRows(_numRowsIndexed).withInstanceId(_instanceId).withReason(_stopReason);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -1295,7 +1295,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
-        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
+        .withNumRows(_numRowsIndexed).withInstanceId(_instanceId);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -1308,7 +1308,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
-        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason)
+        .withNumRows(_numRowsIndexed).withInstanceId(_instanceId).withReason(_stopReason)
         .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
         .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
         .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
@@ -1447,7 +1447,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withStreamPartitionMsgOffset(_currentOffset.toString()).withSegmentName(_segmentNameStr)
-        .withReason(_stopReason).withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
+        .withReason(_stopReason).withNumRows(_numRowsIndexed).withInstanceId(_instanceId);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -1520,8 +1520,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             if (_realtimeTableDataManager.isUpsertEnabled()
                 && _realtimeTableDataManager.getTableUpsertMetadataManager() != null) {
               UpsertContext context = _realtimeTableDataManager.getTableUpsertMetadataManager().getContext();
-              if (_realtimeTableDataManager.isPartialUpsertEnabled() || (context.isDropOutOfOrderRecord()
-                  && context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE)) {
+              if (_realtimeTableDataManager.isPartialUpsertEnabled() || context.isDropOutOfOrderRecord()
+                  || context.getOutOfOrderRecordColumn() != null) {
                 _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_AHEAD_OF_ZK, 1L);
               }
             }
@@ -1877,8 +1877,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     //     TODO: Revisit the non-pauseless handling
     if (_partitionUpsertMetadataManager != null) {
       UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
-      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit()
-          || upsertContext.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
+      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit() || (
+          upsertContext.getUpsertMode() != UpsertConfig.Mode.PARTIAL && !upsertContext.isDropOutOfOrderRecord()
+              && upsertContext.getOutOfOrderRecordColumn() == null)) {
         return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
       }
       return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY

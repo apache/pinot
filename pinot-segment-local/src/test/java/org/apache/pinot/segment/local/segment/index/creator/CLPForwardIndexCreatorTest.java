@@ -80,7 +80,7 @@ public class CLPForwardIndexCreatorTest implements PinotBuffersAfterMethodCheckR
     TableConfig tableConfig =
         new TableConfig("mytable", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig(null, null, null), new IndexingConfig(), new TableCustomConfig(null), null, null, null,
-            null, null, null, null, null, null, null, null, false, null, null, null);
+            null, null, null, null, null, null, null, null, false, null, null, null, null);
     List<FieldConfig> fieldConfigList = new ArrayList<>();
     fieldConfigList.add(new FieldConfig("column1", FieldConfig.EncodingType.RAW, Collections.EMPTY_LIST,
         FieldConfig.CompressionCodec.CLP, Collections.EMPTY_MAP));

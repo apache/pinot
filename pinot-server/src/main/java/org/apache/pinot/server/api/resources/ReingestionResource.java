@@ -56,6 +56,9 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.realtime.writer.StatelessRealtimeSegmentWriter;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -134,6 +137,7 @@ public class ReingestionResource {
   @GET
   @Path("/reingestSegment/jobs")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @ApiOperation("Get all running re-ingestion jobs along with job IDs")
   public Response getAllRunningReingestionJobs() {
     // Filter only the jobs still marked as running
@@ -144,6 +148,7 @@ public class ReingestionResource {
   @POST
   @Path("/reingestSegment/{segmentName}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT)
   @ApiOperation(value = "Re-ingest segment asynchronously", notes = "Returns a jobId immediately; ingestion runs in "
       + "background.")
   @ApiResponses(value = {

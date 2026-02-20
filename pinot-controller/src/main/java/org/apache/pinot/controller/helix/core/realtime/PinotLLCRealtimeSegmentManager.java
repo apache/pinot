@@ -51,11 +51,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.HelixAdmin;
@@ -376,6 +378,20 @@ public class PinotLLCRealtimeSegmentManager {
    * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
    */
   public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+    List<Pair<PartitionGroupMetadata, Integer>> newPartitionGroupMetadataList =
+        getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), idealState).stream().map(
+            x -> Pair.of(x, STARTING_SEQUENCE_NUMBER)
+        ).collect(Collectors.toList());
+    setUpNewTable(tableConfig, idealState, newPartitionGroupMetadataList);
+  }
+
+  /**
+   * Sets up the initial segments for a new LLC real-time table.
+   * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
+   */
+  public void setUpNewTable(TableConfig tableConfig, IdealState idealState,
+      List<Pair<PartitionGroupMetadata, Integer>> consumeMeta) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -384,9 +400,7 @@ public class PinotLLCRealtimeSegmentManager {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
     streamConfigs.forEach(_flushThresholdUpdateManager::clearFlushThresholdUpdater);
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
-    List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-        getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), idealState);
-    int numPartitionGroups = newPartitionGroupMetadataList.size();
+    int numPartitionGroups = consumeMeta.size();
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
     SegmentAssignment segmentAssignment =
@@ -396,11 +410,13 @@ public class PinotLLCRealtimeSegmentManager {
 
     long currentTimeMs = getCurrentTimeMs();
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
-    for (PartitionGroupMetadata partitionGroupMetadata : newPartitionGroupMetadataList) {
+    for (Pair<PartitionGroupMetadata, Integer> pair : consumeMeta) {
+      PartitionGroupMetadata metadata = pair.getLeft();
+      int sequence = pair.getRight();
       StreamConfig streamConfig = IngestionConfigUtils.getStreamConfigFromPinotPartitionId(streamConfigs,
-          partitionGroupMetadata.getPartitionGroupId());
+          metadata.getPartitionGroupId());
       String segmentName =
-          setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, currentTimeMs, instancePartitions,
+          setupNewPartitionGroup(tableConfig, streamConfig, metadata, sequence, currentTimeMs, instancePartitions,
               numPartitionGroups, numReplicas);
       updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, segmentName, segmentAssignment,
           instancePartitionsMap);
@@ -640,10 +656,6 @@ public class PinotLLCRealtimeSegmentManager {
     String committingSegmentName = committingSegmentDescriptor.getSegmentName();
     TableConfig tableConfig = getTableConfig(realtimeTableName);
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
-    IdealState idealState = getIdealState(realtimeTableName);
-    Preconditions.checkState(
-        idealState.getInstanceStateMap(committingSegmentName).containsValue(SegmentStateModel.CONSUMING),
-        "Failed to find instance in CONSUMING state in IdealState for segment: %s", committingSegmentName);
 
     /*
      * Update zookeeper in 3 steps.
@@ -665,7 +677,7 @@ public class PinotLLCRealtimeSegmentManager {
     // Step-2: Create new segment metadata if needed
     long startTimeNs2 = System.nanoTime();
     String newConsumingSegmentName =
-        createNewSegmentMetadata(tableConfig, idealState, committingSegmentDescriptor, committingSegmentZKMetadata,
+        createNewSegmentMetadata(tableConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
             instancePartitions);
 
     preProcessCommitIdealStateUpdate();
@@ -674,13 +686,34 @@ public class PinotLLCRealtimeSegmentManager {
     LOGGER.info("Updating Idealstate for previous: {} and new segment: {}", committingSegmentName,
         newConsumingSegmentName);
     long startTimeNs3 = System.nanoTime();
+    Map<String, Map<String, String>> instanceStatesMapAfterStep3 = Collections.emptyMap();
+    boolean newConsumingSegmentInIdealState = false;
 
     // When multiple segments of the same table complete around the same time it is possible that
     // the idealstate update fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    idealState =
-        updateIdealStateForSegments(tableConfig, committingSegmentName, newConsumingSegmentName, instancePartitions);
+    try {
+      IdealState idealState =
+          updateIdealStateForSegments(tableConfig, committingSegmentName, newConsumingSegmentName, instancePartitions);
+      instanceStatesMapAfterStep3 = idealState.getRecord().getMapFields();
+      if (newConsumingSegmentName != null) {
+        newConsumingSegmentInIdealState = instanceStatesMapAfterStep3.containsKey(newConsumingSegmentName);
+        if (!newConsumingSegmentInIdealState) {
+          LOGGER.info(
+              "Cleaning up segment ZK metadata for new consuming segment {} of table {} because it was not added to "
+                  + "IdealState. This can happen when table/topic consumption is paused.",
+              newConsumingSegmentName, realtimeTableName);
+          removeSegmentZKMetadataBestEffort(realtimeTableName, newConsumingSegmentName);
+          newConsumingSegmentName = null;
+        }
+      }
+    } catch (RuntimeException e) {
+      if (newConsumingSegmentName != null) {
+        removeSegmentZKMetadataBestEffort(realtimeTableName, newConsumingSegmentName);
+      }
+      throw e;
+    }
 
     long endTimeNs = System.nanoTime();
     LOGGER.info(
@@ -702,8 +735,8 @@ public class PinotLLCRealtimeSegmentManager {
     _metadataEventNotifierFactory.create().notifyOnSegmentFlush(tableConfig);
 
     // Handle segment movement if necessary
-    if (newConsumingSegmentName != null) {
-      handleSegmentMovement(realtimeTableName, idealState.getRecord().getMapFields(), committingSegmentName,
+    if (newConsumingSegmentInIdealState) {
+      handleSegmentMovement(realtimeTableName, instanceStatesMapAfterStep3, committingSegmentName,
           newConsumingSegmentName);
     }
   }
@@ -782,7 +815,7 @@ public class PinotLLCRealtimeSegmentManager {
 
   // Step 2: Create new segment metadata
   @Nullable
-  private String createNewSegmentMetadata(TableConfig tableConfig, IdealState idealState,
+  private String createNewSegmentMetadata(TableConfig tableConfig,
       CommittingSegmentDescriptor committingSegmentDescriptor, SegmentZKMetadata committingSegmentZKMetadata,
       InstancePartitions instancePartitions) {
     String committingSegmentName = committingSegmentDescriptor.getSegmentName();
@@ -791,38 +824,60 @@ public class PinotLLCRealtimeSegmentManager {
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
     String newConsumingSegmentName = null;
-    if (!isTablePaused(idealState) && !isTopicPaused(idealState, committingSegmentName)) {
-      LLCSegmentName committingLLCSegment = new LLCSegmentName(committingSegmentName);
-      int committingSegmentPartitionGroupId = committingLLCSegment.getPartitionGroupId();
+    LLCSegmentName committingLLCSegment = new LLCSegmentName(committingSegmentName);
+    int committingSegmentPartitionGroupId = committingLLCSegment.getPartitionGroupId();
 
-      List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
-      Set<Integer> partitionIds = getPartitionIds(streamConfigs, idealState);
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+    PartitionIdsWithIdealState partitionIdsWithIdealState = getPartitionIdsWithIdealState(streamConfigs,
+        () -> getIdealState(realtimeTableName));
+    Set<Integer> partitionIds = partitionIdsWithIdealState._partitionIds;
 
-      if (partitionIds.contains(committingSegmentPartitionGroupId)) {
-        String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
-        long newSegmentCreationTimeMs = getCurrentTimeMs();
-        LLCSegmentName newLLCSegment = new LLCSegmentName(rawTableName, committingSegmentPartitionGroupId,
-            committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
-
-        StreamConfig streamConfig =
-            IngestionConfigUtils.getStreamConfigFromPinotPartitionId(streamConfigs, committingSegmentPartitionGroupId);
-        createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegment, newSegmentCreationTimeMs,
-            committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, partitionIds.size(),
-            numReplicas);
-        newConsumingSegmentName = newLLCSegment.getSegmentName();
-        LOGGER.info("Created new segment metadata for segment: {} with status: {}.", newConsumingSegmentName,
-            Status.IN_PROGRESS);
-      } else {
-        LOGGER.info(
-            "Skipping creation of new segment metadata after segment: {} during commit. Reason: Partition ID: {} not "
-                + "found in upstream metadata.", committingSegmentName, committingSegmentPartitionGroupId);
+    if (partitionIds.contains(committingSegmentPartitionGroupId)) {
+      IdealState idealState = partitionIdsWithIdealState._idealState;
+      if (idealState == null) {
+        idealState = getIdealState(realtimeTableName);
       }
+      if (idealState != null
+          && (isTablePaused(idealState) || isTopicPaused(idealState, committingSegmentName))) {
+        LOGGER.info("Skipping creation of new segment metadata after segment: {} during commit. Reason: table/topic is "
+            + "paused.", committingSegmentName);
+        return null;
+      }
+      String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+      long newSegmentCreationTimeMs = getCurrentTimeMs();
+      LLCSegmentName newLLCSegment = new LLCSegmentName(rawTableName, committingSegmentPartitionGroupId,
+          committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
+
+      StreamConfig streamConfig =
+          IngestionConfigUtils.getStreamConfigFromPinotPartitionId(streamConfigs, committingSegmentPartitionGroupId);
+      createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegment, newSegmentCreationTimeMs,
+          committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, partitionIds.size(),
+          numReplicas);
+      newConsumingSegmentName = newLLCSegment.getSegmentName();
+      LOGGER.info("Created new segment metadata for segment: {} with status: {}.", newConsumingSegmentName,
+          Status.IN_PROGRESS);
     } else {
       LOGGER.info(
-          "Skipping creation of new segment metadata after segment: {} during commit. Reason: table: {} is paused.",
-          committingSegmentName, realtimeTableName);
+          "Skipping creation of new segment metadata after segment: {} during commit. Reason: Partition ID: {} not "
+              + "found in upstream metadata.", committingSegmentName, committingSegmentPartitionGroupId);
     }
     return newConsumingSegmentName;
+  }
+
+  private void removeSegmentZKMetadataBestEffort(String realtimeTableName, String segmentName) {
+    String segmentMetadataPath =
+        ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName);
+    try {
+      if (!_propertyStore.remove(segmentMetadataPath, AccessOption.PERSISTENT)) {
+        LOGGER.warn("Failed to remove segment ZK metadata for segment: {} of table: {}", segmentName,
+            realtimeTableName);
+      } else {
+        LOGGER.debug("Removed segment ZK metadata for segment: {} of table: {}", segmentName, realtimeTableName);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while removing segment ZK metadata for segment: {} of table: {}", segmentName,
+          realtimeTableName, e);
+    }
   }
 
   // Step 3: Update IdealState
@@ -1122,6 +1177,22 @@ public class PinotLLCRealtimeSegmentManager {
 
   @VisibleForTesting
   Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs, IdealState idealState) {
+    return getPartitionIdsWithIdealState(streamConfigs, () -> idealState)._partitionIds;
+  }
+
+  private static class PartitionIdsWithIdealState {
+    private final Set<Integer> _partitionIds;
+    @Nullable
+    private final IdealState _idealState;
+
+    private PartitionIdsWithIdealState(Set<Integer> partitionIds, @Nullable IdealState idealState) {
+      _partitionIds = partitionIds;
+      _idealState = idealState;
+    }
+  }
+
+  private PartitionIdsWithIdealState getPartitionIdsWithIdealState(List<StreamConfig> streamConfigs,
+      Supplier<IdealState> idealStateSupplier) {
     Set<Integer> partitionIds = new HashSet<>();
     boolean allPartitionIdsFetched = true;
     int numStreams = streamConfigs.size();
@@ -1161,6 +1232,7 @@ public class PinotLLCRealtimeSegmentManager {
     // If it is failing to fetch partition ids from stream (usually transient due to stream metadata service outage),
     // we need to use the existing partition information from ideal state to keep same ingestion behavior.
     if (!allPartitionIdsFetched) {
+      IdealState idealState = idealStateSupplier.get();
       LOGGER.info(
           "Fetch partition ids from Stream incomplete, merge fetched partitionIds with partition group metadata "
               + "for: {}", idealState.getId());
@@ -1173,8 +1245,9 @@ public class PinotLLCRealtimeSegmentManager {
       partitionIds.addAll(newPartitionGroupMetadataList.stream()
           .map(PartitionGroupMetadata::getPartitionGroupId)
           .collect(Collectors.toSet()));
+      return new PartitionIdsWithIdealState(partitionIds, idealState);
     }
-    return partitionIds;
+    return new PartitionIdsWithIdealState(partitionIds, null);
   }
 
   /**
@@ -1413,9 +1486,9 @@ public class PinotLLCRealtimeSegmentManager {
         throw new HelixHelper.PermanentUpdaterException(
             "Exceeded max segment completion time for segment " + committingSegmentName);
       }
-      updateInstanceStatesForNewConsumingSegment(idealState.getRecord().getMapFields(), committingSegmentName,
-          isTablePaused(idealState) || isTopicPaused(idealState, committingSegmentName) ? null : newSegmentName,
-          segmentAssignment, instancePartitionsMap);
+    updateInstanceStatesForNewConsumingSegment(idealState.getRecord().getMapFields(), committingSegmentName,
+        isTablePaused(idealState) || isTopicPaused(idealState, committingSegmentName), newSegmentName,
+        segmentAssignment, instancePartitionsMap);
       return idealState;
     };
     if (_controllerConf.getSegmentCompletionGroupCommitEnabled()) {
@@ -1471,9 +1544,20 @@ public class PinotLLCRealtimeSegmentManager {
   void updateInstanceStatesForNewConsumingSegment(Map<String, Map<String, String>> instanceStatesMap,
       @Nullable String committingSegmentName, @Nullable String newSegmentName, SegmentAssignment segmentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+    updateInstanceStatesForNewConsumingSegment(instanceStatesMap, committingSegmentName, false, newSegmentName,
+        segmentAssignment, instancePartitionsMap);
+  }
+
+  private void updateInstanceStatesForNewConsumingSegment(Map<String, Map<String, String>> instanceStatesMap,
+      @Nullable String committingSegmentName, boolean isTableOrTopicPaused, @Nullable String newSegmentName,
+      SegmentAssignment segmentAssignment, Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
     if (committingSegmentName != null) {
       // Change committing segment state to ONLINE
-      Set<String> instances = instanceStatesMap.get(committingSegmentName).keySet();
+      Map<String, String> committingSegmentInstanceStateMap = instanceStatesMap.get(committingSegmentName);
+      Preconditions.checkState(committingSegmentInstanceStateMap != null && committingSegmentInstanceStateMap
+              .containsValue(SegmentStateModel.CONSUMING),
+          "Failed to find instance in CONSUMING state in IdealState for segment: %s", committingSegmentName);
+      Set<String> instances = committingSegmentInstanceStateMap.keySet();
       instanceStatesMap.put(committingSegmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instances, SegmentStateModel.ONLINE));
       LOGGER.info("Updating segment: {} to ONLINE state", committingSegmentName);
@@ -1486,7 +1570,7 @@ public class PinotLLCRealtimeSegmentManager {
     // These conditions can happen again due to manual operations considered as fixes in Issues #5559 and #5263
     // The following check prevents the table from going into such a state (but does not prevent the root cause
     // of attempting such a zk update).
-    if (newSegmentName != null) {
+    if (newSegmentName != null && !isTableOrTopicPaused) {
       LLCSegmentName newLLCSegmentName = new LLCSegmentName(newSegmentName);
       int partitionId = newLLCSegmentName.getPartitionGroupId();
       int seqNum = newLLCSegmentName.getSequenceNumber();
@@ -1903,17 +1987,26 @@ public class PinotLLCRealtimeSegmentManager {
   private String setupNewPartitionGroup(TableConfig tableConfig, StreamConfig streamConfig,
       PartitionGroupMetadata partitionGroupMetadata, long creationTimeMs, InstancePartitions instancePartitions,
       int numPartitions, int numReplicas) {
+    return setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, STARTING_SEQUENCE_NUMBER,
+        creationTimeMs, instancePartitions, numPartitions, numReplicas);
+  }
+
+  private String setupNewPartitionGroup(TableConfig tableConfig, StreamConfig streamConfig,
+      PartitionGroupMetadata partitionGroupMetadata, int sequence, long creationTimeMs,
+      InstancePartitions instancePartitions, int numPartitions, int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     int partitionGroupId = partitionGroupMetadata.getPartitionGroupId();
     String startOffset = partitionGroupMetadata.getStartOffset().toString();
-    LOGGER.info("Setting up new partition group: {} for table: {}", partitionGroupId, realtimeTableName);
+    LOGGER.info("Setting up new partition group: {} for table: {} with sequence: {} and startOffset: {}",
+        partitionGroupId, realtimeTableName, sequence, startOffset);
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     LLCSegmentName newLLCSegmentName =
-        new LLCSegmentName(rawTableName, partitionGroupId, STARTING_SEQUENCE_NUMBER, creationTimeMs);
+        new LLCSegmentName(rawTableName, partitionGroupId, sequence, creationTimeMs);
     String newSegmentName = newLLCSegmentName.getSegmentName();
 
-    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null,
+            startOffset, 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
         committingSegmentDescriptor, null, instancePartitions, numPartitions, numReplicas);
 

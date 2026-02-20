@@ -59,6 +59,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -923,7 +924,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         LoaderUtils.reloadFailureRecovery(indexDir);
       } catch (Exception recoveryFailureException) {
         _logger.error("Failed to recover segment: {} after reload failure", segmentName, recoveryFailureException);
-        reloadFailureException.addSuppressed(recoveryFailureException);
+        ExceptionUtils.suppress(recoveryFailureException, reloadFailureException);
       }
       addSegmentError(segmentName,
           new SegmentErrorInfo(System.currentTimeMillis(), "Caught exception while reloading segment",
@@ -1659,8 +1660,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
   }
 
+  // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
+  // useDataCRC.
   private static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
-    return zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc());
+    if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
+      return true;
+    }
+    return zkMetadata.isUseDataCrc()
+            && zkMetadata.getDataCrc() >= 0
+            && Long.parseLong(localMetadata.getDataCrc()) >= 0
+            && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
   }
 
   private static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {

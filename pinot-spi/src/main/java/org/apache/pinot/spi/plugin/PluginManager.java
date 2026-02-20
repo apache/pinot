@@ -95,8 +95,12 @@ public class PluginManager {
       put("org.apache.pinot.filesystem.LocalPinotFS", "org.apache.pinot.spi.filesystem.LocalPinotFS");
 
       // StreamConsumerFactory
+      // Old-style class names mapped to current plugin packages
+      // Rename the usage of kafka 2 to kafka 3
       put("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
+          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+      put("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
       put("org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory",
           "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
     }

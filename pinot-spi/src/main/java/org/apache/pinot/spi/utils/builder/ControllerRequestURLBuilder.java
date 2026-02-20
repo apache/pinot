@@ -347,6 +347,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "schema");
   }
 
+  public String forConsumerWatermarksGet(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "consumerWatermarks");
+  }
+
   public String forTableExternalView(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
   }

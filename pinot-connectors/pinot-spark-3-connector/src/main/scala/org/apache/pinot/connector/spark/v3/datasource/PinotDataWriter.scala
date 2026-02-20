@@ -185,7 +185,7 @@ class PinotDataWriter[InternalRow](
       new TableCustomConfig(null),
       null, null, null, null, null, null, null,
       null, null, null, null, false, null, null,
-      null)
+      null, null)
 
     val segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, pinotSchema)
     segmentGeneratorConfig.setTableName(tableName)

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
@@ -63,6 +64,7 @@ public class Constants {
   public static final String REALTIME_SEGMENT_VALIDATION_MANAGER = "RealtimeSegmentValidationManager";
   public static final String REALTIME_OFFSET_AUTO_RESET_MANAGER = "RealtimeOffsetAutoResetManager";
 
+  @Nullable
   public static TableType validateTableType(String tableTypeStr) {
     if (StringUtils.isBlank(tableTypeStr)) {
       return null;

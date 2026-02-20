@@ -342,6 +342,13 @@ public class PinotClientRequest {
           }
       });
 
+      if (isExplainMode(requestJson)) {
+        BrokerResponse explainResponse = _requestHandler.handleExplainTimeSeriesRequest(language, queryString,
+          queryParams);
+        asyncResponse.resume(explainResponse);
+        return;
+      }
+
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         TimeSeriesBlock timeSeriesBlock = executeTimeSeriesQuery(language, queryString, queryParams,
             requestContext, makeHttpIdentity(requestCtx), httpHeaders);
@@ -639,6 +646,10 @@ public class PinotClientRequest {
       HttpHeaders httpHeaders) throws QueryException {
     return _requestHandler.handleTimeSeriesRequest(language, queryString, queryParams, requestContext,
         requesterIdentity, httpHeaders);
+  }
+
+  private static boolean isExplainMode(JsonNode requestJson) {
+    return requestJson.has("mode") && "explain".equalsIgnoreCase(requestJson.get("mode").asText());
   }
 
   public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {

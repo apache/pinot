@@ -43,6 +43,9 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -63,6 +66,7 @@ public class PinotServerLogger {
   @GET
   @Path("/loggers")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOGGER)
   @ApiOperation(value = "Get all the loggers", notes = "Return all the logger names")
   public List<String> getLoggers() {
     return LoggerUtils.getAllConfiguredLoggers();
@@ -71,6 +75,7 @@ public class PinotServerLogger {
   @GET
   @Path("/loggers/{loggerName}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOGGER)
   @ApiOperation(value = "Get logger configs", notes = "Return logger info")
   public Map<String, String> getLogger(
       @ApiParam(value = "Logger name", required = true) @PathParam("loggerName") String loggerName) {
@@ -84,6 +89,7 @@ public class PinotServerLogger {
   @PUT
   @Path("/loggers/{loggerName}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_LOGGER)
   @ApiOperation(value = "Set logger level", notes = "Set logger level for a given logger")
   public Map<String, String> setLoggerLevel(@ApiParam(value = "Logger name") @PathParam("loggerName") String loggerName,
       @ApiParam(value = "Logger level") @QueryParam("level") String level) {
@@ -93,6 +99,7 @@ public class PinotServerLogger {
   @GET
   @Path("/loggers/files")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @ApiOperation(value = "Get all local log files")
   public Set<String> getLocalLogFiles() {
     try {
@@ -108,6 +115,7 @@ public class PinotServerLogger {
   @GET
   @Path("/loggers/download")
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @ApiOperation(value = "Download a log file")
   public Response downloadLogFile(
       @ApiParam(value = "Log file path", required = true) @QueryParam("filePath") String filePath) {

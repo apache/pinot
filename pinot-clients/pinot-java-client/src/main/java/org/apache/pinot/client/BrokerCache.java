@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.utils.BrokerSelectorUtils;
 import org.apache.pinot.client.utils.ConnectionUtils;
@@ -211,6 +212,7 @@ public class BrokerCache {
     _brokerData = getBrokerData(responses);
   }
 
+  @Nullable
   public String getBroker(String... tableNames) {
     // If tableNames is not-null, filter out nulls
     tableNames = tableNames == null ? tableNames

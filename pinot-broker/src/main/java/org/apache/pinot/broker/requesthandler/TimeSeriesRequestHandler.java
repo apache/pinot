@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -45,13 +46,17 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HumanReadableDuration;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
@@ -146,14 +151,16 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       try {
         timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       } catch (URISyntaxException e) {
-        throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);
+        throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest: "
+            + e.getMessage(), e);
       }
       requestContext.setQuery(timeSeriesRequest.getQuery());
 
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
       // If there are no buckets in the logical plan, return an empty response.
       if (logicalPlanResult.getTimeBuckets().getNumBuckets() == 0) {
-        return new TimeSeriesBlock(logicalPlanResult.getTimeBuckets(), new HashMap<>());
+        timeSeriesBlock = new TimeSeriesBlock(logicalPlanResult.getTimeBuckets(), new HashMap<>());
+        return timeSeriesBlock;
       }
       TimeSeriesDispatchablePlan dispatchablePlan =
           _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
@@ -161,6 +168,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
 
       timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
           timeSeriesRequest.getTimeout().toMillis(), requestContext);
+
       TimeSeriesResponseMapper.setStatsInRequestContext(requestContext, timeSeriesBlock.getMetadata());
       setExceptionsFromBlockToRequestContext(timeSeriesBlock, requestContext);
       return timeSeriesBlock;
@@ -170,14 +178,17 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       if (e instanceof QueryException) {
         qe = (QueryException) e;
       } else {
-        qe = new QueryException(QueryErrorCode.UNKNOWN, "Error processing time-series query", e);
+        qe = new QueryException(QueryErrorCode.UNKNOWN, e.getClass().getSimpleName() + ": " + e.getMessage(), e);
       }
       requestContext.setErrorCode(qe.getErrorCode());
       throw qe;
     } finally {
-      _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, System.currentTimeMillis() - queryStartTime,
-          TimeUnit.MILLISECONDS);
+      long endToEndTimeMs = System.currentTimeMillis() - queryStartTime;
+      _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, endToEndTimeMs, TimeUnit.MILLISECONDS);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
+      if (timeSeriesBlock != null) {
+        timeSeriesBlock.getMetadata().put(DataTable.MetadataKey.TIME_USED_MS.getName(), String.valueOf(endToEndTimeMs));
+      }
     }
   }
 
@@ -393,5 +404,34 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
           Response.Status.FORBIDDEN);
       }
     }
+  }
+
+  @Override
+  public BrokerResponse handleExplainTimeSeriesRequest(String lang, String rawQueryParamString,
+      Map<String, String> queryParams) {
+    try {
+      RangeTimeSeriesRequest request = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
+      TimeSeriesLogicalPlanResult planResult = _queryEnvironment.buildLogicalPlan(request);
+      String plan = explainPlanTree(planResult.getPlanNode(), new StringBuilder(), 0).toString();
+      DataSchema schema = new DataSchema(new String[]{"QUERY", "PLAN"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+      BrokerResponseNative response = BrokerResponseNative.empty();
+      response.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[]{request.getQuery(),
+        plan})));
+      return response;
+    } catch (URISyntaxException e) {
+      throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);
+    }
+  }
+
+  private static StringBuilder explainPlanTree(BaseTimeSeriesPlanNode node, StringBuilder sb, int depth) {
+    if (depth > 0) {
+      sb.append("\n").append("  ".repeat(depth));
+    }
+    sb.append(node.getExplainName());
+    for (BaseTimeSeriesPlanNode child : node.getInputs()) {
+      explainPlanTree(child, sb, depth + 1);
+    }
+    return sb;
   }
 }

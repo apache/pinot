@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -44,21 +44,13 @@ import static org.testng.Assert.assertEquals;
 
 public class FreshnessBasedConsumptionStatusCheckerTest {
 
-  private class FakeFreshnessBasedConsumptionStatusChecker extends FreshnessBasedConsumptionStatusChecker {
-
-    private final long _now;
-
-    public FakeFreshnessBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
-        Map<String, Set<String>> consumingSegments, Function<String, Set<String>> consumingSegmentsSupplier,
-        long minFreshnessMs, long idleTimeoutMs, long now) {
-      super(instanceDataManager, consumingSegments, consumingSegmentsSupplier, minFreshnessMs, idleTimeoutMs);
-      _now = now;
-    }
-
-    @Override
-    protected long now() {
-      return _now;
-    }
+  private void setupMinimumIngestionLag(RealtimeSegmentDataManager segmentDataManager,
+      long minimumIngestionLagMs) {
+    MutableSegment mockSegment = mock(MutableSegment.class);
+    SegmentMetadata mockSegmentMetdata = mock(SegmentMetadata.class);
+    when(mockSegment.getSegmentMetadata()).thenReturn(mockSegmentMetdata);
+    when(mockSegmentMetdata.getMinimumIngestionLagMs()).thenReturn(minimumIngestionLagMs);
+    when(segmentDataManager.getSegment()).thenReturn(mockSegment);
   }
 
   @Test
@@ -91,20 +83,17 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
-    MutableSegment mockSegment = mock(MutableSegment.class);
-    SegmentMetadata mockSegmentMetdata = mock(SegmentMetadata.class);
-    when(mockSegment.getSegmentMetadata()).thenReturn(mockSegmentMetdata);
-    when(mockSegmentMetdata.getLatestIngestionTimestamp()).thenReturn(0L);
+    // mock minimum ingestion lag higher than the threshold so offset catchup is used
+    setupMinimumIngestionLag(segMngrA0, Long.MAX_VALUE);
+    setupMinimumIngestionLag(segMngrA1, Long.MAX_VALUE);
+    setupMinimumIngestionLag(segMngrB0, Long.MAX_VALUE);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              15                       20                     now               0
-    // segA1              150                      200                    now               0
-    // segB0              1500                     2000                   now               0
-    when(segMngrA0.getSegment()).thenReturn(mockSegment);
+    //              current offset          latest stream offset    minimum ingestion lag
+    // segA0              15                       20                     MAX_VALUE
+    // segA1              150                      200                    MAX_VALUE
+    // segB0              1500                     2000                   MAX_VALUE
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(15));
-    when(segMngrA1.getSegment()).thenReturn(mockSegment);
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(150));
-    when(segMngrB0.getSegment()).thenReturn(mockSegment);
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1500));
 
     StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
@@ -119,26 +108,29 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(200)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(2000)));
 
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              20                       20                     now               0
-    // segA1              300                      200                    now               0
-    // segB0              1998                     2000                   now               0
+    //              current offset          latest stream offset
+    // segA0              20                       20
+    // segA1              300                      200
+    // segB0              1998                     2000
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     // The unexpected case where currentOffset > latestOffset
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(300));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1998));
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              20                       20                     100               0
-    // segA1              200                      200                    100               0
-    // segB0              2000                     2000                   100               0
+    //              current offset          latest stream offset
+    // segA0              20                       20
+    // segA1              200                      200
+    // segB0              2000                     2000
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(2000));
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
@@ -174,14 +166,15 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
     when(segMngrA0.getStreamPartitionId()).thenReturn(0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
 
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
-    // ensure negative values are ignored
-    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
+    // ensure high lag values are handled - offset catchup will be used
+    setupMinimumIngestionLag(segMngrA0, Long.MAX_VALUE);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              0                       20                     100               Long.MIN_VALUE
+    //              current offset          latest stream offset    minimum ingestion lag
+    // segA0              0                       20                     MAX_VALUE
     // segA1 (segment is absent)
     // segB0 (table is absent)
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -196,15 +189,6 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
-  private void setupLatestIngestionTimestamp(RealtimeSegmentDataManager segmentDataManager,
-      long latestIngestionTimestamp) {
-    MutableSegment mockSegment = mock(MutableSegment.class);
-    SegmentMetadata mockSegmentMetdata = mock(SegmentMetadata.class);
-    when(mockSegment.getSegmentMetadata()).thenReturn(mockSegmentMetdata);
-    when(mockSegmentMetdata.getLatestIngestionTimestamp()).thenReturn(latestIngestionTimestamp);
-    when(segmentDataManager.getSegment()).thenReturn(mockSegment);
-  }
-
   @Test
   public void regularCaseWithFreshnessCatchup() {
     String segA0 = "tableA__0__0__123Z";
@@ -214,9 +198,10 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    long minFreshnessMs = 10L;
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
-            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L, 100L);
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), minFreshnessMs, 0L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -247,38 +232,41 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(200)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(2000)));
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
-    // ensure negative values are ignored
-    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
-    setupLatestIngestionTimestamp(segMngrA1, -1L);
-    setupLatestIngestionTimestamp(segMngrB0, 0L);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              0                       20                     100               Long.MIN_VALUE
-    // segA1              0                       200                    100               -1
-    // segB0              0                       2000                   100               0
+    // High minimum ingestion lag - segments not caught up
+    setupMinimumIngestionLag(segMngrA0, 200L);
+    setupMinimumIngestionLag(segMngrA1, 200L);
+    setupMinimumIngestionLag(segMngrB0, 200L);
+
+    //              minimum ingestion lag     minFreshnessMs
+    // segA0              200                      10
+    // segA1              200                      10
+    // segB0              200                      10
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              0                       20                     100               90
-    // segA1              0                       200                    100               101
-    // segB0              0                       2000                   100               50
-    setupLatestIngestionTimestamp(segMngrA0, 90L);
-    // Unexpected case where latest ingested is somehow after current time
-    setupLatestIngestionTimestamp(segMngrA1, 101L);
-    setupLatestIngestionTimestamp(segMngrB0, 89L);
+    //              minimum ingestion lag     minFreshnessMs
+    // segA0              5                       10  (caught up)
+    // segA1              10                      10  (caught up - exactly at threshold)
+    // segB0              15                      10  (not caught up)
+    setupMinimumIngestionLag(segMngrA0, 5L);
+    setupMinimumIngestionLag(segMngrA1, 10L);
+    setupMinimumIngestionLag(segMngrB0, 15L);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              20                       20                     100               90
-    // segA1              200                      200                    100               101
-    // segB0              1999                     2000                   100               95
-    setupLatestIngestionTimestamp(segMngrB0, 95L);
+    //              minimum ingestion lag     minFreshnessMs
+    // segA0              5                       10  (caught up)
+    // segA1              10                      10  (caught up)
+    // segB0              8                       10  (caught up)
+    setupMinimumIngestionLag(segMngrB0, 8L);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
@@ -293,8 +281,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     long idleTimeoutMs = 10L;
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
-            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, idleTimeoutMs, 100L);
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, idleTimeoutMs);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -325,6 +313,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(20)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
@@ -332,10 +323,11 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
-    // ensure negative values are ignored
-    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
-    setupLatestIngestionTimestamp(segMngrA1, -1L);
-    setupLatestIngestionTimestamp(segMngrB0, 0L);
+
+    // mock minimum ingestion lag higher than the threshold so idle timeout is used
+    setupMinimumIngestionLag(segMngrA0, 200L);
+    setupMinimumIngestionLag(segMngrA1, 200L);
+    setupMinimumIngestionLag(segMngrB0, 200L);
 
     when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(0L);
     when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(0L);
@@ -382,8 +374,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
-            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L, 100L);
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -414,6 +406,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(20)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
@@ -421,10 +416,10 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
-    // ensure negative values are ignored
-    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
-    setupLatestIngestionTimestamp(segMngrA1, -1L);
-    setupLatestIngestionTimestamp(segMngrB0, 0L);
+    // minimum ingestion lag is higher than threshold
+    setupMinimumIngestionLag(segMngrA0, 200L);
+    setupMinimumIngestionLag(segMngrA1, 200L);
+    setupMinimumIngestionLag(segMngrB0, 200L);
 
     when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(0L);
     when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(0L);
@@ -447,8 +442,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
-            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L, 100L);
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -479,6 +474,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(200)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(2000)));
@@ -486,28 +484,27 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
-    // ensure negative values are ignored
-    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
-    setupLatestIngestionTimestamp(segMngrA1, -1L);
-    setupLatestIngestionTimestamp(segMngrB0, 0L);
+    // minimum ingestion lag is higher than threshold
+    setupMinimumIngestionLag(segMngrA0, 200L);
+    setupMinimumIngestionLag(segMngrA1, 200L);
+    setupMinimumIngestionLag(segMngrB0, 200L);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              0                       20                     100               Long.MIN_VALUE
-    // segA1              0                       200                    100               -1
-    // segB0              0                       2000                   100               0
+    //              minimum ingestion lag     minFreshnessMs
+    // segA0              200                      10
+    // segA1              200                      10
+    // segB0              200                      10
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // segB0 is now committed; ImmutableSegmentDataManager is returned by table data manager
     ImmutableSegmentDataManager immSegMngrB0 = mock(ImmutableSegmentDataManager.class);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(immSegMngrB0);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              0                       20                     100               90
-    // segA1              0                       200                    100               101
+    //              minimum ingestion lag     minFreshnessMs
+    // segA0              5                       10  (caught up)
+    // segA1              0                       10  (caught up)
     // segB0              already committed
-    setupLatestIngestionTimestamp(segMngrA0, 90L);
-    // Unexpected case where latest ingested is somehow after current time
-    setupLatestIngestionTimestamp(segMngrA1, 101L);
+    setupMinimumIngestionLag(segMngrA0, 5L);
+    setupMinimumIngestionLag(segMngrA1, 0L);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
     consumingSegments.get("tableB_REALTIME").remove(segB0);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
@@ -523,8 +520,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
-            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L, 100L);
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -555,6 +552,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getStreamPartitionId()).thenReturn(1);
     when(segMngrB0.getStreamPartitionId()).thenReturn(0);
 
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
     when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
     when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(200)));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of());
@@ -562,24 +562,90 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(null);
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
-    // ensure negative values are ignored
-    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
-    setupLatestIngestionTimestamp(segMngrA1, 90L);
-    setupLatestIngestionTimestamp(segMngrB0, 0L);
+    // segA0 and segB0 have unknown minimum lag, segA1 has good lag (caught up)
+    setupMinimumIngestionLag(segMngrA0, Long.MAX_VALUE);
+    setupMinimumIngestionLag(segMngrA1, 5L);
+    setupMinimumIngestionLag(segMngrB0, Long.MAX_VALUE);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              null                    20                     100               Long.MIN_VALUE
-    // segA1              0                       200                    100               90
-    // segB0              0                       null                   100               0
+    //              current offset          latest stream offset    minimum ingestion lag
+    // segA0              null                    20                     MAX_VALUE (unknown)
+    // segA1              0                       200                    5 (caught up)
+    // segB0              0                       null                   MAX_VALUE (unknown)
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
 
-    //              current offset          latest stream offset    current time    last ingestion time
-    // segA0              20                      20                     100               89
-    // segA1              0                       200                    100               90
-    // segB0              0                       0                      100               0
-    setupLatestIngestionTimestamp(segMngrA0, 89L);
+    //              current offset          latest stream offset    minimum ingestion lag
+    // segA0              20                      20                     MAX_VALUE (offset caught up)
+    // segA1              0                       200                    5 (caught up)
+    // segB0              0                       0                      MAX_VALUE (offset caught up)
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(0)));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
+  }
+
+  @Test
+  public void testTimeoutExceptionWhenFetchingLatestStreamOffset() {
+    String segA0 = "tableA__0__0__123Z";
+    String segA1 = "tableA__1__0__123Z";
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    long idleTimeoutMs = 10L;
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, idleTimeoutMs);
+
+    // TableDataManager is not set up yet
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
+
+    // setup TableDataManager
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
+
+    // setup SegmentDataManagers
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
+    when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
+
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+
+    when(segMngrA0.getStreamPartitionId()).thenReturn(0);
+    when(segMngrA1.getStreamPartitionId()).thenReturn(1);
+
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    // segA0 provider throws RuntimeException - this should be caught and handled gracefully
+    // In practice, RealtimeSegmentMetadataUtils wraps TimeoutException in RuntimeException
+    when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenThrow(
+        new RuntimeException("Failed to fetch latest stream offset for segment: " + segA0,
+            new TimeoutException("Timeout fetching latest stream offset")));
+    // segA1 provider works normally
+    when(segA1Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(1, new LongMsgOffset(20)));
+
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    // minimum ingestion lag is higher than threshold
+    setupMinimumIngestionLag(segMngrA0, Long.MAX_VALUE);
+    setupMinimumIngestionLag(segMngrA1, Long.MAX_VALUE);
+
+    // segA0 has idle time below threshold, segA1 has idle time above threshold
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs - 1);
+    when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs + 1);
+
+    // segA0: timeout exception when fetching latest offset, but idle time is below threshold
+    //         - should not be caught up (can't determine from offset, and idle time not exceeded)
+    // segA1: can fetch latest offset (10 < 20), but idle time exceeds threshold
+    //         - should be caught up due to idle timeout
+    // Expected: 1 segment not caught up (segA0)
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+
+    // Now make segA0 also exceed idle timeout - it should be caught up despite timeout exception
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs + 1);
+    // Expected: 0 segments not caught up (both exceed idle timeout)
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 }

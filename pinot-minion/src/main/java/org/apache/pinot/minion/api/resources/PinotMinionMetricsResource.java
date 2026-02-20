@@ -35,6 +35,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.common.metrics.MinionMetrics;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -52,6 +55,7 @@ public class PinotMinionMetricsResource {
   @GET
   @Path("/gauge/{gaugeName}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
   @ApiOperation("Get gauge value for the provided minion gauge name")
   public String getMinionGaugeValue(@ApiParam(value = "Gauge name") @PathParam("gaugeName") String gaugeName)
       throws JsonProcessingException {

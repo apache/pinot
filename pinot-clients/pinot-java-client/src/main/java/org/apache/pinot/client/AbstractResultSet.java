@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.client;
 
+import javax.annotation.Nullable;
+
 /**
  * Shared implementation between the different ResultSets.
  */
 public abstract class AbstractResultSet implements ResultSet {
 
   @Override
+  @Nullable
   public String getColumnDataType(int columnIndex) {
     return null;
   }

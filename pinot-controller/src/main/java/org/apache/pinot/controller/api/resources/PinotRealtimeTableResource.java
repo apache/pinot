@@ -53,10 +53,14 @@ import javax.ws.rs.core.Response;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
@@ -108,6 +112,7 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/pauseConsumption")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.PAUSE_CONSUMPTION)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Pause consumption of a realtime table", notes = "Pause the consumption of a realtime table")
@@ -144,6 +149,7 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/pauseTopicConsumption")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.PAUSE_CONSUMPTION)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Pause consumption of some topics of a realtime table", notes = "Pause the consumption of "
@@ -176,6 +182,7 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/resumeConsumption")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RESUME_CONSUMPTION)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Resume consumption of a realtime table", notes =
@@ -213,6 +220,7 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/resumeTopicConsumption")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RESUME_CONSUMPTION)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Resume consumption of some topics of a realtime table", notes =
@@ -246,6 +254,7 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/forceCommit")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.FORCE_COMMIT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Force commit the current consuming segments",
@@ -446,6 +455,26 @@ public class PinotRealtimeTableResource {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to get pauseless debug info for table %s. %s", realtimeTableName, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/consumerWatermarks")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_IDEAL_STATE)
+  @ApiOperation(value = "Get consumer watermarks for a realtime table",
+      notes = "Returns the next offset to be consumed for each partition group. Only works for realtime tables.")
+  public WatermarkInductionResult getConsumerWatermark(
+      @ApiParam(value = "Name of the realtime table", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    try {
+      String table = DatabaseUtils.translateTableName(tableName, headers);
+      return _pinotHelixResourceManager.getConsumerWatermarks(table);
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND, e);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 

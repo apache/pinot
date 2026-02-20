@@ -48,6 +48,7 @@ import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.conf.ServerConf;
+import org.apache.pinot.server.starter.helix.KeepPipelineBreakerStatsPredicate;
 import org.apache.pinot.server.starter.helix.SendStatsPredicate;
 import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
@@ -87,6 +88,7 @@ public class ServerInstance {
   public ServerInstance(ServerConf serverConf, String instanceId, HelixManager helixManager,
       AccessControlFactory accessControlFactory, @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
       ThreadAccountant threadAccountant, SendStatsPredicate sendStatsPredicate,
+      KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate,
       ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception {
     LOGGER.info("Initializing server instance: {}", instanceId);
@@ -132,7 +134,8 @@ public class ServerInstance {
     if (serverConf.isMultiStageServerEnabled()) {
       LOGGER.info("Initializing Multi-stage query engine");
       _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager,
-          serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, threadAccountant, sendStatsPredicate);
+          serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, threadAccountant, sendStatsPredicate,
+          keepPipelineBreakerStatsPredicate);
     } else {
       _workerQueryServer = null;
     }
