@@ -227,18 +227,21 @@ public class PartitionGroupMetadataFetcherTest {
 
     // Create separate metadata providers for each stream
     StreamMetadataProvider successProvider1 = mock(StreamMetadataProvider.class);
+    when(successProvider1.getTopics()).thenThrow(new UnsupportedOperationException("Not supported"));
     when(successProvider1.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
-        any(List.class), anyInt()))
+        any(List.class), anyInt(), anyBoolean()))
         .thenReturn(Collections.singletonList(mockedMetadata));
 
     StreamMetadataProvider failingProvider = mock(StreamMetadataProvider.class);
+    when(failingProvider.getTopics()).thenThrow(new UnsupportedOperationException("Not supported"));
     when(failingProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
-        any(List.class), anyInt()))
+        any(List.class), anyInt(), anyBoolean()))
         .thenThrow(new RuntimeException("Failed to fetch partition count for topic2-failing"));
 
     StreamMetadataProvider successProvider3 = mock(StreamMetadataProvider.class);
+    when(successProvider3.getTopics()).thenThrow(new UnsupportedOperationException("Not supported"));
     when(successProvider3.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
-        any(List.class), anyInt()))
+        any(List.class), anyInt(), anyBoolean()))
         .thenReturn(Collections.singletonList(mockedMetadata));
 
     StreamConsumerFactory factory1 = mock(StreamConsumerFactory.class);
@@ -257,7 +260,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(streamConfig3)).thenReturn(factory3);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList());
+          streamConfigs, statusList, Collections.emptyList(), false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -296,8 +299,9 @@ public class PartitionGroupMetadataFetcherTest {
     List<PartitionGroupConsumptionStatus> statusList = Collections.emptyList();
 
     StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    when(metadataProvider.getTopics()).thenThrow(new UnsupportedOperationException("Not supported"));
     when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
-        any(List.class), anyInt()))
+        any(List.class), anyInt(), anyBoolean()))
         .thenThrow(new TransientConsumerException(new RuntimeException("Transient error")));
 
     StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
@@ -308,7 +312,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList());
+          streamConfigs, statusList, Collections.emptyList(), false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -342,7 +346,7 @@ public class PartitionGroupMetadataFetcherTest {
     StreamMetadataProvider provider1 = mock(StreamMetadataProvider.class);
     when(provider1.getTopics()).thenReturn(Arrays.asList(topic1Metadata, topic3Metadata));
     when(provider1.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
-        any(List.class), anyInt()))
+        any(List.class), anyInt(), anyBoolean()))
         .thenReturn(Collections.singletonList(mockedMetadata));
 
     // Provider for topic2 - topic does NOT exist (getTopics returns list without topic2)
@@ -353,7 +357,7 @@ public class PartitionGroupMetadataFetcherTest {
     StreamMetadataProvider provider3 = mock(StreamMetadataProvider.class);
     when(provider3.getTopics()).thenReturn(Arrays.asList(topic1Metadata, topic3Metadata));
     when(provider3.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
-        any(List.class), anyInt()))
+        any(List.class), anyInt(), anyBoolean()))
         .thenReturn(Collections.singletonList(mockedMetadata));
 
     StreamConsumerFactory factory1 = mock(StreamConsumerFactory.class);
@@ -372,7 +376,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(streamConfig3)).thenReturn(factory3);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList());
+          streamConfigs, statusList, Collections.emptyList(), false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -411,7 +415,7 @@ public class PartitionGroupMetadataFetcherTest {
     // getTopics() throws UnsupportedOperationException (default behavior for non-Kafka streams)
     when(metadataProvider.getTopics()).thenThrow(new UnsupportedOperationException("Not supported"));
     when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
-        any(List.class), anyInt()))
+        any(List.class), anyInt(), anyBoolean()))
         .thenReturn(Collections.singletonList(mockedMetadata));
 
     StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
@@ -422,7 +426,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList());
+          streamConfigs, statusList, Collections.emptyList(), false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -465,7 +469,7 @@ public class PartitionGroupMetadataFetcherTest {
     StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
     when(metadataProvider.getTopics()).thenReturn(Arrays.asList(topic1Metadata, topic2Metadata));
     when(metadataProvider.computePartitionGroupMetadata(anyString(), any(StreamConfig.class),
-        any(List.class), anyInt()))
+        any(List.class), anyInt(), anyBoolean()))
         .thenReturn(Collections.singletonList(mockedMetadata));
 
     StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
@@ -476,7 +480,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList());
+          streamConfigs, statusList, Collections.emptyList(), false);
 
       // Execute
       Boolean result = fetcher.call();

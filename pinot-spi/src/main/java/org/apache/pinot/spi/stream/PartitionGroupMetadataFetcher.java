@@ -20,6 +20,7 @@ package org.apache.pinot.spi.stream;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
  */
 public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupMetadataFetcher.class);
+  private static final String TOPIC_EXISTENCE_CHECK_ENABLED = TOPIC_EXISTENCE_CHECK_ENABLED;
 
   private final List<StreamConfig> _streamConfigs;
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
@@ -102,6 +104,10 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private Boolean fetchMultipleStreams()
       throws Exception {
     int numStreams = _streamConfigs.size();
+
+    // Fetch available topics once and reuse across all streams (for topic existence validation)
+    Set<String> availableTopicNames = fetchAvailableTopicNames();
+
     for (int i = 0; i < numStreams; i++) {
       if (_pausedTopicIndices.contains(i)) {
         LOGGER.info("Skipping fetching PartitionGroupMetadata for paused topic: {}",
@@ -124,16 +130,12 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
           StreamConsumerFactory.getUniqueClientId(clientId))) {
 
         // Check if the topic exists before fetching partition metadata
-        try {
-          List<StreamMetadataProvider.TopicMetadata> topics = streamMetadataProvider.getTopics();
-          boolean topicExists = topics.stream().anyMatch(t -> t.getName().equals(topicName));
-          if (!topicExists) {
-            LOGGER.warn("Topic {} does not exist. Skipping this topic from ingestion.", topicName);
-            continue;
-          }
-        } catch (Exception e) {
-          // getTopics() not supported by this stream type, proceed without topic existence validation
-          LOGGER.debug("Topic existence check not supported for stream type, proceeding for topic: {}", topicName);
+        // Only perform this check if topic existence validation is enabled and topics were fetched
+        boolean checkTopicExists = Boolean.parseBoolean(
+            streamConfig.getStreamConfigsMap().getOrDefault(TOPIC_EXISTENCE_CHECK_ENABLED, "false"));
+        if (checkTopicExists && availableTopicNames != null && !availableTopicNames.contains(topicName)) {
+          LOGGER.warn("Topic {} does not exist. Skipping this topic from ingestion.", topicName);
+          continue;
         }
 
         _newPartitionGroupMetadataList.addAll(
@@ -160,5 +162,40 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
       }
     }
     return Boolean.TRUE;
+  }
+
+  /**
+   * Fetches available topic names from the stream provider.
+   * Uses the first stream config that has topic existence check enabled.
+   *
+   * @return Set of available topic names, or null if topics could not be fetched
+   */
+  private Set<String> fetchAvailableTopicNames() {
+    // Find first stream config with topic existence check enabled
+    StreamConfig streamConfigForTopicFetch = _streamConfigs.stream()
+        .filter(config -> Boolean.parseBoolean(
+            config.getStreamConfigsMap().getOrDefault(TOPIC_EXISTENCE_CHECK_ENABLED, "false")))
+        .findFirst()
+        .orElse(null);
+
+    if (streamConfigForTopicFetch == null) {
+      return null;
+    }
+
+    String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-topicFetch-"
+        + streamConfigForTopicFetch.getTableNameWithType();
+    StreamConsumerFactory factory = StreamConsumerFactoryProvider.create(streamConfigForTopicFetch);
+
+    try (StreamMetadataProvider provider = factory.createStreamMetadataProvider(clientId)) {
+      return provider.getTopics().stream()
+          .map(StreamMetadataProvider.TopicMetadata::getName)
+          .collect(Collectors.toSet());
+    } catch (UnsupportedOperationException e) {
+      LOGGER.debug("getTopics() not supported for stream type, skipping topic existence validation");
+      return null;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to fetch available topics, skipping topic existence validation", e);
+      return null;
+    }
   }
 }
