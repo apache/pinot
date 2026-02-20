@@ -30,15 +30,26 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
   }
 
   @Override
+  protected int getNumKafkaBrokers() {
+    return DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS;
+  }
+
+  @Override
+  protected long getDocsLoadedTimeoutMs() {
+    return 1_200_000L;
+  }
+
+  @Override
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
+    String kafkaBrokerList = getKafkaBrokerList();
     // the first transaction of kafka messages are aborted
     ClusterIntegrationTestUtils
-        .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
+        .pushAvroIntoKafkaWithTransaction(avroFiles, kafkaBrokerList, getKafkaTopic(),
             getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), false);
     // the second transaction of kafka messages are committed
     ClusterIntegrationTestUtils
-        .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
+        .pushAvroIntoKafkaWithTransaction(avroFiles, kafkaBrokerList, getKafkaTopic(),
             getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), true);
   }
 }
