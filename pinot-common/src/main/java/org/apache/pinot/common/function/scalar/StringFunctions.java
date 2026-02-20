@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.JsonUtils;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -25,10 +30,9 @@ import java.text.Normalizer;
 import java.util.Base64;
 import java.util.UUID;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.spi.annotations.ScalarFunction;
-import org.apache.pinot.spi.utils.JsonUtils;
+import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -585,17 +589,234 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int index) {
-    String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
-    if (index >= 0 && index < splitString.length) {
-      return splitString[index];
-    } else if (index < 0 && index >= -splitString.length) {
-      return splitString[splitString.length + index];
-    } else {
-      return "null";
-    }
+      if (input == null || delimiter == null) {
+          return "null";
+      }
+
+      int delimiterLength = delimiter.length();
+      if (delimiterLength == 0) {
+          return input;
+      }
+
+      String[] splitString;
+      if (index >= 0) {
+          int limit = index + 2;
+          splitString = splitBySeparatorTillLimitForward(input, delimiter, limit);
+          return index < splitString.length ? splitString[index] : "null";
+      } else {
+          int limit = Math.abs(index) + 2;
+          splitString = splitBySeparatorTillLimitBackward(input, delimiter, limit);
+          return index >= -splitString.length ? splitString[splitString.length + index] : "null";
+      }
   }
 
-  /**
+    private static String[] splitByNullSeparatorForward(String str, int limit) {
+        // Performance tuned for 2.0 (JDK1.4)
+        // Direct code is quicker than StringTokenizer.
+        // Also, StringTokenizer uses isSpace() not isWhitespace()
+        if (str == null) {
+            return null;
+        }
+
+        final int len = str.length();
+        if (len == 0) {
+            return new String[0];
+        }
+
+        final List<String> list = new ArrayList<>();
+        int sizePlus1 = 1;
+        int limitPlus1 = limit + 1;
+        int i = 0;
+        int start = 0;
+        boolean match = false;
+        boolean lastMatch = false;
+        while (i < len) {
+            if (Character.isWhitespace(str.charAt(i))) {
+                if (match) {
+                    lastMatch = true;
+                    if (sizePlus1++ > limitPlus1) {
+                        lastMatch = false;
+                        break;
+                    }
+                    if (sizePlus1 < limitPlus1) {
+                        // only add to list s.t number of substrings is less than limitPlus1
+                        list.add(str.substring(start, i));
+                    }
+                    match = false;
+                }
+                start = ++i;
+                continue;
+            }
+            lastMatch = false;
+            match = true;
+            i++;
+        }
+        if ((sizePlus1 <= limitPlus1) && (match && lastMatch)) {
+            list.add(str.substring(start, i));
+        }
+        return list.toArray(ArrayUtils.EMPTY_STRING_ARRAY);
+    }
+
+    private static String[] splitByNullSeparatorBackward(String str, int limit) {
+        // Performance tuned for 2.0 (JDK1.4)
+        // Direct code is quicker than StringTokenizer.
+        // Also, StringTokenizer uses isSpace() not isWhitespace()
+        // Null separator means use whitespace using isWhitespace()
+        if (str == null) {
+            return null;
+        }
+        final int len = str.length();
+        if (len == 0) {
+            return new String[0];
+        }
+
+        final List<String> list = new ArrayList<>();
+        int sizePlus1 = 1;
+        int limitPlus1 = limit + 1; //
+
+        int i = len - 1;
+        int end = len - 1;
+        boolean match = false;
+        boolean lastMatch = false;
+        while (i >= 0) {
+            if (Character.isWhitespace(str.charAt(i))) {
+                if (match) {
+                    lastMatch = true;
+                    if (sizePlus1++ > limitPlus1) {
+                        lastMatch = false;
+                        break;
+                    }
+                    if (sizePlus1 < limitPlus1) {
+                        // only add to list s.t number of substrings is less than limitPlus1
+                        list.add(str.substring(i, end + 1));
+                    }
+                    match = false;
+                }
+                end = i--;
+                continue;
+            }
+            lastMatch = false;
+            match = true;
+            i--;
+        }
+        if ((sizePlus1 <= limitPlus1) && (match || lastMatch)) {
+            list.add(str.substring(++i, end));
+        }
+        Collections.reverse(list);
+        return list.toArray(ArrayUtils.EMPTY_STRING_ARRAY);
+    }
+
+    private static String[] splitBySeparatorTillLimitBackward(String str, String separator, int limit) {
+        if (str == null) {
+            return null;
+        }
+        final int len = str.length();
+        if (len == 0) {
+            return ArrayUtils.EMPTY_STRING_ARRAY;
+        }
+        if (separator == null || separator.isEmpty()) {
+            // Split on whitespace.
+            return splitByNullSeparatorBackward(str, limit);
+        }
+        final int separatorLength = separator.length();
+        final ArrayList<String> substrings = new ArrayList<>();
+        int numberOfSubstrings = 0;
+        int beg = len - 1;
+        int end = len - 1;
+        int terminal = len;
+        boolean lastMatch = false;
+        while (beg >= 0) {
+            beg = str.lastIndexOf(separator, end);
+            if (beg > -1) {
+                terminal = end + 1;
+                if (end >= beg) {
+                    numberOfSubstrings += 1;
+                    if (numberOfSubstrings == limit) {
+                        // Number of substrings should not exceed limit in our answer
+                        break;
+                    } else {
+                        // The following is OK, because String.substring( beg, end ) excludes
+                        // the character at the position 'end'.
+                        int afterSeparator = beg + separatorLength;
+                        if (lastMatch) {
+                            if (afterSeparator < terminal) {
+                                substrings.add(str.substring(afterSeparator, terminal));
+                                lastMatch = false;
+                            }
+                        } else {
+                            if (afterSeparator < terminal) {
+                                substrings.add(str.substring(afterSeparator, terminal));
+                            }
+                            if (afterSeparator == terminal) {
+                                substrings.add(str.substring(afterSeparator, terminal));
+                                lastMatch = true;
+                            }
+                        }
+                        end = --beg;
+                    }
+                }
+            }
+        }
+        if (numberOfSubstrings < limit) {
+            terminal = end + 1;
+            int start = 0;
+            substrings.add(str.substring(start, terminal));
+        }
+        Collections.reverse(substrings);
+        return substrings.toArray(ArrayUtils.EMPTY_STRING_ARRAY);
+    }
+
+    private static String[] splitBySeparatorTillLimitForward(String str, String separator, int max) {
+        if (str == null) {
+            return null;
+        }
+        final int len = str.length();
+        if (len == 0) {
+            return ArrayUtils.EMPTY_STRING_ARRAY;
+        }
+        if (separator == null || separator.isEmpty()) {
+            // Split on whitespace.
+            return splitByNullSeparatorForward(str, max);
+        }
+        final int separatorLength = separator.length();
+        final ArrayList<String> substrings = new ArrayList<>();
+        int numberOfSubstrings = 0;
+        int beg = 0;
+        int end = 0;
+        while (end < len) {
+            end = str.indexOf(separator, beg);
+            if (end > -1) {
+                if (end > beg) {
+                    numberOfSubstrings += 1;
+                    if (numberOfSubstrings == max) {
+                        // Number of substrings should not exceed max - 1 in our answer
+                        end = len;
+                    } else {
+                        // The following is OK, because String.substring( beg, end ) excludes
+                        // the character at the position 'end'.
+                        // only add to list s.t number of substrings is less than or equal to max - 1
+                        substrings.add(str.substring(beg, end));
+                        // Set the starting point for the next search.
+                        // The following is equivalent to beg = end + (separatorLength - 1) + 1,
+                        // which is the right calculation:
+                        beg = end + separatorLength;
+                    }
+                } else {
+                    // We found a consecutive occurrence of the separator, so skip it.
+                    beg = end + separatorLength;
+                }
+            } else {
+                // String.substring( beg ) goes from 'beg' to the end of the String.
+                if (numberOfSubstrings < max) {
+                    substrings.add(str.substring(beg));
+                }
+                end = len;
+            }
+        }
+        return substrings.toArray(ArrayUtils.EMPTY_STRING_ARRAY);
+    }
+
+    /**
    * @param input the input String to be split into parts.
    * @param delimiter the specified delimiter to split the input string.
    * @param limit the max count of parts that the input string can be splitted into.
