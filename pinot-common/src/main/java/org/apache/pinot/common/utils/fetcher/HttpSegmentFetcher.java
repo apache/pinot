@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.fetcher;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.InetAddresses;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.LinkedList;
@@ -32,6 +33,7 @@ import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.common.utils.http.HttpClient;
@@ -106,20 +108,26 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
         return true;
       } catch (HttpErrorStatusException e) {
         int statusCode = e.getStatusCode();
-        if (statusCode == HttpStatus.SC_NOT_FOUND || statusCode >= 500) {
-          // Temporary exception
-          // 404 is treated as a temporary exception, as the downloadURI may be backed by multiple hosts,
-          // if singe host is down, can retry with another host.
-          _logger.warn("Got temporary error status code: {} while downloading segment from: {} to: {}", statusCode, uri,
-              dest, e);
-          return false;
-        } else {
-          // Permanent exception
-          _logger.error("Got permanent error status code: {} while downloading segment from: {} to: {}, won't retry",
-              statusCode, uri, dest, e);
+        if (statusCode == HttpStatus.SC_NOT_FOUND) {
+          // Segment not found (404): fail immediately without retry so caller can return HTTP 404.
+          _logger.error("Segment not found (404) while downloading from: {} to: {}, won't retry", uri, dest, e);
           throw e;
         }
+        if (statusCode >= 500) {
+          // Temporary exception: retry with another host if available.
+          _logger.warn("Got temporary error status code: {} while downloading segment from: {} to: {}", statusCode,
+              uri, dest, e);
+          return false;
+        }
+        // Other permanent exception
+        _logger.error("Got permanent error status code: {} while downloading segment from: {} to: {}, won't retry",
+            statusCode, uri, dest, e);
+        throw e;
       } catch (Exception e) {
+        if (ExceptionUtils.isCauseInstanceOf(e, FileNotFoundException.class)) {
+          _logger.error("File not found while downloading segment from: {} to: {}, won't retry", uri, dest, e);
+          throw e;
+        }
         _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
         return false;
       }
