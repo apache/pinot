@@ -180,8 +180,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = helixManager.getHelixPropertyStore();
     _segmentLocks = segmentLocks;
     _segmentReloadSemaphore = segmentReloadSemaphore;
-    _segmentReloadRefreshExecutor = segmentReloadRefreshExecutor;
-    _segmentPreloadExecutor = segmentPreloadExecutor;
+    _segmentReloadRefreshExecutor = new SegmentOperationsExecutorService(segmentReloadRefreshExecutor,
+        SegmentOperationsTaskType.REFRESH_OR_RELOAD, tableConfig.getTableName());
+    _segmentPreloadExecutor = segmentPreloadExecutor != null
+        ? new SegmentOperationsExecutorService(segmentPreloadExecutor, SegmentOperationsTaskType.PRELOAD,
+        tableConfig.getTableName())
+        : null;
     _enableAsyncSegmentRefresh = enableAsyncSegmentRefresh;
     _authProvider = AuthProviderUtils.extractAuthProvider(instanceDataManagerConfig.getAuthConfig(), null);
 

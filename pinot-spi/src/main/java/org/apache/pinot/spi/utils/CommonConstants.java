@@ -1501,6 +1501,17 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
     public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
 
+    // State transition thread pool config
+    // NOTE: Previously, Helix managed the state transition thread pool, which could be configured via ZooKeeper
+    // using the key "STATE_TRANSITION.maxThreads" at either the participant or cluster level. The Helix default
+    // was 40 threads if not configured. This Pinot configuration replaces the Helix ZooKeeper-based configuration
+    // with a file-based configuration for easier management.
+    // Migration: Check your existing Helix config in ZK at CONFIGS/PARTICIPANT/<instance> or CONFIGS/CLUSTER/<cluster>
+    // for "STATE_TRANSITION.maxThreads". If set, use that value here. Otherwise, the default of 40 is used.
+    public static final String CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE =
+        "pinot.server.instance.stateTransitionThreadPoolSize";
+    public static final int DEFAULT_STATE_TRANSITION_THREAD_POOL_SIZE = 40;
+
     // Predownload related configs
     public static final String CONFIG_OF_PREDOWNLOAD_PARALLELISM = "pinot.server.predownload.parallelism";
     public static final int DEFAULT_PREDOWNLOAD_PARALLELISM = -1; // Use numProcessors * 3 as default
