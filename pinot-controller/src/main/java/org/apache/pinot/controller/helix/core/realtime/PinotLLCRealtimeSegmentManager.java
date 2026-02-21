@@ -1826,7 +1826,8 @@ public class PinotLLCRealtimeSegmentManager {
 
           // Smallest offset is fetched from stream once and cached in partitionIdToSmallestOffset.
           if (partitionIdToSmallestOffset == null) {
-            partitionIdToSmallestOffset = fetchPartitionGroupIdToSmallestOffset(streamConfigs, idealState);
+            partitionIdToSmallestOffset =
+                fetchPartitionGroupIdToSmallestOffset(streamConfigs, idealState, latestSegmentZKMetadataMap);
           }
 
           // Do not create new CONSUMING segment when the stream partition has reached end of life.
@@ -1927,11 +1928,13 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private Map<Integer, StreamPartitionMsgOffset> fetchPartitionGroupIdToSmallestOffset(List<StreamConfig> streamConfigs,
-      IdealState idealState) {
+      IdealState idealState, Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap) {
+    // Build consumption status from pre-computed ZK metadata map instead of rescanning IdealState (O(1) vs O(N))
+    List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
+        buildPartitionGroupConsumptionStatusFromZKMetadata(latestSegmentZKMetadataMap, streamConfigs);
+
     Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToSmallestOffset = new HashMap<>();
     for (StreamConfig streamConfig : streamConfigs) {
-      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-          getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
       OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
       streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
 
@@ -1951,6 +1954,51 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
     return partitionGroupIdToSmallestOffset;
+  }
+
+  /**
+   * Builds {@link PartitionGroupConsumptionStatus} list from the pre-computed latest segment ZK metadata map,
+   * avoiding an O(N) scan of all IdealState segments that {@link #getPartitionGroupConsumptionStatusList} performs.
+   */
+  @VisibleForTesting
+  List<PartitionGroupConsumptionStatus> buildPartitionGroupConsumptionStatusFromZKMetadata(
+      Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap, List<StreamConfig> streamConfigs) {
+    List<PartitionGroupConsumptionStatus> result = new ArrayList<>(latestSegmentZKMetadataMap.size());
+    int numStreams = streamConfigs.size();
+    if (numStreams == 1) {
+      StreamPartitionMsgOffsetFactory offsetFactory =
+          StreamConsumerFactoryProvider.create(streamConfigs.get(0)).createStreamMsgOffsetFactory();
+      for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
+        int partitionGroupId = entry.getKey();
+        SegmentZKMetadata zkMetadata = entry.getValue();
+        LLCSegmentName llcSegmentName = new LLCSegmentName(zkMetadata.getSegmentName());
+        result.add(new PartitionGroupConsumptionStatus(partitionGroupId, llcSegmentName.getSequenceNumber(),
+            offsetFactory.create(zkMetadata.getStartOffset()),
+            zkMetadata.getEndOffset() != null ? offsetFactory.create(zkMetadata.getEndOffset()) : null,
+            zkMetadata.getStatus().toString()));
+      }
+    } else {
+      StreamPartitionMsgOffsetFactory[] offsetFactories = new StreamPartitionMsgOffsetFactory[numStreams];
+      for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
+        int partitionGroupId = entry.getKey();
+        int index = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionGroupId);
+        int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(partitionGroupId);
+        SegmentZKMetadata zkMetadata = entry.getValue();
+        LLCSegmentName llcSegmentName = new LLCSegmentName(zkMetadata.getSegmentName());
+        StreamPartitionMsgOffsetFactory offsetFactory = offsetFactories[index];
+        if (offsetFactory == null) {
+          offsetFactory =
+              StreamConsumerFactoryProvider.create(streamConfigs.get(index)).createStreamMsgOffsetFactory();
+          offsetFactories[index] = offsetFactory;
+        }
+        result.add(new PartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId,
+            llcSegmentName.getSequenceNumber(),
+            offsetFactory.create(zkMetadata.getStartOffset()),
+            zkMetadata.getEndOffset() != null ? offsetFactory.create(zkMetadata.getEndOffset()) : null,
+            zkMetadata.getStatus().toString()));
+      }
+    }
+    return result;
   }
 
   private StreamPartitionMsgOffset selectStartOffset(OffsetCriteria offsetCriteria, int partitionGroupId,
