@@ -56,5 +56,16 @@ public class SelectionOnlyResultsBlockMerger implements ResultsBlockMerger<Selec
       return;
     }
     SelectionOperatorUtils.mergeWithoutOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
+    // Propagate lite-cap truncation flag/reason from children to merged block (OR semantics)
+    String childLite =
+        blockToMerge.getResultsMetadata().get(org.apache.pinot.common.datatable.DataTable.MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName());
+    if ("true".equals(childLite)) {
+      mergedBlock.setLiteLeafLimitReached(true);
+      String reason =
+          blockToMerge.getResultsMetadata().get(org.apache.pinot.common.datatable.DataTable.MetadataKey.LEAF_TRUNCATION_REASON.getName());
+      if (reason != null) {
+        mergedBlock.setLeafTruncationReason(reason);
+      }
+    }
   }
 }
