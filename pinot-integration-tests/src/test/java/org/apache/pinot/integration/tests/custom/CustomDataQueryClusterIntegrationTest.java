@@ -74,7 +74,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     // Start the Pinot cluster
     startZk();
     LOGGER.warn("Start Kafka in the integration test suite");
-    startKafka();
+    startKafkaWithoutTopic();
     startController();
     startBroker();
     startServer();
