@@ -26,12 +26,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -45,7 +45,6 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.assertj.core.api.Assertions;
-import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -171,7 +170,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    */
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
-    ResultTable resultTable = queryRunner(sql, false).getResultTable();
+    BrokerResponseNativeV2 response = queryRunner(sql, false);
+    Assert.assertEquals(response.getExceptions(), List.of());
+    ResultTable resultTable = response.getResultTable();
     Assert.assertEquals(resultTable.getRows().size(), expectedRows);
   }
 
@@ -194,21 +195,27 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    * Test compares against its desired exceptions.
    */
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
-  public void testSqlWithExceptionMsgChecker(String sql, @Language("regexp") String expectedError) {
+  public void testSqlWithExceptionMsgChecker(String sql, String expectedError, boolean match) {
     try {
       // query pinot
-      QueryDispatcher.QueryResult queryResult = queryRunner(sql, false);
-      if (queryResult.getProcessingException() != null) {
-        throw new RuntimeException(queryResult.getProcessingException().getMessage());
+      BrokerResponseNativeV2 response = queryRunner(sql, false);
+      if (response.getExceptions() != null && !response.getExceptions().isEmpty()) {
+        throw new RuntimeException(response.getExceptions().get(0).getMessage());
       }
-      ResultTable resultTable = queryResult.getResultTable();
+      ResultTable resultTable = response.getResultTable();
       Assert.fail("Expected error with message '" + expectedError + "'. But instead rows were returned: "
           + JsonUtils.objectToPrettyString(resultTable));
     } catch (Exception e) {
       String exceptionMessage = e.getMessage();
-      Assertions.assertThat(exceptionMessage)
-          .withFailMessage("Exception should contain: " + expectedError + ", but found: " + exceptionMessage)
-          .contains(expectedError);
+      if (match) {
+        Assertions.assertThat(exceptionMessage)
+            .withFailMessage("Exception should match: " + expectedError + ", but found: " + exceptionMessage)
+            .matches(expectedError);
+      } else {
+        Assertions.assertThat(exceptionMessage)
+            .withFailMessage("Exception should contain: " + expectedError + ", but found: " + exceptionMessage)
+            .contains(expectedError);
+      }
     }
   }
 
@@ -297,49 +304,64 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   protected Iterator<Object[]> provideTestSqlWithExecutionException() {
     List<Object[]> testCases = new ArrayList<>();
     // Missing index
-    testCases.add(new Object[]{"SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10", "without text index"});
-    testCases.add(new Object[]{"SELECT col1, textMatch(col1, 'f') FROM a LIMIT 10", "without text index"});
+    testCases.add(new Object[]{"SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10", "without text index", false});
+    testCases.add(new Object[]{"SELECT col1, textMatch(col1, 'f') FROM a LIMIT 10", "without text index", false});
 
     // Query hint with dynamic broadcast pipeline breaker should return error upstream
     testCases.add(new Object[]{
         "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a WHERE a.col1 IN "
             + "(SELECT b.col2 FROM b WHERE textMatch(col1, 'f')) AND a.col3 > 0",
-        "without text index"
+        "without text index",
+        false
     });
 
     // Timeout exception should occur with this option:
     // - If the query times out during submission, we get: "Error occurred during stage submission: Timeout"
-    // - If the query times out during execution, we get: "Timed out on stage 0 waiting for data sent by a child stage"
+    // - If the query times out during execution, we get: "Received 1 error from stage X on Y: Timing out on: Z"
     testCases.add(new Object[]{
         "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
-        "Time"
+        "(.*Time.*)|(.*Timing out on.*)",
+        true
     });
 
     // Function with incorrect argument signature should throw runtime exception when casting string to numeric
-    testCases.add(new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1", "For input string:"});
+    testCases.add(new Object[]{
+        "SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
+        "For input string:",
+        false}
+    );
 
     // Scalar function that doesn't have a valid use should throw an exception on the leaf stage
     //   - predicate only functions:
-    testCases.add(new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"});
-    testCases.add(new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index"});
-    testCases.add(new Object[]{"SELECT * FROM a WHERE textContains(col1, 'f')", "supported only on native text index"});
+    testCases.add(new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index", false});
+    testCases.add(new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index", false});
+    testCases.add(new Object[]{
+        "SELECT * FROM a WHERE textContains(col1, 'f')",
+        "supported only on native text index",
+        false});
     testCases.add(new Object[]{
         "SELECT * FROM a WHERE text_contains(col1, 'f')",
-        "supported only on native text index"}
+        "supported only on native text index",
+        false}
     );
 
     //  - transform only functions
-    testCases.add(new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"});
-    testCases.add(new Object[]{"SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String"});
+    testCases.add(new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String", false});
+    testCases.add(new Object[]{"SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String", false});
 
     //  - PlaceholderScalarFunction registered will throw on intermediate stage, but works on leaf stage.
     //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.
     testCases.add(
-        new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
+        new Object[]{
+            "SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a",
+            "Cannot resolve JSON path",
+            false}
+    );
     //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
     testCases.add(new Object[]{
         "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
-        "Unsupported function: JSONEXTRACTSCALAR"
+        "Unsupported function: JSONEXTRACTSCALAR",
+        false
     });
 
     // Positive int keys (only included ones that will be parsed for this query)
@@ -353,7 +375,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       for (String value : new String[]{"-10000000000", "-2147483648", "-1", "0", "2147483648", "10000000000"}) {
         testCases.add(new Object[]{
             "set " + key + " = " + value + "; SELECT col1, count(*) FROM a GROUP BY col1",
-            key + " must be a number between 1 and 2^31-1, got: " + value
+            key + " must be a number between 1 and 2^31-1, got: " + value,
+            false
         });
       }
     }

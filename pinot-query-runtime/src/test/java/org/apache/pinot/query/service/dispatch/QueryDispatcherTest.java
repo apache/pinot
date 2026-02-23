@@ -31,6 +31,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.response.StreamingBrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
@@ -42,9 +44,11 @@ import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.assertj.core.api.Assertions;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -74,9 +78,18 @@ public class QueryDispatcherTest extends QueryTestSet {
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(1, portList.get(0), portList.get(1),
         QueryEnvironmentTestBase.TABLE_SCHEMAS, QueryEnvironmentTestBase.SERVER1_SEGMENTS,
         QueryEnvironmentTestBase.SERVER2_SEGMENTS, null);
-    _queryDispatcher =
+    _queryDispatcher = Mockito.spy(
         new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, true,
-            Duration.ofSeconds(1));
+            Duration.ofSeconds(1))
+    );
+  }
+
+  @AfterMethod
+  public void resetMocks() {
+    Mockito.reset(_queryDispatcher);
+    for (QueryServer worker : _queryServerMap.values()) {
+      Mockito.reset(worker);
+    }
   }
 
   @AfterClass
@@ -123,22 +136,21 @@ public class QueryDispatcherTest extends QueryTestSet {
       observer.onError(new RuntimeException("foo"));
       return Set.of();
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
-    long requestId = REQUEST_ID_GEN.getAndIncrement();
-    RequestContext context = new DefaultRequestContext();
-    context.setRequestId(requestId);
+    long requestId;
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
-      _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Map.of());
-      Assert.fail("Method call above should have failed");
-    } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+      requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
+      RequestContext context = new DefaultRequestContext();
+      context.setRequestId(requestId);
+      BrokerResponseNativeV2 response = _queryDispatcher.submitAndReduceForTest(dispatchableSubPlan, Map.of());
+      Assertions.assertThat(response.getExceptions())
+          .describedAs("Expected exceptions from the response")
+          .isNotEmpty();
     }
     // wait just a little, until the cancel is being called.
     Thread.sleep(50);
-    for (QueryServer queryServer : _queryServerMap.values()) {
-      Mockito.verify(queryServer, Mockito.times(1))
-          .cancel(Mockito.argThat(a -> a.getRequestId() == requestId), Mockito.any());
-    }
+    Mockito.verify(_queryDispatcher, Mockito.times(1))
+        .cancel(requestId);
     Mockito.reset(failingQueryServer);
   }
 
@@ -146,26 +158,38 @@ public class QueryDispatcherTest extends QueryTestSet {
   public void testQueryDispatcherCancelWhenQueryReducerReturnsError()
       throws Exception {
     String sql = "SELECT * FROM a";
-    long requestId = REQUEST_ID_GEN.getAndIncrement();
-    RequestContext context = new DefaultRequestContext();
-    context.setRequestId(requestId);
+    long requestId;
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
+      RequestContext context = new DefaultRequestContext();
+      context.setRequestId(requestId);
+
+      QueryServer aServer = _queryServerMap.values().stream()
+          .findAny()
+          .orElseThrow();
+      Mockito.doThrow(RuntimeException.class).when(aServer).submit(Mockito.any(), Mockito.any());
+
       // will throw b/c mailboxService is mocked
-      QueryDispatcher.QueryResult queryResult =
-          _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Map.of());
-      if (queryResult.getProcessingException() == null) {
-        Assert.fail("Method call above should have failed");
+      try {
+        QueryDispatcher.DispatcherStreamingBrokerResponse queryResult =
+            _queryDispatcher.submit(context, dispatchableSubPlan, 10_000L, Map.of());
+
+        StreamingBrokerResponse.Metainfo metainfo = queryResult.consumeData(
+            data -> {
+              // no-op
+            });
+        if (metainfo.getExceptions().isEmpty()) {
+          Assert.fail("Method call above should have failed");
+        }
+      } catch (RuntimeException e) {
+        // expected
       }
-    } catch (NullPointerException e) {
-      // Expected
     }
     // wait just a little, until the cancel is being called.
     Thread.sleep(50);
-    for (QueryServer queryServer : _queryServerMap.values()) {
-      Mockito.verify(queryServer, Mockito.times(1))
-          .cancel(Mockito.argThat(a -> a.getRequestId() == requestId), Mockito.any());
-    }
+    Mockito.verify(_queryDispatcher, Mockito.times(1))
+        .cancel(requestId);
   }
 
   @Test

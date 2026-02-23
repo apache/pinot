@@ -236,127 +236,132 @@ public class DataSchema {
   }
 
   public enum ColumnDataType {
-    INT(NullValuePlaceHolder.INT) {
+    INT(Integer.class, NullValuePlaceHolder.INT) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.INTEGER);
       }
     },
-    LONG(NullValuePlaceHolder.LONG) {
+    LONG(Long.class, NullValuePlaceHolder.LONG) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.BIGINT);
       }
     },
-    FLOAT(NullValuePlaceHolder.FLOAT) {
+    FLOAT(Float.class, NullValuePlaceHolder.FLOAT) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.REAL);
       }
     },
-    DOUBLE(NullValuePlaceHolder.DOUBLE) {
+    DOUBLE(Double.class, NullValuePlaceHolder.DOUBLE) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.DOUBLE);
       }
     },
-    BIG_DECIMAL(NullValuePlaceHolder.BIG_DECIMAL) {
+    BIG_DECIMAL(BigDecimal.class, NullValuePlaceHolder.BIG_DECIMAL) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.DECIMAL);
       }
     },
-    BOOLEAN(INT, NullValuePlaceHolder.INT) {
+    BOOLEAN(Boolean.class, INT, NullValuePlaceHolder.INT) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.BOOLEAN);
       }
     },
-    TIMESTAMP(LONG, NullValuePlaceHolder.LONG) {
+    TIMESTAMP(Timestamp.class, LONG, NullValuePlaceHolder.LONG) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
       }
     },
-    STRING(NullValuePlaceHolder.STRING) {
+    STRING(String.class, NullValuePlaceHolder.STRING) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
       }
     },
-    JSON(STRING, NullValuePlaceHolder.STRING) {
+    JSON(String.class, STRING, NullValuePlaceHolder.STRING) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
       }
     },
-    MAP(NullValuePlaceHolder.MAP) {
+    MAP(Map.class, NullValuePlaceHolder.MAP) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.MAP);
       }
     },
-    BYTES(NullValuePlaceHolder.INTERNAL_BYTES) {
+    BYTES(byte[].class, NullValuePlaceHolder.INTERNAL_BYTES) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
       }
     },
-    OBJECT(null) {
+    OBJECT(Object.class, null) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.ANY);
       }
     },
-    INT_ARRAY(NullValuePlaceHolder.INT_ARRAY) {
+    INT_ARRAY(int[].class, NullValuePlaceHolder.INT_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createArrayType(INT.toType(typeFactory), -1);
       }
     },
-    LONG_ARRAY(NullValuePlaceHolder.LONG_ARRAY) {
+    LONG_ARRAY(long[].class, NullValuePlaceHolder.LONG_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createArrayType(LONG.toType(typeFactory), -1);
       }
     },
-    FLOAT_ARRAY(NullValuePlaceHolder.FLOAT_ARRAY) {
+    FLOAT_ARRAY(float[].class, NullValuePlaceHolder.FLOAT_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createArrayType(FLOAT.toType(typeFactory), -1);
       }
     },
-    DOUBLE_ARRAY(NullValuePlaceHolder.DOUBLE_ARRAY) {
+    DOUBLE_ARRAY(double[].class, NullValuePlaceHolder.DOUBLE_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createArrayType(DOUBLE.toType(typeFactory), -1);
       }
     },
-    BOOLEAN_ARRAY(INT_ARRAY, NullValuePlaceHolder.INT_ARRAY) {
+    BOOLEAN_ARRAY(boolean[].class, INT_ARRAY, NullValuePlaceHolder.INT_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createArrayType(BOOLEAN.toType(typeFactory), -1);
       }
+
+      @Override
+      public Object toExternal(Object value) {
+        return toBooleanArray((int[]) value);
+      }
     },
-    TIMESTAMP_ARRAY(LONG_ARRAY, NullValuePlaceHolder.LONG_ARRAY) {
+    TIMESTAMP_ARRAY(Timestamp[].class, LONG_ARRAY, NullValuePlaceHolder.LONG_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createArrayType(TIMESTAMP.toType(typeFactory), -1);
       }
     },
-    STRING_ARRAY(NullValuePlaceHolder.STRING_ARRAY) {
+    STRING_ARRAY(String[].class, NullValuePlaceHolder.STRING_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createArrayType(STRING.toType(typeFactory), -1);
       }
     },
-    BYTES_ARRAY(NullValuePlaceHolder.BYTES_ARRAY) {
+    BYTES_ARRAY(byte[].class, NullValuePlaceHolder.BYTES_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createArrayType(BYTES.toType(typeFactory), -1);
       }
     },
-    UNKNOWN(null) {
+    UNKNOWN(Object.class, null) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.ANY);
@@ -374,17 +379,20 @@ public class DataSchema {
 
     // stored data type.
     private final ColumnDataType _storedColumnDataType;
+    private final Class<?> _externalClass;
 
     // Placeholder for null. We need a placeholder for null so that it can be serialized in the data table
     private final Object _nullPlaceholder;
 
-    ColumnDataType(Object nullPlaceHolder) {
+    ColumnDataType(Class<?> externalClass, Object nullPlaceHolder) {
       _storedColumnDataType = this;
+      _externalClass = externalClass;
       _nullPlaceholder = nullPlaceHolder;
     }
 
-    ColumnDataType(ColumnDataType storedColumnDataType, Object nullPlaceHolder) {
+    ColumnDataType(Class<?> externalClass, ColumnDataType storedColumnDataType, Object nullPlaceHolder) {
       _storedColumnDataType = storedColumnDataType;
+      _externalClass = externalClass;
       _nullPlaceholder = nullPlaceHolder;
     }
 
@@ -518,6 +526,10 @@ public class DataSchema {
         default:
           return value;
       }
+    }
+
+    public Class<?> getExternalClass() {
+      return _externalClass;
     }
 
     /**
