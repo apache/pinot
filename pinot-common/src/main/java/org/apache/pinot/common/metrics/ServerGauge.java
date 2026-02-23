@@ -153,7 +153,9 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
 
   // ThrottleOnCriticalHeapUsageExecutor metrics
   THROTTLE_EXECUTOR_QUEUE_SIZE("count", true,
-      "Current number of tasks in the throttle executor queue");
+      "Current number of tasks in the throttle executor queue"),
+  // Workload config fetch status: 1 = success, 0 = failure
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true);
 
   private final String _gaugeName;
   private final String _unit;

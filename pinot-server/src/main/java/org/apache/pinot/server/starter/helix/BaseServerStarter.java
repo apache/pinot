@@ -786,7 +786,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     updateInstanceConfigIfNeeded(serverConf);
 
     // Get all workload budgets this instance should support (must be done after HelixManager is connected)
-    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _helixManager);
+    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _helixManager,
+        status -> serverMetrics.setValueOfGlobalGauge(ServerGauge.WORKLOAD_CONFIG_FETCH_STATUS, status));
 
     // Start a background task to monitor Helix message count
     int refreshIntervalSeconds = _serverConf.getProperty(Server.CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS,

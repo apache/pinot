@@ -404,7 +404,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         org.apache.pinot.spi.config.instance.InstanceType.BROKER);
     _threadAccountant.startWatcherTask();
     // Get all workload budgets this instance should support
-    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _spectatorHelixManager);
+    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _spectatorHelixManager,
+        status -> _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.WORKLOAD_CONFIG_FETCH_STATUS, status));
     PinotClusterConfigChangeListener threadAccountantListener = _threadAccountant.getClusterConfigChangeListener();
     if (threadAccountantListener != null) {
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(threadAccountantListener);
@@ -412,7 +413,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     // TODO: Hook multiClusterRoutingContext into request handlers subsequently.
     MultiClusterRoutingContext multiClusterRoutingContext = getMultiClusterRoutingContext();
-
     // Create Broker request handler.
     String brokerId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     BrokerRequestIdGenerator requestIdGenerator = new BrokerRequestIdGenerator();

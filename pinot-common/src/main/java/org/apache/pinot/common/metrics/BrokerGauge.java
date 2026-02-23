@@ -106,7 +106,9 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   GRPC_TOTAL_MAX_DIRECT_MEMORY("bytes", true),
   /// Exports the total amount of direct memory allocated by the shaded Netty code used by gRPC
   /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.usedDirectMemory()
-  GRPC_TOTAL_USED_DIRECT_MEMORY("bytes", true);
+  GRPC_TOTAL_USED_DIRECT_MEMORY("bytes", true),
+  // Workload config fetch status: 1 = success, 0 = failure
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true);
 
   private final String _brokerGaugeName;
   private final String _unit;
