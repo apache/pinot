@@ -158,7 +158,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
       } catch (Exception e) {
         LOGGER.warn("Could not get partition count for topic {}", topicName, e);
         _exception = e;
-        // Continue processing other streams (don't throw for multiple streams)
+        throw e;
       }
     }
     return Boolean.TRUE;
