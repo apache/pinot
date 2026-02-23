@@ -124,15 +124,27 @@ public class PinotHelixTaskResourceManager {
     _queueCapacity = queueCapacity;
   }
 
+  public long getTaskExpireTimeMs() {
+    return _taskExpireTimeMs;
+  }
+
   public void setTaskExpireTimeMs(long taskExpireTimeMs) {
     Preconditions.checkArgument(taskExpireTimeMs > 0, "taskExpireTimeMs must be positive: %s", taskExpireTimeMs);
     _taskExpireTimeMs = taskExpireTimeMs;
+  }
+
+  public long getTerminalStateExpireTimeMs() {
+    return _terminalStateExpireTimeMs;
   }
 
   public void setTerminalStateExpireTimeMs(long terminalStateExpireTimeMs) {
     Preconditions.checkArgument(terminalStateExpireTimeMs > 0,
         "terminalStateExpireTimeMs must be positive: %s", terminalStateExpireTimeMs);
     _terminalStateExpireTimeMs = terminalStateExpireTimeMs;
+  }
+
+  public int getQueueCapacity() {
+    return _queueCapacity;
   }
 
   /**

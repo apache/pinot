@@ -1119,122 +1119,174 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     // Parent implementation is a no-op; no need to call super.onChange().
     // This needed to be revisited if parent behavior changes
-    if (clusterConfigs == null) {
+    if (changedConfigs == null || clusterConfigs == null) {
       return;
     }
 
-    if (changedConfigs == null
-        || changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS)) {
-      String taskExpireStr = clusterConfigs.get(
-          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS);
-      if (taskExpireStr != null) {
-        try {
-          long parsed = Long.parseLong(taskExpireStr);
-          if (parsed <= 0) {
-            LOGGER.warn("Ignoring non-positive value {} for {}", parsed,
-                ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS);
-          } else {
-            _helixTaskResourceManager.setTaskExpireTimeMs(parsed);
-          }
-        } catch (NumberFormatException e) {
-          LOGGER.warn("Invalid value for {}: {}",
-              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS, taskExpireStr);
-        }
-      }
-    }
+    tryUpdateTaskExpireTimeMs(changedConfigs, clusterConfigs);
+    tryUpdateTerminalStateExpireTimeMs(changedConfigs, clusterConfigs);
+    tryUpdateTaskQueueMaxSize(changedConfigs, clusterConfigs);
+    tryUpdateMaxDeletesPerCycle(changedConfigs, clusterConfigs);
+    tryUpdateQueueCapacity(changedConfigs, clusterConfigs);
+    tryUpdateWarningThreshold(changedConfigs, clusterConfigs);
+  }
 
-    if (changedConfigs == null
-        || changedConfigs.contains(
-            ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS)) {
-      String terminalExpireStr = clusterConfigs.get(
-          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS);
-      if (terminalExpireStr != null) {
-        try {
-          long parsed = Long.parseLong(terminalExpireStr);
-          if (parsed <= 0) {
-            LOGGER.warn("Ignoring non-positive value {} for {}", parsed,
-                ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS);
-          } else {
-            _helixTaskResourceManager.setTerminalStateExpireTimeMs(parsed);
-          }
-        } catch (NumberFormatException e) {
-          LOGGER.warn("Invalid value for {}: {}",
-              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS, terminalExpireStr);
-        }
-      }
+  private void tryUpdateTaskExpireTimeMs(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS)) {
+      return;
     }
-
-    if (changedConfigs == null
-        || changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE)) {
-      String maxSizeStr = clusterConfigs.get(
-          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE);
-      if (maxSizeStr != null) {
-        try {
-          _taskQueueMaxSize = Integer.parseInt(maxSizeStr);
-        } catch (NumberFormatException e) {
-          LOGGER.warn("Invalid value for {}: {}",
-              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE, maxSizeStr);
-        }
-      }
+    String newValue = clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS);
+    if (newValue == null) {
+      return;
     }
-
-    if (changedConfigs == null
-        || changedConfigs.contains(
-            ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE)) {
-      String maxDeletesStr = clusterConfigs.get(
-          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
-      if (maxDeletesStr != null) {
-        try {
-          int parsed = Integer.parseInt(maxDeletesStr);
-          if (parsed <= 0) {
-            LOGGER.warn("Ignoring non-positive value {} for {}", parsed,
-                ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
-          } else if (parsed > MAX_DELETES_PER_CYCLE_CAP) {
-            LOGGER.warn("Clamping {} to cap {} for {}", parsed, MAX_DELETES_PER_CYCLE_CAP,
-                ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
-            _taskQueueMaxDeletesPerCycle = MAX_DELETES_PER_CYCLE_CAP;
-          } else {
-            _taskQueueMaxDeletesPerCycle = parsed;
-          }
-        } catch (NumberFormatException e) {
-          LOGGER.warn("Invalid value for {}: {}",
-              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE, maxDeletesStr);
-        }
+    long oldValue = _helixTaskResourceManager.getTaskExpireTimeMs();
+    try {
+      long parsed = Long.parseLong(newValue);
+      if (parsed <= 0) {
+        LOGGER.warn("Invalid value for taskExpireTimeMs: {}, must be positive, keeping current value: {}",
+            parsed, oldValue);
+      } else if (oldValue == parsed) {
+        LOGGER.info("No change in taskExpireTimeMs, current value: {}", oldValue);
+      } else {
+        _helixTaskResourceManager.setTaskExpireTimeMs(parsed);
+        LOGGER.info("Updated taskExpireTimeMs from {} to {}", oldValue, parsed);
       }
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for taskExpireTimeMs: {}, keeping current value: {}", newValue, oldValue);
     }
+  }
 
-    if (changedConfigs == null
-        || changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY)) {
-      String capacityStr = clusterConfigs.get(
-          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY);
-      if (capacityStr != null) {
-        try {
-          int parsed = Integer.parseInt(capacityStr);
-          if (parsed > 0 || parsed == -1) {
-            _helixTaskResourceManager.setQueueCapacity(parsed);
-          } else {
-            LOGGER.warn("Ignoring invalid capacity {} for {}. Must be -1 (unlimited) or positive.",
-                parsed, ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY);
-          }
-        } catch (NumberFormatException e) {
-          LOGGER.warn("Invalid value for {}: {}",
-              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY, capacityStr);
-        }
-      }
+  private void tryUpdateTerminalStateExpireTimeMs(Set<String> changedConfigs,
+      Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(
+        ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS)) {
+      return;
     }
-
-    if (changedConfigs == null
-        || changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD)) {
-      String warningStr = clusterConfigs.get(
-          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD);
-      if (warningStr != null) {
-        try {
-          _taskQueueWarningThreshold = Integer.parseInt(warningStr);
-        } catch (NumberFormatException e) {
-          LOGGER.warn("Invalid value for {}: {}",
-              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD, warningStr);
-        }
+    String newValue = clusterConfigs.get(
+        ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS);
+    if (newValue == null) {
+      return;
+    }
+    long oldValue = _helixTaskResourceManager.getTerminalStateExpireTimeMs();
+    try {
+      long parsed = Long.parseLong(newValue);
+      if (parsed <= 0) {
+        LOGGER.warn("Invalid value for terminalStateExpireTimeMs: {}, must be positive, keeping current value: {}",
+            parsed, oldValue);
+      } else if (oldValue == parsed) {
+        LOGGER.info("No change in terminalStateExpireTimeMs, current value: {}", oldValue);
+      } else {
+        _helixTaskResourceManager.setTerminalStateExpireTimeMs(parsed);
+        LOGGER.info("Updated terminalStateExpireTimeMs from {} to {}", oldValue, parsed);
       }
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for terminalStateExpireTimeMs: {}, keeping current value: {}", newValue, oldValue);
+    }
+  }
+
+  private void tryUpdateTaskQueueMaxSize(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE)) {
+      return;
+    }
+    String newValue = clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE);
+    if (newValue == null) {
+      return;
+    }
+    int oldValue = _taskQueueMaxSize;
+    try {
+      int parsed = Integer.parseInt(newValue);
+      if (oldValue == parsed) {
+        LOGGER.info("No change in taskQueueMaxSize, current value: {}", oldValue);
+      } else {
+        _taskQueueMaxSize = parsed;
+        LOGGER.info("Updated taskQueueMaxSize from {} to {}", oldValue, parsed);
+      }
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for taskQueueMaxSize: {}, keeping current value: {}", newValue, oldValue);
+    }
+  }
+
+  private void tryUpdateMaxDeletesPerCycle(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(
+        ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE)) {
+      return;
+    }
+    String newValue = clusterConfigs.get(
+        ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
+    if (newValue == null) {
+      return;
+    }
+    int oldValue = _taskQueueMaxDeletesPerCycle;
+    try {
+      int parsed = Integer.parseInt(newValue);
+      if (parsed <= 0) {
+        LOGGER.warn("Invalid value for maxDeletesPerCycle: {}, must be positive, keeping current value: {}",
+            parsed, oldValue);
+      } else if (parsed > MAX_DELETES_PER_CYCLE_CAP) {
+        int clamped = MAX_DELETES_PER_CYCLE_CAP;
+        LOGGER.warn("Clamping maxDeletesPerCycle from {} to cap {}", parsed, clamped);
+        _taskQueueMaxDeletesPerCycle = clamped;
+      } else if (oldValue == parsed) {
+        LOGGER.info("No change in maxDeletesPerCycle, current value: {}", oldValue);
+      } else {
+        _taskQueueMaxDeletesPerCycle = parsed;
+        LOGGER.info("Updated maxDeletesPerCycle from {} to {}", oldValue, parsed);
+      }
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for maxDeletesPerCycle: {}, keeping current value: {}", newValue, oldValue);
+    }
+  }
+
+  private void tryUpdateQueueCapacity(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY)) {
+      return;
+    }
+    String newValue = clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY);
+    if (newValue == null) {
+      return;
+    }
+    int oldValue = _helixTaskResourceManager.getQueueCapacity();
+    try {
+      int parsed = Integer.parseInt(newValue);
+      // -1 is the sentinel for unlimited (mapped to Integer.MAX_VALUE in ensureTaskQueueExists);
+      // reject 0 and other negatives to prevent misconfiguration.
+      if (parsed > 0 || parsed == -1) {
+        if (oldValue == parsed) {
+          LOGGER.info("No change in queueCapacity, current value: {}", oldValue);
+        } else {
+          _helixTaskResourceManager.setQueueCapacity(parsed);
+          LOGGER.info("Updated queueCapacity from {} to {}", oldValue, parsed);
+        }
+      } else {
+        LOGGER.warn("Invalid value for queueCapacity: {}, must be -1 (unlimited) or positive, "
+            + "keeping current value: {}", parsed, oldValue);
+      }
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for queueCapacity: {}, keeping current value: {}", newValue, oldValue);
+    }
+  }
+
+  private void tryUpdateWarningThreshold(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(
+        ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD)) {
+      return;
+    }
+    String newValue = clusterConfigs.get(
+        ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD);
+    if (newValue == null) {
+      return;
+    }
+    int oldValue = _taskQueueWarningThreshold;
+    try {
+      int parsed = Integer.parseInt(newValue);
+      if (oldValue == parsed) {
+        LOGGER.info("No change in warningThreshold, current value: {}", oldValue);
+      } else {
+        _taskQueueWarningThreshold = parsed;
+        LOGGER.info("Updated warningThreshold from {} to {}", oldValue, parsed);
+      }
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for warningThreshold: {}, keeping current value: {}", newValue, oldValue);
     }
   }
 
@@ -1253,9 +1305,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       for (TaskState taskState : taskStates.values()) {
         _taskStateToCountMap.merge(taskState, 1, Integer::sum);
       }
-      _controllerMetrics.setValueOfTableGauge(taskType, ControllerGauge.TASK_QUEUE_SIZE, taskStates.size());
+      _controllerMetrics.setValueOfTableGauge(taskType, ControllerGauge.TASKS_TRACKED_FOR_TASK_TYPE,
+          taskStates.size());
     } else {
-      _controllerMetrics.setValueOfTableGauge(taskType, ControllerGauge.TASK_QUEUE_SIZE, 0);
+      _controllerMetrics.setValueOfTableGauge(taskType, ControllerGauge.TASKS_TRACKED_FOR_TASK_TYPE, 0);
     }
     for (Map.Entry<TaskState, Integer> taskStateEntry : _taskStateToCountMap.entrySet()) {
       _controllerMetrics.setValueOfTableGauge(String.format("%s.%s", taskType, taskStateEntry.getKey()),

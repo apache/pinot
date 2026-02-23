@@ -77,7 +77,13 @@ public class PinotTaskManagerOnChangeTest {
 
   @Test
   public void testOnChangeNullClusterConfigs() {
-    _taskManager.onChange(null, null);
+    _taskManager.onChange(new HashSet<>(), null);
+    verifyNoInteractions(_helixTaskResourceManager);
+  }
+
+  @Test
+  public void testOnChangeNullChangedConfigs() {
+    _taskManager.onChange(null, Collections.emptyMap());
     verifyNoInteractions(_helixTaskResourceManager);
   }
 
@@ -104,7 +110,10 @@ public class PinotTaskManagerOnChangeTest {
     Map<String, String> clusterConfigs = new HashMap<>();
     clusterConfigs.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS, "0");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     verify(_helixTaskResourceManager, never()).setTaskExpireTimeMs(anyLong());
   }
 
@@ -113,7 +122,10 @@ public class PinotTaskManagerOnChangeTest {
     Map<String, String> clusterConfigs = new HashMap<>();
     clusterConfigs.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS, "-100");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     verify(_helixTaskResourceManager, never()).setTaskExpireTimeMs(anyLong());
   }
 
@@ -122,7 +134,10 @@ public class PinotTaskManagerOnChangeTest {
     Map<String, String> clusterConfigs = new HashMap<>();
     clusterConfigs.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS, "not_a_number");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     verify(_helixTaskResourceManager, never()).setTaskExpireTimeMs(anyLong());
   }
 
@@ -132,7 +147,10 @@ public class PinotTaskManagerOnChangeTest {
     clusterConfigs.put(
         ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS, "172800000");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     verify(_helixTaskResourceManager).setTerminalStateExpireTimeMs(172800000L);
   }
 
@@ -142,7 +160,10 @@ public class PinotTaskManagerOnChangeTest {
     clusterConfigs.put(
         ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS, "-1");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     verify(_helixTaskResourceManager, never()).setTerminalStateExpireTimeMs(anyLong());
   }
 
@@ -151,7 +172,10 @@ public class PinotTaskManagerOnChangeTest {
     Map<String, String> clusterConfigs = new HashMap<>();
     clusterConfigs.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE, "10000");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     assertEquals(_taskManager.getTaskQueueMaxSize(), 10000);
   }
 
@@ -161,7 +185,10 @@ public class PinotTaskManagerOnChangeTest {
     clusterConfigs.put(
         ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE, "100");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     assertEquals(_taskManager.getTaskQueueMaxDeletesPerCycle(), 100);
   }
 
@@ -171,7 +198,10 @@ public class PinotTaskManagerOnChangeTest {
     clusterConfigs.put(
         ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE, "9999");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     assertEquals(_taskManager.getTaskQueueMaxDeletesPerCycle(), PinotTaskManager.MAX_DELETES_PER_CYCLE_CAP);
   }
 
@@ -181,8 +211,11 @@ public class PinotTaskManagerOnChangeTest {
     clusterConfigs.put(
         ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE, "0");
 
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
+
     int before = _taskManager.getTaskQueueMaxDeletesPerCycle();
-    _taskManager.onChange(null, clusterConfigs);
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     assertEquals(_taskManager.getTaskQueueMaxDeletesPerCycle(), before);
   }
 
@@ -191,7 +224,10 @@ public class PinotTaskManagerOnChangeTest {
     Map<String, String> clusterConfigs = new HashMap<>();
     clusterConfigs.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY, "5000");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     verify(_helixTaskResourceManager).setQueueCapacity(5000);
   }
 
@@ -201,7 +237,10 @@ public class PinotTaskManagerOnChangeTest {
     clusterConfigs.put(
         ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD, "8000");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
     assertEquals(_taskManager.getTaskQueueWarningThreshold(), 8000);
   }
 
@@ -222,13 +261,17 @@ public class PinotTaskManagerOnChangeTest {
   }
 
   @Test
-  public void testOnChangeNullChangedConfigsProcessesAll() {
+  public void testOnChangeMultipleChangedConfigsProcessesBoth() {
     Map<String, String> clusterConfigs = new HashMap<>();
     clusterConfigs.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS, "10000");
     clusterConfigs.put(
         ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS, "20000");
 
-    _taskManager.onChange(null, clusterConfigs);
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS);
+    changedConfigs.add(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS);
+
+    _taskManager.onChange(changedConfigs, clusterConfigs);
 
     verify(_helixTaskResourceManager).setTaskExpireTimeMs(10000L);
     verify(_helixTaskResourceManager).setTerminalStateExpireTimeMs(20000L);
@@ -258,7 +301,7 @@ public class PinotTaskManagerOnChangeTest {
     assertEquals(mgr.getTaskQueueMaxDeletesPerCycle(), PinotTaskManager.MAX_DELETES_PER_CYCLE_CAP);
   }
 
-  // ==================== TASK_QUEUE_SIZE metric tests ====================
+  // ==================== TASKS_TRACKED_FOR_TASK_TYPE metric tests ====================
 
   @Test
   public void testReportMetricsEmitsTaskQueueSize() {
@@ -291,7 +334,7 @@ public class PinotTaskManagerOnChangeTest {
     when(taskResMgr.getTaskStates(taskType)).thenReturn(taskStates);
 
     mgr.reportMetrics(taskType);
-    verify(metrics).setValueOfTableGauge(taskType, ControllerGauge.TASK_QUEUE_SIZE, 3);
+    verify(metrics).setValueOfTableGauge(taskType, ControllerGauge.TASKS_TRACKED_FOR_TASK_TYPE, 3);
   }
 
   @Test
@@ -317,6 +360,6 @@ public class PinotTaskManagerOnChangeTest {
     when(taskResMgr.getTaskTypes()).thenReturn(Collections.emptySet());
 
     mgr.reportMetrics(taskType);
-    verify(metrics).setValueOfTableGauge(taskType, ControllerGauge.TASK_QUEUE_SIZE, 0);
+    verify(metrics).setValueOfTableGauge(taskType, ControllerGauge.TASKS_TRACKED_FOR_TASK_TYPE, 0);
   }
 }
