@@ -129,7 +129,7 @@ public class SpecialValueTransformerUtils {
       return values;
     }
 
-    List<Object> transformedValues = new ArrayList<>(values.length);
+    List<Object> transformedValues = null;
     boolean transformed = false;
 
     for (Object value : values) {
@@ -138,6 +138,9 @@ public class SpecialValueTransformerUtils {
         transformed = true;
       }
       if (transformedValue != null) {
+        if (transformedValues == null) {
+          transformedValues = new ArrayList<>(values.length);
+        }
         transformedValues.add(transformedValue);
       }
     }
@@ -146,6 +149,6 @@ public class SpecialValueTransformerUtils {
       return values;
     }
 
-    return !transformedValues.isEmpty() ? transformedValues.toArray() : null;
+    return transformedValues != null && !transformedValues.isEmpty() ? transformedValues.toArray() : null;
   }
 }

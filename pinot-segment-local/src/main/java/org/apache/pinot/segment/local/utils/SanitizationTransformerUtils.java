@@ -144,9 +144,9 @@ public class SanitizationTransformerUtils {
         } else {
           result = SanitizationTransformerUtils.sanitizeStringValue(columnInfo, values[i].toString());
         }
-        values[i] = result.getValue();
-        if (result.isSanitized()) {
+        if (result != null && result.isSanitized()) {
           isSanitized = true;
+          values[i] = result.getValue();
         }
       }
       return new SanitizationResult(values, isSanitized);
@@ -162,6 +162,7 @@ public class SanitizationTransformerUtils {
    * @return The sanitization result containing the sanitized value and whether it was modified
    * @throws IllegalStateException If strategy is ERROR and value exceeds max length or contains null character
    */
+  @Nullable
   private static SanitizationResult sanitizeStringValue(SanitizedColumnInfo columnInfo, String value) {
     String columnName = columnInfo.getColumnName();
     int maxLength = columnInfo.getMaxLength();
@@ -208,7 +209,7 @@ public class SanitizationTransformerUtils {
         case NO_ACTION:
           index = value.indexOf(NULL_CHARACTER);
           if (index < 0) {
-            return new SanitizationResult(value, false);
+            return null;
           } else {
             return new SanitizationResult(sanitizedValue, true);
           }
@@ -216,7 +217,7 @@ public class SanitizationTransformerUtils {
           throw new IllegalStateException("Unsupported max length exceed strategy: " + strategy);
       }
     }
-    return new SanitizationResult(sanitizedValue, false);
+    return null;
   }
 
   /**
@@ -227,6 +228,7 @@ public class SanitizationTransformerUtils {
    * @return The sanitization result containing the sanitized value and whether it was modified
    * @throws IllegalStateException If strategy is ERROR and value exceeds max length
    */
+  @Nullable
   private static SanitizationResult sanitizeBytesValue(SanitizedColumnInfo columnInfo, byte[] value) {
     return sanitizeBytesValue(columnInfo.getColumnName(), value, columnInfo.getMaxLength(),
         columnInfo.getMaxLengthExceedStrategy(), columnInfo.getDefaultNullValue());
@@ -256,11 +258,11 @@ public class SanitizationTransformerUtils {
               String.format("Throwing exception as value for column %s exceeds configured max length %d.", columnName,
                   maxLength));
         case NO_ACTION:
-          return new SanitizationResult(value, false);
+          return null;
         default:
           throw new IllegalStateException("Unsupported max length exceed strategy: " + strategy);
       }
     }
-    return new SanitizationResult(value, false);
+    return null;
   }
 }
