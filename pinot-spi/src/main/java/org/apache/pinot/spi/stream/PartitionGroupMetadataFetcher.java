@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  */
 public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupMetadataFetcher.class);
-  private static final String TOPIC_EXISTENCE_CHECK_ENABLED = TOPIC_EXISTENCE_CHECK_ENABLED;
+  private static final String TOPIC_EXISTENCE_CHECK_ENABLED = "topic.existence.check.enabled";
 
   private final List<StreamConfig> _streamConfigs;
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
@@ -158,7 +158,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
       } catch (Exception e) {
         LOGGER.warn("Could not get partition count for topic {}", topicName, e);
         _exception = e;
-        throw e;
+        // Continue processing other streams (don't throw for multiple streams)
       }
     }
     return Boolean.TRUE;

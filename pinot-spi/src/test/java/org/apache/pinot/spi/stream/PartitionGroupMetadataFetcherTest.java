@@ -20,7 +20,9 @@ package org.apache.pinot.spi.stream;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -327,9 +329,9 @@ public class PartitionGroupMetadataFetcherTest {
   public void testFetchMultipleStreamsSkipsNonExistentTopic()
       throws Exception {
     // Setup: 3 streams where the second topic does not exist
-    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
-    StreamConfig streamConfig2 = createMockStreamConfig("topic2-nonexistent", "test-table", false);
-    StreamConfig streamConfig3 = createMockStreamConfig("topic3", "test-table", false);
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", true);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2-nonexistent", "test-table", true);
+    StreamConfig streamConfig3 = createMockStreamConfig("topic3", "test-table", true);
     List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2, streamConfig3);
 
     List<PartitionGroupConsumptionStatus> statusList = Collections.emptyList();
@@ -452,8 +454,8 @@ public class PartitionGroupMetadataFetcherTest {
   public void testFetchMultipleStreamsTopicExistsCheckPasses()
       throws Exception {
     // Setup: All topics exist, processing should proceed normally
-    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
-    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
+    StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", true);
+    StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", true);
     List<StreamConfig> streamConfigs = Arrays.asList(streamConfig1, streamConfig2);
 
     List<PartitionGroupConsumptionStatus> statusList = Collections.emptyList();
@@ -502,10 +504,16 @@ public class PartitionGroupMetadataFetcherTest {
     }
   }
 
-  private StreamConfig createMockStreamConfig(String topicName, String tableName, boolean isEphemeral) {
+  private StreamConfig createMockStreamConfig(String topicName, String tableName,
+      boolean topicExistenceCheckEnabled) {
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getTopicName()).thenReturn(topicName);
     when(streamConfig.getTableNameWithType()).thenReturn(tableName);
+    Map<String, String> configsMap = new HashMap<>();
+    if (topicExistenceCheckEnabled) {
+      configsMap.put("topic.existence.check.enabled", "true");
+    }
+    when(streamConfig.getStreamConfigsMap()).thenReturn(configsMap);
     return streamConfig;
   }
 }
