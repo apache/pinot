@@ -432,7 +432,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
     long compilationEndTimeNs = System.nanoTime();
 
-    // Validate that physical tables are not queried with multi-cluster routing enabled
+    // Validate that physical tables are not queried with multi-cluster routing enabled.
+    // Unlike the MSE, the SSE has no centralized exception handler that converts QueryException into
+    // BrokerResponseNative, so we must catch and convert here to return a proper JSON error response.
     try {
       validatePhysicalTablesWithMultiClusterRouting(Set.of(tableName), sqlNodeAndOptions.getOptions());
     } catch (QueryException e) {

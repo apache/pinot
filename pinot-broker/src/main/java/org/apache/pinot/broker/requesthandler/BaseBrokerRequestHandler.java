@@ -263,9 +263,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
-   * Validates that physical tables are not being queried with enableMultiClusterRouting=true.
-   * Physical tables are cluster-specific and should never be federated across clusters.
-   * Only logical tables support multi-cluster routing.
+   * Validates that tables can be queried with enableMultiClusterRouting if and only if they are logical tables.
+   * Physical tables are cluster-specific and cannot be federated across clusters.
+   * Multi-cluster routing is only supported for logical tables.
    *
    * @param tableNames Set of table names to validate
    * @param queryOptions Map of query options
@@ -277,7 +277,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     boolean isMultiClusterRoutingEnabled = queryOptions.containsKey(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING)
         && Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING));
 
-    if (isMultiClusterRoutingEnabled) {
+    if (isMultiClusterRoutingEnabled && tableNames != null) {
       // Validate each table - physical tables cannot be queried with multi-cluster routing
       for (String tableName : tableNames) {
         if (!_tableCache.isLogicalTable(tableName)) {

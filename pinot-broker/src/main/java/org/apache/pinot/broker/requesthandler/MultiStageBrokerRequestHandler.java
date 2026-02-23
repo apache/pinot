@@ -358,6 +358,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant);
         QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, requestContext,
             httpHeaders, queryTimer)) {
+      validatePhysicalTablesWithMultiClusterRouting(compiledQuery.getTableNames(), compiledQuery.getOptions());
       AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
       checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery, rlsFiltersApplied);
 
@@ -409,9 +410,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery, AtomicBoolean rlsFiltersApplied) {
     Set<String> tables = compiledQuery.getTableNames();
     if (tables != null && !tables.isEmpty()) {
-      // Validate that physical tables are not queried with multi-cluster routing enabled
-      validatePhysicalTablesWithMultiClusterRouting(tables, compiledQuery.getOptions());
-
       TableAuthorizationResult tableAuthorizationResult =
           hasTableAccess(requesterIdentity, tables, requestContext, httpHeaders);
       if (!tableAuthorizationResult.hasAccess()) {
