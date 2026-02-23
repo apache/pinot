@@ -110,8 +110,8 @@ function waitForKafkaReady() {
   status=1
   while [ $status -ne 0 ]; do
     sleep 1
-    echo "Checking port 19092 for kafka ready"
-    echo x | nc localhost 19092 1>/dev/null 2>&1
+    echo "Checking port ${KAFKA_PORT} for kafka ready"
+    echo x | nc localhost ${KAFKA_PORT} 1>/dev/null 2>&1
     status=$?
   done
 }
@@ -196,8 +196,7 @@ function startService() {
     ./pinot-admin.sh StartServer ${configFileArg} 1>${LOG_DIR}/server2.${logCount}.log 2>&1 &
         echo $! >${PID_DIR}/server2.pid
   elif [ "$serviceName" = "kafka" ]; then
-    ./pinot-admin.sh StartKafka -zkAddress localhost:${ZK_PORT}/kafka 1>${LOG_DIR}/kafka.${logCount}.log 2>&1 &
-    echo $! >${PID_DIR}/kafka.pid
+    startKafkaService
   fi
   # Keep log files distinct so we can debug
   logCount=$((logCount + 1))
@@ -206,12 +205,63 @@ function startService() {
   popd 1>/dev/null || exit 1
 }
 
+function setupKafkaBinary() {
+  if [ ! -x "${KAFKA_HOME}/bin/kafka-server-start.sh" ]; then
+    echo "Setting up Kafka from ${KAFKA_DOWNLOAD_URL}"
+    rm -rf "${KAFKA_HOME}"
+    rm -rf "${workingDir}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}"
+    if [ ! -f "${KAFKA_ARCHIVE}" ]; then
+      curl -fSL "${KAFKA_DOWNLOAD_URL}" -o "${KAFKA_ARCHIVE}" 1>${LOG_DIR}/kafka.download.${logCount}.log 2>&1 || exit 1
+    fi
+    tar -xzf "${KAFKA_ARCHIVE}" -C "${workingDir}" 1>>${LOG_DIR}/kafka.download.${logCount}.log 2>&1 || exit 1
+    mv "${workingDir}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}" "${KAFKA_HOME}"
+  fi
+
+  rm -rf "${KAFKA_DATA_DIR}"
+  mkdir -p "${KAFKA_DATA_DIR}"
+  cat <<EOF >"${KAFKA_CONFIG_FILE}"
+listeners=${KAFKA_LISTENER}
+advertised.listeners=${KAFKA_LISTENER}
+num.io.threads=8
+num.network.threads=3
+socket.send.buffer.bytes=102400
+socket.receive.buffer.bytes=102400
+socket.request.max.bytes=104857600
+log.dirs=${KAFKA_DATA_DIR}
+num.partitions=1
+num.recovery.threads.per.data.dir=1
+offsets.topic.replication.factor=1
+transaction.state.log.replication.factor=1
+transaction.state.log.min.isr=1
+zookeeper.connect=localhost:${ZK_PORT}/kafka
+zookeeper.connection.timeout.ms=6000
+EOF
+}
+
+function startKafkaService() {
+  setupKafkaBinary
+  "${KAFKA_HOME}/bin/kafka-server-start.sh" "${KAFKA_CONFIG_FILE}" 1>${LOG_DIR}/kafka.${logCount}.log 2>&1 &
+  echo $! >${PID_DIR}/kafka.pid
+}
+
+function stopKafkaService() {
+  if [ -x "${KAFKA_HOME}/bin/kafka-server-stop.sh" ]; then
+    "${KAFKA_HOME}/bin/kafka-server-stop.sh" --config "${KAFKA_CONFIG_FILE}" 1>${LOG_DIR}/kafka.stop.${logCount}.log 2>&1
+  else
+    kill -9 $1 1>/dev/null 2>&1
+  fi
+}
+
 # Given a component, check if it known to be running and stop that specific component
 function stopService() {
   serviceName=$1
   if [ -f "${PID_DIR}/${serviceName}".pid ]; then
     pid=$(cat "${PID_DIR}/${serviceName}".pid)
-    kill -9 $pid 1>/dev/null 2>&1
+    if [ "$serviceName" = "kafka" ]; then
+      stopKafkaService $pid
+    else
+      kill -9 $pid 1>/dev/null 2>&1
+    fi
     # TODO Kill without -9 and add a while loop waiting for process to die
     status=0
     while [ $status -ne 1 ]; do
@@ -404,6 +454,15 @@ SERVER_NETTY_PORT=8098
 SERVER_2_NETTY_PORT=9098
 SERVER_GRPC_PORT=8090
 SERVER_2_GRPC_PORT=9090
+KAFKA_VERSION="${KAFKA_VERSION:-3.9.1}"
+ KAFKA_SCALA_VERSION="${KAFKA_SCALA_VERSION:-2.13}"
+ KAFKA_DOWNLOAD_URL="${KAFKA_DOWNLOAD_URL:-https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz}"
+ KAFKA_PORT="${KAFKA_PORT:-19092}"
+ KAFKA_LISTENER="PLAINTEXT://127.0.0.1:${KAFKA_PORT}"
+ KAFKA_HOME="${workingDir}/kafka"
+ KAFKA_ARCHIVE="${workingDir}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz"
+ KAFKA_DATA_DIR="${workingDir}/kafka-data"
+ KAFKA_CONFIG_FILE="${workingDir}/kafka-server.properties"
 
 PID_DIR=${workingDir}/pids
 LOG_DIR=${workingDir}/logs
@@ -427,6 +486,7 @@ setupCompatTester
 # check that the default ports are open
 if ! checkPortAvailable ${SERVER_ADMIN_PORT} || ! checkPortAvailable ${SERVER_NETTY_PORT} || ! checkPortAvailable ${SERVER_GRPC_PORT} ||
   ! checkPortAvailable ${BROKER_QUERY_PORT} || ! checkPortAvailable ${CONTROLLER_PORT} || ! checkPortAvailable ${ZK_PORT} ||
+  ! checkPortAvailable ${KAFKA_PORT} ||
   { [ -f "${SERVER_CONF_2}" ] && { ! checkPortAvailable ${SERVER_2_ADMIN_PORT} || ! checkPortAvailable ${SERVER_2_NETTY_PORT} || ! checkPortAvailable ${SERVER_2_GRPC_PORT}; } ; }; then
   exit 1
 fi
