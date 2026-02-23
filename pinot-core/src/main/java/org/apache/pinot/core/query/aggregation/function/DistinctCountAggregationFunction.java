@@ -82,7 +82,7 @@ public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggre
 
   @Override
   public Integer extractFinalResult(Set intermediateResult) {
-    return intermediateResult.size();
+    return intermediateResult == null ? 0 : intermediateResult.size();
   }
 
   @Override

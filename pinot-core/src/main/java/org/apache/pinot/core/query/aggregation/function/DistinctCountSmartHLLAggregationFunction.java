@@ -374,6 +374,9 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
 
   @Override
   public Integer extractFinalResult(Object intermediateResult) {
+    if (intermediateResult == null) {
+      return 0;
+    }
     if (intermediateResult instanceof HyperLogLog) {
       return (int) ((HyperLogLog) intermediateResult).cardinality();
     } else {

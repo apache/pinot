@@ -121,6 +121,11 @@ public class DistinctCountRawHLLPlusAggregationFunction
 
   @Override
   public SerializedHLLPlus extractFinalResult(HyperLogLogPlus intermediateResult) {
+    if (intermediateResult == null) {
+      return new SerializedHLLPlus(
+          new HyperLogLogPlus(_distinctCountHLLPlusAggregationFunction.getP(),
+              _distinctCountHLLPlusAggregationFunction.getSp()));
+    }
     return new SerializedHLLPlus(intermediateResult);
   }
 }

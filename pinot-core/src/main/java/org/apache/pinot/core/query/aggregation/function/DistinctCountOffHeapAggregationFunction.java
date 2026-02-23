@@ -467,7 +467,9 @@ public class DistinctCountOffHeapAggregationFunction
 
   @Override
   public Integer extractFinalResult(BaseOffHeapSet set) {
-    assert set != null;
+    if (set == null) {
+      return 0;
+    }
     int size = set.size();
     set.close();
     return size;

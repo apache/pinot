@@ -423,6 +423,9 @@ public class DistinctCountCPCSketchAggregationFunction
 
   @Override
   public Comparable extractFinalResult(CpcSketchAccumulator intermediateResult) {
+    if (intermediateResult == null) {
+      return 0L;
+    }
     intermediateResult.setLgNominalEntries(_lgNominalEntries);
     intermediateResult.setThreshold(_accumulatorThreshold);
     return Math.round(intermediateResult.getResult().getEstimate());

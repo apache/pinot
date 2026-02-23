@@ -622,7 +622,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
 
   @Override
   public Long extractFinalResult(HyperLogLogPlus intermediateResult) {
-    return intermediateResult.cardinality();
+    return intermediateResult == null ? 0L : intermediateResult.cardinality();
   }
 
   @Override

@@ -1079,6 +1079,9 @@ public class DistinctCountThetaSketchAggregationFunction
 
   @Override
   public Comparable extractFinalResult(List<ThetaSketchAccumulator> accumulators) {
+    if (accumulators == null) {
+      return 0L;
+    }
     int numAccumulators = accumulators.size();
     List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
 

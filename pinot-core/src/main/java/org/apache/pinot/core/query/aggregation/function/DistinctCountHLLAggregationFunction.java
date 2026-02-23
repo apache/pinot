@@ -606,7 +606,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   @Override
   public Long extractFinalResult(HyperLogLog intermediateResult) {
-    return intermediateResult.cardinality();
+    return intermediateResult == null ? 0L : intermediateResult.cardinality();
   }
 
   @Override

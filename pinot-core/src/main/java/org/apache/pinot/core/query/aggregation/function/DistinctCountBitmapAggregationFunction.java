@@ -562,7 +562,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
 
   @Override
   public Integer extractFinalResult(RoaringBitmap intermediateResult) {
-    return intermediateResult.getCardinality();
+    return intermediateResult == null ? 0 : intermediateResult.getCardinality();
   }
 
   @Override

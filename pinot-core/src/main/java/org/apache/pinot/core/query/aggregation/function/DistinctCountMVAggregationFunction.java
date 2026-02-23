@@ -63,7 +63,7 @@ public class DistinctCountMVAggregationFunction extends BaseDistinctAggregateAgg
 
   @Override
   public Integer extractFinalResult(Set intermediateResult) {
-    return intermediateResult.size();
+    return intermediateResult == null ? 0 : intermediateResult.size();
   }
 
   @Override

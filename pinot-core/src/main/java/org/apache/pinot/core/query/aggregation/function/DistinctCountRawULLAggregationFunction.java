@@ -33,6 +33,9 @@ public class DistinctCountRawULLAggregationFunction extends DistinctCountULLAggr
 
   @Override
   public SerializedULL extractFinalResult(UltraLogLog intermediateResult) {
+    if (intermediateResult == null) {
+      return new SerializedULL(UltraLogLog.create(_p));
+    }
     return new SerializedULL(intermediateResult);
   }
 

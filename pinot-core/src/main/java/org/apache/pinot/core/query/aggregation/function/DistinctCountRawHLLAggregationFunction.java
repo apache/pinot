@@ -120,6 +120,9 @@ public class DistinctCountRawHLLAggregationFunction
 
   @Override
   public SerializedHLL extractFinalResult(HyperLogLog intermediateResult) {
+    if (intermediateResult == null) {
+      return new SerializedHLL(new HyperLogLog(_distinctCountHLLAggregationFunction.getLog2m()));
+    }
     return new SerializedHLL(intermediateResult);
   }
 }
