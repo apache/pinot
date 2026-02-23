@@ -214,7 +214,7 @@ public class PartitionGroupMetadataFetcherTest {
   }
 
   @Test
-  public void testFetchMultipleStreamsWithExceptionContinuesProcessing()
+  public void testFetchMultipleStreamsWithExceptionThrows()
       throws Exception {
     // Setup: 3 streams where the second one throws an exception
     StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
@@ -264,29 +264,22 @@ public class PartitionGroupMetadataFetcherTest {
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
           streamConfigs, statusList, Collections.emptyList(), false);
 
-      // Execute
-      Boolean result = fetcher.call();
+      // Execute and verify exception is thrown
+      try {
+        fetcher.call();
+        Assert.fail("Expected RuntimeException to be thrown");
+      } catch (RuntimeException e) {
+        // Verify: exception should contain topic2-failing
+        Assert.assertTrue(e.getMessage().contains("topic2-failing"));
+        // Verify: exception should also be recorded
+        Assert.assertNotNull(fetcher.getException());
+        Assert.assertEquals(e, fetcher.getException());
+      }
 
-      // Verify: should return TRUE despite exception (continues processing other streams)
-      Assert.assertTrue(result);
-
-      // Verify: exception should be recorded
-      Assert.assertNotNull(fetcher.getException());
-      Assert.assertTrue(fetcher.getException() instanceof RuntimeException);
-      Assert.assertTrue(fetcher.getException().getMessage().contains("topic2-failing"));
-
-      // Verify: metadata from successful streams (topic1 and topic3) should be collected
-      // topic1 returns partition 0, topic3 (index 2) returns partition 20000
+      // Verify: only metadata from topic1 should be collected (before exception)
       List<PartitionGroupMetadata> resultMetadata = fetcher.getPartitionGroupMetadataList();
-      Assert.assertEquals(resultMetadata.size(), 2);
-
-      List<Integer> partitionIds = resultMetadata.stream()
-          .map(PartitionGroupMetadata::getPartitionGroupId)
-          .sorted()
-          .collect(Collectors.toList());
-
-      // Partition IDs: 0 from topic1 (index 0), 20000 from topic3 (index 2)
-      Assert.assertEquals(partitionIds, Arrays.asList(0, 20000));
+      Assert.assertEquals(resultMetadata.size(), 1);
+      Assert.assertEquals(resultMetadata.get(0).getPartitionGroupId(), 0);
     }
   }
 
