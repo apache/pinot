@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
  */
 public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupMetadataFetcher.class);
-  private static final String TOPIC_EXISTENCE_CHECK_ENABLED = "topic.existence.check.enabled";
 
   private final List<StreamConfig> _streamConfigs;
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
@@ -132,7 +131,8 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         // Check if the topic exists before fetching partition metadata
         // Only perform this check if topic existence validation is enabled and topics were fetched
         boolean checkTopicExists = Boolean.parseBoolean(
-            streamConfig.getStreamConfigsMap().getOrDefault(TOPIC_EXISTENCE_CHECK_ENABLED, "false"));
+            streamConfig.getStreamConfigsMap()
+                .getOrDefault(StreamConfigProperties.TOPIC_EXISTENCE_CHECK_ENABLED, "false"));
         if (checkTopicExists && availableTopicNames != null && !availableTopicNames.contains(topicName)) {
           LOGGER.warn("Topic {} does not exist. Skipping this topic from ingestion.", topicName);
           continue;
@@ -174,7 +174,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     // Find first stream config with topic existence check enabled
     StreamConfig streamConfigForTopicFetch = _streamConfigs.stream()
         .filter(config -> Boolean.parseBoolean(
-            config.getStreamConfigsMap().getOrDefault(TOPIC_EXISTENCE_CHECK_ENABLED, "false")))
+            config.getStreamConfigsMap().getOrDefault(StreamConfigProperties.TOPIC_EXISTENCE_CHECK_ENABLED, "false")))
         .findFirst()
         .orElse(null);
 
