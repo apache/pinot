@@ -21,7 +21,6 @@ package org.apache.pinot.server.starter.helix;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +34,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskContext;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.executor.DecoratorExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,7 +96,9 @@ public class DefaultStateTransitionThreadPoolManager implements StateTransitionT
   public void onHelixManagerConnected() {
     // Determine pool size with full precedence: Pinot config > Helix config > default
     int poolSize = determinePoolSize();
-    _executorService = createExecutorService(poolSize);
+    _executorService =
+        new ContextualStateTransitionExecutor(new ThreadPoolExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(), new ThreadFactoryBuilder().setNameFormat("state-transition-%d").build()));
     LOGGER.info("Created state transition thread pool with size: {}", poolSize);
   }
 
@@ -120,7 +122,7 @@ public class DefaultStateTransitionThreadPoolManager implements StateTransitionT
       Integer legacyPoolSize = readLegacyHelixConfig(_helixManager);
       if (legacyPoolSize != null) {
         LOGGER.info("Using state transition thread pool size from legacy Helix config: {}. "
-            + "Consider migrating to Pinot config: {}", legacyPoolSize,
+                + "Consider migrating to Pinot config: {}", legacyPoolSize,
             org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE);
         return legacyPoolSize;
       }
@@ -130,11 +132,6 @@ public class DefaultStateTransitionThreadPoolManager implements StateTransitionT
     int defaultSize = org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_STATE_TRANSITION_THREAD_POOL_SIZE;
     LOGGER.info("Using default state transition thread pool size: {}", defaultSize);
     return defaultSize;
-  }
-
-  private ExecutorService createExecutorService(int poolSize) {
-    return new ContextWrappingExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS,
-        new LinkedBlockingQueue<>(), new ThreadFactoryBuilder().setNameFormat("state-transition-%d").build());
   }
 
   /**
@@ -215,18 +212,33 @@ public class DefaultStateTransitionThreadPoolManager implements StateTransitionT
     }
   }
 
-  private static class ContextWrappingExecutor extends ThreadPoolExecutor {
-    ContextWrappingExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit,
-        LinkedBlockingQueue<Runnable> workQueue, java.util.concurrent.ThreadFactory threadFactory) {
-      super(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue, threadFactory);
+  private static class ContextualStateTransitionExecutor extends DecoratorExecutorService {
+    public ContextualStateTransitionExecutor(ExecutorService delegate) {
+      super(delegate);
     }
 
     @Override
-    public <T> Future<T> submit(Callable<T> task) {
+    protected <T> Callable<T> decorate(Callable<T> task) {
       Message message = task instanceof MessageTask ? ((MessageTask) task).getMessage() : null;
       String tableNameWithType = message != null ? message.getResourceName() : null;
-      return super.submit(
-          SegmentOperationsTaskContext.wrap(task, SegmentOperationsTaskType.STATE_TRANSITION, tableNameWithType));
+      if (!(task instanceof MessageTask)) {
+        LOGGER.warn(
+            "Submitting a Callable task that is not a MessageTask. State transition task will be wrapped with null "
+                + "table name.");
+      }
+      return SegmentOperationsTaskContext.wrap(task, SegmentOperationsTaskType.STATE_TRANSITION, tableNameWithType);
+    }
+
+    @Override
+    protected Runnable decorate(Runnable task) {
+      Message message = task instanceof MessageTask ? ((MessageTask) task).getMessage() : null;
+      String tableNameWithType = message != null ? message.getResourceName() : null;
+      if (!(task instanceof MessageTask)) {
+        LOGGER.warn(
+            "Submitting a Runnable task that is not a MessageTask. State transition task will be wrapped with null "
+                + "table name.");
+      }
+      return SegmentOperationsTaskContext.wrap(task, SegmentOperationsTaskType.STATE_TRANSITION, tableNameWithType);
     }
   }
 }
