@@ -304,7 +304,7 @@
 
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
-    <mockito-core.version>5.17.0</mockito-core.version>
+    <mockito-core.version>5.21.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>2.0.3</testcontainers.version>
     <h2.version>2.4.240</h2.version>
