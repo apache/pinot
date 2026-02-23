@@ -16,31 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.recordtransformer;
+package org.apache.pinot.segment.local.columntransformer;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.TimeValidationTransformerUtils;
 import org.apache.pinot.segment.local.utils.TimeValidationTransformerUtils.TimeValidationConfig;
+import org.apache.pinot.spi.columntransformer.ColumnTransformer;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 
 
 /**
- * The {@code TimeValidationTransformer} class will validate the time column value.
- * <p>NOTE: should put this after the {@link DataTypeTransformer} so that all values follow the data types in
- * {@link FieldSpec}, and before the {@link NullValueTransformer} so that the invalidated value can be filled.
+ * Column transformer that validates time column values are within the valid range (1971-2071).
+ * Invalid values are transformed to null.
+ *
+ * <p>This transformer should be applied after {@link DataTypeColumnTransformer} so that all values
+ * follow the data types in FieldSpec, and before {@link NullValueColumnTransformer} so that
+ * invalidated values can be filled with defaults.
  */
-public class TimeValidationTransformer implements RecordTransformer {
+public class TimeValidationColumnTransformer implements ColumnTransformer {
 
-  private final String _timeColumnName;
   @Nullable
   private final TimeValidationConfig _config;
 
-  public TimeValidationTransformer(TableConfig tableConfig, Schema schema) {
-    _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+  /**
+   * Create a TimeValidationColumnTransformer.
+   *
+   * @param tableConfig The table configuration
+   * @param schema The schema
+   */
+  public TimeValidationColumnTransformer(TableConfig tableConfig, Schema schema) {
     _config = TimeValidationTransformerUtils.getConfig(tableConfig, schema);
   }
 
@@ -50,15 +55,7 @@ public class TimeValidationTransformer implements RecordTransformer {
   }
 
   @Override
-  public void transform(GenericRow record) {
-    Object timeValue = record.getValue(_timeColumnName);
-    if (timeValue == null) {
-      return;
-    }
-    Object result = TimeValidationTransformerUtils.transformTimeValue(_config, timeValue);
-    if (result == null) {
-      record.putValue(_timeColumnName, null);
-      record.markIncomplete();
-    }
+  public Object transform(@Nullable Object value) {
+    return TimeValidationTransformerUtils.transformTimeValue(_config, value);
   }
 }
