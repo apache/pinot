@@ -2241,11 +2241,19 @@ public class PinotHelixResourceManager {
   }
 
   public void validateLogicalTableConfig(LogicalTableConfig logicalTableConfig) {
-    LogicalTableConfigUtils.validateLogicalTableConfig(
-        logicalTableConfig,
-        getAllBrokerTenantNames()::contains,
-        _propertyStore
-    );
+    LogicalTableConfigUtils.validateLogicalTableConfig(logicalTableConfig);
+    // validate broker tenant exists
+    String brokerTenant = logicalTableConfig.getBrokerTenant();
+    if (!getAllBrokerTenantNames().contains(brokerTenant)) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: '" + brokerTenant + "' should be one of the existing broker tenants");
+    }
+    // Validate schema with same name as logical table exists
+    if (!ZKMetadataProvider.isSchemaExists(_propertyStore, logicalTableConfig.getTableName())) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: Schema with same name as logical table '"
+              + logicalTableConfig.getTableName() + "' does not exist");
+    }
   }
 
   /**
