@@ -324,7 +324,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
   }
 
   @Override
-  public Long extractFinalResult(Long intermediateResult) {
+  public Long extractFinalResult(@Nullable Long intermediateResult) {
     return intermediateResult == null ? 0L : intermediateResult;
   }
 

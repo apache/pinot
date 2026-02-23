@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.customobject.SerializedULL;
@@ -31,10 +32,11 @@ public class DistinctCountRawULLAggregationFunction extends DistinctCountULLAggr
     super(arguments);
   }
 
+  @Nullable
   @Override
-  public SerializedULL extractFinalResult(UltraLogLog intermediateResult) {
+  public SerializedULL extractFinalResult(@Nullable UltraLogLog intermediateResult) {
     if (intermediateResult == null) {
-      return new SerializedULL(UltraLogLog.create(_p));
+      return null;
     }
     return new SerializedULL(intermediateResult);
   }

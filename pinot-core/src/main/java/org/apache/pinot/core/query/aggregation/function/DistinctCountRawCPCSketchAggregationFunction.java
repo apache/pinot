@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import org.apache.datasketches.cpc.CpcSketch;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
@@ -47,10 +47,11 @@ public class DistinctCountRawCPCSketchAggregationFunction extends DistinctCountC
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public SerializedCPCSketch extractFinalResult(CpcSketchAccumulator intermediateResult) {
+  public SerializedCPCSketch extractFinalResult(@Nullable CpcSketchAccumulator intermediateResult) {
     if (intermediateResult == null) {
-      return new SerializedCPCSketch(new CpcSketch(_lgNominalEntries));
+      return null;
     }
     intermediateResult.setLgNominalEntries(_lgNominalEntries);
     intermediateResult.setThreshold(_accumulatorThreshold);
