@@ -55,7 +55,8 @@ public class SanitizationTransformerUtils {
   public static SanitizedColumnInfo getSanitizedColumnInfo(FieldSpec fieldSpec) {
     FieldSpec.DataType dataType = fieldSpec.getDataType();
 
-    if (dataType == FieldSpec.DataType.STRING || dataType == FieldSpec.DataType.JSON || dataType == FieldSpec.DataType.BYTES) {
+    if (dataType == FieldSpec.DataType.STRING || dataType == FieldSpec.DataType.JSON
+        || dataType == FieldSpec.DataType.BYTES) {
       MaxLengthExceedStrategy strategy = fieldSpec.getEffectiveMaxLengthExceedStrategy();
       // For STRING, always apply (to handle null characters even with NO_ACTION)
       // For JSON/BYTES, only apply if strategy is not NO_ACTION
