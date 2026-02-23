@@ -38,6 +38,9 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.utils.QueryIdUtils;
 import org.apache.pinot.core.transport.InstanceRequestHandler;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -60,6 +63,7 @@ public class QueryResource {
   @DELETE
   @Path("/query/{queryId}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
   @ApiOperation(value = "Cancel a query running on the server as identified by the queryId", notes = "No effect if "
       + "no query exists for the given queryId. Query may continue to run for a short while after calling cancel as "
       + "it's done in a non-blocking manner. The cancel API can be called multiple times.")
@@ -97,6 +101,7 @@ public class QueryResource {
   @GET
   @Path("/queries/id")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)
   @ApiOperation(value = "Get queryIds of running queries on the server", notes = "QueryIds are in the format of "
       + "<brokerId>_<requestId>_(O|R)")
   @ApiResponses(value = {

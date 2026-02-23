@@ -49,6 +49,9 @@ import org.apache.pinot.common.restlet.resources.PrimaryKeyCountInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -76,6 +79,7 @@ public class InstanceResource {
 
   @GET
   @Path("tags")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @ApiOperation(value = "Tenant tags for current instance")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
@@ -96,6 +100,7 @@ public class InstanceResource {
    */
   @GET
   @Path("pools")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @ApiOperation(value = "Tenant pools for current instance")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
@@ -113,6 +118,7 @@ public class InstanceResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/diskUtilization")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @ApiOperation(value = "Show disk utilization", notes = "Disk capacity and usage shown in bytes")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -133,6 +139,7 @@ public class InstanceResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/primaryKeyCount")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @ApiOperation(value = "Show number of primary keys", notes = "Total number of upsert / dedup primary keys")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")

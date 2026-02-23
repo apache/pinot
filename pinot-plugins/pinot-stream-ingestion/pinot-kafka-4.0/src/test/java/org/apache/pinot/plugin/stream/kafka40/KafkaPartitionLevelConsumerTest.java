@@ -103,9 +103,9 @@ public class KafkaPartitionLevelConsumerTest {
     _kafkaCluster = new MiniKafkaCluster("0");
     _kafkaCluster.start();
     _kafkaBrokerAddress = _kafkaCluster.getKafkaServerAddress();
-    _kafkaCluster.createTopic(TEST_TOPIC_1, 1, 1);
-    _kafkaCluster.createTopic(TEST_TOPIC_2, 2, 1);
-    _kafkaCluster.createTopic(TEST_TOPIC_3, 1, 1);
+    _kafkaCluster.createTopic(TEST_TOPIC_1, 1);
+    _kafkaCluster.createTopic(TEST_TOPIC_2, 2);
+    _kafkaCluster.createTopic(TEST_TOPIC_3, 1);
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
     produceMsgToKafka();
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
@@ -152,7 +152,7 @@ public class KafkaPartitionLevelConsumerTest {
       _kafkaCluster.deleteTopic(TEST_TOPIC_2);
       _kafkaCluster.deleteTopic(TEST_TOPIC_3);
     } finally {
-      _kafkaCluster.close();
+      _kafkaCluster.stop();
     }
   }
 
