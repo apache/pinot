@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.io.PrintWriter;
@@ -41,6 +42,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.task.TaskState;
+import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -124,6 +126,29 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   protected final @Nullable DistributedTaskLockManager _distributedTaskLockManager;
 
+  // Dynamically updatable task queue configs
+  private volatile int _taskQueueMaxSize;
+  private volatile int _taskQueueMaxDeletesPerCycle;
+  private volatile int _taskQueueWarningThreshold;
+
+  @VisibleForTesting
+  static final int MAX_DELETES_PER_CYCLE_CAP = 1000;
+
+  @VisibleForTesting
+  int getTaskQueueMaxSize() {
+    return _taskQueueMaxSize;
+  }
+
+  @VisibleForTesting
+  int getTaskQueueMaxDeletesPerCycle() {
+    return _taskQueueMaxDeletesPerCycle;
+  }
+
+  @VisibleForTesting
+  int getTaskQueueWarningThreshold() {
+    return _taskQueueWarningThreshold;
+  }
+
   public PinotTaskManager(PinotHelixTaskResourceManager helixTaskResourceManager,
       PinotHelixResourceManager helixResourceManager, LeadControllerManager leadControllerManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics,
@@ -151,6 +176,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     } else {
       _scheduler = null;
     }
+
+    _taskQueueMaxSize = controllerConf.getPinotTaskQueueMaxSize();
+    int rawMaxDeletes = controllerConf.getPinotTaskQueueMaxDeletesPerCycle();
+    _taskQueueMaxDeletesPerCycle = Math.min(rawMaxDeletes, MAX_DELETES_PER_CYCLE_CAP);
+    _taskQueueWarningThreshold = controllerConf.getPinotTaskQueueWarningThreshold();
 
     // For distributed locking
     boolean enableDistributedLocking = controllerConf.isPinotTaskManagerDistributedLockingEnabled();
@@ -391,8 +421,32 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   protected void prepTaskQueue(String taskType) {
-    _helixTaskResourceManager.ensureTaskQueueExists(taskType);
+    // workflowConfig is a point-in-time snapshot; queue size may drift between this read and the
+    // subsequent trim call if jobs are enqueued concurrently. This is intentionally best-effort.
+    WorkflowConfig workflowConfig = _helixTaskResourceManager.ensureTaskQueueExists(taskType);
     addTaskTypeMetricsUpdaterIfNeeded(taskType);
+
+    if (workflowConfig != null) {
+      int queueSize = workflowConfig.getJobDag().getAllNodes().size();
+
+      int maxSize = _taskQueueMaxSize;
+      int deleted = 0;
+      if (maxSize > 0 && queueSize > maxSize) {
+        deleted = _helixTaskResourceManager.trimTaskQueueIfNeeded(taskType, workflowConfig, maxSize,
+            _taskQueueMaxDeletesPerCycle);
+      }
+
+      int warningThreshold = _taskQueueWarningThreshold;
+      if (warningThreshold > 0) {
+        int estimatedSize = queueSize - deleted;
+        if (estimatedSize > warningThreshold) {
+          LOGGER.warn("Task queue for type {} has {} jobs{}, which exceeds warning threshold of {}.",
+              taskType, estimatedSize,
+              deleted > 0 ? String.format(" (was %d before trimming %d)", queueSize, deleted) : "",
+              warningThreshold);
+        }
+      }
+    }
   }
 
   public void forceReleaseLock(String tableNameWithType) {
@@ -1061,6 +1115,129 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    // Parent implementation is a no-op; no need to call super.onChange().
+    // This needed to be revisited if parent behavior changes
+    if (clusterConfigs == null) {
+      return;
+    }
+
+    if (changedConfigs == null
+        || changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS)) {
+      String taskExpireStr = clusterConfigs.get(
+          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS);
+      if (taskExpireStr != null) {
+        try {
+          long parsed = Long.parseLong(taskExpireStr);
+          if (parsed <= 0) {
+            LOGGER.warn("Ignoring non-positive value {} for {}", parsed,
+                ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS);
+          } else {
+            _helixTaskResourceManager.setTaskExpireTimeMs(parsed);
+          }
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid value for {}: {}",
+              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS, taskExpireStr);
+        }
+      }
+    }
+
+    if (changedConfigs == null
+        || changedConfigs.contains(
+            ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS)) {
+      String terminalExpireStr = clusterConfigs.get(
+          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS);
+      if (terminalExpireStr != null) {
+        try {
+          long parsed = Long.parseLong(terminalExpireStr);
+          if (parsed <= 0) {
+            LOGGER.warn("Ignoring non-positive value {} for {}", parsed,
+                ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS);
+          } else {
+            _helixTaskResourceManager.setTerminalStateExpireTimeMs(parsed);
+          }
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid value for {}: {}",
+              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS, terminalExpireStr);
+        }
+      }
+    }
+
+    if (changedConfigs == null
+        || changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE)) {
+      String maxSizeStr = clusterConfigs.get(
+          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE);
+      if (maxSizeStr != null) {
+        try {
+          _taskQueueMaxSize = Integer.parseInt(maxSizeStr);
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid value for {}: {}",
+              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE, maxSizeStr);
+        }
+      }
+    }
+
+    if (changedConfigs == null
+        || changedConfigs.contains(
+            ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE)) {
+      String maxDeletesStr = clusterConfigs.get(
+          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
+      if (maxDeletesStr != null) {
+        try {
+          int parsed = Integer.parseInt(maxDeletesStr);
+          if (parsed <= 0) {
+            LOGGER.warn("Ignoring non-positive value {} for {}", parsed,
+                ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
+          } else if (parsed > MAX_DELETES_PER_CYCLE_CAP) {
+            LOGGER.warn("Clamping {} to cap {} for {}", parsed, MAX_DELETES_PER_CYCLE_CAP,
+                ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
+            _taskQueueMaxDeletesPerCycle = MAX_DELETES_PER_CYCLE_CAP;
+          } else {
+            _taskQueueMaxDeletesPerCycle = parsed;
+          }
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid value for {}: {}",
+              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE, maxDeletesStr);
+        }
+      }
+    }
+
+    if (changedConfigs == null
+        || changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY)) {
+      String capacityStr = clusterConfigs.get(
+          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY);
+      if (capacityStr != null) {
+        try {
+          int parsed = Integer.parseInt(capacityStr);
+          if (parsed > 0 || parsed == -1) {
+            _helixTaskResourceManager.setQueueCapacity(parsed);
+          } else {
+            LOGGER.warn("Ignoring invalid capacity {} for {}. Must be -1 (unlimited) or positive.",
+                parsed, ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY);
+          }
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid value for {}: {}",
+              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY, capacityStr);
+        }
+      }
+    }
+
+    if (changedConfigs == null
+        || changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD)) {
+      String warningStr = clusterConfigs.get(
+          ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD);
+      if (warningStr != null) {
+        try {
+          _taskQueueWarningThreshold = Integer.parseInt(warningStr);
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid value for {}: {}",
+              ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD, warningStr);
+        }
+      }
+    }
+  }
+
   @Nullable
   public Scheduler getScheduler() {
     return _scheduler;
@@ -1076,6 +1253,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       for (TaskState taskState : taskStates.values()) {
         _taskStateToCountMap.merge(taskState, 1, Integer::sum);
       }
+      _controllerMetrics.setValueOfTableGauge(taskType, ControllerGauge.TASK_QUEUE_SIZE, taskStates.size());
+    } else {
+      _controllerMetrics.setValueOfTableGauge(taskType, ControllerGauge.TASK_QUEUE_SIZE, 0);
     }
     for (Map.Entry<TaskState, Integer> taskStateEntry : _taskStateToCountMap.entrySet()) {
       _controllerMetrics.setValueOfTableGauge(String.format("%s.%s", taskType, taskStateEntry.getKey()),

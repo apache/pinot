@@ -28,15 +28,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -57,6 +58,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.MinionStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
@@ -89,19 +91,57 @@ public class PinotHelixTaskResourceManager {
   private static final String UNKNOWN_TABLE_NAME = "unknown";
   private static final String UNKNOWN_TENANT_NAME = "unknown";
 
+  private static final EnumSet<TaskState> TERMINAL_STATES =
+      EnumSet.of(TaskState.COMPLETED, TaskState.FAILED, TaskState.TIMED_OUT, TaskState.ABORTED);
+
   private final TaskDriver _taskDriver;
   private final PinotHelixResourceManager _helixResourceManager;
-  private final long _taskExpireTimeMs;
+
+  private volatile long _taskExpireTimeMs;
+  private volatile long _terminalStateExpireTimeMs;
+  private volatile int _queueCapacity;
 
   public PinotHelixTaskResourceManager(PinotHelixResourceManager helixResourceManager, TaskDriver taskDriver) {
-    this(helixResourceManager, taskDriver, TimeUnit.HOURS.toMillis(24));
+    this(helixResourceManager, taskDriver,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_TASK_EXPIRE_TIME_MS,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_TERMINAL_STATE_EXPIRE_TIME_MS,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_CAPACITY);
   }
 
   public PinotHelixTaskResourceManager(PinotHelixResourceManager helixResourceManager, TaskDriver taskDriver,
       long taskExpireTimeMs) {
+    this(helixResourceManager, taskDriver, taskExpireTimeMs,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_TERMINAL_STATE_EXPIRE_TIME_MS,
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_CAPACITY);
+  }
+
+  public PinotHelixTaskResourceManager(PinotHelixResourceManager helixResourceManager, TaskDriver taskDriver,
+      long taskExpireTimeMs, long terminalStateExpireTimeMs, int queueCapacity) {
     _helixResourceManager = helixResourceManager;
     _taskDriver = taskDriver;
     _taskExpireTimeMs = taskExpireTimeMs;
+    _terminalStateExpireTimeMs = terminalStateExpireTimeMs;
+    _queueCapacity = queueCapacity;
+  }
+
+  public void setTaskExpireTimeMs(long taskExpireTimeMs) {
+    Preconditions.checkArgument(taskExpireTimeMs > 0, "taskExpireTimeMs must be positive: %s", taskExpireTimeMs);
+    _taskExpireTimeMs = taskExpireTimeMs;
+  }
+
+  public void setTerminalStateExpireTimeMs(long terminalStateExpireTimeMs) {
+    Preconditions.checkArgument(terminalStateExpireTimeMs > 0,
+        "terminalStateExpireTimeMs must be positive: %s", terminalStateExpireTimeMs);
+    _terminalStateExpireTimeMs = terminalStateExpireTimeMs;
+  }
+
+  /**
+   * Updates the capacity used when creating <em>new</em> task queues. Existing Helix queues are intentionally
+   * not modified because calling {@code updateWorkflow} on a live queue could interfere with in-flight jobs.
+   * Count-based cleanup via {@link #trimTaskQueueIfNeeded} is the primary mechanism for bounding existing queues.
+   */
+  public void setQueueCapacity(int queueCapacity) {
+    _queueCapacity = queueCapacity;
   }
 
   /**
@@ -123,20 +163,24 @@ public class PinotHelixTaskResourceManager {
    * Ensure the task queue for the given task type exists.
    *
    * @param taskType Task type
+   * @return the existing WorkflowConfig, or {@code null} if a new queue was just created
+   *         (callers should skip trimming on newly created queues since the WorkflowContext
+   *         may not yet be initialized by Helix's state machine)
    */
-  public synchronized void ensureTaskQueueExists(String taskType) {
+  public synchronized WorkflowConfig ensureTaskQueueExists(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
     if (workflowConfig == null) {
-      // Task queue does not exist
       LOGGER.info("Creating task queue: {} for task type: {}", helixJobQueueName, taskType);
 
-      // Set full parallelism
-      // Don't allow overlap job assignment so that we can control number of concurrent tasks per instance
+      int capacity = _queueCapacity > 0 ? _queueCapacity : Integer.MAX_VALUE;
       JobQueue jobQueue = new JobQueue.Builder(helixJobQueueName).setWorkflowConfig(
-          new WorkflowConfig.Builder().setParallelJobs(Integer.MAX_VALUE).build()).build();
+          new WorkflowConfig.Builder().setParallelJobs(Integer.MAX_VALUE)
+              .setCapacity(capacity).build()).build();
       _taskDriver.createQueue(jobQueue);
+      return null;
     }
+    return workflowConfig;
   }
 
   /**
@@ -148,6 +192,93 @@ public class PinotHelixTaskResourceManager {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Cleaning up task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.cleanupQueue(helixJobQueueName);
+  }
+
+  /**
+   * Trims terminal jobs from the task queue if the queue size exceeds the given limit.
+   * Deletes the oldest terminal jobs (COMPLETED, FAILED, TIMED_OUT, ABORTED) first, using a bounded max-heap
+   * ordered by Helix-recorded start times to avoid fragile job-name parsing.
+   *
+   * <p>NOTE: This is a best-effort operation. The {@code workflowConfig} is a point-in-time snapshot
+   * that may become stale if jobs are enqueued concurrently by other controllers or threads.
+   * The actual queue size after trimming is therefore approximate.
+   *
+   * @param taskType Task type
+   * @param workflowConfig The workflow config snapshot (from ensureTaskQueueExists)
+   * @param maxQueueSize Maximum allowed queue size. If &lt;= 0, trimming is disabled.
+   * @param maxDeletesPerCycle Maximum number of jobs to delete in a single cycle.
+   * @return Number of jobs deleted
+   */
+  public synchronized int trimTaskQueueIfNeeded(String taskType, WorkflowConfig workflowConfig,
+      int maxQueueSize, int maxDeletesPerCycle) {
+    if (maxQueueSize <= 0 || maxDeletesPerCycle <= 0 || workflowConfig == null) {
+      return 0;
+    }
+
+    Set<String> allJobs = workflowConfig.getJobDag().getAllNodes();
+    int queueSize = allJobs.size();
+    if (queueSize <= maxQueueSize) {
+      return 0;
+    }
+
+    int excess = queueSize - maxQueueSize;
+    int toDelete = Math.min(excess, maxDeletesPerCycle);
+    LOGGER.debug("Task queue for type {} has {} jobs (limit {}). Attempting to delete up to {} terminal jobs.",
+        taskType, queueSize, maxQueueSize, toDelete);
+
+    String helixJobQueueName = getHelixJobQueueName(taskType);
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(helixJobQueueName);
+    if (workflowContext == null) {
+      LOGGER.warn("No workflow context for task type {}. Cannot trim queue.", taskType);
+      return 0;
+    }
+    Map<String, TaskState> jobStates = workflowContext.getJobStates();
+
+    // Bounded max-heap ordered by start time descending.
+    // poll() evicts the newest (largest start time), so the heap retains the N oldest terminal jobs.
+    // Jobs with unknown start times (NOT_STARTED = -1) sort as newest via Long.MAX_VALUE to avoid accidental deletion.
+    PriorityQueue<JobStartTime> maxHeap = new PriorityQueue<>(toDelete + 1,
+        (a, b) -> Long.compare(b._startTime, a._startTime));
+
+    for (String helixJobName : allJobs) {
+      TaskState state = jobStates.get(helixJobName);
+      if (state != null && TERMINAL_STATES.contains(state)) {
+        long startTime = workflowContext.getJobStartTime(helixJobName);
+        long sortKey = (startTime >= 0) ? startTime : Long.MAX_VALUE;
+        maxHeap.offer(new JobStartTime(helixJobName, sortKey));
+        if (maxHeap.size() > toDelete) {
+          maxHeap.poll();
+        }
+      }
+    }
+
+    int deleted = 0;
+    while (!maxHeap.isEmpty()) {
+      String helixJobName = maxHeap.poll()._jobName;
+      String pinotTaskName = getPinotTaskName(helixJobName);
+      try {
+        _taskDriver.deleteJob(helixJobQueueName, pinotTaskName, true);
+        deleted++;
+      } catch (Exception e) {
+        LOGGER.warn("Failed to delete job {} from queue {}", pinotTaskName, helixJobQueueName, e);
+      }
+    }
+
+    if (deleted > 0) {
+      LOGGER.info("Deleted {} terminal jobs from task queue for type {}. Queue size was: {}", deleted, taskType,
+          queueSize);
+    }
+    return deleted;
+  }
+
+  private static class JobStartTime {
+    final String _jobName;
+    final long _startTime;
+
+    JobStartTime(String jobName, long startTime) {
+      _jobName = jobName;
+      _startTime = startTime;
+    }
   }
 
   /**
@@ -309,14 +440,15 @@ public class PinotHelixTaskResourceManager {
       helixTaskConfigs.add(pinotTaskConfig.toHelixTaskConfig(parentTaskName + TASK_NAME_SEPARATOR + i));
     }
 
-    // Run each task only once no matter whether it succeeds or not, and never fail the job
-    // The reason for this is that: we put multiple independent tasks into one job to get them run in parallel, so we
-    // don't want one task failure affects other tasks. Also, if one task failed, next time we will re-schedule it
+    // Run each task only once no matter whether it succeeds or not, and never fail the job.
+    // We put multiple independent tasks into one job to get them run in parallel, so we don't want
+    // one task failure to affect other tasks. If one task fails, next time we will re-schedule it.
     JobConfig.Builder jobBuilder =
         new JobConfig.Builder().addTaskConfigs(helixTaskConfigs).setInstanceGroupTag(minionInstanceTag)
             .setTimeoutPerTask(taskTimeoutMs).setNumConcurrentTasksPerInstance(numConcurrentTasksPerInstance)
             .setIgnoreDependentJobFailure(true).setMaxAttemptsPerTask(maxAttemptsPerTask)
-            .setFailureThreshold(Integer.MAX_VALUE).setExpiry(_taskExpireTimeMs);
+            .setFailureThreshold(Integer.MAX_VALUE).setExpiry(_taskExpireTimeMs)
+            .setTerminalStateExpiry(_terminalStateExpireTimeMs);
     _taskDriver.enqueueJob(getHelixJobQueueName(taskType), parentTaskName, jobBuilder);
 
     return parentTaskName;

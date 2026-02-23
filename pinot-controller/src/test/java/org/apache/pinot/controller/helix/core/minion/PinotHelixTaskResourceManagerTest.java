@@ -27,11 +27,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
 import org.apache.helix.task.JobDag;
+import org.apache.helix.task.JobQueue;
 import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskPartitionState;
@@ -56,6 +58,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -1258,6 +1261,396 @@ public class PinotHelixTaskResourceManagerTest {
         spyMgr.getTaskCounts(taskType, null, null);
     assertEquals(allTasks.size(), 1);
     assertTrue(allTasks.containsKey(taskName1));
+  }
+
+  // ==================== Tests for task queue bounding ====================
+
+  @Test
+  public void testTrimTaskQueueIfNeededDisabled() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+
+    // maxQueueSize <= 0 means disabled
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, -1, 50), 0);
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 0, 50), 0);
+
+    // null workflowConfig
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", null, 100, 50), 0);
+
+    // maxDeletesPerCycle <= 0 means disabled (prevents IllegalArgumentException on PriorityQueue)
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 100, 0), 0);
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 100, -1), 0);
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 100, -999), 0);
+  }
+
+  @Test
+  public void testTrimTaskQueueIfNeededUnderLimit() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    Set<String> jobs = new HashSet<>();
+    jobs.add("TaskQueue_TestTask_Task_TestTask_a");
+    jobs.add("TaskQueue_TestTask_Task_TestTask_b");
+    when(jobDag.getAllNodes()).thenReturn(jobs);
+
+    // Queue size 2 <= maxQueueSize 5, no trimming needed
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 5, 50), 0);
+  }
+
+  @Test
+  public void testTrimTaskQueueIfNeededDeletesOldestTerminal() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    String helixJobQueueName = "TaskQueue_TestTask";
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    String job1 = "TaskQueue_TestTask_Task_TestTask_a"; // oldest, COMPLETED
+    String job2 = "TaskQueue_TestTask_Task_TestTask_b"; // FAILED
+    String job3 = "TaskQueue_TestTask_Task_TestTask_c"; // IN_PROGRESS (should NOT be deleted)
+    String job4 = "TaskQueue_TestTask_Task_TestTask_d"; // TIMED_OUT
+    String job5 = "TaskQueue_TestTask_Task_TestTask_e"; // ABORTED
+
+    Set<String> allJobs = new HashSet<>();
+    allJobs.add(job1);
+    allJobs.add(job2);
+    allJobs.add(job3);
+    allJobs.add(job4);
+    allJobs.add(job5);
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+
+    Map<String, TaskState> jobStates = new HashMap<>();
+    jobStates.put(job1, TaskState.COMPLETED);
+    jobStates.put(job2, TaskState.FAILED);
+    jobStates.put(job3, TaskState.IN_PROGRESS);
+    jobStates.put(job4, TaskState.TIMED_OUT);
+    jobStates.put(job5, TaskState.ABORTED);
+    when(workflowContext.getJobStates()).thenReturn(jobStates);
+
+    // Start times: job1 is oldest (1000), job2 next (2000), etc.
+    when(workflowContext.getJobStartTime(job1)).thenReturn(1000L);
+    when(workflowContext.getJobStartTime(job2)).thenReturn(2000L);
+    when(workflowContext.getJobStartTime(job3)).thenReturn(3000L);
+    when(workflowContext.getJobStartTime(job4)).thenReturn(4000L);
+    when(workflowContext.getJobStartTime(job5)).thenReturn(5000L);
+
+    // maxQueueSize = 3, so need to delete 2 oldest terminal jobs (job1 and job2)
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 3, 50);
+    assertEquals(deleted, 2);
+
+    verify(taskDriver).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_a"), eq(true));
+    verify(taskDriver).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_b"), eq(true));
+
+    // IN_PROGRESS job should NOT be deleted
+    verify(taskDriver, Mockito.never()).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_c"), anyBoolean());
+  }
+
+  @Test
+  public void testTrimTaskQueueIfNeededRespectsMaxDeletesPerCycle() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    String helixJobQueueName = "TaskQueue_TestTask";
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    Set<String> allJobs = new HashSet<>();
+    Map<String, TaskState> jobStates = new HashMap<>();
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    for (int i = 0; i < 10; i++) {
+      String job = String.format("TaskQueue_TestTask_Task_TestTask_uuid%d", i);
+      allJobs.add(job);
+      jobStates.put(job, TaskState.COMPLETED);
+      when(workflowContext.getJobStartTime(job)).thenReturn((long) ((i + 1) * 1000));
+    }
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+    when(workflowContext.getJobStates()).thenReturn(jobStates);
+
+    // maxQueueSize = 2, so need to delete 8, but maxDeletesPerCycle = 3
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 2, 3);
+    assertEquals(deleted, 3);
+  }
+
+  @Test
+  public void testTrimTaskQueueIfNeededNoTerminalJobs() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    String helixJobQueueName = "TaskQueue_TestTask";
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    Set<String> allJobs = new HashSet<>();
+    Map<String, TaskState> jobStates = new HashMap<>();
+    for (int i = 0; i < 5; i++) {
+      String job = String.format("TaskQueue_TestTask_Task_TestTask_uuid%d", i);
+      allJobs.add(job);
+      jobStates.put(job, TaskState.IN_PROGRESS);
+    }
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+    when(workflowContext.getJobStates()).thenReturn(jobStates);
+
+    // maxQueueSize = 2, but no terminal jobs to delete
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 2, 50);
+    assertEquals(deleted, 0);
+  }
+
+  @Test
+  public void testTrimTaskQueueIfNeededNullWorkflowContext() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    Set<String> allJobs = new HashSet<>();
+    for (int i = 0; i < 5; i++) {
+      allJobs.add("TaskQueue_TestTask_Task_TestTask_uuid" + i);
+    }
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    when(taskDriver.getWorkflowContext("TaskQueue_TestTask")).thenReturn(null);
+
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 2, 50);
+    assertEquals(deleted, 0);
+  }
+
+  @Test
+  public void testEnsureTaskQueueExistsReturnsWorkflowConfig() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    WorkflowConfig existingConfig = mock(WorkflowConfig.class);
+    when(taskDriver.getWorkflowConfig("TaskQueue_TestTask")).thenReturn(existingConfig);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig result = mgr.ensureTaskQueueExists("TestTask");
+    assertSame(result, existingConfig);
+  }
+
+  @Test
+  public void testEnsureTaskQueueExistsCreationReturnsNull() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    when(taskDriver.getWorkflowConfig("TaskQueue_TestTask")).thenReturn(null);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig result = mgr.ensureTaskQueueExists("TestTask");
+    assertNull(result);
+    verify(taskDriver).createQueue(any());
+  }
+
+  @Test
+  public void testSettersUpdateVolatileFields() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver,
+            1000L, 2000L, 100);
+
+    // Verify setQueueCapacity takes effect when creating a new queue
+    mgr.setQueueCapacity(500);
+    when(taskDriver.getWorkflowConfig("TaskQueue_SetterTest")).thenReturn(null);
+    mgr.ensureTaskQueueExists("SetterTest");
+
+    ArgumentCaptor<JobQueue> queueCaptor = ArgumentCaptor.forClass(JobQueue.class);
+    verify(taskDriver).createQueue(queueCaptor.capture());
+    assertEquals(queueCaptor.getValue().getWorkflowConfig().getCapacity(), 500);
+
+    // Verify setTaskExpireTimeMs and setTerminalStateExpireTimeMs take effect when submitting a task
+    mgr.setTaskExpireTimeMs(5000L);
+    mgr.setTerminalStateExpireTimeMs(10000L);
+
+    WorkflowConfig mockConfig = mock(WorkflowConfig.class);
+    when(taskDriver.getWorkflowConfig("TaskQueue_SetterTest")).thenReturn(mockConfig);
+
+    Map<String, String> configs = new HashMap<>();
+    configs.put("tableName", "testTable_OFFLINE");
+    List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    pinotTaskConfigs.add(new PinotTaskConfig("SetterTest", configs));
+    mgr.submitTask(pinotTaskConfigs, 60000L, 1, 1);
+
+    ArgumentCaptor<JobConfig.Builder> jobCaptor = ArgumentCaptor.forClass(JobConfig.Builder.class);
+    verify(taskDriver).enqueueJob(eq("TaskQueue_SetterTest"), anyString(), jobCaptor.capture());
+    JobConfig builtJob = jobCaptor.getValue().setWorkflow("TaskQueue_SetterTest").build();
+    assertEquals(builtJob.getExpiry(), 5000L);
+    assertEquals(builtJob.getTerminalStateExpiry(), 10000L);
+  }
+
+  @Test
+  public void testSubmitTaskIncludesTerminalStateExpiry() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    long terminalExpiry = 48 * 60 * 60 * 1000L; // 48 hours
+    long taskExpiry = TimeUnit.HOURS.toMillis(24);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver,
+            taskExpiry, terminalExpiry, -1);
+
+    WorkflowConfig mockConfig = mock(WorkflowConfig.class);
+    when(taskDriver.getWorkflowConfig("TaskQueue_TestTask")).thenReturn(mockConfig);
+
+    Map<String, String> configs = new HashMap<>();
+    configs.put("tableName", "testTable_OFFLINE");
+    List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    pinotTaskConfigs.add(new PinotTaskConfig("TestTask", configs));
+
+    mgr.submitTask(pinotTaskConfigs, 60000L, 1, 1);
+
+    ArgumentCaptor<JobConfig.Builder> jobCaptor = ArgumentCaptor.forClass(JobConfig.Builder.class);
+    verify(taskDriver).enqueueJob(eq("TaskQueue_TestTask"), anyString(), jobCaptor.capture());
+    JobConfig builtJob = jobCaptor.getValue().setWorkflow("TaskQueue_TestTask").build();
+    assertEquals(builtJob.getExpiry(), taskExpiry);
+    assertEquals(builtJob.getTerminalStateExpiry(), terminalExpiry);
+  }
+
+  @Test
+  public void testTrimTaskQueueExactlyOnOverLimit() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    String helixJobQueueName = "TaskQueue_TestTask";
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    // 4 jobs, limit = 3 => excess = 1
+    String job1 = "TaskQueue_TestTask_Task_TestTask_a";
+    String job2 = "TaskQueue_TestTask_Task_TestTask_b";
+    String job3 = "TaskQueue_TestTask_Task_TestTask_c";
+    String job4 = "TaskQueue_TestTask_Task_TestTask_d";
+
+    Set<String> allJobs = new HashSet<>();
+    allJobs.add(job1);
+    allJobs.add(job2);
+    allJobs.add(job3);
+    allJobs.add(job4);
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+
+    Map<String, TaskState> jobStates = new HashMap<>();
+    jobStates.put(job1, TaskState.COMPLETED);
+    jobStates.put(job2, TaskState.COMPLETED);
+    jobStates.put(job3, TaskState.IN_PROGRESS);
+    jobStates.put(job4, TaskState.COMPLETED);
+    when(workflowContext.getJobStates()).thenReturn(jobStates);
+
+    when(workflowContext.getJobStartTime(job1)).thenReturn(1000L);
+    when(workflowContext.getJobStartTime(job2)).thenReturn(2000L);
+    when(workflowContext.getJobStartTime(job3)).thenReturn(3000L);
+    when(workflowContext.getJobStartTime(job4)).thenReturn(4000L);
+
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 3, 50);
+    assertEquals(deleted, 1);
+
+    // The oldest terminal (start time 1000) should be the one deleted
+    verify(taskDriver).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_a"), eq(true));
+    verify(taskDriver, Mockito.never()).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_b"), anyBoolean());
+    verify(taskDriver, Mockito.never()).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_d"), anyBoolean());
+  }
+
+  @Test
+  public void testTrimTaskQueueAtExactLimit() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    Set<String> allJobs = new HashSet<>();
+    allJobs.add("TaskQueue_TestTask_Task_TestTask_a");
+    allJobs.add("TaskQueue_TestTask_Task_TestTask_b");
+    allJobs.add("TaskQueue_TestTask_Task_TestTask_c");
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    // Queue size 3 == limit 3, no trimming
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 3, 50), 0);
+  }
+
+  @Test
+  public void testTrimTaskQueueWithUnknownStartTimes() {
+    // Jobs with unknown start times (-1) should be treated as newest and not deleted
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    String helixJobQueueName = "TaskQueue_TestTask";
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    String knownJob = "TaskQueue_TestTask_Task_TestTask_known";
+    String unknownJob1 = "TaskQueue_TestTask_Task_TestTask_unknown1";
+    String unknownJob2 = "TaskQueue_TestTask_Task_TestTask_unknown2";
+
+    Set<String> allJobs = new HashSet<>();
+    allJobs.add(knownJob);
+    allJobs.add(unknownJob1);
+    allJobs.add(unknownJob2);
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+
+    Map<String, TaskState> jobStates = new HashMap<>();
+    jobStates.put(knownJob, TaskState.COMPLETED);
+    jobStates.put(unknownJob1, TaskState.COMPLETED);
+    jobStates.put(unknownJob2, TaskState.COMPLETED);
+    when(workflowContext.getJobStates()).thenReturn(jobStates);
+
+    when(workflowContext.getJobStartTime(knownJob)).thenReturn(1000L);
+    when(workflowContext.getJobStartTime(unknownJob1)).thenReturn(-1L);
+    when(workflowContext.getJobStartTime(unknownJob2)).thenReturn(-1L);
+
+    // Delete 1 of 3. The known-start-time job (1000ms) is oldest; unknowns sort as newest.
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 2, 50);
+    assertEquals(deleted, 1);
+
+    verify(taskDriver).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_known"), eq(true));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testSetTaskExpireTimeMsRejectsNonPositive() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    mgr.setTaskExpireTimeMs(0);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testSetTerminalStateExpireTimeMsRejectsNonPositive() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    mgr.setTerminalStateExpireTimeMs(-1);
   }
 
   /**

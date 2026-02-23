@@ -173,6 +173,34 @@ public class ControllerConf extends PinotConfiguration {
     // This is the expiry for the ended tasks. Helix cleans up the task info from ZK after the expiry time from the
     // end of the task.
     public static final String PINOT_TASK_EXPIRE_TIME_MS = "controller.task.expire.time.ms";
+    public static final long DEFAULT_TASK_EXPIRE_TIME_MS = 24 * 60 * 60 * 1000L; // 24 hours
+
+    // Terminal state expiry for FAILED/TIMED_OUT jobs. Helix uses this to determine when to purge
+    // jobs in terminal states other than COMPLETED from ZK.
+    public static final String PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS =
+        "controller.task.terminalState.expire.time.ms";
+    public static final long DEFAULT_TERMINAL_STATE_EXPIRE_TIME_MS = 72 * 60 * 60 * 1000L; // 72 hours
+
+    // Maximum number of jobs allowed in a task queue before triggering count-based cleanup.
+    // -1 means disabled (no count-based cleanup).
+    public static final String PINOT_TASK_QUEUE_MAX_SIZE = "controller.task.queue.maxSize";
+    public static final int DEFAULT_TASK_QUEUE_MAX_SIZE = -1;
+
+    // Maximum number of terminal jobs to delete per count based cleanup cycle to bound ZK write overhead.
+    public static final String PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE = "controller.task.queue.maxDeletesPerCycle";
+    public static final int DEFAULT_TASK_QUEUE_MAX_DELETES_PER_CYCLE = 100;
+
+    // Helix WorkflowConfig.capacity: hard ceiling on the number of jobs in a task queue.
+    // When reached during enqueue, Helix purges expired jobs first; if still full, enqueue
+    // fails with HelixException. Only applies to newly created queues (existing queues retain
+    // their original capacity). -1 means unlimited (Integer.MAX_VALUE).
+    // This is a safety net complementing Pinot's own count-based trimming (maxSize).
+    public static final String PINOT_TASK_QUEUE_CAPACITY = "controller.task.queue.capacity";
+    public static final int DEFAULT_TASK_QUEUE_CAPACITY = -1;
+
+    // Queue size threshold above which a warning is logged during prepTaskQueue.
+    public static final String PINOT_TASK_QUEUE_WARNING_THRESHOLD = "controller.task.queue.warningThreshold";
+    public static final int DEFAULT_TASK_QUEUE_WARNING_THRESHOLD = 5000;
 
     // Distributed lock enablement for PinotTaskManager
     public static final String ENABLE_DISTRIBUTED_LOCKING = "controller.task.enableDistributedLocking";
@@ -1240,7 +1268,33 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public long getPinotTaskExpireTimeInMs() {
-    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS, TimeUnit.HOURS.toMillis(24));
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_EXPIRE_TIME_MS);
+  }
+
+  public long getPinotTaskTerminalStateExpireTimeInMs() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS,
+        ControllerPeriodicTasksConf.DEFAULT_TERMINAL_STATE_EXPIRE_TIME_MS);
+  }
+
+  public int getPinotTaskQueueMaxSize() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_MAX_SIZE);
+  }
+
+  public int getPinotTaskQueueMaxDeletesPerCycle() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
+  }
+
+  public int getPinotTaskQueueCapacity() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_CAPACITY);
+  }
+
+  public int getPinotTaskQueueWarningThreshold() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_WARNING_THRESHOLD);
   }
 
   /**
