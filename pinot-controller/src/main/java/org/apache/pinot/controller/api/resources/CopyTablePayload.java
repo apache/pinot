@@ -31,6 +31,21 @@ import javax.annotation.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CopyTablePayload {
 
+  /**
+   * Job type for table copy operation.
+   */
+  public enum JobType {
+    /**
+     * Controller-based job type (default). The copy job runs on the controller.
+     */
+    CONTROLLER,
+
+    /**
+     * Minion-based job type (not yet supported). The copy job would run on minion workers.
+     */
+    MINION
+  }
+
   private String _sourceClusterUri;
   private Map<String, String> _headers;
 
@@ -49,6 +64,13 @@ public class CopyTablePayload {
   private Integer _backfillParallism;
 
   /**
+   * Job type for the copy operation.
+   * Defaults to CONTROLLER if not specified.
+   * Currently only CONTROLLER is supported.
+   */
+  private JobType _jobType;
+
+  /**
    * The instanceAssignmentConfig's tagPoolConfig contains full tenant name. We will use this field to let user specify
    * the replacement relation from source cluster's full tenant to target cluster's full tenant.
    */
@@ -63,7 +85,8 @@ public class CopyTablePayload {
       @JsonProperty(value = "brokerTenant", required = true) String brokerTenant,
       @JsonProperty(value = "serverTenant", required = true) String serverTenant,
       @JsonProperty("tagPoolReplacementMap") @Nullable Map<String, String> tagPoolReplacementMap,
-      @JsonProperty("backfillParallism") @Nullable Integer backfillParallism) {
+      @JsonProperty("backfillParallism") @Nullable Integer backfillParallism,
+      @JsonProperty("jobType") @Nullable JobType jobType) {
     _sourceClusterUri = sourceClusterUri;
     _headers = headers;
     _destinationClusterUri = destinationClusterUri;
@@ -72,6 +95,7 @@ public class CopyTablePayload {
     _serverTenant = serverTenant;
     _tagPoolReplacementMap = tagPoolReplacementMap;
     _backfillParallism = backfillParallism;
+    _jobType = jobType != null ? jobType : JobType.CONTROLLER;
   }
 
   @JsonGetter("sourceClusterUri")
@@ -112,5 +136,10 @@ public class CopyTablePayload {
   @JsonGetter("tagPoolReplacementMap")
   public Map<String, String> getTagPoolReplacementMap() {
     return _tagPoolReplacementMap;
+  }
+
+  @JsonGetter("jobType")
+  public JobType getJobType() {
+    return _jobType;
   }
 }

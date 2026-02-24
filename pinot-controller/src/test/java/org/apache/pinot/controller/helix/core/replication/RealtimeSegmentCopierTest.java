@@ -72,7 +72,7 @@ public class RealtimeSegmentCopierTest {
     String tableNameWithType = "table1_REALTIME";
     String segmentName = "seg1";
     CopyTablePayload payload = new CopyTablePayload("http://src", Collections.emptyMap(),
-        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null);
+        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null, null);
 
     Map<String, String> metadata = new HashMap<>();
     metadata.put("segment.download.url", "hdfs://src/data/seg1");
@@ -97,7 +97,7 @@ public class RealtimeSegmentCopierTest {
     String tableNameWithType = "table1_REALTIME";
     String segmentName = "seg1";
     CopyTablePayload payload = new CopyTablePayload("http://src", Collections.emptyMap(),
-        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null);
+        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null, null);
 
     Map<String, String> metadata = new HashMap<>();
     metadata.put("segment.download.url", "hdfs://src/data/seg1");
