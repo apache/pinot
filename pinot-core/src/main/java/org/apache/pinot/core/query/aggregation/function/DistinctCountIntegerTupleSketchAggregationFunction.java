@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -45,7 +46,10 @@ public class DistinctCountIntegerTupleSketchAggregationFunction extends IntegerT
   }
 
   @Override
-  public Comparable extractFinalResult(TupleIntSketchAccumulator accumulator) {
+  public Comparable extractFinalResult(@Nullable TupleIntSketchAccumulator accumulator) {
+    if (accumulator == null) {
+      return 0L;
+    }
     accumulator.setNominalEntries(_nominalEntries);
     accumulator.setSetOperations(_setOps);
     accumulator.setThreshold(_accumulatorThreshold);
