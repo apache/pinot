@@ -20,21 +20,22 @@ package org.apache.pinot.segment.local.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.concurrency.AdjustableSemaphore;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Base class for segment operation throttlers, contains the common logic for the semaphore and handling the pre and
  * post query serving values. The semaphore cannot be null and must contain > 0 total permits
  */
-public abstract class BaseSegmentOperationsThrottler implements PinotClusterConfigChangeListener {
+public class BaseSegmentOperationsThrottler {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseSegmentOperationsThrottler.class);
   protected ServerMetrics _serverMetrics;
   protected AdjustableSemaphore _semaphore;
   /**
@@ -45,21 +46,55 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
   protected int _maxConcurrencyBeforeServingQueries;
   protected boolean _isServingQueries;
   private AtomicInteger _numSegmentsAcquiredSemaphore;
-  private final Logger _logger;
+  private String _throttlerName;
+  @Nullable
+  private final ServerGauge _thresholdGauge;
+  @Nullable
+  private final ServerGauge _countGauge;
 
   /**
    * Base segment operations throttler constructor
    * @param maxConcurrency configured concurrency
    * @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
    * @param isServingQueries whether the server is ready to serve queries or not
-   * @param logger logger to use
+   */
+  @VisibleForTesting
+  public BaseSegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
+      boolean isServingQueries) {
+    this(maxConcurrency, maxConcurrencyBeforeServingQueries, isServingQueries, null, null, "");
+  }
+
+  /**
+   * Base segment operations throttler constructor
+   * @param maxConcurrency configured concurrency
+   * @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
+   * @param isServingQueries whether the server is ready to serve queries or not
+   * @param throttlerName name of the throttler to be used in logging
    */
   public BaseSegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
-      boolean isServingQueries, Logger logger) {
-    _logger = logger;
-    _logger.info("Initializing SegmentOperationsThrottler, maxConcurrency: {}, maxConcurrencyBeforeServingQueries: {}, "
-            + "isServingQueries: {}",
-        maxConcurrency, maxConcurrencyBeforeServingQueries, isServingQueries);
+      boolean isServingQueries, String throttlerName) {
+    this(maxConcurrency, maxConcurrencyBeforeServingQueries, isServingQueries, null, null, throttlerName);
+  }
+
+  /**
+   * Base segment operations throttler constructor with gauge parameters
+   * @param maxConcurrency configured concurrency
+   * @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
+   * @param isServingQueries whether the server is ready to serve queries or not
+   * @param thresholdGauge gauge for tracking the throttle threshold metric, or null to skip
+   * @param countGauge gauge for tracking the count metric, or null to skip
+   * @param throttlerName name of the throttler to be used in logging
+   */
+  public BaseSegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
+      boolean isServingQueries, @Nullable ServerGauge thresholdGauge, @Nullable ServerGauge countGauge,
+      String throttlerName) {
+    _throttlerName = throttlerName;
+    _thresholdGauge = thresholdGauge;
+    _countGauge = countGauge;
+    LOGGER.info("Initializing SegmentOperationsThrottler {}, maxConcurrency: {}, "
+            + "maxConcurrencyBeforeServingQueries: {}, isServingQueries: {}",
+        throttlerName, maxConcurrency, maxConcurrencyBeforeServingQueries,
+        isServingQueries);
     Preconditions.checkArgument(maxConcurrency > 0, "Max parallelism must be > 0, but found to be: " + maxConcurrency);
     Preconditions.checkArgument(maxConcurrencyBeforeServingQueries > 0,
         "Max parallelism before serving queries must be > 0, but found to be: " + maxConcurrencyBeforeServingQueries);
@@ -72,28 +107,37 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
     // ready to serve queries this is not used again. This too is configurable via ZK CLUSTER config updates while the
     // server is starting up.
     if (!isServingQueries) {
-      logger.info("Serving queries is disabled, using concurrency as: {}", _maxConcurrencyBeforeServingQueries);
+      LOGGER.info("Throttler {}: Serving queries is disabled, using concurrency as: {}",
+          _throttlerName, _maxConcurrencyBeforeServingQueries);
     }
 
     int concurrency = _isServingQueries ? _maxConcurrency : _maxConcurrencyBeforeServingQueries;
     _semaphore = new AdjustableSemaphore(concurrency, true);
     _numSegmentsAcquiredSemaphore = new AtomicInteger(0);
     initializeMetrics();
-    _logger.info("Created semaphore with total permits: {}, available permits: {}", totalPermits(),
-        availablePermits());
+    LOGGER.info("Throttler {}: Created semaphore with total permits: {}, available permits: {}",
+        _throttlerName, totalPermits(), availablePermits());
   }
 
   /**
    * Updates the throttle threshold metric
    * @param value value to update the metric to
    */
-  public abstract void updateThresholdMetric(int value);
+  public void updateThresholdMetric(int value) {
+    if (_thresholdGauge != null) {
+      _serverMetrics.setValueOfGlobalGauge(_thresholdGauge, value);
+    }
+  }
 
   /**
    * Updates the throttle count metric
    * @param value value to update the metric to
    */
-  public abstract void updateCountMetric(int value);
+  public void updateCountMetric(int value) {
+    if (_countGauge != null) {
+      _serverMetrics.setValueOfGlobalGauge(_countGauge, value);
+    }
+  }
 
   /**
    * The ServerMetrics may be created after these throttle objects are created. In that case, the initialization that
@@ -109,98 +153,43 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
   }
 
   public synchronized void startServingQueries() {
-    _logger.info("Serving queries is to be enabled, reset throttling threshold for segment operations concurrency, "
-        + "total permits: {}, available permits: {}", totalPermits(), availablePermits());
+    LOGGER.info("Throttler {}: Serving queries is to be enabled, reset throttling threshold "
+        + "for segment operations concurrency, total permits: {}, available permits: {}",
+        _throttlerName, totalPermits(), availablePermits());
     _isServingQueries = true;
     _semaphore.setPermits(_maxConcurrency);
     updateThresholdMetric(_maxConcurrency);
-    _logger.info("Reset throttling completed, new concurrency: {}, total permits: {}, available permits: {}",
-        _maxConcurrency, totalPermits(), availablePermits());
+    LOGGER.info("Throttler {}: Reset throttling completed, new concurrency: {}, "
+        + "total permits: {}, available permits: {}",
+        _throttlerName, _maxConcurrency, totalPermits(),
+        availablePermits());
   }
 
-  protected void handleMaxConcurrencyChange(Set<String> changedConfigs, Map<String, String> clusterConfigs,
-      String configName, String defaultConfigValue) {
-    if (!changedConfigs.contains(configName)) {
-      _logger.info("changedConfigs list indicates config: {} was not updated, skipping updates", configName);
-      return;
-    }
+  /**
+   * Updates the throttler permits based on new configuration values.
+   * This is called by the parent SegmentOperationsThrottler when config changes are detected.
+   *
+   * @param maxConcurrency new max concurrency value
+   * @param maxConcurrencyBeforeServingQueries new max concurrency before serving queries value
+   */
+  public synchronized void updatePermits(int maxConcurrency, int maxConcurrencyBeforeServingQueries) {
+    Preconditions.checkArgument(maxConcurrency > 0, "Max concurrency must be > 0, but found: " + maxConcurrency);
+    Preconditions.checkArgument(maxConcurrencyBeforeServingQueries > 0,
+        "Max concurrency before serving queries must be > 0, but found: " + maxConcurrencyBeforeServingQueries);
 
-    String maxParallelSegmentOperationsStr =
-        clusterConfigs == null ? defaultConfigValue : clusterConfigs.getOrDefault(configName, defaultConfigValue);
+    LOGGER.info("Throttler {}: Updating permits - maxConcurrency: {} -> {}, "
+        + "maxConcurrencyBeforeServingQueries: {} -> {}",
+        _throttlerName, _maxConcurrency, maxConcurrency,
+        _maxConcurrencyBeforeServingQueries, maxConcurrencyBeforeServingQueries);
 
-    int maxConcurrency;
-    try {
-      maxConcurrency = Integer.parseInt(maxParallelSegmentOperationsStr);
-    } catch (Exception e) {
-      _logger.warn("Invalid config {} set to: {}, not making change, fix config and try again", configName,
-          maxParallelSegmentOperationsStr);
-      return;
-    }
-
-    if (maxConcurrency <= 0) {
-      _logger.warn("config {}: {} must be > 0, not making change, fix config and try again", configName,
-          maxConcurrency);
-      return;
-    }
-
-    if (maxConcurrency == _maxConcurrency) {
-      _logger.info("No ZK update for config {}, value: {}, total permits: {}", configName, _maxConcurrency,
-          totalPermits());
-      return;
-    }
-
-    _logger.info("Updated config: {} from: {} to: {}", configName, _maxConcurrency, maxConcurrency);
     _maxConcurrency = maxConcurrency;
-
-    if (!_isServingQueries) {
-      _logger.info("Serving queries hasn't been enabled yet, not updating the permits with config {}", configName);
-      return;
-    }
-    _semaphore.setPermits(_maxConcurrency);
-    updateThresholdMetric(_maxConcurrency);
-    _logger.info("Updated total permits: {}", totalPermits());
-  }
-
-  protected void handleMaxConcurrencyBeforeServingQueriesChange(Set<String> changedConfigs,
-      Map<String, String> clusterConfigs, String configName, String defaultConfigValue) {
-    if (!changedConfigs.contains(configName)) {
-      _logger.info("changedConfigs list indicates config: {} was not updated, skipping updates", configName);
-      return;
-    }
-
-    String maxParallelSegmentOperationsBeforeServingQueriesStr =
-        clusterConfigs == null ? defaultConfigValue : clusterConfigs.getOrDefault(configName, defaultConfigValue);
-
-    int maxConcurrencyBeforeServingQueries;
-    try {
-      maxConcurrencyBeforeServingQueries = Integer.parseInt(maxParallelSegmentOperationsBeforeServingQueriesStr);
-    } catch (Exception e) {
-      _logger.warn("Invalid config {} set to: {}, not making change, fix config and try again", configName,
-          maxParallelSegmentOperationsBeforeServingQueriesStr);
-      return;
-    }
-
-    if (maxConcurrencyBeforeServingQueries <= 0) {
-      _logger.warn("config {}: {} must be > 0, not making change, fix config and try again", configName,
-          maxConcurrencyBeforeServingQueries);
-      return;
-    }
-
-    if (maxConcurrencyBeforeServingQueries == _maxConcurrencyBeforeServingQueries) {
-      _logger.info("No ZK update for config: {} value: {}, total permits: {}", configName,
-          _maxConcurrencyBeforeServingQueries, totalPermits());
-      return;
-    }
-
-    _logger.info("Updated config: {} from: {} to: {}", configName, _maxConcurrencyBeforeServingQueries,
-        maxConcurrencyBeforeServingQueries);
     _maxConcurrencyBeforeServingQueries = maxConcurrencyBeforeServingQueries;
-    if (!_isServingQueries) {
-      _logger.info("config: {} was updated before serving queries was enabled, updating the permits", configName);
-      _semaphore.setPermits(_maxConcurrencyBeforeServingQueries);
-      updateThresholdMetric(_maxConcurrencyBeforeServingQueries);
-      _logger.info("Updated total permits: {}", totalPermits());
-    }
+
+    // Update semaphore based on current state
+    int newPermits = _isServingQueries ? _maxConcurrency : _maxConcurrencyBeforeServingQueries;
+    _semaphore.setPermits(newPermits);
+    updateThresholdMetric(newPermits);
+    LOGGER.info("Throttler {}: Updated total permits: {}", _throttlerName, totalPermits());
   }
 
   /**
@@ -250,5 +239,9 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
   @VisibleForTesting
   public int totalPermits() {
     return _semaphore.getTotalPermits();
+  }
+
+  public String getThrottlerName() {
+    return _throttlerName;
   }
 }

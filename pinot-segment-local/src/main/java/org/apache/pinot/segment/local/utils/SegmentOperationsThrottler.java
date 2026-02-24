@@ -20,7 +20,11 @@ package org.apache.pinot.segment.local.utils;
 
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -35,41 +39,43 @@ import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
  * throttling, this object itself will be passed in as 'null'.
  */
 public class SegmentOperationsThrottler implements PinotClusterConfigChangeListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOperationsThrottler.class);
 
-  private final SegmentAllIndexPreprocessThrottler _segmentAllIndexPreprocessThrottler;
-  private final SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
-  private final SegmentMultiColTextIndexPreprocessThrottler _segmentMultiColTextIndexPreprocessThrottler;
-  private final SegmentDownloadThrottler _segmentDownloadThrottler;
+  private final BaseSegmentOperationsThrottler _segmentAllIndexPreprocessThrottler;
+  private final BaseSegmentOperationsThrottler _segmentStarTreePreprocessThrottler;
+  private final BaseSegmentOperationsThrottler _segmentMultiColTextIndexPreprocessThrottler;
+  private final BaseSegmentOperationsThrottler _segmentDownloadThrottler;
 
   /**
    * Constructor for SegmentOperationsThrottler
    * @param segmentAllIndexPreprocessThrottler segment preprocess throttler to use for all indexes
    * @param segmentStarTreePreprocessThrottler segment preprocess throttler to use for StarTree index
    * @param segmentDownloadThrottler segment download throttler to throttle download at server level
+   * @param segmentMultiColTextIndexPreprocessThrottler segment preprocess throttler for multi-col text index
    */
-  public SegmentOperationsThrottler(SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler,
-      SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler,
-      SegmentDownloadThrottler segmentDownloadThrottler,
-      SegmentMultiColTextIndexPreprocessThrottler segmentMultiColTextIndexPreprocessThrottler) {
+  public SegmentOperationsThrottler(BaseSegmentOperationsThrottler segmentAllIndexPreprocessThrottler,
+      BaseSegmentOperationsThrottler segmentStarTreePreprocessThrottler,
+      BaseSegmentOperationsThrottler segmentDownloadThrottler,
+      BaseSegmentOperationsThrottler segmentMultiColTextIndexPreprocessThrottler) {
     _segmentAllIndexPreprocessThrottler = segmentAllIndexPreprocessThrottler;
     _segmentStarTreePreprocessThrottler = segmentStarTreePreprocessThrottler;
     _segmentDownloadThrottler = segmentDownloadThrottler;
     _segmentMultiColTextIndexPreprocessThrottler = segmentMultiColTextIndexPreprocessThrottler;
   }
 
-  public SegmentAllIndexPreprocessThrottler getSegmentAllIndexPreprocessThrottler() {
+  public BaseSegmentOperationsThrottler getSegmentAllIndexPreprocessThrottler() {
     return _segmentAllIndexPreprocessThrottler;
   }
 
-  public SegmentStarTreePreprocessThrottler getSegmentStarTreePreprocessThrottler() {
+  public BaseSegmentOperationsThrottler getSegmentStarTreePreprocessThrottler() {
     return _segmentStarTreePreprocessThrottler;
   }
 
-  public SegmentMultiColTextIndexPreprocessThrottler getSegmentMultiColTextIndexPreprocessThrottler() {
+  public BaseSegmentOperationsThrottler getSegmentMultiColTextIndexPreprocessThrottler() {
     return _segmentMultiColTextIndexPreprocessThrottler;
   }
 
-  public SegmentDownloadThrottler getSegmentDownloadThrottler() {
+  public BaseSegmentOperationsThrottler getSegmentDownloadThrottler() {
     return _segmentDownloadThrottler;
   }
 
@@ -94,9 +100,88 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
 
   @Override
   public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    _segmentAllIndexPreprocessThrottler.onChange(changedConfigs, clusterConfigs);
-    _segmentStarTreePreprocessThrottler.onChange(changedConfigs, clusterConfigs);
-    _segmentDownloadThrottler.onChange(changedConfigs, clusterConfigs);
-    _segmentMultiColTextIndexPreprocessThrottler.onChange(changedConfigs, clusterConfigs);
+    if (CollectionUtils.isEmpty(changedConfigs)) {
+      LOGGER.info("Skip updating SegmentOperationsThrottler configs with unchanged clusterConfigs");
+      return;
+    }
+
+    LOGGER.info("Updating SegmentOperationsThrottler configs with latest clusterConfigs");
+
+    // Update all index preprocess throttler
+    updateThrottlerIfConfigChanged(changedConfigs, clusterConfigs,
+        _segmentAllIndexPreprocessThrottler,
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM,
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+
+    // Update startree preprocess throttler
+    updateThrottlerIfConfigChanged(changedConfigs, clusterConfigs,
+        _segmentStarTreePreprocessThrottler,
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+
+    // Update download throttler
+    updateThrottlerIfConfigChanged(changedConfigs, clusterConfigs,
+        _segmentDownloadThrottler,
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+
+    // Update multi-col text index preprocess throttler
+    updateThrottlerIfConfigChanged(changedConfigs, clusterConfigs,
+        _segmentMultiColTextIndexPreprocessThrottler,
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM,
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM,
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+
+    LOGGER.info("Updated SegmentOperationsThrottler configs with latest clusterConfigs");
+  }
+
+  protected void updateThrottlerIfConfigChanged(Set<String> changedConfigs, Map<String, String> clusterConfigs,
+      BaseSegmentOperationsThrottler throttler, String maxConcurrencyConfigKey, String maxConcurrencyDefault,
+      String maxConcurrencyBeforeServingQueriesConfigKey, String maxConcurrencyBeforeServingQueriesDefault) {
+    String throttlerName = throttler.getThrottlerName();
+    boolean maxConcurrencyChanged = changedConfigs.contains(maxConcurrencyConfigKey);
+    boolean maxConcurrencyBeforeServingQueriesChanged =
+        changedConfigs.contains(maxConcurrencyBeforeServingQueriesConfigKey);
+
+    if (!maxConcurrencyChanged && !maxConcurrencyBeforeServingQueriesChanged) {
+      LOGGER.debug("No config changes for {}", throttlerName);
+      return;
+    }
+
+    // Parse maxConcurrency
+    int maxConcurrency = parseConfigValue(clusterConfigs, maxConcurrencyConfigKey, maxConcurrencyDefault);
+    if (maxConcurrency <= 0) {
+      return;
+    }
+
+    // Parse maxConcurrencyBeforeServingQueries
+    int maxConcurrencyBeforeServingQueries =
+        parseConfigValue(clusterConfigs, maxConcurrencyBeforeServingQueriesConfigKey,
+            maxConcurrencyBeforeServingQueriesDefault);
+    if (maxConcurrencyBeforeServingQueries <= 0) {
+      return;
+    }
+
+    // Update throttler
+    LOGGER.info("Updating {} throttler with maxConcurrency: {}, maxConcurrencyBeforeServingQueries: {}",
+        throttlerName, maxConcurrency, maxConcurrencyBeforeServingQueries);
+    throttler.updatePermits(maxConcurrency, maxConcurrencyBeforeServingQueries);
+  }
+
+  protected int parseConfigValue(Map<String, String> clusterConfigs, String configKey, String defaultValue) {
+    String valueStr = clusterConfigs == null ? defaultValue : clusterConfigs.getOrDefault(configKey, defaultValue);
+    try {
+      return Integer.parseInt(valueStr);
+    } catch (Exception e) {
+      LOGGER.warn("Invalid config {} set to: {}, not making change, fix config and try again", configKey, valueStr);
+      return -1;
+    }
   }
 }
