@@ -52,6 +52,7 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -861,6 +862,54 @@ public class RealtimeSegmentDataManagerTest {
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(),
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  @Test
+  public void testIngestionTimestampUpdatedWhenAllEventsFiltered()
+      throws Exception {
+    // When the ingestion plugin filters ALL events, processStreamEvents() should still update
+    // the segment's ingestion timestamp so that FreshnessBasedConsumptionStatusChecker can
+    // detect that fresh data has been consumed.
+    TableConfig tableConfig = createTableConfig();
+    tableConfig.setUpsertConfig(null);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    // Filter that drops every row: column "m" is always a non-null integer
+    ingestionConfig.setFilterConfig(
+        new FilterConfig("m IS NOT NULL"));
+    tableConfig.setIngestionConfig(ingestionConfig);
+
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(
+        true, timeSupplier, String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS),
+        "10m", tableConfig)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+
+      // Before consuming, the segment should have default (unset) ingestion lag
+      Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getMinimumIngestionLagMs(),
+          Long.MAX_VALUE, "Expected default ingestion lag before consumption");
+
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      final LongMsgOffset endOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      segmentDataManager._consumeOffsets.add(endOffset);
+      final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(endOffset.toString()));
+      segmentDataManager._responses.add(response);
+
+      consumer.run();
+
+      // No rows should have been indexed (all filtered)
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 0,
+          "Expected 0 indexed docs when all events are filtered");
+
+      // But the ingestion timestamp should have been updated via updateIngestionTimestamp()
+      Assert.assertNotEquals(segmentDataManager.getSegment().getSegmentMetadata().getMinimumIngestionLagMs(),
+          Long.MAX_VALUE,
+          "Expected ingestion lag to be updated even though all events were filtered");
     }
   }
 

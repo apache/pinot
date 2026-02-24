@@ -110,7 +110,7 @@ public class TransformPipeline {
         _numRowsSanitized++;
       }
     }
-    return new Result(rows, skippedRowCount, incompleteRowCount, sanitizedRowCount);
+    return new Result(rows, incompleteRowCount, skippedRowCount, sanitizedRowCount);
   }
 
   /// Reports stats after all rows are processed.
