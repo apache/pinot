@@ -52,9 +52,6 @@ import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.core.auth.Actions;
-import org.apache.pinot.core.auth.Authorize;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentMetadataUtils;
@@ -105,7 +102,6 @@ public class DebugResource {
   @GET
   @Path("tables/{tableName}")
   @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
   @ApiOperation(value = "Get segments debug info for this table",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public List<SegmentServerDebugInfo> getSegmentsDebugInfo(
@@ -119,7 +115,6 @@ public class DebugResource {
   @GET
   @Path("segments/{tableName}/{segmentName}")
   @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
   @ApiOperation(value = "Get segment debug info",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public SegmentServerDebugInfo getSegmentDebugInfo(
@@ -152,7 +147,6 @@ public class DebugResource {
   @GET
   @Path("threads/resourceUsage")
   @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
   @ApiOperation(value = "Get current resource usage of threads",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public Collection<? extends ThreadResourceTracker> getThreadUsage() {
@@ -162,7 +156,6 @@ public class DebugResource {
   @GET
   @Path("queries/resourceUsage")
   @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
   @ApiOperation(value = "Get current resource usage of queries in this service",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public Collection<? extends QueryResourceTracker> getQueryUsage() {
@@ -284,7 +277,6 @@ public class DebugResource {
    */
   @GET
   @Path("queryWorkloadCost/{workloadName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
   @ApiOperation(value = "Get instance cost information for a specific workload")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -348,7 +340,6 @@ public class DebugResource {
    */
   @GET
   @Path("queryWorkloadCosts")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
   @ApiOperation(value = "Get instance cost information for all workloads")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),

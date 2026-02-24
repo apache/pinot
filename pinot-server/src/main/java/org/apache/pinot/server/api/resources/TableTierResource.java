@@ -47,9 +47,6 @@ import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.core.auth.Actions;
-import org.apache.pinot.core.auth.Authorize;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -82,7 +79,6 @@ public class TableTierResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableNameWithType}/tiers")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_STORAGE_TIER)
   @ApiOperation(value = "Get storage tiers of immutable segments of the given table", notes = "Get storage tiers of "
       + "immutable segments of the given table")
   @ApiResponses(value = {
@@ -125,7 +121,6 @@ public class TableTierResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableNameWithType}/{segmentName}/tiers")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_STORAGE_TIER)
   @ApiOperation(value = "Get storage tiers of the immutable segment of the given table", notes = "Get storage tiers "
       + "of the immutable segment of the given table")
   @ApiResponses(value = {

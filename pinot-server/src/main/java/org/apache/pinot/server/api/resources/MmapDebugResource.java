@@ -41,9 +41,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.core.auth.Actions;
-import org.apache.pinot.core.auth.Authorize;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -76,7 +73,6 @@ public class MmapDebugResource {
 
   @GET
   @Path("memory/offheap")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
   @ApiOperation(value = "View current off-heap allocations", notes = "Lists all off-heap allocations and their "
       + "associated sizes")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success")})
@@ -88,7 +84,6 @@ public class MmapDebugResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/memory/offheap/table/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SIZE)
   @ApiOperation(value = "Show off heap memory consumed by latest mutable segment",
       notes = "Returns off heap memory consumed by latest consuming segment of realtime table")
   @ApiResponses(value = {
