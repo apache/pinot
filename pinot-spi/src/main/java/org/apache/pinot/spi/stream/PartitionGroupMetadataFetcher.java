@@ -130,10 +130,10 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
         // Check if the topic exists before fetching partition metadata
         // Only perform this check if topic existence validation is enabled and topics were fetched
-        boolean checkTopicExists = Boolean.parseBoolean(
+        boolean skipMissingTopics = Boolean.parseBoolean(
             streamConfig.getStreamConfigsMap()
                 .getOrDefault(StreamConfigProperties.SKIP_MISSING_TOPICS, "false"));
-        if (checkTopicExists && availableTopicNames != null && !availableTopicNames.contains(topicName)) {
+        if (skipMissingTopics && availableTopicNames != null && !availableTopicNames.contains(topicName)) {
           LOGGER.warn("Topic {} does not exist. Skipping this topic from ingestion.", topicName);
           continue;
         }
