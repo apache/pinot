@@ -573,7 +573,6 @@ public class IngestionDelayTracker {
    */
   public long getPartitionIngestionDelayMs(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
-    long ingestionTimeMs = 0;
     if (ingestionInfo == null || ingestionInfo._ingestionTimeMs < 0) {
       return 0;
     }
