@@ -35,13 +35,10 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
-import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
+import org.apache.pinot.segment.local.utils.BaseSegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
-import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -128,10 +125,10 @@ public class BaseTableDataManagerAcquireSegmentTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).build();
     SegmentOperationsThrottler segmentOperationsThrottler =
         new SegmentOperationsThrottler(
-            new SegmentAllIndexPreprocessThrottler(8, 10, true),
-            new SegmentStarTreePreprocessThrottler(4, 8, true),
-            new SegmentDownloadThrottler(10, 20, true),
-            new SegmentMultiColTextIndexPreprocessThrottler(4, 8, true));
+            new BaseSegmentOperationsThrottler(8, 10, true),
+            new BaseSegmentOperationsThrottler(4, 8, true),
+            new BaseSegmentOperationsThrottler(10, 20, true),
+            new BaseSegmentOperationsThrottler(4, 8, true));
     TableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, schema,
         new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, segmentOperationsThrottler,
