@@ -45,9 +45,6 @@ import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.core.auth.Actions;
-import org.apache.pinot.core.auth.Authorize;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -80,7 +77,6 @@ public class TableSizeResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/size")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SIZE)
   @ApiOperation(value = "Show table storage size", notes = "Lists size of all the segments of the table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -138,7 +134,6 @@ public class TableSizeResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/table/{tableName}/size")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SIZE)
   @ApiOperation(value = "Show table storage size", notes = "Lists size of all the segments of the table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
