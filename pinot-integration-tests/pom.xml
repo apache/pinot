@@ -86,25 +86,57 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>false</skipTests>
-              <includes>
-                <include>**/org/apache/pinot/integration/tests/A*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/B*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/C*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/D*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/E*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/F*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/G*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/H*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/I*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/J*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/K*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/L*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/M*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
-              </includes>
-            </configuration>
+            <executions>
+              <!-- Disable default execution so only our custom executions run -->
+              <execution>
+                <id>default-test</id>
+                <phase>none</phase>
+              </execution>
+              <!-- 1) Run the "must-run-first" test -->
+              <execution>
+                <id>run-first-exactly-once</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>false</skipTests>
+                  <includes>
+                    <include>**/org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</include>
+                  </includes>
+                </configuration>
+              </execution>
+              <!-- 2) Run the rest of set-1 -->
+              <execution>
+                <id>run-rest-set-1</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>false</skipTests>
+                  <includes>
+                    <include>**/org/apache/pinot/integration/tests/A*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/B*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/C*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/D*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/E*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/F*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/G*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/H*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/I*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/J*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/K*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/L*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/M*Test.java</include>
+                    <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
+                  </includes>
+                  <excludes>
+                    <exclude>**/org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
+                  </excludes>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>

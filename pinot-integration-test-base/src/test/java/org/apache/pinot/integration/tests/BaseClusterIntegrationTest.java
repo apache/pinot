@@ -194,6 +194,29 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return useKafkaTransaction() ? DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS : DEFAULT_LLC_NUM_KAFKA_BROKERS;
   }
 
+  /**
+   * Maximum number of attempts to start the Kafka cluster. Subclasses may override to use more
+   * attempts in resource-constrained environments (e.g. CI).
+   */
+  protected int getKafkaStartMaxAttempts() {
+    return KAFKA_START_MAX_ATTEMPTS;
+  }
+
+  /**
+   * Wait time in ms between Kafka startup retry attempts. Subclasses may override for CI.
+   */
+  protected long getKafkaStartRetryWaitMs() {
+    return KAFKA_START_RETRY_WAIT_MS;
+  }
+
+  /**
+   * Timeout in ms for Kafka cluster to become ready (brokers + transaction coordinator).
+   * Subclasses may override for resource-constrained environments (e.g. CI).
+   */
+  protected long getKafkaClusterReadyTimeoutMs() {
+    return KAFKA_CLUSTER_READY_TIMEOUT_MS;
+  }
+
   protected int getKafkaPort() {
     int idx = RANDOM.nextInt(_kafkaStarters.size());
     return _kafkaStarters.get(idx).getPort();
@@ -818,7 +841,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     int requestedBrokers = getNumKafkaBrokers();
     List<KafkaBrokerConfig> brokerConfigs = getOrCreateKafkaBrokerConfigs(requestedBrokers);
     Throwable lastFailure = null;
-    for (int attempt = 1; attempt <= KAFKA_START_MAX_ATTEMPTS; attempt++) {
+    for (int attempt = 1; attempt <= getKafkaStartMaxAttempts(); attempt++) {
       String clusterId = UUID.randomUUID().toString().replace("-", "");
       String networkName = "pinot-it-kafka-" + UUID.randomUUID().toString().replace("-", "");
       String quorumVoters = brokerConfigs.stream()
@@ -836,7 +859,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         _kafkaStarters = kafkaStarters;
         waitForKafkaClusterReady(getKafkaBrokerList(), requestedBrokers, useKafkaTransaction());
         if (attempt > 1) {
-          LOGGER.info("Kafka startup succeeded on retry attempt {}/{}", attempt, KAFKA_START_MAX_ATTEMPTS);
+          LOGGER.info("Kafka startup succeeded on retry attempt {}/{}", attempt, getKafkaStartMaxAttempts());
         }
         return;
       } catch (Throwable t) {
@@ -846,19 +869,19 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
         lastFailure = t;
         LOGGER.warn("Kafka startup attempt {}/{} failed; stopping started brokers before retry", attempt,
-            KAFKA_START_MAX_ATTEMPTS, t);
+            getKafkaStartMaxAttempts(), t);
         _kafkaStarters = kafkaStarters;
         try {
           stopKafka();
         } catch (RuntimeException stopException) {
-          LOGGER.warn("Kafka cleanup failed after startup attempt {}/{}", attempt, KAFKA_START_MAX_ATTEMPTS,
+          LOGGER.warn("Kafka cleanup failed after startup attempt {}/{}", attempt, getKafkaStartMaxAttempts(),
               stopException);
           t.addSuppressed(stopException);
         }
 
-        if (attempt < KAFKA_START_MAX_ATTEMPTS) {
+        if (attempt < getKafkaStartMaxAttempts()) {
           try {
-            Thread.sleep(KAFKA_START_RETRY_WAIT_MS);
+            Thread.sleep(getKafkaStartRetryWaitMs());
           } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while waiting to retry Kafka startup", interruptedException);
@@ -868,7 +891,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
 
     _kafkaBrokerConfigs = null;
-    throw new RuntimeException("Failed to start Kafka cluster after " + KAFKA_START_MAX_ATTEMPTS + " attempts",
+    throw new RuntimeException("Failed to start Kafka cluster after " + getKafkaStartMaxAttempts() + " attempts",
         lastFailure);
   }
 
@@ -921,11 +944,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   private void waitForKafkaClusterReady(String brokerList, int brokerCount, boolean requireTransactions) {
+    long clusterReadyTimeoutMs = getKafkaClusterReadyTimeoutMs();
     TestUtils.waitForCondition(aVoid -> isKafkaClusterReady(brokerList, brokerCount), 200L,
-        KAFKA_CLUSTER_READY_TIMEOUT_MS,
+        clusterReadyTimeoutMs,
         "Kafka brokers are not ready");
     if (requireTransactions) {
-      TestUtils.waitForCondition(aVoid -> canInitTransactions(brokerList), 500L, KAFKA_CLUSTER_READY_TIMEOUT_MS,
+      TestUtils.waitForCondition(aVoid -> canInitTransactions(brokerList), 500L, clusterReadyTimeoutMs,
           "Kafka transaction coordinator is not ready");
     }
   }

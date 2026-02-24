@@ -24,7 +24,7 @@
     <Console name="console" target="SYSTEM_OUT">
       <PatternLayout pattern="%d{HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n"/>
       <Filters>
-        <BurstFilter level="ERROR" rate="5" maxBurst="10"/>
+        <BurstFilter level="INFO" rate="5" maxBurst="10"/>
       </Filters>
     </Console>
     <Console name="spammy" target="SYSTEM_OUT">
@@ -42,7 +42,7 @@
     <Logger name="org.apache.pinot.core.accounting" level="warn" additivity="false">
       <AppenderRef ref="spammy"/>
     </Logger>
-    <Root level="error">
+    <Root level="info">
       <AppenderRef ref="console"/>
     </Root>
   </Loggers>

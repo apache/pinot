@@ -68,13 +68,39 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
 
   @Override
   protected int getNumKafkaBrokers() {
-    return DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS;
+    // 2 brokers: fewer resources than 3, but transaction coordinator handles abort better than 1
+    return 2;
+  }
+
+  @Override
+  protected int getKafkaStartMaxAttempts() {
+    // Transactional quorum is resource-intensive; use more retries for both CI and local
+    return 5;
+  }
+
+  @Override
+  protected long getKafkaStartRetryWaitMs() {
+    return 5_000L;
+  }
+
+  @Override
+  protected long getKafkaClusterReadyTimeoutMs() {
+    // Transaction coordinator needs time to become ready
+    return 120_000L;
+  }
+
+  @Override
+  protected long getRealtimePartitionsReadyTimeoutMs() {
+    // Transactional consumer needs time to initialize with transaction coordinator
+    return 300_000L;
   }
 
   @Override
   protected long getDocsLoadedTimeoutMs() {
     return 1_200_000L;
   }
+
+  private static final long POST_COMMIT_PROPAGATION_DELAY_MS = 5_000L;
 
   @Override
   protected void pushAvroIntoKafka(List<File> avroFiles)
@@ -88,6 +114,13 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     ClusterIntegrationTestUtils
         .pushAvroIntoKafkaWithTransaction(avroFiles, kafkaBrokerList, getKafkaTopic(),
             getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), true);
+    // Allow transaction coordinator to propagate commit state before consumer fetches
+    try {
+      Thread.sleep(POST_COMMIT_PROPAGATION_DELAY_MS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while waiting for transaction commit propagation", e);
+    }
   }
 
   private boolean isRetryableRealtimePartitionMetadataError(Throwable throwable) {
