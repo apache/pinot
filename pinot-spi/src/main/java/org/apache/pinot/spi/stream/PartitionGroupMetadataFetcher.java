@@ -132,7 +132,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         // Only perform this check if topic existence validation is enabled and topics were fetched
         boolean checkTopicExists = Boolean.parseBoolean(
             streamConfig.getStreamConfigsMap()
-                .getOrDefault(StreamConfigProperties.TOPIC_EXISTENCE_CHECK_ENABLED, "false"));
+                .getOrDefault(StreamConfigProperties.SKIP_MISSING_TOPICS, "false"));
         if (checkTopicExists && availableTopicNames != null && !availableTopicNames.contains(topicName)) {
           LOGGER.warn("Topic {} does not exist. Skipping this topic from ingestion.", topicName);
           continue;
@@ -174,7 +174,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     // Find first stream config with topic existence check enabled
     StreamConfig streamConfigForTopicFetch = _streamConfigs.stream()
         .filter(config -> Boolean.parseBoolean(
-            config.getStreamConfigsMap().getOrDefault(StreamConfigProperties.TOPIC_EXISTENCE_CHECK_ENABLED, "false")))
+            config.getStreamConfigsMap().getOrDefault(StreamConfigProperties.SKIP_MISSING_TOPICS, "false")))
         .findFirst()
         .orElse(null);
 

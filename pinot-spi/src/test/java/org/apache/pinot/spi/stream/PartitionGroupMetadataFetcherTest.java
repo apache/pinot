@@ -504,7 +504,7 @@ public class PartitionGroupMetadataFetcherTest {
     when(streamConfig.getTableNameWithType()).thenReturn(tableName);
     Map<String, String> configsMap = new HashMap<>();
     if (topicExistenceCheckEnabled) {
-      configsMap.put("topic.existence.check.enabled", "true");
+      configsMap.put(StreamConfigProperties.SKIP_MISSING_TOPICS, "true");
     }
     when(streamConfig.getStreamConfigsMap()).thenReturn(configsMap);
     return streamConfig;
