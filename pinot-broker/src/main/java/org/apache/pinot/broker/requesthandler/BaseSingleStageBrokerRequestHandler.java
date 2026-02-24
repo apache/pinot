@@ -596,6 +596,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
+      _queryOptimizer.optimize(offlinePinotQuery, schema);
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
 
       PinotQuery realtimePinotQuery = serverPinotQuery.deepCopy();
@@ -603,6 +604,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
       handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
+      _queryOptimizer.optimize(offlinePinotQuery, schema);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
 
       requestContext.setFanoutType(RequestContext.FanoutType.HYBRID);
@@ -613,6 +615,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig);
+      _queryOptimizer.optimize(offlinePinotQuery, schema);
       offlineBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.OFFLINE);
@@ -622,6 +625,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       setTableName(serverBrokerRequest, realtimeTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig);
+      _queryOptimizer.optimize(offlinePinotQuery, schema);
       realtimeBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.REALTIME);
