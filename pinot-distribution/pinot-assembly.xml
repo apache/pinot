@@ -48,10 +48,10 @@
     <!-- Start Include Pinot Stream Ingestion Plugins-->
     <file>
       <source>
-        ${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-2.0/target/pinot-kafka-2.0-${project.version}-shaded.jar
+        ${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-3.0/target/pinot-kafka-3.0-${project.version}-shaded.jar
       </source>
       <destName>
-        plugins/pinot-stream-ingestion/pinot-kafka-2.0/pinot-kafka-2.0-${project.version}-shaded.jar
+        plugins/pinot-stream-ingestion/pinot-kafka-3.0/pinot-kafka-3.0-${project.version}-shaded.jar
       </destName>
     </file>
     <file>
@@ -262,18 +262,6 @@
       <useDefaultExcludes>false</useDefaultExcludes>
       <directory>${pinot.root}/pinot-tools/src/main/resources/conf</directory>
       <outputDirectory>conf</outputDirectory>
-    </fileSet>
-    <fileSet>
-      <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/src/main/resources/examples/stream/meetupRsvp/kafka_2.0
-      </directory>
-      <outputDirectory>examples/stream/meetupRsvp/</outputDirectory>
-    </fileSet>
-    <fileSet>
-      <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/src/main/resources/examples/stream/airlineStats/kafka_2.0
-      </directory>
-      <outputDirectory>examples/stream/airlineStats/</outputDirectory>
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>

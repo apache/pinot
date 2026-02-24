@@ -100,7 +100,7 @@ const defaultTableObj = {
       "stream.kafka.topic.name": "",
       "stream.kafka.broker.list": "",
       "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
-      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder",
       "realtime.segment.flush.threshold.rows": "0",
       "realtime.segment.flush.threshold.segment.rows": "0",

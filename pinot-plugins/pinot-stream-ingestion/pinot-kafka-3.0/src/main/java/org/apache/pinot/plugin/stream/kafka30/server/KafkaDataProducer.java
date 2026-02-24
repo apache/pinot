@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20.server;
+package org.apache.pinot.plugin.stream.kafka30.server;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -59,7 +59,8 @@ public class KafkaDataProducer implements StreamDataProducer {
     try {
       _producer = new KafkaProducer<>(props);
     } catch (Exception e) {
-      LOGGER.error("Failed to create a Kafka 2 Producer.", e);
+      LOGGER.error("Failed to create a Kafka Producer with properties: {}", props, e);
+      throw new IllegalStateException("Failed to initialize KafkaDataProducer; see cause for details.", e);
     }
   }
 
@@ -109,6 +110,8 @@ public class KafkaDataProducer implements StreamDataProducer {
 
   @Override
   public void close() {
-    _producer.close();
+    if (_producer != null) {
+      _producer.close();
+    }
   }
 }
