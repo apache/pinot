@@ -42,9 +42,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.core.auth.Actions;
-import org.apache.pinot.core.auth.Authorize;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.event.MinionTaskState;
@@ -71,7 +68,6 @@ public class PinotTaskProgressResource {
   @GET
   @Path("/tasks/subtask/progress")
   @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @ApiOperation("Get finer grained task progress tracked in memory for the given subtasks")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
@@ -99,7 +95,6 @@ public class PinotTaskProgressResource {
   @GET
   @Path("/tasks/subtask/state/progress")
   @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @ApiOperation("Get finer grained task progress tracked in memory for given subtasks or given state")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
@@ -153,7 +148,6 @@ public class PinotTaskProgressResource {
   @GET
   @Path("/tasks/subtask/progressStats")
   @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @ApiOperation("Get task progress stats tracked for the given subtasks")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
