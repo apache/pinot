@@ -80,7 +80,7 @@ public class TableReplicatorTest {
     String tableName = "table1_REALTIME";
     String sourceClusterUri = "http://localhost:9000";
     CopyTablePayload copyTablePayload = new CopyTablePayload(sourceClusterUri, Collections.emptyMap(),
-        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null);
+        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null, null);
 
     List<WatermarkInductionResult.Watermark> watermarks = Arrays.asList(
         new WatermarkInductionResult.Watermark(0, 10, 100L),

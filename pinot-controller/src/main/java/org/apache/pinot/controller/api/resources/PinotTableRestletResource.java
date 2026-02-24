@@ -309,6 +309,17 @@ public class PinotTableRestletResource {
       }
 
       CopyTablePayload copyTablePayload = JsonUtils.stringToObject(payload, CopyTablePayload.class);
+
+      // Validate jobType - only CONTROLLER is currently supported
+      CopyTablePayload.JobType jobType = copyTablePayload.getJobType();
+      if (jobType == CopyTablePayload.JobType.MINION) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Job type '%s' is not supported. Only 'CONTROLLER' job type is currently supported.",
+                jobType),
+            Response.Status.BAD_REQUEST);
+      }
+      LOGGER.info("[copyTable] Job type: {}", jobType);
+
       String sourceControllerUri = copyTablePayload.getSourceClusterUri();
       Map<String, String> requestHeaders = copyTablePayload.getHeaders();
 
