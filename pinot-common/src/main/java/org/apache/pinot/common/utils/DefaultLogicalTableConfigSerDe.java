@@ -31,15 +31,6 @@ import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
-import static org.apache.pinot.spi.data.LogicalTableConfig.BROKER_TENANT_KEY;
-import static org.apache.pinot.spi.data.LogicalTableConfig.LOGICAL_TABLE_NAME_KEY;
-import static org.apache.pinot.spi.data.LogicalTableConfig.PHYSICAL_TABLE_CONFIG_KEY;
-import static org.apache.pinot.spi.data.LogicalTableConfig.QUERY_CONFIG_KEY;
-import static org.apache.pinot.spi.data.LogicalTableConfig.QUOTA_CONFIG_KEY;
-import static org.apache.pinot.spi.data.LogicalTableConfig.REF_OFFLINE_TABLE_NAME_KEY;
-import static org.apache.pinot.spi.data.LogicalTableConfig.REF_REALTIME_TABLE_NAME_KEY;
-import static org.apache.pinot.spi.data.LogicalTableConfig.TIME_BOUNDARY_CONFIG_KEY;
-
 
 @AutoService(LogicalTableConfigSerDe.class)
 public class DefaultLogicalTableConfigSerDe implements LogicalTableConfigSerDe {
@@ -58,26 +49,26 @@ public class DefaultLogicalTableConfigSerDe implements LogicalTableConfigSerDe {
 
   protected void populateFromZNRecord(LogicalTableConfig config, ZNRecord znRecord)
       throws IOException {
-    config.setTableName(znRecord.getSimpleField(LOGICAL_TABLE_NAME_KEY));
-    config.setBrokerTenant(znRecord.getSimpleField(BROKER_TENANT_KEY));
+    config.setTableName(znRecord.getSimpleField(LogicalTableConfig.LOGICAL_TABLE_NAME_KEY));
+    config.setBrokerTenant(znRecord.getSimpleField(LogicalTableConfig.BROKER_TENANT_KEY));
 
-    String queryConfigJson = znRecord.getSimpleField(QUERY_CONFIG_KEY);
+    String queryConfigJson = znRecord.getSimpleField(LogicalTableConfig.QUERY_CONFIG_KEY);
     if (queryConfigJson != null) {
       config.setQueryConfig(JsonUtils.stringToObject(queryConfigJson, QueryConfig.class));
     }
-    String quotaConfigJson = znRecord.getSimpleField(QUOTA_CONFIG_KEY);
+    String quotaConfigJson = znRecord.getSimpleField(LogicalTableConfig.QUOTA_CONFIG_KEY);
     if (quotaConfigJson != null) {
       config.setQuotaConfig(JsonUtils.stringToObject(quotaConfigJson, QuotaConfig.class));
     }
-    String refOfflineTableName = znRecord.getSimpleField(REF_OFFLINE_TABLE_NAME_KEY);
+    String refOfflineTableName = znRecord.getSimpleField(LogicalTableConfig.REF_OFFLINE_TABLE_NAME_KEY);
     if (refOfflineTableName != null) {
       config.setRefOfflineTableName(refOfflineTableName);
     }
-    String refRealtimeTableName = znRecord.getSimpleField(REF_REALTIME_TABLE_NAME_KEY);
+    String refRealtimeTableName = znRecord.getSimpleField(LogicalTableConfig.REF_REALTIME_TABLE_NAME_KEY);
     if (refRealtimeTableName != null) {
       config.setRefRealtimeTableName(refRealtimeTableName);
     }
-    String timeBoundaryConfigJson = znRecord.getSimpleField(TIME_BOUNDARY_CONFIG_KEY);
+    String timeBoundaryConfigJson = znRecord.getSimpleField(LogicalTableConfig.TIME_BOUNDARY_CONFIG_KEY);
     if (timeBoundaryConfigJson != null) {
       config.setTimeBoundaryConfig(JsonUtils.stringToObject(timeBoundaryConfigJson, TimeBoundaryConfig.class));
     }
@@ -88,7 +79,7 @@ public class DefaultLogicalTableConfigSerDe implements LogicalTableConfigSerDe {
   protected void populatePhysicalTableConfigs(LogicalTableConfig config, ZNRecord znRecord)
       throws IOException {
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
-    Map<String, String> physicalTableMapField = znRecord.getMapField(PHYSICAL_TABLE_CONFIG_KEY);
+    Map<String, String> physicalTableMapField = znRecord.getMapField(LogicalTableConfig.PHYSICAL_TABLE_CONFIG_KEY);
     if (physicalTableMapField != null) {
       for (Map.Entry<String, String> entry : physicalTableMapField.entrySet()) {
         physicalTableConfigMap.put(entry.getKey(),
@@ -108,29 +99,30 @@ public class DefaultLogicalTableConfigSerDe implements LogicalTableConfigSerDe {
 
   protected void writeToZNRecord(LogicalTableConfig config, ZNRecord znRecord)
       throws JsonProcessingException {
-    znRecord.setSimpleField(LOGICAL_TABLE_NAME_KEY, config.getTableName());
-    znRecord.setSimpleField(BROKER_TENANT_KEY, config.getBrokerTenant());
+    znRecord.setSimpleField(LogicalTableConfig.LOGICAL_TABLE_NAME_KEY, config.getTableName());
+    znRecord.setSimpleField(LogicalTableConfig.BROKER_TENANT_KEY, config.getBrokerTenant());
 
     if (config.getQueryConfig() != null) {
-      znRecord.setSimpleField(QUERY_CONFIG_KEY, config.getQueryConfig().toJsonString());
+      znRecord.setSimpleField(LogicalTableConfig.QUERY_CONFIG_KEY, config.getQueryConfig().toJsonString());
     }
     if (config.getQuotaConfig() != null) {
-      znRecord.setSimpleField(QUOTA_CONFIG_KEY, config.getQuotaConfig().toJsonString());
+      znRecord.setSimpleField(LogicalTableConfig.QUOTA_CONFIG_KEY, config.getQuotaConfig().toJsonString());
     }
     if (config.getRefOfflineTableName() != null) {
-      znRecord.setSimpleField(REF_OFFLINE_TABLE_NAME_KEY, config.getRefOfflineTableName());
+      znRecord.setSimpleField(LogicalTableConfig.REF_OFFLINE_TABLE_NAME_KEY, config.getRefOfflineTableName());
     }
     if (config.getRefRealtimeTableName() != null) {
-      znRecord.setSimpleField(REF_REALTIME_TABLE_NAME_KEY, config.getRefRealtimeTableName());
+      znRecord.setSimpleField(LogicalTableConfig.REF_REALTIME_TABLE_NAME_KEY, config.getRefRealtimeTableName());
     }
     if (config.getTimeBoundaryConfig() != null) {
-      znRecord.setSimpleField(TIME_BOUNDARY_CONFIG_KEY, config.getTimeBoundaryConfig().toJsonString());
+      znRecord.setSimpleField(LogicalTableConfig.TIME_BOUNDARY_CONFIG_KEY,
+          config.getTimeBoundaryConfig().toJsonString());
     }
 
     Map<String, String> physicalTableConfigMapField = new HashMap<>();
     for (Map.Entry<String, PhysicalTableConfig> entry : config.getPhysicalTableConfigMap().entrySet()) {
       physicalTableConfigMapField.put(entry.getKey(), entry.getValue().toJsonString());
     }
-    znRecord.setMapField(PHYSICAL_TABLE_CONFIG_KEY, physicalTableConfigMapField);
+    znRecord.setMapField(LogicalTableConfig.PHYSICAL_TABLE_CONFIG_KEY, physicalTableConfigMapField);
   }
 }
