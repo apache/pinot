@@ -24,11 +24,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
-import org.apache.pinot.spi.config.ConfigRecord;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -153,72 +151,6 @@ public class LogicalTableConfig extends BaseJsonConfig {
 
   public void setTimeBoundaryConfig(TimeBoundaryConfig timeBoundaryConfig) {
     _timeBoundaryConfig = timeBoundaryConfig;
-  }
-
-  public void populateFromConfigRecord(ConfigRecord record)
-      throws IOException {
-    setTableName(record.getSimpleField(LOGICAL_TABLE_NAME_KEY));
-    setBrokerTenant(record.getSimpleField(BROKER_TENANT_KEY));
-
-    if (record.getSimpleField(QUERY_CONFIG_KEY) != null) {
-      setQueryConfig(JsonUtils.stringToObject(record.getSimpleField(QUERY_CONFIG_KEY), QueryConfig.class));
-    }
-    if (record.getSimpleField(QUOTA_CONFIG_KEY) != null) {
-      setQuotaConfig(JsonUtils.stringToObject(record.getSimpleField(QUOTA_CONFIG_KEY), QuotaConfig.class));
-    }
-    if (record.getSimpleField(REF_OFFLINE_TABLE_NAME_KEY) != null) {
-      setRefOfflineTableName(record.getSimpleField(REF_OFFLINE_TABLE_NAME_KEY));
-    }
-    if (record.getSimpleField(REF_REALTIME_TABLE_NAME_KEY) != null) {
-      setRefRealtimeTableName(record.getSimpleField(REF_REALTIME_TABLE_NAME_KEY));
-    }
-    String timeBoundaryConfigJson = record.getSimpleField(TIME_BOUNDARY_CONFIG_KEY);
-    if (timeBoundaryConfigJson != null) {
-      setTimeBoundaryConfig(JsonUtils.stringToObject(timeBoundaryConfigJson, TimeBoundaryConfig.class));
-    }
-
-    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
-    Map<String, String> physicalTableMapField = record.getMapField(PHYSICAL_TABLE_CONFIG_KEY);
-    if (physicalTableMapField != null) {
-      for (Map.Entry<String, String> entry : physicalTableMapField.entrySet()) {
-        physicalTableConfigMap.put(entry.getKey(),
-            JsonUtils.stringToObject(entry.getValue(), PhysicalTableConfig.class));
-      }
-    }
-    setPhysicalTableConfigMap(physicalTableConfigMap);
-  }
-
-  public ConfigRecord toConfigRecord()
-      throws JsonProcessingException {
-    Map<String, String> simpleFields = new HashMap<>();
-    simpleFields.put(LOGICAL_TABLE_NAME_KEY, getTableName());
-    simpleFields.put(BROKER_TENANT_KEY, getBrokerTenant());
-
-    if (getQueryConfig() != null) {
-      simpleFields.put(QUERY_CONFIG_KEY, getQueryConfig().toJsonString());
-    }
-    if (getQuotaConfig() != null) {
-      simpleFields.put(QUOTA_CONFIG_KEY, getQuotaConfig().toJsonString());
-    }
-    if (getRefOfflineTableName() != null) {
-      simpleFields.put(REF_OFFLINE_TABLE_NAME_KEY, getRefOfflineTableName());
-    }
-    if (getRefRealtimeTableName() != null) {
-      simpleFields.put(REF_REALTIME_TABLE_NAME_KEY, getRefRealtimeTableName());
-    }
-    if (getTimeBoundaryConfig() != null) {
-      simpleFields.put(TIME_BOUNDARY_CONFIG_KEY, getTimeBoundaryConfig().toJsonString());
-    }
-
-    Map<String, String> physicalTableConfigMapField = new HashMap<>();
-    for (Map.Entry<String, PhysicalTableConfig> entry : getPhysicalTableConfigMap().entrySet()) {
-      physicalTableConfigMapField.put(entry.getKey(), entry.getValue().toJsonString());
-    }
-
-    Map<String, Map<String, String>> mapFields = new HashMap<>();
-    mapFields.put(PHYSICAL_TABLE_CONFIG_KEY, physicalTableConfigMapField);
-
-    return new ConfigRecord(getTableName(), simpleFields, mapFields);
   }
 
   private JsonNode toJsonObject() {

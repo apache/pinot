@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -36,6 +37,12 @@ public interface LogicalTableConfigSerDe {
    */
   LogicalTableConfig fromZNRecord(ZNRecord znRecord)
       throws IOException;
+
+  /**
+   * Serializes a {@link LogicalTableConfig} into a {@link ZNRecord}.
+   */
+  ZNRecord toZNRecord(LogicalTableConfig logicalTableConfig)
+      throws JsonProcessingException;
 
   /**
    * Returns the priority of this implementation. Higher values win over lower values
