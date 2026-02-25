@@ -55,9 +55,8 @@ public class PinotFSSegmentFetcher extends BaseSegmentFetcher {
     }
     AtomicReference<File> untarredFileRef = new AtomicReference<>();
 
-    int tries;
     try {
-      tries =
+      int tries =
           RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
             try (InputStream inputStream = pinotFS.open(uri)) {
               List<File> untarredFiles = TarCompressionUtils.untarWithRateLimiter(inputStream, dest, rateLimit);
@@ -68,11 +67,11 @@ public class PinotFSSegmentFetcher extends BaseSegmentFetcher {
               return false;
             }
           });
+      attempts.set(tries);
     } catch (AttemptsExceededException | RetriableOperationException e) {
       attempts.set(e.getAttempts());
       throw e;
     }
-    attempts.set(tries);
     return untarredFileRef.get();
   }
 }
