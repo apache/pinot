@@ -22,9 +22,16 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.util.HashMap;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +47,10 @@ import picocli.CommandLine;
 @CommandLine.Command(name = "StopProcess", mixinStandardHelpOptions = true)
 public class StopProcessCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StopProcessCommand.class);
+  private static final String QUICKSTART_KAFKA_CONTAINER_PREFIX = "pinot-qs-kafka-";
+  private static final int PORT_RELEASE_TIMEOUT_SECONDS = 30;
+  private static final long PORT_RELEASE_POLL_INTERVAL_MS = 200L;
+  private static final int PROCESS_TIMEOUT_SECONDS = 60;
 
   @CommandLine.Option(names = {"-controller"}, required = false, description = "Stop the PinotController process.")
   private boolean _controller = false;
@@ -88,14 +99,27 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
     return this;
   }
 
+  public StopProcessCommand stopKafka() {
+    _kafka = true;
+    return this;
+  }
+
   @Override
   public boolean execute()
       throws Exception {
     LOGGER.info("Executing command: {}", toString());
 
-    Map<String, String> processes = new HashMap<String, String>();
+    Map<String, String> processes = new LinkedHashMap<>();
     String prefix = System.getProperty("java.io.tmpdir") + File.separator;
     File tempDir = new File(System.getProperty("java.io.tmpdir"));
+
+    if (_kafka) {
+      stopManagedQuickstartKafkaContainers();
+      String kafkaPidFile = prefix + ".kafka.pid";
+      if (new File(kafkaPidFile).exists()) {
+        processes.put("Kafka", kafkaPidFile);
+      }
+    }
 
     if (_server) {
       File[] serverFiles = tempDir.listFiles(new FilenameFilter() {
@@ -150,10 +174,6 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
 
     if (_zooKeeper) {
       processes.put("Zookeeper", prefix + ".zooKeeper.pid");
-    }
-
-    if (_kafka) {
-      processes.put("Kafka", prefix + ".kafka.pid");
     }
 
     boolean ret = true;
@@ -215,5 +235,86 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
 
     file.delete();
     return true;
+  }
+
+  private void stopManagedQuickstartKafkaContainers() {
+    try {
+      List<String> containers = runProcess(List.of("docker", "ps", "-a",
+          "--filter", "name=" + QUICKSTART_KAFKA_CONTAINER_PREFIX,
+          "--format", "{{.Names}}"));
+      Set<Integer> publishedPorts = new HashSet<>();
+      for (String container : containers) {
+        if (!container.isBlank()) {
+          publishedPorts.addAll(getPublishedPorts(container));
+          LOGGER.info("Stopping managed quickstart Kafka container: {}", container);
+          runProcess(List.of("docker", "rm", "-f", container));
+        }
+      }
+      waitForPortsReleased(publishedPorts);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to stop managed quickstart Kafka containers", e);
+    }
+  }
+
+  private static Set<Integer> getPublishedPorts(String containerName)
+      throws Exception {
+    Set<Integer> ports = new HashSet<>();
+    for (String line : runProcess(List.of("docker", "port", containerName))) {
+      int lastColon = line.lastIndexOf(':');
+      if (lastColon < 0 || lastColon == line.length() - 1) {
+        continue;
+      }
+      String portToken = line.substring(lastColon + 1).trim();
+      if (portToken.isEmpty()) {
+        continue;
+      }
+      try {
+        ports.add(Integer.parseInt(portToken));
+      } catch (NumberFormatException ignored) {
+        // Ignore malformed output lines and continue parsing remaining mappings.
+      }
+    }
+    return ports;
+  }
+
+  private static void waitForPortsReleased(Set<Integer> ports)
+      throws Exception {
+    if (ports.isEmpty()) {
+      return;
+    }
+    long deadlineMs = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(PORT_RELEASE_TIMEOUT_SECONDS);
+    while (System.currentTimeMillis() < deadlineMs) {
+      boolean allReleased = true;
+      for (int port : ports) {
+        if (!NetUtils.available(port)) {
+          allReleased = false;
+          break;
+        }
+      }
+      if (allReleased) {
+        return;
+      }
+      Thread.sleep(PORT_RELEASE_POLL_INTERVAL_MS);
+    }
+    throw new IllegalStateException("Kafka ports are still in use after stop timeout: " + ports);
+  }
+
+  private static List<String> runProcess(List<String> command)
+      throws Exception {
+    Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+    if (!process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+      process.destroyForcibly();
+      process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      String timeoutOutput = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+      throw new IllegalStateException("Command timed out after " + PROCESS_TIMEOUT_SECONDS + "s: "
+          + String.join(" ", command) + (timeoutOutput.isEmpty() ? "" : "\n" + timeoutOutput));
+    }
+    String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    int code = process.exitValue();
+    if (code != 0) {
+      throw new IllegalStateException("Command failed (" + code + "): " + String.join(" ", command)
+          + (output.isBlank() ? "" : "\n" + output.trim()));
+    }
+    return output.lines().collect(Collectors.toList());
   }
 }
