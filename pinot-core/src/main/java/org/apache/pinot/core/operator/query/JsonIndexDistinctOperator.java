@@ -160,9 +160,14 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
 
   @Nullable
   private RoaringBitmap buildFilteredDocIds() {
-    if (_filterOperator == null || _filterOperator.isResultMatchingAll()) {
+    if (_filterOperator.isResultMatchingAll()) {
       return null;
     }
+
+    if (_filterOperator.canProduceBitmaps()) {
+      return _filterOperator.getBitmaps().reduce().toRoaringBitmap();
+    }
+
     if (_filterOperator.isResultEmpty()) {
       return new RoaringBitmap();
     }
@@ -175,9 +180,7 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
     while ((block = docIdSetOperator.nextBlock()) != null) {
       int[] docIds = block.getDocIds();
       int length = block.getLength();
-      for (int i = 0; i < length; i++) {
-        bitmap.add(docIds[i]);
-      }
+      bitmap.addN(docIds, 0, length);
     }
     return bitmap;
   }
@@ -292,6 +295,8 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
     if (dataSource.getJsonIndex() != null) {
       return true;
     }
+
+    //for composite Json index check for key
     Optional<IndexType<?, ?, ?>> compositeIndex =
         IndexService.getInstance().getOptional("composite_json_index");
     return compositeIndex.isPresent() && dataSource.getIndex(compositeIndex.get()) != null;
