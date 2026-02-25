@@ -810,6 +810,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottler);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
+    if (_transitionThreadPoolManager instanceof PinotClusterConfigChangeListener) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          (PinotClusterConfigChangeListener) _transitionThreadPoolManager);
+    }
 
     if (sendStatsPredicate.needWatchForInstanceConfigChange()) {
       LOGGER.info("Initializing and registering the SendStatsPredicate");

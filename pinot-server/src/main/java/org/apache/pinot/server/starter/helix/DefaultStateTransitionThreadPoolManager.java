@@ -19,6 +19,8 @@
 package org.apache.pinot.server.starter.helix;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -33,8 +35,10 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskContext;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.DecoratorExecutorService;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,19 +57,26 @@ import org.slf4j.LoggerFactory;
  *
  * <p><b>Configuration precedence:</b></p>
  * <ol>
- *   <li>Pinot server config: pinot.server.instance.stateTransitionThreadPoolSize</li>
+ *   <li>Cluster config: pinot.server.instance.stateTransitionThreadPoolSize (dynamic, via ZK cluster config)</li>
+ *   <li>Pinot server config: pinot.server.instance.stateTransitionThreadPoolSize (static, from server properties)</li>
  *   <li>Helix instance config: STATE_TRANSITION.maxThreads (from CONFIGS/PARTICIPANT/&lt;instance&gt;)</li>
  *   <li>Helix cluster config: STATE_TRANSITION.maxThreads (from CONFIGS/CLUSTER/&lt;cluster&gt;)</li>
  *   <li>Default value: 40</li>
  * </ol>
+ *
+ * <p>The pool size can be dynamically adjusted at runtime by updating the cluster config key
+ * {@code pinot.server.instance.stateTransitionThreadPoolSize}. This class implements
+ * {@link PinotClusterConfigChangeListener} and should be registered with the cluster config change handler.</p>
  */
-public class DefaultStateTransitionThreadPoolManager implements StateTransitionThreadPoolManager {
+public class DefaultStateTransitionThreadPoolManager
+    implements StateTransitionThreadPoolManager, PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultStateTransitionThreadPoolManager.class);
   private static final String HELIX_STATE_TRANSITION_KEY = "STATE_TRANSITION.maxThreads";
 
   private final PinotConfiguration _serverConf;
   private final HelixManager _helixManager;
-  private ExecutorService _executorService;
+  private final ThreadPoolExecutor _threadPoolExecutor;
+  private final ExecutorService _executorService;
 
   /**
    * Creates a state transition thread pool manager with the default pool size configuration.
@@ -79,8 +90,9 @@ public class DefaultStateTransitionThreadPoolManager implements StateTransitionT
 
   /**
    * Creates a state transition thread pool manager with backward compatibility for legacy Helix config.
-   * The executor service is created lazily in {@link #onHelixManagerConnected()} after Helix connects,
-   * allowing it to read legacy Helix config if needed.
+   * The thread pool is created immediately with the default core size so that
+   * {@link #getExecutorService(String)} never returns null. When {@link #onHelixManagerConnected()} is called,
+   * the pool size is adjusted based on configuration precedence (Pinot config > Helix config > default).
    *
    * @param serverConf the server configuration
    * @param helixManager the Helix manager to read legacy config from later (can be null)
@@ -89,17 +101,66 @@ public class DefaultStateTransitionThreadPoolManager implements StateTransitionT
       @Nullable HelixManager helixManager) {
     _serverConf = serverConf;
     _helixManager = helixManager;
-    // Executor service will be created in onHelixManagerConnected()
+    int defaultSize = org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_STATE_TRANSITION_THREAD_POOL_SIZE;
+    _threadPoolExecutor = new ThreadPoolExecutor(defaultSize, defaultSize, 0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(), new ThreadFactoryBuilder().setNameFormat("state-transition-%d").build());
+    _executorService = new ContextualStateTransitionExecutor(_threadPoolExecutor);
+    LOGGER.info("Initialized state transition thread pool with default size: {}", defaultSize);
   }
 
   @Override
   public void onHelixManagerConnected() {
     // Determine pool size with full precedence: Pinot config > Helix config > default
     int poolSize = determinePoolSize();
-    _executorService =
-        new ContextualStateTransitionExecutor(new ThreadPoolExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(), new ThreadFactoryBuilder().setNameFormat("state-transition-%d").build()));
-    LOGGER.info("Created state transition thread pool with size: {}", poolSize);
+    resizeThreadPool(poolSize);
+  }
+
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE)) {
+      return;
+    }
+    String value = clusterConfigs.get(CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE);
+    if (value == null) {
+      LOGGER.info("Cluster config {} was removed, reverting to server config / default",
+          CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE);
+      resizeThreadPool(determinePoolSize());
+      return;
+    }
+    try {
+      int poolSize = Integer.parseInt(value.trim());
+      if (poolSize <= 0) {
+        LOGGER.warn("Invalid non-positive value for cluster config {}: {}. Ignoring.",
+            CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE, value);
+        return;
+      }
+      LOGGER.info("Cluster config {} changed to {}", CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE,
+          poolSize);
+      resizeThreadPool(poolSize);
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for cluster config {}: {}. Ignoring.",
+          CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE, value);
+    }
+  }
+
+  /**
+   * Resizes the thread pool to the given size if it differs from the current size.
+   */
+  private void resizeThreadPool(int poolSize) {
+    int currentSize = _threadPoolExecutor.getCorePoolSize();
+    if (poolSize == currentSize) {
+      LOGGER.info("State transition thread pool size unchanged at: {}", poolSize);
+      return;
+    }
+    // When increasing size, set max first; when decreasing, set core first
+    if (poolSize > currentSize) {
+      _threadPoolExecutor.setMaximumPoolSize(poolSize);
+      _threadPoolExecutor.setCorePoolSize(poolSize);
+    } else {
+      _threadPoolExecutor.setCorePoolSize(poolSize);
+      _threadPoolExecutor.setMaximumPoolSize(poolSize);
+    }
+    LOGGER.info("Adjusted state transition thread pool size from {} to {}", currentSize, poolSize);
   }
 
   /**
@@ -198,20 +259,13 @@ public class DefaultStateTransitionThreadPoolManager implements StateTransitionT
   // Only override this method but not other two. It doesn't matter since this override is sufficient to cover all
   // messages so that all messages go to this executor service
   @Override
-  @Nullable
   public ExecutorService getExecutorService(String resourceName) {
-    if (_executorService == null) {
-      LOGGER.warn("Executor service not initialized yet. State transition for resource {} will use Helix default pool.",
-          resourceName);
-    }
     return _executorService;
   }
 
   @Override
   public void shutdown() {
-    if (_executorService != null) {
-      _executorService.shutdown();
-    }
+    _executorService.shutdown();
   }
 
   private static class ContextualStateTransitionExecutor extends DecoratorExecutorService {
