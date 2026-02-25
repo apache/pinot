@@ -101,7 +101,7 @@ public class DefaultStateTransitionThreadPoolManager
       @Nullable HelixManager helixManager) {
     _serverConf = serverConf;
     _helixManager = helixManager;
-    int defaultSize = org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_STATE_TRANSITION_THREAD_POOL_SIZE;
+    int defaultSize = CommonConstants.Server.DEFAULT_STATE_TRANSITION_THREAD_POOL_SIZE;
     _threadPoolExecutor = new ThreadPoolExecutor(defaultSize, defaultSize, 0L, TimeUnit.MILLISECONDS,
         new LinkedBlockingQueue<>(), new ThreadFactoryBuilder().setNameFormat("state-transition-%d").build());
     _executorService = new ContextualStateTransitionExecutor(_threadPoolExecutor);
@@ -170,10 +170,10 @@ public class DefaultStateTransitionThreadPoolManager
   private int determinePoolSize() {
     // 1. Check Pinot config first (highest precedence)
     if (_serverConf.containsKey(
-        org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE)) {
+        CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE)) {
       int poolSize = _serverConf.getProperty(
-          org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE,
-          org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_STATE_TRANSITION_THREAD_POOL_SIZE);
+          CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE,
+          CommonConstants.Server.DEFAULT_STATE_TRANSITION_THREAD_POOL_SIZE);
       LOGGER.info("Using state transition thread pool size from Pinot config: {}", poolSize);
       return poolSize;
     }
@@ -184,13 +184,13 @@ public class DefaultStateTransitionThreadPoolManager
       if (legacyPoolSize != null) {
         LOGGER.info("Using state transition thread pool size from legacy Helix config: {}. "
                 + "Consider migrating to Pinot config: {}", legacyPoolSize,
-            org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE);
+            CommonConstants.Server.CONFIG_OF_STATE_TRANSITION_THREAD_POOL_SIZE);
         return legacyPoolSize;
       }
     }
 
     // 3. Use default
-    int defaultSize = org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_STATE_TRANSITION_THREAD_POOL_SIZE;
+    int defaultSize = CommonConstants.Server.DEFAULT_STATE_TRANSITION_THREAD_POOL_SIZE;
     LOGGER.info("Using default state transition thread pool size: {}", defaultSize);
     return defaultSize;
   }
