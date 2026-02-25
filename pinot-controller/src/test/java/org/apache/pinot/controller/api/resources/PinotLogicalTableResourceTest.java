@@ -335,7 +335,8 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testLogicalTablePhysicalTableConfigValidation() {
+  public void testLogicalTablePhysicalTableConfigValidation()
+      throws IOException {
     // Test empty physical table names is not allowed
     Throwable throwable = expectThrows(IOException.class, () -> {
       LogicalTableConfig tableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(), BROKER_TENANT);
@@ -345,6 +346,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
         throwable.getMessage());
 
     // Test all table names are physical table names and none is hybrid table name
+    addDummySchema(LOGICAL_TABLE_NAME);
     throwable = expectThrows(IOException.class, () -> {
       List<String> physicalTableNames = List.of("test_table_1");
       LogicalTableConfig logicalTableConfig =
