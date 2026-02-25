@@ -263,7 +263,7 @@
     <curator.version>5.9.0</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.83</bouncycastle.version>
-    <aircompressor.version>0.27</aircompressor.version>
+    <aircompressor.version>2.0.3</aircompressor.version>
     <jna.version>5.18.1</jna.version>
     <jnr-ffi.version>2.2.18</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
