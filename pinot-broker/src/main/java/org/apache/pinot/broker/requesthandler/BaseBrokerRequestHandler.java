@@ -273,12 +273,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   protected void validatePhysicalTablesWithMultiClusterRouting(Set<String> tableNames,
       Map<String, String> queryOptions) {
-    // Check if multi-cluster routing is enabled
+    Preconditions.checkNotNull(tableNames, "Table names cannot be null when validating multi-cluster routing");
+    Preconditions.checkNotNull(queryOptions, "Query options cannot be null");
     boolean isMultiClusterRoutingEnabled = queryOptions.containsKey(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING)
         && Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING));
 
-    if (isMultiClusterRoutingEnabled && tableNames != null) {
-      // Validate each table - physical tables cannot be queried with multi-cluster routing
+    if (isMultiClusterRoutingEnabled) {
       for (String tableName : tableNames) {
         if (!_tableCache.isLogicalTable(tableName)) {
           throw QueryErrorCode.QUERY_VALIDATION.asException(
