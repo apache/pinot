@@ -291,4 +291,33 @@ public class ControllerConfTest {
   private String getRandomString() {
     return RandomStringUtils.randomAlphanumeric(5);
   }
+
+  @Test
+  public void testTaskQueueBoundingConfigDefaults() {
+    ControllerConf conf = new ControllerConf();
+
+    // Verify default values
+    Assert.assertEquals(conf.getPinotTaskExpireTimeInMs(), 24 * 60 * 60 * 1000L);
+    Assert.assertEquals(conf.getPinotTaskTerminalStateExpireTimeInMs(), 72 * 60 * 60 * 1000L);
+    Assert.assertEquals(conf.getPinotTaskQueueMaxSize(), -1);
+    Assert.assertEquals(conf.getPinotTaskQueueMaxDeletesPerCycle(), 100);
+    Assert.assertEquals(conf.getPinotTaskQueueCapacity(), -1);
+    Assert.assertEquals(conf.getPinotTaskQueueWarningThreshold(), 5000);
+  }
+
+  @Test
+  public void testTaskQueueBoundingConfigCustomValues() {
+    ControllerConf conf = new ControllerConf();
+    conf.setProperty(PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS, 48 * 60 * 60 * 1000L);
+    conf.setProperty(PINOT_TASK_QUEUE_MAX_SIZE, 5000);
+    conf.setProperty(PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE, 100);
+    conf.setProperty(PINOT_TASK_QUEUE_CAPACITY, 10000);
+    conf.setProperty(PINOT_TASK_QUEUE_WARNING_THRESHOLD, 8000);
+
+    Assert.assertEquals(conf.getPinotTaskTerminalStateExpireTimeInMs(), 48 * 60 * 60 * 1000L);
+    Assert.assertEquals(conf.getPinotTaskQueueMaxSize(), 5000);
+    Assert.assertEquals(conf.getPinotTaskQueueMaxDeletesPerCycle(), 100);
+    Assert.assertEquals(conf.getPinotTaskQueueCapacity(), 10000);
+    Assert.assertEquals(conf.getPinotTaskQueueWarningThreshold(), 8000);
+  }
 }
