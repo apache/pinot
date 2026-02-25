@@ -165,6 +165,11 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
   }
 
+  /** When true, use JsonIndexDistinctOperator for SELECT DISTINCT jsonExtractIndex(...) instead of default DistinctOperator. */
+  public static boolean isUseJsonIndexDistinct(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_JSON_INDEX_DISTINCT));
+  }
+
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }

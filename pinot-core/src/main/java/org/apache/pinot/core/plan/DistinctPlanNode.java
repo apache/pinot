@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
 import org.apache.pinot.core.operator.query.JsonIndexDistinctOperator;
@@ -74,9 +75,10 @@ public class DistinctPlanNode implements PlanNode {
       }
     }
 
-    // POC: Use JSON index directly for DISTINCT jsonExtractIndex (avoids doc scan)
-    if (expressions.size() == 1) {
+    // Use JSON index directly for DISTINCT jsonExtractIndex when query option useJsonIndexDistinct=true
+    if (QueryOptionsUtils.isUseJsonIndexDistinct(_queryContext.getQueryOptions()) && expressions.size() == 1) {
       ExpressionContext expr = expressions.get(0);
+      //Similar logic for Inverted Index use InvertedIndexDistinctoperator
       if (JsonIndexDistinctOperator.canUseJsonIndexDistinct(_indexSegment, expr)) {
         BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
         return new JsonIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator);
