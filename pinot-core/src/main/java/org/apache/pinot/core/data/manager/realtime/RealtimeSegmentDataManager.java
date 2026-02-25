@@ -1876,8 +1876,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     //     TODO: Revisit the non-pauseless handling
     if (_partitionUpsertMetadataManager != null) {
       UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
-      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit()
-          || (!upsertContext.hasInconsistentTableConfigs())) {
+      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit() || !upsertContext.hasInconsistentTableConfigs()) {
         return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
       }
       return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY

@@ -145,13 +145,13 @@
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.2</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.21.0</jackson.version>
+    <jackson.version>2.21.1</jackson.version>
     <zookeeper.version>3.9.4</zookeeper.version>
-    <async-http-client.version>3.0.6</async-http-client.version>
+    <async-http-client.version>3.0.7</async-http-client.version>
     <jersey.version>2.47</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.31.0</swagger-ui.version>
+    <swagger-ui.version>5.31.2</swagger-ui.version>
     <hadoop.version>3.4.2</hadoop.version>
     <jsonpath.version>2.10.0</jsonpath.version>
     <jsonsmart.version>2.6.0</jsonsmart.version>
@@ -165,7 +165,7 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.38</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
-    <zstd-jni.version>1.5.7-6</zstd-jni.version>
+    <zstd-jni.version>1.5.7-7</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.22.0</libthrift.verion>
     <log4j.version>2.25.3</log4j.version>
@@ -178,9 +178,9 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.41.19</aws.sdk.version>
+    <aws.sdk.version>2.42.0</aws.sdk.version>
     <azure.sdk.version>1.3.4</azure.sdk.version>
-    <azure.msal4j.version>1.23.1</azure.msal4j.version>
+    <azure.msal4j.version>1.24.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <ayza.version>10.0.3</ayza.version>
@@ -188,17 +188,16 @@
     <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
     <scala-xml.version>2.4.0</scala-xml.version>
     <fmpp.version>0.9.16</fmpp.version>
-    <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <enforcer-api.version>3.6.2</enforcer-api.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.8</spark3.version>
-    <kafka2.version>2.8.2</kafka2.version>
-    <kafka3.version>3.9.1</kafka3.version>
+    <kafka3.version>3.9.2</kafka3.version>
+    <kafka4.version>4.1.1</kafka4.version>
     <confluent.version>7.9.5</confluent.version>
-    <pulsar.version>4.0.8</pulsar.version>
+    <pulsar.version>4.0.9</pulsar.version>
     <flink.version>1.20.3</flink.version>
 
     <!-- Apache Commons Libraries -->
@@ -235,15 +234,15 @@
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
     <httpclient5.version>5.6</httpclient5.version>
-    <httpcore5.version>5.4</httpcore5.version>
+    <httpcore5.version>5.4.1</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.8</protobuf.version>
-    <grpc.version>1.78.0</grpc.version>
+    <grpc.version>1.79.0</grpc.version>
     <google.cloud.libraries.version>26.74.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
-    <google.errorprone.version>2.46.0</google.errorprone.version>
+    <google.errorprone.version>2.47.0</google.errorprone.version>
     <google.j2objc.version>3.1</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -257,7 +256,7 @@
     <jline.version>3.30.6</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>10.7</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>10.8</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.4</dnsjava.version>
     <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
     <woodstox.version>7.1.1</woodstox.version>
@@ -270,21 +269,21 @@
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.9.1</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
-    <kotlin.stdlib.version>2.3.0</kotlin.stdlib.version>
-    <jetbrains.annotations.version>26.0.2-1</jetbrains.annotations.version>
+    <kotlin.stdlib.version>2.3.10</kotlin.stdlib.version>
+    <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
     <okio.version>3.16.4</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.5</objenesis.version>
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
-    <c3p0.version>0.11.2</c3p0.version>
-    <mchange-commons-java.version>0.3.2</mchange-commons-java.version>
-    <checker-qual.version>3.53.0</checker-qual.version>
+    <c3p0.version>0.12.0</c3p0.version>
+    <mchange-commons-java.version>0.4.0</mchange-commons-java.version>
+    <checker-qual.version>3.53.1</checker-qual.version>
     <groovy-all.version>2.4.21</groovy-all.version>
     <xml-apis.version>2.0.2</xml-apis.version>
-    <roaring-bitmap.version>1.3.0</roaring-bitmap.version>
-    <prometheus.jmx-exporter-javaagent.version>0.19.0</prometheus.jmx-exporter-javaagent.version>
+    <roaring-bitmap.version>1.6.10</roaring-bitmap.version>
+    <prometheus.jmx-exporter-javaagent.version>0.20.0</prometheus.jmx-exporter-javaagent.version>
     <fastutil.version>8.5.18</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
     <snakeyaml.version>2.5</snakeyaml.version>
@@ -305,9 +304,9 @@
 
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
-    <mockito-core.version>5.17.0</mockito-core.version>
+    <mockito-core.version>5.21.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
-    <testcontainers.version>1.21.3</testcontainers.version>
+    <testcontainers.version>2.0.3</testcontainers.version>
     <h2.version>2.4.240</h2.version>
     <jnr-posix.version>3.1.21</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
@@ -676,12 +675,12 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-2.0</artifactId>
+        <artifactId>pinot-kafka-3.0</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-3.0</artifactId>
+        <artifactId>pinot-kafka-4.0</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -1752,12 +1751,12 @@
       <dependency>
         <groupId>org.apache.kafka</groupId>
         <artifactId>kafka-clients</artifactId>
-        <version>${kafka2.version}</version>
+        <version>${kafka3.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.kafka</groupId>
         <artifactId>kafka_${scala.compat.version}</artifactId>
-        <version>${kafka2.version}</version>
+        <version>${kafka3.version}</version>
       </dependency>
 
       <dependency>
@@ -2531,7 +2530,7 @@
         <plugin>
           <groupId>org.eclipse.sisu</groupId>
           <artifactId>sisu-maven-plugin</artifactId>
-          <version>0.9.0.M4</version>
+          <version>1.0.0</version>
           <executions>
             <execution>
               <goals>
@@ -2923,6 +2922,9 @@
 
                 <!-- Solve NoClassDefFoundError. Borrowed from https://github.com/prometheus/jmx_exporter/issues/802 -->
                 <exclude>META-INF/versions/9/org/yaml/snakeyaml/internal/**</exclude>
+
+                <!-- Exclude NettyInstance because it includes Netty package literals -->
+                <exclude>src/main/java/org/apache/pinot/core/transport/NettyInstance.java</exclude>
               </excludes>
             </filter>
           </filters>

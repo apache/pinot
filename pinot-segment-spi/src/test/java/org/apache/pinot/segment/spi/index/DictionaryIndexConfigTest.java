@@ -35,7 +35,7 @@ public class DictionaryIndexConfigTest {
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isOnHeap(), "Unexpected onHeap");
-    assertFalse(config.getUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
+    assertFalse(config.isUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
   }
 
   @Test
@@ -46,7 +46,7 @@ public class DictionaryIndexConfigTest {
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isOnHeap(), "Unexpected onHeap");
-    assertFalse(config.getUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
+    assertFalse(config.isUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
   }
 
   @Test
@@ -57,7 +57,7 @@ public class DictionaryIndexConfigTest {
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isOnHeap(), "Unexpected onHeap");
-    assertFalse(config.getUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
+    assertFalse(config.isUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
   }
 
   @Test
@@ -68,7 +68,7 @@ public class DictionaryIndexConfigTest {
 
     assertTrue(config.isDisabled(), "Unexpected disabled");
     assertFalse(config.isOnHeap(), "Unexpected onHeap");
-    assertFalse(config.getUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
+    assertFalse(config.isUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
   }
 
   @Test
@@ -82,6 +82,6 @@ public class DictionaryIndexConfigTest {
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertTrue(config.isOnHeap(), "Unexpected onHeap");
-    assertTrue(config.getUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
+    assertTrue(config.isUseVarLengthDictionary(), "Unexpected useVarLengthDictionary");
   }
 }

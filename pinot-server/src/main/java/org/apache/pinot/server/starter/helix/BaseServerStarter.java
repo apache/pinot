@@ -87,6 +87,7 @@ import org.apache.pinot.core.data.manager.realtime.ServerRateLimitConfigChangeLi
 import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.NettyInspector;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
@@ -295,6 +296,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
     initTransitionThreadPoolManager();
+
+    NettyInspector.logAllChecks();
   }
 
   /**
@@ -750,9 +753,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
+    KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate =
+        KeepPipelineBreakerStatsPredicate.create(_serverConf);
     _serverInstance =
         new ServerInstance(serverConf, _instanceId, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
-            _threadAccountant, sendStatsPredicate, _reloadJobStatusCache);
+            _threadAccountant, sendStatsPredicate, keepPipelineBreakerStatsPredicate, _reloadJobStatusCache);
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
@@ -792,6 +797,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottler);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
 
     if (sendStatsPredicate.needWatchForInstanceConfigChange()) {
       LOGGER.info("Initializing and registering the SendStatsPredicate");
@@ -906,6 +912,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } else {
       _serverMetrics.addTimedValue(ServerTimer.STARTUP_FAILURE_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
     }
+
+    NettyInspector.registerMetrics(_serverMetrics);
   }
 
   protected SegmentMultiColTextIndexPreprocessThrottler createMultiColumnIndexPreprocessThrottler() {

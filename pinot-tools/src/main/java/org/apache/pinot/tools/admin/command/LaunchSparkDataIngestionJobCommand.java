@@ -74,7 +74,7 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   // Kafka plugins need to be excluded as they contain scala dependencies which cause
   // NoSuchMethodErrors with runtime spark.
   // It is also fine to exclude Kafka plugins as they are not going to be used in batch ingestion in any case
-  @CommandLine.Option(names = {"-pluginsToExclude"}, defaultValue = "pinot-kafka-0.9:pinot-kafka-2.0", required =
+  @CommandLine.Option(names = {"-pluginsToExclude"}, defaultValue = "pinot-kafka-3.0", required =
       false, arity = "1..*", split = ":", description =
       "List " + "of plugin name separated by : to not load at runtime. e.g. pinto-s3:pinot-parquet")
   private List<String> _pluginsToExclude;

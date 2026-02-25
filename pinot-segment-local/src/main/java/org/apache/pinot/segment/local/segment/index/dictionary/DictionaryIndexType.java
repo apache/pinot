@@ -106,7 +106,7 @@ public class DictionaryIndexType
   @Override
   public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
-    if (dictionaryConfig.isEnabled() && dictionaryConfig.getUseVarLengthDictionary()) {
+    if (dictionaryConfig.isEnabled() && dictionaryConfig.isUseVarLengthDictionary()) {
       DataType storedType = fieldSpec.getDataType().getStoredType();
       Preconditions.checkState(!storedType.isFixedWidth(),
           "Cannot create var-length dictionary on column: %s of fixed-width stored type: %s", fieldSpec.getName(),
@@ -161,7 +161,7 @@ public class DictionaryIndexType
   }
 
   public boolean shouldUseVarLengthDictionary(IndexCreationContext context, DictionaryIndexConfig indexConfig) {
-    if (indexConfig.getUseVarLengthDictionary()) {
+    if (indexConfig.isUseVarLengthDictionary()) {
       return true;
     }
     DataType storedType = context.getFieldSpec().getDataType().getStoredType();

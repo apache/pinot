@@ -350,4 +350,19 @@ public class MinionTaskUtilsTest {
         BatchConfigProperties.SegmentPushType.TAR.toString());
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI), "http://localhost:9000");
   }
+
+  @Test
+  public void testGetPushTaskConfigMETADATAPushModeWithLocalOutputDir() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.toString());
+    taskConfig.put(MinionTaskUtils.ALLOW_METADATA_PUSH_WITH_LOCAL_FS, "true");
+    Map<String, String> pushTaskConfigs = MinionTaskUtils.getPushTaskConfig(_tableConfig.getTableName(), taskConfig,
+        getMockClusterInfo("/data/dir", "http://localhost:9000"));
+
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI), "/data/dir/myTable");
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_MODE),
+        BatchConfigProperties.SegmentPushType.METADATA.toString());
+    assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI), "http://localhost:9000");
+    assertEquals(pushTaskConfigs.size(), 4);
+  }
 }

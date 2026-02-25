@@ -190,7 +190,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     _tableName = tableName;
   }
 
-  private TableTaskConfig getPurgeTaskConfig() {
+  protected TableTaskConfig getPurgeTaskConfig() {
     Map<String, String> tableTaskConfigs = new HashMap<>();
     tableTaskConfigs.put(MinionConstants.PurgeTask.LAST_PURGE_TIME_THREESOLD_PERIOD, "1d");
     return new TableTaskConfig(Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));

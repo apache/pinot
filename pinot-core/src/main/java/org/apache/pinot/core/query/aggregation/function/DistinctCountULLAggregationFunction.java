@@ -377,9 +377,10 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     return ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Comparable extractFinalResult(UltraLogLog intermediateResult) {
-    return Math.round(intermediateResult.getDistinctCountEstimate());
+  public Comparable extractFinalResult(@Nullable UltraLogLog intermediateResult) {
+    return intermediateResult == null ? 0L : Math.round(intermediateResult.getDistinctCountEstimate());
   }
 
   @Override
