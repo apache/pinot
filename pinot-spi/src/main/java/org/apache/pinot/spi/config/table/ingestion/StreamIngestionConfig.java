@@ -62,6 +62,9 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Class to handle realtime offset auto reset")
   private String _realtimeOffsetAutoResetHandlerClass;
 
+  @JsonPropertyDescription("Whether to skip topics that don't exist during partition metadata fetch")
+  private boolean _skipMissingTopics;
+
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
     _streamConfigMaps = streamConfigMaps;
@@ -135,5 +138,13 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setRealtimeOffsetAutoResetHandlerClass(String realtimeOffsetAutoResetHandlerClass) {
     _realtimeOffsetAutoResetHandlerClass = realtimeOffsetAutoResetHandlerClass;
+  }
+
+  public boolean isSkipMissingTopics() {
+    return _skipMissingTopics;
+  }
+
+  public void setSkipMissingTopics(boolean skipMissingTopics) {
+    _skipMissingTopics = skipMissingTopics;
   }
 }

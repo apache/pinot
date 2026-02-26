@@ -351,4 +351,17 @@ public final class IngestionConfigUtils {
     }
     return streamIndexToPartitions;
   }
+
+  /**
+   * Returns whether to skip missing topics during partition metadata fetch.
+   * @param tableConfig the table config
+   * @return true if missing topics should be skipped, false otherwise
+   */
+  public static boolean getSkipMissingTopics(TableConfig tableConfig) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null && ingestionConfig.getStreamIngestionConfig() != null) {
+      return ingestionConfig.getStreamIngestionConfig().isSkipMissingTopics();
+    }
+    return false;
+  }
 }

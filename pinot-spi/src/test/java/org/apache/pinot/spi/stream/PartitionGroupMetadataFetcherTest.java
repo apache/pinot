@@ -65,7 +65,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList(), false);
+          streamConfigs, statusList, Collections.emptyList(), false, false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -99,7 +99,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList(), false);
+          streamConfigs, statusList, Collections.emptyList(), false, false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -140,7 +140,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList(), false);
+          streamConfigs, statusList, Collections.emptyList(), false, false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -192,7 +192,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Arrays.asList(1), false);
+          streamConfigs, statusList, Arrays.asList(1), false, false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -262,7 +262,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(streamConfig3)).thenReturn(factory3);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList(), false);
+          streamConfigs, statusList, Collections.emptyList(), false, false);
 
       // Execute and verify exception is thrown
       try {
@@ -307,7 +307,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList(), false);
+          streamConfigs, statusList, Collections.emptyList(), false, false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -371,7 +371,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(streamConfig3)).thenReturn(factory3);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList(), false);
+          streamConfigs, statusList, Collections.emptyList(), false, false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -421,7 +421,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList(), false);
+          streamConfigs, statusList, Collections.emptyList(), false, false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -475,7 +475,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList(), false);
+          streamConfigs, statusList, Collections.emptyList(), false, false);
 
       // Execute
       Boolean result = fetcher.call();

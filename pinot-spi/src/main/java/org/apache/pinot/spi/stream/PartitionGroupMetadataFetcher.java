@@ -38,6 +38,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private final List<StreamConfig> _streamConfigs;
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
   private final boolean _forceGetOffsetFromStream;
+  private final boolean _skipMissingTopics;
   private final List<PartitionGroupMetadata> _newPartitionGroupMetadataList = new ArrayList<>();
   private final List<Integer> _pausedTopicIndices;
 
@@ -45,10 +46,11 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
   public PartitionGroupMetadataFetcher(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, List<Integer> pausedTopicIndices,
-      boolean forceGetOffsetFromStream) {
+      boolean forceGetOffsetFromStream, boolean skipMissingTopics) {
     _streamConfigs = streamConfigs;
     _partitionGroupConsumptionStatusList = partitionGroupConsumptionStatusList;
     _forceGetOffsetFromStream = forceGetOffsetFromStream;
+    _skipMissingTopics = skipMissingTopics;
     _pausedTopicIndices = pausedTopicIndices;
   }
 
@@ -130,10 +132,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
         // Check if the topic exists before fetching partition metadata
         // Only perform this check if topic existence validation is enabled and topics were fetched
-        boolean skipMissingTopics = Boolean.parseBoolean(
-            streamConfig.getStreamConfigsMap()
-                .getOrDefault(StreamConfigProperties.SKIP_MISSING_TOPICS, "false"));
-        if (skipMissingTopics && availableTopicNames != null && !availableTopicNames.contains(topicName)) {
+        if (_skipMissingTopics && availableTopicNames != null && !availableTopicNames.contains(topicName)) {
           LOGGER.warn("Topic {} does not exist. Skipping this topic from ingestion.", topicName);
           continue;
         }
@@ -166,21 +165,16 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
   /**
    * Fetches available topic names from the stream provider.
-   * Uses the first stream config that has topic existence check enabled.
+   * Uses the first stream config to fetch topics.
    *
-   * @return Set of available topic names, or null if topics could not be fetched
+   * @return Set of available topic names, or null if topics could not be fetched or skip missing topics is disabled
    */
   private Set<String> fetchAvailableTopicNames() {
-    // Find first stream config with topic existence check enabled
-    StreamConfig streamConfigForTopicFetch = _streamConfigs.stream()
-        .filter(config -> Boolean.parseBoolean(
-            config.getStreamConfigsMap().getOrDefault(StreamConfigProperties.SKIP_MISSING_TOPICS, "false")))
-        .findFirst()
-        .orElse(null);
-
-    if (streamConfigForTopicFetch == null) {
+    if (!_skipMissingTopics || _streamConfigs.isEmpty()) {
       return null;
     }
+
+    StreamConfig streamConfigForTopicFetch = _streamConfigs.get(0);
 
     String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-topicFetch-"
         + streamConfigForTopicFetch.getTableNameWithType();
