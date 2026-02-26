@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
@@ -195,7 +196,8 @@ public class TableConfigsRestletResource {
   @ManualAuthorization // performed after parsing table configs
   public ConfigSuccessResponse addConfig(
       String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
+          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders httpHeaders, @Context Request request)
@@ -362,7 +364,8 @@ public class TableConfigsRestletResource {
   public ConfigSuccessResponse updateConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
       String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
+          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload,
@@ -447,7 +450,8 @@ public class TableConfigsRestletResource {
   @ApiOperation(value = "Validate the TableConfigs", notes = "Validate the TableConfigs")
   @ManualAuthorization // performed after parsing TableConfigs
   public String validateConfig(String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
+          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
@@ -484,6 +488,11 @@ public class TableConfigsRestletResource {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
 
+
+  /**
+   * Validates the provided TableConfigs. Hybrid table validation is performed only on the provided
+   * configs and does not check for conflicts with existing tables in the cluster.
+   */
   private void validateConfig(TableConfigs tableConfigs, String database, @Nullable String typesToSkip) {
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), database);
     TableConfig offlineTableConfig = tableConfigs.getOffline();
@@ -500,6 +509,8 @@ public class TableConfigsRestletResource {
       Preconditions.checkState(rawTableName.equals(schemaName),
           "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
       SchemaUtils.validate(schema);
+      // Parse validation types to skip using TableConfigUtils method
+      Set<TableConfigUtils.ValidationType> skipTypes = TableConfigUtils.parseTypesToSkipString(typesToSkip);
       if (offlineTableConfig != null) {
         String offlineRawTableName = DatabaseUtils.translateTableName(
             TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName()), database);
@@ -507,6 +518,17 @@ public class TableConfigsRestletResource {
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
         TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip);
+        if (!skipTypes.contains(TableConfigUtils.ValidationType.ALL)) {
+          if (!skipTypes.contains(TableConfigUtils.ValidationType.TENANT)) {
+            _pinotHelixResourceManager.validateTableTenantConfig(offlineTableConfig);
+          }
+          if (!skipTypes.contains(TableConfigUtils.ValidationType.MINION_INSTANCES)) {
+            _pinotHelixResourceManager.validateTableTaskMinionInstanceTagConfig(offlineTableConfig);
+          }
+          if (!skipTypes.contains(TableConfigUtils.ValidationType.ACTIVE_TASKS)) {
+            PinotTableRestletResource.tableTasksValidation(offlineTableConfig, _pinotHelixTaskResourceManager);
+          }
+        }
         TaskConfigUtils.validateTaskConfigs(tableConfigs.getOffline(), schema, _pinotTaskManager, typesToSkip);
       }
       if (realtimeTableConfig != null) {
@@ -516,6 +538,17 @@ public class TableConfigsRestletResource {
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
         TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip);
+        if (!skipTypes.contains(TableConfigUtils.ValidationType.ALL)) {
+          if (!skipTypes.contains(TableConfigUtils.ValidationType.TENANT)) {
+            _pinotHelixResourceManager.validateTableTenantConfig(realtimeTableConfig);
+          }
+          if (!skipTypes.contains(TableConfigUtils.ValidationType.MINION_INSTANCES)) {
+            _pinotHelixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+          }
+          if (!skipTypes.contains(TableConfigUtils.ValidationType.ACTIVE_TASKS)) {
+            PinotTableRestletResource.tableTasksValidation(realtimeTableConfig, _pinotHelixTaskResourceManager);
+          }
+        }
         TaskConfigUtils.validateTaskConfigs(tableConfigs.getRealtime(), schema, _pinotTaskManager, typesToSkip);
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {

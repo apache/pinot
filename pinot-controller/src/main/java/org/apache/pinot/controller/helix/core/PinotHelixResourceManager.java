@@ -1932,7 +1932,7 @@ public class PinotHelixResourceManager {
    * these parameters must be specified in the table config.
    */
   @VisibleForTesting
-  void validateTableTenantConfig(TableConfig tableConfig) {
+  public void validateTableTenantConfig(TableConfig tableConfig) {
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
     String tableNameWithType = tableConfig.getTableName();
     String brokerTag = tenantConfig.getBroker();
@@ -2001,7 +2001,7 @@ public class PinotHelixResourceManager {
    * The validation will run only when the task is set to be scheduled (has the schedule config param set).
    */
   @VisibleForTesting
-  void validateTableTaskMinionInstanceTagConfig(TableConfig tableConfig) {
+  public void validateTableTaskMinionInstanceTagConfig(TableConfig tableConfig) {
 
     List<InstanceConfig> allMinionWorkerInstanceConfigs = getAllMinionInstanceConfigs();
 

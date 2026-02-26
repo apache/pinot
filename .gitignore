@@ -106,3 +106,6 @@ hf_cache/
 # LangChain / LlamaIndex
 .langchain/
 .llamaindex/
+
+# Claude
+.claude/
