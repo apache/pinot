@@ -72,6 +72,7 @@ public final class TlsUtils {
   private static final String FILE_SCHEME_PREFIX = FILE_SCHEME + "://";
   private static final String FILE_SCHEME_PREFIX_WITHOUT_SLASH = FILE_SCHEME + ":";
   private static final String INSECURE = "insecure";
+  private static final String PROTOCOLS = "protocols";
 
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
   private static final Set<String> LOGGED_TLS_DIAGNOSTICS_KEYS = ConcurrentHashMap.newKeySet();
@@ -121,6 +122,14 @@ public final class TlsUtils {
         pinotConfig.getProperty(key(namespace, SSL_PROVIDER), defaultConfig.getSslProvider()));
     tlsConfig.setInsecure(
         pinotConfig.getProperty(key(namespace, INSECURE), defaultConfig.isInsecure()));
+
+    // Read allowed TLS protocols from config (e.g., "TLSv1.2,TLSv1.3")
+    String protocolsConfig = pinotConfig.getProperty(key(namespace, PROTOCOLS));
+    if (protocolsConfig != null && !protocolsConfig.isEmpty()) {
+      tlsConfig.setAllowedProtocols(protocolsConfig.split(","));
+    } else if (defaultConfig.getAllowedProtocols() != null) {
+      tlsConfig.setAllowedProtocols(defaultConfig.getAllowedProtocols());
+    }
 
     return tlsConfig;
   }
@@ -256,7 +265,6 @@ public final class TlsUtils {
       // HttpsURLConnection
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
       setSslContext(sc);
-      logTlsDiagnosticsOnce("https.default", sc, null, false);
     } catch (GenericSSLContextException | GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
@@ -326,6 +334,14 @@ public final class TlsUtils {
         SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
     sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
     sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
+
+    // Apply protocol restrictions if configured
+    String[] allowedProtocols = tlsConfig.getAllowedProtocols();
+    if (allowedProtocols != null && allowedProtocols.length > 0) {
+      sslContextBuilder.protocols(allowedProtocols);
+      LOGGER.debug("TLS client context restricted to protocols: {}", Arrays.toString(allowedProtocols));
+    }
+
     try {
       warnIfNonJdkProviderConfiguredInternal("netty.client", tlsConfig);
       return sslContextBuilder.build();
@@ -352,6 +368,14 @@ public final class TlsUtils {
     if (tlsConfig.isClientAuthEnabled()) {
       sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
     }
+
+    // Apply protocol restrictions if configured
+    String[] allowedProtocols = tlsConfig.getAllowedProtocols();
+    if (allowedProtocols != null && allowedProtocols.length > 0) {
+      sslContextBuilder.protocols(allowedProtocols);
+      LOGGER.debug("TLS server context restricted to protocols: {}", Arrays.toString(allowedProtocols));
+    }
+
     try {
       warnIfNonJdkProviderConfiguredInternal("netty.server", tlsConfig);
       return sslContextBuilder.build();
@@ -435,7 +459,7 @@ public final class TlsUtils {
       return;
     }
 
-    // Basic “what are we actually using at runtime?” visibility.
+    // Basic "what are we actually using at runtime?" visibility.
     LOGGER.info(
         "TLS diagnostics ({}): SSLContext protocol='{}', provider='{}', configuredSslProvider='{}', insecure={}",
         contextName, protocol, providerName, configuredSslProvider, insecure);
