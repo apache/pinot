@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.IdealState;
@@ -82,6 +81,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   private volatile boolean _untrackedSegmentDeletionEnabled;
   private volatile int _untrackedSegmentsRetentionTimeInDays;
   private final int _agedSegmentsDeletionBatchSize;
+  private volatile int _segmentsZKMetadataBatchSize;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
   private volatile boolean _isHybridTableRetentionStrategyEnabled;
@@ -96,6 +96,14 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     _untrackedSegmentDeletionEnabled = config.getUntrackedSegmentDeletionEnabled();
     _untrackedSegmentsRetentionTimeInDays = config.getUntrackedSegmentsRetentionTimeInDays();
     _agedSegmentsDeletionBatchSize = config.getAgedSegmentsDeletionBatchSize();
+    int configuredSegmentsZKMetadataBatchSize = config.getSegmentsZKMetadataBatchSize();
+    if (configuredSegmentsZKMetadataBatchSize > 0) {
+      _segmentsZKMetadataBatchSize = configuredSegmentsZKMetadataBatchSize;
+    } else {
+      _segmentsZKMetadataBatchSize = ZKMetadataProvider.DEFAULT_SEGMENTS_ZK_METADATA_BATCH_SIZE;
+      LOGGER.warn("Invalid configured segmentsZKMetadataBatchSize: {}, using default {}",
+          configuredSegmentsZKMetadataBatchSize, _segmentsZKMetadataBatchSize);
+    }
     _isHybridTableRetentionStrategyEnabled = config.isHybridTableRetentionStrategyEnabled();
     _brokerServiceHelper = brokerServiceHelper;
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}", getIntervalInSeconds());
@@ -176,19 +184,20 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy,
       int untrackedSegmentsDeletionBatchSize, RetentionStrategy untrackedSegmentsRetentionStrategy) {
-    List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
+    Set<String> segmentsPresentInZK = new HashSet<>();
+    List<String> segmentsToDelete = new ArrayList<>();
+    _pinotHelixResourceManager.forEachSegmentsZKMetadata(offlineTableName, _segmentsZKMetadataBatchSize,
+        segmentZKMetadata -> {
+          segmentsPresentInZK.add(segmentZKMetadata.getSegmentName());
+          if (retentionStrategy.isPurgeable(offlineTableName, segmentZKMetadata)) {
+            segmentsToDelete.add(segmentZKMetadata.getSegmentName());
+          }
+        });
 
     // fetch those segments that are beyond the retention period and don't have an entry in ZK i.e.
     // SegmentZkMetadata is missing for those segments
-    List<String> segmentsToDelete =
-        getSegmentsToDeleteFromDeepstore(offlineTableName, retentionStrategy, segmentZKMetadataList,
-            untrackedSegmentsDeletionBatchSize, untrackedSegmentsRetentionStrategy);
-
-    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-      if (retentionStrategy.isPurgeable(offlineTableName, segmentZKMetadata)) {
-        segmentsToDelete.add(segmentZKMetadata.getSegmentName());
-      }
-    }
+    segmentsToDelete.addAll(getSegmentsToDeleteFromDeepstore(offlineTableName, retentionStrategy, segmentsPresentInZK,
+        untrackedSegmentsDeletionBatchSize, untrackedSegmentsRetentionStrategy));
     if (!segmentsToDelete.isEmpty()) {
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), offlineTableName);
       _pinotHelixResourceManager.deleteSegments(offlineTableName, segmentsToDelete);
@@ -197,32 +206,34 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy,
       int untrackedSegmentsDeletionBatchSize, RetentionStrategy untrackedSegmentsRetentionStrategy) {
-    List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
-
-    // fetch those segments that are beyond the retention period and don't have an entry in ZK i.e.
-    // SegmentZkMetadata is missing for those segments
-    List<String> segmentsToDelete =
-        getSegmentsToDeleteFromDeepstore(realtimeTableName, retentionStrategy, segmentZKMetadataList,
-            untrackedSegmentsDeletionBatchSize, untrackedSegmentsRetentionStrategy);
+    Set<String> segmentsPresentInZK = new HashSet<>();
+    List<String> segmentsToDelete = new ArrayList<>();
 
     IdealState idealState = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName);
 
-    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-      String segmentName = segmentZKMetadata.getSegmentName();
-      if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
-        // Delete old LLC segment that hangs around. Do not delete segment that are current since there may be a race
-        // with RealtimeSegmentValidationManager trying to auto-create the LLC segment
-        if (shouldDeleteInProgressLLCSegment(segmentName, idealState, segmentZKMetadata)) {
-          segmentsToDelete.add(segmentName);
-        }
-      } else {
-        // Sealed segment
-        if (retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
-          segmentsToDelete.add(segmentName);
-        }
-      }
-    }
+    _pinotHelixResourceManager.forEachSegmentsZKMetadata(realtimeTableName, _segmentsZKMetadataBatchSize,
+        segmentZKMetadata -> {
+          String segmentName = segmentZKMetadata.getSegmentName();
+          segmentsPresentInZK.add(segmentName);
+          if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+            // Delete old LLC segment that hangs around. Do not delete segment that are current since there may be
+            // a race with RealtimeSegmentValidationManager trying to auto-create the LLC segment
+            if (shouldDeleteInProgressLLCSegment(segmentName, idealState, segmentZKMetadata)) {
+              segmentsToDelete.add(segmentName);
+            }
+          } else {
+            // Sealed segment
+            if (retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
+              segmentsToDelete.add(segmentName);
+            }
+          }
+        });
+
+    // fetch those segments that are beyond the retention period and don't have an entry in ZK i.e.
+    // SegmentZKMetadata is missing for those segments
+    segmentsToDelete.addAll(getSegmentsToDeleteFromDeepstore(realtimeTableName, retentionStrategy, segmentsPresentInZK,
+        untrackedSegmentsDeletionBatchSize, untrackedSegmentsRetentionStrategy));
 
     // Remove last sealed segments such that the table can still create new consuming segments if it's paused
     segmentsToDelete.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(realtimeTableName));
@@ -263,17 +274,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
           "Failed to determine a valid time boundary for table: " + offlineTableName);
 
       // Iterate over all COMPLETED segments of the REALTIME table and check if they are eligible for deletion.
-      for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)) {
-        // The segment should be in COMPLETED state
-        if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS
-            || segmentZKMetadata.getStatus() == Status.COMMITTING) {
-          continue;
-        }
-        // The segment should be older than the calculated time boundary
-        if (segmentZKMetadata.getEndTimeMs() < timeBoundaryMs) {
-          segmentsToDelete.add(segmentZKMetadata.getSegmentName());
-        }
-      }
+      _pinotHelixResourceManager.forEachSegmentsZKMetadata(realtimeTableName, _segmentsZKMetadataBatchSize,
+          segmentZKMetadata -> {
+            // The segment should be in COMPLETED state
+            if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS
+                || segmentZKMetadata.getStatus() == Status.COMMITTING) {
+              return;
+            }
+            // The segment should be older than the calculated time boundary
+            if (segmentZKMetadata.getEndTimeMs() < timeBoundaryMs) {
+              segmentsToDelete.add(segmentZKMetadata.getSegmentName());
+            }
+          });
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
       if (!segmentsToDelete.isEmpty()) {
         _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
@@ -310,7 +322,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   private List<String> getSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
-      List<SegmentZKMetadata> segmentZKMetadataList, int untrackedSegmentsDeletionBatchSize,
+      Set<String> segmentsPresentInZK, int untrackedSegmentsDeletionBatchSize,
       RetentionStrategy untrackedSegmentsRetentionStrategy) {
     List<String> segmentsToDelete = new ArrayList<>();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -341,26 +353,22 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return segmentsToDelete;
     }
 
-    Set<String> segmentsPresentInZK;
+    Set<String> segmentsToExcludeFromDeepstore;
     if (isHybridTable) {
-      segmentsPresentInZK = new HashSet<>();
-      // This must be the OFFLINE table
-      segmentsPresentInZK.addAll(
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet()));
+      segmentsToExcludeFromDeepstore = new HashSet<>(segmentsPresentInZK);
       // Add segments from the REALTIME table as well
-      segmentsPresentInZK.addAll(
+      segmentsToExcludeFromDeepstore.addAll(
           _pinotHelixResourceManager.getSegmentsFor(TableNameBuilder.REALTIME.tableNameWithType(rawTableName), false));
     } else {
-      segmentsPresentInZK =
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet());
+      segmentsToExcludeFromDeepstore = segmentsPresentInZK;
     }
 
     try {
       LOGGER.info("Fetch segments present in deep store that are beyond retention period for table: {}",
           tableNameWithType);
       segmentsToDelete =
-          findUntrackedSegmentsToDeleteFromDeepstore(tableNameWithType, retentionStrategy, segmentsPresentInZK,
-              untrackedSegmentsRetentionStrategy);
+          findUntrackedSegmentsToDeleteFromDeepstore(tableNameWithType, retentionStrategy,
+              segmentsToExcludeFromDeepstore, untrackedSegmentsRetentionStrategy);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.UNTRACKED_SEGMENTS_COUNT,
           segmentsToDelete.size());
 
@@ -530,6 +538,11 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
           clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS));
     }
 
+    if (changedConfigs.contains(ControllerConf.ControllerPeriodicTasksConf.SEGMENTS_ZK_METADATA_BATCH_SIZE)) {
+      updateSegmentsZKMetadataBatchSize(
+          clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.SEGMENTS_ZK_METADATA_BATCH_SIZE));
+    }
+
     if (changedConfigs.contains(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY)) {
       updateHybridTableRetentionStrategyEnabled(
           clusterConfigs.get(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY));
@@ -572,6 +585,24 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     } catch (NumberFormatException e) {
       LOGGER.warn("Invalid value for untrackedSegmentsRetentionTimeInDays: {}, keeping current value: {}", newValue,
           oldValue);
+    }
+  }
+
+  private void updateSegmentsZKMetadataBatchSize(String newValue) {
+    int oldValue = _segmentsZKMetadataBatchSize;
+    try {
+      int parsedValue = Integer.parseInt(newValue);
+      if (parsedValue <= 0) {
+        LOGGER.warn("Invalid value for segmentsZKMetadataBatchSize: {}, must be positive, keeping current value: {}",
+            parsedValue, oldValue);
+      } else if (oldValue == parsedValue) {
+        LOGGER.info("No change in segmentsZKMetadataBatchSize, current value: {}", oldValue);
+      } else {
+        _segmentsZKMetadataBatchSize = parsedValue;
+        LOGGER.info("Updated segmentsZKMetadataBatchSize from {} to {}", oldValue, parsedValue);
+      }
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid value for segmentsZKMetadataBatchSize: {}, keeping current value: {}", newValue, oldValue);
     }
   }
 
