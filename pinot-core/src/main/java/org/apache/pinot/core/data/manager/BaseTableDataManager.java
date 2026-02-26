@@ -65,7 +65,6 @@ import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
-import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
@@ -83,6 +82,7 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -110,6 +110,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -820,21 +821,24 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       // Use force commit to reload consuming segment
       if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-        // Force-committing consuming segments is enabled by default.
-        // For partial-upsert tables or upserts with out-of-order events enabled (notably when replication > 1),
-        // winner selection could incorrectly favor replicas with fewer consumed rows.
-        // This triggered unnecessary reconsumption and resulted in inconsistent upsert state.
-        // The new fix restores and correct segment metadata after inconsistencies are noticed.
-        // To toggle, existing Force commit behavior dynamically use the cluster config
-        // `pinot.server.upsert.force.commit.reload` without restarting servers.
+        // Force-committing consuming segments is restricted only for tables with inconsistent state configs
+        // (partial-upsert or dropOutOfOrderRecord=true with replication > 1).
+        // For these tables, winner selection could incorrectly favor replicas with fewer consumed rows,
+        // triggering unnecessary reconsumption and resulting in inconsistent upsert state.
+        // To enable force commit for such tables, change the cluster config
+        // `pinot.server.consuming.segment.consistency.mode` to PROTECTED for safer reload.
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-        UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
-        if (tableConfig != null && config.isForceCommitReloadAllowed(tableConfig)) {
+        ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
+        boolean hasInconsistentConfigs = TableConfigUtils.checkForInconsistentStateConfigs(tableConfig);
+        // Allow force commit if:
+        // 1. Table doesn't have inconsistent configs (non-upsert or standard upsert tables), OR
+        // 2. Consistency mode is PROTECTED or UNSAFE (isForceCommitAllowed = true)
+        if (tableConfig == null || (hasInconsistentConfigs && !config.isForceCommitAllowed())) {
+          _logger.warn("Skipping reload (force commit) on consuming segment: {} due to inconsistent state config. "
+              + "Change the cluster config: {} to `PROTECTED` for safer commit", segmentName, config.getConfigKey());
+        } else {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
           ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
-        } else {
-          _logger.warn("Skipping reload (force commit) on consuming segment: {} due to inconsistent state config. "
-              + "Control via cluster config: {}", segmentName, config.getConfigKey());
         }
       } else {
         _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);

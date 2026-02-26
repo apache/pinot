@@ -81,7 +81,6 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.data.Schema;
@@ -1877,9 +1876,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     //     TODO: Revisit the non-pauseless handling
     if (_partitionUpsertMetadataManager != null) {
       UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
-      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit() || (
-          upsertContext.getUpsertMode() != UpsertConfig.Mode.PARTIAL && !upsertContext.isDropOutOfOrderRecord()
-              && upsertContext.getOutOfOrderRecordColumn() == null)) {
+      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit() || !upsertContext.hasInconsistentTableConfigs()) {
         return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
       }
       return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY

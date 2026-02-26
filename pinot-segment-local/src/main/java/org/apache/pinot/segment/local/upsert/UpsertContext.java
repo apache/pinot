@@ -192,6 +192,16 @@ public class UpsertContext {
     return _tableIndexDir;
   }
 
+  /**
+   * Returns true if the table configuration has settings that can lead to inconsistent upsert metadata
+   * during segment replacement after force commit. This happens when:
+   * - Partial upsert is enabled (records need to be merged with previous values)
+   * - dropOutOfOrderRecord is enabled with NONE consistency mode (records may have been dropped)
+   */
+  public boolean hasInconsistentTableConfigs() {
+    return _dropOutOfOrderRecord || _outOfOrderRecordColumn != null || _partialUpsertHandler != null;
+  }
+
   @Override
   public String toString() {
     return new ToStringBuilder(this)

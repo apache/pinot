@@ -1628,10 +1628,8 @@ public final class TableConfigUtils {
     if (upsertConfig == null) {
       return false;
     }
-    return tableConfig.getReplication() > 1 && (
-        upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL
-            || (upsertConfig.isDropOutOfOrderRecord()
-            && upsertConfig.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
+    return tableConfig.getReplication() > 1 && (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL
+        || upsertConfig.isDropOutOfOrderRecord() || upsertConfig.getOutOfOrderRecordColumn() != null);
   }
 
   // enum of all the skip-able validation types.
