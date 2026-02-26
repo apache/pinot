@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
@@ -41,6 +42,9 @@ import static org.testng.Assert.*;
 
 public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtimeIngestionTest {
   private final static int FORCE_COMMIT_REBALANCE_TIMEOUT_MS = 600_000;
+  private final static int BASELINE_SERVERS = 1;
+  private final static int EXTRA_SERVERS_PER_TEST = 4;
+  private final static AtomicInteger NEXT_SERVER_ID = new AtomicInteger(BASELINE_SERVERS);
 
   @Override
   protected String getFailurePoint() {
@@ -115,13 +119,14 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       throws Exception {
     final String tenantA = tableConfig.getTenantConfig().getServer();
     final String tenantB = tenantA + "_new";
+    int serverIdStart = NEXT_SERVER_ID.getAndAdd(EXTRA_SERVERS_PER_TEST);
 
-    BaseServerStarter serverStarter0 = startOneServer(0);
-    BaseServerStarter serverStarter1 = startOneServer(1);
+    BaseServerStarter serverStarter0 = startOneServer(serverIdStart);
+    BaseServerStarter serverStarter1 = startOneServer(serverIdStart + 1);
     createServerTenant(tenantA, 0, 2);
 
-    BaseServerStarter serverStarter2 = startOneServer(2);
-    BaseServerStarter serverStarter3 = startOneServer(3);
+    BaseServerStarter serverStarter2 = startOneServer(serverIdStart + 2);
+    BaseServerStarter serverStarter3 = startOneServer(serverIdStart + 3);
     createServerTenant(tenantB, 0, 2);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     try {

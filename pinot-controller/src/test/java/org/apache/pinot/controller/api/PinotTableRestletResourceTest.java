@@ -1197,18 +1197,21 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     String taskName = taskInfo.values().iterator().next().getScheduledTaskNames().get(0);
     waitForTaskState(taskName, TaskState.IN_PROGRESS);
 
-    // stop the task queue to abort the task
+    // Stop the task queue to abort the task. Keep it stopped until table deletion is complete to avoid
+    // task transition races while cleanup deletes Helix job metadata.
     sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
         .forStopMinionTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
-    waitForTaskState(taskName, TaskState.STOPPED);
-    // resume the task queue again to avoid affecting other tests
-    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
-        .forResumeMinionTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
-
-    // Delete table - should succeed and clean up tasks
-    String deleteResponse = sendDeleteRequest(
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
-    assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
+    try {
+      waitForTaskState(taskName, TaskState.STOPPED);
+      // Delete table - should succeed and clean up tasks
+      String deleteResponse = sendDeleteRequest(
+          DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+      assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
+    } finally {
+      // Resume queue to avoid affecting other tests.
+      sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
+          .forResumeMinionTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
+    }
   }
 
   private static void waitForTaskState(String taskName, TaskState expectedState) {
