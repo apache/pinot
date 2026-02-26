@@ -685,6 +685,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kafka-3.0-microbatch</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-kinesis</artifactId>
         <version>${project.version}</version>
       </dependency>
