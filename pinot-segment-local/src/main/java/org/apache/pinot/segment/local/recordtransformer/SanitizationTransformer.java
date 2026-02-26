@@ -31,25 +31,23 @@ import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.StringUtil;
 
 
-/**
- * The {@code SanitizationTransformer} class will sanitize the values to follow certain rules including:
- * <ul>
- *   <li>No {@code null} characters in string values</li>
- *   <li>String values are within the length limit</li>
- * </ul>
- * <p>NOTE: should put this after the {@link DataTypeTransformer} so that all values follow the data types in
- * {@link FieldSpec}.
- * This uses the MaxLengthExceedStrategy in the {@link FieldSpec} to decide what to do when the value exceeds the max.
- * For TRIM_LENGTH, the value is trimmed to the max length.
- * For SUBSTITUTE_DEFAULT_VALUE, the value is replaced with the default null value string.
- * For ERROR, an exception is thrown and the record is skipped.
- * For NO_ACTION, the value is kept as is if no NULL_CHARACTER present else trimmed till NULL.
- * In the first 2 scenarios, this metric REALTIME_ROWS_SANITIZED can be tracked to know if a trimmed /
- * default record was persisted.
- * In the third scenario, this metric ROWS_WITH_ERRORS can be tracked  to know if a record was skipped.
- * In the last scenario, this metric REALTIME_ROWS_SANITIZED can be tracked to know if a record was trimmed
- * due to having a null character.
- */
+/// The `SanitizationTransformer` class will sanitize the values to follow certain rules including:
+/// - No `null` characters in string values
+/// - String/bytes values are within the length limit
+///
+/// NOTE: should put this after the [DataTypeTransformer] so that all values follow the data types in [FieldSpec].
+/// This uses the `MaxLengthExceedStrategy` in the [FieldSpec] to decide what to do when the value exceeds the max
+/// length:
+/// - TRIM_LENGTH: Trim value to the max length
+/// - SUBSTITUTE_DEFAULT_VALUE: Replace value with the default null value
+/// - ERROR: Throw exception when value doesn't conform with the rules
+/// - NO_ACTION: Keep the value as is if no `NULL_CHARACTER` presents, else trim till `NULL_CHARACTER`
+///
+/// In the first 2 scenarios, this metric `REALTIME_ROWS_SANITIZED` can be tracked to know if a trimmed / default record
+/// was persisted.
+/// In the third scenario, this metric `ROWS_WITH_ERRORS` can be tracked to know if a record was skipped.
+/// In the last scenario, this metric `REALTIME_ROWS_SANITIZED` can be tracked to know if a record was trimmed due to
+/// having a `NULL_CHARACTER`.
 public class SanitizationTransformer implements RecordTransformer {
   private static final String NULL_CHARACTER = "\0";
   private final Map<String, SanitizedColumnInfo> _columnToColumnInfoMap = new HashMap<>();
@@ -62,8 +60,7 @@ public class SanitizationTransformer implements RecordTransformer {
           MaxLengthExceedStrategy strategy = fieldSpec.getEffectiveMaxLengthExceedStrategy();
           if (dataType == DataType.STRING || strategy != MaxLengthExceedStrategy.NO_ACTION) {
             _columnToColumnInfoMap.put(fieldSpec.getName(),
-                new SanitizedColumnInfo(fieldSpec.getName(), fieldSpec.getEffectiveMaxLength(), strategy,
-                    fieldSpec.getDefaultNullValue()));
+                new SanitizedColumnInfo(fieldSpec.getEffectiveMaxLength(), strategy, fieldSpec.getDefaultNullValue()));
           }
         }
       }
@@ -132,7 +129,7 @@ public class SanitizationTransformer implements RecordTransformer {
         case TRIM_LENGTH:
           return Pair.of(sanitizedValue, true);
         case SUBSTITUTE_DEFAULT_VALUE:
-          return Pair.of(FieldSpec.getStringValue(sanitizedColumnInfo.getDefaultNullValue()), true);
+          return Pair.of((String) sanitizedColumnInfo.getDefaultNullValue(), true);
         case ERROR:
           index = value.indexOf(NULL_CHARACTER);
           if (index < 0) {
@@ -190,21 +187,15 @@ public class SanitizationTransformer implements RecordTransformer {
   }
 
   private static class SanitizedColumnInfo {
-    private final String _columnName;
     private final int _maxLength;
     private final MaxLengthExceedStrategy _maxLengthExceedStrategy;
     private final Object _defaultNullValue;
 
-    private SanitizedColumnInfo(String columnName, int maxLength, MaxLengthExceedStrategy maxLengthExceedStrategy,
+    private SanitizedColumnInfo(int maxLength, MaxLengthExceedStrategy maxLengthExceedStrategy,
         Object defaultNullValue) {
-      _columnName = columnName;
       _maxLength = maxLength;
       _maxLengthExceedStrategy = maxLengthExceedStrategy;
       _defaultNullValue = defaultNullValue;
-    }
-
-    public String getColumnName() {
-      return _columnName;
     }
 
     public int getMaxLength() {
