@@ -180,12 +180,14 @@ public class SegmentPurgerTest {
   }
 
   @Test
-  public void testSegmentPurgerWithCustomSegmentGeneratorConfig() {
+  public void testSegmentPurgerWithCustomSegmentGeneratorConfig()
+      throws Exception {
     SegmentPurger.RecordPurger recordPurger = row -> row.getValue(D1).equals(0);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_originalIndexDir);
 
     SegmentPurger segmentPurger =
         new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, null, null);
-    segmentPurger.initSegmentGeneratorConfig("currentSegmentName");
+    segmentPurger.initSegmentGeneratorConfig("currentSegmentName", segmentMetadata);
     assertEquals(segmentPurger.getSegmentGeneratorConfig().getSegmentName(), "currentSegmentName");
 
     String newSegmentName = "myTable_segment_001";
@@ -196,43 +198,51 @@ public class SegmentPurgerTest {
     SegmentPurger segmentPurger2 =
         new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, null,
             segmentGeneratorCustomConfigs);
-    segmentPurger2.initSegmentGeneratorConfig("currentSegmentName");
+    segmentPurger2.initSegmentGeneratorConfig("currentSegmentName", segmentMetadata);
     assertEquals(segmentPurger2.getSegmentGeneratorConfig().getSegmentName(), newSegmentName);
   }
 
   @Test
-  public void testStarTreeSkippedWhenDynamicCreationDisabled() {
-    // Table config has starTreeIndexConfigs but enableDynamicStarTreeCreation is false (default)
+  public void testStarTreeSkippedForSegmentWithoutStarTree()
+      throws Exception {
+    // Table config has starTreeIndexConfigs but the original segment has no star tree
+    // and enableDynamicStarTreeCreation is false (default). Star tree should NOT be added.
     TableConfig tableConfigWithStarTree = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME)
         .setStarTreeIndexConfigs(Collections.singletonList(
             new StarTreeIndexConfig(List.of(D1, D2), null, List.of("SUM__d2"), null, 10000)))
         .build();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_originalIndexDir);
+    // Original segment was created without star tree
+    assertNull(segmentMetadata.getStarTreeV2MetadataList());
 
     SegmentPurger.RecordPurger recordPurger = row -> row.getValue(D1).equals(0);
     SegmentPurger segmentPurger = new SegmentPurger(
         _originalIndexDir, PURGED_SEGMENT_DIR, tableConfigWithStarTree, _schema, recordPurger, null, null);
-    segmentPurger.initSegmentGeneratorConfig(SEGMENT_NAME);
+    segmentPurger.initSegmentGeneratorConfig(SEGMENT_NAME, segmentMetadata);
 
-    // Star tree should be skipped since enableDynamicStarTreeCreation is false
+    // Star tree should be skipped: segment didn't have it and enableDynamicStarTreeCreation is false
     assertNull(segmentPurger.getSegmentGeneratorConfig().getStarTreeIndexConfigs());
     assertFalse(segmentPurger.getSegmentGeneratorConfig().isEnableDefaultStarTree());
   }
 
   @Test
-  public void testStarTreeBuiltWhenDynamicCreationEnabled() {
-    // Table config has starTreeIndexConfigs and enableDynamicStarTreeCreation is true
+  public void testStarTreeAddedWhenDynamicCreationEnabled()
+      throws Exception {
+    // Table config has starTreeIndexConfigs, enableDynamicStarTreeCreation is true.
+    // Even though the segment has no star tree, it should be added because dynamic creation is enabled.
     TableConfig tableConfigWithStarTree = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME)
         .setStarTreeIndexConfigs(Collections.singletonList(
             new StarTreeIndexConfig(List.of(D1, D2), null, List.of("SUM__d2"), null, 10000)))
         .build();
     tableConfigWithStarTree.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_originalIndexDir);
 
     SegmentPurger.RecordPurger recordPurger = row -> row.getValue(D1).equals(0);
     SegmentPurger segmentPurger = new SegmentPurger(
         _originalIndexDir, PURGED_SEGMENT_DIR, tableConfigWithStarTree, _schema, recordPurger, null, null);
-    segmentPurger.initSegmentGeneratorConfig(SEGMENT_NAME);
+    segmentPurger.initSegmentGeneratorConfig(SEGMENT_NAME, segmentMetadata);
 
     // Star tree should be present since enableDynamicStarTreeCreation is true
     assertNotNull(segmentPurger.getSegmentGeneratorConfig().getStarTreeIndexConfigs());

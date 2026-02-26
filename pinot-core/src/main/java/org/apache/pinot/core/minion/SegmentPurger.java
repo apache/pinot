@@ -91,7 +91,7 @@ public class SegmentPurger {
         return null;
       }
 
-      initSegmentGeneratorConfig(segmentName);
+      initSegmentGeneratorConfig(segmentName, segmentMetadata);
 
       // Keep index creation time the same as original segment because both segments use the same raw data.
       // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
@@ -120,15 +120,18 @@ public class SegmentPurger {
   }
 
   @VisibleForTesting
-  void initSegmentGeneratorConfig(String segmentName) {
+  void initSegmentGeneratorConfig(String segmentName, SegmentMetadataImpl segmentMetadata) {
     _segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     _segmentGeneratorConfig.setOutDir(_workingDir.getPath());
 
-    // Skip star-tree index creation during purge unless enableDynamicStarTreeCreation is set.
-    // This prevents unintended star-tree creation when segments are rebuilt for compliance/purge purposes.
-    if (!_tableConfig.getIndexingConfig().isEnableDynamicStarTreeCreation()) {
+    // When enableDynamicStarTreeCreation is false and the segment doesn't already have star-tree, clear
+    // star-tree configs to prevent unintended addition. This is consistent with SegmentPreProcessor which
+    // skips all star-tree processing when enableDynamicStarTreeCreation is false.
+    // For segments that already have star-tree, the table config (already loaded by SegmentGeneratorConfig)
+    // is used as-is since it represents the config that originally created the star-tree.
+    if (!_tableConfig.getIndexingConfig().isEnableDynamicStarTreeCreation()
+        && segmentMetadata.getStarTreeV2MetadataList() == null) {
       _segmentGeneratorConfig.setStarTreeIndexConfigs(null);
-      _segmentGeneratorConfig.setEnableDefaultStarTree(false);
     }
 
     if (_segmentGeneratorCustomConfigs != null && StringUtils.isNotEmpty(
