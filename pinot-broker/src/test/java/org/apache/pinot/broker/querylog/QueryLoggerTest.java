@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
@@ -33,6 +34,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
@@ -337,6 +339,78 @@ public class QueryLoggerTest {
     String logLine = _infoLog.get(0);
     Assert.assertTrue(logLine.contains("queryHash=,"),
         "Expected empty queryHash field. Got: " + logLine);
+  }
+
+  @Test
+  public void shouldLogAtDebugWhenDroppedWithMarkerEnabled() {
+    // Given: rate limiter does not allow, logDroppedWithMarker is true
+    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter, "debug");
+
+    // Set up debug logger to capture all debug signatures
+    List<String> debugLog = new ArrayList<>();
+    Mockito.doAnswer(invocation -> {
+      String format = invocation.getArgument(0);
+      debugLog.add(format);
+      return null;
+    }).when(_logger).debug(Mockito.anyString());
+    Mockito.doAnswer(invocation -> {
+      String format = invocation.getArgument(0);
+      Object arg1 = invocation.getArguments().length > 1 ? invocation.getArgument(1) : null;
+      debugLog.add(String.format(format.replace("{}", "%s"), arg1));
+      return null;
+    }).when(_logger).debug(Mockito.anyString(), (Object) Mockito.any());
+    Mockito.doAnswer(invocation -> {
+      String format = invocation.getArgument(0);
+      BrokerResponse arg1 = invocation.getArgument(1);
+      debugLog.add(String.format(format.replace("{}", "%s"), arg1.toJsonString()));
+      return null;
+    }).when(_logger).debug(Mockito.anyString(), Mockito.<BrokerResponse>any());
+    Mockito.doAnswer(invocation -> {
+      String format = invocation.getArgument(0);
+      Object arg1 = invocation.getArguments().length > 1 ? invocation.getArgument(1) : null;
+      Object arg2 = invocation.getArguments().length > 2 ? invocation.getArgument(2) : null;
+      debugLog.add(String.format(format.replace("{}", "%s"), arg1, arg2));
+      return null;
+    }).when(_logger).debug(Mockito.anyString(), Mockito.any(), Mockito.any());
+
+    // When:
+    boolean wasLogged = queryLogger.logQueryReceived(123L, "SELECT * FROM foo");
+
+    // Then:
+    Assert.assertFalse(wasLogged);
+    Assert.assertTrue(debugLog.stream().anyMatch(s -> s.contains("SQL query for request 123: SELECT * FROM foo")),
+        "Expected debug log with correct message, got: " + debugLog);
+    Assert.assertEquals(_infoLog.size(), 0, "Should not log at info level");
+  }
+
+  @Test
+  public void shouldLogCompletionAtDebugWhenDroppedWithMarkerEnabled() {
+    // Given: wasLogged = false, logDroppedWithMarker = true
+    QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter, "debug");
+
+    List<String> debugLog = new ArrayList<>();
+    Mockito.doAnswer(invocation -> {
+      String format = invocation.getArgument(0);
+      Object arg1 = invocation.getArguments().length > 1 ? invocation.getArgument(1) : null;
+      debugLog.add(String.format(format.replace("{}", "%s"), arg1));
+      return null;
+    }).when(_logger).debug(Mockito.anyString(), (Object) Mockito.any());
+    Mockito.doAnswer(invocation -> {
+      String format = invocation.getArgument(0);
+      BrokerResponse arg1 = invocation.getArgument(1);
+      debugLog.add(String.format(format.replace("{}", "%s"), arg1.toJsonString()));
+      return null;
+    }).when(_logger).debug(Mockito.anyString(), Mockito.<BrokerResponse>any());
+
+    // When:
+    queryLogger.logQueryCompleted(params, false);
+
+    // Then:
+    Assert.assertTrue(debugLog.stream().anyMatch(s -> s.contains("requestId")),
+        "Expected debug log with log line, got: " + debugLog);
+    Assert.assertEquals(_infoLog.size(), 0, "Should not log at info level");
   }
 
   private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached,
