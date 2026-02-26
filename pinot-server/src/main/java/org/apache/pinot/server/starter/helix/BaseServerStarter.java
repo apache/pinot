@@ -784,11 +784,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
 
-    // Notify thread pool manager that Helix is now connected so it can read legacy config if needed
-    if (_transitionThreadPoolManager != null) {
-      _transitionThreadPoolManager.onHelixManagerConnected();
-    }
-
     updateInstanceConfigIfNeeded(serverConf);
 
     // Start a background task to monitor Helix message count
@@ -807,10 +802,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottler);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
-    if (_transitionThreadPoolManager instanceof PinotClusterConfigChangeListener) {
-      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
-          (PinotClusterConfigChangeListener) _transitionThreadPoolManager);
-    }
 
     if (sendStatsPredicate.needWatchForInstanceConfigChange()) {
       LOGGER.info("Initializing and registering the SendStatsPredicate");

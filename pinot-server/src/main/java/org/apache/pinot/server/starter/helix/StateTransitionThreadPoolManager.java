@@ -53,13 +53,5 @@ public interface StateTransitionThreadPoolManager {
   @Nullable
   ExecutorService getExecutorService(String resourceName);
 
-  /**
-   * Called after the Helix manager has connected successfully.
-   * This allows implementations to read configuration from ZooKeeper that requires an active connection.
-   */
-  default void onHelixManagerConnected() {
-    // Default no-op for backward compatibility
-  }
-
   void shutdown();
 }
