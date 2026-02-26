@@ -81,7 +81,7 @@ public class TransformPipeline {
 
   public Result processRow(GenericRow decodedRow) {
     if (Boolean.TRUE.equals(decodedRow.getValue(GenericRow.SKIP_RECORD_KEY))) {
-      return new Result(List.of(), 0, 0, 0);
+      return new Result(List.of(), 0, 1, 0);
     }
     //noinspection unchecked
     List<GenericRow> rows = (List<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
@@ -110,7 +110,7 @@ public class TransformPipeline {
         _numRowsSanitized++;
       }
     }
-    return new Result(rows, skippedRowCount, incompleteRowCount, sanitizedRowCount);
+    return new Result(rows, incompleteRowCount, skippedRowCount, sanitizedRowCount);
   }
 
   /// Reports stats after all rows are processed.
