@@ -170,6 +170,11 @@ public class KafkaServerStartable implements StreamDataServerStartable {
       runAdminWithRetry(() -> adminClient.createTopics(Collections.singletonList(newTopic)).all().get(),
           "create topic: " + topic);
     } catch (Exception e) {
+      if (e instanceof ExecutionException
+          && e.getCause() instanceof org.apache.kafka.common.errors.TopicExistsException) {
+        // Topic already exists, skip creation silently
+        return;
+      }
       throw new RuntimeException("Failed to create topic: " + topic, e);
     }
   }
