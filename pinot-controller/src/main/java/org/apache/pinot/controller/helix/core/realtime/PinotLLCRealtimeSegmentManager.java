@@ -1259,7 +1259,7 @@ public class PinotLLCRealtimeSegmentManager {
   List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState) {
     return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState,
-        false);
+        false, false);
   }
 
   /**
@@ -1271,10 +1271,24 @@ public class PinotLLCRealtimeSegmentManager {
   List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState,
       boolean forceGetOffsetFromStream) {
+    return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState,
+        forceGetOffsetFromStream, false);
+  }
+
+  /**
+   * Fetches the latest state of the PartitionGroups for the stream
+   * If any partition has reached end of life, and all messages of that partition have been consumed by the segment,
+   * it will be skipped from the result
+   */
+  @VisibleForTesting
+  List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
+      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState,
+      boolean forceGetOffsetFromStream, boolean multitopicSkipMissingTopics) {
     PauseState pauseState = extractTablePauseState(idealState);
     return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs,
         currentPartitionGroupConsumptionStatusList,
-        pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), forceGetOffsetFromStream);
+        pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), forceGetOffsetFromStream,
+        multitopicSkipMissingTopics);
   }
 
   /**
