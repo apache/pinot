@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -53,6 +54,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -195,6 +198,45 @@ public class SegmentPurgerTest {
             segmentGeneratorCustomConfigs);
     segmentPurger2.initSegmentGeneratorConfig("currentSegmentName");
     assertEquals(segmentPurger2.getSegmentGeneratorConfig().getSegmentName(), newSegmentName);
+  }
+
+  @Test
+  public void testStarTreeSkippedWhenDynamicCreationDisabled() {
+    // Table config has starTreeIndexConfigs but enableDynamicStarTreeCreation is false (default)
+    TableConfig tableConfigWithStarTree = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(Collections.singletonList(
+            new StarTreeIndexConfig(List.of(D1, D2), null, null, List.of("SUM__d2"), 10000)))
+        .build();
+
+    SegmentPurger.RecordPurger recordPurger = row -> row.getValue(D1).equals(0);
+    SegmentPurger segmentPurger = new SegmentPurger(
+        _originalIndexDir, PURGED_SEGMENT_DIR, tableConfigWithStarTree, _schema, recordPurger, null, null);
+    segmentPurger.initSegmentGeneratorConfig(SEGMENT_NAME);
+
+    // Star tree should be skipped since enableDynamicStarTreeCreation is false
+    assertNull(segmentPurger.getSegmentGeneratorConfig().getStarTreeIndexConfigs());
+    assertFalse(segmentPurger.getSegmentGeneratorConfig().isEnableDefaultStarTree());
+  }
+
+  @Test
+  public void testStarTreeBuiltWhenDynamicCreationEnabled() {
+    // Table config has starTreeIndexConfigs and enableDynamicStarTreeCreation is true
+    TableConfig tableConfigWithStarTree = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(Collections.singletonList(
+            new StarTreeIndexConfig(List.of(D1, D2), null, null, List.of("SUM__d2"), 10000)))
+        .build();
+    tableConfigWithStarTree.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
+
+    SegmentPurger.RecordPurger recordPurger = row -> row.getValue(D1).equals(0);
+    SegmentPurger segmentPurger = new SegmentPurger(
+        _originalIndexDir, PURGED_SEGMENT_DIR, tableConfigWithStarTree, _schema, recordPurger, null, null);
+    segmentPurger.initSegmentGeneratorConfig(SEGMENT_NAME);
+
+    // Star tree should be present since enableDynamicStarTreeCreation is true
+    assertNotNull(segmentPurger.getSegmentGeneratorConfig().getStarTreeIndexConfigs());
+    assertEquals(segmentPurger.getSegmentGeneratorConfig().getStarTreeIndexConfigs().size(), 1);
   }
 
   @AfterClass

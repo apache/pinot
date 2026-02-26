@@ -124,6 +124,13 @@ public class SegmentPurger {
     _segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     _segmentGeneratorConfig.setOutDir(_workingDir.getPath());
 
+    // Skip star-tree index creation during purge unless enableDynamicStarTreeCreation is set.
+    // This prevents unintended star-tree creation when segments are rebuilt for compliance/purge purposes.
+    if (!_tableConfig.getIndexingConfig().isEnableDynamicStarTreeCreation()) {
+      _segmentGeneratorConfig.setStarTreeIndexConfigs(null);
+      _segmentGeneratorConfig.setEnableDefaultStarTree(false);
+    }
+
     if (_segmentGeneratorCustomConfigs != null && StringUtils.isNotEmpty(
         _segmentGeneratorCustomConfigs.getSegmentName())) {
       _segmentGeneratorConfig.setSegmentName(_segmentGeneratorCustomConfigs.getSegmentName());
