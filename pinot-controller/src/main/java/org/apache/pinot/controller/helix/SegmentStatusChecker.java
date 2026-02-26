@@ -474,7 +474,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
       List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
-      boolean skipMissingTopics = IngestionConfigUtils.getSkipMissingTopics(tableConfig);
+      boolean skipMissingTopics = IngestionConfigUtils.getMultitopicSkipMissingTables(tableConfig);
 
       new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
           streamConfigs, idealState, skipMissingTopics).findAndEmitMetrics(idealState);
