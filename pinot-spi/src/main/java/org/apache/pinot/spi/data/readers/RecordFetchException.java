@@ -33,6 +33,8 @@ import java.io.IOException;
  */
 public class RecordFetchException extends IOException {
 
+  private static final long serialVersionUID = 1L;
+
   public RecordFetchException(String message) {
     super(message);
   }

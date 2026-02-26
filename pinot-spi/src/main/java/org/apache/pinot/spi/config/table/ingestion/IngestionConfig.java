@@ -221,8 +221,7 @@ public class IngestionConfig extends BaseJsonConfig {
     _ingestionExceptionLogRateLimitPerMin = ingestionExceptionLogRateLimitPerMin;
   }
 
-  public IngestionConfig setMaxConsecutiveRecordFetchFailuresAllowed(int maxConsecutiveRecordFetchFailuresAllowed) {
+  public void setMaxConsecutiveRecordFetchFailuresAllowed(int maxConsecutiveRecordFetchFailuresAllowed) {
     _maxConsecutiveRecordFetchFailuresAllowed = maxConsecutiveRecordFetchFailuresAllowed;
-    return this;
   }
 }

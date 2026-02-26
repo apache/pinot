@@ -223,7 +223,7 @@ public class SegmentMapper {
           LOGGER.debug("{} Consecutive fetch failures: {}", consecutiveFetchFailures, logMessage, e);
           if (consecutiveFetchFailures >= maxConsecutiveRecordFetchFailuresAllowed) {
             String warningMessage = String.format(
-                "Stopping record reader at index %d out of %d due to %d consecutive fetch failures. "
+                "Stopping at record reader %d out of %d due to %d consecutive fetch failures. "
                     + "This may indicate the reader is stuck and unable to advance. Last error: %s",
                 count, totalCount, consecutiveFetchFailures, e.getMessage());
             observer.accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()
@@ -236,8 +236,8 @@ public class SegmentMapper {
         } else {
           // Parse error - log and continue without counting toward threshold
           _throttledLogger.warn(logMessage + "Processing RecordReader " + count + " out of " + totalCount, e);
-          _incompleteRowsFound++;
         }
+        _incompleteRowsFound++;
       }
       reuse.clear();
     }

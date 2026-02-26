@@ -376,7 +376,7 @@ public class SegmentMapperTest {
           throw new RecordFetchException("Simulated fetch failure at index " + _index);
         case PARSE_FAIL:
           _index++;
-          throw new RuntimeException("Simulated parse failure");
+          throw new IOException("Simulated parse failure");
         default:
           throw new IllegalStateException("Unknown action: " + action);
       }
