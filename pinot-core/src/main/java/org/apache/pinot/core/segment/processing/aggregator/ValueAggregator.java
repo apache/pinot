@@ -31,4 +31,8 @@ public interface ValueAggregator {
    * @return aggregated value given two column values
    */
   Object aggregate(Object value1, Object value2, Map<String, String> functionParameters);
+
+  default String getValueType() {
+    return "";
+  }
 }

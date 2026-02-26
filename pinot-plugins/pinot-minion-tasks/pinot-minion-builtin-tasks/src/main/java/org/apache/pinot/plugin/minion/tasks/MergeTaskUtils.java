@@ -19,13 +19,19 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
@@ -51,6 +57,7 @@ public class MergeTaskUtils {
   }
 
   private static final int AGGREGATION_TYPE_KEY_SUFFIX_LENGTH = MergeTask.AGGREGATION_TYPE_KEY_SUFFIX.length();
+  private static final String COMMA_SEPARATOR = ",";
 
   /**
    * Creates the time handler config based on the given table config, schema and task config. Returns {@code null} if
@@ -132,6 +139,25 @@ public class MergeTaskUtils {
       if (key.endsWith(MergeTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
         String column = key.substring(0, key.length() - AGGREGATION_TYPE_KEY_SUFFIX_LENGTH);
         aggregationTypes.put(column, AggregationFunctionType.getAggregationFunctionType(entry.getValue()));
+      }
+    }
+    return aggregationTypes;
+  }
+
+  public static Map<String, Set<AggregationFunctionType>> getAggregationTypesMap(Map<String, String> taskConfig) {
+    Map<String, Set<AggregationFunctionType>> aggregationTypes = new HashMap<>();
+    for (Map.Entry<String, String> entry : taskConfig.entrySet()) {
+      String key = entry.getKey();
+      if (key.endsWith(MergeTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
+        String column = key.substring(0, key.length() - AGGREGATION_TYPE_KEY_SUFFIX_LENGTH);
+        Set<AggregationFunctionType> aggregationFunctionTypes =
+            Stream.of(StringUtils.split(entry.getValue(), COMMA_SEPARATOR))
+                .map(s -> s.trim()).filter(s -> StringUtils.isNotBlank(s))
+                .map(AggregationFunctionType::getAggregationFunctionType)
+                .collect(Collectors.toSet());
+
+        aggregationTypes.put(column, Sets.union(aggregationFunctionTypes,
+            aggregationTypes.getOrDefault(column, new HashSet<>())));
       }
     }
     return aggregationTypes;

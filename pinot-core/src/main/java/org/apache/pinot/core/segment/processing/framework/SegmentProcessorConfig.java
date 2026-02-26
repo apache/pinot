@@ -51,13 +51,14 @@ public class SegmentProcessorConfig {
   private final Consumer<Object> _progressObserver;
   private final SegmentNameGenerator _segmentNameGenerator;
   private final Long _customCreationTime;
+  private final MaterializedViewProcessorConfig _mvProcessorConfig;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema, TimeHandlerConfig timeHandlerConfig,
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
       Map<String, AggregationFunctionType> aggregationTypes,
       Map<String, Map<String, String>> aggregationFunctionParameters, SegmentConfig segmentConfig,
       Consumer<Object> progressObserver, @Nullable SegmentNameGenerator segmentNameGenerator,
-      @Nullable Long customCreationTime) {
+      @Nullable Long customCreationTime, @Nullable MaterializedViewProcessorConfig mvProcessorConfig) {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableConfig = tableConfig;
     _schema = schema;
@@ -72,6 +73,7 @@ public class SegmentProcessorConfig {
     };
     _segmentNameGenerator = segmentNameGenerator;
     _customCreationTime = customCreationTime;
+    _mvProcessorConfig = mvProcessorConfig;
   }
 
   /**
@@ -142,6 +144,11 @@ public class SegmentProcessorConfig {
     return _customCreationTime != null ? _customCreationTime : System.currentTimeMillis();
   }
 
+  public MaterializedViewProcessorConfig getMaterializedViewProcessorConfig() {
+    return _mvProcessorConfig;
+  }
+
+
   @Override
   public String toString() {
     return "SegmentProcessorConfig{" + "_tableConfig=" + _tableConfig + ", _schema=" + _schema + ", _timeHandlerConfig="
@@ -165,6 +172,7 @@ public class SegmentProcessorConfig {
     private Consumer<Object> _progressObserver;
     private SegmentNameGenerator _segmentNameGenerator;
     private Long _customCreationTime;
+    private MaterializedViewProcessorConfig _mvProcessorConfig;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -221,6 +229,11 @@ public class SegmentProcessorConfig {
       return this;
     }
 
+    public Builder setMaterializedViewProcessorConfig(MaterializedViewProcessorConfig mvProcessorConfig) {
+      _mvProcessorConfig = mvProcessorConfig;
+      return this;
+    }
+
     public SegmentProcessorConfig build() {
       Preconditions.checkState(_tableConfig != null, "Must provide table config in SegmentProcessorConfig");
       Preconditions.checkState(_schema != null, "Must provide schema in SegmentProcessorConfig");
@@ -245,7 +258,7 @@ public class SegmentProcessorConfig {
       }
       return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
           _aggregationTypes, _aggregationFunctionParameters, _segmentConfig, _progressObserver,
-              _segmentNameGenerator, _customCreationTime);
+              _segmentNameGenerator, _customCreationTime, _mvProcessorConfig);
     }
   }
 }
