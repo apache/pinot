@@ -44,6 +44,7 @@ import org.apache.orc.OrcFile;
 import org.apache.orc.Reader;
 import org.apache.orc.TypeDescription;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
@@ -180,6 +181,7 @@ public class ORCRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
+    // Data parsing: extract current batch row into GenericRow.
     int numFields = _orcFields.size();
     for (int i = 0; i < numFields; i++) {
       if (!_includeOrcFields[i]) {
@@ -190,8 +192,13 @@ public class ORCRecordReader implements RecordReader {
       reuse.putValue(field, extractValue(field, _rowBatch.cols[i], fieldType, _nextRowId));
     }
 
+    // Record fetch: read next batch when current one is exhausted.
     if (_nextRowId == _rowBatch.size - 1) {
-      _hasNext = _orcRecordReader.nextBatch(_rowBatch);
+      try {
+        _hasNext = _orcRecordReader.nextBatch(_rowBatch);
+      } catch (IOException e) {
+        throw new RecordFetchException("Failed to read next ORC record", e);
+      }
       _nextRowId = 0;
     } else {
       _nextRowId++;

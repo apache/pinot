@@ -19,13 +19,16 @@
 package org.apache.pinot.core.segment.processing.framework;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
@@ -44,10 +47,13 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -58,6 +64,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -310,6 +317,216 @@ public class SegmentMapperTest {
     inputs.add(new Object[]{config9, expectedRecords9});
 
     return inputs.toArray(new Object[0][]);
+  }
+
+  /**
+   * RecordReader that throws fetch or parse errors at configured positions.
+   * Used to test continueOnError and consecutiveFetchFailures short-circuit logic.
+   */
+  private static final class FailingRecordReader implements RecordReader {
+    enum Action {
+      SUCCESS,
+      FETCH_FAIL,
+      PARSE_FAIL
+    }
+
+    private final List<GenericRow> _rows;
+    private final List<Action> _actions;
+    /**
+     * If false, on FETCH_FAIL we do not advance the index (simulates stuck reader).
+     * If true, we advance so the next call can succeed (intermittent failures).
+     */
+    private final boolean _advanceOnFetchFail;
+    private int _index;
+
+    FailingRecordReader(List<GenericRow> rows, List<Action> actions, boolean advanceOnFetchFail) {
+      _rows = rows;
+      _actions = actions;
+      _advanceOnFetchFail = advanceOnFetchFail;
+      _index = 0;
+    }
+
+    @Override
+    public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+        throws IOException {
+      // No-op for test; state is set via constructor.
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _index < _rows.size();
+    }
+
+    @Override
+    public GenericRow next(GenericRow reuse)
+        throws IOException {
+      if (_index >= _rows.size()) {
+        throw new IllegalStateException("No more records");
+      }
+      Action action = _actions.get(_index);
+      switch (action) {
+        case SUCCESS:
+          reuse.init(_rows.get(_index));
+          _index++;
+          return reuse;
+        case FETCH_FAIL:
+          if (_advanceOnFetchFail) {
+            _index++;
+          }
+          throw new RecordFetchException("Simulated fetch failure at index " + _index);
+        case PARSE_FAIL:
+          _index++;
+          throw new RuntimeException("Simulated parse failure");
+        default:
+          throw new IllegalStateException("Unknown action: " + action);
+      }
+    }
+
+    @Override
+    public void rewind()
+        throws IOException {
+      _index = 0;
+    }
+
+    @Override
+    public void close() {
+      // No-op.
+    }
+  }
+
+  /**
+   * Builds a TableConfig with continueOnError=true and optional max consecutive fetch failures.
+   */
+  private static TableConfig getTableConfigWithContinueOnError(int maxConsecutiveRecordFetchFailuresAllowed) {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setContinueOnError(true);
+    ingestionConfig.setMaxConsecutiveRecordFetchFailuresAllowed(maxConsecutiveRecordFetchFailuresAllowed);
+    return TABLE_CONFIG_BUILDER.setIngestionConfig(ingestionConfig).build();
+  }
+
+  /**
+   * Creates a list of GenericRows suitable for the test schema (campaign, clicks, ts).
+   */
+  private static List<GenericRow> rows(Object[]... raw) {
+    List<GenericRow> list = new ArrayList<>();
+    for (Object[] r : raw) {
+      GenericRow row = new GenericRow();
+      row.putValue("campaign", r[0]);
+      row.putValue("clicks", r[1]);
+      row.putValue("ts", r[2]);
+      list.add(row);
+    }
+    return list;
+  }
+
+  @Test
+  public void testContinueOnErrorIntermittentFetchFailures()
+      throws Exception {
+    // Intermittent fetch failures: fail then succeed repeatedly. Counter resets on success, so we never hit threshold.
+    List<GenericRow> data = rows(
+        new Object[]{"x", 0, 1597719600000L},
+        new Object[]{"a", 1, 1597719600000L},
+        new Object[]{"x", 0, 1597773600000L},
+        new Object[]{"b", 2, 1597773600000L},
+        new Object[]{"x", 0, 1597777200000L},
+        new Object[]{"c", 3, 1597777200000L});
+    List<FailingRecordReader.Action> actions = Arrays.asList(
+        FailingRecordReader.Action.FETCH_FAIL,
+        FailingRecordReader.Action.SUCCESS,
+        FailingRecordReader.Action.FETCH_FAIL,
+        FailingRecordReader.Action.SUCCESS,
+        FailingRecordReader.Action.FETCH_FAIL,
+        FailingRecordReader.Action.SUCCESS);
+    FailingRecordReader reader = new FailingRecordReader(data, actions, true);
+
+    TableConfig tableConfig = getTableConfigWithContinueOnError(3);
+    SegmentProcessorConfig processorConfig =
+        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(getSchema()).build();
+    File mapperOutputDir = new File(TEMP_DIR, "mapper_output_intermittent");
+    FileUtils.deleteQuietly(mapperOutputDir);
+    assertTrue(mapperOutputDir.mkdirs());
+
+    SegmentMapper segmentMapper =
+        new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(reader)),
+            Collections.emptyList(), processorConfig, mapperOutputDir);
+    Map<String, GenericRowFileManager> result = segmentMapper.map();
+
+    // Should complete successfully with 3 rows written (successes only).
+    assertEquals(result.size(), 1);
+    GenericRowFileManager fileManager = result.get("0");
+    assertNotNull(fileManager);
+    assertEquals(fileManager.getFileReader().getNumRows(), 3);
+    fileManager.cleanUp();
+  }
+
+  @Test
+  public void testContinueOnErrorConsistentFetchFailures() {
+    // Consistent fetch failures: reader never advances. After maxConsecutiveRecordFetchFailuresAllowed we short-circuit
+    List<GenericRow> data = rows(new Object[]{"a", 1, 1597719600000L});
+    List<FailingRecordReader.Action> actions = Collections.singletonList(FailingRecordReader.Action.FETCH_FAIL);
+    FailingRecordReader reader = new FailingRecordReader(data, actions, false);
+
+    TableConfig tableConfig = getTableConfigWithContinueOnError(3);
+    SegmentProcessorConfig processorConfig =
+        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(getSchema()).build();
+    File mapperOutputDir = new File(TEMP_DIR, "mapper_output_consistent");
+    FileUtils.deleteQuietly(mapperOutputDir);
+    assertTrue(mapperOutputDir.mkdirs());
+
+    SegmentMapper segmentMapper =
+        new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(reader)),
+            Collections.emptyList(), processorConfig, mapperOutputDir);
+
+    try {
+      segmentMapper.map();
+      fail("Expected RuntimeException due to consecutive fetch failures");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("consecutive fetch failures"),
+          "Expected message about consecutive fetch failures: " + e.getMessage());
+      assertTrue(e.getMessage().contains("Stopping record reader"),
+          "Expected message about stopping record reader: " + e.getMessage());
+    }
+  }
+
+  @Test
+  public void testContinueOnErrorParseFailures()
+      throws Exception {
+    // Parse failures do not count toward consecutive fetch threshold; mapper continues and counts incomplete rows.
+    List<GenericRow> data = rows(
+        new Object[]{"x", 0, 1597719600000L},
+        new Object[]{"a", 1, 1597719600000L},
+        new Object[]{"x", 0, 1597773600000L},
+        new Object[]{"b", 2, 1597773600000L},
+        new Object[]{"x", 0, 1597777200000L},
+        new Object[]{"c", 3, 1597777200000L});
+    List<FailingRecordReader.Action> actions = Arrays.asList(
+        FailingRecordReader.Action.PARSE_FAIL,
+        FailingRecordReader.Action.SUCCESS,
+        FailingRecordReader.Action.PARSE_FAIL,
+        FailingRecordReader.Action.SUCCESS,
+        FailingRecordReader.Action.PARSE_FAIL,
+        FailingRecordReader.Action.SUCCESS);
+    FailingRecordReader reader = new FailingRecordReader(data, actions, true);
+
+    TableConfig tableConfig = getTableConfigWithContinueOnError(3);
+    SegmentProcessorConfig processorConfig =
+        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(getSchema()).build();
+    File mapperOutputDir = new File(TEMP_DIR, "mapper_output_parse");
+    FileUtils.deleteQuietly(mapperOutputDir);
+    assertTrue(mapperOutputDir.mkdirs());
+
+    SegmentMapper segmentMapper =
+        new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(reader)),
+            Collections.emptyList(), processorConfig, mapperOutputDir);
+    Map<String, GenericRowFileManager> result = segmentMapper.map();
+
+    // Should complete; 3 rows written, 3 incomplete (parse failures).
+    assertEquals(result.size(), 1);
+    GenericRowFileManager fileManager = result.get("0");
+    assertNotNull(fileManager);
+    assertEquals(fileManager.getFileReader().getNumRows(), 3);
+    assertEquals(segmentMapper.getIncompleteRowsFound(), 3);
+    fileManager.cleanUp();
   }
 
   @AfterClass

@@ -67,6 +67,9 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to skip any row which has error and continue during ingestion")
   private boolean _continueOnError;
 
+  @JsonPropertyDescription("Max consecutive failures allowed while fetching record from source.")
+  private int _maxConsecutiveRecordFetchFailuresAllowed;
+
   @JsonPropertyDescription(
       "Configs related to retry segment build on reduced size when previous build fails on Preconditions check")
   private boolean _retryOnSegmentBuildPrecheckFailure;
@@ -161,6 +164,10 @@ public class IngestionConfig extends BaseJsonConfig {
     return _ingestionExceptionLogRateLimitPerMin;
   }
 
+  public int getMaxConsecutiveRecordFetchFailuresAllowed() {
+    return _maxConsecutiveRecordFetchFailuresAllowed;
+  }
+
   public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {
     _batchIngestionConfig = batchIngestionConfig;
   }
@@ -212,5 +219,10 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setIngestionExceptionLogRateLimitPerMin(int ingestionExceptionLogRateLimitPerMin) {
     _ingestionExceptionLogRateLimitPerMin = ingestionExceptionLogRateLimitPerMin;
+  }
+
+  public IngestionConfig setMaxConsecutiveRecordFetchFailuresAllowed(int maxConsecutiveRecordFetchFailuresAllowed) {
+    _maxConsecutiveRecordFetchFailuresAllowed = maxConsecutiveRecordFetchFailuresAllowed;
+    return this;
   }
 }
