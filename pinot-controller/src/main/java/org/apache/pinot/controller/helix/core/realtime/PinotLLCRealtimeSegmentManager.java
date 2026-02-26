@@ -1225,12 +1225,12 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState,
-      boolean forceGetOffsetFromStream, boolean skipMissingTopics) {
+      boolean forceGetOffsetFromStream, boolean multitopicSkipMissingTopics) {
     PauseState pauseState = extractTablePauseState(idealState);
     return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs,
         currentPartitionGroupConsumptionStatusList,
         pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), forceGetOffsetFromStream,
-        skipMissingTopics);
+        multitopicSkipMissingTopics);
   }
 
   /**

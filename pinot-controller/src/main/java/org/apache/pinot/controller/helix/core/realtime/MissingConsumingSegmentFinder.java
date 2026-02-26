@@ -70,7 +70,7 @@ public class MissingConsumingSegmentFinder {
 
   public MissingConsumingSegmentFinder(String realtimeTableName, ZkHelixPropertyStore<ZNRecord> propertyStore,
       ControllerMetrics controllerMetrics, List<StreamConfig> streamConfigs, IdealState idealState,
-      boolean skipMissingTopics) {
+      boolean multitopicSkipMissingTopics) {
     _realtimeTableName = realtimeTableName;
     _controllerMetrics = controllerMetrics;
     _segmentMetadataFetcher = new SegmentMetadataFetcher(propertyStore, controllerMetrics);
@@ -86,7 +86,7 @@ public class MissingConsumingSegmentFinder {
     try {
       PauseState pauseState = PinotLLCRealtimeSegmentManager.extractTablePauseState(idealState);
       PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs, Collections.emptyList(),
-              pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), false, skipMissingTopics)
+              pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), false, multitopicSkipMissingTopics)
           .forEach(metadata -> {
             _partitionGroupIdToLargestStreamOffsetMap.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
           });

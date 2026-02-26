@@ -62,7 +62,8 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Class to handle realtime offset auto reset")
   private String _realtimeOffsetAutoResetHandlerClass;
 
-  @JsonPropertyDescription("Multitopic Tables : If true, non-existent topics will be skipped instead of causing failures. ")
+  @JsonPropertyDescription("Multitopic Tables: If true, non-existent topics will be skipped instead of "
+      + "causing failures.")
   private boolean _multitopicSkipMissingTables;
 
   @JsonCreator

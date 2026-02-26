@@ -38,7 +38,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private final List<StreamConfig> _streamConfigs;
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
   private final boolean _forceGetOffsetFromStream;
-  private final boolean _skipMissingTopics;
+  private final boolean _multitopicSkipMissingTopics;
   private final List<PartitionGroupMetadata> _newPartitionGroupMetadataList = new ArrayList<>();
   private final List<Integer> _pausedTopicIndices;
 
@@ -46,11 +46,11 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
   public PartitionGroupMetadataFetcher(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, List<Integer> pausedTopicIndices,
-      boolean forceGetOffsetFromStream, boolean skipMissingTopics) {
+      boolean forceGetOffsetFromStream, boolean multitopicSkipMissingTopics) {
     _streamConfigs = streamConfigs;
     _partitionGroupConsumptionStatusList = partitionGroupConsumptionStatusList;
     _forceGetOffsetFromStream = forceGetOffsetFromStream;
-    _skipMissingTopics = skipMissingTopics;
+    _multitopicSkipMissingTopics = multitopicSkipMissingTopics;
     _pausedTopicIndices = pausedTopicIndices;
   }
 
@@ -132,7 +132,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
         // Check if the topic exists before fetching partition metadata
         // Only perform this check if topic existence validation is enabled and topics were fetched
-        if (_skipMissingTopics && availableTopicNames != null && !availableTopicNames.contains(topicName)) {
+        if (_multitopicSkipMissingTopics && availableTopicNames != null && !availableTopicNames.contains(topicName)) {
           LOGGER.warn("Topic {} does not exist. Skipping this topic from ingestion.", topicName);
           continue;
         }
@@ -170,7 +170,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
    * @return Set of available topic names, or null if topics could not be fetched or skip missing topics is disabled
    */
   private Set<String> fetchAvailableTopicNames() {
-    if (!_skipMissingTopics || _streamConfigs.isEmpty()) {
+    if (!_multitopicSkipMissingTopics || _streamConfigs.isEmpty()) {
       return null;
     }
 
