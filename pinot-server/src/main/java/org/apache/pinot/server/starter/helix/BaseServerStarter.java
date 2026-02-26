@@ -300,11 +300,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   /**
-   * Initialize the state transition thread pool manager.
-   *
-   * <p>Override this method to provide a custom implementation.
-   * By default, returns null, which means Helix's default shared thread pool will be used
-   * for all state transitions.</p>
+   * Override to provide custom transition thread pool manager
    */
   protected void initTransitionThreadPoolManager() {
     _transitionThreadPoolManager = null;
@@ -783,7 +779,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Connecting Helix manager");
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-
     updateInstanceConfigIfNeeded(serverConf);
 
     // Start a background task to monitor Helix message count
