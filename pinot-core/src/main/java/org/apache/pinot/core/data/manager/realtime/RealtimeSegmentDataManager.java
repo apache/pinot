@@ -53,6 +53,8 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.core.data.manager.SegmentOperationsTaskContext;
+import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.DedupContext;
@@ -1633,7 +1635,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   public void startConsumption() {
-    _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
+    Runnable consumer =
+        SegmentOperationsTaskContext.wrap(new PartitionConsumer(), SegmentOperationsTaskType.CONSUMER,
+            _tableNameWithType);
+    _consumerThread = new Thread(consumer, _segmentNameStr);
     _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this);
     _consumerThread.start();
   }
