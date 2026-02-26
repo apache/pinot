@@ -303,14 +303,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * Initialize the state transition thread pool manager.
    *
    * <p>Override this method to provide a custom implementation.
-   *
-   * <p><b>Migration note:</b> Previously, state transitions used the Helix-managed thread pool configured via
-   * ZooKeeper using "STATE_TRANSITION.maxThreads" at CONFIGS/PARTICIPANT/&lt;instance&gt; or
-   * CONFIGS/CLUSTER/&lt;cluster&gt;. This is now managed by Pinot with server config, but will fall back to
-   * reading the legacy Helix config for backward compatibility if the new config is not set.</p>
+   * By default, returns null, which means Helix's default shared thread pool will be used
+   * for all state transitions.</p>
    */
   protected void initTransitionThreadPoolManager() {
-    _transitionThreadPoolManager = new DefaultStateTransitionThreadPoolManager(_serverConf, _helixManager);
+    _transitionThreadPoolManager = null;
   }
 
   /// Can be overridden to apply custom configs to the server conf.

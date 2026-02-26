@@ -28,8 +28,6 @@ package org.apache.pinot.core.data.manager;
 public class SegmentOperationsTaskType {
   public static final SegmentOperationsTaskType CONSUMER =
       new SegmentOperationsTaskType("CONSUMER");
-  public static final SegmentOperationsTaskType STATE_TRANSITION =
-      new SegmentOperationsTaskType("STATE_TRANSITION");
   public static final SegmentOperationsTaskType REFRESH_OR_RELOAD =
       new SegmentOperationsTaskType("REFRESH_OR_RELOAD");
   public static final SegmentOperationsTaskType PRELOAD =
