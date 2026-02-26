@@ -57,7 +57,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
-    properties.put("controller.segment.fetcher.auth.token", AUTH_TOKEN);
+    properties.put("pinot.controller.segment.fetcher.auth.token", AUTH_TOKEN);
     properties.put("controller.admin.access.control.factory.class",
         "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
     properties.put("controller.admin.access.control.principals", "admin, user, user2");
