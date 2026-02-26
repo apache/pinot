@@ -412,10 +412,10 @@ public class PinotSegmentUploadDownloadRestletResource {
           _storageQuotaChecker);
 
       // Perform resource utilization checks
-      UtilizationChecker.CheckResult isDiskUtilizationWithinLimits =
+      UtilizationChecker.CheckResult isResourceUtilizationWithinLimits =
           _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
               UtilizationChecker.CheckPurpose.OFFLINE_SEGMENT_UPLOAD);
-      if (isDiskUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
+      if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
         _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
             1L);
         throw new ControllerApplicationException(LOGGER,
@@ -423,7 +423,7 @@ public class PinotSegmentUploadDownloadRestletResource {
                 tableNameWithType,
                 segmentName),
             Response.Status.FORBIDDEN);
-      } else if (isDiskUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) {
+      } else if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) {
         LOGGER.warn(
             "Resource utilization status could not be determined for table: {}. Will allow segment upload to "
                 + "proceed.",

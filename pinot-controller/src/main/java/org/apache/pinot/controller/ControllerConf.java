@@ -371,17 +371,15 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DISK_UTILIZATION_THRESHOLD = "controller.disk.utilization.threshold"; // 0 < threshold < 1
   public static final String DISK_UTILIZATION_CHECK_TIMEOUT_MS = "controller.disk.utilization.check.timeoutMs";
   public static final String DISK_UTILIZATION_PATH = "controller.disk.utilization.path";
-  // Deprecated in favor of controller.enable.resource.utilization.checkers.all
-  @Deprecated
   public static final String ENABLE_RESOURCE_UTILIZATION_CHECK = "controller.enable.resource.utilization.check";
   // Explicitly enables all resource utilization checkers
   public static final String ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS =
-      "controller.enable.resource.utilization.checkers.all";
-  // If controller.enable.resource.utilization.checkers.all = false, each individual utilization checker can be enabled.
+      "controller.enable.all.resource.utilization.checkers";
+  // If controller.enable.all.resource.utilization.checkers = false, each individual utilization checker can be enabled.
   // When a new resource utilization checker is added, a new config must be added to have the option to specifically
   // enable/disable it.
   public static final String ENABLE_DISK_UTILIZATION_CHECKER =
-      "controller.enable.resource.utilization.checkers.disk";
+      "controller.enable.disk.utilization.checker";
   public static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
       "controller.resource.utilization.checker.initial.delay";
   public static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
@@ -416,7 +414,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS = 30_000;
   public static final String DEFAULT_DISK_UTILIZATION_PATH = "/home/pinot/data";
   public static final boolean DEFAULT_ENABLE_RESOURCE_UTILIZATION_CHECK = false;
-  public static final boolean DEFAULT_ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS = false;
+  // Include all resource utilization checkers by default
+  public static final boolean DEFAULT_ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS = true;
   public static final boolean DEFAULT_ENABLE_DISK_UTILIZATION_CHECKER = false;
   public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY = 300L; // 5 minutes
   public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY = 300L; // 5 minutes

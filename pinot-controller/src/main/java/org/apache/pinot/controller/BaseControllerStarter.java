@@ -231,7 +231,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
   protected final List<UtilizationChecker> _utilizationCheckers = new ArrayList<>();
-  protected DiskUtilizationChecker _diskUtilizationChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
@@ -379,16 +378,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             MAX_STATE_TRANSITIONS_PER_RESOURCE, constraintItemResource);
   }
 
-  protected void maybeAddUtilizationChecker(UtilizationChecker utilizationChecker,
-      boolean isSpecificUtilizationCheckerEnabled) {
+  protected boolean shouldAddUtilizationChecker(boolean isSpecificUtilizationCheckerEnabled) {
     // Add utilization checker if:
-    // 1. All resource utilization checkers are enabled, OR
-    // 2. This specific utilization checker is enabled, OR
-    // 3. The legacy resource utilization check config is enabled (backwards compatibility)
-    if (_config.isAllResourceUtilizationCheckersEnabled() || isSpecificUtilizationCheckerEnabled
-        || _config.isResourceUtilizationCheckEnabled()) {
-      _utilizationCheckers.add(utilizationChecker);
-    }
+    // 1. All resource utilization checkers are enabled (on by default for backwards compatibility), OR
+    // 2. This specific utilization checker is enabled
+    return _config.isAllResourceUtilizationCheckersEnabled() || isSpecificUtilizationCheckerEnabled;
+  }
+
+  protected void addUtilizationChecker(UtilizationChecker utilizationChecker) {
+    _utilizationCheckers.add(utilizationChecker);
   }
 
   /**
@@ -643,8 +641,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
         _helixResourceManager, _config);
 
-    _diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
-    maybeAddUtilizationChecker(_diskUtilizationChecker, _config.isDiskUtilizationCheckerEnabled());
+    DiskUtilizationChecker diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
+    if (shouldAddUtilizationChecker(_config.isDiskUtilizationCheckerEnabled())) {
+      addUtilizationChecker(diskUtilizationChecker);
+    }
     _resourceUtilizationManager = new ResourceUtilizationManager(_config, _utilizationCheckers);
     _rebalancePreChecker = RebalancePreCheckerFactory.create(_config.getRebalancePreCheckerClass());
     _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getRebalanceDiskUtilizationThreshold());
@@ -718,7 +718,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_tenantRebalancer).to(TenantRebalancer.class);
         bind(_tableSizeReader).to(TableSizeReader.class);
         bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
-        bind(_diskUtilizationChecker).to(DiskUtilizationChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
 
