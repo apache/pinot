@@ -74,6 +74,7 @@ import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.utils.OomProtectionUtils;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -379,6 +380,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
         _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             CommonConstants.Broker.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
+    // If JVM does not enable thread allocated bytes measurement, disable OOM protection to avoid false actions.
+    if (!ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
+      LOGGER.warn("Thread allocated bytes measurement is not enabled by JVM. Disabling OOM protection.");
+      _brokerConf.setProperty(CommonConstants.Accounting.FULLY_QUALIFIED_CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, false);
+    }
+    // Ensure required GC option is present; if not, disable OOM protection.
+    OomProtectionUtils.enforceIhopGcOrDisableOom(_brokerConf);
     // Initialize workload budget manager and thread resource usage accountant. Workload budget manager must be
     // initialized first because it might be used by the accountant.
     PinotConfiguration schedulerConfig = _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
