@@ -257,6 +257,13 @@ public class MinionConstants {
      * number of segments to query in one batch to fetch valid doc id metadata, by default 500
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
+
+    /**
+     * Randomization factor for segment selection. If set to 2.0, will select top (maxTasks * 2.0) segments
+     * as candidates, then randomly pick maxTasks from them. Default: 2.0 (2x randomization)
+     */
+    public static final String SEGMENT_SELECTION_RANDOMIZATION_FACTOR = "segmentSelectionRandomizationFactor";
+    public static final double DEFAULT_SEGMENT_SELECTION_RANDOMIZATION_FACTOR = 2.0;
   }
 
   public static class UpsertCompactMergeTask {
