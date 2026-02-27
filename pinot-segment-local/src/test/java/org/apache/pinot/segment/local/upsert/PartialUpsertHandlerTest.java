@@ -21,16 +21,26 @@ package org.apache.pinot.segment.local.upsert;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformerUtils;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.internal.util.collections.Sets;
@@ -38,6 +48,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 
 
 public class PartialUpsertHandlerTest {
@@ -105,6 +116,61 @@ public class PartialUpsertHandlerTest {
     testCustomMerge(prevRecord, newRecord, expectedRecord, getCustomMerger());
   }
 
+  @Test
+  public void testPostUpsertTransformRunsAfterMerge() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("pk",
+            FieldSpec.DataType.STRING)
+        .addSingleValueDimension("firstName", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("lastName", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("fullName", FieldSpec.DataType.STRING)
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .setPrimaryKeyColumns(List.of("pk")).build();
+
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setComparisonColumns(List.of("hoursSinceEpoch"));
+    upsertConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("fullName", "concat(firstName,lastName)")));
+    TableConfig tableConfig = createTableConfig(schema, upsertConfig);
+    List<RecordTransformer> postUpdateTransformers =
+        RecordTransformerUtils.getPostPartialUpsertTransformers(tableConfig, schema);
+    assertFalse(postUpdateTransformers.isEmpty());
+    PartialUpsertHandler handler =
+        new PartialUpsertHandler(tableConfig, schema, List.of("hoursSinceEpoch"), upsertConfig);
+
+    LazyRow previousRow = mock(LazyRow.class);
+    when(previousRow.getColumnNames()).thenReturn(
+        Set.of("pk", "firstName", "lastName", "fullName", "hoursSinceEpoch"));
+    when(previousRow.getValue("pk")).thenReturn("pk1");
+    when(previousRow.getValue("firstName")).thenReturn("Alice");
+    when(previousRow.getValue("lastName")).thenReturn(null);
+    when(previousRow.getValue("fullName")).thenReturn(schema.getFieldSpecFor("fullName").getDefaultNullValue());
+    when(previousRow.getValue("hoursSinceEpoch")).thenReturn(1L);
+
+    GenericRow newRecord = new GenericRow();
+    newRecord.putValue("pk", "pk1");
+    newRecord.putValue("lastName", "Smith");
+    newRecord.putValue("hoursSinceEpoch", 2L);
+    newRecord.putDefaultNullValue("firstName", schema.getFieldSpecFor("firstName").getDefaultNullValue());
+    newRecord.putDefaultNullValue("fullName", schema.getFieldSpecFor("fullName").getDefaultNullValue());
+
+    GenericRow transformOnlyRow = new GenericRow();
+    transformOnlyRow.putValue("firstName", "Alice");
+    transformOnlyRow.putValue("lastName", "Smith");
+    transformOnlyRow.putDefaultNullValue("fullName", schema.getFieldSpecFor("fullName").getDefaultNullValue());
+    for (RecordTransformer transformer : postUpdateTransformers) {
+      transformer.transform(transformOnlyRow);
+    }
+    assertEquals(transformOnlyRow.getValue("fullName"), "AliceSmith");
+
+    handler.merge(previousRow, newRecord, new HashMap<>());
+    assertEquals(newRecord.getValue("firstName"), "Alice");
+    assertEquals(newRecord.getValue("lastName"), "Smith");
+    assertEquals(FunctionEvaluatorFactory.getExpressionEvaluator("concat(firstName,lastName)").evaluate(newRecord),
+        "AliceSmith");
+    assertEquals(newRecord.getValue("fullName"), "AliceSmith");
+    assertFalse(newRecord.isNullValue("fullName"));
+  }
+
   public void testMerge(boolean isPreviousNull, Object previousValue, boolean isNewNull, Object newValue,
       String columnName, Object expectedValue, boolean isExpectedNull) {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
@@ -123,8 +189,10 @@ public class PartialUpsertHandlerTest {
       UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
       upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
       upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.IGNORE);
+      TableConfig tableConfig = createTableConfig(schema, upsertConfig);
       PartialUpsertHandler handler =
-          spy(new PartialUpsertHandler(schema, Collections.singletonList("hoursSinceEpoch"), upsertConfig));
+          spy(new PartialUpsertHandler(tableConfig, schema, Collections.singletonList("hoursSinceEpoch"),
+              upsertConfig));
 
       ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
       when(segment.getColumnNames()).thenReturn(Sets.newSet("field1", "field2", "hoursSinceEpoch"));
@@ -161,8 +229,9 @@ public class PartialUpsertHandlerTest {
         PartialUpsertMergerFactory.class)) {
       when(PartialUpsertMergerFactory.getPartialUpsertMerger(Arrays.asList("pk"), Arrays.asList("hoursSinceEpoch"),
           upsertConfig)).thenReturn(customMerger);
+      TableConfig tableConfig = createTableConfig(schema, upsertConfig);
       PartialUpsertHandler handler =
-          new PartialUpsertHandler(schema, Collections.singletonList("hoursSinceEpoch"), upsertConfig);
+          new PartialUpsertHandler(tableConfig, schema, Collections.singletonList("hoursSinceEpoch"), upsertConfig);
       HashMap<String, Object> reuseMergerResult = new HashMap<>();
       handler.merge(prevRecord, newRecord, reuseMergerResult);
       assertEquals(newRecord, expectedRecord);
@@ -184,6 +253,15 @@ public class PartialUpsertHandlerTest {
         resultHolder.put("field3", null);
       }
     };
+  }
+
+  private TableConfig createTableConfig(Schema schema, UpsertConfig upsertConfig) {
+    String tableName = schema.getSchemaName();
+    if (StringUtils.isEmpty(tableName)) {
+      tableName = "testTable";
+    }
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
+        .setTimeColumnName("hoursSinceEpoch").setNullHandlingEnabled(true).setUpsertConfig(upsertConfig).build();
   }
 
   private LazyRow mockLazyRow(LazyRow prevRecord, Map<String, Object> values) {
