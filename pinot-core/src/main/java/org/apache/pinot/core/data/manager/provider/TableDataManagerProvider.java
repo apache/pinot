@@ -45,7 +45,8 @@ import org.apache.pinot.spi.data.Schema;
 public interface TableDataManagerProvider {
 
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
-      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, ServerReloadJobStatusCache reloadJobStatusCache);
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
+      ServerReloadJobStatusCache reloadJobStatusCache);
 
   TableDataManager getTableDataManager(TableConfig tableConfig,
       Schema schema,

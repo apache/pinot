@@ -445,7 +445,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
     if (!_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
       _logger.info("Skipping replacing segment: {} even though its CRC has changed from: {} to: {} because "
-          + "instance.check.crc.on.segment.load is set to false", segmentName, localMetadata.getCrc(),
+              + "instance.check.crc.on.segment.load is set to false", segmentName, localMetadata.getCrc(),
           zkMetadata.getCrc());
       return;
     }
@@ -1034,7 +1034,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     try {
       if (_segmentOperationsThrottlerSet != null) {
         long startTime = System.currentTimeMillis();
-        BaseSegmentOperationsThrottler segmentDownloadThrottler = _segmentOperationsThrottlerSet.getSegmentDownloadThrottler();
+        BaseSegmentOperationsThrottler segmentDownloadThrottler =
+            _segmentOperationsThrottlerSet.getSegmentDownloadThrottler();
         _logger.info("Acquiring instance level segment download semaphore for segment: {}, queue-length: {} ",
             segmentName, segmentDownloadThrottler.getQueueLength());
         segmentDownloadThrottler.acquire();
@@ -1101,7 +1102,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     if (_segmentOperationsThrottlerSet != null) {
       long startTime = System.currentTimeMillis();
-      BaseSegmentOperationsThrottler segmentDownloadThrottler = _segmentOperationsThrottlerSet.getSegmentDownloadThrottler();
+      BaseSegmentOperationsThrottler segmentDownloadThrottler =
+          _segmentOperationsThrottlerSet.getSegmentDownloadThrottler();
       _logger.info("Acquiring instance level segment download semaphore for peer downloading segment: {}, "
           + "queue-length: {} ", segmentName, segmentDownloadThrottler.getQueueLength());
       segmentDownloadThrottler.acquire();
@@ -1671,9 +1673,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return true;
     }
     return zkMetadata.isUseDataCrc()
-            && zkMetadata.getDataCrc() >= 0
-            && Long.parseLong(localMetadata.getDataCrc()) >= 0
-            && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
+        && zkMetadata.getDataCrc() >= 0
+        && Long.parseLong(localMetadata.getDataCrc()) >= 0
+        && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
   }
 
   private static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {
