@@ -92,9 +92,9 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     BasicAuthTestUtils.addControllerConfiguration(properties);
-    properties.put("controller.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
-    properties.put("controller.segment.fetcher.auth.url", AUTH_URL);
-    properties.put("controller.segment.fetcher.auth.prefix", AUTH_PREFIX);
+    properties.put("pinot.controller.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
+    properties.put("pinot.controller.segment.fetcher.auth.url", AUTH_URL);
+    properties.put("pinot.controller.segment.fetcher.auth.prefix", AUTH_PREFIX);
   }
 
   @Override
@@ -119,12 +119,17 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected void overrideMinionConf(PinotConfiguration minionConf) {
     BasicAuthTestUtils.addMinionConfiguration(minionConf);
-    minionConf.setProperty("segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
-    minionConf.setProperty("segment.fetcher.auth.url", AUTH_URL_PREFIXED);
-    minionConf.setProperty("segment.fetcher.auth.prefix", AUTH_PREFIX);
-    minionConf.setProperty("task.auth.provider.class", AUTH_PROVIDER_CLASS);
-    minionConf.setProperty("task.auth.url", AUTH_URL_PREFIXED);
-    minionConf.setProperty("task.auth.prefix", AUTH_PREFIX);
+    minionConf.setProperty("pinot.minion.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
+    minionConf.setProperty("pinot.minion.segment.fetcher.auth.url", AUTH_URL_PREFIXED);
+    minionConf.setProperty("pinot.minion.segment.fetcher.auth.prefix", AUTH_PREFIX);
+    // Add explicit token as fallback
+    minionConf.setProperty("pinot.minion.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+
+    minionConf.setProperty("pinot.minion.task.auth.provider.class", AUTH_PROVIDER_CLASS);
+    minionConf.setProperty("pinot.minion.task.auth.url", AUTH_URL_PREFIXED);
+    minionConf.setProperty("pinot.minion.task.auth.prefix", AUTH_PREFIX);
+    // Add explicit token as fallback
+    minionConf.setProperty("pinot.minion.task.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
   }
 
   @Override
