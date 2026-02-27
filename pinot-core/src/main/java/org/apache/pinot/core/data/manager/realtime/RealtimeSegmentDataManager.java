@@ -707,8 +707,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     updateCurrentDocumentCountMetrics();
     if (messageBatch.getUnfilteredMessageCount() > 0) {
-      updateIngestionMetrics(messageBatch.getLastMessageMetadata());
+      StreamMessageMetadata lastMetadata = messageBatch.getLastMessageMetadata();
+      updateIngestionMetrics(lastMetadata);
       _hasMessagesFetched = true;
+      // When messages were consumed from the stream but all were filtered out, we update
+      // the segment's ingestion timestamp so freshness tracking reflects fresh data was consumed.
+      if (indexedMessageCount == 0 && streamMessageCount > 0) {
+        if (lastMetadata != null) {
+          _realtimeSegment.updateIngestionTimestamp(lastMetadata.getRecordIngestionTimeMs());
+        }
+      }
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
             indexedMessageCount, streamMessageCount, _currentOffset);

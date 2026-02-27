@@ -706,14 +706,21 @@ public class MutableSegmentImpl implements MutableSegment {
     // Update last indexed time and latest ingestion time
     _lastIndexedTimeMs = System.currentTimeMillis();
     if (metadata != null) {
-      _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, metadata.getRecordIngestionTimeMs());
-      // if for some reason the record ingestion time is in the future, we should not
-      // update the minimum ingestion lag past 0
-      long ingestionLagMs = Math.max(0, _lastIndexedTimeMs - _latestIngestionTimeMs);
-      _minimumIngestionLagMs = Math.min(_minimumIngestionLagMs, ingestionLagMs);
+      updateIngestionTimestamp(metadata.getRecordIngestionTimeMs());
     }
 
     return canTakeMore;
+  }
+
+  /**
+   * Updates ingestion timestamp metadata. This is a public function to allow
+   * external components to update the ingestion timestamp metadata without indexing a row.
+   */
+  public void updateIngestionTimestamp(long recordIngestionTimeMs) {
+    long now = System.currentTimeMillis();
+    _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, recordIngestionTimeMs);
+    long ingestionLagMs = Math.max(0, now - _latestIngestionTimeMs);
+    _minimumIngestionLagMs = Math.min(_minimumIngestionLagMs, ingestionLagMs);
   }
 
   private boolean isUpsertEnabled() {
