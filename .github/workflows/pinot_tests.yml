@@ -168,7 +168,8 @@ jobs:
               --new "$NEW" \
               --error-on-binary-incompatibility \
               --only-incompatible \
-              --ignore-missing-classes
+              --ignore-missing-classes \
+              --exclude @.github/workflows/japicmp-exclude.xml
           done
   unit-test:
     if: github.repository == 'apache/pinot'

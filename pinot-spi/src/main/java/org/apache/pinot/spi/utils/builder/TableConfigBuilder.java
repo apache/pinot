@@ -55,8 +55,8 @@ import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
 
 public class TableConfigBuilder {
-  private static final String DEFAULT_SEGMENT_PUSH_TYPE = "APPEND";
   private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
+  private static final String APPEND_SEGMENT_PUSH_TYPE = "APPEND";
   private static final String DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD = "7d";
   private static final String DEFAULT_NUM_REPLICAS = "1";
   private static final String MMAP_LOAD_MODE = "MMAP";
@@ -74,12 +74,6 @@ public class TableConfigBuilder {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
   private String _deletedSegmentsRetentionPeriod = DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD;
-  @Deprecated
-  private String _segmentPushFrequency;
-
-  // TODO: Remove 'DEFAULT_SEGMENT_PUSH_TYPE' in the future major release.
-  @Deprecated
-  private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
   @Deprecated
   private String _segmentAssignmentStrategy;
   private String _peerSegmentDownloadScheme;
@@ -199,26 +193,6 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setDeletedSegmentsRetentionPeriod(String deletedSegmentsRetentionPeriod) {
     _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
-    return this;
-  }
-
-  /**
-   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
-  public TableConfigBuilder setSegmentPushType(String segmentPushType) {
-    if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
-      _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
-    } else {
-      _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
-    }
-    return this;
-  }
-
-  /**
-   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
-  public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
-    _segmentPushFrequency = segmentPushFrequency;
     return this;
   }
 
@@ -494,8 +468,6 @@ public class TableConfigBuilder {
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
     validationConfig.setDeletedSegmentsRetentionPeriod(_deletedSegmentsRetentionPeriod);
-    validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
-    validationConfig.setSegmentPushType(_segmentPushType);
     validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
     validationConfig.setReplicaGroupStrategyConfig(_replicaGroupStrategyConfig);
     validationConfig.setCompletionConfig(_completionConfig);
