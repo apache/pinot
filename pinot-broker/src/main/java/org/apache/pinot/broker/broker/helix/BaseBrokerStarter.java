@@ -662,6 +662,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (_tlsPort > 0) {
       HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
     }
+
+    // Update admin port
+    String adminApiPortString = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ADMIN_API_PORT);
+    if (adminApiPortString != null) {
+      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.ADMIN_PORT_KEY, Integer.parseInt(adminApiPortString));
+    }
     // Update GRPC query engine port
     if (BrokerGrpcServer.isEnabled(_brokerConf)) {
       int grpcPort = BrokerGrpcServer.getGrpcPort(_brokerConf);

@@ -114,11 +114,13 @@ public final class ListenerConfigUtil {
 
   public static List<ListenerConfig> buildBrokerConfigs(PinotConfiguration brokerConf) {
     List<ListenerConfig> listeners = new ArrayList<>();
+    // Build thread pool config once and reuse for all broker listeners using the same namespace
+    HttpServerThreadPoolConfig threadPoolConfig = buildServerThreadPoolConfig(brokerConf, "pinot.broker");
 
     String queryPortString = brokerConf.getProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT);
     if (queryPortString != null) {
       listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(queryPortString),
-          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(brokerConf, "pinot.broker")));
+          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), threadPoolConfig));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(brokerConf, CommonConstants.Broker.BROKER_TLS_PREFIX);
@@ -129,7 +131,14 @@ public final class ListenerConfigUtil {
     if (listeners.isEmpty()) {
       listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST,
           CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig(),
-          buildServerThreadPoolConfig(brokerConf, "pinot.broker")));
+          threadPoolConfig));
+    }
+
+    // Admin API port support
+    String adminPortString = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ADMIN_API_PORT);
+    if (adminPortString != null) {
+      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminPortString),
+          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), threadPoolConfig));
     }
 
     return listeners;

@@ -64,6 +64,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_REALTIME_SEGMENTS = 6;
   private static final int NUM_SERVERS = 2;
   private static final int NUM_BROKERS = 2;
+  private int _brokerAdminApiPort = 8079;
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
@@ -95,6 +96,8 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
           true);
       configuration.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
           true);
+      _brokerAdminApiPort = _brokerAdminApiPort + 1000;
+      configuration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ADMIN_API_PORT, _brokerAdminApiPort);
     } else {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
           true);

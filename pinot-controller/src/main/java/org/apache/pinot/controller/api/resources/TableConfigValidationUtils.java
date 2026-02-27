@@ -84,7 +84,8 @@ public final class TableConfigValidationUtils {
 
   private static void validateInstanceAssignment(PinotHelixResourceManager resourceManager,
       TableConfig tableConfig) {
-    TableRebalancer tableRebalancer = new TableRebalancer(resourceManager.getHelixZkManager());
+    TableRebalancer tableRebalancer = new TableRebalancer(resourceManager.getHelixZkManager(),
+        resourceManager.getQueryWorkloadManager());
     try {
       tableRebalancer.getInstancePartitionsMap(tableConfig, true, true, true);
     } catch (Exception e) {

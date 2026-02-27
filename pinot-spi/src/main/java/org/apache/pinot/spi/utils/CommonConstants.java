@@ -621,6 +621,8 @@ public class CommonConstants {
     // keep the variable to pass the compability test
     @Deprecated
     public static final int FALLBACK_REPLICA_GROUP_ID = -1;
+    // Admin API port for broker, to be used admin operations.
+    public static final String CONFIG_OF_BROKER_ADMIN_API_PORT = "pinot.broker.adminapi.port";
 
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
         "pinot.broker.query.enable.auto.rewrite.aggregation.type";
