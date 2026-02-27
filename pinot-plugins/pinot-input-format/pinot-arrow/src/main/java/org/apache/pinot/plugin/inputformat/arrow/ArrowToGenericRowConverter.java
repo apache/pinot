@@ -29,9 +29,12 @@ import javax.annotation.Nullable;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.complex.MapVector;
+import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.dictionary.DictionaryEncoder;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.util.Text;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
@@ -113,25 +116,28 @@ public class ArrowToGenericRowConverter {
 
     // Process all fields in the Arrow schema
     for (int i = 0; i < root.getFieldVectors().size(); i++) {
-      Object value;
-
       FieldVector fieldVector = root.getFieldVectors().get(i);
       String fieldName = fieldVector.getField().getName();
+
       try {
-        if (fieldVector.getField().getDictionary() != null) {
-          long dictionaryId = fieldVector.getField().getDictionary().getId();
-          try (ValueVector realFieldVector =
-              DictionaryEncoder.decode(
-                  fieldVector, reader.getDictionaryVectors().get(dictionaryId))) {
-            value = realFieldVector.getObject(rowIndex);
-          }
+        Object value;
+
+        // Handle complex types with potential nested dictionary encoding
+        if (fieldVector instanceof ListVector) {
+          value = extractListValue((ListVector) fieldVector, rowIndex, reader);
+        } else if (fieldVector instanceof MapVector) {
+          value = extractMapValue((MapVector) fieldVector, rowIndex, reader);
+        } else if (fieldVector instanceof StructVector) {
+          value = extractStructValue((StructVector) fieldVector, rowIndex, reader);
         } else {
-          value = fieldVector.getObject(rowIndex);
-        }
-        if (value != null) {
+          // Handle simple types and top-level dictionary encoding
+          value = extractValueFromVector(fieldVector, rowIndex, reader);
           // Convert Arrow-specific types to Pinot-compatible types
-          Object pinotCompatibleValue = convertArrowTypeToPinotCompatible(value);
-          row.putValue(fieldName, pinotCompatibleValue);
+          value = convertArrowTypeToPinotCompatible(value);
+        }
+
+        if (value != null) {
+          row.putValue(fieldName, value);
           convertedFields++;
         }
       } catch (Exception e) {
@@ -141,6 +147,134 @@ public class ArrowToGenericRowConverter {
 
     logger.debug("Converted {} fields from Arrow row {} to GenericRow", convertedFields, rowIndex);
     return row;
+  }
+
+  /**
+   * Extracts value from a FieldVector with dictionary decoding support. Handles null values and
+   * recursively decodes nested dictionary-encoded structures.
+   *
+   * @param vector Source vector to extract from
+   * @param index Row index to extract
+   * @param reader ArrowStreamReader for dictionary lookup
+   * @return Decoded value, or null if value is null
+   */
+  @Nullable
+  private Object extractValueFromVector(FieldVector vector, int index, ArrowStreamReader reader) {
+    // Null check first - preserve nulls throughout decoding
+    if (vector.isNull(index)) {
+      return null;
+    }
+
+    try {
+      // Decode dictionary if present at this level
+      if (vector.getField().getDictionary() != null) {
+        long dictionaryId = vector.getField().getDictionary().getId();
+        ValueVector dictionaryVector = reader.getDictionaryVectors().get(dictionaryId);
+        if (dictionaryVector == null) {
+          logger.error("Dictionary ID {} not found for field {}", dictionaryId, vector.getField().getName());
+          return null;
+        }
+        try (ValueVector decodedVector = DictionaryEncoder.decode(vector, dictionaryVector)) {
+          return decodedVector.getObject(index);
+        }
+      }
+
+      // No dictionary encoding at this level
+      return vector.getObject(index);
+    } catch (Exception e) {
+      logger.error("Error decoding value for field {} at index {}", vector.getField().getName(), index, e);
+      return null;
+    }
+  }
+
+  /**
+   * Extracts and decodes a List value, handling dictionary-encoded elements.
+   */
+  @Nullable
+  private List<Object> extractListValue(ListVector listVector, int index, ArrowStreamReader reader) {
+    if (listVector.isNull(index)) {
+      return null;
+    }
+
+    int startOffset = listVector.getOffsetBuffer().getInt(index * ListVector.OFFSET_WIDTH);
+    int endOffset = listVector.getOffsetBuffer().getInt((index + 1) * ListVector.OFFSET_WIDTH);
+    int elementCount = endOffset - startOffset;
+
+    if (elementCount == 0) {
+      return new ArrayList<>();
+    }
+
+    FieldVector dataVector = listVector.getDataVector();
+    List<Object> result = new ArrayList<>(elementCount);
+
+    for (int i = 0; i < elementCount; i++) {
+      int elementIndex = startOffset + i;
+      Object elementValue = extractValueFromVector(dataVector, elementIndex, reader);
+      result.add(convertArrowTypeToPinotCompatible(elementValue));
+    }
+
+    return result;
+  }
+
+  /**
+   * Extracts and decodes a Struct value, handling dictionary-encoded fields.
+   */
+  @Nullable
+  private Map<String, Object> extractStructValue(StructVector structVector, int index,
+      ArrowStreamReader reader) {
+    if (structVector.isNull(index)) {
+      return null;
+    }
+
+    List<Field> childFields = structVector.getField().getChildren();
+    Map<String, Object> result = new LinkedHashMap<>(childFields.size());
+
+    for (Field childField : childFields) {
+      String fieldName = childField.getName();
+      FieldVector childVector = structVector.getChild(fieldName);
+      if (childVector != null) {
+        Object childValue = extractValueFromVector(childVector, index, reader);
+        result.put(fieldName, convertArrowTypeToPinotCompatible(childValue));
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Extracts and decodes a Map value, handling dictionary-encoded keys and values.
+   */
+  @Nullable
+  private Map<String, Object> extractMapValue(MapVector mapVector, int index, ArrowStreamReader reader) {
+    if (mapVector.isNull(index)) {
+      return null;
+    }
+
+    int startOffset = mapVector.getOffsetBuffer().getInt(index * MapVector.OFFSET_WIDTH);
+    int endOffset = mapVector.getOffsetBuffer().getInt((index + 1) * MapVector.OFFSET_WIDTH);
+    int entryCount = endOffset - startOffset;
+
+    if (entryCount == 0) {
+      return new LinkedHashMap<>();
+    }
+
+    StructVector entriesVector = (StructVector) mapVector.getDataVector();
+    FieldVector keyVector = entriesVector.getChild(MapVector.KEY_NAME);
+    FieldVector valueVector = entriesVector.getChild(MapVector.VALUE_NAME);
+
+    Map<String, Object> result = new LinkedHashMap<>(entryCount);
+
+    for (int i = 0; i < entryCount; i++) {
+      int entryIndex = startOffset + i;
+      Object key = extractValueFromVector(keyVector, entryIndex, reader);
+      Object value = extractValueFromVector(valueVector, entryIndex, reader);
+
+      Object convertedKey = convertArrowTypeToPinotCompatible(key);
+      Object convertedValue = convertArrowTypeToPinotCompatible(value);
+      result.put(String.valueOf(convertedKey), convertedValue);
+    }
+
+    return result;
   }
 
   /**
