@@ -184,6 +184,27 @@ public class SortedGroupByCombineOperatorsTest {
     }
   }
 
+  @Test
+  public void testNoOrderByToSafeTrimPairWiseCombine() {
+    GroupByResultsBlock combineResult = getPairWiseCombineResult(
+        "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn LIMIT 100");
+    assertEquals(combineResult.getDataSchema(),
+        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+    assertEquals(combineResult.getRows().size(), 100);
+    assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+    for (int i = 0; i < 50; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 1L);
+    }
+    for (int i = 50; i < 100; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 2L);
+    }
+  }
+
   // ----
   // Sequential combine
   @Test
@@ -271,6 +292,27 @@ public class SortedGroupByCombineOperatorsTest {
   public void testSafeTrimSequentialCombineServerReturnFinal() {
     GroupByResultsBlock combineResult = getSequentialCombineResultServerReturnFinal(
         "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn ORDER BY intColumn LIMIT 100");
+    assertEquals(combineResult.getDataSchema(),
+        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+    assertEquals(combineResult.getRows().size(), 100);
+    assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+    for (int i = 0; i < 50; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 1L);
+    }
+    for (int i = 50; i < 100; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 2L);
+    }
+  }
+
+  @Test
+  public void testNoOrderByToSafeTrimSequentialCombine() {
+    GroupByResultsBlock combineResult = getSequentialCombineResult(
+        "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn LIMIT 100");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN, "count(*)"},
             new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));

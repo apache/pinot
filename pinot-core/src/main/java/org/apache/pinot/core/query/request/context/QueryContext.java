@@ -83,7 +83,7 @@ public class QueryContext {
   private final FilterContext _filter;
   private final List<ExpressionContext> _groupByExpressions;
   private final FilterContext _havingFilter;
-  private final List<OrderByExpressionContext> _orderByExpressions;
+  private List<OrderByExpressionContext> _orderByExpressions;
   private final int _limit;
   private final int _offset;
   private final Map<String, String> _queryOptions;
@@ -733,12 +733,26 @@ public class QueryContext {
 
       // Pre-calculate group-by configs
       if (queryContext.getGroupByExpressions() != null) {
-        queryContext._isUnsafeTrim =
-            !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
         Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
         if (sortAggregateLimitThreshold != null) {
           queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
         }
+
+        // Convert non-order-by group-by queries with small limit
+        // and no having clause to safeTrim case
+        // to do sort-aggregate for deterministic results
+        if (queryContext.getOrderByExpressions() == null
+            && queryContext.getHavingFilter() == null
+            && queryContext.getLimit() < queryContext.getSortAggregateLimitThreshold()) {
+          List<OrderByExpressionContext> orderByExpressions = new ArrayList<>();
+          for (ExpressionContext groupKey: _groupByExpressions) {
+            orderByExpressions.add(new OrderByExpressionContext(groupKey, true));
+          }
+          queryContext._orderByExpressions = orderByExpressions;
+        }
+
+        queryContext._isUnsafeTrim =
+            !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
         queryContext.setEffectiveSegmentGroupTrimSize(queryContext.calculateEffectiveSegmentGroupTrimSize());
 
         // sortAggregateSequentialCombineNumSegmentsThreshold is defaulted to hardware concurrency

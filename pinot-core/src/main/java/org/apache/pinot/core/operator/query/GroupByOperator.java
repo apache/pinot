@@ -172,7 +172,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
       List<IntermediateRecord> intermediateRecords =
           tableResizer.sortInSegmentResults(groupByExecutor.getGroupKeyGenerator(),
-              groupByExecutor.getGroupByResultHolders(), trimSize);
+              groupByExecutor.getGroupByResultHolders());
       // close groupKeyGenerator after getting intermediateRecords
       groupByExecutor.getGroupKeyGenerator().close();
       resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
