@@ -282,7 +282,7 @@
     <checker-qual.version>3.53.1</checker-qual.version>
     <groovy-all.version>2.4.21</groovy-all.version>
     <xml-apis.version>2.0.2</xml-apis.version>
-    <roaring-bitmap.version>1.6.10</roaring-bitmap.version>
+    <roaring-bitmap.version>1.6.12</roaring-bitmap.version>
     <prometheus.jmx-exporter-javaagent.version>0.20.0</prometheus.jmx-exporter-javaagent.version>
     <fastutil.version>8.5.18</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
