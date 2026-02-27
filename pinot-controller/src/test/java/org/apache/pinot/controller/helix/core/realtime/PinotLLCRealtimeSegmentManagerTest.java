@@ -1622,7 +1622,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._numPartitions = 2;
 
     // Test empty ideal state
-    Set<Integer> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState);
+    Set<Integer> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState, null);
     Assert.assertEquals(partitionIds.size(), 2);
     partitionIds.clear();
 
@@ -1638,8 +1638,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         List.of(new PartitionGroupMetadata(0, new LongMsgOffset(234)),
             new PartitionGroupMetadata(1, new LongMsgOffset(345)));
     doReturn(partitionGroupMetadataList).when(segmentManagerSpy)
-        .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList, idealState);
-    partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState);
+        .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList, idealState, false, false);
+    partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState, null);
     Assert.assertEquals(partitionIds.size(), 2);
   }
 
@@ -2106,7 +2106,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
-        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState) {
+        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState,
+        boolean multitopicSkipMissingTopics) {
       if (_partitionGroupMetadataList != null) {
         return _partitionGroupMetadataList;
       } else {
@@ -2118,8 +2119,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     @Override
     List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState,
-        boolean forceGetOffsetFromStream) {
-      return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
+        boolean forceGetOffsetFromStream, boolean multitopicSkipMissingTopics) {
+      return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState,
+          multitopicSkipMissingTopics);
     }
 
     @Override

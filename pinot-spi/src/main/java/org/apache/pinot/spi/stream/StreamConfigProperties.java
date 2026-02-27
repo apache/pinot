@@ -48,7 +48,7 @@ public class StreamConfigProperties {
   public static final String GROUP_ID = "hlc.group.id";
   public static final String PARTITION_MSG_OFFSET_FACTORY_CLASS = "partition.offset.factory.class.name";
   public static final String TOPIC_CONSUMPTION_RATE_LIMIT = "topic.consumption.rate.limit";
-  public static final String SKIP_MISSING_TOPICS = "skip.missing.topics";
+  public static final String MULTITOPIC_SKIP_MISSING_TOPICS = "multitopic.skip.missing.topics";
   public static final String METADATA_POPULATE = "metadata.populate";
 
   /**

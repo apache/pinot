@@ -378,8 +378,10 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+    boolean multitopicSkipMissingTopics = IngestionConfigUtils.getMultitopicSkipMissingTablesFlag(tableConfig);
     List<Pair<PartitionGroupMetadata, Integer>> newPartitionGroupMetadataList =
-        getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), idealState).stream().map(
+        getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), idealState, false,
+            multitopicSkipMissingTopics).stream().map(
             x -> Pair.of(x, STARTING_SEQUENCE_NUMBER)
         ).collect(Collectors.toList());
     setUpNewTable(tableConfig, idealState, newPartitionGroupMetadataList);
@@ -811,7 +813,8 @@ public class PinotLLCRealtimeSegmentManager {
       int committingSegmentPartitionGroupId = committingLLCSegment.getPartitionGroupId();
 
       List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
-      Set<Integer> partitionIds = getPartitionIds(streamConfigs, idealState);
+      boolean multitopicSkipMissingTopics = IngestionConfigUtils.getMultitopicSkipMissingTablesFlag(tableConfig);
+      Set<Integer> partitionIds = getPartitionIds(streamConfigs, idealState, multitopicSkipMissingTopics);
 
       if (partitionIds.contains(committingSegmentPartitionGroupId)) {
         String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
@@ -1136,7 +1139,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs, IdealState idealState) {
+  Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs, IdealState idealState, boolean multitopicSkipMissingTopics) {
     Set<Integer> partitionIds = new HashSet<>();
     boolean allPartitionIdsFetched = true;
     int numStreams = streamConfigs.size();
@@ -1184,7 +1187,8 @@ public class PinotLLCRealtimeSegmentManager {
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
           getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
       List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-          getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
+          getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState,
+              false, multitopicSkipMissingTopics);
       partitionIds.addAll(newPartitionGroupMetadataList.stream()
           .map(PartitionGroupMetadata::getPartitionGroupId)
           .collect(Collectors.toSet()));
@@ -1199,22 +1203,10 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
-      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState) {
-    return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState,
-        false, false);
-  }
-
-  /**
-   * Fetches the latest state of the PartitionGroups for the stream
-   * If any partition has reached end of life, and all messages of that partition have been consumed by the segment,
-   * it will be skipped from the result
-   */
-  @VisibleForTesting
-  List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState,
-      boolean forceGetOffsetFromStream) {
+      boolean multitopicSkipMissingTopics) {
     return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState,
-        forceGetOffsetFromStream, false);
+        false, multitopicSkipMissingTopics);
   }
 
   /**
@@ -1402,8 +1394,11 @@ public class PinotLLCRealtimeSegmentManager {
           streamConfigs.stream()
               .forEach(streamConfig -> streamConfig.setOffsetCriteria(
                   offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA));
+          boolean multitopicSkipMissingTopics =
+              IngestionConfigUtils.getMultitopicSkipMissingTablesFlag(tableConfig);
           List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-              getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
+              getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState,
+                  false, multitopicSkipMissingTopics);
           streamConfigs.stream().forEach(streamConfig -> streamConfig.setOffsetCriteria(originalOffsetCriteria));
           return ensureAllPartitionsConsuming(tableConfig, streamConfigs, idealState, newPartitionGroupMetadataList,
               offsetCriteria);
@@ -1768,10 +1763,11 @@ public class PinotLLCRealtimeSegmentManager {
                 latestSegmentName, latestSegmentZKMetadata.getStatus());
             continue;
           }
-
+          boolean skipMissingTopics = IngestionConfigUtils.getMultitopicSkipMissingTablesFlag(tableConfig);
           // Smallest offset is fetched from stream once and cached in partitionIdToSmallestOffset.
           if (partitionIdToSmallestOffset == null) {
-            partitionIdToSmallestOffset = fetchPartitionGroupIdToSmallestOffset(streamConfigs, idealState);
+            partitionIdToSmallestOffset = fetchPartitionGroupIdToSmallestOffset(streamConfigs, idealState,
+                skipMissingTopics);
           }
 
           // Do not create new CONSUMING segment when the stream partition has reached end of life.
@@ -1872,7 +1868,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private Map<Integer, StreamPartitionMsgOffset> fetchPartitionGroupIdToSmallestOffset(List<StreamConfig> streamConfigs,
-      IdealState idealState) {
+      IdealState idealState, boolean multitopicSkipMissingTopics) {
     Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToSmallestOffset = new HashMap<>();
     for (StreamConfig streamConfig : streamConfigs) {
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
@@ -1889,7 +1885,7 @@ public class PinotLLCRealtimeSegmentManager {
       // The kafka implementation of computePartitionGroupMetadata() will ignore the current status
       // while the kinesis implementation will use it.
       List<PartitionGroupMetadata> partitionGroupMetadataList = getNewPartitionGroupMetadataList(
-          streamConfigs, currentPartitionGroupConsumptionStatusList, idealState, true);
+          streamConfigs, currentPartitionGroupConsumptionStatusList, idealState, true, multitopicSkipMissingTopics);
       streamConfig.setOffsetCriteria(originalOffsetCriteria);
       for (PartitionGroupMetadata metadata : partitionGroupMetadataList) {
         partitionGroupIdToSmallestOffset.put(metadata.getPartitionGroupId(), metadata.getStartOffset());

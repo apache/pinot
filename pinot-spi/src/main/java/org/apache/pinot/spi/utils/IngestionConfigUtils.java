@@ -357,7 +357,7 @@ public final class IngestionConfigUtils {
    * @param tableConfig the table config
    * @return true if missing topics should be skipped, false otherwise
    */
-  public static boolean getMultitopicSkipMissingTables(TableConfig tableConfig) {
+  public static boolean getMultitopicSkipMissingTablesFlag(TableConfig tableConfig) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig != null && ingestionConfig.getStreamIngestionConfig() != null) {
       return ingestionConfig.getStreamIngestionConfig().isMultitopicSkipMissingTables();
