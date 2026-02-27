@@ -40,13 +40,20 @@ public class TimeValidationColumnTransformer implements ColumnTransformer {
   private final TimeValidationConfig _config;
 
   /**
-   * Create a TimeValidationColumnTransformer.
+   * Create a TimeValidationColumnTransformer for a specific column.
    *
    * @param tableConfig The table configuration
    * @param schema The schema
+   * @param columnName The column name this transformer is being applied to
    */
-  public TimeValidationColumnTransformer(TableConfig tableConfig, Schema schema) {
-    _config = TimeValidationTransformerUtils.getConfig(tableConfig, schema);
+  public TimeValidationColumnTransformer(TableConfig tableConfig, Schema schema, String columnName) {
+    String timeColumnName = tableConfig.getValidationConfig() != null
+        ? tableConfig.getValidationConfig().getTimeColumnName() : null;
+    if (timeColumnName != null && timeColumnName.equals(columnName)) {
+      _config = TimeValidationTransformerUtils.getConfig(tableConfig, schema);
+    } else {
+      _config = null;
+    }
   }
 
   @Override

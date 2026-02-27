@@ -220,4 +220,70 @@ public class SpecialValueColumnTransformerTest {
     assertEquals(resultArray[0], 0.0d);
     assertEquals(Double.doubleToRawLongBits((Double) resultArray[0]), Double.doubleToRawLongBits(0.0d));
   }
+
+  @Test
+  public void testTransformMultiValueFloatWithNaNAndNegativeZero() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("floatMVCol", FieldSpec.DataType.FLOAT)
+        .build();
+    FieldSpec fieldSpec = schema.getFieldSpecFor("floatMVCol");
+
+    SpecialValueColumnTransformer transformer = new SpecialValueColumnTransformer(fieldSpec);
+    Object[] values = new Object[]{-0.0f, Float.NaN, 2.0f};
+    Object result = transformer.transform(values);
+
+    assertTrue(result instanceof Object[]);
+    Object[] resultArray = (Object[]) result;
+    assertEquals(resultArray.length, 2);
+    assertEquals(resultArray[0], 0.0f);
+    assertEquals(Float.floatToRawIntBits((Float) resultArray[0]), Float.floatToRawIntBits(0.0f));
+    assertEquals(resultArray[1], 2.0f);
+  }
+
+  @Test
+  public void testTransformMultiValueDoubleWithNaN() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("doubleMVCol", FieldSpec.DataType.DOUBLE)
+        .build();
+    FieldSpec fieldSpec = schema.getFieldSpecFor("doubleMVCol");
+
+    SpecialValueColumnTransformer transformer = new SpecialValueColumnTransformer(fieldSpec);
+    Object[] values = new Object[]{-0.0d, Double.NaN, 2.0d};
+    Object result = transformer.transform(values);
+
+    assertTrue(result instanceof Object[]);
+    Object[] resultArray = (Object[]) result;
+    assertEquals(resultArray.length, 2);
+    assertEquals(resultArray[0], 0.0d);
+    assertEquals(Double.doubleToRawLongBits((Double) resultArray[0]), Double.doubleToRawLongBits(0.0d));
+    assertEquals(resultArray[1], 2.0d);
+  }
+
+  @Test
+  public void testTransformBigDecimalZeroVariants() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMetricField("bigDecimalCol", FieldSpec.DataType.BIG_DECIMAL)
+        .build();
+    FieldSpec fieldSpec = schema.getFieldSpecFor("bigDecimalCol");
+
+    SpecialValueColumnTransformer transformer = new SpecialValueColumnTransformer(fieldSpec);
+
+    assertEquals(transformer.transform(new BigDecimal("0")), BigDecimal.ZERO);
+    assertEquals(transformer.transform(new BigDecimal("0.0")), BigDecimal.ZERO);
+    assertEquals(transformer.transform(new BigDecimal("0E-18")), BigDecimal.ZERO);
+  }
+
+  @Test
+  public void testTransformNormalDouble() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("doubleCol", FieldSpec.DataType.DOUBLE)
+        .build();
+    FieldSpec fieldSpec = schema.getFieldSpecFor("doubleCol");
+
+    SpecialValueColumnTransformer transformer = new SpecialValueColumnTransformer(fieldSpec);
+    Double value = 1.5d;
+    Object result = transformer.transform(value);
+
+    assertSame(result, value);
+  }
 }

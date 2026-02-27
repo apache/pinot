@@ -103,44 +103,6 @@ public class TimeValidationTransformerUtils {
   }
 
   /**
-   * Validate that the time value is within the valid range (1971-2071).
-   *
-   * @param timeValue The time value to validate
-   * @param timeFormatSpec The format spec to parse the time value
-   * @return The original timeValue if valid, null if invalid or null input
-   * @throws Exception if parsing fails
-   */
-  @Nullable
-  public static Object validateTimeValue(@Nullable Object timeValue, DateTimeFormatSpec timeFormatSpec)
-      throws Exception {
-    if (timeValue == null) {
-      return null;
-    }
-    long timeValueMs = timeFormatSpec.fromFormatToMillis(timeValue.toString());
-    if (!TimeUtils.timeValueInValidRange(timeValueMs)) {
-      return null;
-    }
-    return timeValue;
-  }
-
-  /**
-   * Check if the time value is within the valid range (1971-2071).
-   *
-   * @param timeValue The time value to check
-   * @param timeFormatSpec The format spec to parse the time value
-   * @return true if the time value is valid, false otherwise
-   * @throws Exception if parsing fails
-   */
-  public static boolean isTimeValueValid(@Nullable Object timeValue, DateTimeFormatSpec timeFormatSpec)
-      throws Exception {
-    if (timeValue == null) {
-      return true; // null values are considered valid (handled by NullValueTransformer)
-    }
-    long timeValueMs = timeFormatSpec.fromFormatToMillis(timeValue.toString());
-    return TimeUtils.timeValueInValidRange(timeValueMs);
-  }
-
-  /**
    * Transform (validate) a time value. Returns the value unchanged if valid, null if invalid.
    * Handles error logging/throwing based on the config's continueOnError setting.
    *
@@ -153,30 +115,32 @@ public class TimeValidationTransformerUtils {
     if (value == null) {
       return null;
     }
+
+    // Step 1: Parse
+    long timeValueMs;
     try {
-      long timeValueMs = config.getTimeFormatSpec().fromFormatToMillis(value.toString());
-      if (!TimeUtils.timeValueInValidRange(timeValueMs)) {
-        String errorMessage =
-            String.format("Time value: %s is not in valid range: %s", new DateTime(timeValueMs, DateTimeZone.UTC),
-                TimeUtils.VALID_TIME_INTERVAL);
-        if (!config.isContinueOnError()) {
-          throw new IllegalStateException(errorMessage);
-        }
-        config.getThrottledLogger().warn(errorMessage, new IllegalStateException(errorMessage));
-        return null;
-      }
-      return value;
-    } catch (IllegalStateException e) {
-      throw e;
+      timeValueMs = config.getTimeFormatSpec().fromFormatToMillis(value.toString());
     } catch (Exception e) {
-      String errorMessage =
-          String.format("Caught exception while parsing time value: %s with format: %s", value,
-              config.getTimeFormatSpec());
+      String errorMessage = String.format("Caught exception while parsing time value: %s with format: %s", value,
+        config.getTimeFormatSpec());
       if (!config.isContinueOnError()) {
         throw new IllegalStateException(errorMessage, e);
       }
       config.getThrottledLogger().warn(errorMessage, e);
       return null;
     }
+
+    // Step 2: Validate
+    if (!TimeUtils.timeValueInValidRange(timeValueMs)) {
+      String errorMessage = String.format("Time value: %s is not in valid range: %s",
+              new DateTime(timeValueMs, DateTimeZone.UTC), TimeUtils.VALID_TIME_INTERVAL);
+      if (!config.isContinueOnError()) {
+        throw new IllegalStateException(errorMessage);
+      }
+      config.getThrottledLogger().warn(errorMessage, new IllegalStateException(errorMessage));
+      return null;
+    }
+
+    return value;
   }
 }

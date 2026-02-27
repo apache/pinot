@@ -46,7 +46,7 @@ public class TimeValidationColumnTransformerTest {
         .setTableName("testTable")
         .build();
 
-    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema);
+    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema, "timeCol");
     assertTrue(transformer.isNoOp(), "Should be no-op when no time column configured");
   }
 
@@ -62,12 +62,12 @@ public class TimeValidationColumnTransformerTest {
         .build();
     // rowTimeValueCheck is false by default
 
-    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema);
+    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema, "timeCol");
     assertTrue(transformer.isNoOp(), "Should be no-op when time value check is disabled");
   }
 
   @Test
-  public void testIsNoOpWhenTimeValueCheckEnabled() {
+  public void testIsNotNoOpWhenTimeValueCheckEnabled() {
     Schema schema = new Schema.SchemaBuilder()
         .addDateTime("timeCol", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
@@ -81,7 +81,7 @@ public class TimeValidationColumnTransformerTest {
         .setIngestionConfig(ingestionConfig)
         .build();
 
-    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema);
+    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema, "timeCol");
     assertTrue(!transformer.isNoOp(), "Should not be no-op when time value check is enabled");
   }
 
@@ -100,7 +100,7 @@ public class TimeValidationColumnTransformerTest {
         .setIngestionConfig(ingestionConfig)
         .build();
 
-    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema);
+    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema, "timeCol");
 
     // Valid time: current time
     long validTime = System.currentTimeMillis();
@@ -124,7 +124,7 @@ public class TimeValidationColumnTransformerTest {
         .setIngestionConfig(ingestionConfig)
         .build();
 
-    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema);
+    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema, "timeCol");
     Object result = transformer.transform(null);
 
     assertNull(result, "Null should return null");
@@ -146,7 +146,7 @@ public class TimeValidationColumnTransformerTest {
         .setIngestionConfig(ingestionConfig)
         .build();
 
-    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema);
+    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema, "timeCol");
 
     // Invalid time: year 2100 (after 2071)
     long invalidTime = 4102444800000L;
@@ -171,7 +171,7 @@ public class TimeValidationColumnTransformerTest {
         .setIngestionConfig(ingestionConfig)
         .build();
 
-    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema);
+    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema, "timeCol");
 
     // Invalid time: year 2100 (after 2071)
     long invalidTime = 4102444800000L;
@@ -193,7 +193,7 @@ public class TimeValidationColumnTransformerTest {
         .setIngestionConfig(ingestionConfig)
         .build();
 
-    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema);
+    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema, "timeCol");
 
     // Valid time as string
     String validTime = String.valueOf(System.currentTimeMillis());
@@ -217,12 +217,72 @@ public class TimeValidationColumnTransformerTest {
         .setIngestionConfig(ingestionConfig)
         .build();
 
-    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema);
+    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema, "timeCol");
 
     // Time at the start of valid range (1971)
     long boundaryTime = 31536000000L; // Jan 1, 1971 in millis
     Object result = transformer.transform(boundaryTime);
 
     assertEquals(result, boundaryTime, "Time at 1971 boundary should be valid");
+  }
+
+  @Test
+  public void testTransformVerySmallInvalidTime() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addDateTime("timeCol", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setRowTimeValueCheck(true);
+    ingestionConfig.setContinueOnError(true);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .setTimeColumnName("timeCol")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    TimeValidationColumnTransformer transformer = new TimeValidationColumnTransformer(tableConfig, schema, "timeCol");
+
+    // Very small value (1L) is clearly invalid (pre-1971)
+    Object result = transformer.transform(1L);
+
+    assertNull(result, "Very small time value (1L) should be invalid and transformed to null");
+  }
+
+  @Test
+  public void testIsNoOpForNonTimeColumn() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addDateTime("timeCol", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addSingleValueDimension("otherCol", FieldSpec.DataType.STRING)
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setRowTimeValueCheck(true);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .setTimeColumnName("timeCol")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    TimeValidationColumnTransformer transformer =
+        new TimeValidationColumnTransformer(tableConfig, schema, "otherCol");
+    assertTrue(transformer.isNoOp(), "Should be no-op for non-time column");
+  }
+
+  @Test
+  public void testIsNoOpWhenNoTimeColumnConfigured() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("col1", FieldSpec.DataType.LONG)
+        .build();
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+
+    TimeValidationColumnTransformer transformer =
+        new TimeValidationColumnTransformer(tableConfig, schema, "col1");
+    assertTrue(transformer.isNoOp(), "Should be no-op when no time column is configured in table config");
   }
 }

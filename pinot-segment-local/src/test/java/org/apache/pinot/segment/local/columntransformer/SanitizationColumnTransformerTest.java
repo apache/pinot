@@ -59,8 +59,10 @@ public class SanitizationColumnTransformerTest {
 
   @Test
   public void testIsNotNoOpForJson() {
+    DimensionFieldSpec bytesFieldSpec = new DimensionFieldSpec("jsonCol", FieldSpec.DataType.JSON, true);
+    bytesFieldSpec.setMaxLengthExceedStrategy(MaxLengthExceedStrategy.TRIM_LENGTH);
     Schema schema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("jsonCol", FieldSpec.DataType.JSON)
+        .addField(bytesFieldSpec)
         .build();
     FieldSpec fieldSpec = schema.getFieldSpecFor("jsonCol");
 
@@ -70,15 +72,16 @@ public class SanitizationColumnTransformerTest {
 
   @Test
   public void testIsNotNoOpForBytes() {
+    DimensionFieldSpec bytesFieldSpec = new DimensionFieldSpec("bytesCol", FieldSpec.DataType.BYTES, true);
+    bytesFieldSpec.setMaxLengthExceedStrategy(MaxLengthExceedStrategy.TRIM_LENGTH);
     Schema schema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("bytesCol", FieldSpec.DataType.BYTES)
+        .addField(bytesFieldSpec)
         .build();
     FieldSpec fieldSpec = schema.getFieldSpecFor("bytesCol");
 
     SanitizationColumnTransformer transformer = new SanitizationColumnTransformer(fieldSpec);
-    // BYTES with NO_ACTION strategy should be no-op
-    // Default strategy depends on field spec configuration
-    assertTrue(transformer.isNoOp() || !transformer.isNoOp());
+    // BYTES with TRIM_LENGTH strategy should not be no-op
+    assertFalse(transformer.isNoOp(), "BYTES column with TRIM_LENGTH strategy should not be no-op");
   }
 
   @Test
@@ -222,5 +225,107 @@ public class SanitizationColumnTransformerTest {
     assertEquals(resultArray.length, 2);
     assertEquals(resultArray[0], new byte[]{1, 2, 3});
     assertEquals(resultArray[1], new byte[]{6, 7});
+  }
+
+  // --- JSON max length tests (4 strategies) ---
+
+  @Test
+  public void testIsNoOpForJsonWithNoActionStrategy() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("jsonCol", FieldSpec.DataType.JSON, true);
+    fieldSpec.setMaxLength(10);
+    fieldSpec.setMaxLengthExceedStrategy(MaxLengthExceedStrategy.NO_ACTION);
+
+    SanitizationColumnTransformer transformer = new SanitizationColumnTransformer(fieldSpec);
+    assertTrue(transformer.isNoOp(), "JSON column with NO_ACTION strategy should be no-op");
+  }
+
+  @Test
+  public void testTransformJsonExceedsMaxLengthWithTrimStrategy() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("jsonCol", FieldSpec.DataType.JSON, true);
+    fieldSpec.setMaxLength(10);
+    fieldSpec.setMaxLengthExceedStrategy(MaxLengthExceedStrategy.TRIM_LENGTH);
+
+    SanitizationColumnTransformer transformer = new SanitizationColumnTransformer(fieldSpec);
+    String value = "{\"first\": \"daffy\", \"last\": \"duck\"}";
+    Object result = transformer.transform(value);
+
+    assertEquals(result, "{\"first\": ");
+  }
+
+  @Test
+  public void testTransformJsonExceedsMaxLengthWithSubstituteStrategy() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("jsonCol", FieldSpec.DataType.JSON, true);
+    fieldSpec.setMaxLength(10);
+    fieldSpec.setMaxLengthExceedStrategy(MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+    fieldSpec.setDefaultNullValue("null");
+
+    SanitizationColumnTransformer transformer = new SanitizationColumnTransformer(fieldSpec);
+    String value = "{\"first\": \"daffy\", \"last\": \"duck\"}";
+    Object result = transformer.transform(value);
+
+    assertEquals(result, "null");
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testTransformJsonExceedsMaxLengthWithErrorStrategy() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("jsonCol", FieldSpec.DataType.JSON, true);
+    fieldSpec.setMaxLength(10);
+    fieldSpec.setMaxLengthExceedStrategy(MaxLengthExceedStrategy.ERROR);
+
+    SanitizationColumnTransformer transformer = new SanitizationColumnTransformer(fieldSpec);
+    String value = "{\"first\": \"daffy\", \"last\": \"duck\"}";
+    transformer.transform(value); // Should throw
+  }
+
+  // --- Bytes SUBSTITUTE_DEFAULT_VALUE and ERROR tests ---
+
+  @Test
+  public void testTransformBytesExceedsMaxLengthWithSubstituteStrategy() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("bytesCol", FieldSpec.DataType.BYTES, true);
+    fieldSpec.setMaxLength(3);
+    fieldSpec.setMaxLengthExceedStrategy(MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+    fieldSpec.setDefaultNullValue(new byte[0]);
+
+    SanitizationColumnTransformer transformer = new SanitizationColumnTransformer(fieldSpec);
+    byte[] value = new byte[]{1, 2, 3, 4, 5};
+    Object result = transformer.transform(value);
+
+    assertEquals(result, new byte[0]);
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testTransformBytesExceedsMaxLengthWithErrorStrategy() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("bytesCol", FieldSpec.DataType.BYTES, true);
+    fieldSpec.setMaxLength(3);
+    fieldSpec.setMaxLengthExceedStrategy(MaxLengthExceedStrategy.ERROR);
+
+    SanitizationColumnTransformer transformer = new SanitizationColumnTransformer(fieldSpec);
+    byte[] value = new byte[]{1, 2, 3, 4, 5};
+    transformer.transform(value); // Should throw
+  }
+
+  // --- String null character with ERROR and SUBSTITUTE strategies ---
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testTransformStringWithNullCharacterAndErrorStrategy() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("stringCol", FieldSpec.DataType.STRING, true);
+    fieldSpec.setMaxLengthExceedStrategy(MaxLengthExceedStrategy.ERROR);
+
+    SanitizationColumnTransformer transformer = new SanitizationColumnTransformer(fieldSpec);
+    String value = "hello\0world";
+    transformer.transform(value); // Should throw
+  }
+
+  @Test
+  public void testTransformStringWithNullCharacterAndSubstituteStrategy() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("stringCol", FieldSpec.DataType.STRING, true);
+    fieldSpec.setMaxLengthExceedStrategy(MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+    fieldSpec.setDefaultNullValue("null");
+
+    SanitizationColumnTransformer transformer = new SanitizationColumnTransformer(fieldSpec);
+    String value = "hello\0world";
+    Object result = transformer.transform(value);
+
+    assertEquals(result, "null");
   }
 }

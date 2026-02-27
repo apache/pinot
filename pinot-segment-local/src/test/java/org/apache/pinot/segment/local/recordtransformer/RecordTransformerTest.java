@@ -281,6 +281,26 @@ public class RecordTransformerTest {
       transformer.transform(record3);
       assertEquals(record3.getValue(timeCol), currentTimeMillis);
     }
+
+    // Valid timestamp as string, validation enabled
+    transformer = new TimeValidationTransformer(tableConfig, schema);
+    GenericRow record4 = getRecord();
+    String timeStr = String.valueOf(System.currentTimeMillis());
+    record4.putValue(timeCol, timeStr);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      transformer.transform(record4);
+      assertEquals(record4.getValue(timeCol), timeStr);
+    }
+
+    // Boundary time at 1971, validation enabled
+    transformer = new TimeValidationTransformer(tableConfig, schema);
+    GenericRow record5 = getRecord();
+    long boundaryTime = 31536000000L; // Jan 1, 1971 in millis
+    record5.putValue(timeCol, boundaryTime);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      transformer.transform(record5);
+      assertEquals(record5.getValue(timeCol), boundaryTime);
+    }
   }
 
   @Test
