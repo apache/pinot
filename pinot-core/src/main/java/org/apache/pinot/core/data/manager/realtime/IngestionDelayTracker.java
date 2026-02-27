@@ -555,12 +555,11 @@ public class IngestionDelayTracker {
    */
   public long getPartitionEndToEndIngestionDelayMs(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
-    long firstStreamIngestionTimeMs = 0;
-    if ((ingestionInfo != null) && (ingestionInfo._firstStreamIngestionTimeMs > 0)) {
-      firstStreamIngestionTimeMs = ingestionInfo._firstStreamIngestionTimeMs;
+    if (ingestionInfo == null || ingestionInfo._firstStreamIngestionTimeMs < 0) {
+      return 0;
     }
     // Compute aged delay for current partition
-    long agedIngestionDelayMs = _clock.millis() - firstStreamIngestionTimeMs;
+    long agedIngestionDelayMs = _clock.millis() - ingestionInfo._firstStreamIngestionTimeMs;
     // Correct to zero for any time shifts due to NTP or time reset.
     return Math.max(agedIngestionDelayMs, 0);
   }
@@ -574,12 +573,11 @@ public class IngestionDelayTracker {
    */
   public long getPartitionIngestionDelayMs(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
-    long ingestionTimeMs = 0;
-    if ((ingestionInfo != null) && (ingestionInfo._ingestionTimeMs > 0)) {
-      ingestionTimeMs = ingestionInfo._ingestionTimeMs;
+    if (ingestionInfo == null || ingestionInfo._ingestionTimeMs < 0) {
+      return 0;
     }
     // Compute aged delay for current partition
-    long agedIngestionDelayMs = _clock.millis() - ingestionTimeMs;
+    long agedIngestionDelayMs = _clock.millis() - ingestionInfo._ingestionTimeMs;
     // Correct to zero for any time shifts due to NTP or time reset.
     return Math.max(agedIngestionDelayMs, 0);
   }
