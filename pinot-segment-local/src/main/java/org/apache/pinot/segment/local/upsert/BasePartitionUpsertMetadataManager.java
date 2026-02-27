@@ -53,6 +53,7 @@ import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.local.utils.WatermarkUtils;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -135,6 +136,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // for a configurable period, to wait for brokers to add the segment in routing tables.
   private final Map<String, Long> _newlyAddedSegments = new ConcurrentHashMap<>();
   private final long _newSegmentTrackingTimeMs;
+
+  // Variables to check if all segments are loaded before allowing delete key removal
+  // This prevents stale records from reappearing after server restart due to out-of-order segment loading
+  private volatile boolean _allSegmentsLoaded = false;
+  private long _lastSegmentsLoadedCheckTimeMs = 0;
+  private static final long SEGMENTS_LOADED_CHECK_INTERVAL_MS = 5000; // Check every 5 seconds
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
@@ -301,6 +308,43 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected boolean isTTLEnabled() {
     return _metadataTTL > 0 || _deletedKeysTTL > 0;
+  }
+
+  /**
+   * Checks if all segments are loaded for the table. Uses a cached result to avoid frequent checks.
+   * Once all segments are loaded, the check is skipped in subsequent calls.
+   * This method is used to prevent deleted primary keys from being removed from memory until all segments
+   * are loaded, which prevents stale records from reappearing after server restart due to out-of-order
+   * segment loading.
+   *
+   * @return true if all segments are loaded, false otherwise
+   */
+  protected boolean areAllSegmentsLoaded() {
+    if (_allSegmentsLoaded) {
+      return true;
+    }
+    synchronized (this) {
+      if (_allSegmentsLoaded) {
+        return true;
+      }
+      long currentTimeMs = System.currentTimeMillis();
+      if (currentTimeMs - _lastSegmentsLoadedCheckTimeMs <= SEGMENTS_LOADED_CHECK_INTERVAL_MS) {
+        return false;
+      }
+      _lastSegmentsLoadedCheckTimeMs = currentTimeMs;
+      TableDataManager tableDataManager = _context.getTableDataManager();
+      if (tableDataManager != null) {
+        HelixManager helixManager = tableDataManager.getHelixManager();
+        if (helixManager != null) {
+          _allSegmentsLoaded = TableStateUtils.isAllSegmentsLoaded(helixManager, _tableNameWithType);
+          if (_allSegmentsLoaded) {
+            _logger.info("All segments are now loaded for table: {}, partition: {}", _tableNameWithType, _partitionId);
+          }
+          return _allSegmentsLoaded;
+        }
+      }
+      return false;
+    }
   }
 
   protected double getMaxComparisonValue(IndexSegment segment) {
