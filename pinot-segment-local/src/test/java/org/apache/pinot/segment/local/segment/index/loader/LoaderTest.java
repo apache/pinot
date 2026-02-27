@@ -31,7 +31,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.utils.BaseSegmentOperationsThrottler;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -74,8 +74,8 @@ public class LoaderTest {
   private static final String VECTOR_INDEX_COL_NAME = "vector1";
   private static final int VECTOR_DIM_SIZE = 512;
 
-  private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER =
-      new SegmentOperationsThrottler(new BaseSegmentOperationsThrottler(1, 2, true),
+  private static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER =
+      new SegmentOperationsThrottlerSet(new BaseSegmentOperationsThrottler(1, 2, true),
           new BaseSegmentOperationsThrottler(1, 2, true), new BaseSegmentOperationsThrottler(1, 2, true),
           new BaseSegmentOperationsThrottler(1, 2, true));
 

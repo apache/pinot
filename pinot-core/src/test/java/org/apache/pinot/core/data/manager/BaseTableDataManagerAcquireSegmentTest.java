@@ -37,7 +37,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.BaseSegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -123,15 +123,15 @@ public class BaseTableDataManagerAcquireSegmentTest {
     when(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes()).thenReturn(DELETED_SEGMENTS_TTL_MINUTES);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).build();
-    SegmentOperationsThrottler segmentOperationsThrottler =
-        new SegmentOperationsThrottler(
+    SegmentOperationsThrottlerSet segmentOperationsThrottlerSet =
+        new SegmentOperationsThrottlerSet(
             new BaseSegmentOperationsThrottler(8, 10, true),
             new BaseSegmentOperationsThrottler(4, 8, true),
             new BaseSegmentOperationsThrottler(10, 20, true),
             new BaseSegmentOperationsThrottler(4, 8, true));
     TableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, schema,
-        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, segmentOperationsThrottler,
+        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, segmentOperationsThrottlerSet,
         false, mock(ServerReloadJobStatusCache.class));
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");

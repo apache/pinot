@@ -60,7 +60,7 @@ import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -128,7 +128,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, ServerReloadJobStatusCache reloadJobStatusCache)
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception {
     LOGGER.info("Initializing Helix instance data manager");
 
@@ -140,7 +140,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     String tableDataManagerProviderClass = _instanceDataManagerConfig.getTableDataManagerProviderClass();
     LOGGER.info("Initializing table data manager provider of class: {}", tableDataManagerProviderClass);
     _tableDataManagerProvider = PluginManager.get().createInstance(tableDataManagerProviderClass);
-    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks, segmentOperationsThrottler,
+    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks,
+        segmentOperationsThrottlerSet,
         _reloadJobStatusCache);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
