@@ -76,6 +76,7 @@ public class SanitizationTransformerUtils {
     private final int _maxLength;
     private final MaxLengthExceedStrategy _maxLengthExceedStrategy;
     private final Object _defaultNullValue;
+    private final SanitizationResult _result = new SanitizationResult();
 
     SanitizedColumnInfo(String columnName, int maxLength, MaxLengthExceedStrategy maxLengthExceedStrategy,
         Object defaultNullValue) {
@@ -100,16 +101,24 @@ public class SanitizationTransformerUtils {
     Object getDefaultNullValue() {
       return _defaultNullValue;
     }
+
+    SanitizationResult getResult() {
+      return _result;
+    }
   }
 
   /**
-   * Result of sanitization containing the sanitized value and whether it was modified.
+   * Mutable result of sanitization containing the sanitized value and whether it was modified.
+   * Reused across calls to avoid repeated object allocation.
    */
   public static class SanitizationResult {
-    private final Object _value;
-    private final boolean _sanitized;
+    private Object _value;
+    private boolean _sanitized;
 
-    SanitizationResult(Object value, boolean sanitized) {
+    SanitizationResult() {
+    }
+
+    void set(Object value, boolean sanitized) {
       _value = value;
       _sanitized = sanitized;
     }
@@ -128,60 +137,51 @@ public class SanitizationTransformerUtils {
     if (value == null) {
       return null;
     }
+    SanitizationResult result = columnInfo.getResult();
     if (value instanceof byte[]) {
       // Single-value BYTES column
-      return SanitizationTransformerUtils.sanitizeBytesValue(columnInfo, (byte[]) value);
+      sanitizeBytesValue(columnInfo, (byte[]) value, result);
+      return result;
     } else if (value instanceof String) {
       // Single-valued String column
-      return SanitizationTransformerUtils.sanitizeStringValue(columnInfo, (String) value);
+      sanitizeStringValue(columnInfo, (String) value, result);
+      return result;
     } else if (value instanceof Object[]) {
       // Multi-valued String / BYTES column
       Object[] values = (Object[]) value;
       boolean isSanitized = false;
       for (int i = 0; i < values.length; i++) {
-        SanitizationResult result;
         if (values[i] instanceof byte[]) {
-          result = SanitizationTransformerUtils.sanitizeBytesValue(columnInfo, (byte[]) values[i]);
+          sanitizeBytesValue(columnInfo, (byte[]) values[i], result);
         } else {
-          result = SanitizationTransformerUtils.sanitizeStringValue(columnInfo, values[i].toString());
+          sanitizeStringValue(columnInfo, values[i].toString(), result);
         }
-        isSanitized = result.isSanitized();
+        isSanitized |= result.isSanitized();
         values[i] = result.getValue();
       }
-      return new SanitizationResult(values, isSanitized);
+      result.set(values, isSanitized);
+      return result;
     }
     return null;
   }
 
   /**
    * Sanitize a string value based on column info configuration.
-   *
-   * @param columnInfo The sanitization configuration for the column
-   * @param value The string value to sanitize
-   * @return The sanitization result containing the sanitized value and whether it was modified
-   * @throws IllegalStateException If strategy is ERROR and value exceeds max length or contains null character
+   * Updates the provided result in place.
    */
-  private static SanitizationResult sanitizeStringValue(SanitizedColumnInfo columnInfo, String value) {
-    String columnName = columnInfo.getColumnName();
-    int maxLength = columnInfo.getMaxLength();
-    MaxLengthExceedStrategy strategy = columnInfo.getMaxLengthExceedStrategy();
-    Object defaultNullValue = columnInfo.getDefaultNullValue();
-    return sanitizeStringValue(columnName, value, maxLength, strategy, defaultNullValue);
+  private static void sanitizeStringValue(SanitizedColumnInfo columnInfo, String value, SanitizationResult result) {
+    sanitizeStringValue(columnInfo.getColumnName(), value, columnInfo.getMaxLength(),
+        columnInfo.getMaxLengthExceedStrategy(), columnInfo.getDefaultNullValue(), result);
   }
 
   /**
    * Sanitize a string value based on max length and strategy.
+   * Updates the provided result in place.
    *
-   * @param columnName The column name (for error messages)
-   * @param value The string value to sanitize
-   * @param maxLength The maximum allowed length
-   * @param strategy The strategy to use when max length is exceeded
-   * @param defaultNullValue The default null value to use for SUBSTITUTE_DEFAULT_VALUE strategy
-   * @return The sanitization result containing the sanitized value and whether it was modified
    * @throws IllegalStateException If strategy is ERROR and value exceeds max length or contains null character
    */
-  private static SanitizationResult sanitizeStringValue(String columnName, String value, int maxLength,
-      MaxLengthExceedStrategy strategy, Object defaultNullValue) {
+  private static void sanitizeStringValue(String columnName, String value, int maxLength,
+      MaxLengthExceedStrategy strategy, Object defaultNullValue, SanitizationResult result) {
     String sanitizedValue = StringUtil.sanitizeStringValue(value, maxLength);
     int index;
 
@@ -190,9 +190,11 @@ public class SanitizationTransformerUtils {
     if (sanitizedValue != value) {
       switch (strategy) {
         case TRIM_LENGTH:
-          return new SanitizationResult(sanitizedValue, true);
+          result.set(sanitizedValue, true);
+          return;
         case SUBSTITUTE_DEFAULT_VALUE:
-          return new SanitizationResult(FieldSpec.getStringValue(defaultNullValue), true);
+          result.set(FieldSpec.getStringValue(defaultNullValue), true);
+          return;
         case ERROR:
           index = value.indexOf(NULL_CHARACTER);
           if (index < 0) {
@@ -207,59 +209,54 @@ public class SanitizationTransformerUtils {
         case NO_ACTION:
           index = value.indexOf(NULL_CHARACTER);
           if (index < 0) {
-            return new SanitizationResult(value, false);
+            result.set(value, false);
           } else {
-            return new SanitizationResult(sanitizedValue, true);
+            result.set(sanitizedValue, true);
           }
+          return;
         default:
           throw new IllegalStateException("Unsupported max length exceed strategy: " + strategy);
       }
     }
-    return new SanitizationResult(value, false);
+    result.set(value, false);
   }
 
   /**
    * Sanitize a bytes value based on column info configuration.
-   *
-   * @param columnInfo The sanitization configuration for the column
-   * @param value The bytes value to sanitize
-   * @return The sanitization result containing the sanitized value and whether it was modified
-   * @throws IllegalStateException If strategy is ERROR and value exceeds max length
+   * Updates the provided result in place.
    */
-  private static SanitizationResult sanitizeBytesValue(SanitizedColumnInfo columnInfo, byte[] value) {
-    return sanitizeBytesValue(columnInfo.getColumnName(), value, columnInfo.getMaxLength(),
-        columnInfo.getMaxLengthExceedStrategy(), columnInfo.getDefaultNullValue());
+  private static void sanitizeBytesValue(SanitizedColumnInfo columnInfo, byte[] value, SanitizationResult result) {
+    sanitizeBytesValue(columnInfo.getColumnName(), value, columnInfo.getMaxLength(),
+        columnInfo.getMaxLengthExceedStrategy(), columnInfo.getDefaultNullValue(), result);
   }
 
   /**
    * Sanitize a bytes value based on max length and strategy.
+   * Updates the provided result in place.
    *
-   * @param columnName The column name (for error messages)
-   * @param value The bytes value to sanitize
-   * @param maxLength The maximum allowed length
-   * @param strategy The strategy to use when max length is exceeded
-   * @param defaultNullValue The default null value to use for SUBSTITUTE_DEFAULT_VALUE strategy
-   * @return The sanitization result containing the sanitized value and whether it was modified
    * @throws IllegalStateException If strategy is ERROR and value exceeds max length
    */
-  private static SanitizationResult sanitizeBytesValue(String columnName, byte[] value, int maxLength,
-      MaxLengthExceedStrategy strategy, Object defaultNullValue) {
+  private static void sanitizeBytesValue(String columnName, byte[] value, int maxLength,
+      MaxLengthExceedStrategy strategy, Object defaultNullValue, SanitizationResult result) {
     if (value.length > maxLength) {
       switch (strategy) {
         case TRIM_LENGTH:
-          return new SanitizationResult(Arrays.copyOf(value, maxLength), true);
+          result.set(Arrays.copyOf(value, maxLength), true);
+          return;
         case SUBSTITUTE_DEFAULT_VALUE:
-          return new SanitizationResult(defaultNullValue, true);
+          result.set(defaultNullValue, true);
+          return;
         case ERROR:
           throw new IllegalStateException(
               String.format("Throwing exception as value for column %s exceeds configured max length %d.", columnName,
                   maxLength));
         case NO_ACTION:
-          return new SanitizationResult(value, false);
+          result.set(value, false);
+          return;
         default:
           throw new IllegalStateException("Unsupported max length exceed strategy: " + strategy);
       }
     }
-    return new SanitizationResult(value, false);
+    result.set(value, false);
   }
 }
