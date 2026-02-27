@@ -51,7 +51,8 @@ public interface InstanceDataManager {
    * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.instance'
    */
   void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, ServerReloadJobStatusCache reloadJobStatusCache)
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
+      ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception;
 
   /**
