@@ -38,8 +38,8 @@ import org.slf4j.LoggerFactory;
  * this throttler. The throttlers passed in for now cannot be 'null', instead for code paths that do not need
  * throttling, this object itself will be passed in as 'null'.
  */
-public class SegmentOperationsThrottler implements PinotClusterConfigChangeListener {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOperationsThrottler.class);
+public class SegmentOperationsThrottlerSet implements PinotClusterConfigChangeListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOperationsThrottlerSet.class);
 
   private final BaseSegmentOperationsThrottler _segmentAllIndexPreprocessThrottler;
   private final BaseSegmentOperationsThrottler _segmentStarTreePreprocessThrottler;
@@ -47,13 +47,13 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
   private final BaseSegmentOperationsThrottler _segmentDownloadThrottler;
 
   /**
-   * Constructor for SegmentOperationsThrottler
+   * Constructor for SegmentOperationsThrottlerSet
    * @param segmentAllIndexPreprocessThrottler segment preprocess throttler to use for all indexes
    * @param segmentStarTreePreprocessThrottler segment preprocess throttler to use for StarTree index
    * @param segmentDownloadThrottler segment download throttler to throttle download at server level
    * @param segmentMultiColTextIndexPreprocessThrottler segment preprocess throttler for multi-col text index
    */
-  public SegmentOperationsThrottler(BaseSegmentOperationsThrottler segmentAllIndexPreprocessThrottler,
+  public SegmentOperationsThrottlerSet(BaseSegmentOperationsThrottler segmentAllIndexPreprocessThrottler,
       BaseSegmentOperationsThrottler segmentStarTreePreprocessThrottler,
       BaseSegmentOperationsThrottler segmentDownloadThrottler,
       BaseSegmentOperationsThrottler segmentMultiColTextIndexPreprocessThrottler) {
@@ -101,11 +101,11 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
   @Override
   public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     if (CollectionUtils.isEmpty(changedConfigs)) {
-      LOGGER.info("Skip updating SegmentOperationsThrottler configs with unchanged clusterConfigs");
+      LOGGER.info("Skip updating SegmentOperationsThrottlerSet configs with unchanged clusterConfigs");
       return;
     }
 
-    LOGGER.info("Updating SegmentOperationsThrottler configs with latest clusterConfigs");
+    LOGGER.info("Updating SegmentOperationsThrottlerSet configs with latest clusterConfigs");
 
     // Update all index preprocess throttler
     updateThrottlerIfConfigChanged(changedConfigs, clusterConfigs,
@@ -139,7 +139,7 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
         CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
 
-    LOGGER.info("Updated SegmentOperationsThrottler configs with latest clusterConfigs");
+    LOGGER.info("Updated SegmentOperationsThrottlerSet configs with latest clusterConfigs");
   }
 
   protected void updateThrottlerIfConfigChanged(Set<String> changedConfigs, Map<String, String> clusterConfigs,

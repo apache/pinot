@@ -91,7 +91,7 @@ public class BaseSegmentOperationsThrottler {
     _throttlerName = throttlerName;
     _thresholdGauge = thresholdGauge;
     _countGauge = countGauge;
-    LOGGER.info("Initializing SegmentOperationsThrottler {}, maxConcurrency: {}, "
+    LOGGER.info("Initializing SegmentOperationsThrottlerSet {}, maxConcurrency: {}, "
             + "maxConcurrencyBeforeServingQueries: {}, isServingQueries: {}",
         throttlerName, maxConcurrency, maxConcurrencyBeforeServingQueries,
         isServingQueries);
@@ -167,7 +167,7 @@ public class BaseSegmentOperationsThrottler {
 
   /**
    * Updates the throttler permits based on new configuration values.
-   * This is called by the parent SegmentOperationsThrottler when config changes are detected.
+   * This is called by the parent SegmentOperationsThrottlerSet when config changes are detected.
    *
    * @param maxConcurrency new max concurrency value
    * @param maxConcurrencyBeforeServingQueries new max concurrency before serving queries value

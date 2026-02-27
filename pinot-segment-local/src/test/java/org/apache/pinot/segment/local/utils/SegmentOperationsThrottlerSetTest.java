@@ -33,7 +33,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 
 
-public class SegmentOperationsThrottlerTest {
+public class SegmentOperationsThrottlerSetTest {
 
   private static final int NUM_THROTTLERS = 4;
 
@@ -108,10 +108,10 @@ public class SegmentOperationsThrottlerTest {
   }
 
   /**
-   * Creates a SegmentOperationsThrottler wrapping the given array of 4 throttlers.
+   * Creates a SegmentOperationsThrottlerSet wrapping the given array of 4 throttlers.
    */
-  private SegmentOperationsThrottler wrapInSegmentOperationsThrottler(BaseSegmentOperationsThrottler[] throttlers) {
-    return new SegmentOperationsThrottler(throttlers[0], throttlers[1], throttlers[2], throttlers[3]);
+  private SegmentOperationsThrottlerSet wrapInSegmentOperationsThrottler(BaseSegmentOperationsThrottler[] throttlers) {
+    return new SegmentOperationsThrottlerSet(throttlers[0], throttlers[1], throttlers[2], throttlers[3]);
   }
 
   @Test
@@ -244,7 +244,7 @@ public class SegmentOperationsThrottlerTest {
   public void testPositiveToNegativeThrottleChange() {
     int initialPermits = 2;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, true);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -279,7 +279,7 @@ public class SegmentOperationsThrottlerTest {
       throws Exception {
     int initialPermits = 4;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, true);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -344,7 +344,7 @@ public class SegmentOperationsThrottlerTest {
       throws Exception {
     int initialPermits = 4;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, true);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -496,7 +496,7 @@ public class SegmentOperationsThrottlerTest {
       throttlers[k] = new BaseSegmentOperationsThrottler(initialPermits, reducedPermitsBefore, false,
           THRESHOLD_GAUGES[k], COUNT_GAUGES[k], "throttler-" + k);
     }
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -528,7 +528,7 @@ public class SegmentOperationsThrottlerTest {
         Assert.assertEquals(countGaugeValue, j + 1);
       }
 
-      // Increase the permits for before serving queries config via SegmentOperationsThrottler onChange.
+      // Increase the permits for before serving queries config via SegmentOperationsThrottlerSet onChange.
       // Include both keys so maxConcurrency stays at initialPermits for later startServingQueries.
       Map<String, String> updatedClusterConfigs = new HashMap<>();
       updatedClusterConfigs.put(PARALLELISM_KEYS[i], String.valueOf(initialPermits));
@@ -589,7 +589,7 @@ public class SegmentOperationsThrottlerTest {
       throttlers[k] = new BaseSegmentOperationsThrottler(initialPermits, defaultPermitsBefore, false,
           THRESHOLD_GAUGES[k], COUNT_GAUGES[k], "throttler-" + k);
     }
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -680,7 +680,7 @@ public class SegmentOperationsThrottlerTest {
   public void testChangeConfigsEmpty() {
     int initialPermits = 4;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, true);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -709,7 +709,7 @@ public class SegmentOperationsThrottlerTest {
   public void testChangeConfigDeletedConfigsEmpty() {
     int initialPermits = 4;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, true);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -741,7 +741,7 @@ public class SegmentOperationsThrottlerTest {
   public void testChangeConfigDeletedConfigsEmptyQueriesDisabled() {
     int initialPermits = 4;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, false);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -774,7 +774,7 @@ public class SegmentOperationsThrottlerTest {
   public void testChangeConfigsOtherThanRelevant() {
     int initialPermits = 4;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, true);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 1; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -808,7 +808,7 @@ public class SegmentOperationsThrottlerTest {
   public void testChangeConfigs() {
     int initialPermits = 4;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, true);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -841,7 +841,7 @@ public class SegmentOperationsThrottlerTest {
   public void testChangeConfigsWithServingQueriesDisabled() {
     int initialPermits = 4;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, false);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       BaseSegmentOperationsThrottler t = throttlers[i];
       String thresholdGaugeName = THRESHOLD_GAUGES[i].getGaugeName();
@@ -874,7 +874,7 @@ public class SegmentOperationsThrottlerTest {
   public void testChangeConfigsOnSegmentOperationsThrottler() {
     int initialPermits = 4;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, true);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
 
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       Assert.assertEquals(throttlers[i].totalPermits(), initialPermits);
@@ -917,7 +917,7 @@ public class SegmentOperationsThrottlerTest {
   public void testChangeConfigsOnSegmentOperationsThrottlerQueriesDisabled() {
     int initialPermits = 4;
     BaseSegmentOperationsThrottler[] throttlers = createThrottlers(initialPermits, initialPermits * 2, false);
-    SegmentOperationsThrottler sot = wrapInSegmentOperationsThrottler(throttlers);
+    SegmentOperationsThrottlerSet sot = wrapInSegmentOperationsThrottler(throttlers);
 
     for (int i = 0; i < NUM_THROTTLERS; i++) {
       Assert.assertEquals(throttlers[i].totalPermits(), initialPermits * 2);

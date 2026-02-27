@@ -43,7 +43,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.BaseSegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -121,7 +121,7 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
       .setPrimaryKeyColumns(Arrays.asList(SORTED_COL_NAME, RAW_STRING_COL_NAME, NO_INDEX_STRING_COL, RAW_INT_COL_NAME))
       .build();
 
-  private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
+  private static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottlerSet(
       new BaseSegmentOperationsThrottler(1, 2, true),
       new BaseSegmentOperationsThrottler(1, 2, true),
       new BaseSegmentOperationsThrottler(1, 2, true),
