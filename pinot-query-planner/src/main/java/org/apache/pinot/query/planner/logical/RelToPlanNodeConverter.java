@@ -621,7 +621,7 @@ public final class RelToPlanNodeConverter {
     for (List<RexLiteral> tuple : node.tuples) {
       List<RexExpression.Literal> literalRow = new ArrayList<>(tuple.size());
       for (RexLiteral rexLiteral : tuple) {
-        literalRow.add(RexExpressionUtils.fromRexLiteral(rexLiteral));
+        literalRow.add(RexExpressionUtils.fromRexLiteral(rexLiteral, false));
       }
       literalRows.add(literalRow);
     }
@@ -680,7 +680,7 @@ public final class RelToPlanNodeConverter {
     // the WindowNode and plan serde.
     List<RexExpression.Literal> constants = new ArrayList<>(node.constants.size());
     for (RexLiteral constant : node.constants) {
-      constants.add(RexExpressionUtils.fromRexLiteral(constant));
+      constants.add(RexExpressionUtils.fromRexLiteral(constant, false));
     }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
@@ -933,6 +933,9 @@ public final class RelToPlanNodeConverter {
     }
   }
 
+  /**
+   * Read more about type mapping <a href="https://calcite.apache.org/docs/reference.html#scalar-types">here</a>.
+   */
   public static ColumnDataType convertToColumnDataType(RelDataType relDataType) {
     SqlTypeName sqlTypeName = relDataType.getSqlTypeName();
     if (sqlTypeName == SqlTypeName.NULL) {
@@ -953,10 +956,12 @@ public final class RelToPlanNodeConverter {
       case BIGINT:
         return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
       case DECIMAL:
+        // TODO: Revisit this method
         return resolveDecimal(relDataType, isArray);
-      case FLOAT:
       case REAL:
         return isArray ? ColumnDataType.FLOAT_ARRAY : ColumnDataType.FLOAT;
+      // Quirk: In Calcite, FLOAT is a synonym for DOUBLE
+      case FLOAT:
       case DOUBLE:
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
       case DATE:
@@ -984,7 +989,7 @@ public final class RelToPlanNodeConverter {
   }
 
   /**
-   * Calcite uses DEMICAL type to infer data type hoisting and infer arithmetic result types. down casting this back to
+   * Calcite uses DECIMAL type to infer data type hoisting and infer arithmetic result types. down casting this back to
    * the proper primitive type for Pinot.
    * TODO: Revisit this method:
    *  - Currently we are converting exact value to approximate value
