@@ -30,6 +30,17 @@ import javax.annotation.Nullable;
  * The <code>RecordReader</code> interface is used to read records from various file formats into {@link GenericRow}s.
  * Pinot segments will be generated from {@link GenericRow}s.
  * <p>NOTE: for time column, record reader should be able to read both incoming and outgoing time
+ * <p>
+ * <h2>Exception Handling</h2>
+ * <p>When implementing {@link #next(GenericRow)}, implementations should use appropriate exception types to indicate
+ * the nature of the error:
+ * <ul>
+ *   <li><b>{@link RecordFetchException}</b>: Throw when encountering I/O or data fetch errors that may prevent
+ *       the reader from advancing its pointer to the next record. These errors count toward the consecutive failure
+ *       threshold to prevent infinite loops.</li>
+ *   <li><b>{@link IOException}</b>: For backward compatibility, IOException is treated as a parse error and can be
+ *       skipped indefinitely.</li>
+ * </ul>
  */
 public interface RecordReader extends Closeable, Serializable {
 
@@ -54,6 +65,18 @@ public interface RecordReader extends Closeable, Serializable {
    * Get the next record.
    * <p>This method should be called only if {@link #hasNext()} returns <code>true</code>. Caller is responsible for
    * handling exceptions from this method and skip the row if user wants to continue reading the remaining rows.
+   * <p>
+   * <b>Exception Guidelines:</b>
+   * <ul>
+   *   <li>Throw {@link RecordFetchException} if the reader cannot advance due to I/O or fetch errors</li>
+   *   <li>Throw {@link IOException} if data is corrupt but the reader can advance to the next record</li>
+   * </ul>
+   * <b>Important:</b> If an exception is thrown, the implementation should ensure that either:
+   * <ul>
+   *   <li>The reader's pointer advances to the next record (for parse errors), OR</li>
+   *   <li>The reader throws RecordFetchException to indicate it cannot advance (for fetch errors)</li>
+   * </ul>
+   * This prevents infinite loops when the same record is repeatedly attempted.
    */
   default GenericRow next()
       throws IOException {
@@ -65,7 +88,21 @@ public interface RecordReader extends Closeable, Serializable {
    * <p>The passed in row should be cleared before calling this method.
    * <p>This method should be called only if {@link #hasNext()} returns <code>true</code>. Caller is responsible for
    * handling exceptions from this method and skip the row if user wants to continue reading the remaining rows.
-   *
+   * <p>
+   * <b>Exception Guidelines:</b>
+   * <ul>
+   *   <li>Throw {@link RecordFetchException} if the reader cannot advance due to I/O or fetch errors (e.g., network
+   *       failure, file system error, stream corruption that prevents reading). These errors count toward the
+   *       consecutive failure threshold.</li>
+   *   <li>Throw {@link IOException} if data is corrupt or malformed but the reader can advance to the next
+   *       record (e.g., invalid format, type conversion failure, schema mismatch).</li>
+   * </ul>
+   * <b>Important:</b> If an exception is thrown, the implementation should ensure that either:
+   * <ul>
+   *   <li>The reader's pointer advances to the next record (for parse errors), OR</li>
+   *   <li>The reader throws RecordFetchException to indicate it cannot advance (for fetch errors)</li>
+   * </ul>
+   * This prevents infinite loops when the same record is repeatedly attempted.<br>
    * TODO: Consider clearing the row within the record reader to simplify the caller
    */
   GenericRow next(GenericRow reuse)
