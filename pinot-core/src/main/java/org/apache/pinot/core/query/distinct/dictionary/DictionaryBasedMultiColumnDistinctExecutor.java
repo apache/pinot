@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.function.LongSupplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.query.distinct.DistinctEarlyTerminationContext;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorUtils;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
@@ -57,6 +59,7 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
   private final HashSet<DictIds> _dictIdsSet;
 
   private ObjectHeapPriorityQueue<DictIds> _priorityQueue;
+  private final DistinctEarlyTerminationContext _earlyTerminationContext = new DistinctEarlyTerminationContext();
 
   public DictionaryBasedMultiColumnDistinctExecutor(List<ExpressionContext> expressions, boolean hasMVExpression,
       DataSchema dataSchema, List<Dictionary> dictionaries, int limit, boolean nullHandlingEnabled,
@@ -99,9 +102,122 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
   }
 
   @Override
+  public void setMaxRowsToProcess(int maxRows) {
+    _earlyTerminationContext.setMaxRowsToProcess(maxRows);
+  }
+
+  @Override
+  public void setNumRowsWithoutChangeInDistinct(int numRowsWithoutChangeInDistinct) {
+    _earlyTerminationContext.setNumRowsWithoutChangeInDistinct(numRowsWithoutChangeInDistinct);
+  }
+
+  @Override
+  public void setTimeSupplier(LongSupplier timeSupplier) {
+    _earlyTerminationContext.setTimeSupplier(timeSupplier);
+  }
+
+  @Override
+  public void setRemainingTimeNanos(long remainingTimeNanos) {
+    _earlyTerminationContext.setRemainingTimeNanos(remainingTimeNanos);
+  }
+
+  @Override
+  public boolean isNumRowsWithoutChangeLimitReached() {
+    return _earlyTerminationContext.isNumRowsWithoutChangeLimitReached();
+  }
+
+  @Override
+  public boolean isMaxRowsLimitReached() {
+    return _earlyTerminationContext.isMaxRowsLimitReached();
+  }
+
+  @Override
+  public boolean isTimeLimitReached() {
+    return _earlyTerminationContext.isTimeLimitReached();
+  }
+
+  @Override
+  public int getNumRowsProcessed() {
+    return _earlyTerminationContext.getNumRowsProcessed();
+  }
+
+  @Override
   public boolean process(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
+    boolean trackProgress = _earlyTerminationContext.isTrackingEnabled();
+    if (trackProgress && shouldStopProcessing()) {
+      return true;
+    }
+    int numDocs = trackProgress ? clampToRemaining(valueBlock.getNumDocs()) : valueBlock.getNumDocs();
+    if (numDocs <= 0) {
+      return true;
+    }
     int numExpressions = _expressions.size();
+    if (!trackProgress) {
+      if (!_hasMVExpression) {
+        int[][] dictIdsArray = new int[numDocs][numExpressions];
+        for (int i = 0; i < numExpressions; i++) {
+          BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expressions.get(i));
+          int[] dictIdsForExpression = getDictIdsSV(blockValueSet, i);
+          for (int j = 0; j < numDocs; j++) {
+            dictIdsArray[j][i] = dictIdsForExpression[j];
+          }
+        }
+        if (_limit == Integer.MAX_VALUE) {
+          for (int i = 0; i < numDocs; i++) {
+            addUnbounded(new DictIds(dictIdsArray[i]));
+          }
+        } else if (_orderByExpressions == null) {
+          for (int i = 0; i < numDocs; i++) {
+            if (addWithoutOrderBy(new DictIds(dictIdsArray[i]))) {
+              return true;
+            }
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            addWithOrderBy(new DictIds(dictIdsArray[i]));
+          }
+        }
+      } else {
+        int[][] svDictIds = new int[numExpressions][];
+        int[][][] mvDictIds = new int[numExpressions][][];
+        for (int i = 0; i < numExpressions; i++) {
+          BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expressions.get(i));
+          if (blockValueSet.isSingleValue()) {
+            svDictIds[i] = getDictIdsSV(blockValueSet, i);
+          } else {
+            mvDictIds[i] = blockValueSet.getDictionaryIdsMV();
+          }
+        }
+        if (_limit == Integer.MAX_VALUE) {
+          for (int i = 0; i < numDocs; i++) {
+            int[][] dictIdsArray = DistinctExecutorUtils.getDictIds(svDictIds, mvDictIds, i);
+            for (int[] dictIds : dictIdsArray) {
+              addUnbounded(new DictIds(dictIds));
+            }
+          }
+        } else if (_orderByExpressions == null) {
+          for (int i = 0; i < numDocs; i++) {
+            int[][] dictIdsArray = DistinctExecutorUtils.getDictIds(svDictIds, mvDictIds, i);
+            for (int[] dictIds : dictIdsArray) {
+              if (addWithoutOrderBy(new DictIds(dictIds))) {
+                return true;
+              }
+            }
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            int[][] dictIdsArray = DistinctExecutorUtils.getDictIds(svDictIds, mvDictIds, i);
+            for (int[] dictIds : dictIdsArray) {
+              addWithOrderBy(new DictIds(dictIds));
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    boolean limitReached = false;
+    boolean trackDistinctChange = _earlyTerminationContext.isDistinctChangeTrackingEnabled();
     if (!_hasMVExpression) {
       int[][] dictIdsArray = new int[numDocs][numExpressions];
       for (int i = 0; i < numExpressions; i++) {
@@ -113,17 +229,34 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
       }
       if (_limit == Integer.MAX_VALUE) {
         for (int i = 0; i < numDocs; i++) {
-          addUnbounded(new DictIds(dictIdsArray[i]));
+          if (shouldStopProcessingWithoutTime()) {
+            break;
+          }
+          boolean distinctChanged = _dictIdsSet.add(new DictIds(dictIdsArray[i]));
+          recordRowProcessed(trackDistinctChange && distinctChanged);
         }
       } else if (_orderByExpressions == null) {
         for (int i = 0; i < numDocs; i++) {
-          if (addWithoutOrderBy(new DictIds(dictIdsArray[i]))) {
-            return true;
+          if (shouldStopProcessingWithoutTime()) {
+            break;
+          }
+          DictIds dictIds = new DictIds(dictIdsArray[i]);
+          boolean distinctChanged = _dictIdsSet.add(dictIds);
+          if (distinctChanged && _dictIdsSet.size() == _limit) {
+            limitReached = true;
+          }
+          recordRowProcessed(trackDistinctChange && distinctChanged);
+          if (limitReached) {
+            break;
           }
         }
       } else {
         for (int i = 0; i < numDocs; i++) {
-          addWithOrderBy(new DictIds(dictIdsArray[i]));
+          if (shouldStopProcessingWithoutTime()) {
+            break;
+          }
+          boolean distinctChanged = addWithOrderBy(new DictIds(dictIdsArray[i]));
+          recordRowProcessed(trackDistinctChange && distinctChanged);
         }
       }
     } else {
@@ -139,30 +272,56 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
       }
       if (_limit == Integer.MAX_VALUE) {
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessingWithoutTime()) {
+            break;
+          }
+          boolean rowChanged = false;
           int[][] dictIdsArray = DistinctExecutorUtils.getDictIds(svDictIds, mvDictIds, i);
           for (int[] dictIds : dictIdsArray) {
-            addUnbounded(new DictIds(dictIds));
+            if (_dictIdsSet.add(new DictIds(dictIds))) {
+              rowChanged = true;
+            }
           }
+          recordRowProcessed(trackDistinctChange && rowChanged);
         }
       } else if (_orderByExpressions == null) {
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessingWithoutTime()) {
+            break;
+          }
+          boolean rowChanged = false;
           int[][] dictIdsArray = DistinctExecutorUtils.getDictIds(svDictIds, mvDictIds, i);
           for (int[] dictIds : dictIdsArray) {
-            if (addWithoutOrderBy(new DictIds(dictIds))) {
-              return true;
+            if (_dictIdsSet.add(new DictIds(dictIds))) {
+              rowChanged = true;
+              if (_dictIdsSet.size() == _limit) {
+                limitReached = true;
+                break;
+              }
             }
+          }
+          recordRowProcessed(trackDistinctChange && rowChanged);
+          if (limitReached) {
+            break;
           }
         }
       } else {
         for (int i = 0; i < numDocs; i++) {
+          if (shouldStopProcessingWithoutTime()) {
+            break;
+          }
+          boolean rowChanged = false;
           int[][] dictIdsArray = DistinctExecutorUtils.getDictIds(svDictIds, mvDictIds, i);
           for (int[] dictIds : dictIdsArray) {
-            addWithOrderBy(new DictIds(dictIds));
+            if (addWithOrderBy(new DictIds(dictIds))) {
+              rowChanged = true;
+            }
           }
+          recordRowProcessed(trackDistinctChange && rowChanged);
         }
       }
     }
-    return false;
+    return shouldStopProcessing() || limitReached;
   }
 
   private int[] getDictIdsSV(BlockValSet blockValueSet, int expressionIndex) {
@@ -187,14 +346,13 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
     return _dictIdsSet.size() == _limit;
   }
 
-  private void addWithOrderBy(DictIds dictIds) {
+  private boolean addWithOrderBy(DictIds dictIds) {
     assert _dictIdsSet.size() <= _limit;
     if (_dictIdsSet.size() < _limit) {
-      _dictIdsSet.add(dictIds);
-      return;
+      return _dictIdsSet.add(dictIds);
     }
     if (_dictIdsSet.contains(dictIds)) {
-      return;
+      return false;
     }
     if (_priorityQueue == null) {
       _priorityQueue = new ObjectHeapPriorityQueue<>(_dictIdsSet, getComparator());
@@ -205,7 +363,9 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
       _dictIdsSet.add(dictIds);
       _priorityQueue.dequeue();
       _priorityQueue.enqueue(dictIds);
+      return true;
     }
+    return false;
   }
 
   private Comparator<DictIds> getComparator() {
@@ -223,6 +383,22 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
       }
       return 0;
     };
+  }
+
+  private int clampToRemaining(int numDocs) {
+    return _earlyTerminationContext.clampToRemaining(numDocs);
+  }
+
+  private void recordRowProcessed(boolean distinctChanged) {
+    _earlyTerminationContext.recordRowProcessed(distinctChanged);
+  }
+
+  private boolean shouldStopProcessing() {
+    return _earlyTerminationContext.shouldStopProcessing();
+  }
+
+  private boolean shouldStopProcessingWithoutTime() {
+    return _earlyTerminationContext.shouldStopProcessingWithoutTime();
   }
 
   @Override
@@ -252,6 +428,16 @@ public class DictionaryBasedMultiColumnDistinctExecutor implements DistinctExecu
       }
     }
     return distinctTable;
+  }
+
+  @Override
+  public int getRemainingRowsToProcess() {
+    return _earlyTerminationContext.getRemainingRowsToProcess();
+  }
+
+  @Override
+  public int getNumDistinctRowsCollected() {
+    return _dictIdsSet.size();
   }
 
   private static class DictIds {

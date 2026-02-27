@@ -360,6 +360,32 @@ public class LeafOperator extends MultiStageOperator {
         case NUM_GROUPS_WARNING_LIMIT_REACHED:
           _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
           break;
+        case EARLY_TERMINATION_REASON:
+          String reasonStr = entry.getValue();
+          try {
+            BaseResultsBlock.EarlyTerminationReason reason = "TIME_LIMIT".equals(reasonStr)
+                ? BaseResultsBlock.EarlyTerminationReason.DISTINCT_TIME_LIMIT
+                : BaseResultsBlock.EarlyTerminationReason.valueOf(reasonStr);
+            switch (reason) {
+              case DISTINCT_MAX_ROWS:
+                _statMap.merge(StatKey.MAX_ROWS_IN_DISTINCT_REACHED, true);
+                break;
+              case DISTINCT_NO_NEW_VALUES:
+                _statMap.merge(StatKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT_REACHED, true);
+                break;
+              case DISTINCT_TIME_LIMIT:
+                _statMap.merge(StatKey.TIME_LIMIT_IN_DISTINCT_REACHED, true);
+                break;
+              case NONE:
+                break;
+              default:
+                LOGGER.warn("Unknown distinct early termination reason: {}", reasonStr);
+                break;
+            }
+          } catch (IllegalArgumentException e) {
+            LOGGER.warn("Unknown distinct early termination reason: {}", reasonStr);
+          }
+          break;
         case TIME_USED_MS:
           _statMap.merge(StatKey.SSE_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
           break;
@@ -725,6 +751,9 @@ public class LeafOperator extends MultiStageOperator {
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    MAX_ROWS_IN_DISTINCT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT_REACHED(StatMap.Type.BOOLEAN),
+    TIME_LIMIT_IN_DISTINCT_REACHED(StatMap.Type.BOOLEAN),
     NUM_RESIZES(StatMap.Type.INT, null),
     RESIZE_TIME_MS(StatMap.Type.LONG, null),
     THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),

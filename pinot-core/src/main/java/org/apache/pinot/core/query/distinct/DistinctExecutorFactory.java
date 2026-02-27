@@ -55,7 +55,8 @@ public class DistinctExecutorFactory {
   public static DistinctExecutor getDistinctExecutor(BaseProjectOperator<?> projectOperator,
       QueryContext queryContext) {
     List<ExpressionContext> expressions = queryContext.getSelectExpressions();
-    int limit = queryContext.getLimit();
+    int queryLimit = queryContext.getLimit();
+    int tableCapacity = queryLimit;
     boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     int numExpressions = expressions.size();
@@ -76,25 +77,32 @@ public class DistinctExecutorFactory {
       // Note: Use raw value based when ordering is needed and dictionary is not sorted (consuming segments).
       if (dictionary != null && (orderByExpression == null || dictionary.isSorted())) {
         // Dictionary based
-        return new DictionaryBasedSingleColumnDistinctExecutor(expression, dictionary, dataType, limit,
+        return new DictionaryBasedSingleColumnDistinctExecutor(expression, dictionary, dataType, tableCapacity,
             nullHandlingEnabled, orderByExpression);
       } else {
         // Raw value based
         switch (dataType.getStoredType()) {
           case INT:
-            return new IntDistinctExecutor(expression, dataType, limit, nullHandlingEnabled, orderByExpression);
+            return new IntDistinctExecutor(expression, dataType, tableCapacity, nullHandlingEnabled,
+                orderByExpression);
           case LONG:
-            return new LongDistinctExecutor(expression, dataType, limit, nullHandlingEnabled, orderByExpression);
+            return new LongDistinctExecutor(expression, dataType, tableCapacity, nullHandlingEnabled,
+                orderByExpression);
           case FLOAT:
-            return new FloatDistinctExecutor(expression, dataType, limit, nullHandlingEnabled, orderByExpression);
+            return new FloatDistinctExecutor(expression, dataType, tableCapacity, nullHandlingEnabled,
+                orderByExpression);
           case DOUBLE:
-            return new DoubleDistinctExecutor(expression, dataType, limit, nullHandlingEnabled, orderByExpression);
+            return new DoubleDistinctExecutor(expression, dataType, tableCapacity, nullHandlingEnabled,
+                orderByExpression);
           case BIG_DECIMAL:
-            return new BigDecimalDistinctExecutor(expression, dataType, limit, nullHandlingEnabled, orderByExpression);
+            return new BigDecimalDistinctExecutor(expression, dataType, tableCapacity, nullHandlingEnabled,
+                orderByExpression);
           case STRING:
-            return new StringDistinctExecutor(expression, dataType, limit, nullHandlingEnabled, orderByExpression);
+            return new StringDistinctExecutor(expression, dataType, tableCapacity, nullHandlingEnabled,
+                orderByExpression);
           case BYTES:
-            return new BytesDistinctExecutor(expression, dataType, limit, nullHandlingEnabled, orderByExpression);
+            return new BytesDistinctExecutor(expression, dataType, tableCapacity, nullHandlingEnabled,
+                orderByExpression);
           default:
             throw new IllegalStateException("Unsupported data type: " + dataType);
         }
@@ -138,11 +146,11 @@ public class DistinctExecutorFactory {
       if (dictionaryBased) {
         // Dictionary based
         return new DictionaryBasedMultiColumnDistinctExecutor(expressions, hasMVExpression, dataSchema, dictionaries,
-            limit, nullHandlingEnabled, orderByExpressions);
+            tableCapacity, nullHandlingEnabled, orderByExpressions);
       } else {
         // Raw value based
-        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataSchema, limit, nullHandlingEnabled,
-            orderByExpressions);
+        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataSchema, tableCapacity,
+            nullHandlingEnabled, orderByExpressions);
       }
     }
   }

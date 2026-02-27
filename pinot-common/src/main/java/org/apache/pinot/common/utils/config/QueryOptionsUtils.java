@@ -125,6 +125,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Long getMaxExecutionTimeMsInDistinct(Map<String, String> queryOptions) {
+    String maxExecutionTimeMs = queryOptions.get(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT);
+    return checkedParseLong(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT, maxExecutionTimeMs, 0);
+  }
+
+  @Nullable
   public static Long getMaxServerResponseSizeBytes(Map<String, String> queryOptions) {
     String responseSize = queryOptions.get(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES);
     return checkedParseLongPositive(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, responseSize);
@@ -423,6 +429,19 @@ public class QueryOptionsUtils {
   public static Integer getMaxRowsInJoin(Map<String, String> queryOptions) {
     String maxRowsInJoin = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_JOIN);
     return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_JOIN, maxRowsInJoin);
+  }
+
+  @Nullable
+  public static Integer getMaxRowsInDistinct(Map<String, String> queryOptions) {
+    String maxRowsInDistinct = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_DISTINCT);
+    return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_DISTINCT, maxRowsInDistinct);
+  }
+
+  @Nullable
+  public static Integer getNumRowsWithoutChangeInDistinct(Map<String, String> queryOptions) {
+    String numRowsWithoutChange =
+        queryOptions.get(QueryOptionKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT);
+    return checkedParseIntPositive(QueryOptionKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT, numRowsWithoutChange);
   }
 
   @Nullable
