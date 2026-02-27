@@ -22,7 +22,6 @@ import java.io.File;
 import java.net.URI;
 import org.apache.pinot.common.utils.LLCSegmentName;
 
-
 public interface SegmentUploader {
 
   /**
@@ -35,4 +34,11 @@ public interface SegmentUploader {
    * wait for the specified timeout.
    */
   URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis);
+
+  // Added logic (assuming you want this within the method or as part of your class)
+  default void modifySegmentFileName(String segmentFileName, boolean removeTarGz) {
+    if (removeTarGz && segmentFileName.endsWith(".tar.gz")) {
+      segmentFileName = segmentFileName.substring(0, segmentFileName.length() - 7);
+    }
+  }
 }
