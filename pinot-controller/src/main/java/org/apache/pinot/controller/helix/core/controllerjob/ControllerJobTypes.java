@@ -40,7 +40,8 @@ public enum ControllerJobTypes implements ControllerJobType {
   RELOAD_SEGMENT,
   FORCE_COMMIT,
   TABLE_REBALANCE,
-  TENANT_REBALANCE;
+  TENANT_REBALANCE,
+  TABLE_REPLICATION;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerJobTypes.class);
   private static final EnumMap<ControllerJobTypes, Integer> ZK_NUM_JOBS_LIMIT = new EnumMap<>(ControllerJobTypes.class);
@@ -55,6 +56,7 @@ public enum ControllerJobTypes implements ControllerJobType {
     ZK_NUM_JOBS_LIMIT.put(FORCE_COMMIT, controllerConf.getMaxForceCommitZkJobs());
     ZK_NUM_JOBS_LIMIT.put(TABLE_REBALANCE, controllerConf.getMaxTableRebalanceZkJobs());
     ZK_NUM_JOBS_LIMIT.put(TENANT_REBALANCE, controllerConf.getMaxTenantRebalanceZkJobs());
+    ZK_NUM_JOBS_LIMIT.put(TABLE_REPLICATION, controllerConf.getMaxTableReplicationZkJobs());
   }
 
   @Override

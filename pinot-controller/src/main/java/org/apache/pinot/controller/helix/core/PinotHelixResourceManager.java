@@ -2553,6 +2553,29 @@ public class PinotHelixResourceManager {
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.FORCE_COMMIT);
   }
 
+  public boolean addNewTableReplicationJob(String tableNameWithType, String jobId, long jobSubmissionTimeMs,
+      WatermarkInductionResult res)
+      throws JsonProcessingException {
+    Map<String, String> jobMetadata =
+        commonTableReplicationJobMetadata(tableNameWithType, jobId, jobSubmissionTimeMs, res);
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.TABLE_REPLICATION);
+  }
+
+  public Map<String, String> commonTableReplicationJobMetadata(String tableNameWithType, String jobId,
+      long jobSubmissionTimeMs, WatermarkInductionResult res)
+      throws JsonProcessingException {
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REPLICATION.name());
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.SEGMENTS_TO_BE_COPIED,
+        Integer.toString(res.getHistoricalSegments().size()));
+    jobMetadata.put(CommonConstants.ControllerJob.CONSUMER_WATERMARKS, JsonUtils.objectToString(res.getWatermarks()));
+    jobMetadata.put(CommonConstants.ControllerJob.REPLICATION_JOB_STATUS, "IN_PROGRESS");
+    return jobMetadata;
+  }
+
   /**
    * Adds a new job metadata for controller job like table rebalance or reload into ZK
    * @param jobId job's UUID
@@ -4965,7 +4988,23 @@ public class PinotHelixResourceManager {
       }
       return new WatermarkInductionResult.Watermark(status.getPartitionGroupId(), seq, startOffset);
     }).collect(Collectors.toList());
-    return new WatermarkInductionResult(watermarks);
+
+    Map<Integer, Integer> partGroupToLatestSeq = watermarks.stream().collect(
+        Collectors.toMap(WatermarkInductionResult.Watermark::getPartitionGroupId,
+            WatermarkInductionResult.Watermark::getSequenceNumber));
+    List<String> historicalSegments = new ArrayList<>();
+    for (String segment : idealState.getRecord().getMapFields().keySet()) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
+      if (llcSegmentName != null) {
+        int partitionGroupId = llcSegmentName.getPartitionGroupId();
+        int seq = llcSegmentName.getSequenceNumber();
+        if (partGroupToLatestSeq.containsKey(partitionGroupId) && partGroupToLatestSeq.get(partitionGroupId) == seq) {
+          continue;
+        }
+      }
+      historicalSegments.add(segment);
+    }
+    return new WatermarkInductionResult(watermarks, historicalSegments);
   }
 
   /*

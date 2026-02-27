@@ -468,6 +468,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableName, "metadata") + "?type=" + tableType.name();
   }
 
+  public String forSegmentZkMetadata(String tableNameWithType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, "zkmetadata");
+  }
+
   public String forListAllSegmentLineages(String tableName, String tableType) {
     return StringUtil.join("/", _baseUrl, "segments", tableName, "lineage?type=" + tableType);
   }
