@@ -153,9 +153,18 @@ public class SegmentGenerationUtils {
     } catch (IOException e) {
       throw new RuntimeException("Failed to decode table config into JSON from String - '" + tableConfigJson + "'", e);
     }
+
+    if (tableJsonNode.has(OFFLINE) && tableJsonNode.has(REALTIME)) {
+      throw new RuntimeException(
+              "You must specify 'REALTIME' or 'OFFLINE' when providing the tableConfigURI for a hybrid table");
+    }
+
     if (tableJsonNode.has(OFFLINE)) {
       tableJsonNode = tableJsonNode.get(OFFLINE);
     } else if (tableJsonNode.has(REALTIME)) {
+      tableJsonNode = tableJsonNode.get(REALTIME);
+    }
+    if (tableJsonNode.has(REALTIME)) {
       tableJsonNode = tableJsonNode.get(REALTIME);
     }
     try {
