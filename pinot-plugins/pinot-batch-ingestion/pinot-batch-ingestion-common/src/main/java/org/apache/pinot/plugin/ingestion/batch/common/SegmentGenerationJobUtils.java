@@ -114,6 +114,7 @@ public class SegmentGenerationJobUtils implements Serializable {
     for (String sourcePath : fs.listFiles(sourceDir, true)) {
       URI sourceFileUri = SegmentGenerationUtils.getFileURI(sourcePath, sourceDir);
       String sourceFilename = SegmentGenerationUtils.getFileName(sourceFileUri);
+      sourceFilename = sourceFilename.replaceAll("\\s+", "_");
       URI destFileUri =
               SegmentGenerationUtils.getRelativeOutputPath(sourceDir, sourceFileUri, destDir).resolve(sourceFilename);
 
