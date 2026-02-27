@@ -151,11 +151,13 @@ public interface DataTable {
     // Needed so that we can track workload name in Netty channel response.
     WORKLOAD_NAME(40, "workloadName", MetadataValueType.STRING),
     // Needed so that we can track query id in Netty channel response.
-    QUERY_ID(41, "queryId", MetadataValueType.STRING);
+    QUERY_ID(41, "queryId", MetadataValueType.STRING),
+    LEAF_TRUNCATION_REASON(42, "leafTruncationReason", MetadataValueType.STRING),
+    LITE_LEAF_CAP_TRUNCATION(43, "liteLeafCapTruncation", MetadataValueType.BOOLEAN);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = QUERY_ID.getId();
+    private static final int MAX_ID = LITE_LEAF_CAP_TRUNCATION.getId();
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
