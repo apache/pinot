@@ -483,7 +483,7 @@ public class SegmentMapperTest {
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("consecutive fetch failures"),
           "Expected message about consecutive fetch failures: " + e.getMessage());
-      assertTrue(e.getMessage().contains("Stopping record reader"),
+      assertTrue(e.getMessage().contains("Stopping at record reader"),
           "Expected message about stopping record reader: " + e.getMessage());
     }
   }
