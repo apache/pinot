@@ -39,6 +39,8 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter WEB_APPLICATION_EXCEPTIONS = create("WEB_APPLICATION_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter HEALTHCHECK_BAD_CALLS = create("HEALTHCHECK_BAD_CALLS", "healthcheck", true);
   public static final BrokerMeter HEALTHCHECK_OK_CALLS = create("HEALTHCHECK_OK_CALLS", "healthcheck", true);
+  public static final BrokerMeter READINESS_CHECK_BAD_CALLS = create("READINESS_CHECK_BAD_CALLS", "healthcheck", true);
+  public static final BrokerMeter READINESS_CHECK_OK_CALLS = create("READINESS_CHECK_OK_CALLS", "healthcheck", true);
   /**
    * Number of queries executed.
    * <p>

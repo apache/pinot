@@ -29,6 +29,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.GET;
@@ -39,6 +40,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -54,7 +56,12 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
     description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
 @Path("/")
-public class PinotBrokerHealthCheck {
+public class PinotBrokerHealthCheckResource {
+
+  @Inject
+  @Named(BrokerAdminApiApplication.SHUTDOWN_IN_PROGRESS)
+  private AtomicBoolean _shutdownInProgress;
+
   @Inject
   @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
   private String _instanceId;
@@ -85,6 +92,32 @@ public class PinotBrokerHealthCheck {
     String errMessage = String.format("Pinot broker status is %s", status);
     Response response =
         Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
+    throw new WebApplicationException(errMessage, response);
+  }
+
+  @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  @Path("health/readiness")
+  @ApiOperation(value = "Checking broker readiness status")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Broker is ready to serve queries"), @ApiResponse(code = 503, message =
+      "Broker is not ready to serve queries")
+  })
+  public String checkReadiness() {
+    if (_shutdownInProgress.get()) {
+      String errMessage = "Broker is shutting down";
+      throw new WebApplicationException(errMessage,
+          Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build());
+    }
+    ServiceStatus.Status status =
+        ServiceStatus.getServiceStatus(_instanceId + BaseBrokerStarter.READINESS_CALLBACK_SUFFIX);
+    if (status == ServiceStatus.Status.GOOD) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.READINESS_CHECK_OK_CALLS, 1);
+      return "OK";
+    }
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.READINESS_CHECK_BAD_CALLS, 1);
+    String errMessage = String.format("Pinot broker readiness status is %s", status);
+    Response response = Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
     throw new WebApplicationException(errMessage, response);
   }
 
