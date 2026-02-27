@@ -48,6 +48,7 @@ public class SegmentFetcherFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
   private static final Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new HashMap<>();
   private static final SegmentFetcher HTTP_SEGMENT_FETCHER = new HttpSegmentFetcher();
+  private static final SegmentFetcher HTTPS_SEGMENT_FETCHER = new HttpsSegmentFetcher();
   private static final SegmentFetcher PINOT_FS_SEGMENT_FETCHER = new PinotFSSegmentFetcher();
 
   /**
@@ -56,6 +57,7 @@ public class SegmentFetcherFactory {
   public static void init(PinotConfiguration config)
       throws Exception {
     HTTP_SEGMENT_FETCHER.init(config); // directly, without sub-namespace
+    HTTPS_SEGMENT_FETCHER.init(config); // directly, without sub-namespace
     PINOT_FS_SEGMENT_FETCHER.init(config); // directly, without sub-namespace
 
     List<String> protocols = config.getProperty(PROTOCOLS_KEY, Collections.emptyList());
@@ -98,7 +100,8 @@ public class SegmentFetcherFactory {
 
   /**
    * Returns the segment fetcher associated with the given protocol, or the default segment fetcher
-   * ({@link HttpSegmentFetcher} for "http" and "https", {@link PinotFSSegmentFetcher} for other protocols).
+   * ({@link HttpSegmentFetcher} for "http", {@link HttpsSegmentFetcher} for "https",
+   * {@link PinotFSSegmentFetcher} for other protocols).
    */
   public static SegmentFetcher getSegmentFetcher(String protocol) {
     SegmentFetcher segmentFetcher = SEGMENT_FETCHER_MAP.get(protocol);
@@ -111,8 +114,9 @@ public class SegmentFetcherFactory {
       }
       switch (protocol) {
         case CommonConstants.HTTP_PROTOCOL:
-        case CommonConstants.HTTPS_PROTOCOL:
           return HTTP_SEGMENT_FETCHER;
+        case CommonConstants.HTTPS_PROTOCOL:
+          return HTTPS_SEGMENT_FETCHER;
         default:
           return PINOT_FS_SEGMENT_FETCHER;
       }
