@@ -82,6 +82,7 @@ import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.AvgPrecisionPair;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
@@ -165,7 +166,8 @@ public class ObjectSerDeUtils {
     TupleIntSketchAccumulator(48),
     CpcSketchAccumulator(49),
     OrderedStringSet(50),
-    FunnelStepEventAccumulator(51);
+    FunnelStepEventAccumulator(51),
+    AvgPrecisionPair(52);
 
     private final int _value;
 
@@ -211,6 +213,8 @@ public class ObjectSerDeUtils {
         return ObjectType.StringArrayList;
       } else if (value instanceof AvgPair) {
         return ObjectType.AvgPair;
+      } else if (value instanceof AvgPrecisionPair) {
+        return ObjectType.AvgPrecisionPair;
       } else if (value instanceof MinMaxRangePair) {
         return ObjectType.MinMaxRangePair;
       } else if (value instanceof HyperLogLog) {
@@ -577,6 +581,24 @@ public class ObjectSerDeUtils {
     @Override
     public AvgPair deserialize(ByteBuffer byteBuffer) {
       return AvgPair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<AvgPrecisionPair> AVG_PRECISION_PAIR_SER_DE = new ObjectSerDe<AvgPrecisionPair>() {
+
+    @Override
+    public byte[] serialize(AvgPrecisionPair avgPrecisionPair) {
+      return avgPrecisionPair.toBytes();
+    }
+
+    @Override
+    public AvgPrecisionPair deserialize(byte[] bytes) {
+      return AvgPrecisionPair.fromBytes(bytes);
+    }
+
+    @Override
+    public AvgPrecisionPair deserialize(ByteBuffer byteBuffer) {
+      return AvgPrecisionPair.fromByteBuffer(byteBuffer);
     }
   };
 
@@ -1803,6 +1825,7 @@ public class ObjectSerDeUtils {
       DATA_SKETCH_CPC_ACCUMULATOR_SER_DE,
       ORDERED_STRING_SET_SER_DE,
       FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE,
+      AVG_PRECISION_PAIR_SER_DE,
   };
   //@formatter:on
 

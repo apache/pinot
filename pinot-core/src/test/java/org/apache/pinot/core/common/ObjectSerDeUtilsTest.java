@@ -33,6 +33,7 @@ import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -52,6 +53,7 @@ import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregation
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.AvgPrecisionPair;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
@@ -137,6 +139,19 @@ public class ObjectSerDeUtilsTest {
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       AvgPair actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.AvgPair);
+
+      assertEquals(actual.getSum(), expected.getSum(), ERROR_MESSAGE);
+      assertEquals(actual.getCount(), expected.getCount(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testAvgPrecisionPair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      AvgPrecisionPair expected = new AvgPrecisionPair(new BigDecimal(RANDOM.nextDouble()), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      AvgPrecisionPair actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.AvgPrecisionPair);
 
       assertEquals(actual.getSum(), expected.getSum(), ERROR_MESSAGE);
       assertEquals(actual.getCount(), expected.getCount(), ERROR_MESSAGE);
