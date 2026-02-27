@@ -1264,14 +1264,15 @@ public class PinotHelixTaskResourceManager {
 
   /**
    * Returns the names of all task queues by fetching only the resource config child names from ZooKeeper,
-   * filtered to those with the {@link #TASK_QUEUE_PREFIX}. This avoids the expensive
+   * filtered to those with the {@link #TASK_QUEUE_PREFIX} but excluding individual job entries (which
+   * contain {@link #TASK_PREFIX} e.g. {@code TaskQueue_Type_Task_Type_12345}). This avoids the expensive
    * {@link TaskDriver#getWorkflows()} call which reads all resource config values.
    */
   private List<String> getTaskQueueNames() {
     HelixDataAccessor accessor = _helixResourceManager.getHelixZkManager().getHelixDataAccessor();
     List<String> resourceConfigNames = accessor.getChildNames(accessor.keyBuilder().resourceConfigs());
     return resourceConfigNames.stream()
-        .filter(name -> name.startsWith(TASK_QUEUE_PREFIX))
+        .filter(name -> name.startsWith(TASK_QUEUE_PREFIX) && !name.contains(TASK_NAME_SEPARATOR + TASK_PREFIX))
         .collect(Collectors.toList());
   }
 
