@@ -27,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -124,6 +125,58 @@ public class HttpSegmentFetcherTest {
     when(client.downloadFile(any(), any(), any())).thenReturn(200);
     HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
     List<URI> uris = List.of();
+    segmentFetcher.fetchSegmentToLocal(SEGMENT_NAME, () -> uris, SEGMENT_FILE);
+  }
+
+  @Test(expectedExceptions = RetriableOperationException.class)
+  public void testFetchSegmentToLocalFileNotFoundNoRetry()
+      throws Exception {
+    FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
+    when(client.downloadFile(any(), any(), any()))
+        .thenThrow(new java.io.FileNotFoundException("Segment file not found"));
+    HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
+    List<URI> uris = List.of(new URI("http://h1:8080"));
+    // FileNotFoundException is rethrown and wrapped by retry policy as RetriableOperationException
+    segmentFetcher.fetchSegmentToLocal(SEGMENT_NAME, () -> uris, SEGMENT_FILE);
+  }
+
+  @Test(expectedExceptions = RetriableOperationException.class)
+  public void testFetchSegmentToLocalWithURIFileNotFoundNoRetry()
+      throws Exception {
+    FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
+    when(client.downloadFile(any(), any(), any()))
+        .thenThrow(new java.io.FileNotFoundException("Segment file not found"));
+    when(client.downloadFile(any(), any(), any(), any(), any(Integer.class), any(Integer.class)))
+        .thenThrow(new java.io.FileNotFoundException("Segment file not found"));
+    HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
+    // Use 127.0.0.1 to avoid DNS resolution (RoundRobinURIProvider resolves hostname)
+    URI uri = new URI("http://127.0.0.1:8080/segment");
+    // FileNotFoundException is detected and rethrown (no retries), wrapped as RetriableOperationException
+    segmentFetcher.fetchSegmentToLocal(uri, SEGMENT_FILE);
+  }
+
+  @Test(expectedExceptions = RetriableOperationException.class)
+  public void testFetchSegmentToLocalWithURIListFileNotFoundNoRetry()
+      throws Exception {
+    FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
+    when(client.downloadFile(any(), any(), any()))
+        .thenThrow(new java.io.FileNotFoundException("Segment file not found"));
+    HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
+    List<URI> uris = List.of(new URI("http://h1:8080"), new URI("http://h2:8080"));
+    segmentFetcher.fetchSegmentToLocal(uris, SEGMENT_FILE);
+  }
+
+  @Test(expectedExceptions = RetriableOperationException.class)
+  public void testFetchSegmentToLocalWrappedFileNotFoundNoRetry()
+      throws Exception {
+    FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
+    java.io.FileNotFoundException fnfe = new java.io.FileNotFoundException("Segment not found");
+    java.io.IOException wrappedException = new java.io.IOException("Wrapped error", fnfe);
+    when(client.downloadFile(any(), any(), any())).thenThrow(wrappedException);
+
+    HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
+    List<URI> uris = List.of(new URI("http://h1:8080"));
+    // FileNotFoundException in cause chain is detected and rethrown, wrapped as RetriableOperationException
     segmentFetcher.fetchSegmentToLocal(SEGMENT_NAME, () -> uris, SEGMENT_FILE);
   }
 }
