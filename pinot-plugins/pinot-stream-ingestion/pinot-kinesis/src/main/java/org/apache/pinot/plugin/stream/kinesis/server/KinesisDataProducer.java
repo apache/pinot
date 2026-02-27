@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kinesis.server;
 
+import java.io.FileNotFoundException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -119,6 +120,8 @@ public class KinesisDataProducer implements StreamDataProducer {
       _retryPolicy.attempt(() -> putRecord(topic, null, payload));
     } catch (AttemptsExceededException ae) {
       LOGGER.error("Retries exhausted while pushing record in stream {}", topic);
+    } catch (FileNotFoundException fne) {
+      LOGGER.error("Path not found while pushing records in stream {}", topic, fne);
     } catch (RetriableOperationException roe) {
       LOGGER.error("Error occurred while pushing records in stream {}", topic, roe);
     }
@@ -130,6 +133,8 @@ public class KinesisDataProducer implements StreamDataProducer {
       _retryPolicy.attempt(() -> putRecord(topic, key, payload));
     } catch (AttemptsExceededException ae) {
       LOGGER.error("Retries exhausted while pushing record in stream {}", topic);
+    } catch (FileNotFoundException fne) {
+      LOGGER.error("Path not found while pushing records in stream {}", topic, fne);
     } catch (RetriableOperationException roe) {
       LOGGER.error("Error occurred while pushing records in stream {}", topic, roe);
     }
@@ -141,6 +146,8 @@ public class KinesisDataProducer implements StreamDataProducer {
       _retryPolicy.attempt(() -> putRecordBatch(topic, rows));
     } catch (AttemptsExceededException ae) {
       LOGGER.error("Retries exhausted while pushing record in stream {}", topic);
+    } catch (FileNotFoundException fne) {
+      LOGGER.error("Path not found while pushing records in stream {}", topic, fne);
     } catch (RetriableOperationException roe) {
       LOGGER.error("Error occurred while pushing records in stream {}", topic, roe);
     }

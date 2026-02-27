@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.ingestion.batch.spark.common;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
@@ -102,7 +103,7 @@ public abstract class BaseSparkSegmentUriPushJobRunner implements IngestionJobRu
       // Push from driver
       try {
         SegmentPushUtils.sendSegmentUris(_spec, segmentUris);
-      } catch (RetriableOperationException | AttemptsExceededException e) {
+      } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
         throw new RuntimeException(e);
       }
     } else {

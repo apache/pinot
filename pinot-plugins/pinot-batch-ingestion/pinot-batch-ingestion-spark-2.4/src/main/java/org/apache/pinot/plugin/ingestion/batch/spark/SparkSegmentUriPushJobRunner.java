@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark;
 
+import java.io.FileNotFoundException;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.plugin.ingestion.batch.spark.common.BaseSparkSegmentUriPushJobRunner;
@@ -62,7 +63,7 @@ public class SparkSegmentUriPushJobRunner extends BaseSparkSegmentUriPushJobRunn
                 .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
           }
           SegmentPushUtils.sendSegmentUris(_spec, Arrays.asList(segmentUri));
-        } catch (RetriableOperationException | AttemptsExceededException e) {
+        } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
           throw new RuntimeException(e);
         }
       }

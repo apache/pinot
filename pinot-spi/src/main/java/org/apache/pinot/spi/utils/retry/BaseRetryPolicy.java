@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils.retry;
 
+import java.io.FileNotFoundException;
 import java.util.concurrent.Callable;
 
 
@@ -43,7 +44,7 @@ public abstract class BaseRetryPolicy implements RetryPolicy {
 
   @Override
   public int attempt(Callable<Boolean> operation)
-      throws AttemptsExceededException, RetriableOperationException {
+      throws AttemptsExceededException, FileNotFoundException, RetriableOperationException {
     int attempt = 0;
     try {
       while (attempt < _maxNumAttempts - 1) {
@@ -59,6 +60,8 @@ public abstract class BaseRetryPolicy implements RetryPolicy {
         // Succeeded
         return attempt;
       }
+    } catch (FileNotFoundException e) { // Not retryable exception
+      throw e;
     } catch (Exception e) {
       throw new RetriableOperationException(e, attempt + 1);
     }

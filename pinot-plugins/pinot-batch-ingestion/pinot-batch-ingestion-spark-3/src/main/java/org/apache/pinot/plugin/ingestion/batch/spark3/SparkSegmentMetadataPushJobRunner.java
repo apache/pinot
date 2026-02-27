@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.ingestion.batch.spark3;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
@@ -185,7 +186,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
       // Push from driver
       try {
         SegmentPushUtils.pushSegments(_spec, outputDirFS, segmentsToPush);
-      } catch (RetriableOperationException | AttemptsExceededException e) {
+      } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
         throw new RuntimeException(e);
       }
     } else {
@@ -209,7 +210,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
                       segmentsInPartition.toArray(new String[0]));
               SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
                   segmentUriToTarPathMap);
-            } catch (RetriableOperationException | AttemptsExceededException e) {
+            } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
               throw new RuntimeException(e);
             }
           }
@@ -227,7 +228,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
                       new String[]{segmentTarPath});
               SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
                   segmentUriToTarPathMap);
-            } catch (RetriableOperationException | AttemptsExceededException e) {
+            } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
               throw new RuntimeException(e);
             }
           }
