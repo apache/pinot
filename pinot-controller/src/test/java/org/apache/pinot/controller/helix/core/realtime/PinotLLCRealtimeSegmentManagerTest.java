@@ -299,7 +299,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // committing segment's partitionGroupId no longer in the newPartitionGroupMetadataList
     List<PartitionGroupMetadata> partitionGroupMetadataListWithout0 =
         segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfigs, Collections.emptyList(),
-            mock(IdealState.class));
+            mock(IdealState.class), false);
     partitionGroupMetadataListWithout0.remove(0);
     segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout0;
 
@@ -853,7 +853,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // 1 reached end of shard.
     List<PartitionGroupMetadata> partitionGroupMetadataListWithout1 =
         segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfigs, Collections.emptyList(),
-            mock(IdealState.class));
+            mock(IdealState.class), false);
     partitionGroupMetadataListWithout1.remove(1);
     segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout1;
     // noop
@@ -1622,7 +1622,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._numPartitions = 2;
 
     // Test empty ideal state
-    Set<Integer> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState, null);
+    Set<Integer> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState, false);
     Assert.assertEquals(partitionIds.size(), 2);
     partitionIds.clear();
 
@@ -1638,8 +1638,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         List.of(new PartitionGroupMetadata(0, new LongMsgOffset(234)),
             new PartitionGroupMetadata(1, new LongMsgOffset(345)));
     doReturn(partitionGroupMetadataList).when(segmentManagerSpy)
-        .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList, idealState, false, false);
-    partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState, null);
+        .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList, idealState, false);
+    partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState, false);
     Assert.assertEquals(partitionIds.size(), 2);
   }
 
@@ -2024,7 +2024,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     public void ensureAllPartitionsConsuming() {
       ensureAllPartitionsConsuming(_tableConfig, _streamConfigs, _idealState,
-          getNewPartitionGroupMetadataList(_streamConfigs, Collections.emptyList(), mock(IdealState.class)), null);
+          getNewPartitionGroupMetadataList(_streamConfigs, Collections.emptyList(), mock(IdealState.class), false),
+          null);
     }
 
     @Override

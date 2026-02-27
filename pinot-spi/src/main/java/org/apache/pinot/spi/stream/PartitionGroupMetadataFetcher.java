@@ -106,7 +106,8 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
       throws Exception {
     int numStreams = _streamConfigs.size();
 
-    // Fetch available topics once and reuse across all streams (for topic existence validation)
+    // For multi topic tables - Fetch available topics once and reuse across all streams
+    // (for topic existence validation)
     Set<String> availableTopicNames = fetchAvailableTopicNames();
 
     for (int i = 0; i < numStreams; i++) {

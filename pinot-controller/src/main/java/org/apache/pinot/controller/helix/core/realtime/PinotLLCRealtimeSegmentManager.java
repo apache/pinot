@@ -380,7 +380,7 @@ public class PinotLLCRealtimeSegmentManager {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
     boolean multitopicSkipMissingTopics = IngestionConfigUtils.getMultitopicSkipMissingTablesFlag(tableConfig);
     List<Pair<PartitionGroupMetadata, Integer>> newPartitionGroupMetadataList =
-        getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), idealState, false,
+        getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), idealState,
             multitopicSkipMissingTopics).stream().map(
             x -> Pair.of(x, STARTING_SEQUENCE_NUMBER)
         ).collect(Collectors.toList());
@@ -1139,7 +1139,8 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs, IdealState idealState, boolean multitopicSkipMissingTopics) {
+  Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs, IdealState idealState,
+      boolean multitopicSkipMissingTopics) {
     Set<Integer> partitionIds = new HashSet<>();
     boolean allPartitionIdsFetched = true;
     int numStreams = streamConfigs.size();
@@ -1188,7 +1189,7 @@ public class PinotLLCRealtimeSegmentManager {
           getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
       List<PartitionGroupMetadata> newPartitionGroupMetadataList =
           getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState,
-              false, multitopicSkipMissingTopics);
+              multitopicSkipMissingTopics);
       partitionIds.addAll(newPartitionGroupMetadataList.stream()
           .map(PartitionGroupMetadata::getPartitionGroupId)
           .collect(Collectors.toSet()));
@@ -1398,7 +1399,7 @@ public class PinotLLCRealtimeSegmentManager {
               IngestionConfigUtils.getMultitopicSkipMissingTablesFlag(tableConfig);
           List<PartitionGroupMetadata> newPartitionGroupMetadataList =
               getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState,
-                  false, multitopicSkipMissingTopics);
+                  multitopicSkipMissingTopics);
           streamConfigs.stream().forEach(streamConfig -> streamConfig.setOffsetCriteria(originalOffsetCriteria));
           return ensureAllPartitionsConsuming(tableConfig, streamConfigs, idealState, newPartitionGroupMetadataList,
               offsetCriteria);

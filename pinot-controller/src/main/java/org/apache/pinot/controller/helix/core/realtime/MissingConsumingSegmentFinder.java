@@ -86,7 +86,8 @@ public class MissingConsumingSegmentFinder {
     try {
       PauseState pauseState = PinotLLCRealtimeSegmentManager.extractTablePauseState(idealState);
       PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs, Collections.emptyList(),
-              pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), false, multitopicSkipMissingTopics)
+              pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), false,
+              multitopicSkipMissingTopics)
           .forEach(metadata -> {
             _partitionGroupIdToLargestStreamOffsetMap.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
           });

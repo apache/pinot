@@ -89,7 +89,8 @@ public class PinotTableIdealStateBuilder {
    *                                          and is created using the latest segment zk metadata.
    * @param pausedTopicIndices List of inactive topic indices. Index is the index of the topic in the streamConfigMaps.
    * @param forceGetOffsetFromStream - details in PinotLLCRealtimeSegmentManager.fetchPartitionGroupIdToSmallestOffset
-   * @param multitopicSkipMissingTopics whether to skip topics that don't exist during partition metadata fetch
+   * @param multitopicSkipMissingTopics - In multitopic tables whether to skip topics that don't exist
+   *                                      during partition metadata fetch
    */
   public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, List<Integer> pausedTopicIndices,
