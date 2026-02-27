@@ -585,14 +585,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int index) {
-    String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
-    if (index >= 0 && index < splitString.length) {
-      return splitString[index];
-    } else if (index < 0 && index >= -splitString.length) {
-      return splitString[splitString.length + index];
-    } else {
-      return "null";
-    }
+    return splitPart(input, delimiter, 0, index);
   }
 
   /**
@@ -604,14 +597,83 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int limit, int index) {
-    String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter, limit);
-    if (index >= 0 && index < splitString.length) {
-      return splitString[index];
-    } else if (index < 0 && index >= -splitString.length) {
-      return splitString[splitString.length + index];
-    } else {
+    if (delimiter == null || delimiter.isEmpty()) {
       return "null";
     }
+
+    // Normalize limit: non-positive means no limit
+    int maxParts = (limit <= 0) ? Integer.MAX_VALUE : limit;
+
+    int targetIndex = index;
+
+    // Handle Negative Index: We must count total tokens first
+    if (index < 0) {
+      // Pass -1 as targetIndex to run in "Count Mode"
+      int totalTokens = scanAndGet(input, delimiter, maxParts, -1, null);
+
+      targetIndex = totalTokens + index;
+      if (targetIndex < 0) {
+        return "null";
+      }
+    }
+
+    // Handle Positive Index: Retrieve the token
+    // We use a 1-element array as a mutable container to avoid allocating a wrapper object
+    String[] result = new String[1];
+    scanAndGet(input, delimiter, maxParts, targetIndex, result);
+
+    return result[0] != null ? result[0] : "null";
+  }
+
+  /**
+   * Unified logic to scan tokens.
+   * If container is null -> Returns token count (Count Mode).
+   * If container is set -> Extracts the token at targetIndex (Fetch Mode).
+   */
+  private static int scanAndGet(String input, String delimiter, int maxParts, int targetIndex, String[] container) {
+    int count = 0;
+    int start = 0;
+    int len = input.length();
+    int dLen = delimiter.length();
+
+    while (start < len) {
+      int nextDelim = input.indexOf(delimiter, start);
+
+      // Check if this is the last token (End of string OR Hit limit)
+      if (nextDelim == -1 || (count + 1 == maxParts)) {
+        if (targetIndex == count && container != null) {
+          container[0] = input.substring(start);
+        }
+        return count + 1; // Return total count (current + 1)
+      }
+
+      // Skip empty tokens (consecutive delimiters)
+      if (nextDelim == start) {
+        start += dLen;
+        continue;
+      }
+
+      // Found a standard token
+      if (targetIndex == count) {
+        if (container != null) {
+          container[0] = input.substring(start, nextDelim);
+        }
+        return count; // Found target, return doesn't matter much here but strictly it's 'count'
+      }
+
+      count++;
+      start = nextDelim + dLen;
+    }
+
+    // Edge Case: Input purely delimiters (e.g. "+++++") or empty
+    if (count == 0 && len > 0) {
+      if (targetIndex == 0 && container != null) {
+        container[0] = "";
+      }
+      return 1;
+    }
+
+    return count;
   }
 
   /**
@@ -706,7 +768,7 @@ public class StringFunctions {
         int cost = (input1.charAt(i - 1) == input2.charAt(j - 1)) ? 0 : 1;
         dp[i][j] = Math.min(
             Math.min(dp[i - 1][j] + 1,      // deletion
-                     dp[i][j - 1] + 1),     // insertion
+                dp[i][j - 1] + 1),     // insertion
             dp[i - 1][j - 1] + cost         // substitution
         );
       }
