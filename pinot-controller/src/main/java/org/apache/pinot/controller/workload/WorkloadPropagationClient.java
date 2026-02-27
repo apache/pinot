@@ -29,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -97,8 +98,8 @@ public class WorkloadPropagationClient implements AutoCloseable {
                                    ControllerMetrics controllerMetrics) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     // Create dedicated executor for HTTP callback processing to avoid blocking workload propagation tasks
-    int httpThreads = controllerConf.getControllerWorkloadExecutorThreads();
-    int httpQueueSize = controllerConf.getControllerWorkloadExecutorQueueSize();
+    int httpThreads = controllerConf.getControllerWorkloadHttpExecutorThreads();
+    int httpQueueSize = controllerConf.getControllerWorkloadHttpExecutorQueueSize();
     _httpCallbackExecutor = new ThreadPoolExecutor(httpThreads, httpThreads,
         60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(httpQueueSize),
@@ -162,8 +163,6 @@ public class WorkloadPropagationClient implements AutoCloseable {
   public void sendQueryWorkloadMessage(Map<String, QueryWorkloadRequest> instanceToRefreshRequestMap) {
     long startTime = System.currentTimeMillis();
     int totalInstances = instanceToRefreshRequestMap.size();
-
-    LOGGER.info("Total {} instances to send workload refresh message", totalInstances);
     // Create async requests for all instances (callbacks processed by dedicated executor)
     List<CompletableFuture<Boolean>> futures = new ArrayList<>(totalInstances);
     for (Map.Entry<String, QueryWorkloadRequest> entry : instanceToRefreshRequestMap.entrySet()) {
@@ -216,7 +215,7 @@ public class WorkloadPropagationClient implements AutoCloseable {
       }
     }
     if (failureCount > 0) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_MESSAGES_FAILED, failureCount);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_MESSAGES_ERROR, failureCount);
     }
     _controllerMetrics.addTimedValue(ControllerTimer.QUERY_WORKLOAD_SEND_MESSAGE_TIME_MS,
         System.currentTimeMillis() - startTime, TimeUnit.MILLISECONDS);
@@ -330,6 +329,12 @@ public class WorkloadPropagationClient implements AutoCloseable {
         }, _httpCallbackExecutor)
         .exceptionally(ex -> {
           Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+          // Track HTTP callback executor rejection
+          if (cause instanceof RejectedExecutionException || ex instanceof RejectedExecutionException) {
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED, 1L);
+            LOGGER.warn("HTTP callback executor queue full - workload request dropped for instance: {}", instanceId);
+            return false;
+          }
           // Non-retriable errors (400/403/404) should not be retried - return false to count as failure
           if (cause instanceof IllegalStateException && cause.getCause() instanceof HttpErrorStatusException) {
             HttpErrorStatusException httpEx = (HttpErrorStatusException) cause.getCause();
@@ -337,8 +342,7 @@ public class WorkloadPropagationClient implements AutoCloseable {
               return false;
             }
           }
-          // Other exceptions should have been retried already or hit max retries
-          LOGGER.error("Unexpected exception in retry logic for instance: {}", instanceId, ex);
+          LOGGER.error("Workload request to instance {} failed after {} attempts", instanceId, attemptNumber + 1);
           return false;
         });
   }
@@ -351,7 +355,7 @@ public class WorkloadPropagationClient implements AutoCloseable {
         SimpleHttpResponse wrappedResponse = HttpClient.wrapAndThrowHttpException(response);
         if (wrappedResponse.getStatusCode() == HttpStatus.SC_OK
             || wrappedResponse.getStatusCode() == HttpStatus.SC_ACCEPTED) {
-          LOGGER.info("Successfully sent workload request to instance: {}", instanceId);
+          LOGGER.debug("Successfully sent workload request to instance: {}", instanceId);
           return true;
         }
         return false;

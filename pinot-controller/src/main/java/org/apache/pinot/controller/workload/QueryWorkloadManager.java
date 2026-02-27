@@ -30,6 +30,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
@@ -92,6 +93,7 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
   // TODO: Remove this check once we have fully rolled out query workload configs
   private final boolean _enableInstanceChangePropagation;
   private final boolean _enableBrokerChangePropagation;
+  private final long _propagationTimeoutSeconds;
 
 
   public QueryWorkloadManager(PinotHelixResourceManager pinotHelixResourceManager,
@@ -108,6 +110,7 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
     _enableInstanceChangePropagation = controllerConf.enableInstanceChangePropagation();
     _enableBrokerChangePropagation = controllerConf.enableBrokerChangePropagation();
     _controllerMetrics = controllerMetrics;
+    _propagationTimeoutSeconds = controllerConf.getControllerWorkloadPropagationTimeoutSeconds();
     LOGGER.info("Initialized QueryWorkloadManager with instance change propagation: {}, broker change propagation: {}",
         _enableInstanceChangePropagation, _enableBrokerChangePropagation);
   }
@@ -149,36 +152,40 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     LOGGER.info("Propagating workload update for: {}", queryWorkloadName);
     long startTime = System.currentTimeMillis();
-    // Track propagation call
-    _controllerMetrics.addMeteredTableValue(queryWorkloadName, ControllerMeter.QUERY_WORKLOAD_PROPAGATION_COUNT,
-        1L);
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_PROPAGATION_COUNT, 1L);
     try {
-      Map<String, InstanceCost> workloadInstanceCostMap = new HashMap<>();
-      for (NodeConfig nodeConfig: queryWorkloadConfig.getNodeConfigs()) {
-        resolveInstanceCostMap(nodeConfig, workloadInstanceCostMap);
-      }
-      Map<String, QueryWorkloadRequest> instanceToRefreshRequestMap = workloadInstanceCostMap.entrySet().stream()
-          .collect(Collectors.toMap(Map.Entry::getKey, entry -> new QueryWorkloadRequest(
-              queryWorkloadName, entry.getValue())));
-      // Sends the message only after all nodeConfigs are processed successfully
-      // TODO: See if we also need to send a delete message message to entities that were previously targeted but
-      //  are no longer targeted by the updated workload config.
-      _propagationClient.sendQueryWorkloadMessage(instanceToRefreshRequestMap);
-      LOGGER.info("Successfully propagated workload update for: {} to {} instances", queryWorkloadName,
-          instanceToRefreshRequestMap.size());
+      // Run this inside the dedicated executor to ensure that the propagation overhead can be controlled
+      CompletableFuture.runAsync(() -> {
+        Map<String, InstanceCost> workloadInstanceCostMap = new HashMap<>();
+        for (NodeConfig nodeConfig: queryWorkloadConfig.getNodeConfigs()) {
+          resolveInstanceCostMap(nodeConfig, workloadInstanceCostMap);
+        }
+        Map<String, QueryWorkloadRequest> instanceToRefreshRequestMap = workloadInstanceCostMap.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, entry -> new QueryWorkloadRequest(
+                queryWorkloadName, entry.getValue())));
+        // Sends the message only after all nodeConfigs are processed successfully
+        // TODO: See if we also need to send a delete message message to entities that were previously targeted but
+        //  are no longer targeted by the updated workload config.
+        _propagationClient.sendQueryWorkloadMessage(instanceToRefreshRequestMap);
+        LOGGER.info("Successfully propagated workload update for: {} to {} instances", queryWorkloadName,
+            instanceToRefreshRequestMap.size());
+      }, _queryWorkloadExecutor).get(_propagationTimeoutSeconds, TimeUnit.SECONDS);
     } catch (Exception e) {
-      // Track failure
-      _controllerMetrics.addMeteredTableValue(queryWorkloadName, ControllerMeter.QUERY_WORKLOAD_PROPAGATION_FAILED, 1L);
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_PROPAGATION_FAILED, 1L);
-      String errorMsg = String.format("Failed to propagate workload update for: %s", queryWorkloadName);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg, e);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_PROPAGATION_ERROR, 1L);
+      if (e instanceof TimeoutException) {
+        LOGGER.error("Workload propagation timed out after {} seconds for: {}", _propagationTimeoutSeconds,
+            queryWorkloadName);
+        throw new RuntimeException("Workload propagation timed out for: " + queryWorkloadName);
+      } else if (e instanceof RejectedExecutionException) {
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_REQUEST_DROPPED, 1L);
+        LOGGER.error("Workload propagation queue full - request dropped for: {}", queryWorkloadName);
+        throw new RuntimeException("Workload propagation queue full for: " + queryWorkloadName, e);
+      } else {
+        LOGGER.error("Workload propagation failed for: {}", queryWorkloadName, e);
+        throw new RuntimeException("Workload propagation failed for: " + queryWorkloadName, e);
+      }
     } finally {
-      // Track propagation time
       long duration = System.currentTimeMillis() - startTime;
-      _controllerMetrics.addTimedTableValue(queryWorkloadName, ControllerTimer.QUERY_WORKLOAD_PROPAGATE_TIME_MS,
-          duration, TimeUnit.MILLISECONDS);
       _controllerMetrics.addTimedValue(ControllerTimer.QUERY_WORKLOAD_PROPAGATE_TIME_MS, duration,
           TimeUnit.MILLISECONDS);
     }
@@ -227,39 +234,42 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     LOGGER.info("Propagating workload delete for: {}", queryWorkloadName);
     long startTime = System.currentTimeMillis();
-    _controllerMetrics.addMeteredTableValue(queryWorkloadName, ControllerMeter.QUERY_WORKLOAD_PROPAGATION_COUNT,
-        1L);
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_PROPAGATION_COUNT, 1L);
-    Map<String, QueryWorkloadRequest> instanceToDeleteRequestMap = new HashMap<>();
     try {
-      for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
-        if (nodeConfig == null) {
-          LOGGER.warn("Skipping null NodeConfig for workload delete: {}", queryWorkloadName);
-          continue;
+      // Run this inside the dedicated executor to ensure that the propagation overhead can be controlled
+      CompletableFuture.runAsync(() -> {
+        Map<String, QueryWorkloadRequest> instanceToDeleteRequestMap = new HashMap<>();
+        for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
+          Set<String> instances = resolveInstances(nodeConfig);
+          if (instances.isEmpty()) {
+            LOGGER.warn("No instances found for workload delete: {} with nodeConfig: {}", queryWorkloadName,
+                nodeConfig);
+            continue;
+          }
+          QueryWorkloadRequest deleteRequest = new QueryWorkloadRequest(queryWorkloadName, null);
+          instanceToDeleteRequestMap.putAll(instances.stream()
+              .collect(Collectors.toMap(instance -> instance, instance -> deleteRequest)));
         }
-        Set<String> instances = resolveInstances(nodeConfig);
-        if (instances.isEmpty()) {
-          LOGGER.warn("No instances found for workload delete: {} with nodeConfig: {}", queryWorkloadName, nodeConfig);
-          continue;
-        }
-        QueryWorkloadRequest deleteRequest = new QueryWorkloadRequest(queryWorkloadName, null);
-        instanceToDeleteRequestMap.putAll(instances.stream()
-            .collect(Collectors.toMap(instance -> instance, instance -> deleteRequest)));
-      }
-      _propagationClient.sendQueryWorkloadMessage(instanceToDeleteRequestMap);
-      LOGGER.info("Successfully propagated workload delete for: {} to {} instances", queryWorkloadName,
-          instanceToDeleteRequestMap.size());
+        _propagationClient.sendQueryWorkloadMessage(instanceToDeleteRequestMap);
+        LOGGER.info("Successfully propagated workload delete for: {} to {} instances", queryWorkloadName,
+            instanceToDeleteRequestMap.size());
+      }, _queryWorkloadExecutor).get(_propagationTimeoutSeconds, TimeUnit.SECONDS);
     } catch (Exception e) {
-      _controllerMetrics.addMeteredTableValue(queryWorkloadName, ControllerMeter.QUERY_WORKLOAD_PROPAGATION_FAILED,
-          1L);
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_PROPAGATION_FAILED, 1L);
-      String errorMsg = String.format("Failed to propagate workload delete for: %s", queryWorkloadName);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg, e);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_PROPAGATION_ERROR, 1L);
+      if (e instanceof TimeoutException) {
+        LOGGER.error("Workload delete propagation timed out after {} seconds for: {}", _propagationTimeoutSeconds,
+            queryWorkloadName);
+        throw new RuntimeException("Workload delete propagation timed out for: " + queryWorkloadName);
+      } else if (e instanceof RejectedExecutionException) {
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_REQUEST_DROPPED, 1L);
+        LOGGER.error("Workload delete propagation queue full - request dropped for: {}", queryWorkloadName, e);
+        throw new RuntimeException("Workload delete propagation queue full for: " + queryWorkloadName);
+      } else {
+        LOGGER.error("Workload delete propagation failed for: {}", queryWorkloadName, e);
+        throw new RuntimeException("Workload delete propagation failed for: " + queryWorkloadName);
+      }
     } finally {
       long duration = System.currentTimeMillis() - startTime;
-      _controllerMetrics.addTimedTableValue(queryWorkloadName, ControllerTimer.QUERY_WORKLOAD_PROPAGATE_TIME_MS,
-          duration, TimeUnit.MILLISECONDS);
       _controllerMetrics.addTimedValue(ControllerTimer.QUERY_WORKLOAD_PROPAGATE_TIME_MS, duration,
           TimeUnit.MILLISECONDS);
     }
@@ -375,74 +385,83 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
    *         to the given instance for its role.
    */
   public Map<String, InstanceCost> getWorkloadToInstanceCostFor(String instanceName) {
-    Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
     long startTime = System.currentTimeMillis();
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_COUNT, 1L);
     try {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_COUNT, 1L);
-      InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
-      if (instanceConfig == null) {
-        LOGGER.warn("InstanceConfig not found for instance: {}", instanceName);
-        return workloadToInstanceCostMap;
-      }
-      List<String> helixTags = instanceConfig.getTags();
-      if (helixTags.isEmpty()) {
-        LOGGER.warn("No helix tags found for instance: {}", instanceName);
-        return workloadToInstanceCostMap;
-      }
-      List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
-      if (queryWorkloadConfigs.isEmpty()) {
-        LOGGER.warn("No query workload configs found in zookeeper");
-        return workloadToInstanceCostMap;
-      }
-      // Filter to only workloads that match this instance's tags - this is the key optimization
-      Set<QueryWorkloadConfig> relevantWorkloadConfigs =
-          PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, new HashSet<>(helixTags),
-              queryWorkloadConfigs);
-      // Determine node type from instance name
-      NodeConfig.Type nodeType;
-      if (InstanceTypeUtils.isServer(instanceName)) {
-        nodeType = NodeConfig.Type.SERVER_NODE;
-      } else if (InstanceTypeUtils.isBroker(instanceName)) {
-        nodeType = NodeConfig.Type.BROKER_NODE;
-      } else {
-        LOGGER.warn("Instance {} is neither a server nor a broker", instanceName);
-        return workloadToInstanceCostMap;
-      }
-      // Iterate through relevant workloads and compute cost for this instance
-      for (QueryWorkloadConfig queryWorkloadConfig : relevantWorkloadConfigs) {
-        try {
-          List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(queryWorkloadConfig);
-          if (!errors.isEmpty()) {
-            LOGGER.error("Invalid QueryWorkloadConfig: {}, errors: {}", queryWorkloadConfig, errors);
-            continue;
-          }
-          String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
-          for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
-            if (nodeConfig.getNodeType() != nodeType) {
-              // Skip node configs that don't match this instance's type
+      // Run this inside the dedicated executor to ensure that computation overhead can be controlled
+      return CompletableFuture.supplyAsync(() -> {
+        Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
+        InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+        if (instanceConfig == null) {
+          LOGGER.warn("InstanceConfig not found for instance: {}", instanceName);
+          return workloadToInstanceCostMap;
+        }
+        List<String> helixTags = instanceConfig.getTags();
+        if (helixTags.isEmpty()) {
+          LOGGER.warn("No helix tags found for instance: {}", instanceName);
+          return workloadToInstanceCostMap;
+        }
+        List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
+        if (queryWorkloadConfigs.isEmpty()) {
+          return workloadToInstanceCostMap;
+        }
+        // Filter to only workloads that match this instance's tags
+        Set<QueryWorkloadConfig> relevantWorkloadConfigs =
+            PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, new HashSet<>(helixTags),
+                queryWorkloadConfigs);
+        // Determine node type from instance name
+        NodeConfig.Type nodeType;
+        if (InstanceTypeUtils.isServer(instanceName)) {
+          nodeType = NodeConfig.Type.SERVER_NODE;
+        } else if (InstanceTypeUtils.isBroker(instanceName)) {
+          nodeType = NodeConfig.Type.BROKER_NODE;
+        } else {
+          LOGGER.warn("Instance {} is neither a server nor a broker", instanceName);
+          return workloadToInstanceCostMap;
+        }
+        // Iterate through relevant workloads and compute cost for this instance
+        for (QueryWorkloadConfig queryWorkloadConfig : relevantWorkloadConfigs) {
+          try {
+            List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(queryWorkloadConfig);
+            if (!errors.isEmpty()) {
+              LOGGER.warn("Invalid QueryWorkloadConfig: {}, errors: {}", queryWorkloadConfig, errors);
               continue;
             }
-            Map<String, InstanceCost> instanceCostMap = new HashMap<>();
-            resolveInstanceCostMap(nodeConfig, instanceCostMap);
-            InstanceCost instanceCost = instanceCostMap.get(instanceName);
-            if (instanceCost != null) {
-              workloadToInstanceCostMap.put(queryWorkloadName, instanceCost);
-              break; // Found cost for this workload, move to next workload
+            String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
+            for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
+              if (nodeConfig.getNodeType() != nodeType) {
+                continue;
+              }
+              Map<String, InstanceCost> instanceCostMap = new HashMap<>();
+              resolveInstanceCostMap(nodeConfig, instanceCostMap);
+              InstanceCost instanceCost = instanceCostMap.get(instanceName);
+              if (instanceCost != null) {
+                workloadToInstanceCostMap.put(queryWorkloadName, instanceCost);
+                break;
+              }
             }
+          } catch (Exception e) {
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_ERROR, 1L);
+            LOGGER.error("Error computing cost for workload: {}", queryWorkloadConfig.getQueryWorkloadName(), e);
           }
-        } catch (Exception e) {
-          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_FAILED, 1L);
-          LOGGER.error("Error computing cost for workload: {}", queryWorkloadConfig.getQueryWorkloadName(), e);
-          // Continue with other workloads instead of failing completely
         }
-      }
-      LOGGER.info("Computed {} workload costs for instance: {}", workloadToInstanceCostMap.size(), instanceName);
-      return workloadToInstanceCostMap;
+        LOGGER.info("Computed {} workload costs for instance: {}", workloadToInstanceCostMap.size(), instanceName);
+        return workloadToInstanceCostMap;
+      }, _queryWorkloadExecutor).get(_propagationTimeoutSeconds, TimeUnit.SECONDS);
     } catch (Exception e) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_FAILED, 1L);
-      String errorMsg = String.format("Failed to compute workload costs for instance: %s", instanceName);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg, e);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_ERROR, 1L);
+      if (e instanceof TimeoutException) {
+        LOGGER.error("Workload cost computation timed out after {} seconds for instance: {}",
+            _propagationTimeoutSeconds, instanceName);
+        throw new RuntimeException("Workload cost computation timed out for: " + instanceName);
+      } else if (e instanceof RejectedExecutionException) {
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_REQUEST_DROPPED, 1L);
+        LOGGER.error("Workload cost computation queue full - request dropped for instance: {}", instanceName);
+        throw new RuntimeException("Workload cost computation queue full for: " + instanceName);
+      } else {
+        LOGGER.error("Failed to compute workload costs for instance: {}", instanceName, e);
+        throw new RuntimeException("Failed to compute workload costs for: " + instanceName, e);
+      }
     } finally {
       long duration = System.currentTimeMillis() - startTime;
       _controllerMetrics.addTimedValue(ControllerTimer.QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_TIME_MS, duration,
@@ -524,10 +543,12 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
       }
     } catch (Exception e) {
       if (e instanceof RejectedExecutionException) {
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_REQUEST_DROPPED, 1L);
         LOGGER.warn("Workload propagation queue full - cannot propagate for instance partitions change: {}. ",
-            instancePartitionsName, e);
+            instancePartitionsName);
+      } else {
+        LOGGER.warn("Error handling instance partitions change for: {}", instancePartitionsName, e);
       }
-      LOGGER.warn("Error handling instance partitions change for: {}", instancePartitionsName, e);
     }
   }
 
@@ -568,17 +589,12 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
         allTables.addAll(tablesRemoved);
       }
       CompletableFuture.runAsync(() ->
-        propagateWorkloadForTables(allTables, NodeConfig.Type.BROKER_NODE), _queryWorkloadExecutor)
-      .exceptionally(ex -> {
-        LOGGER.error("Error propagating workload for broker resource change - tables added: {}, removed: {}",
-            tablesAdded, tablesRemoved, ex);
-        return null;
-      });
+          propagateWorkloadForTables(allTables, NodeConfig.Type.BROKER_NODE), _queryWorkloadExecutor);
     } catch (Exception e) {
       if (e instanceof RejectedExecutionException) {
         _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_REQUEST_DROPPED, 1L);
         LOGGER.warn("Workload propagation queue full - cannot propagate for broker resource change: "
-            + "tables added: {}, removed: {}.", tablesAdded, tablesRemoved, e);
+            + "tables added: {}, removed: {}.", tablesAdded, tablesRemoved);
       } else {
         LOGGER.warn("Error handling broker resource change for tables added: {}, removed: {}",
             tablesAdded, tablesRemoved, e);

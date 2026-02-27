@@ -360,6 +360,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_WORKLOAD_HTTP_EXECUTOR_THREADS = "controller.workload.http.executor.threads";
   public static final String CONTROLLER_WORKLOAD_HTTP_EXECUTOR_QUEUE_SIZE =
       "controller.workload.http.executor.queueSize";
+  public static final String CONTROLLER_WORKLOAD_PROPAGATION_TIMEOUT_SECONDS =
+      "controller.workload.propagation.timeoutSeconds";
   public static final String CONTROLLER_ENABLE_BROKER_CHANGE_PROPAGATION = "controller.enable.table.change.propagation";
   public static final String CONTROLLER_ENABLE_INSTANCE_CHANGE_PROPAGATION =
       "controller.enable.instance.change.propagation";
@@ -633,6 +635,8 @@ public class ControllerConf extends PinotConfiguration {
    * Number of threads to used when sending/response for HTTP requests to servers/brokers.
    */
   public int getControllerWorkloadExecutorThreads() {
+    // We did benchmarking and found that having 5 threads helps us support about 50 requests per second with latency
+    // of about 500ms and CPU utilization of 1% on a 40 core machine and memory consumption of about 100MB.
     return getProperty(CONTROLLER_WORKLOAD_EXECUTOR_THREADS, 5);
   }
 
@@ -640,21 +644,32 @@ public class ControllerConf extends PinotConfiguration {
    * Size of the bounded queue for workload propagation tasks.
    */
   public int getControllerWorkloadExecutorQueueSize() {
-    return getProperty(CONTROLLER_WORKLOAD_EXECUTOR_QUEUE_SIZE, 1000);
+    // We did benchmarking and found that each workload request queuing takes about 100K of memory.
+    // So with default of 10,000 queue size we are using about 1GB of memory for queuing in worst case.
+    return getProperty(CONTROLLER_WORKLOAD_EXECUTOR_QUEUE_SIZE, 10000);
   }
 
   /**
    * Number of threads for HTTP callback processing.
    */
   public int getControllerWorkloadHttpExecutorThreads() {
-    return getProperty(CONTROLLER_WORKLOAD_HTTP_EXECUTOR_THREADS, getControllerWorkloadExecutorThreads());
+    return getProperty(CONTROLLER_WORKLOAD_HTTP_EXECUTOR_THREADS, 5);
   }
 
   /**
    * Size of the bounded queue for HTTP callback tasks.
    */
   public int getControllerWorkloadHttpExecutorQueueSize() {
-    return getProperty(CONTROLLER_WORKLOAD_HTTP_EXECUTOR_QUEUE_SIZE, 100000);
+    // We did benchmarking and found that each HTTP callback queuing takes about 10K of memory.
+    // So with default of 10,000 queue size we are using about 100MB of memory for queuing in worst case.
+    return getProperty(CONTROLLER_WORKLOAD_HTTP_EXECUTOR_QUEUE_SIZE, 10000);
+  }
+
+  /**
+   * Timeout in seconds for workload propagation and cost computation operations.
+   */
+  public long getControllerWorkloadPropagationTimeoutSeconds() {
+    return getProperty(CONTROLLER_WORKLOAD_PROPAGATION_TIMEOUT_SECONDS, 120L);
   }
 
   public boolean enableInstanceChangePropagation() {
