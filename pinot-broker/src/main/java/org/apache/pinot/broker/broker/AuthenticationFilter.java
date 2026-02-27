@@ -99,7 +99,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
           Response.Status.FORBIDDEN);
     }
 
-    FineGrainedAuthUtils.validateFineGrainedAuth(endpointMethod, uriInfo, _httpHeaders, accessControl);
+    FineGrainedAuthUtils.validateFineGrainedAuth(endpointMethod, uriInfo, _httpHeaders, null, accessControl);
   }
 
   private static boolean isBaseFile(String path) {

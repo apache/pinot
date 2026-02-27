@@ -254,7 +254,7 @@ public class PinotBrokerDebug {
     // TODO: Handle nested queries
     if (brokerRequest.isSetQuerySource() && brokerRequest.getQuerySource().isSetTableName()) {
       if (!_accessControlFactory.create()
-          .hasAccess(httpHeaders, TargetType.TABLE, brokerRequest.getQuerySource().getTableName(),
+          .hasAccess(httpHeaders, null, TargetType.TABLE, brokerRequest.getQuerySource().getTableName(),
               Actions.Table.GET_ROUTING_TABLE)) {
         throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
       }

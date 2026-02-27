@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.auth.BasicAuthTokenUtils;
@@ -80,13 +81,15 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders)
-          .filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
+    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders,
+        HttpServletRequest request, String endpointUrl) {
+      return getPrincipal(httpHeaders).filter(
+          p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
     }
 
     @Override
-    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, HttpServletRequest request,
+        String endpointUrl) {
       if (getPrincipal(httpHeaders).isEmpty()) {
         throw new NotAuthorizedException("Basic");
       }
