@@ -56,6 +56,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _untrackedSegmentsDeletionBatchSize;
   private String _untrackedSegmentsRetentionTimeUnit;
   private String _untrackedSegmentsRetentionTimeValue;
+  // Skip CRC check for segment load at table level; defaults to false
+  private boolean _skipCrcCheckOnLoad;
 
   /**
    * @deprecated Use {@link InstanceAssignmentConfig} instead
@@ -258,6 +260,14 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public String getUntrackedSegmentsRetentionTimeValue() {
     return _untrackedSegmentsRetentionTimeValue;
+  }
+
+  public boolean isSkipCrcCheckOnLoad() {
+    return _skipCrcCheckOnLoad;
+  }
+
+  public void setSkipCrcCheckOnLoad(boolean skipCrcCheckOnLoad) {
+    _skipCrcCheckOnLoad = skipCrcCheckOnLoad;
   }
 
   public void setUntrackedSegmentsRetentionTimeValue(String untrackedSegmentsRetentionTimeValue) {
