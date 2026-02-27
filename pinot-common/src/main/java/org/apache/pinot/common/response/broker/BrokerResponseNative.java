@@ -240,8 +240,28 @@ public class BrokerResponseNative implements BrokerResponse {
 
   @JsonIgnore
   @Override
+  public long getMaxRowsInJoin() {
+    return 0;
+  }
+
+  @JsonIgnore
+  @Override
   public boolean isMaxRowsInWindowReached() {
     return false;
+  }
+
+  @JsonIgnore
+  @Override
+  public long getMaxRowsInWindow() {
+    return 0;
+  }
+
+  // TODO: Only populated for multi-stage queries. Single-stage tracks group limit
+  // flags but not actual group counts.
+  @JsonIgnore
+  @Override
+  public long getNumGroups() {
+    return 0;
   }
 
   @Override

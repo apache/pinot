@@ -212,6 +212,8 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       // Row based overflow check.
       if (rows.size() + numRows > _maxRowsInJoin) {
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
+          // Record stat before we throw so it propagates to query response
+          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numRows + rows.size());
           throwForJoinRowLimitExceeded(
               "Cannot build in memory hash table for join operator, reached number of rows limit: " + _maxRowsInJoin);
         } else {
@@ -236,6 +238,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     } else {
       _isRightTableBuilt = true;
       finishBuildingRightTable();
+      _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numRows);
     }
 
     _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
@@ -343,6 +346,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   protected boolean isMaxRowsLimitReached(int numJoinedRows) {
     if (numJoinedRows == _maxRowsInJoin) {
       if (_joinOverflowMode == JoinOverFlowMode.THROW) {
+        _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numJoinedRows);
         throwForJoinRowLimitExceeded(
             "Cannot process join, reached number of rows limit: " + _maxRowsInJoin);
       } else {
@@ -350,6 +354,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
         logger().info("Terminating join operator early as the maximum number of rows limit was reached: {}",
             _maxRowsInJoin);
         earlyTerminateLeftInput();
+        _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numJoinedRows);
         _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
         return true;
       }
@@ -390,6 +395,16 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
      * How long (CPU time) has been spent on building the hash table.
      */
     TIME_BUILDING_HASH_TABLE_MS(StatMap.Type.LONG),
+    /**
+     * The max number of rows seen in the join. Recorded during right table build (normal and overflow paths)
+     * and at the joined-output limit check in {@link #isMaxRowsLimitReached}.
+     */
+    MAX_ROWS_IN_JOIN(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    },
     /**
      * Allocated memory in bytes for this operator or its children in the same stage.
      */

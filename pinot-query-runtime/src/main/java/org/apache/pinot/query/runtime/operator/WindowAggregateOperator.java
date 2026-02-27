@@ -217,6 +217,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
       int containerSize = container.size();
       if (_numRows + containerSize > _maxRowsInWindowCache) {
         if (_windowOverflowMode == WindowOverFlowMode.THROW) {
+          // Record stat before we throw so it propagates to query response
+          _statMap.merge(StatKey.MAX_ROWS_IN_WINDOW, _numRows + containerSize);
           throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
               "Cannot build in memory window cache for WINDOW operator, reach number of rows limit: "
                   + _maxRowsInWindowCache);
@@ -224,6 +226,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
           // Just fill up the buffer.
           int remainingRows = _maxRowsInWindowCache - _numRows;
           container = container.subList(0, remainingRows);
+          // Update container size here since MAX_ROWS_IN_WINDOW is recorded after the loop exits
+          // via _numRows once EOS is received from the early-terminated input.
+          containerSize = remainingRows;
           _statMap.merge(StatKey.MAX_ROWS_IN_WINDOW_REACHED, true);
           // setting the inputOperator to be early terminated and awaits EOS block next.
           _input.earlyTerminate();
@@ -239,6 +244,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       checkTerminationAndSampleUsage();
       block = _input.nextBlock();
     }
+    _statMap.merge(StatKey.MAX_ROWS_IN_WINDOW, _numRows);
     MseBlock.Eos eosBlock = (MseBlock.Eos) block;
     _eosBlock = eosBlock;
     // Early termination if the block is an error block
@@ -301,6 +307,12 @@ public class WindowAggregateOperator extends MultiStageOperator {
       }
     },
     MAX_ROWS_IN_WINDOW_REACHED(StatMap.Type.BOOLEAN),
+    MAX_ROWS_IN_WINDOW(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    },
     /**
      * Allocated memory in bytes for this operator or its children in the same stage.
      */

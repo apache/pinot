@@ -38,7 +38,8 @@ import org.apache.pinot.common.response.ProcessingException;
  */
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "maxRowsInJoinReached", "maxRowsInWindowReached", "timeUsedMs", "stageStats",
+    "numGroupsWarningLimitReached", "numGroups", "maxRowsInJoinReached", "maxRowsInJoin",
+    "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats",
     "maxRowsInOperator", "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
@@ -59,7 +60,9 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private ResultTable _resultTable;
   private int _numRowsResultSet;
   private boolean _maxRowsInJoinReached;
+  private long _maxRowsInJoin;
   private boolean _maxRowsInWindowReached;
+  private long _maxRowsInWindow;
   private long _timeUsedMs;
   /**
    * Statistics for each stage of the query execution.
@@ -144,6 +147,15 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
+  public long getNumGroups() {
+    return _brokerStats.getLong(StatKey.NUM_GROUPS);
+  }
+
+  public void mergeNumGroups(long numGroups) {
+    _brokerStats.merge(StatKey.NUM_GROUPS, numGroups);
+  }
+
+  @Override
   public boolean isNumGroupsWarningLimitReached() {
     return _brokerStats.getBoolean(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED);
   }
@@ -162,12 +174,30 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
+  public long getMaxRowsInJoin() {
+    return _maxRowsInJoin;
+  }
+
+  public void mergeMaxRowsInJoin(long maxRowsInJoin) {
+    _maxRowsInJoin = Math.max(_maxRowsInJoin, maxRowsInJoin);
+  }
+
+  @Override
   public boolean isMaxRowsInWindowReached() {
     return _maxRowsInWindowReached;
   }
 
   public void mergeMaxRowsInWindowReached(boolean maxRowsInWindowReached) {
     _maxRowsInWindowReached |= maxRowsInWindowReached;
+  }
+
+  @Override
+  public long getMaxRowsInWindow() {
+    return _maxRowsInWindow;
+  }
+
+  public void mergeMaxRowsInWindow(long maxRowsInWindow) {
+    _maxRowsInWindow = Math.max(_maxRowsInWindow, maxRowsInWindow);
   }
 
   /**
@@ -453,7 +483,13 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
-    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_GROUPS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    };
 
     private final StatMap.Type _type;
 
