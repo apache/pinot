@@ -11,6 +11,11 @@
   "tableIndexConfig": {
     "loadMode": "MMAP"
   },
+  "dimensionTableConfig": {
+    "disablePreload": false,
+    "errorOnDuplicatePrimaryKey": false,
+    "enableUpsert": true
+  },
   "metadata": {
     "customConfigs": {
     }
