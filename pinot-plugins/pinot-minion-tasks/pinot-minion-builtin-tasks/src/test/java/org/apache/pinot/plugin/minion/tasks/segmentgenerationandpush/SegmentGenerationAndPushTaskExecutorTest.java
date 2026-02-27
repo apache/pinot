@@ -74,7 +74,7 @@ public class SegmentGenerationAndPushTaskExecutorTest {
       put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, "inputtext");
       put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".prop.seg.1", "valseg1");
       put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".propseg2", "valseg2");
-      put(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "true");
+      put(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "false");
     }};
     SegmentGenerationTaskSpec spec = executor.generateTaskSpec(configMap, Paths.get(resourcesLoc.toURI()).toFile());
     assertEquals(spec.getSequenceId(), 42);
