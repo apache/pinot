@@ -42,7 +42,7 @@ import org.apache.pinot.core.transport.ChannelHandlerFactory;
 import org.apache.pinot.core.transport.InstanceRequestHandler;
 import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -86,7 +86,7 @@ public class ServerInstance {
   private boolean _queryServerStarted = false;
 
   public ServerInstance(ServerConf serverConf, String instanceId, HelixManager helixManager,
-      AccessControlFactory accessControlFactory, @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      AccessControlFactory accessControlFactory, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
       ThreadAccountant threadAccountant, SendStatsPredicate sendStatsPredicate,
       KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate,
       ServerReloadJobStatusCache reloadJobStatusCache)
@@ -96,16 +96,16 @@ public class ServerInstance {
     _threadAccountant = threadAccountant;
     _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
 
-    if (segmentOperationsThrottler != null) {
+    if (segmentOperationsThrottlerSet != null) {
       // Initialize the metrics for the throttler so it picks up the newly registered ServerMetrics object
-      segmentOperationsThrottler.initializeMetrics();
+      segmentOperationsThrottlerSet.initializeMetrics();
     }
 
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);
     _instanceDataManager = PluginManager.get().createInstance(instanceDataManagerClassName);
     _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics,
-        segmentOperationsThrottler, _reloadJobStatusCache);
+        segmentOperationsThrottlerSet, _reloadJobStatusCache);
 
     // Initialize ServerQueryLogger and FunctionRegistry before starting the query executor
     ServerQueryLogger.init(serverConf.getQueryLogMaxRate(), serverConf.getQueryLogDroppedReportMaxRate(),
