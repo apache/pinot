@@ -38,6 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Worker;
@@ -215,7 +216,17 @@ public class QueryRunner {
         exceedStrategy = QueryThreadExceedStrategy.valueOf(Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
       }
       LOGGER.info("Setting multi-stage executor hardLimit: {} exceedStrategy: {}", hardLimit, exceedStrategy);
-      _executorService = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy);
+      HardLimitExecutor hardLimitExecutor = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy,
+          () -> serverMetrics.addMeteredGlobalValue(ServerMeter.MSE_EXECUTION_THREADS_TASK_REJECTIONS, 1L));
+
+      // Set max thread limit gauge (constant value)
+      serverMetrics.setValueOfGlobalGauge(ServerGauge.MSE_EXECUTION_THREADS_MAX, (long) hardLimit);
+
+      // Register callback gauge for current thread usage
+      serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MSE_EXECUTION_THREADS_CURRENT,
+          hardLimitExecutor::getCurrentThreadUsage);
+
+      _executorService = hardLimitExecutor;
     }
 
     _executorService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
