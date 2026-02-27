@@ -22,7 +22,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.io.File;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -809,6 +811,97 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
       assertEquals(row.get(0).get(0).asDouble(), 0.1);
       assertEquals(row.get(0).get(1).asDouble(), 0.2);
     }
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testArrayJoinSampleQuery(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT longArrayCol, doubleArrayCol "
+        + "FROM %s "
+        + "ARRAY JOIN longArrayCol, doubleArrayCol "
+        + "WHERE intCol = 0 "
+        + "GROUP BY longArrayCol, doubleArrayCol "
+        + "ORDER BY longArrayCol", getTableName());
+    JsonNode resultJson = postQuery(query);
+    JsonNode rows = resultJson.get("resultTable").get("rows");
+    assertEquals(rows.size(), 4);
+    Set<Integer> seenValues = new HashSet<>();
+    for (int i = 0; i < 4; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      int longValue = row.get(0).asInt();
+      assertEquals(row.get(1).asDouble(), longValue * 0.1, 0.000001);
+      seenValues.add(longValue);
+    }
+    assertEquals(seenValues, Set.of(0, 1, 2, 3));
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testArrayJoinFilterOnFlattenedValueWithGroupBy(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT COUNT(*), flattenedLong "
+        + "FROM %s "
+        + "ARRAY JOIN longArrayCol AS flattenedLong "
+        + "WHERE flattenedLong > 1 "
+        + "GROUP BY flattenedLong", getTableName());
+    JsonNode resultJson = postQuery(query).get("resultTable");
+    JsonNode rows = resultJson.get("rows");
+    assertEquals(rows.size(), 2);
+    Set<Integer> seenValues = new HashSet<>();
+    for (JsonNode row : rows) {
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).asLong(), getCountStarResult());
+      int flattenedValue = row.get(1).asInt();
+      assertTrue(flattenedValue > 1);
+      seenValues.add(flattenedValue);
+    }
+    assertEquals(seenValues, Set.of(2, 3));
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testArrayJoinFilterOnOriginalMvColumnWithGroupBy(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT COUNT(*), longArrayCol "
+        + "FROM %s "
+        + "ARRAY JOIN longArrayCol "
+        + "WHERE longArrayCol > 1 "
+        + "GROUP BY longArrayCol", getTableName());
+    JsonNode resultJson = postQuery(query).get("resultTable");
+    JsonNode rows = resultJson.get("rows");
+    assertEquals(rows.size(), 2);
+    Set<Integer> seenValues = new HashSet<>();
+    for (JsonNode row : rows) {
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).asLong(), getCountStarResult());
+      int flattenedValue = row.get(1).asInt();
+      assertTrue(flattenedValue > 1);
+      seenValues.add(flattenedValue);
+    }
+    assertEquals(seenValues, Set.of(2, 3));
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testArrayJoinFilterOnAliasWithGroupByOrderBy(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT flattenedLong, COUNT(*) "
+        + "FROM %s "
+        + "ARRAY JOIN longArrayCol AS flattenedLong "
+        + "WHERE intCol = 0 AND flattenedLong = 2 "
+        + "GROUP BY flattenedLong "
+        + "ORDER BY COUNT(*) DESC "
+        + "LIMIT 10", getTableName());
+    JsonNode resultJson = postQuery(query).get("resultTable");
+    JsonNode rows = resultJson.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).asInt(), 2);
+    // intCol=0 repeats 10 times due to record cache reuse.
+    assertEquals(row.get(1).asLong(), 10L);
   }
 
   @Test(dataProvider = "useV1QueryEngine")
