@@ -620,4 +620,17 @@ public class QueryOptionsUtils {
     }
     return i;
   }
+
+  public static int getMseMaxInClauseElements(Map<String, String> options, int defaultValue) {
+    String mseMaxInClauseElements = options.get(QueryOptionKey.MSE_MAX_IN_CLAUSE_ELEMENTS);
+    if (mseMaxInClauseElements != null) {
+      try {
+        return Integer.parseInt(mseMaxInClauseElements);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(String.format("%s must be an integer, got: %s",
+            QueryOptionKey.MSE_MAX_IN_CLAUSE_ELEMENTS, mseMaxInClauseElements));
+      }
+    }
+    return defaultValue;
+  }
 }
