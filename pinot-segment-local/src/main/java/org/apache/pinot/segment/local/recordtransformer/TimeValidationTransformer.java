@@ -18,21 +18,14 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
-import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.ThrottledLogger;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.utils.TimeValidationTransformerUtils;
+import org.apache.pinot.segment.local.utils.TimeValidationTransformerUtils.TimeValidationConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
-import org.apache.pinot.spi.utils.TimeUtils;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -41,34 +34,19 @@ import org.slf4j.LoggerFactory;
  * {@link FieldSpec}, and before the {@link NullValueTransformer} so that the invalidated value can be filled.
  */
 public class TimeValidationTransformer implements RecordTransformer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TimeValidationTransformer.class);
 
   private final String _timeColumnName;
-  private final DateTimeFormatSpec _timeFormatSpec;
-  private final boolean _enableTimeValueCheck;
-  private final boolean _continueOnError;
-  private final ThrottledLogger _throttledLogger;
+  @Nullable
+  private final TimeValidationConfig _config;
 
   public TimeValidationTransformer(TableConfig tableConfig, Schema schema) {
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    _enableTimeValueCheck = _timeColumnName != null && ingestionConfig != null && ingestionConfig.isRowTimeValueCheck();
-    if (_enableTimeValueCheck) {
-      DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(_timeColumnName);
-      Preconditions.checkState(dateTimeFieldSpec != null, "Failed to find spec for time column: %s from schema: %s",
-          _timeColumnName, schema.getSchemaName());
-      _timeFormatSpec = dateTimeFieldSpec.getFormatSpec();
-      _continueOnError = ingestionConfig.isContinueOnError();
-    } else {
-      _timeFormatSpec = null;
-      _continueOnError = false;
-    }
-    _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
+    _config = TimeValidationTransformerUtils.getConfig(tableConfig, schema);
   }
 
   @Override
   public boolean isNoOp() {
-    return !_enableTimeValueCheck;
+    return _config == null;
   }
 
   @Override
@@ -77,28 +55,8 @@ public class TimeValidationTransformer implements RecordTransformer {
     if (timeValue == null) {
       return;
     }
-    long timeValueMs;
-    try {
-      timeValueMs = _timeFormatSpec.fromFormatToMillis(timeValue.toString());
-    } catch (Exception e) {
-      String errorMessage =
-          String.format("Caught exception while parsing time value: %s with format: %s", timeValue, _timeFormatSpec);
-      if (!_continueOnError) {
-        throw new IllegalStateException(errorMessage, e);
-      }
-      _throttledLogger.warn(errorMessage, e);
-      record.putValue(_timeColumnName, null);
-      record.markIncomplete();
-      return;
-    }
-    if (!TimeUtils.timeValueInValidRange(timeValueMs)) {
-      String errorMessage =
-          String.format("Time value: %s is not in valid range: %s", new DateTime(timeValueMs, DateTimeZone.UTC),
-              TimeUtils.VALID_TIME_INTERVAL);
-      if (!_continueOnError) {
-        throw new IllegalStateException(errorMessage);
-      }
-      _throttledLogger.warn(errorMessage, new IllegalStateException(errorMessage));
+    Object result = TimeValidationTransformerUtils.transformTimeValue(_config, timeValue);
+    if (result == null) {
       record.putValue(_timeColumnName, null);
       record.markIncomplete();
     }
