@@ -385,6 +385,11 @@ public class CommonConstants {
     public static final long DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS = 100L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_INSTANCE_TAGS = "pinot.broker.instance.tags";
+    // Cluster-level enforcement flag: when enabled, brokers must have pinot.broker.instance.tags configured
+    // to start. Prevents misconfigured brokers from joining multi-tenant clusters without tenant tags.
+    public static final String CONFIG_OF_BROKER_INSTANCE_TAGS_ENFORCE_ENABLED =
+        "pinot.cluster.broker.instance.tags.enforce.enabled";
+    public static final boolean DEFAULT_BROKER_INSTANCE_TAGS_ENFORCE_ENABLED = false;
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Comma separated list of packages that contains javax service resources.

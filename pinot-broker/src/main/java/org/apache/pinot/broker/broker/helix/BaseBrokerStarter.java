@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -661,6 +662,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           instanceConfig.addTag(instanceTag);
         }
         shouldUpdateBrokerResource = true;
+      } else if (_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS_ENFORCE_ENABLED,
+          Broker.DEFAULT_BROKER_INSTANCE_TAGS_ENFORCE_ENABLED)) {
+        throwEnforcementException();
       } else if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
         shouldUpdateBrokerResource = true;
@@ -682,6 +686,28 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       LOGGER.info("Updated broker resource for new joining broker: {} with instance tags: {} in {}ms, tables added: {}",
           _instanceId, instanceTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
     }
+  }
+
+  /**
+   * Validates that broker instance tags are configured when enforcement is enabled. Throws
+   * {@link IllegalStateException} if enforcement is on but tags are missing.
+   */
+  @VisibleForTesting
+  static void validateInstanceTagsConfiguration(PinotConfiguration brokerConf) {
+    boolean enforce = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS_ENFORCE_ENABLED,
+        Broker.DEFAULT_BROKER_INSTANCE_TAGS_ENFORCE_ENABLED);
+    String instanceTagsConfig = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
+    if (enforce && StringUtils.isEmpty(instanceTagsConfig)) {
+      throwEnforcementException();
+    }
+  }
+
+  private static void throwEnforcementException() {
+    throw new IllegalStateException(String.format(
+        "Broker instance tags enforcement is enabled ('%s' = true), but '%s' is not configured. "
+            + "Please set it for this broker or disable enforcement to allow startup.",
+        Broker.CONFIG_OF_BROKER_INSTANCE_TAGS_ENFORCE_ENABLED,
+        Broker.CONFIG_OF_BROKER_INSTANCE_TAGS));
   }
 
   /**
