@@ -32,6 +32,9 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <jdk.version>11</jdk.version> <!-- Compiles with JDK 11 because it is needed by spark connector -->
+    <!-- Tests with JDK 21 because we include test dependencies that require so (ie pinot-avro) -->
+    <jdk.test.version>21</jdk.test.version>
   </properties>
 
   <dependencies>

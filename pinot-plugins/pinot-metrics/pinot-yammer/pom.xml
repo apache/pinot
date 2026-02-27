@@ -33,6 +33,7 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <shade.phase.prop>package</shade.phase.prop>
+    <jdk.version>11</jdk.version>
   </properties>
 
   <dependencies>

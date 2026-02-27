@@ -46,5 +46,5 @@ jobs:
           OPEN_JDK_DIST: ${{ matrix.openJdkDist }}
           BASE_IMAGE_TYPE: ${{ matrix.baseImageType }}
           BUILD_PLATFORM: "linux/amd64,linux/arm64"
-          TAG: "11-${{ matrix.openJdkDist }}"
+          TAG: "21-${{ matrix.openJdkDist }}"
         run: .github/workflows/scripts/docker/.pinot_base_docker_image_build_and_push.sh
