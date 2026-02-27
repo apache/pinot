@@ -54,7 +54,9 @@ public interface UtilizationChecker {
   enum CheckPurpose {
     // REALTIME_INGESTION if the check is performed from the realtime ingestion code path to pause ingestion
     // TASK_GENERATION if the check is performed from the task generation framework to pause creation of new tasks
-    REALTIME_INGESTION, TASK_GENERATION
+    // OFFLINE_SEGMENT_UPLOAD if the check is performed from the offline segment upload code path to reject a segment
+    // upload
+    REALTIME_INGESTION, TASK_GENERATION, OFFLINE_SEGMENT_UPLOAD
   }
 
   enum CheckResult {
