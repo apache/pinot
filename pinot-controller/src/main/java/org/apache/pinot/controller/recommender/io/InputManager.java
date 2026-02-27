@@ -25,6 +25,7 @@ import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -123,7 +124,7 @@ public class InputManager {
   Set<String> _dimNames = null;
   Set<String> _metricNames = null;
   Set<String> _dateTimeNames = null;
-  Set<String> _columnNamesInvertedSortedIndexApplicable = null;
+  List<String> _columnNamesInvertedSortedIndexApplicable = null;
   Map<String, Integer> _colNameToIntMap = null;
   String[] _intToColNameMap = null;
   Map<String, Triple<Double, BrokerRequest, QueryContext>> _parsedQueries = new HashMap<>();
@@ -261,10 +262,12 @@ public class InputManager {
     _colNameToIntMap = new HashMap<>();
 
     // Inverted index and sorted index will be recommended on all types of columns : dimensions, metrics and date time
-    _columnNamesInvertedSortedIndexApplicable = new HashSet<>(_dimNames);
+    _columnNamesInvertedSortedIndexApplicable = new ArrayList<>(_dimNames);
     _columnNamesInvertedSortedIndexApplicable.addAll(_metricNames);
     _columnNamesInvertedSortedIndexApplicable.addAll(_dateTimeNames);
-
+    // Made _columnNamesInvertedSortedIndexApplicable as a list, so that the _colNameToIntMap has dimensionFields at the
+    // start, followed by metric fields and then date time fields. This is important for the FixedLenBitset to work,
+    // which only has dimensionFields in it.
     AtomicInteger counter = new AtomicInteger(0);
     _columnNamesInvertedSortedIndexApplicable.forEach(name -> {
       _intToColNameMap[counter.get()] = name;
