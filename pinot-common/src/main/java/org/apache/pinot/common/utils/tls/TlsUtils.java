@@ -125,8 +125,16 @@ public final class TlsUtils {
 
     // Read allowed TLS protocols from config (e.g., "TLSv1.2,TLSv1.3")
     String protocolsConfig = pinotConfig.getProperty(key(namespace, PROTOCOLS));
-    if (protocolsConfig != null && !protocolsConfig.isEmpty()) {
-      tlsConfig.setAllowedProtocols(protocolsConfig.split(","));
+    if (StringUtils.isNotBlank(protocolsConfig)) {
+      String[] protocols = Arrays.stream(protocolsConfig.split(","))
+          .map(String::trim)
+          .filter(StringUtils::isNotBlank)
+          .toArray(String[]::new);
+      if (protocols.length > 0) {
+        tlsConfig.setAllowedProtocols(protocols);
+      } else if (defaultConfig.getAllowedProtocols() != null) {
+        tlsConfig.setAllowedProtocols(defaultConfig.getAllowedProtocols());
+      }
     } else if (defaultConfig.getAllowedProtocols() != null) {
       tlsConfig.setAllowedProtocols(defaultConfig.getAllowedProtocols());
     }
@@ -265,6 +273,7 @@ public final class TlsUtils {
       // HttpsURLConnection
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
       setSslContext(sc);
+      logTlsDiagnosticsOnce("https.default", sc, null, false);
     } catch (GenericSSLContextException | GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }

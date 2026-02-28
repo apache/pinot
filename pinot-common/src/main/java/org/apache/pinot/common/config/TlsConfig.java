@@ -141,10 +141,7 @@ public class TlsConfig {
 
   @Nullable
   public String[] getAllowedProtocols() {
-    if (_allowedProtocols != null) {
-      return Arrays.copyOf(_allowedProtocols, _allowedProtocols.length);
-    }
-    return null;
+    return _allowedProtocols != null ? Arrays.copyOf(_allowedProtocols, _allowedProtocols.length) : null;
   }
 
   public void setAllowedProtocols(@Nullable String[] allowedProtocols) {
