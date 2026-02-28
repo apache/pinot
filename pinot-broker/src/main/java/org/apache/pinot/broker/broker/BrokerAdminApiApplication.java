@@ -34,6 +34,7 @@ import org.apache.hc.core5.util.Timeout;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.SystemTableBrokerRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.audit.AuditLogFilter;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
@@ -78,6 +79,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
       ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory,
+      SystemTableBrokerRequestHandler systemTableBrokerRequestHandler,
       HelixManager helixManager, QueryQuotaManager queryQuotaManager, ThreadAccountant threadAccountant,
       AbstractResponseStore responseStore) {
     _brokerResourcePackages = brokerConf.getProperty(CommonConstants.Broker.BROKER_RESOURCE_PACKAGES,
@@ -108,6 +110,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(routingManager).to(BrokerRoutingManager.class);
         bind(brokerRequestHandler).to(BrokerRequestHandler.class);
+        bind(systemTableBrokerRequestHandler).to(SystemTableBrokerRequestHandler.class);
         bind(brokerMetrics).to(BrokerMetrics.class);
         String loggerRootDir = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {

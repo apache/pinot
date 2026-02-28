@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -31,7 +32,9 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
@@ -144,5 +147,23 @@ public class PinotAdminClientTest {
 
     String resp = _adminClient.getTableClient().deleteTable("tbl1_OFFLINE");
     assertEquals(new ObjectMapper().readTree(resp).get("status").asText(), "DELETED");
+  }
+
+  @Test
+  public void testGetTableSize()
+      throws Exception {
+    String jsonResponse = "{\"reportedSizeInBytes\":1234}";
+    JsonNode mockResponse = new ObjectMapper().readTree(jsonResponse);
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(mockResponse);
+
+    JsonNode response = _adminClient.getTableSize("tbl1_OFFLINE", true, false);
+    assertEquals(response.get("reportedSizeInBytes").asInt(), 1234);
+
+    ArgumentCaptor<Map<String, String>> queryParamsCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/tables/tbl1_OFFLINE/size"),
+        queryParamsCaptor.capture(), eq(HEADERS));
+    assertEquals(queryParamsCaptor.getValue().get("verbose"), "true");
+    assertEquals(queryParamsCaptor.getValue().get("includeReplacedSegments"), "false");
   }
 }
