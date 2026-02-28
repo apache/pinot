@@ -87,11 +87,13 @@ import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
+import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.NettyInspector;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
+import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
@@ -138,7 +140,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _instanceId;
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
-
   // Dedicated handler for listening to cluster config changes
   protected final DefaultClusterConfigChangeHandler _clusterConfigChangeHandler =
       new DefaultClusterConfigChangeHandler();
@@ -235,6 +236,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    */
   protected QueryOperatorFactoryProvider createQueryOperatorFactoryProvider(PinotConfiguration brokerConf) {
     return DefaultQueryOperatorFactoryProvider.INSTANCE;
+  }
+
+  /**
+   * Override to customize the {@link WorkerManager} used for multi-stage query engine worker assignment.
+   */
+  protected WorkerManager createWorkerManager(String brokerId, String hostname, int port,
+      RoutingManager routingManager) {
+    return new WorkerManager(brokerId, hostname, port, routingManager);
   }
 
   private void setupHelixSystemProperties() {
@@ -438,10 +447,21 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
       // TODO: decouple protocol and engine selection.
+      String queryRunnerHostname = _brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+      int queryRunnerPort = Integer.parseInt(_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+      WorkerManager workerManager =
+          createWorkerManager(brokerId, queryRunnerHostname, queryRunnerPort, _routingManager);
+      WorkerManager multiClusterWorkerManager;
+      if (multiClusterRoutingContext != null) {
+        multiClusterWorkerManager = createWorkerManager(brokerId, queryRunnerHostname, queryRunnerPort,
+            multiClusterRoutingContext.getMultiClusterRoutingManager());
+      } else {
+        multiClusterWorkerManager = workerManager;
+      }
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
-              _threadAccountant, multiClusterRoutingContext);
+              _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
@@ -724,7 +744,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
   }
 
-  private boolean updatePortIfNeeded(Map<String, String> instanceConfigSimpleFields, String key, int port) {
+  protected boolean updatePortIfNeeded(Map<String, String> instanceConfigSimpleFields, String key, int port) {
     String existingPortStr = instanceConfigSimpleFields.get(key);
     if (port > 0) {
       String portStr = Integer.toString(port);
