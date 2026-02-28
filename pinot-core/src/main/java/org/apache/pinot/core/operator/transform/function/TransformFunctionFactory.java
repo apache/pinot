@@ -151,6 +151,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.MILLISECOND, DateTimeTransformFunction.Millisecond.class);
     typeToImplementation.put(TransformFunctionType.ARRAY_LENGTH, ArrayLengthTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VALUE_IN, ValueInTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.EVAL_MV, EvalMvTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.MAP_VALUE, MapValueTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IN_ID_SET, InIdSetTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
