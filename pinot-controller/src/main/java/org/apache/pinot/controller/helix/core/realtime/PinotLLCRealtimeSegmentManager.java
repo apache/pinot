@@ -400,7 +400,15 @@ public class PinotLLCRealtimeSegmentManager {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
     streamConfigs.forEach(_flushThresholdUpdateManager::clearFlushThresholdUpdater);
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
-    int numPartitionGroups = consumeMeta.size();
+    // For subset-partition tables the instance map was built with the full Kafka topic partition
+    // count (set by ImplicitRealtimeTablePartitionSelector), so getNumPartitions() exceeds the
+    // number of actively consumed partitions.  Use it so that RealtimeSegmentAssignment correctly
+    // resolves non-contiguous partition IDs via  partitionId % numPartitions.
+    // For standard tables the instance map either has a single slot (non-partition-based
+    // assignment) or exactly as many slots as partitions, so consumeMeta.size() is the right value.
+    int numPartitionGroups = instancePartitions.getNumPartitions() > consumeMeta.size()
+        ? instancePartitions.getNumPartitions()   // subset-partition table: full topic count
+        : consumeMeta.size();                     // standard table: actual active partition count
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
     SegmentAssignment segmentAssignment =
@@ -1709,7 +1717,16 @@ public class PinotLLCRealtimeSegmentManager {
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
-    int numPartitions = partitionGroupMetadataList.size();
+    // For subset-partition tables the instance map was built with the full Kafka topic partition
+    // count (set by ImplicitRealtimeTablePartitionSelector), so getNumPartitions() exceeds the
+    // number of actively consumed partitions.  Use it so that RealtimeSegmentAssignment correctly
+    // resolves non-contiguous partition IDs via  partitionId % numPartitions.
+    // For standard tables the instance map either has a single slot (non-partition-based
+    // assignment) or exactly as many slots as partitions, so partitionGroupMetadataList.size()
+    // is the right value.
+    int numPartitions = instancePartitions.getNumPartitions() > partitionGroupMetadataList.size()
+        ? instancePartitions.getNumPartitions()       // subset-partition table: full topic count
+        : partitionGroupMetadataList.size();          // standard table: actual active partition count
 
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
@@ -1914,7 +1931,16 @@ public class PinotLLCRealtimeSegmentManager {
       Map<String, Map<String, String>> instanceStatesMap, SegmentAssignment segmentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, StreamPartitionMsgOffset startOffset) {
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
-    int numPartitions = newPartitionGroupMetadataList.size();
+    // For subset-partition tables the instance map was built with the full Kafka topic partition
+    // count (set by ImplicitRealtimeTablePartitionSelector), so getNumPartitions() exceeds the
+    // number of actively consumed partitions.  Use it so that RealtimeSegmentAssignment correctly
+    // resolves non-contiguous partition IDs via  partitionId % numPartitions.
+    // For standard tables the instance map either has a single slot (non-partition-based
+    // assignment) or exactly as many slots as partitions, so newPartitionGroupMetadataList.size()
+    // is the right value.
+    int numPartitions = instancePartitions.getNumPartitions() > newPartitionGroupMetadataList.size()
+        ? instancePartitions.getNumPartitions()         // subset-partition table: full topic count
+        : newPartitionGroupMetadataList.size();         // standard table: actual active partition count
     LLCSegmentName latestLLCSegmentName = new LLCSegmentName(latestSegmentZKMetadata.getSegmentName());
     LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
     CommittingSegmentDescriptor committingSegmentDescriptor =

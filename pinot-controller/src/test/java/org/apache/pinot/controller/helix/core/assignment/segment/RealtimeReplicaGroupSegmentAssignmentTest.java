@@ -335,19 +335,20 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
   public void testExplicitPartition() {
     // CONSUMING instances:
     // {
-    //   0_0=[instance_0], 1_0=[instance_1], 2_0=[instance_2],
-    //   0_1=[instance_3], 1_1=[instance_4], 2_1=[instance_5],
-    //   0_2=[instance_6], 1_2=[instance_7], 2_2=[instance_8]
+    //   0_0=[instance_0], 1_0=[instance_1], 2_0=[instance_2], 3_0=[instance_0],
+    //   0_1=[instance_3], 1_1=[instance_4], 2_1=[instance_5], 3_1=[instance_3],
+    //   0_2=[instance_6], 1_2=[instance_7], 2_2=[instance_8], 3_2=[instance_6]
     // }
     //        p0                p1                p2
     //        p3
     InstancePartitions consumingInstancePartitions = new InstancePartitions(CONSUMING_INSTANCE_PARTITIONS_NAME);
     int numConsumingInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
-    int consumingInstanceIdToAdd = 0;
     for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
-      for (int partitionId = 0; partitionId < numConsumingInstancesPerReplicaGroup; partitionId++) {
+      for (int partitionId = 0; partitionId < NUM_PARTITIONS; partitionId++) {
+        int instanceIndex = (partitionId % numConsumingInstancesPerReplicaGroup)
+            + replicaGroupId * numConsumingInstancesPerReplicaGroup;
         consumingInstancePartitions.setInstances(partitionId, replicaGroupId,
-            Collections.singletonList(CONSUMING_INSTANCES.get(consumingInstanceIdToAdd++)));
+            Collections.singletonList(CONSUMING_INSTANCES.get(instanceIndex)));
       }
     }
 
@@ -441,6 +442,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
       }
     }
   }
+
 
   private void addToAssignment(Map<String, Map<String, String>> currentAssignment, int segmentId,
       List<String> instancesAssigned) {
