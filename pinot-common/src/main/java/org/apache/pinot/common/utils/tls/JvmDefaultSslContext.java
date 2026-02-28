@@ -122,7 +122,9 @@ public class JvmDefaultSslContext {
               .map(String::trim).filter(StringUtils::isNotBlank).orElse(null);
       RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(jvmSslFactory, jvmKeystoreType, jvmKeyStorePath,
           jvmKeystorePassword, jvmTrustStoreType, jvmTrustStorePath, jvmTrustStorePassword, null, null, () -> false);
+      LOGGER.info("Successfully initialized JVM default SSL context");
+    } else {
+      LOGGER.info("No key store or trust store specified via system properties, skipping JVM default SSL context setup");
     }
-    LOGGER.info("Successfully initialized JVM default SSL context");
   }
 }
