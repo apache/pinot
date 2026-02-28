@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.common.utils.tls;
 
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -25,5 +30,23 @@ public class TlsUtilsTest {
   @Test
   public void installDefaultSSLSocketFactoryWhenNoKeyOrTrustStore() {
     TlsUtils.installDefaultSSLSocketFactory(null, null, null, null, null, null);
+  }
+
+  @Test
+  public void extractTlsConfigShouldTrimProtocols() {
+    Map<String, Object> props = new HashMap<>();
+    props.put("tls.protocols", " TLSv1.2, TLSv1.3 ,, ");
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(new PinotConfiguration(props), "tls");
+    Assert.assertEquals(tlsConfig.getAllowedProtocols(), new String[]{"TLSv1.2", "TLSv1.3"});
+  }
+
+  @Test
+  public void extractTlsConfigShouldFallbackToDefaultProtocolsWhenEmpty() {
+    Map<String, Object> props = new HashMap<>();
+    props.put("tls.protocols", " , ");
+    TlsConfig defaultConfig = new TlsConfig();
+    defaultConfig.setAllowedProtocols(new String[]{"TLSv1.2"});
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(new PinotConfiguration(props), "tls", defaultConfig);
+    Assert.assertEquals(tlsConfig.getAllowedProtocols(), new String[]{"TLSv1.2"});
   }
 }
