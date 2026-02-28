@@ -124,7 +124,8 @@ public class JvmDefaultSslContext {
           jvmKeystorePassword, jvmTrustStoreType, jvmTrustStorePath, jvmTrustStorePassword, null, null, () -> false);
       LOGGER.info("Successfully initialized JVM default SSL context");
     } else {
-      LOGGER.info("No key store or trust store specified via system properties, skipping JVM default SSL context setup");
+      LOGGER.info("No key store or trust store specified via system properties, "
+          + "skipping JVM default SSL context setup");
     }
   }
 }
