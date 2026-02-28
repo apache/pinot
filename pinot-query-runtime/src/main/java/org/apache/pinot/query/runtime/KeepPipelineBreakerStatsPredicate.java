@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.starter.helix;
+package org.apache.pinot.query.runtime;
 
 import java.util.Map;
 import java.util.Set;

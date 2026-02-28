@@ -111,6 +111,7 @@ public class QueryRunner {
   private ExecutorService _executorService;
   private OpChainSchedulerService _opChainScheduler;
   private MailboxService _mailboxService;
+  private boolean _ownsMailboxService = true;
   private QueryExecutor _leafQueryExecutor;
 
   // Group-by settings
@@ -143,10 +144,14 @@ public class QueryRunner {
   private BooleanSupplier _keepPipelineBreakerStats;
 
   /**
-   * Initializes the query executor.
+   * Initializes the query runner.
    * <p>Should be called only once and before calling any other method.
+   *
+   * @param instanceDataManager when non-null, the leaf query executor and time series visitor are initialized
+   *                            for processing leaf-stage queries. When null, only intermediate-stage execution
+   *                            is supported.
    */
-  public void init(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
+  public void init(PinotConfiguration serverConf, String instanceId, @Nullable InstanceDataManager instanceDataManager,
       @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats) {
     String hostname = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
@@ -221,19 +226,25 @@ public class QueryRunner {
     _executorService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
         _executorService, serverConf, "multi-stage executor");
 
-    _opChainScheduler = new OpChainSchedulerService(instanceDataManager.getInstanceId(), _executorService, serverConf);
-    _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
-    try {
-      _leafQueryExecutor = new ServerQueryExecutorV1Impl();
-      _leafQueryExecutor.init(serverConf.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
-          serverMetrics);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    _opChainScheduler = new OpChainSchedulerService(instanceId, _executorService, serverConf);
+    if (_mailboxService == null) {
+      _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
     }
-    if (StringUtils.isNotBlank(serverConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
-      _timeSeriesPhysicalPlanVisitor =
-          new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService, serverMetrics);
-      TimeSeriesBuilderFactoryProvider.init(serverConf);
+
+    if (instanceDataManager != null) {
+      try {
+        _leafQueryExecutor = new ServerQueryExecutorV1Impl();
+        _leafQueryExecutor.init(serverConf.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
+            serverMetrics);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      if (StringUtils.isNotBlank(
+          serverConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
+        _timeSeriesPhysicalPlanVisitor =
+            new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService, serverMetrics);
+        TimeSeriesBuilderFactoryProvider.init(serverConf);
+      }
     }
 
     _sendStats = sendStats;
@@ -242,14 +253,35 @@ public class QueryRunner {
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
   }
 
+  /**
+   * Initializes the query runner with a shared {@link MailboxService}.
+   */
+  public void init(PinotConfiguration serverConf, String instanceId, @Nullable InstanceDataManager instanceDataManager,
+      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats,
+      @Nullable MailboxService sharedMailboxService) {
+    if (sharedMailboxService != null) {
+      _mailboxService = sharedMailboxService;
+      _ownsMailboxService = false;
+    }
+    init(serverConf, instanceId, instanceDataManager, tlsConfig, sendStats, keepPipelineBreakerStats);
+  }
+
   public void start() {
-    _mailboxService.start();
-    _leafQueryExecutor.start();
+    if (_ownsMailboxService) {
+      _mailboxService.start();
+    }
+    if (_leafQueryExecutor != null) {
+      _leafQueryExecutor.start();
+    }
   }
 
   public void shutDown() {
-    _leafQueryExecutor.shutDown();
-    _mailboxService.shutdown();
+    if (_leafQueryExecutor != null) {
+      _leafQueryExecutor.shutDown();
+    }
+    if (_ownsMailboxService) {
+      _mailboxService.shutdown();
+    }
     ExecutorServiceUtils.close(_executorService);
   }
 

@@ -133,6 +133,10 @@ public class QueryDispatcher {
     }
   }
 
+  public MailboxService getMailboxService() {
+    return _mailboxService;
+  }
+
   public void start() {
     _mailboxService.start();
   }

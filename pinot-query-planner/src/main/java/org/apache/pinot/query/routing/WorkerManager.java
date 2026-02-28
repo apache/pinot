@@ -205,7 +205,7 @@ public class WorkerManager {
   // --------------------------------------------------------------------------
   // Intermediate stage assign logic
   // --------------------------------------------------------------------------
-  private void assignWorkersToIntermediateFragment(PlanFragment fragment, DispatchablePlanContext context) {
+  protected void assignWorkersToIntermediateFragment(PlanFragment fragment, DispatchablePlanContext context) {
     List<PlanFragment> children = fragment.getChildren();
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
@@ -300,11 +300,13 @@ public class WorkerManager {
             childWorkerIdToSegmentsMap.put(workerId, replicatedSegments);
           }
         } else {
-          int numWorkers = candidateServers.size();
+          List<QueryServerInstance> replicatedLeafServers =
+              getCandidateServersForReplicatedLeaf(context, candidateServers);
+          int numWorkers = replicatedLeafServers.size();
           childWorkerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
           childWorkerIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numWorkers);
           for (int workerId = 0; workerId < numWorkers; workerId++) {
-            childWorkerIdToServerInstanceMap.put(workerId, candidateServers.get(workerId));
+            childWorkerIdToServerInstanceMap.put(workerId, replicatedLeafServers.get(workerId));
             childWorkerIdToSegmentsMap.put(workerId, replicatedSegments);
           }
         }
@@ -359,7 +361,7 @@ public class WorkerManager {
   /**
    * Returns the servers serving any segment of the tables in the query.
    */
-  private List<QueryServerInstance> getCandidateServers(DispatchablePlanContext context) {
+  protected List<QueryServerInstance> getCandidateServers(DispatchablePlanContext context) {
     List<QueryServerInstance> candidateServers;
     if (context.isUseLeafServerForIntermediateStage()) {
       Set<QueryServerInstance> leafServerInstances = context.getLeafServerInstances();
@@ -385,7 +387,7 @@ public class WorkerManager {
     return candidateServers;
   }
 
-  private List<QueryServerInstance> getCandidateServersPerTables(DispatchablePlanContext context) {
+  protected List<QueryServerInstance> getCandidateServersPerTables(DispatchablePlanContext context) {
     Set<String> nonLookupTables = context.getNonLookupTables();
     assert !nonLookupTables.isEmpty();
     Set<String> servers = new HashSet<>();
@@ -435,6 +437,18 @@ public class WorkerManager {
       throw new IllegalStateException("No server instance found for intermediate stage for tables: " + nonLookupTables);
     }
     return candidateServers;
+  }
+
+  /**
+   * Returns the instances to assign to replicated leaf stage children when there is no local exchange peer. By default,
+   * uses the same candidates as the intermediate stage.
+   *
+   * <p>Subclasses can override to use different instances for replicated leaf stages (e.g., when intermediate stages
+   * run on non-server instances that cannot scan segments).</p>
+   */
+  protected List<QueryServerInstance> getCandidateServersForReplicatedLeaf(DispatchablePlanContext context,
+      List<QueryServerInstance> intermediateStageWorkers) {
+    return intermediateStageWorkers;
   }
 
   private void assignWorkersToLeafFragment(PlanFragment fragment, DispatchablePlanContext context) {

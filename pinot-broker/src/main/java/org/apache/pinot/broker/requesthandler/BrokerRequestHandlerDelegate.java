@@ -62,6 +62,11 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     _responseStore = responseStore;
   }
 
+  @Nullable
+  public MultiStageBrokerRequestHandler getMultiStageBrokerRequestHandler() {
+    return _multiStageBrokerRequestHandler;
+  }
+
   @Override
   public void start() {
     _singleStageBrokerRequestHandler.start();
