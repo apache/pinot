@@ -43,6 +43,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
@@ -158,12 +159,10 @@ public class PinotHelixTaskResourceManager {
 
   /**
    * Get all task types.
-   * @note: It reads all resource config back and check which are workflows and which are jobs, so it can take some time
-   * if there are a lot of tasks.
    * @return Set of all task types
    */
   public synchronized Set<String> getTaskTypes() {
-    Set<String> helixJobQueues = _taskDriver.getWorkflows().keySet();
+    List<String> helixJobQueues = getTaskQueueNames();
     Set<String> taskTypes = new HashSet<>(helixJobQueues.size());
     for (String helixJobQueue : helixJobQueues) {
       taskTypes.add(getTaskType(helixJobQueue));
@@ -360,7 +359,7 @@ public class PinotHelixTaskResourceManager {
    * @return Set of task queue names
    */
   public synchronized Set<String> getTaskQueues() {
-    return _taskDriver.getWorkflows().keySet();
+    return new HashSet<>(getTaskQueueNames());
   }
 
   /**
@@ -1408,6 +1407,20 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
+   * Returns the names of all task queues by fetching only the resource config child names from ZooKeeper,
+   * filtered to those with the {@link #TASK_QUEUE_PREFIX} but excluding individual job entries (which
+   * contain {@link #TASK_PREFIX} e.g. {@code TaskQueue_Type_Task_Type_12345}). This avoids the expensive
+   * {@link TaskDriver#getWorkflows()} call which reads all resource config values.
+   */
+  private List<String> getTaskQueueNames() {
+    HelixDataAccessor accessor = _helixResourceManager.getHelixZkManager().getHelixDataAccessor();
+    List<String> resourceConfigNames = accessor.getChildNames(accessor.keyBuilder().resourceConfigs());
+    return resourceConfigNames.stream()
+        .filter(name -> name.startsWith(TASK_QUEUE_PREFIX) && !name.contains(TASK_NAME_SEPARATOR + TASK_PREFIX))
+        .collect(Collectors.toList());
+  }
+
+  /**
    * Helper method to convert task type to Helix JobQueue name.
    * <p>E.g. DummyTask -> TaskQueue_DummyTask
    *
@@ -1575,7 +1588,7 @@ public class PinotHelixTaskResourceManager {
     Map<String, Integer> runningTaskCounts = new HashMap<>();
 
     // Get all workflows (task queues)
-    Set<String> workflows = _taskDriver.getWorkflows().keySet();
+    List<String> workflows = getTaskQueueNames();
 
     for (String workflow : workflows) {
       WorkflowContext workflowContext = _taskDriver.getWorkflowContext(workflow);

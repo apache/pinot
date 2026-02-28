@@ -1678,7 +1678,7 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.emptySet());
+    Mockito.doReturn(Collections.emptySet()).when(spyMgr).getTaskTypes();
 
     PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
 
@@ -1695,7 +1695,7 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(null);
+    Mockito.doReturn(null).when(spyMgr).getTaskTypes();
 
     PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
 
@@ -1715,7 +1715,7 @@ public class PinotHelixTaskResourceManagerTest {
     String taskName = "Task_TestTask_12345";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task with no running/waiting tasks (all completed)
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
@@ -1745,7 +1745,7 @@ public class PinotHelixTaskResourceManagerTest {
     String tenant = "defaultTenant";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task with running and waiting tasks
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
@@ -1803,7 +1803,7 @@ public class PinotHelixTaskResourceManagerTest {
     String tenant2 = "tenant2";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task 1: tenant1 with running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount1 = new PinotHelixTaskResourceManager.TaskCount();
@@ -1879,7 +1879,7 @@ public class PinotHelixTaskResourceManagerTest {
     String tenant2 = "tenant2";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Both tasks have running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount1 = new PinotHelixTaskResourceManager.TaskCount();
@@ -1939,7 +1939,7 @@ public class PinotHelixTaskResourceManagerTest {
     String taskName = "Task_TestTask_12345";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task with running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
@@ -1972,7 +1972,7 @@ public class PinotHelixTaskResourceManagerTest {
     String taskName = "Task_TestTask_12345";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task with running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
@@ -2009,7 +2009,7 @@ public class PinotHelixTaskResourceManagerTest {
     Set<String> taskTypes = new HashSet<>();
     taskTypes.add(taskType1);
     taskTypes.add(taskType2);
-    when(spyMgr.getTaskTypes()).thenReturn(taskTypes);
+    Mockito.doReturn(taskTypes).when(spyMgr).getTaskTypes();
 
     // Task 1: TaskType1 with running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount1 = new PinotHelixTaskResourceManager.TaskCount();
@@ -2075,7 +2075,7 @@ public class PinotHelixTaskResourceManagerTest {
     String taskName = "Task_TestTask_12345";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task with running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
@@ -2109,7 +2109,7 @@ public class PinotHelixTaskResourceManagerTest {
     String tableName = "testTable_OFFLINE";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task with running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
@@ -2152,7 +2152,7 @@ public class PinotHelixTaskResourceManagerTest {
     String tableName = "testTable_OFFLINE";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task with running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
@@ -2195,7 +2195,7 @@ public class PinotHelixTaskResourceManagerTest {
     String tableName = "testTable_OFFLINE";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task with running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
@@ -2240,7 +2240,7 @@ public class PinotHelixTaskResourceManagerTest {
     String tableName = "testTable_OFFLINE";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task with running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
@@ -2285,7 +2285,7 @@ public class PinotHelixTaskResourceManagerTest {
     String taskType = "TestTask";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Empty task counts
     when(spyMgr.getTaskCounts(taskType)).thenReturn(Collections.emptyMap());
@@ -2307,7 +2307,7 @@ public class PinotHelixTaskResourceManagerTest {
     String taskType = "TestTask";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Null task counts
     when(spyMgr.getTaskCounts(taskType)).thenReturn(null);
@@ -2330,7 +2330,7 @@ public class PinotHelixTaskResourceManagerTest {
     String taskName = "Task_TestTask_12345";
 
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
-    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+    Mockito.doReturn(Collections.singleton(taskType)).when(spyMgr).getTaskTypes();
 
     // Task with running tasks
     PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
