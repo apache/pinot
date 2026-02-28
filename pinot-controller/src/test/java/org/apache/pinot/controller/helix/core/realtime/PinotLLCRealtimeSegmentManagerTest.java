@@ -28,6 +28,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -1790,6 +1791,76 @@ public class PinotLLCRealtimeSegmentManagerTest {
         .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList, idealState);
     partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState);
     Assert.assertEquals(partitionIds.size(), 2);
+  }
+
+  /**
+   * Verifies that {@code buildPartitionGroupConsumptionStatusFromZKMetadata} produces the same results as
+   * {@code getPartitionGroupConsumptionStatusList} for the common case where IdealState and ZK metadata are in sync.
+   * This validates that the optimization in {@code fetchPartitionGroupIdToSmallestOffset} (reusing the pre-computed
+   * latestSegmentZKMetadataMap instead of rescanning the entire IdealState) does not change behavior.
+   */
+  @Test
+  public void testBuildPartitionGroupConsumptionStatusFromZKMetadataMatchesOriginal() {
+    // Set up a table with 2 replicas, 5 instances, 4 partitions
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    setUpNewTable(segmentManager, 2, 5, 4);
+
+    // Commit segments for partitions 0 and 1 to get a mix of ONLINE (DONE) and CONSUMING (IN_PROGRESS) segments
+    for (int partitionGroupId = 0; partitionGroupId < 2; partitionGroupId++) {
+      String segmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionGroupId, 0, CURRENT_TIME_MS).getSegmentName();
+      CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
+          new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
+      committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
+      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    }
+
+    // Build latestSegmentZKMetadataMap from the fake ZK metadata (same logic as getLatestSegmentZKMetadataMap)
+    Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = new HashMap<>();
+    for (Map.Entry<String, SegmentZKMetadata> entry : segmentManager._segmentZKMetadataMap.entrySet()) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(entry.getKey());
+      int partitionId = llcSegmentName.getPartitionGroupId();
+      latestSegmentZKMetadataMap.merge(partitionId, entry.getValue(),
+          (existing, candidate) -> {
+            int existingSeq = new LLCSegmentName(existing.getSegmentName()).getSequenceNumber();
+            int candidateSeq = new LLCSegmentName(candidate.getSegmentName()).getSequenceNumber();
+            return candidateSeq > existingSeq ? candidate : existing;
+          });
+    }
+
+    // Get results from both methods
+    List<PartitionGroupConsumptionStatus> fromIdealState =
+        segmentManager.getPartitionGroupConsumptionStatusList(segmentManager._idealState,
+            segmentManager._streamConfigs);
+    List<PartitionGroupConsumptionStatus> fromZKMetadata =
+        segmentManager.buildPartitionGroupConsumptionStatusFromZKMetadata(latestSegmentZKMetadataMap,
+            segmentManager._streamConfigs);
+
+    // Sort both by partition group id for comparison
+    fromIdealState.sort(Comparator.comparingInt(PartitionGroupConsumptionStatus::getPartitionGroupId));
+    fromZKMetadata.sort(Comparator.comparingInt(PartitionGroupConsumptionStatus::getPartitionGroupId));
+
+    // Verify same number of partitions
+    assertEquals(fromIdealState.size(), fromZKMetadata.size(),
+        "Both methods should return the same number of partitions");
+
+    // Verify each partition has identical consumption status
+    for (int i = 0; i < fromIdealState.size(); i++) {
+      PartitionGroupConsumptionStatus isStatus = fromIdealState.get(i);
+      PartitionGroupConsumptionStatus zkStatus = fromZKMetadata.get(i);
+
+      assertEquals(zkStatus.getPartitionGroupId(), isStatus.getPartitionGroupId(),
+          "Partition group id mismatch at index " + i);
+      assertEquals(zkStatus.getSequenceNumber(), isStatus.getSequenceNumber(),
+          "Sequence number mismatch for partition " + isStatus.getPartitionGroupId());
+      assertEquals(zkStatus.getStartOffset().toString(), isStatus.getStartOffset().toString(),
+          "Start offset mismatch for partition " + isStatus.getPartitionGroupId());
+      String zkEnd = zkStatus.getEndOffset() != null ? zkStatus.getEndOffset().toString() : null;
+      String isEnd = isStatus.getEndOffset() != null ? isStatus.getEndOffset().toString() : null;
+      assertEquals(zkEnd, isEnd,
+          "End offset mismatch for partition " + isStatus.getPartitionGroupId());
+      assertEquals(zkStatus.getStatus(), isStatus.getStatus(),
+          "Status mismatch for partition " + isStatus.getPartitionGroupId());
+    }
   }
 
   @Test
