@@ -19,10 +19,6 @@
 package org.apache.pinot.controller.helix.core.assignment.instance;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -33,18 +29,20 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 /**
- * Variation of {@link InstanceReplicaGroupPartitionSelector} that uses the number and IDs of partitions
- * from the stream to determine the partitions in each replica group. When the stream exposes partition IDs
- * (e.g. Kafka with subset), instance partitions are keyed by those IDs so non-contiguous subsets work.
+ * Variation of {@link InstanceReplicaGroupPartitionSelector} that uses the number of partitions from the stream
+ * to determine the number of partitions in each replica group.
  */
 public class ImplicitRealtimeTablePartitionSelector extends InstanceReplicaGroupPartitionSelector {
   private final int _numPartitions;
-  private final List<Integer> _partitionIds;
 
   public ImplicitRealtimeTablePartitionSelector(TableConfig tableConfig,
       InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig, String tableNameWithType,
       @Nullable InstancePartitions existingInstancePartitions, boolean minimizeDataMovement) {
     this(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions, minimizeDataMovement,
+        // Get the number of partitions from the first stream config
+        // TODO: Revisit this logic to better handle multiple streams in the future - either validate that they
+        //       all have the same number of partitions and use that or disallow the use of this selector in case the
+        //       partition counts differ.
         StreamConsumerFactoryProvider.create(IngestionConfigUtils.getFirstStreamConfig(tableConfig))
             .createStreamMetadataProvider(
                 ImplicitRealtimeTablePartitionSelector.class.getSimpleName() + "-" + tableNameWithType)
@@ -56,16 +54,12 @@ public class ImplicitRealtimeTablePartitionSelector extends InstanceReplicaGroup
       String tableNameWithType, @Nullable InstancePartitions existingInstancePartitions, boolean minimizeDataMovement,
       StreamMetadataProvider streamMetadataProvider) {
     super(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions, minimizeDataMovement);
+    _numPartitions = getStreamNumPartitions(streamMetadataProvider);
+  }
+
+  private int getStreamNumPartitions(StreamMetadataProvider streamMetadataProvider) {
     try (streamMetadataProvider) {
-      Set<Integer> ids = streamMetadataProvider.fetchPartitionIds(10_000L);
-      if (ids != null && !ids.isEmpty()) {
-        _partitionIds = new ArrayList<>(ids);
-        Collections.sort(_partitionIds);
-        _numPartitions = _partitionIds.size();
-      } else {
-        _numPartitions = streamMetadataProvider.fetchPartitionCount(10_000L);
-        _partitionIds = null;
-      }
+      return streamMetadataProvider.fetchPartitionCount(10_000L);
     } catch (Exception e) {
       throw new RuntimeException("Failed to retrieve partition info for table: " + _tableNameWithType, e);
     }
@@ -74,12 +68,6 @@ public class ImplicitRealtimeTablePartitionSelector extends InstanceReplicaGroup
   @Override
   protected int getNumPartitions() {
     return _numPartitions;
-  }
-
-  @Nullable
-  @Override
-  protected List<Integer> getPartitionIds() {
-    return _partitionIds;
   }
 
   @Override

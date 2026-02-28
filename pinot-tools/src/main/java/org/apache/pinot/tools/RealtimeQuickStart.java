@@ -100,14 +100,14 @@ public class RealtimeQuickStart extends QuickStartBase {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q7)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q8 = "select count(*) from \"fineFoodReviews-part-0\"";
-    printStatus(Color.YELLOW, "Total number of documents in fineFoodReviews-part-0");
+    String q8 = "select count(*) from \"fineFoodReviews_part_0\"";
+    printStatus(Color.YELLOW, "Total number of documents in fineFoodReviews_part_0");
     printStatus(Color.CYAN, "Query : " + q8);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q8)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q9 = "select count(*) from \"fineFoodReviews-part-1\"";
-    printStatus(Color.YELLOW, "Total number of documents in fineFoodReviews-part-1");
+    String q9 = "select count(*) from \"fineFoodReviews_part_1\"";
+    printStatus(Color.YELLOW, "Total number of documents in fineFoodReviews_part_1");
     printStatus(Color.CYAN, "Query : " + q9);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q9)));
     printStatus(Color.GREEN, "***************************************************");

@@ -64,11 +64,9 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     implements StreamMetadataProvider {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamMetadataProvider.class);
-  /** Whether this table consumes only a subset of topic partitions (from stream.kafka.partition.ids). */
-  private final boolean _partialPartitions;
   /**
    * Immutable partition ID subset from table config. Read once at construction; does not change during the
-   * provider's lifetime. To change the subset, update the table config and restart the consumer.
+   * provider's lifetime. Empty when no subset is configured (consume all partitions).
    */
   private final List<Integer> _partitionIdSubset;
 
@@ -81,12 +79,9 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     List<Integer> subset =
         KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(_config.getStreamConfigMap());
     if (subset != null) {
-      // The partition subset comes from the table config and is expected to remain stable until config update.
-      _partialPartitions = true;
       _partitionIdSubset = Collections.unmodifiableList(subset);
       validatePartitionIds(_partitionIdSubset);
     } else {
-      _partialPartitions = false;
       _partitionIdSubset = Collections.emptyList();
     }
   }
@@ -94,9 +89,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
     try {
-      if (_partialPartitions) {
-        return _partitionIdSubset.size();
-      }
       List<PartitionInfo> partitionInfos = fetchPartitionInfos(timeoutMillis);
       if (CollectionUtils.isNotEmpty(partitionInfos)) {
         return partitionInfos.size();
@@ -111,9 +103,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public Set<Integer> fetchPartitionIds(long timeoutMillis) {
     try {
-      if (_partialPartitions) {
-        return new HashSet<>(_partitionIdSubset);
-      }
       List<PartitionInfo> partitionInfos = fetchPartitionInfos(timeoutMillis);
       if (CollectionUtils.isEmpty(partitionInfos)) {
         throw new TransientConsumerException(new RuntimeException(
@@ -133,7 +122,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
       throws IOException, java.util.concurrent.TimeoutException {
-    if (!_partialPartitions) {
+    if (_partitionIdSubset.isEmpty()) {
       return StreamMetadataProvider.super.computePartitionGroupMetadata(clientId, streamConfig,
           partitionGroupConsumptionStatuses, timeoutMillis);
     }

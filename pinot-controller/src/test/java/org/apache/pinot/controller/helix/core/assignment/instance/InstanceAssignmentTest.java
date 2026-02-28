@@ -652,53 +652,6 @@ public class InstanceAssignmentTest {
     assertEquals(instancePartitions.getInstances(8, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 17));
   }
 
-  @Test
-  public void testSinglePartitionSubsetWithNonZeroIdAndMinimizeDataMovement() {
-    // Single-partition subset with non-zero stream partition ID (e.g. stream.kafka.partition.ids=5) must create
-    // instance partitions for partition 5, not 0, so consumption and assignment work.
-    int numReplicas = 2;
-    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, 0, 1, true, null);
-    InstanceAssignmentConfig instanceAssignmentConfig =
-        new InstanceAssignmentConfig(new InstanceTagPoolConfig(REALTIME_TAG, false, 0, null), null,
-            replicaGroupPartitionConfig,
-            InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR.name(), true);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setServerTenant(TENANT_NAME)
-            .setNumReplicas(numReplicas)
-            .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
-            .build();
-
-    int numInstances = 4;
-    List<InstanceConfig> instanceConfigs = new ArrayList<>(numInstances);
-    for (int i = 0; i < numInstances; i++) {
-      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
-      instanceConfig.addTag(REALTIME_TAG);
-      instanceConfigs.add(instanceConfig);
-    }
-
-    int singlePartitionId = 5;
-    StreamMetadataProvider streamMetadataProvider = mock(StreamMetadataProvider.class);
-    when(streamMetadataProvider.fetchPartitionCount(anyLong())).thenReturn(1);
-    when(streamMetadataProvider.fetchPartitionIds(anyLong())).thenReturn(Set.of(singlePartitionId));
-
-    InstancePartitionSelector instancePartitionSelector =
-        new ImplicitRealtimeTablePartitionSelector(replicaGroupPartitionConfig, tableConfig.getTableName(), null, true,
-            streamMetadataProvider);
-    InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
-    InstancePartitions instancePartitions =
-        driver.getInstancePartitions(InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME),
-            instanceAssignmentConfig, instanceConfigs, null, true, instancePartitionSelector);
-
-    assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
-    assertEquals(instancePartitions.getNumPartitions(), singlePartitionId + 1);
-
-    // Instance partitions must be keyed by stream partition id 5, not 0
-    assertEquals(instancePartitions.getInstances(singlePartitionId, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
-    assertEquals(instancePartitions.getInstances(singlePartitionId, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
-    assertNull(instancePartitions.getInstances(0, 0));
-  }
-
   public void testMirrorServerSetBasedRandom()
       throws FileNotFoundException {
     testMirrorServerSetBasedRandomInner(10000000);
@@ -3376,5 +3329,176 @@ public class InstanceAssignmentTest {
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + "10" + SERVER_INSTANCE_POOL_PREFIX + 0,
             SERVER_INSTANCE_ID_PREFIX + "11" + SERVER_INSTANCE_POOL_PREFIX + 1,
             SERVER_INSTANCE_ID_PREFIX + "17" + SERVER_INSTANCE_POOL_PREFIX + 2));
+  }
+
+  /**
+   * Verifies that subset-partition tables use the total Kafka partition count (not the subset size)
+   * for instance assignment, producing the same server spread as a normal full-partition table.
+   *
+   * <p><b>Topology:</b> 2 Kafka topic partitions, 4 servers, 2 replica groups,
+   * 1 instance per partition per replica group.
+   * <ul>
+   *   <li>Table A has {@code stream.kafka.partition.ids = "0"} (consumes only Kafka partition 0)</li>
+   *   <li>Table B has {@code stream.kafka.partition.ids = "1"} (consumes only Kafka partition 1)</li>
+   * </ul>
+   *
+   * <p>The {@link ImplicitRealtimeTablePartitionSelector} always fetches the <em>total</em>
+   * Kafka partition count from {@link StreamMetadataProvider#fetchPartitionCount} (= 2). This
+   * produces an instance map with <b>two distinct slots</b> so that {@link
+   * org.apache.pinot.controller.helix.core.assignment.segment.RealtimeSegmentAssignment} routes
+   * Kafka partition 0 → slot 0 and Kafka partition 1 → slot 1, each backed by different servers.
+   *
+   * <p>Without this behaviour ({@code numPartitions = subsetSize = 1}), only slot 0 exists, and
+   * the assignment computes {@code kafkaPartitionId % 1 = 0} for <em>every</em> Kafka partition,
+   * routing all consuming segments to the same slot-0 servers — a hotspot on lower-indexed servers.
+   *
+   * <p><b>Pre-computed hash rotations</b> (used for exact expected server values):
+   * <pre>
+   *   Math.abs("subsetTablePartition0_REALTIME".hashCode()) % 4 = 0  →  no rotation
+   *   Pool after rotation: [s0, s1, s2, s3]
+   *   Round-robin to 2 RGs:  RG0=[s0,s2],  RG1=[s1,s3]
+   *     slot 0: RG0=s0, RG1=s1   |   slot 1: RG0=s2, RG1=s3
+   *
+   *   Math.abs("subsetTablePartition1_REALTIME".hashCode()) % 4 = 1  →  rotate by 1
+   *   Pool after rotation: [s1, s2, s3, s0]
+   *   Round-robin to 2 RGs:  RG0=[s1,s3],  RG1=[s2,s0]
+   *     slot 0: RG0=s1, RG1=s2   |   slot 1: RG0=s3, RG1=s0
+   * </pre>
+   */
+  @Test
+  public void testSubsetPartitionInstanceAssignmentNoHotspot() {
+    final int numReplicas = 2;
+    final int numKafkaPartitions = 2;   // total Kafka topic partition count
+    final int numServers = 4;
+    final int numInstancesPerReplicaGroup = numServers / numReplicas; // = 2
+
+    // 4 servers, single pool (non-pool-based), sorted lexicographically:
+    //   [Server_localhost_0, Server_localhost_1, Server_localhost_2, Server_localhost_3]
+    List<InstanceConfig> instanceConfigs = new ArrayList<>(numServers);
+    for (int i = 0; i < numServers; i++) {
+      InstanceConfig cfg = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
+      cfg.addTag(REALTIME_TAG);
+      instanceConfigs.add(cfg);
+    }
+
+    // The mock always returns 2 (total topic partition count) regardless of the configured subset.
+    StreamMetadataProvider streamMetadataProvider = mock(StreamMetadataProvider.class);
+    when(streamMetadataProvider.fetchPartitionCount(anyLong())).thenReturn(numKafkaPartitions);
+
+    InstanceReplicaGroupPartitionConfig rgConfig = new InstanceReplicaGroupPartitionConfig(
+        true, 0, numReplicas, numInstancesPerReplicaGroup, 0, 0, false, null);
+    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(REALTIME_TAG, false, 0, null), null, rgConfig,
+        InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR.name(), false);
+
+    // ── Table A: assigned subset {partition 0} ───────────────────────────────────────────────
+    // Hash rotation = 0  →  pool [s0,s1,s2,s3] unchanged.
+    // Round-robin → RG0=[s0,s2], RG1=[s1,s3]; 1 instance/partition (ImplicitSelector enforces):
+    //   slot 0: RG0=s0, RG1=s1
+    //   slot 1: RG0=s2, RG1=s3
+    String tableAName = "subsetTablePartition0";
+    TableConfig tableAConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(tableAName).setServerTenant(TENANT_NAME).setNumReplicas(numReplicas)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    InstancePartitions tableAPartitions = new InstanceAssignmentDriver(tableAConfig)
+        .getInstancePartitions(
+            InstancePartitionsType.CONSUMING.getInstancePartitionsName(tableAName),
+            instanceAssignmentConfig, instanceConfigs, null, false,
+            new ImplicitRealtimeTablePartitionSelector(rgConfig, tableAConfig.getTableName(), null, false,
+                streamMetadataProvider));
+
+    // Key correctness check: total Kafka partition count (2) must be used, not subset size (1).
+    assertEquals(tableAPartitions.getNumPartitions(), numKafkaPartitions,
+        "Table A must use total Kafka partition count, not subset size");
+    assertEquals(tableAPartitions.getNumReplicaGroups(), numReplicas);
+    // slot 0 (Kafka partition 0 → 0 % 2 = 0)
+    assertEquals(tableAPartitions.getInstances(0, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(tableAPartitions.getInstances(0, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    // slot 1 (Kafka partition 1 → 1 % 2 = 1, if it were consumed here)
+    assertEquals(tableAPartitions.getInstances(1, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(tableAPartitions.getInstances(1, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+
+    // ── Table B: assigned subset {partition 1} ───────────────────────────────────────────────
+    // Hash rotation = 1  →  rotated pool [s1,s2,s3,s0].
+    // Round-robin → RG0=[s1,s3], RG1=[s2,s0]; 1 instance/partition:
+    //   slot 0: RG0=s1, RG1=s2
+    //   slot 1: RG0=s3, RG1=s0
+    String tableBName = "subsetTablePartition1";
+    TableConfig tableBConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(tableBName).setServerTenant(TENANT_NAME).setNumReplicas(numReplicas)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    InstancePartitions tableBPartitions = new InstanceAssignmentDriver(tableBConfig)
+        .getInstancePartitions(
+            InstancePartitionsType.CONSUMING.getInstancePartitionsName(tableBName),
+            instanceAssignmentConfig, instanceConfigs, null, false,
+            new ImplicitRealtimeTablePartitionSelector(rgConfig, tableBConfig.getTableName(), null, false,
+                streamMetadataProvider));
+
+    assertEquals(tableBPartitions.getNumPartitions(), numKafkaPartitions,
+        "Table B must use total Kafka partition count, not subset size");
+    assertEquals(tableBPartitions.getNumReplicaGroups(), numReplicas);
+    assertEquals(tableBPartitions.getInstances(0, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(tableBPartitions.getInstances(0, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    // slot 1 (Kafka partition 1 → 1 % 2 = 1)
+    assertEquals(tableBPartitions.getInstances(1, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+    assertEquals(tableBPartitions.getInstances(1, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+
+    // ── Anti-hotspot: within each table, slot 0 and slot 1 use disjoint servers ───────────────
+    // RealtimeSegmentAssignment routes: Kafka partition X → slot = X % numPartitions.
+    // With numPartitions=2, slot 0 and slot 1 are guaranteed to be on different servers,
+    // so different Kafka partitions do NOT share consuming instances within the same table.
+    Set<String> tableASlot0 = new HashSet<>(tableAPartitions.getInstances(0, 0));
+    tableASlot0.addAll(tableAPartitions.getInstances(0, 1));
+    Set<String> tableASlot1 = new HashSet<>(tableAPartitions.getInstances(1, 0));
+    tableASlot1.addAll(tableAPartitions.getInstances(1, 1));
+    assertTrue(Collections.disjoint(tableASlot0, tableASlot1),
+        "Table A: slot 0 and slot 1 must be on disjoint servers (no intra-table hotspot)");
+
+    Set<String> tableBSlot0 = new HashSet<>(tableBPartitions.getInstances(0, 0));
+    tableBSlot0.addAll(tableBPartitions.getInstances(0, 1));
+    Set<String> tableBSlot1 = new HashSet<>(tableBPartitions.getInstances(1, 0));
+    tableBSlot1.addAll(tableBPartitions.getInstances(1, 1));
+    assertTrue(Collections.disjoint(tableBSlot0, tableBSlot1),
+        "Table B: slot 0 and slot 1 must be on disjoint servers (no intra-table hotspot)");
+
+    // Each table spreads load evenly: 2 slots × 2 replica groups = all 4 servers.
+    Set<String> tableAAll = new HashSet<>(tableASlot0);
+    tableAAll.addAll(tableASlot1);
+    assertEquals(tableAAll.size(), numServers,
+        "Table A must use all " + numServers + " servers");
+    Set<String> tableBAll = new HashSet<>(tableBSlot0);
+    tableBAll.addAll(tableBSlot1);
+    assertEquals(tableBAll.size(), numServers,
+        "Table B must use all " + numServers + " servers");
+
+    // ── Negative case: numPartitions = 1 (wrong: uses subset size instead of total count) ─────
+    // With InstanceReplicaGroupPartitionSelector (bypasses stream-count lookup), numPartitions=1.
+    // Only slot 0 exists in the instance map.  RealtimeSegmentAssignment then computes:
+    //   Kafka partition 1 → 1 % 1 = 0 → slot 0  (same as partition 0 → HOTSPOT)
+    InstanceReplicaGroupPartitionConfig wrongRgConfig = new InstanceReplicaGroupPartitionConfig(
+        true, 0, numReplicas, numInstancesPerReplicaGroup, 1 /* wrong: subset size */, 1, false, null);
+
+    // Table B wrong assignment (rotation=1): only slot 0  →  RG0=s1, RG1=s2.
+    InstancePartitions wrongTableBPartitions = new InstanceAssignmentDriver(tableBConfig)
+        .getInstancePartitions(
+            InstancePartitionsType.CONSUMING.getInstancePartitionsName(tableBName),
+            instanceAssignmentConfig, instanceConfigs, null, false,
+            new InstanceReplicaGroupPartitionSelector(wrongRgConfig, tableBConfig.getTableName(), null, false));
+
+    // Wrong approach: only slot 0 exists; slot 1 is missing entirely.
+    assertEquals(wrongTableBPartitions.getNumPartitions(), 1,
+        "Wrong approach produces only 1 partition slot");
+    assertNull(wrongTableBPartitions.getInstances(1, 0),
+        "Slot 1 must not exist when numPartitions=1; Kafka partition 1 falls back to slot 0 via 1 % 1 = 0");
+
+    // Under the wrong approach, Kafka partition 1 would be routed to slot 0 (RG0 → s1).
+    // Under the correct approach, it routes to slot 1 (RG0 → s3).  These are different servers.
+    String wrongServerForP1 = wrongTableBPartitions.getInstances(0, 0).get(0); // s1 (slot-0 hotspot)
+    String correctServerForP1 = tableBPartitions.getInstances(1, 0).get(0);    // s3 (slot 1)
+    assertNotEquals(wrongServerForP1, correctServerForP1,
+        "Wrong approach routes Kafka partition 1 to '" + wrongServerForP1
+            + "' (slot-0 hotspot) instead of the correct '" + correctServerForP1 + "' (slot 1)");
   }
 }

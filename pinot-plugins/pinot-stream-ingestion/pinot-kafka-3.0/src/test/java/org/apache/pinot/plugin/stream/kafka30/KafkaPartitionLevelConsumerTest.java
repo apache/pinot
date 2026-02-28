@@ -263,8 +263,11 @@ public class KafkaPartitionLevelConsumerTest {
       StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
       KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
-      assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 1);
-      assertEquals(streamMetadataProvider.fetchPartitionIds(10000L), Set.of(partitionId));
+      // With subset partition config, fetchPartitionCount/fetchPartitionIds still return the total Kafka
+      // partition count and all partition IDs; subset filtering only applies to segment creation.
+      assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 8);
+      assertEquals(streamMetadataProvider.fetchPartitionIds(10000L),
+          new HashSet<>(List.of(0, 1, 2, 3, 4, 5, 6, 7)));
 
       StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
       PartitionGroupConsumer consumer = streamConsumerFactory.createPartitionGroupConsumer(

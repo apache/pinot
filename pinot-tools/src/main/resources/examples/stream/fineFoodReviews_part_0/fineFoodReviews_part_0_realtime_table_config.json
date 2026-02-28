@@ -1,5 +1,5 @@
 {
-  "tableName": "fineFoodReviews-part-0",
+  "tableName": "fineFoodReviews_part_0",
   "tableType": "REALTIME",
   "segmentsConfig": {
     "segmentPushType": "APPEND",

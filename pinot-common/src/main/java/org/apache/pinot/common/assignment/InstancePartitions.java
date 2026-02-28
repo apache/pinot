@@ -23,14 +23,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -104,21 +101,6 @@ public class InstancePartitions {
   @JsonIgnore
   public int getNumPartitions() {
     return _numPartitions;
-  }
-
-  /**
-   * Returns a sorted list of unique partition IDs present in this instance partitions.
-   * Unlike {@link #getNumPartitions()}, this correctly handles non-contiguous partition IDs
-   * (e.g. a Kafka subset [0, 2, 5]).
-   */
-  @JsonIgnore
-  public List<Integer> getPartitionIds() {
-    Set<Integer> partitionIds = new TreeSet<>();
-    for (String key : _partitionToInstancesMap.keySet()) {
-      int separatorIndex = key.indexOf(PARTITION_REPLICA_GROUP_SEPARATOR);
-      partitionIds.add(Integer.parseInt(key.substring(0, separatorIndex)));
-    }
-    return new ArrayList<>(partitionIds);
   }
 
   @JsonIgnore

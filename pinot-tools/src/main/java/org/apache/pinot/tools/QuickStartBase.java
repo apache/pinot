@@ -105,8 +105,8 @@ public abstract class QuickStartBase {
       Map.entry("upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp"),
       Map.entry("upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp"),
       Map.entry("fineFoodReviews", "examples/stream/fineFoodReviews"),
-      Map.entry("fineFoodReviews-part-0", "examples/stream/fineFoodReviews-part-0"),
-      Map.entry("fineFoodReviews-part-1", "examples/stream/fineFoodReviews-part-1"));
+      Map.entry("fineFoodReviews_part_0", "examples/stream/fineFoodReviews_part_0"),
+      Map.entry("fineFoodReviews_part_1", "examples/stream/fineFoodReviews_part_1"));
 
   protected File _dataDir = FileUtils.getTempDirectory();
   protected boolean _setCustomDataDir;
@@ -581,8 +581,8 @@ public abstract class QuickStartBase {
               "***** Starting fineFoodReviews data stream and publishing to Kafka *****");
           publishStreamDataToKafka("fineFoodReviews", new File(quickstartTmpDir, "fineFoodReviews"));
           break;
-        case "fineFoodReviews-part-0":
-        case "fineFoodReviews-part-1":
+        case "fineFoodReviews_part_0":
+        case "fineFoodReviews_part_1":
           // Consume from existing fineFoodReviews topic (partition subset); no separate stream to start
           break;
         default:
@@ -1048,8 +1048,8 @@ public abstract class QuickStartBase {
       return;
     }
     Map<String, String> streamTableDirectories = getDefaultStreamTableDirectories();
-    if (!streamTableDirectories.containsKey("fineFoodReviews-part-0")
-        || !streamTableDirectories.containsKey("fineFoodReviews-part-1")) {
+    if (!streamTableDirectories.containsKey("fineFoodReviews_part_0")
+        || !streamTableDirectories.containsKey("fineFoodReviews_part_1")) {
       return;
     }
     String logicalTableName = "fineFoodReviews-federated";
@@ -1061,10 +1061,10 @@ public abstract class QuickStartBase {
       LogicalTableConfig logicalTableConfig = new LogicalTableConfig();
       logicalTableConfig.setTableName(logicalTableName);
       logicalTableConfig.setBrokerTenant("DefaultTenant");
-      logicalTableConfig.setRefRealtimeTableName("fineFoodReviews-part-0_REALTIME");
+      logicalTableConfig.setRefRealtimeTableName("fineFoodReviews_part_0_REALTIME");
       logicalTableConfig.setPhysicalTableConfigMap(Map.of(
-          "fineFoodReviews-part-0_REALTIME", new PhysicalTableConfig(),
-          "fineFoodReviews-part-1_REALTIME", new PhysicalTableConfig()
+          "fineFoodReviews_part_0_REALTIME", new PhysicalTableConfig(),
+          "fineFoodReviews_part_1_REALTIME", new PhysicalTableConfig()
       ));
 
       String logicalTableUrl = "http://localhost:" + QuickstartRunner.DEFAULT_CONTROLLER_PORT + "/logicalTables";

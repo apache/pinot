@@ -30,8 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.model.InstanceConfig;
@@ -76,18 +74,6 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
     }
   }
 
-  /**
-   * Returns existing instances for the given partition and replica-group, or an empty list if none
-   * (e.g. null from {@link InstancePartitions#getInstances(int, int)} or when no existing partitions).
-   */
-  private List<String> getExistingInstancesOrEmpty(int partitionId, int replicaGroupId) {
-    if (_existingInstancePartitions == null) {
-      return List.of();
-    }
-    List<String> instances = _existingInstancePartitions.getInstances(partitionId, replicaGroupId);
-    return instances != null ? instances : List.of();
-  }
-
   private void nonReplicaGroupBased(Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap,
       InstancePartitions instancePartitions, List<Integer> pools, int tableNameHash) {
     // Pick one pool based on the table name hash
@@ -108,7 +94,7 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
 
     List<String> instancesToSelect;
     if (_minimizeDataMovement) {
-      List<String> existingInstances = getExistingInstancesOrEmpty(0, 0);
+      List<String> existingInstances = _existingInstancePartitions.getInstances(0, 0);
       LinkedHashSet<String> candidateInstances = Sets.newLinkedHashSetWithExpectedSize(instanceConfigs.size());
       instanceConfigs.forEach(k -> candidateInstances.add(k.getInstanceName()));
       instancesToSelect =
@@ -210,11 +196,10 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
     // [i0, i1, i2, i3, i4]
     //  p0  p0  p0  p1  p1
     //  p1  p2  p2  p2
-    List<Integer> partitionIds = getPartitionIdsOrDefault(numPartitions);
     for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
       String[] instancesInReplicaGroup = replicaGroupIdToInstancesMap[replicaGroupId];
       int instanceIdInReplicaGroup = 0;
-      for (Integer partitionId : partitionIds) {
+      for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
         List<String> instances = new ArrayList<>(numInstancesPerPartition);
         for (int i = 0; i < numInstancesPerPartition; i++) {
           instances.add(instancesInReplicaGroup[instanceIdInReplicaGroup]);
@@ -272,24 +257,6 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
     return numPartitions;
   }
 
-  /**
-   * Returns the explicit list of partition IDs to use for instance partition keys, or null to use 0..numPartitions-1.
-   * When non-null (e.g. Kafka subset [0, 2, 5]), instance partitions will have entries for these IDs so segment
-   * assignment can look up by stream partition id.
-   */
-  @Nullable
-  protected List<Integer> getPartitionIds() {
-    return null;
-  }
-
-  private List<Integer> getPartitionIdsOrDefault(int numPartitions) {
-    List<Integer> partitionIds = getPartitionIds();
-    if (partitionIds == null) {
-      return IntStream.range(0, numPartitions).boxed().collect(Collectors.toList());
-    }
-    return partitionIds;
-  }
-
   protected int getNumInstancesPerPartition(int numInstancesPerReplicaGroup) {
     // Assign all instances within a replica-group to each partition if not configured
     int numInstancesPerPartition = _replicaGroupPartitionConfig.getNumInstancesPerPartition();
@@ -322,18 +289,16 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
     int maxReplicaGroupsPerPool = (numReplicaGroups + numPools - 1) / numPools;
     int startIndex = Math.abs(tableNameHash % numPools);
 
-    int existingNumReplicaGroups =
-        _existingInstancePartitions != null ? _existingInstancePartitions.getNumReplicaGroups() : 0;
-    List<Integer> existingPartitionIds =
-        _existingInstancePartitions != null ? _existingInstancePartitions.getPartitionIds() : List.of();
+    int existingNumReplicaGroups = _existingInstancePartitions.getNumReplicaGroups();
+    int existingNumPartitions = _existingInstancePartitions.getNumPartitions();
     for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
       // For each replica-group, gather number of existing instances within each pool
       Set<String> existingInstanceSet = new HashSet<>();
       replicaGroupIdToExistingInstancesMap.add(existingInstanceSet);
       Map<Integer, Integer> poolToNumExistingInstancesMap = new TreeMap<>();
       if (replicaGroupId < existingNumReplicaGroups) {
-        for (int partitionId : existingPartitionIds) {
-          List<String> existingInstances = getExistingInstancesOrEmpty(partitionId, replicaGroupId);
+        for (int partitionId = 0; partitionId < existingNumPartitions; partitionId++) {
+          List<String> existingInstances = _existingInstancePartitions.getInstances(partitionId, replicaGroupId);
           existingInstanceSet.addAll(existingInstances);
           for (String existingInstance : existingInstances) {
             Integer existingPool = instanceToPoolMap.get(existingInstance);
@@ -424,25 +389,22 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
       }
     }
 
-    List<Integer> partitionIds = getPartitionIdsOrDefault(numPartitions);
     if (numPartitions == 1) {
-      int partitionId = partitionIds.get(0);
       for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
         List<String> instancesInReplicaGroup = replicaGroupIdToInstancesMap.get(replicaGroupId);
         if (replicaGroupId < existingNumReplicaGroups) {
-          List<String> existingInstances = getExistingInstancesOrEmpty(partitionId, replicaGroupId);
+          List<String> existingInstances = _existingInstancePartitions.getInstances(0, replicaGroupId);
           LinkedHashSet<String> candidateInstances = new LinkedHashSet<>(instancesInReplicaGroup);
           List<String> instances =
               selectInstancesWithMinimumMovement(numInstancesPerReplicaGroup, candidateInstances, existingInstances);
           LOGGER.info(
-              "Selecting instances: {} for replica-group: {}, partition: {} for table: {}, existing instances: {}",
-              instances, replicaGroupId, partitionId, _tableNameWithType, existingInstances);
-          instancePartitions.setInstances(partitionId, replicaGroupId, instances);
+              "Selecting instances: {} for replica-group: {}, partition: 0 for table: {}, existing instances: {}",
+              instances, replicaGroupId, _tableNameWithType, existingInstances);
+          instancePartitions.setInstances(0, replicaGroupId, instances);
         } else {
-          LOGGER.info("Selecting instances: {} for replica-group: {}, partition: {} for table: {}, "
-              + "there is no existing instances", instancesInReplicaGroup, replicaGroupId, partitionId,
-              _tableNameWithType);
-          instancePartitions.setInstances(partitionId, replicaGroupId, instancesInReplicaGroup);
+          LOGGER.info("Selecting instances: {} for replica-group: {}, partition: 0 for table: {}, "
+              + "there is no existing instances", instancesInReplicaGroup, replicaGroupId, _tableNameWithType);
+          instancePartitions.setInstances(0, replicaGroupId, instancesInReplicaGroup);
         }
       }
     } else {
@@ -459,9 +421,8 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
 
           List<List<String>> partitionIdToInstancesMap = new ArrayList<>(numPartitions);
           List<Set<String>> partitionIdToInstanceSetMap = new ArrayList<>(numPartitions);
-          List<List<String>> partitionIdToExistingInstancesMap = new ArrayList<>(partitionIds.size());
-          for (int idx = 0; idx < partitionIds.size(); idx++) {
-            int partitionId = partitionIds.get(idx);
+          List<List<String>> partitionIdToExistingInstancesMap = new ArrayList<>(existingNumPartitions);
+          for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
             // Initialize the list with empty positions to fill
             List<String> instances = new ArrayList<>(numInstancesPerPartition);
             for (int i = 0; i < numInstancesPerPartition; i++) {
@@ -472,25 +433,26 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
             partitionIdToInstanceSetMap.add(instanceSet);
 
             // Keep the existing instances that are still alive
-            List<String> existingInstances = getExistingInstancesOrEmpty(partitionId, replicaGroupId);
-            partitionIdToExistingInstancesMap.add(existingInstances);
-            int numInstancesToCheck = Math.min(numInstancesPerPartition, existingInstances.size());
-            for (int i = 0; i < numInstancesToCheck; i++) {
-              String existingInstance = existingInstances.get(i);
-              Integer numPartitionsOnInstance = instanceToNumPartitionsMap.get(existingInstance);
-              if (numPartitionsOnInstance != null && numPartitionsOnInstance < maxNumPartitionsPerInstance) {
-                instances.set(i, existingInstance);
-                instanceSet.add(existingInstance);
-                instanceToNumPartitionsMap.put(existingInstance, numPartitionsOnInstance + 1);
+            if (partitionId < existingNumPartitions) {
+              List<String> existingInstances = _existingInstancePartitions.getInstances(partitionId, replicaGroupId);
+              partitionIdToExistingInstancesMap.add(existingInstances);
+              int numInstancesToCheck = Math.min(numInstancesPerPartition, existingInstances.size());
+              for (int i = 0; i < numInstancesToCheck; i++) {
+                String existingInstance = existingInstances.get(i);
+                Integer numPartitionsOnInstance = instanceToNumPartitionsMap.get(existingInstance);
+                if (numPartitionsOnInstance != null && numPartitionsOnInstance < maxNumPartitionsPerInstance) {
+                  instances.set(i, existingInstance);
+                  instanceSet.add(existingInstance);
+                  instanceToNumPartitionsMap.put(existingInstance, numPartitionsOnInstance + 1);
+                }
               }
             }
           }
 
           // Fill the vacant positions with instance that serves the least partitions
-          for (int idx = 0; idx < partitionIds.size(); idx++) {
-            int partitionId = partitionIds.get(idx);
-            List<String> instances = partitionIdToInstancesMap.get(idx);
-            Set<String> instanceSet = partitionIdToInstanceSetMap.get(idx);
+          for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
+            List<String> instances = partitionIdToInstancesMap.get(partitionId);
+            Set<String> instanceSet = partitionIdToInstanceSetMap.get(partitionId);
             int numInstancesToFill = numInstancesPerPartition - instanceSet.size();
             if (numInstancesToFill > 0) {
               // Triple stores (instance, numPartitionsOnInstance, instanceIndex) for sorting
@@ -515,12 +477,11 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
               }
             }
 
-            List<String> existingInstances = partitionIdToExistingInstancesMap.get(idx);
-            if (!existingInstances.isEmpty()) {
+            if (partitionId < existingNumPartitions) {
               LOGGER.info(
                   "Selecting instances: {} for replica-group: {}, partition: {} for table: {}, existing instances: {}",
                   instances, replicaGroupId, partitionId, _tableNameWithType,
-                  existingInstances);
+                  partitionIdToExistingInstancesMap.get(partitionId));
             } else {
               LOGGER.info("Selecting instances: {} for replica-group: {}, partition: {} for table: {}, "
                   + "there is no existing instances", instances, replicaGroupId, partitionId, _tableNameWithType);
@@ -530,7 +491,7 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
         } else {
           // Assign consecutive instances within a replica-group to each partition
           int instanceIdInReplicaGroup = 0;
-          for (Integer partitionId : partitionIds) {
+          for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
             List<String> instances = new ArrayList<>(numInstancesPerPartition);
             for (int i = 0; i < numInstancesPerPartition; i++) {
               instances.add(instancesInReplicaGroup.get(instanceIdInReplicaGroup));

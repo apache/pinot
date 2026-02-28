@@ -36,7 +36,6 @@ import org.apache.pinot.controller.helix.core.assignment.segment.strategy.Segmen
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 
@@ -163,38 +162,10 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
       } else {
         // Explicit partition:
         // Assign segment to the first instance within the partition.
-        // For kafka subset partitions, instance partitions are keyed by the actual stream partition
-        // IDs (which may be non-contiguous, e.g. {5, 10, 15}), so perform a direct lookup first.
-        // For the standard (non-subset) case, instance partition groups use contiguous IDs
-        // 0..numTotalPartitions-1; segments whose partition ID exceeds the number of groups are
-        // mapped via modulo using the total partition count from the table's segment partition config.
-
-        // Derive the total number of stream partitions from the table's segment partition config
-        // (set by the admin to match the total kafka/stream partition count). Fall back to
-        // instancePartitions.getNumPartitions() when not configured.
-        int numTotalPartitions = numPartitions;
-        if (_partitionColumn != null) {
-          SegmentPartitionConfig segmentPartitionConfig =
-              _tableConfig.getIndexingConfig().getSegmentPartitionConfig();
-          if (segmentPartitionConfig != null) {
-            int configuredNumPartitions = segmentPartitionConfig.getNumPartitions(_partitionColumn);
-            if (configuredNumPartitions > 0) {
-              numTotalPartitions = configuredNumPartitions;
-            }
-          }
-        }
 
         for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-          List<String> instances = instancePartitions.getInstances(segmentPartitionId, replicaGroupId);
-          if (instances == null || instances.isEmpty()) {
-            // Fall back to modulo using total stream partition count from table config
-            int partitionId = segmentPartitionId % numTotalPartitions;
-            instances = instancePartitions.getInstances(partitionId, replicaGroupId);
-          }
-          Preconditions.checkState(instances != null && !instances.isEmpty(),
-              "Failed to find instances for partition: %d in instance partitions: %s", segmentPartitionId,
-              instancePartitions.getInstancePartitionsName());
-          instancesAssigned.add(instances.get(0));
+          int partitionId = segmentPartitionId % numPartitions;
+          instancesAssigned.add(instancePartitions.getInstances(partitionId, replicaGroupId).get(0));
         }
       }
 
