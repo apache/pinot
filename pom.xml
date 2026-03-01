@@ -304,6 +304,7 @@
 
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
+    <junit-jupiter-api.version>5.10.2</junit-jupiter-api.version>
     <mockito-core.version>5.22.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>2.0.3</testcontainers.version>
@@ -677,6 +678,12 @@
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-kafka-3.0</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kafka-3.0</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
@@ -1758,6 +1765,24 @@
         <artifactId>kafka_${scala.compat.version}</artifactId>
         <version>${kafka3.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.kafka</groupId>
+        <artifactId>kafka_${scala.compat.version}</artifactId>
+        <version>${kafka3.version}</version>
+        <classifier>test</classifier>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.kafka</groupId>
+        <artifactId>kafka-clients</artifactId>
+        <version>${kafka3.version}</version>
+        <classifier>test</classifier>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.kafka</groupId>
+        <artifactId>kafka-server-common</artifactId>
+        <version>${kafka3.version}</version>
+        <classifier>test</classifier>
+      </dependency>
 
       <dependency>
         <groupId>io.confluent</groupId>
@@ -2051,6 +2076,13 @@
         <groupId>org.testng</groupId>
         <artifactId>testng</artifactId>
         <version>${testng.version}</version>
+        <scope>test</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-api</artifactId>
+        <version>${junit-jupiter-api.version}</version>
         <scope>test</scope>
       </dependency>
 
