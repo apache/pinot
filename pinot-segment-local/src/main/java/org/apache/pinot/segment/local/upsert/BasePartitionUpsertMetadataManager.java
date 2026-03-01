@@ -62,10 +62,12 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -79,6 +81,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected static final double TTL_WATERMARK_NOT_SET = Double.NEGATIVE_INFINITY;
 
   protected final String _tableNameWithType;
+  protected final TableType _tableType;
   protected final int _partitionId;
   protected final UpsertContext _context;
   protected final List<String> _primaryKeyColumns;
@@ -138,6 +141,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
+    _tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     _partitionId = partitionId;
     _context = context;
     _primaryKeyColumns = context.getPrimaryKeyColumns();
@@ -299,6 +303,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
+  /**
+   * Creates a RecordInfoReader for the given segment. When comparison columns are configured, reads comparison values
+   * from the columns. When comparison columns are empty, uses segment creation time as the comparison value.
+   */
+  protected UpsertUtils.RecordInfoReader createRecordInfoReader(IndexSegment segment) {
+    if (_comparisonColumns.isEmpty()) {
+      long segmentCreationTime = getAuthoritativeUpdateOrCreationTime(segment);
+      return new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns, segmentCreationTime, _deleteRecordColumn);
+    }
+    return new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn);
+  }
+
   protected boolean isTTLEnabled() {
     return _metadataTTL > 0 || _deletedKeysTTL > 0;
   }
@@ -351,7 +367,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void doAddSegment(ImmutableSegmentImpl segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Adding segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
-    if (isTTLEnabled()) {
+    if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
       double maxComparisonValue = getMaxComparisonValue(segment);
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
       if (isOutOfMetadataTTL(maxComparisonValue) && skipAddSegmentOutOfTTL(segment)) {
@@ -362,8 +378,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (!_enableSnapshot) {
       deleteSnapshot(segment);
     }
-    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
-        _comparisonColumns, _deleteRecordColumn)) {
+    try (UpsertUtils.RecordInfoReader recordInfoReader = createRecordInfoReader(segment)) {
       Iterator<RecordInfo> recordInfoIterator =
           UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
       addSegment(segment, null, null, recordInfoIterator);
@@ -427,15 +442,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), null);
       return;
     }
-    if (isTTLEnabled()) {
+    if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
       double maxComparisonValue = getMaxComparisonValue(segment);
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
       if (isOutOfMetadataTTL(maxComparisonValue) && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
         return;
       }
     }
-    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
-        _comparisonColumns, _deleteRecordColumn)) {
+    try (UpsertUtils.RecordInfoReader recordInfoReader = createRecordInfoReader(segment)) {
       doPreloadSegment(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
@@ -600,14 +614,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       replaceSegment(segment, null, null, null, oldSegment);
       return;
     }
-    if (isTTLEnabled()) {
+    if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
       double maxComparisonValue = getMaxComparisonValue(segment);
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
       // Segment might be uploaded directly to the table to replace an old segment. So update the TTL watermark but
       // we can't skip segment even if it's out of TTL as its validDocIds bitmap is not updated yet.
     }
-    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
-        _comparisonColumns, _deleteRecordColumn)) {
+    try (UpsertUtils.RecordInfoReader recordInfoReader = createRecordInfoReader(segment)) {
       Iterator<RecordInfo> recordInfoIterator =
           UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
       replaceSegment(segment, null, null, recordInfoIterator, oldSegment);
@@ -787,7 +800,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     try {
       // Skip removing the upsert metadata of segment that is out of metadata TTL. The expired metadata is removed
       // while creating new consuming segment in batches.
-      if (isOutOfMetadataTTL(segment)) {
+      if (!_comparisonColumns.isEmpty() && isOutOfMetadataTTL(segment)) {
         _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
       } else {
         doRemoveSegment(segment);
@@ -1290,16 +1303,22 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   /**
-   * Returns the ZooKeeper creation time for upsert consistency.
-   * This refers to the time set by the controller when creating new consuming segment.
-   * This is used to ensure consistent creation time across replicas for upsert
-   * operations.
-   * @return ZK creation time in milliseconds, or Long.MIN_VALUE if not set
+   * Returns the ZooKeeper update time for upsert consistency.
+   * For realtime table, this refers to the time set by the controller when creating new consuming segment.
+   * For offline table, this refers to the segment push time.
+   * This is used to ensure consistent creation time across replicas for upsert operations.
+   * @return ZK push time or creation time in milliseconds, or Long.MIN_VALUE if not set
    */
-  protected long getAuthoritativeCreationTime(IndexSegment segment) {
+  protected long getAuthoritativeUpdateOrCreationTime(IndexSegment segment) {
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
     if (segmentMetadata instanceof SegmentMetadataImpl) {
       SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
+      if (_tableType == TableType.OFFLINE) {
+        long zkPushTime = segmentMetadataImpl.getZkPushTime();
+        if (zkPushTime != Long.MIN_VALUE) {
+          return zkPushTime;
+        }
+      }
       long zkCreationTime = segmentMetadataImpl.getZkCreationTime();
       if (zkCreationTime != Long.MIN_VALUE) {
         return zkCreationTime;
