@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.executor;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -74,17 +75,18 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
     List<IndexSegment> indexSegments;
     Map<IndexSegment, SegmentContext> providedSegmentContexts = null;
 
-    if (!isUpsertTable(tableDataManager)) {
+    if (!tableDataManager.isUpsertEnabled()) {
       segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
       indexSegments = new ArrayList<>(segmentDataManagers.size());
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         indexSegments.add(segmentDataManager.getSegment());
       }
     } else {
-      RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
-      TableUpsertMetadataManager tumm = rtdm.getTableUpsertMetadataManager();
+      TableUpsertMetadataManager tumm = tableDataManager.getTableUpsertMetadataManager();
+      Preconditions.checkState(tumm != null,
+          "TableUpsertMetadataManager is null for upsert-enabled table: %s", tableNameWithType);
       boolean isUsingConsistencyMode =
-          rtdm.getTableUpsertMetadataManager().getContext().getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
+          tumm.getContext().getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
       if (isUsingConsistencyMode) {
         tumm.lockForSegmentContexts();
       }
@@ -126,18 +128,6 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
 
     return new SingleTableExecutionInfo(tableDataManager, segmentDataManagers, indexSegments, providedSegmentContexts,
         segmentsToQuery, optionalSegments, notAcquiredSegments);
-  }
-
-  private static boolean isUpsertTable(TableDataManager tableDataManager) {
-    // For upsert table, the server can start to process newly added segments before brokers can add those segments
-    // into their routing tables, like newly created consuming segment or newly uploaded segments. We should include
-    // those segments in the list of segments for query to process on the server, otherwise, the query will see less
-    // than expected valid docs from the upsert table.
-    if (tableDataManager instanceof RealtimeTableDataManager) {
-      RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
-      return rtdm.isUpsertEnabled();
-    }
-    return false;
   }
 
   private SingleTableExecutionInfo(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,

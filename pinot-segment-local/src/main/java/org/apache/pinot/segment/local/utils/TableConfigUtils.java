@@ -786,9 +786,6 @@ public final class TableConfigUtils {
     // check both upsert and dedup are not enabled simultaneously
     Preconditions.checkState(!(isUpsertEnabled && isDedupEnabled),
         "A table can have either Upsert or Dedup enabled, but not both");
-    // check table type is realtime
-    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
-        "Upsert/Dedup table is for realtime table only.");
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
@@ -804,10 +801,12 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
-    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
-            tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
-                && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
-        "Invalid tenant tag override used for Upsert/Dedup table");
+    if (tableConfig.getTableType() == TableType.REALTIME) {
+      Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
+              tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
+                  && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
+          "Invalid tenant tag override used for Upsert/Dedup table");
+    }
 
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -907,10 +906,12 @@ public final class TableConfigUtils {
       }
     }
 
-    Preconditions.checkState(
-        tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
-            .containsKey(InstancePartitionsType.COMPLETED.name()),
-        "COMPLETED instance partitions can't be configured for upsert / dedup tables");
+    if (tableConfig.getTableType() == TableType.REALTIME) {
+      Preconditions.checkState(
+          tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
+              .containsKey(InstancePartitionsType.COMPLETED.name()),
+          "COMPLETED instance partitions can't be configured for upsert / dedup tables");
+    }
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
     validateTTLForDedupConfig(tableConfig, schema);
@@ -949,6 +950,8 @@ public final class TableConfigUtils {
           comparisonColumn, comparisonColumnDataType);
     } else {
       String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      Preconditions.checkState(comparisonColumn != null,
+          "MetadataTTL / DeletedKeysTTL requires either a comparison column or a time column to be configured");
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
       Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
           "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s",

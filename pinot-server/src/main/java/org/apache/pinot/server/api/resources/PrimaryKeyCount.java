@@ -24,7 +24,6 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.restlet.resources.PrimaryKeyCountInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,14 +59,9 @@ public class PrimaryKeyCount {
         LOGGER.warn("TableDataManager for table: {} is null, skipping", tableNameWithType);
         continue;
       }
-      if (tableDataManager instanceof RealtimeTableDataManager) {
-        Map<Integer, Long> partitionToPrimaryKeyCount =
-            ((RealtimeTableDataManager) tableDataManager).getPartitionToPrimaryKeyCount();
-
-        if (!partitionToPrimaryKeyCount.isEmpty()) {
-          tablesWithPrimaryKeys.add(tableNameWithType);
-        }
-
+      Map<Integer, Long> partitionToPrimaryKeyCount = tableDataManager.getPartitionToPrimaryKeyCount();
+      if (!partitionToPrimaryKeyCount.isEmpty()) {
+        tablesWithPrimaryKeys.add(tableNameWithType);
         for (Long numPrimaryKeys : partitionToPrimaryKeyCount.values()) {
           totalPrimaryKeyCount += numPrimaryKeys == null ? 0 : numPrimaryKeys;
         }

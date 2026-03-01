@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -59,7 +60,13 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     List<String> comparisonColumns = upsertConfig.getComparisonColumns();
     if (comparisonColumns == null) {
-      comparisonColumns = List.of(tableConfig.getValidationConfig().getTimeColumnName());
+      String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+      if (timeColumnName != null) {
+        comparisonColumns = List.of(timeColumnName);
+      } else {
+        // No comparison column and no time column: use segment creation time for comparison
+        comparisonColumns = Collections.emptyList();
+      }
     }
 
     PartialUpsertHandler partialUpsertHandler = null;
