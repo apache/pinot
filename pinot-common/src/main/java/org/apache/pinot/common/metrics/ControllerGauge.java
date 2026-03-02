@@ -120,6 +120,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Number of Tasks Status
   TASK_STATUS("taskStatus", false),
 
+  // Number of tracked jobs in a task queue (per task type)
+  TASKS_TRACKED_FOR_TASK_TYPE("tasksTrackedForTaskType", false),
+
   // Number of dropped stale minion instances
   DROPPED_MINION_INSTANCES("droppedMinionInstances", true),
 
@@ -221,7 +224,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // The progress of a certain table rebalance job of a table
   TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false),
   // HTTP thread utilization
-  HTTP_THREAD_UTILIZATION("httpThreadUtilization", true);
+  HTTP_THREAD_UTILIZATION("httpThreadUtilization", true),
+  // Track the concurrent executions of the API resources that use @ManagedAsync
+  MANAGED_ASYNC_ACTIVE_THREADS("threads", true);
 
 
   private final String _gaugeName;

@@ -111,7 +111,7 @@ public class OperatorTestUtil {
   public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, long deadlineMs,
       StageMetadata stageMetadata) {
     return new OpChainExecutionContext(mailboxService, 0, "cid", deadlineMs, deadlineMs, "brokerId", Map.of(),
-        stageMetadata, stageMetadata.getWorkerMetadataList().get(0), null, true);
+        stageMetadata, stageMetadata.getWorkerMetadataList().get(0), null, true, true);
   }
 
   public static OpChainExecutionContext getTracingContext() {
@@ -135,7 +135,7 @@ public class OperatorTestUtil {
         new StageMetadata(0, List.of(workerMetadata), Map.of(DispatchablePlanFragment.TABLE_NAME_KEY, "testTable"));
     OpChainExecutionContext opChainExecutionContext =
         OpChainExecutionContext.fromQueryContext(mailboxService, opChainMetadata, stageMetadata, workerMetadata, null,
-            true, QueryExecutionContext.forMseTest());
+            true, true, QueryExecutionContext.forMseTest());
     opChainExecutionContext.setLeafStageContext(
         new ServerPlanRequestContext(new StagePlan(null, stageMetadata), null, null, null));
     return opChainExecutionContext;

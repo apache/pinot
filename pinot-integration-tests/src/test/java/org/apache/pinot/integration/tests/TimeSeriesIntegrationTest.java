@@ -412,6 +412,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     assertTrue(Long.parseLong(result.path("totalDocs").asText()) > 0);
     assertTrue(Long.parseLong(result.path("numDocsScanned").asText()) > 0);
     assertTrue(Long.parseLong(result.path("numSegmentsQueried").asText()) > 0);
+    assertTrue(Long.parseLong(result.path("timeUsedMs").asText()) > 0);
   }
 
   private List<String> extractStrings(JsonNode arrayNode) {

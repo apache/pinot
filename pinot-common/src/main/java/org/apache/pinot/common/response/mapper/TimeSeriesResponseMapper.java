@@ -158,7 +158,18 @@ public class TimeSeriesResponseMapper {
         getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED));
     map.merge(BrokerResponseNativeV2.StatKey.TOTAL_DOCS,
         getLongMetadataValue(metadata, DataTable.MetadataKey.TOTAL_DOCS));
+    map.merge(BrokerResponseNativeV2.StatKey.MIN_CONSUMING_FRESHNESS_TIME_MS,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_INVALID,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_LIMIT,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE));
     brokerResponse.addBrokerStats(map);
+    brokerResponse.setTimeUsedMs(getLongMetadataValue(metadata, DataTable.MetadataKey.TIME_USED_MS));
   }
 
   public static void setStatsInRequestContext(RequestContext requestContext, Map<String, String> metadata) {

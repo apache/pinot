@@ -889,6 +889,17 @@ public final class Schema implements Serializable {
     return cloned;
   }
 
+  public static Schema cloneSchemaWithName(Schema source, String newName) {
+    try {
+      String json = JsonUtils.objectToString(source);
+      Schema cloned = JsonUtils.stringToObject(json, Schema.class);
+      cloned.setSchemaName(newName);
+      return cloned;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to clone schema", e);
+    }
+  }
+
   /**
    * Helper method that converts a {@link TimeFieldSpec} to {@link DateTimeFieldSpec}
    * 1) If timeFieldSpec contains only incoming granularity spec, directly convert it to a dateTimeFieldSpec

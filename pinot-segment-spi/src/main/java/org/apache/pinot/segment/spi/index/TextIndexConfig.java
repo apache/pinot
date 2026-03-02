@@ -153,8 +153,8 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("luceneUseCompoundFile") Boolean luceneUseCompoundFile,
       @JsonProperty("luceneMaxBufferSizeMB") Integer luceneMaxBufferSizeMB,
       @JsonProperty("luceneAnalyzerClass") String luceneAnalyzerClass,
-      @JsonProperty("luceneAnalyzerClassArgs") String luceneAnalyzerClassArgs,
-      @JsonProperty("luceneAnalyzerClassArgTypes") String luceneAnalyzerClassArgTypes,
+      @JsonProperty("luceneAnalyzerClassArgs") Object luceneAnalyzerClassArgs,
+      @JsonProperty("luceneAnalyzerClassArgTypes") Object luceneAnalyzerClassArgTypes,
       @JsonProperty("luceneQueryParserClass") String luceneQueryParserClass,
       @JsonProperty("enablePrefixSuffixMatchingInPhraseQueries") Boolean enablePrefixSuffixMatchingInPhraseQueries,
       @JsonProperty("reuseMutableIndex") Boolean reuseMutableIndex,
@@ -179,9 +179,11 @@ public class TextIndexConfig extends IndexConfig {
 
     // Note that we cannot depend on jackson's default behavior to automatically coerce the comma delimited args to
     // List<String>. This is because the args may contain comma and other special characters such as space. Therefore,
-    // we use our own csv parser to parse the values directly.
-    _luceneAnalyzerClassArgs = CsvParser.parse(luceneAnalyzerClassArgs, true, false);
-    _luceneAnalyzerClassArgTypes = CsvParser.parse(luceneAnalyzerClassArgTypes, false, true);
+    // we use our own csv parser to parse the values directly when the input is a String.
+    // However, when round-tripping (serializing then deserializing), Jackson may produce a List<String> directly,
+    // so we also handle that case.
+    _luceneAnalyzerClassArgs = parseToList(luceneAnalyzerClassArgs, true, false);
+    _luceneAnalyzerClassArgTypes = parseToList(luceneAnalyzerClassArgTypes, false, true);
     _luceneQueryParserClass = luceneQueryParserClass == null
         ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_QUERY_PARSER_CLASS : luceneQueryParserClass;
     _enablePrefixSuffixMatchingInPhraseQueries =
@@ -196,6 +198,39 @@ public class TextIndexConfig extends IndexConfig {
     _docIdTranslatorMode = docIdTranslatorMode == null ? LUCENE_TRANSLATOR_MODE : docIdTranslatorMode;
     _caseSensitive = caseSensitive == null ? LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX : caseSensitive;
     _storeInSegmentFile = storeInSegmentFile == null ? LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE : storeInSegmentFile;
+  }
+
+  /**
+   * Parses the input value to a List of Strings.
+   * Handles both String (CSV format) and List<String> (from JSON array) inputs.
+   * This enables proper round-trip serialization/deserialization since the getter returns List<String>
+   * which Jackson serializes as a JSON array, but the original input format was CSV string.
+   *
+   * @param value the input value (can be String, List, or null)
+   * @param escapeComma if true, don't split on escaped commas when parsing String
+   * @param trim whether to trim each value
+   * @return parsed list of strings, empty list if input is null or empty
+   */
+  @SuppressWarnings("unchecked")
+  private static List<String> parseToList(final @Nullable Object value, final boolean escapeComma, final boolean trim) {
+    if (value == null) {
+      return Collections.emptyList();
+    }
+    if (value instanceof List) {
+      final List<?> list = (List<?>) value;
+      if (list.isEmpty()) {
+        return Collections.emptyList();
+      }
+      // Convert each element to String and optionally trim
+      final List<String> result = new ArrayList<>();
+      for (final Object item : list) {
+        final String strItem = item == null ? "" : item.toString();
+        result.add(trim ? strItem.trim() : strItem);
+      }
+      return result;
+    }
+    // String or other types - use CSV parser
+    return CsvParser.parse(value.toString(), escapeComma, trim);
   }
 
   public FSTType getFstType() {

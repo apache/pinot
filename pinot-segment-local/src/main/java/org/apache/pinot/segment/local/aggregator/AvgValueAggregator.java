@@ -96,9 +96,7 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
       Object[] values = (Object[]) rawValue;
       AvgPair avgPair = new AvgPair();
       for (Object value : values) {
-        if (value != null) {
-          avgPair.apply(ValueAggregatorUtils.toDouble(value));
-        }
+        avgPair.apply(ValueAggregatorUtils.toDouble(value));
       }
       return avgPair;
     }

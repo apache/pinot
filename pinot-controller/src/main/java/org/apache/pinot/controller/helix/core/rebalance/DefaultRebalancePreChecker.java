@@ -344,7 +344,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
   private RebalancePreCheckerResult checkRebalanceConfig(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
-      RebalanceSummaryResult rebalanceSummaryResult) {
+      @Nullable RebalanceSummaryResult rebalanceSummaryResult) {
     List<String> warnings = new ArrayList<>();
     boolean pass = true;
     if (rebalanceConfig.isBestEfforts()) {

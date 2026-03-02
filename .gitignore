@@ -63,3 +63,46 @@ pinot-integration-tests/src/test/resources/udf-test-results/*.md
 !/pinot-integration-tests/src/test/resources/udf-test-results/README.md
 
 tmp/
+
+# OpenAI / Codex / ChatGPT-style tools
+.codex/
+.codex-cache/
+.openai/
+.openai-cache/
+
+# Cursor
+.cursor/
+.cursor-cache/
+
+# GitHub Copilot
+.copilot/
+.github/copilot/
+copilot-chat.log
+
+# Continue.dev
+.continue/
+.continue-cache/
+
+# Tabnine
+.tabnine/
+
+# Codeium
+.codeium/
+
+# Sourcegraph Cody
+.cody/
+
+# Ollama / local LLMs
+.ollama/
+ollama/
+
+# LM Studio
+.lmstudio/
+
+# HuggingFace caches
+.huggingface/
+hf_cache/
+
+# LangChain / LlamaIndex
+.langchain/
+.llamaindex/

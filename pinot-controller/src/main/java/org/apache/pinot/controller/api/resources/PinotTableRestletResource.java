@@ -248,24 +248,14 @@ public class PinotTableRestletResource {
 
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
-      // TableConfigUtils.validate(...) is used across table create/update.
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip);
-      TableConfigUtils.validateTableName(tableConfig);
+      TableConfigValidationUtils.validateTableConfig(
+          tableConfig, schema, typesToSkip, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
     } catch (TableAlreadyExistsException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
     try {
-      try {
-        TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
-        TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
-        checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
-        TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
-        validateInstanceAssignment(tableConfig);
-      } catch (Exception e) {
-        throw new InvalidTableConfigException(e);
-      }
       if (!ignoreActiveTasks) {
         tableTasksValidation(tableConfig, _pinotHelixTaskResourceManager);
       }
@@ -760,7 +750,8 @@ public class PinotTableRestletResource {
 
       schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip);
+      TableConfigValidationUtils.validateTableConfig(
+          tableConfig, schema, typesToSkip, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
@@ -770,16 +761,6 @@ public class PinotTableRestletResource {
       if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
         throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " does not exist",
             Response.Status.NOT_FOUND);
-      }
-
-      try {
-        TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
-        TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
-        checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
-        TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
-        validateInstanceAssignment(tableConfig);
-      } catch (Exception e) {
-        throw new InvalidTableConfigException(e);
       }
       _pinotHelixResourceManager.updateTableConfig(tableConfig);
     } catch (InvalidTableConfigException e) {
@@ -1177,20 +1158,6 @@ public class PinotTableRestletResource {
     return TableNameBuilder.forType(tableType).tableNameWithType(tableName);
   }
 
-  private void checkHybridTableConfig(String rawTableName, TableConfig tableConfig) {
-    if (tableConfig.getTableType() == TableType.REALTIME) {
-      if (_pinotHelixResourceManager.hasOfflineTable(rawTableName)) {
-        TableConfigUtils.verifyHybridTableConfigs(rawTableName,
-            _pinotHelixResourceManager.getOfflineTableConfig(rawTableName), tableConfig);
-      }
-    } else {
-      if (_pinotHelixResourceManager.hasRealtimeTable(rawTableName)) {
-        TableConfigUtils.verifyHybridTableConfigs(rawTableName, tableConfig,
-            _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName));
-      }
-    }
-  }
-
   @GET
   @Path("/tables/{tableName}/status")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
@@ -1545,19 +1512,5 @@ public class PinotTableRestletResource {
     }
 
     return timeBoundaryMs;
-  }
-
-  /**
-   * Try to calculate the instance partitions for the given table config. Throws exception if it fails.
-   */
-  private void validateInstanceAssignment(TableConfig tableConfig) {
-    TableRebalancer tableRebalancer = new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager());
-    try {
-      tableRebalancer.getInstancePartitionsMap(tableConfig, true, true, true);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Failed to calculate instance partitions for table: " + tableConfig.getTableName() + ", reason: "
-              + e.getMessage());
-    }
   }
 }

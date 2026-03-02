@@ -32,6 +32,7 @@ import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.ColumnarSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
@@ -507,7 +508,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
       DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
       boolean createDictionary = dictionaryIndexConfig.isDisabled();
-      boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
+      boolean useVarLengthDictionary = dictionaryIndexConfig.isUseVarLengthDictionary()
           || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
       if (storedType == DataType.BYTES) {
@@ -641,7 +642,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       } catch (Exception closeException) {
         LOGGER.error("Error closing index creator", closeException);
         // Add the close exception as suppressed to preserve both exceptions
-        e.addSuppressed(closeException);
+        ExceptionUtils.suppress(closeException, e);
       }
       throw e;
     } finally {
