@@ -317,7 +317,7 @@ public class MinionTaskUtils {
 
   /**
    * Returns the validDocIds bitmap from server(s). {@code comparisonMode} is the task config value: NONE, EQUAL_CONSENSUS
-   * (default), or MAX_VALID_DOCS. Executor-only; pass the raw config string (no auth resolution or URL hits).
+   * (default), or MAX_VALID_DOCS.
    */
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
