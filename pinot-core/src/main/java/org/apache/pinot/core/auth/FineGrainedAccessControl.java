@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.auth;
 
+import javax.annotation.Nullable;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
@@ -36,8 +38,24 @@ public interface FineGrainedAccessControl {
    * @param action type to validate
    * @return true if user is allowed to perform the action
    */
+  @Deprecated
   default boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
     return true;
+  }
+
+  /**
+   * Checks whether the user has access to perform action on the particular resource
+   *
+   * @param httpHeaders HTTP headers
+   * @param request     the HTTP request for which this access control is called
+   * @param targetType type of resource being accessed
+   * @param targetId id of the resource
+   * @param action type to validate
+   * @return true if user is allowed to perform the action
+   */
+  default boolean hasAccess(HttpHeaders httpHeaders, @Nullable HttpServletRequest request, TargetType targetType,
+      String targetId, String action) {
+    return hasAccess(httpHeaders, targetType, targetId, action);
   }
 
   /**
@@ -62,9 +80,25 @@ public interface FineGrainedAccessControl {
    * @param action type to validate
    * @return An AuthorizationResult object, encapsulating whether the access is granted or not.
    */
+  @Deprecated
   default AuthorizationResult authorize(HttpHeaders httpHeaders, TargetType targetType, String targetId,
       String action) {
     return new BasicAuthorizationResultImpl(hasAccess(httpHeaders, targetType, targetId, action));
+  }
+
+  /**
+   * Verifies if the user has access to perform a specific action on a particular resource.
+   *
+   * @param httpHeaders HTTP headers
+   * @param request     the HTTP request for which this access control is called
+   * @param targetType type of resource being accessed
+   * @param targetId id of the resource
+   * @param action type to validate
+   * @return An AuthorizationResult object, encapsulating whether the access is granted or not.
+   */
+  default AuthorizationResult authorize(HttpHeaders httpHeaders, @Nullable HttpServletRequest request,
+      TargetType targetType, String targetId, String action) {
+    return authorize(httpHeaders, targetType, targetId, action);
   }
 
   /**
@@ -73,7 +107,21 @@ public interface FineGrainedAccessControl {
    * If the return is false, then API will be terminated by the filter.
    * @return true to allow
    */
+  @Deprecated
   default boolean defaultAccess(HttpHeaders httpHeaders) {
     return true;
+  }
+
+  /**
+   * If an API is neither annotated with Authorize nor ManualAuthorization,
+   * this method will be called to check the default authorization.
+   * If the return is false, then API will be terminated by the filter.
+   *
+   * @param httpHeaders HTTP headers
+   * @param request     the HTTP request for which this access control is called
+   * @return true to allow
+   */
+  default boolean defaultAccess(HttpHeaders httpHeaders, @Nullable HttpServletRequest request) {
+    return defaultAccess(httpHeaders);
   }
 }

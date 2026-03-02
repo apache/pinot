@@ -20,6 +20,7 @@
 package org.apache.pinot.controller.api.access;
 
 import javax.annotation.Nullable;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -46,21 +47,23 @@ public final class AccessControlUtils {
    * @param tableName name of the table to be accessed (post database name translation)
    * @param accessType type of the access
    * @param httpHeaders HTTP headers containing requester identity required by access control object
+   * @param request the request for which this access control is called
    * @param endpointUrl the request url for which this access control is called
    * @param accessControl AccessControl object which does the actual validation
    */
   public static void validatePermission(@Nullable String tableName, AccessType accessType,
-      @Nullable HttpHeaders httpHeaders, String endpointUrl, AccessControl accessControl) {
+      @Nullable HttpHeaders httpHeaders, HttpServletRequest request, String endpointUrl,
+      AccessControl accessControl) {
     String userMessage = getUserMessage(tableName, accessType, endpointUrl);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     try {
       if (rawTableName == null) {
-        if (accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
+        if (accessControl.hasAccess(accessType, httpHeaders, request, endpointUrl)) {
           return;
         }
       } else {
-        if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
+        if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, request, endpointUrl)) {
           return;
         }
       }

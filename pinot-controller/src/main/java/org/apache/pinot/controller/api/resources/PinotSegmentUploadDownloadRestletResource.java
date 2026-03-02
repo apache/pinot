@@ -89,6 +89,7 @@ import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.access.GrizzlyRequestAdapter;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.upload.SegmentMetadataInfo;
 import org.apache.pinot.controller.api.upload.SegmentUploadMetadata;
@@ -159,6 +160,12 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Inject
   AccessControlFactory _accessControlFactory;
 
+  @Context
+  HttpHeaders _httpHeaders;
+
+  @Context
+  Request _request;
+
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableName}/{segmentName}")
@@ -169,15 +176,16 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.READ)
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @Context HttpHeaders httpHeaders)
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName)
       throws Exception {
-    tableName = DatabaseUtils.translateTableName(tableName, httpHeaders);
+    tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
     // Validate data access
     boolean hasDataAccess;
     try {
       AccessControl accessControl = _accessControlFactory.create();
-      hasDataAccess = accessControl.hasAccess(tableName, AccessType.READ, httpHeaders, Actions.Table.DOWNLOAD_SEGMENT);
+      hasDataAccess =
+          accessControl.hasAccess(tableName, AccessType.READ, _httpHeaders,
+              GrizzlyRequestAdapter.wrap(_request), Actions.Table.DOWNLOAD_SEGMENT);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Caught exception while validating access to table: " + tableName, Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -814,7 +822,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, false,
-          enableParallelPushProtection, allowRefresh, headers, request));
+          enableParallelPushProtection, allowRefresh, _httpHeaders, _request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -853,7 +861,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
-          enableParallelPushProtection, allowRefresh, headers, request));
+          enableParallelPushProtection, allowRefresh, _httpHeaders, _request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -914,7 +922,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     try {
       asyncResponse.resume(
           uploadSegments(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, enableParallelPushProtection,
-              allowRefresh, headers, request));
+              allowRefresh, _httpHeaders, _request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -956,7 +964,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, true, enableParallelPushProtection,
-              allowRefresh, headers, request));
+              allowRefresh, _httpHeaders, _request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -995,7 +1003,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
-          enableParallelPushProtection, allowRefresh, headers, request));
+          enableParallelPushProtection, allowRefresh, _httpHeaders, _request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }

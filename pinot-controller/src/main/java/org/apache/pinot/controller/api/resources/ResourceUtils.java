@@ -33,6 +33,7 @@ import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.GrizzlyRequestAdapter;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.TargetType;
@@ -86,8 +87,10 @@ public class ResourceUtils {
       AccessType accessType, String action, AccessControlFactory accessControlFactory, Logger logger) {
     String endpointUrl = request.getRequestURL().toString();
     AccessControl accessControl = accessControlFactory.create();
-    AccessControlUtils.validatePermission(typeName, accessType, httpHeaders, endpointUrl, accessControl);
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, typeName, action)) {
+    AccessControlUtils.validatePermission(typeName, accessType, httpHeaders, GrizzlyRequestAdapter.wrap(request),
+        endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, GrizzlyRequestAdapter.wrap(request), TargetType.TABLE, typeName,
+        action)) {
       throw new ControllerApplicationException(logger, "Permission denied", Response.Status.FORBIDDEN);
     }
   }

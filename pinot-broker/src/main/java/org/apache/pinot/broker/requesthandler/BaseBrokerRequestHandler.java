@@ -240,7 +240,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
 
     Set<String> failedTables = tableNames.stream()
-        .filter(table -> !accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY))
+        .filter(table -> !accessControl.hasAccess(httpHeaders, null, TargetType.TABLE, table, Actions.Table.QUERY))
         .collect(Collectors.toSet());
 
     failedTables.addAll(tableAuthorizationResult.getFailedTables());
