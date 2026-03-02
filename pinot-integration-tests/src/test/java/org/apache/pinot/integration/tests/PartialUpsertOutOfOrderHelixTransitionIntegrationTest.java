@@ -19,6 +19,8 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,10 +56,12 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test that validates partial upsert correctness when Helix delivers state transitions out of order.
  *
- * <p>A production incident showed that when segment N+1's OFFLINE-CONSUMING transition arrives before segment N's
- * CONSUMING-ONLINE completes, the partial upsert metadata for segment N is missing when segment N+1 starts consuming.
- * This causes INCREMENT merges to be lost. The {@code enforceConsumptionInOrder} flag fixes this by blocking segment
- * N+1's consumption until segment N is registered via the {@code ConsumerCoordinator}.
+ * <p>A production incident showed that when a delayed OFFLINE-CONSUMING for segment N is processed after segment N is
+ * already committed, segment N gets skipped as CONSUMING on a slow server. If segment N+1 starts consuming before
+ * segment N's CONSUMING-ONLINE transition is processed on that server, partial upsert metadata for segment N is
+ * missing when segment N+1 starts consuming. This causes INCREMENT merges to be lost. The
+ * {@code enforceConsumptionInOrder} flag fixes this by blocking segment N+1's consumption until segment N is
+ * registered via the {@code ConsumerCoordinator}.
  *
  * <p><b>Multi-server approach:</b> This test uses 2 servers with {@code numReplicas=2}. Server 0 has a delay injected
  * into {@code addConsumingSegment()} for segment 1, simulating a slow Helix state transition. Server 1 operates
@@ -66,15 +70,16 @@ import static org.testng.Assert.assertTrue;
  *
  * <p>With {@code enforceConsumptionInOrder=true}, the {@code ConsumerCoordinator} blocks segment 2's consumption
  * on Server 0 until segment 1 is registered (via its eventual CONSUMING-ONLINE transition), ensuring correct
- * partial upsert merges. Without enforcement, segment 2 proceeds immediately without segment 1's data.
+ * partial upsert merges for this single-delayed-previous-segment scenario. Without enforcement, segment 2 proceeds
+ * immediately without segment 1's data.
  *
  * <p><b>Instrumented assertions:</b> The {@link DelayInjectingRealtimeTableDataManager} captures whether the delayed
  * target segment was present in the segment data manager map at the entry of {@code addConsumingSegment()} for
  * subsequent segments. In both the enforced and non-enforced cases, segment 1 is NOT present at this entry point
  * (proving the out-of-order condition was triggered). The key difference is what happens inside
  * {@code super.addConsumingSegment()}: with enforcement, the {@code ConsumerCoordinator} blocks until segment 1
- * is registered, ensuring correct scores; without enforcement, consumption proceeds immediately, potentially
- * producing degraded scores.
+ * is registered, ensuring correct scores; without enforcement, consumption proceeds immediately and produces
+ * degraded scores.
  *
  * <p><b>CRC mismatch detection:</b> The {@link DelayInjectingRealtimeTableDataManager} overrides
  * {@code replaceSegmentIfCrcMismatch} to track whether each server's locally-built segment CRC matches the ZK
@@ -93,28 +98,27 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
 
   private static final int NUM_SERVERS = 2;
   // Delay injected into Server 0's addConsumingSegment for segment 1.
-  // Must be long enough for Server 1 to commit segment 1 and for segment 2/3 transitions to arrive on Server 0.
+  // Must be long enough for Server 1 to commit segment 1 and for segment 2 transition to arrive on Server 0.
   private static final long CONSUMING_DELAY_MS = 20_000;
 
-  // 10 total records in the CSV data, 3 distinct primary keys (100, 101, 102)
-  private static final long TOTAL_DOCS = 10;
+  // 7 total records in the generated CSV subset, 3 distinct primary keys (100, 101, 102)
+  private static final long TOTAL_DOCS = 7;
   private static final long DISTINCT_KEYS = 3;
 
   // Expected correct scores when all INCREMENT merges happen properly.
-  // CSV data (10 records, flush=3, all timestamps monotonically increasing):
+  // CSV data subset (7 records, flush=3, all timestamps monotonically increasing):
   //   Segment 0: player 100(+10), 101(+20), 102(+30)
   //   Segment 1: player 101(+100), 101(+200), 101(+300)  ← delayed on Server 0
-  //   Segment 2: player 102(+40), 100(+50), 100(+60)
-  //   Segment 3: player 101(+400) — stays CONSUMING (only 1 record, below flush threshold)
-  // Player 100: 10 + 50 + 60 = 120
+  //   Segment 2: player 101(+400) — stays CONSUMING
+  // Player 100: 10
   // Player 101: 20 + 100 + 200 + 300 + 400 = 1020
-  // Player 102: 30 + 40 = 70
-  private static final float EXPECTED_SCORE_100 = 120.0f;
+  // Player 102: 30
+  private static final float EXPECTED_SCORE_100 = 10.0f;
   private static final float EXPECTED_SCORE_101 = 1020.0f;
-  private static final float EXPECTED_SCORE_102 = 70.0f;
+  private static final float EXPECTED_SCORE_102 = 30.0f;
 
   // Expected degraded score for player 101 when segment 1's data is missing on Server 0.
-  // Only segment 0's base (20) + segment 3's increment (400) = 420
+  // Only segment 0's base (20) + segment 2's increment (400) = 420
   private static final float DEGRADED_SCORE_101 = 420.0f;
 
   private File _dataFile;
@@ -202,7 +206,7 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
     // Start Kafka, create topic, and push CSV data
     startKafka();
     List<File> dataFiles = unpackTarData(INPUT_DATA_TAR_FILE, _tempDir);
-    _dataFile = dataFiles.get(0);
+    _dataFile = createSingleDelayedScenarioCsvFile(dataFiles.get(0));
     pushCsvIntoKafka(_dataFile, getKafkaTopic(), 0);
 
     // Create schema
@@ -275,14 +279,12 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
    * Waits for Server 0's consuming delay to complete and all segments to settle.
    * After the delay, segment 1 goes through CONSUMING-ONLINE on Server 0, which
    * triggers register() and unblocks any enforced segments waiting on it.
-   * With enforcement, segments 1, 2, 3 are processed sequentially, so we need
-   * sufficient time for all three to complete after the 20s delay.
+   * With enforcement, segment 2 waits until segment 1 is registered.
    */
   private void waitForServerSettling()
       throws InterruptedException {
-    // Wait for the consuming delay plus extra time for sequential segment
-    // processing under enforcement (3 segments × ~10s each after delay)
-    Thread.sleep(CONSUMING_DELAY_MS + 40_000);
+    // Wait for the consuming delay plus time for segment 1->ONLINE and segment 2 consumption to settle.
+    Thread.sleep(CONSUMING_DELAY_MS + 30_000);
   }
 
   /**
@@ -350,10 +352,10 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
     assertServerScores(1, TABLE_NAME,
         EXPECTED_SCORE_100, EXPECTED_SCORE_101, EXPECTED_SCORE_102,
         "Enforced table server 1");
-    // Server 0 (delayed): player 101 has degraded score because enforcement does not
-    // retroactively fix data already consumed out of order.
+    // Server 0 (delayed): in this single-delayed-previous-segment scenario, enforcement
+    // blocks segment 2 until segment 1 is registered, so scores are correct.
     assertServerScores(0, TABLE_NAME,
-        EXPECTED_SCORE_100, DEGRADED_SCORE_101, EXPECTED_SCORE_102,
+        EXPECTED_SCORE_100, EXPECTED_SCORE_101, EXPECTED_SCORE_102,
         "Enforced table server 0");
 
     // Verify CRC consistency via replaceSegmentIfCrcMismatch tracking. This method is called in
@@ -500,6 +502,27 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
         message + ": player 101 on server " + serverId + ", got: " + scores.get(101));
     assertTrue(Math.abs(scores.get(102) - expected102) < 1.0f,
         message + ": player 102 on server " + serverId + ", got: " + scores.get(102));
+  }
+
+  /**
+   * Creates a 7-row CSV subset that yields exactly three segments (flush=3): seq 0, seq 1, seq 2.
+   * We keep rows 1-6 and 10 from the original dataset so only one segment follows the delayed segment.
+   */
+  private File createSingleDelayedScenarioCsvFile(File fullDataFile)
+      throws Exception {
+    List<String> allLines = Files.readAllLines(fullDataFile.toPath(), StandardCharsets.UTF_8);
+    File subsetFile = new File(_tempDir, "gameScores_partial_upsert_single_delayed.csv");
+    List<String> subsetLines = List.of(
+        allLines.get(0),
+        allLines.get(1),
+        allLines.get(2),
+        allLines.get(3),
+        allLines.get(4),
+        allLines.get(5),
+        allLines.get(9)
+    );
+    Files.write(subsetFile.toPath(), subsetLines, StandardCharsets.UTF_8);
+    return subsetFile;
   }
 
   @AfterClass

@@ -88,18 +88,19 @@ public class PartialUpsertMultiComparisonOutOfOrderHelixTransitionIntegrationTes
   private static final int NUM_SERVERS = 2;
   private static final long CONSUMING_DELAY_MS = 20_000;
 
-  private static final long TOTAL_DOCS = 10;
+  private static final long TOTAL_DOCS = 7;
   private static final long DISTINCT_KEYS = 3;
 
   // Expected correct scores when all INCREMENT merges happen properly (identical to single-comparison test).
-  // Player 100: 10 + 50 + 60 = 120
+  // Player 100: 10
   // Player 101: 20 + 100 + 200 + 300 + 400 = 1020
-  // Player 102: 30 + 40 = 70
-  private static final float EXPECTED_SCORE_100 = 120.0f;
+  // Player 102: 30
+  private static final float EXPECTED_SCORE_100 = 10.0f;
   private static final float EXPECTED_SCORE_101 = 1020.0f;
-  private static final float EXPECTED_SCORE_102 = 70.0f;
+  private static final float EXPECTED_SCORE_102 = 30.0f;
 
   // Expected degraded score for player 101 when segment 1's data is missing on Server 0.
+  // Only segment 0's base (20) + segment 2's increment (400) = 420
   private static final float DEGRADED_SCORE_101 = 420.0f;
 
   private File _avroFile;
@@ -222,12 +223,11 @@ public class PartialUpsertMultiComparisonOutOfOrderHelixTransitionIntegrationTes
              new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       writer.create(avroSchema, avroFile);
 
-      // 10 records, same structure as the CSV-based test.
+      // 7 records for the single-delayed-previous-segment scenario.
       // Each record sets exactly one comparison column; the other is null.
       //   Segment 0 (records 1-3): player 100(+10), 101(+20), 102(+30)
       //   Segment 1 (records 4-6, delayed on Server 0): player 101(+100), 101(+200), 101(+300)
-      //   Segment 2 (records 7-9): player 102(+40), 100(+50), 100(+60)
-      //   Segment 3 (record 10, stays CONSUMING): player 101(+400)
+      //   Segment 2 (record 7, stays CONSUMING): player 101(+400)
       Object[][] data = {
           // {playerId, name, game, score, timestampInEpoch, scoreTimestamp, nameTimestamp, deleted}
           {100, "Alice", "chess", 10.0f, 1000L, 1000L, null, false},
@@ -236,9 +236,6 @@ public class PartialUpsertMultiComparisonOutOfOrderHelixTransitionIntegrationTes
           {101, "Bob", "chess", 100.0f, 4000L, 4000L, null, false},
           {101, "Bob", "chess", 200.0f, 5000L, null, 5000L, false},
           {101, "Bob", "chess", 300.0f, 6000L, 6000L, null, false},
-          {102, "Carol", "chess", 40.0f, 7000L, null, 7000L, false},
-          {100, "Alice", "chess", 50.0f, 8000L, 8000L, null, false},
-          {100, "Alice", "chess", 60.0f, 9000L, null, 9000L, false},
           {101, "Bob", "chess", 400.0f, 10000L, 10000L, null, false},
       };
 
@@ -329,7 +326,7 @@ public class PartialUpsertMultiComparisonOutOfOrderHelixTransitionIntegrationTes
 
   private void waitForServerSettling()
       throws InterruptedException {
-    Thread.sleep(CONSUMING_DELAY_MS + 40_000);
+    Thread.sleep(CONSUMING_DELAY_MS + 30_000);
   }
 
   /**
@@ -371,10 +368,10 @@ public class PartialUpsertMultiComparisonOutOfOrderHelixTransitionIntegrationTes
     assertServerScores(1, TABLE_NAME,
         EXPECTED_SCORE_100, EXPECTED_SCORE_101, EXPECTED_SCORE_102,
         "Enforced table server 1");
-    // Server 0 (delayed): player 101 has degraded score because enforcement does not
-    // retroactively fix data already consumed out of order.
+    // Server 0 (delayed): in this single-delayed-previous-segment scenario, enforcement
+    // blocks segment 2 until segment 1 is registered, so scores are correct.
     assertServerScores(0, TABLE_NAME,
-        EXPECTED_SCORE_100, DEGRADED_SCORE_101, EXPECTED_SCORE_102,
+        EXPECTED_SCORE_100, EXPECTED_SCORE_101, EXPECTED_SCORE_102,
         "Enforced table server 0");
 
     Map<Integer, List<Boolean>> enforcedCrcMap =
