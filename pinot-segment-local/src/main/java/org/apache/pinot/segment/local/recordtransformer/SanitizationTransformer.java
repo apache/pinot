@@ -29,25 +29,23 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 
 
-/**
- * The {@code SanitizationTransformer} class will sanitize the values to follow certain rules including:
- * <ul>
- *   <li>No {@code null} characters in string values</li>
- *   <li>String values are within the length limit</li>
- * </ul>
- * <p>NOTE: should put this after the {@link DataTypeTransformer} so that all values follow the data types in
- * {@link FieldSpec}.
- * This uses the MaxLengthExceedStrategy in the {@link FieldSpec} to decide what to do when the value exceeds the max.
- * For TRIM_LENGTH, the value is trimmed to the max length.
- * For SUBSTITUTE_DEFAULT_VALUE, the value is replaced with the default null value string.
- * For ERROR, an exception is thrown and the record is skipped.
- * For NO_ACTION, the value is kept as is if no NULL_CHARACTER present else trimmed till NULL.
- * In the first 2 scenarios, this metric REALTIME_ROWS_SANITIZED can be tracked to know if a trimmed /
- * default record was persisted.
- * In the third scenario, this metric ROWS_WITH_ERRORS can be tracked  to know if a record was skipped.
- * In the last scenario, this metric REALTIME_ROWS_SANITIZED can be tracked to know if a record was trimmed
- * due to having a null character.
- */
+/// The `SanitizationTransformer` class will sanitize the values to follow certain rules including:
+/// - No `null` characters in string values
+/// - String/bytes values are within the length limit
+///
+/// NOTE: should put this after the [DataTypeTransformer] so that all values follow the data types in [FieldSpec].
+/// This uses the `MaxLengthExceedStrategy` in the [FieldSpec] to decide what to do when the value exceeds the max
+/// length:
+/// - TRIM_LENGTH: Trim value to the max length
+/// - SUBSTITUTE_DEFAULT_VALUE: Replace value with the default null value
+/// - ERROR: Throw exception when value doesn't conform with the rules
+/// - NO_ACTION: Keep the value as is if no `NULL_CHARACTER` presents, else trim till `NULL_CHARACTER`
+///
+/// In the first 2 scenarios, this metric `REALTIME_ROWS_SANITIZED` can be tracked to know if a trimmed / default record
+/// was persisted.
+/// In the third scenario, this metric `ROWS_WITH_ERRORS` can be tracked to know if a record was skipped.
+/// In the last scenario, this metric `REALTIME_ROWS_SANITIZED` can be tracked to know if a record was trimmed due to
+/// having a `NULL_CHARACTER`.
 public class SanitizationTransformer implements RecordTransformer {
   private final Map<String, SanitizedColumnInfo> _columnToColumnInfoMap = new HashMap<>();
 
