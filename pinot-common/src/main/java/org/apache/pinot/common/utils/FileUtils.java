@@ -92,11 +92,7 @@ public class FileUtils {
           closeable.close();
         }
       } catch (IOException e) {
-        if (topLevelException == null) {
-          topLevelException = e;
-        } else if (e != topLevelException) {
-          topLevelException.addSuppressed(e);
-        }
+        topLevelException = ExceptionUtils.suppress(e, topLevelException);
       }
     }
 

@@ -68,7 +68,7 @@ public class PipelineBreakerExecutor {
   @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> opChainMetadata, boolean sendStats) {
+      Map<String, String> opChainMetadata, boolean sendStats, boolean keepPipelineBreakerStats) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
     if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
@@ -78,7 +78,7 @@ public class PipelineBreakerExecutor {
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
             OpChainExecutionContext.fromQueryContext(mailboxService, opChainMetadata, stagePlan.getStageMetadata(),
-                workerMetadata, null, sendStats);
+                workerMetadata, null, sendStats, keepPipelineBreakerStats);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {
         long requestId = QueryThreadContext.get().getExecutionContext().getRequestId();

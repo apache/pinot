@@ -95,8 +95,12 @@ public class PluginManager {
       put("org.apache.pinot.filesystem.LocalPinotFS", "org.apache.pinot.spi.filesystem.LocalPinotFS");
 
       // StreamConsumerFactory
+      // Old-style class names mapped to current plugin packages
+      // Rename the usage of kafka 2 to kafka 3
       put("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
+          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+      put("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
       put("org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory",
           "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
     }
@@ -490,6 +494,18 @@ public class PluginManager {
     }
     if (recordReaderConfigClass != null) {
       INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP.put(inputFormat.toLowerCase(), recordReaderConfigClass);
+    }
+  }
+
+  // Register plugin class names when users try to deprecate old plugins/libraries.
+  public void registerBackwardCompatibleClassName(String oldClassName, String newClassName) {
+    String existingNewClassName = PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.put(oldClassName, newClassName);
+    if (existingNewClassName != null) {
+      LOGGER.warn("There is already a mapping for backward compatible class from old [{}] to [{}], override it to [{}]",
+          oldClassName, existingNewClassName, newClassName);
+    } else {
+      LOGGER.info("Registered backward compatible class name mapping from old [{}] to new [{}]", oldClassName,
+          newClassName);
     }
   }
 }

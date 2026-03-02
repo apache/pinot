@@ -62,7 +62,7 @@ public class PrimaryKeyCount {
       }
       if (tableDataManager instanceof RealtimeTableDataManager) {
         Map<Integer, Long> partitionToPrimaryKeyCount =
-            getPartitionToPrimaryKeyCount((RealtimeTableDataManager) tableDataManager);
+            ((RealtimeTableDataManager) tableDataManager).getPartitionToPrimaryKeyCount();
 
         if (!partitionToPrimaryKeyCount.isEmpty()) {
           tablesWithPrimaryKeys.add(tableNameWithType);
@@ -75,15 +75,5 @@ public class PrimaryKeyCount {
     }
 
     return new PrimaryKeyCountInfo(instanceId, totalPrimaryKeyCount, tablesWithPrimaryKeys, System.currentTimeMillis());
-  }
-
-  private static Map<Integer, Long> getPartitionToPrimaryKeyCount(RealtimeTableDataManager tableDataManager) {
-    // Fetch the primary key count per partition if either upsert or dedup is enabled
-    if (tableDataManager.isUpsertEnabled()) {
-      return tableDataManager.getTableUpsertMetadataManager().getPartitionToPrimaryKeyCount();
-    } else if (tableDataManager.isDedupEnabled()) {
-      return tableDataManager.getTableDedupMetadataManager().getPartitionToPrimaryKeyCount();
-    }
-    return Map.of();
   }
 }

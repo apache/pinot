@@ -45,6 +45,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -176,10 +177,17 @@ public class TableConfigSerDeUtils {
       });
     }
 
+    List<TableSamplerConfig> tableSamplerConfigs = null;
+    String tableSamplerConfigsString = simpleFields.get(TableConfig.TABLE_SAMPLERS_KEY);
+    if (tableSamplerConfigsString != null) {
+      tableSamplerConfigs = JsonUtils.stringToObject(tableSamplerConfigsString, new TypeReference<>() {
+      });
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
         dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList,
-        instancePartitionsMap, segmentAssignmentConfigMap);
+        instancePartitionsMap, segmentAssignmentConfigMap, tableSamplerConfigs);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -253,6 +261,10 @@ public class TableConfigSerDeUtils {
     if (segmentAssignmentConfigMap != null) {
       simpleFields.put(TableConfig.SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY,
           JsonUtils.objectToString(segmentAssignmentConfigMap));
+    }
+    List<TableSamplerConfig> tableSamplerConfigs = tableConfig.getTableSamplers();
+    if (tableSamplerConfigs != null) {
+      simpleFields.put(TableConfig.TABLE_SAMPLERS_KEY, JsonUtils.objectToString(tableSamplerConfigs));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());

@@ -781,7 +781,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           statsCollector.seal();
           indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, createDictionary,
-              dictionaryIndexConfig.getUseVarLengthDictionary(), true, fieldSpec.getDefaultNullValue());
+              dictionaryIndexConfig.isUseVarLengthDictionary(), true, fieldSpec.getDefaultNullValue());
           break;
         }
         case BYTES: {
@@ -800,7 +800,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           if (!statsCollector.isFixedLength()) {
             useVarLengthDictionary = true;
           } else {
-            useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary();
+            useVarLengthDictionary = dictionaryIndexConfig.isUseVarLengthDictionary();
           }
           indexCreationInfo =
               new ColumnIndexCreationInfo(statsCollector, createDictionary, useVarLengthDictionary, true,

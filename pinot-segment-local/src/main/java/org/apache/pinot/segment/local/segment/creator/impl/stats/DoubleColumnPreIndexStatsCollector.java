@@ -110,6 +110,10 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
     return _sealed ? _sortedValues.length : _values.size();
   }
 
+  double[] getValues() {
+    return _values.toDoubleArray();
+  }
+
   @Override
   public void seal() {
     if (!_sealed) {

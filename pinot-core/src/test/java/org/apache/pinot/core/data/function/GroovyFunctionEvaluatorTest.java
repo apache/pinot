@@ -222,4 +222,21 @@ public class GroovyFunctionEvaluatorTest {
     });
     return entries.toArray(new Object[entries.size()][]);
   }
+
+  @Test
+  public void testEvaluateObjectArrayWithNullArgument() {
+    // Script that will throw when nullValue is null (calling length() on null)
+    GroovyFunctionEvaluator evaluator =
+        new GroovyFunctionEvaluator("Groovy({nullValue == null ? nullValue.length() : \"Jello\" }, nullValue)");
+    Object result = evaluator.evaluate(new Object[]{null});
+    assertEquals(result, null);
+  }
+
+  @Test(expectedExceptions = Exception.class)
+  public void testEvaluateObjectArrayWithoutNullThrowsException() {
+    // Script that will throw due to invalid operation, but no null arguments
+    GroovyFunctionEvaluator evaluator =
+        new GroovyFunctionEvaluator("Groovy({Integer.parseInt(value)}, value)");
+    evaluator.evaluate(new Object[]{"notANumber"});
+  }
 }

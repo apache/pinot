@@ -872,9 +872,9 @@ public class TableConfigUtilsTest {
         streamIngestionConfigWithoutPauselessUniqueTopics);
     TableConfig tableConfigWithoutPauselessUniqueTopics = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)
-        .setTimeColumnName("timeColumn")
-        .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
-        .build();
+            .setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
+            .build();
     try {
       TableConfigUtils.validate(tableConfigWithoutPauselessUniqueTopics, schema);
     } catch (IllegalStateException e) {
@@ -1894,53 +1894,6 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       // expected
     }
-  }
-
-  @Test
-  public void testValidateUpsertWithTierConfig() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
-    Map<String, String> streamConfigs = getStreamConfigs();
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setRoutingConfig(
-            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
-        .setTimeColumnName(TIME_COLUMN)
-        .setStreamConfigs(streamConfigs)
-        .setTierConfigList(Lists.newArrayList(
-            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
-        .build();
-
-    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
-        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
-  }
-
-  @Test
-  public void testValidateDedupWithTierConfig() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
-    Map<String, String> streamConfigs = getStreamConfigs();
-    DedupConfig dedupConfig = new DedupConfig();
-    dedupConfig.setMetadataTTL(10);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(dedupConfig)
-        .setRoutingConfig(
-            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
-        .setTimeColumnName(TIME_COLUMN)
-        .setStreamConfigs(streamConfigs)
-        .setTierConfigList(Lists.newArrayList(
-            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
-        .build();
-
-    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
-        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
   }
 
   @Test
@@ -3224,7 +3177,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -3240,7 +3193,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -3251,7 +3204,7 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3262,7 +3215,7 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3278,7 +3231,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3294,7 +3247,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3310,7 +3263,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3326,7 +3279,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3337,7 +3290,7 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, true, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, true, null, null, null, null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -3350,7 +3303,8 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, true, null, instancePartitionsMap, null);
+            null, null, null, null, null, null, null, null, null, null, null, true, null, instancePartitionsMap, null,
+            null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);

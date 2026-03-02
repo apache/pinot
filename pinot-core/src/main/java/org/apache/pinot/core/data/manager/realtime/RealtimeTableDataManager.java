@@ -937,12 +937,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   /**
    * Retrieves a mapping of partition id to the primary key count for the partition.
+   * Supports both upsert and dedup enabled tables.
    *
    * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition.
    */
-  public Map<Integer, Long> getUpsertPartitionToPrimaryKeyCount() {
+  public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
     if (isUpsertEnabled()) {
       return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
+    }
+    if (isDedupEnabled()) {
+      return _tableDedupMetadataManager.getPartitionToPrimaryKeyCount();
     }
     return Collections.emptyMap();
   }

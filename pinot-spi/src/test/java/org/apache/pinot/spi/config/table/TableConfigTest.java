@@ -27,8 +27,10 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -103,5 +105,37 @@ public class TableConfigTest {
 
     assertEquals(config, copy);
     assertEquals(config.toJsonString(), copy.toJsonString());
+  }
+
+  @Test
+  public void testDuplicateTableSamplerNamesRejected() {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    List<TableSamplerConfig> duplicateSamplers = List.of(
+        new TableSamplerConfig("sampler1", "firstN", Map.of("numSegments", "10")),
+        new TableSamplerConfig("sampler1", "firstN", Map.of("numSegments", "1")));
+    IllegalArgumentException e = Assert.expectThrows(IllegalArgumentException.class,
+        () -> config.setTableSamplers(duplicateSamplers));
+    assertTrue(e.getMessage().contains("Duplicate table sampler name: sampler1"));
+  }
+
+  @Test
+  public void testDuplicateTableSamplerNamesRejectedAfterNormalization() {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    List<TableSamplerConfig> duplicateSamplers = List.of(
+        new TableSamplerConfig("sampler1", "firstN", Map.of("numSegments", "10")),
+        new TableSamplerConfig(" Sampler1 ", "firstN", Map.of("numSegments", "1")));
+    IllegalArgumentException e = Assert.expectThrows(IllegalArgumentException.class,
+        () -> config.setTableSamplers(duplicateSamplers));
+    assertTrue(e.getMessage().contains("Duplicate table sampler name: Sampler1"));
+  }
+
+  @Test
+  public void testBlankTableSamplerNameRejected() {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    List<TableSamplerConfig> samplers =
+        List.of(new TableSamplerConfig("  ", "firstN", Map.of("numSegments", "10")));
+    IllegalArgumentException e =
+        Assert.expectThrows(IllegalArgumentException.class, () -> config.setTableSamplers(samplers));
+    assertTrue(e.getMessage().contains("Table sampler name cannot be blank"));
   }
 }

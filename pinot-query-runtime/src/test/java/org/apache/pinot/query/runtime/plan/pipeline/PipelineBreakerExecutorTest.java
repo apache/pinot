@@ -116,7 +116,7 @@ public class PipelineBreakerExecutorTest {
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, workerInfo,
         ThreadAccountantUtils.getNoOpAccountant())) {
       return PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan,
-          opChainMetadata, true);
+          opChainMetadata, true, true);
     }
   }
 

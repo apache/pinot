@@ -35,6 +35,7 @@ import org.apache.pinot.segment.local.aggregator.PercentileEstValueAggregator;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -218,7 +219,10 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
   protected Integer processWindow(ArrayDeque<FunnelStepEvent> slidingWindow) {
     int maxStep = 0;
     long previousTimestamp = -1;
+    int numEventsProcessed = 0;
     for (FunnelStepEvent event : slidingWindow) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numEventsProcessed++,
+          "FunnelStepDurationStatsAggregationFunction#processWindow");
       int currentEventStep = event.getStep();
       // If the same condition holds for the sequence of events, then such repeating event interrupts further
       // processing.

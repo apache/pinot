@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
@@ -143,11 +144,7 @@ public abstract class BlockExchange implements AutoCloseable {
         }
       } catch (RuntimeException e) {
         // We want to try to send EOS to all mailboxes, so we catch the exception and rethrow it at the end.
-        if (firstException == null) {
-          firstException = e;
-        } else {
-          firstException.addSuppressed(e);
-        }
+        firstException = ExceptionUtils.suppress(e, firstException);
       }
     }
     if (firstException != null) {
@@ -183,15 +180,7 @@ public abstract class BlockExchange implements AutoCloseable {
       try {
         sendingMailbox.close();
       } catch (Exception e) {
-        if (firstException == null) {
-          if (firstException instanceof RuntimeException) {
-            firstException = (RuntimeException) e;
-          } else {
-            firstException = new RuntimeException(e);
-          }
-        } else {
-          firstException.addSuppressed(e);
-        }
+        firstException = ExceptionUtils.suppress(e, firstException, RuntimeException::new, RuntimeException.class);
       }
     }
     if (firstException != null) {

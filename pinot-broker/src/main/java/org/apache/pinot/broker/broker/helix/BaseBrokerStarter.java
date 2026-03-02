@@ -57,6 +57,7 @@ import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
@@ -86,10 +87,13 @@ import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
+import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.NettyInspector;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
+import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
@@ -97,6 +101,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -135,12 +140,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _instanceId;
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
-
   // Dedicated handler for listening to cluster config changes
-  protected final DefaultClusterConfigChangeHandler _defaultClusterConfigChangeHandler =
+  protected final DefaultClusterConfigChangeHandler _clusterConfigChangeHandler =
       new DefaultClusterConfigChangeHandler();
 
-  // TODO To be removed in favor of _defaultClusterConfigChangeHandler to manage config related changes.
+  // TODO To be removed in favor of _clusterConfigChangeHandler to manage config related changes.
   //      Please use this only if you are reliant specifically on the ClusterChangeMediator infra.
   protected final List<ClusterChangeHandler> _clusterConfigChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _idealStateChangeHandlers = new ArrayList<>();
@@ -181,6 +185,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
     applyCustomConfigs(brokerConf);
+    TableSamplerFactory.init(_brokerConf.subset(CommonConstants.Broker.TABLE_SAMPLER_CONFIG_PREFIX));
     BrokerContext.getInstance().setQueryOperatorFactoryProvider(createQueryOperatorFactoryProvider(_brokerConf));
 
     PinotInsecureMode.setPinotInInsecureMode(
@@ -218,6 +223,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
 
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
+
+    NettyInspector.logAllChecks();
   }
 
   /// Can be overridden to apply custom configs to the broker conf.
@@ -229,6 +236,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    */
   protected QueryOperatorFactoryProvider createQueryOperatorFactoryProvider(PinotConfiguration brokerConf) {
     return DefaultQueryOperatorFactoryProvider.INSTANCE;
+  }
+
+  /**
+   * Override to customize the {@link WorkerManager} used for multi-stage query engine worker assignment.
+   */
+  protected WorkerManager createWorkerManager(String brokerId, String hostname, int port,
+      RoutingManager routingManager) {
+    return new WorkerManager(brokerId, hostname, port, routingManager);
   }
 
   private void setupHelixSystemProperties() {
@@ -380,6 +395,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _threadAccountant = ThreadAccountantUtils.createAccountant(schedulerConfig, _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.BROKER);
     _threadAccountant.startWatcherTask();
+    PinotClusterConfigChangeListener threadAccountantListener = _threadAccountant.getClusterConfigChangeListener();
+    if (threadAccountantListener != null) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(threadAccountantListener);
+    }
 
     // TODO: Hook multiClusterRoutingContext into request handlers subsequently.
     MultiClusterRoutingContext multiClusterRoutingContext = getMultiClusterRoutingContext();
@@ -428,10 +447,21 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
       // TODO: decouple protocol and engine selection.
+      String queryRunnerHostname = _brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+      int queryRunnerPort = Integer.parseInt(_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+      WorkerManager workerManager =
+          createWorkerManager(brokerId, queryRunnerHostname, queryRunnerPort, _routingManager);
+      WorkerManager multiClusterWorkerManager;
+      if (multiClusterRoutingContext != null) {
+        multiClusterWorkerManager = createWorkerManager(brokerId, queryRunnerHostname, queryRunnerPort,
+            multiClusterRoutingContext.getMultiClusterRoutingManager());
+      } else {
+        multiClusterWorkerManager = workerManager;
+      }
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
-              _threadAccountant, multiClusterRoutingContext);
+              _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
@@ -473,7 +503,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
 
     LOGGER.info("Wiring up cluster config change handler with helix");
-    _spectatorHelixManager.addClusterfigChangeListener(_defaultClusterConfigChangeHandler);
+    _spectatorHelixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication = createBrokerAdminApp();
@@ -521,7 +551,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
       System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
 
-    _defaultClusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+
+    NettyInspector.registerMetrics(_brokerMetrics);
 
     LOGGER.info("Finish starting Pinot broker");
   }
@@ -712,7 +744,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
   }
 
-  private boolean updatePortIfNeeded(Map<String, String> instanceConfigSimpleFields, String key, int port) {
+  protected boolean updatePortIfNeeded(Map<String, String> instanceConfigSimpleFields, String key, int port) {
     String existingPortStr = instanceConfigSimpleFields.get(key);
     if (port > 0) {
       String portStr = Integer.toString(port);
@@ -818,13 +850,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _brokerRequestHandler;
   }
 
+  public ThreadAccountant getThreadAccountant() {
+    return _threadAccountant;
+  }
+
   protected BrokerAdminApiApplication createBrokerAdminApp() {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
             _queryQuotaManager, _threadAccountant, _responseStore);
     brokerAdminApiApplication.register(
-        new AuditServiceBinder(_defaultClusterConfigChangeHandler, getServiceRole(), _brokerMetrics));
+        new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _brokerMetrics));
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }

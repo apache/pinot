@@ -85,7 +85,7 @@ public class OpChainSchedulerServiceTest {
     when(mailboxService.getPort()).thenReturn(1234);
     WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
     OpChainExecutionContext context = OpChainExecutionContext.fromQueryContext(mailboxService, Map.of(),
-        new StageMetadata(0, List.of(workerMetadata), Map.of()), workerMetadata, null, true);
+        new StageMetadata(0, List.of(workerMetadata), Map.of()), workerMetadata, null, true, true);
     return new OpChain(context, operator);
   }
 
