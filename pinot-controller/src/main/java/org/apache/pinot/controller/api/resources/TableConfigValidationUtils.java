@@ -62,7 +62,7 @@ public final class TableConfigValidationUtils {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, controllerConf.getDimTableMaxSize());
     checkHybridTableConfig(resourceManager, tableConfig);
     TaskConfigUtils.validateTaskConfigs(tableConfig, schema, taskManager, typesToSkip);
-    validateInstanceAssignment(tableConfig);
+    validateInstanceAssignment(resourceManager, tableConfig);
     resourceManager.validateTableTenantConfig(tableConfig);
     resourceManager.validateTableTaskMinionInstanceTagConfig(tableConfig);
   }
@@ -82,7 +82,8 @@ public final class TableConfigValidationUtils {
     }
   }
 
-  private static void validateInstanceAssignment(TableConfig tableConfig) {
+  private static void validateInstanceAssignment(PinotHelixResourceManager resourceManager,
+      TableConfig tableConfig) {
     TableRebalancer tableRebalancer = new TableRebalancer(resourceManager.getHelixZkManager());
     try {
       tableRebalancer.getInstancePartitionsMap(tableConfig, true, true, true);

@@ -766,16 +766,6 @@ public class PinotTableRestletResource {
         throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " does not exist",
             Response.Status.NOT_FOUND);
       }
-
-      try {
-        TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
-        TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
-        checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
-        TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
-        validateInstanceAssignment(tableConfig);
-      } catch (Exception e) {
-        throw new InvalidTableConfigException(e);
-      }
       _pinotHelixResourceManager.updateTableConfig(tableConfig, force);
     } catch (TableConfigBackwardIncompatibleException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
