@@ -48,6 +48,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -111,6 +112,10 @@ public final class TablesSystemTableProvider implements SystemTableProvider {
       _sizeCacheTtlMs = context.getConfig().getProperty(SIZE_CACHE_TTL_MS_PROPERTY, DEFAULT_SIZE_CACHE_TTL_MS);
       _controllerTimeoutMs =
           context.getConfig().getProperty(CONTROLLER_TIMEOUT_MS_PROPERTY, DEFAULT_CONTROLLER_TIMEOUT_MS);
+      String controllerUrl = context.getConfig().getProperty(CommonConstants.Broker.CONTROLLER_URL);
+      if (controllerUrl != null && !controllerUrl.isEmpty()) {
+        _configuredControllerUrls = List.of(controllerUrl.split(","));
+      }
     }
   }
 
@@ -374,6 +379,7 @@ public final class TablesSystemTableProvider implements SystemTableProvider {
         }
 
         TableSize parsed = JsonUtils.stringToObject(sizeNode.toString(), TableSize.class);
+        enrichWithTotalDocs(parsed, tableName, adminClient);
         LOGGER.debug("{}: controller size response for {} via {} -> segments offline={}, realtime={}, "
                 + "reportedSize={}, estimatedSize={}", TABLE_NAME, tableName, baseUrl,
             parsed._offlineSegments != null && parsed._offlineSegments._segments != null
@@ -388,6 +394,32 @@ public final class TablesSystemTableProvider implements SystemTableProvider {
       }
     }
     return null;
+  }
+
+  private void enrichWithTotalDocs(TableSize tableSize, String tableName, PinotAdminClient adminClient) {
+    String rawName = TableNameBuilder.extractRawTableName(tableName);
+    enrichSubTypeWithTotalDocs(tableSize._offlineSegments,
+        TableNameBuilder.OFFLINE.tableNameWithType(rawName), adminClient);
+    enrichSubTypeWithTotalDocs(tableSize._realtimeSegments,
+        TableNameBuilder.REALTIME.tableNameWithType(rawName), adminClient);
+  }
+
+  private void enrichSubTypeWithTotalDocs(@Nullable TableSubType subType, String tableNameWithType,
+      PinotAdminClient adminClient) {
+    if (subType == null || subType._segments == null || subType._segments.isEmpty()) {
+      return;
+    }
+    for (Map.Entry<String, SegmentSize> entry : subType._segments.entrySet()) {
+      try {
+        JsonNode metadata = adminClient.getSegmentApiClient().getSegmentMetadata(tableNameWithType, entry.getKey());
+        if (metadata != null && metadata.has(CommonConstants.Segment.TOTAL_DOCS)) {
+          entry.getValue()._totalDocs = metadata.path(CommonConstants.Segment.TOTAL_DOCS).asLong(0);
+        }
+      } catch (Exception e) {
+        LOGGER.debug("{}: failed to fetch segment metadata for {}/{}: {}", TABLE_NAME, tableNameWithType,
+            entry.getKey(), e.toString());
+      }
+    }
   }
 
   private List<String> getControllerBaseUrls() {

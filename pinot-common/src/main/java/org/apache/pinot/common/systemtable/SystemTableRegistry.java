@@ -71,11 +71,19 @@ public final class SystemTableRegistry implements AutoCloseable {
       throw new IllegalArgumentException(
           "System table name must start with '" + SYSTEM_TABLE_PREFIX + "', got: " + tableName);
     }
+    SystemTableProvider displaced;
     synchronized (_providers) {
       if (_closed) {
         throw new IllegalStateException("Cannot register provider after registry is closed");
       }
-      _providers.put(normalize(tableName), provider);
+      displaced = _providers.put(normalize(tableName), provider);
+    }
+    if (displaced != null && displaced != provider) {
+      try {
+        displaced.close();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to close displaced provider for {}: {}", tableName, e.toString());
+      }
     }
   }
 
@@ -132,11 +140,21 @@ public final class SystemTableRegistry implements AutoCloseable {
       if (!SystemTableProvider.class.isAssignableFrom(clazz)) {
         continue;
       }
-      SystemTableProvider provider = instantiateProvider(clazz.asSubclass(SystemTableProvider.class));
-      if (provider == null) {
+      Class<? extends SystemTableProvider> providerClass = clazz.asSubclass(SystemTableProvider.class);
+      SystemTableProvider provider;
+      try {
+        provider = providerClass.getConstructor().newInstance();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to instantiate system table provider {}: {}", providerClass.getName(), e.toString());
         continue;
       }
       if (isRegistered(provider.getTableName())) {
+        continue;
+      }
+      try {
+        provider.init(_context);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to initialize system table provider {}: {}", providerClass.getName(), e.toString());
         continue;
       }
       LOGGER.info("Registering system table provider: {}", provider.getTableName());
@@ -185,17 +203,5 @@ public final class SystemTableRegistry implements AutoCloseable {
 
   private String normalize(String tableName) {
     return tableName.toLowerCase(Locale.ROOT);
-  }
-
-  @Nullable
-  private SystemTableProvider instantiateProvider(Class<? extends SystemTableProvider> clazz) {
-    try {
-      SystemTableProvider provider = clazz.getConstructor().newInstance();
-      provider.init(_context);
-      return provider;
-    } catch (Exception e) {
-      LOGGER.warn("Failed to instantiate system table provider {}: {}", clazz.getName(), e.toString());
-      return null;
-    }
   }
 }

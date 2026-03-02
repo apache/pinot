@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -86,6 +87,10 @@ public final class InstancesSystemTableProvider implements SystemTableProvider {
     if (context.getConfig() != null) {
       _controllerTimeoutMs =
           context.getConfig().getProperty(CONTROLLER_TIMEOUT_MS_PROPERTY, DEFAULT_CONTROLLER_TIMEOUT_MS);
+      String controllerUrl = context.getConfig().getProperty(CommonConstants.Broker.CONTROLLER_URL);
+      if (controllerUrl != null && !controllerUrl.isEmpty()) {
+        _configuredControllerUrls = List.of(controllerUrl.split(","));
+      }
     }
   }
 

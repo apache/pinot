@@ -448,10 +448,10 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   private static final class BrokerTarget {
-    final ServerRoutingInstance _routingInstance;
-    final String _dataTableUrl;
+    private final ServerRoutingInstance _routingInstance;
+    private final String _dataTableUrl;
 
-    BrokerTarget(ServerRoutingInstance routingInstance, String dataTableUrl) {
+    private BrokerTarget(ServerRoutingInstance routingInstance, String dataTableUrl) {
       _routingInstance = routingInstance;
       _dataTableUrl = dataTableUrl;
     }
@@ -531,10 +531,10 @@ public class SystemTableBrokerRequestHandler extends BaseBrokerRequestHandler {
       futures.add(Pair.of(target, future));
     }
 
-    long remainingMs = Math.max(1, deadlineMs - System.currentTimeMillis());
     for (Pair<BrokerTarget, Future<DataTable>> pair : futures) {
       BrokerTarget target = pair.getLeft();
       try {
+        long remainingMs = Math.max(1, deadlineMs - System.currentTimeMillis());
         dataTableMap.put(target._routingInstance, pair.getRight().get(remainingMs, TimeUnit.MILLISECONDS));
       } catch (TimeoutException e) {
         pair.getRight().cancel(true);

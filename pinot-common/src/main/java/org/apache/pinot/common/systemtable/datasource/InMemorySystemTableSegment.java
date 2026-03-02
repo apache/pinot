@@ -656,7 +656,11 @@ public final class InMemorySystemTableSegment implements IndexSegment {
       _valueProvider = valueProvider;
     }
 
-    private static <T> T coerceNumber(Object value, Function<Number, T> numberConverter, Function<String, T> parser) {
+    private static <T> T coerceNumber(Object value, T defaultValue, Function<Number, T> numberConverter,
+        Function<String, T> parser) {
+      if (value == null) {
+        return defaultValue;
+      }
       return value instanceof Number ? numberConverter.apply((Number) value) : parser.apply(String.valueOf(value));
     }
 
@@ -678,25 +682,25 @@ public final class InMemorySystemTableSegment implements IndexSegment {
     @Override
     public int getInt(int docId, ForwardIndexReaderContext context) {
       Object value = _valueProvider.apply(docId);
-      return coerceNumber(value, number -> number.intValue(), Integer::parseInt);
+      return coerceNumber(value, 0, Number::intValue, Integer::parseInt);
     }
 
     @Override
     public long getLong(int docId, ForwardIndexReaderContext context) {
       Object value = _valueProvider.apply(docId);
-      return coerceNumber(value, number -> number.longValue(), Long::parseLong);
+      return coerceNumber(value, 0L, Number::longValue, Long::parseLong);
     }
 
     @Override
     public float getFloat(int docId, ForwardIndexReaderContext context) {
       Object value = _valueProvider.apply(docId);
-      return coerceNumber(value, number -> number.floatValue(), Float::parseFloat);
+      return coerceNumber(value, 0.0f, Number::floatValue, Float::parseFloat);
     }
 
     @Override
     public double getDouble(int docId, ForwardIndexReaderContext context) {
       Object value = _valueProvider.apply(docId);
-      return coerceNumber(value, number -> number.doubleValue(), Double::parseDouble);
+      return coerceNumber(value, 0.0d, Number::doubleValue, Double::parseDouble);
     }
 
     @Override
