@@ -575,7 +575,7 @@ software.amazon.awssdk:third-party-jackson-core:2.31.78
 software.amazon.awssdk:third-party-jackson-dataformat-cbor:2.31.78
 software.amazon.awssdk:utils:2.31.78
 software.amazon.eventstream:eventstream:1.0.1
-tools.profiler:async-profiler:2.9
+tools.profiler:async-profiler:4.3
 xml-apis:xml-apis:1.0.b2
 
 ------------------------------------------------------------------------------------

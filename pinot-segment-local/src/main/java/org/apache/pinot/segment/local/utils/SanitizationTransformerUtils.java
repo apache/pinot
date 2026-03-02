@@ -193,7 +193,7 @@ public class SanitizationTransformerUtils {
           result.set(sanitizedValue, true);
           return;
         case SUBSTITUTE_DEFAULT_VALUE:
-          result.set(FieldSpec.getStringValue(defaultNullValue), true);
+          result.set((String) (defaultNullValue), true);
           return;
         case ERROR:
           index = value.indexOf(NULL_CHARACTER);

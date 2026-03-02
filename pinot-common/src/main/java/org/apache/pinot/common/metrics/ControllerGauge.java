@@ -120,6 +120,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Number of Tasks Status
   TASK_STATUS("taskStatus", false),
 
+  // Number of tracked jobs in a task queue (per task type)
+  TASKS_TRACKED_FOR_TASK_TYPE("tasksTrackedForTaskType", false),
+
   // Number of dropped stale minion instances
   DROPPED_MINION_INSTANCES("droppedMinionInstances", true),
 
