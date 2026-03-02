@@ -98,8 +98,8 @@ import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvi
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
-import org.apache.pinot.segment.local.utils.BaseSegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -721,13 +721,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     if (_segmentOperationsThrottlerSet == null) {
       // Only create segment operation throttlers if null
-      BaseSegmentOperationsThrottler segmentAllIndexPreprocessThrottler =
+      SegmentOperationsThrottler segmentAllIndexPreprocessThrottler =
           createSegmentAllIndexPreprocessThrottler();
-      BaseSegmentOperationsThrottler segmentStarTreePreprocessThrottler =
+      SegmentOperationsThrottler segmentStarTreePreprocessThrottler =
           createSegmentStarTreePreprocessThrottler();
-      BaseSegmentOperationsThrottler segmentDownloadThrottler = createSegmentDownloadThrottler();
+      SegmentOperationsThrottler segmentDownloadThrottler = createSegmentDownloadThrottler();
 
-      BaseSegmentOperationsThrottler
+      SegmentOperationsThrottler
           segmentMultiColTextIndexPreprocessThrottler = createMultiColumnIndexPreprocessThrottler();
 
       _segmentOperationsThrottlerSet =
@@ -915,7 +915,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     NettyInspector.registerMetrics(_serverMetrics);
   }
 
-  protected BaseSegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {
+  protected SegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {
     int maxConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM));
@@ -924,12 +924,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
             Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    return new BaseSegmentOperationsThrottler(maxConcurrency, maxBeforeServingQueries, false,
+    return new SegmentOperationsThrottler(maxConcurrency, maxBeforeServingQueries, false,
         ServerGauge.SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_THROTTLE_THRESHOLD,
         ServerGauge.SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_COUNT, "MultiColumnIndexPreprocess");
   }
 
-  protected BaseSegmentOperationsThrottler createSegmentAllIndexPreprocessThrottler() {
+  protected SegmentOperationsThrottler createSegmentAllIndexPreprocessThrottler() {
     int maxPreprocessConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
@@ -937,13 +937,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    return new BaseSegmentOperationsThrottler(maxPreprocessConcurrency,
+    return new SegmentOperationsThrottler(maxPreprocessConcurrency,
         maxPreprocessConcurrencyBeforeServingQueries, false,
         ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD,
         ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT, "AllIndexPreprocess");
   }
 
-  protected BaseSegmentOperationsThrottler createSegmentStarTreePreprocessThrottler() {
+  protected SegmentOperationsThrottler createSegmentStarTreePreprocessThrottler() {
     int maxStarTreePreprocessConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM));
@@ -951,13 +951,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    return new BaseSegmentOperationsThrottler(maxStarTreePreprocessConcurrency,
+    return new SegmentOperationsThrottler(maxStarTreePreprocessConcurrency,
         maxStarTreePreprocessConcurrencyBeforeServingQueries, false,
         ServerGauge.SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD,
         ServerGauge.SEGMENT_STARTREE_PREPROCESS_COUNT, "StarTreePreprocess");
   }
 
-  protected BaseSegmentOperationsThrottler createSegmentDownloadThrottler() {
+  protected SegmentOperationsThrottler createSegmentDownloadThrottler() {
     int maxDownloadConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM));
@@ -965,7 +965,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    return new BaseSegmentOperationsThrottler(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries,
+    return new SegmentOperationsThrottler(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries,
         false, ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_DOWNLOAD_COUNT, "SegmentDownload");
   }
 

@@ -33,9 +33,9 @@ import org.slf4j.LoggerFactory;
  * Base class for segment operation throttlers, contains the common logic for the semaphore and handling the pre and
  * post query serving values. The semaphore cannot be null and must contain > 0 total permits
  */
-public class BaseSegmentOperationsThrottler {
+public class SegmentOperationsThrottler {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseSegmentOperationsThrottler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOperationsThrottler.class);
   protected ServerMetrics _serverMetrics;
   protected AdjustableSemaphore _semaphore;
   /**
@@ -59,7 +59,7 @@ public class BaseSegmentOperationsThrottler {
    * @param isServingQueries whether the server is ready to serve queries or not
    */
   @VisibleForTesting
-  public BaseSegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
+  public SegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
       boolean isServingQueries) {
     this(maxConcurrency, maxConcurrencyBeforeServingQueries, isServingQueries, null, null, "");
   }
@@ -71,7 +71,7 @@ public class BaseSegmentOperationsThrottler {
    * @param isServingQueries whether the server is ready to serve queries or not
    * @param throttlerName name of the throttler to be used in logging
    */
-  public BaseSegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
+  public SegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
       boolean isServingQueries, String throttlerName) {
     this(maxConcurrency, maxConcurrencyBeforeServingQueries, isServingQueries, null, null, throttlerName);
   }
@@ -85,7 +85,7 @@ public class BaseSegmentOperationsThrottler {
    * @param countGauge gauge for tracking the count metric, or null to skip
    * @param throttlerName name of the throttler to be used in logging
    */
-  public BaseSegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
+  public SegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
       boolean isServingQueries, @Nullable ServerGauge thresholdGauge, @Nullable ServerGauge countGauge,
       String throttlerName) {
     _throttlerName = throttlerName;

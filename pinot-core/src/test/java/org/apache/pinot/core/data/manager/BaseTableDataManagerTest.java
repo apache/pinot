@@ -44,8 +44,8 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.local.utils.BaseSegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
@@ -108,10 +108,10 @@ public class BaseTableDataManagerTest {
       new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
           .addMetric(LONG_COLUMN, DataType.LONG).build();
   static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottlerSet(
-      new BaseSegmentOperationsThrottler(2, 4, true),
-      new BaseSegmentOperationsThrottler(2, 4, true),
-      new BaseSegmentOperationsThrottler(2, 4, true),
-      new BaseSegmentOperationsThrottler(2, 4, true));
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(2, 4, true));
 
   @BeforeClass
   public void setUp()

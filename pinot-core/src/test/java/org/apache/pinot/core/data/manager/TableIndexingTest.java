@@ -38,7 +38,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.local.utils.BaseSegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -83,10 +83,10 @@ public class TableIndexingTest {
   private static final String TABLE_NAME = "mytable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
   private static final SegmentOperationsThrottlerSet SEGMENT_PREPROCESS_THROTTLER = new SegmentOperationsThrottlerSet(
-      new BaseSegmentOperationsThrottler(2, 4, true),
-      new BaseSegmentOperationsThrottler(1, 2, true),
-      new BaseSegmentOperationsThrottler(2, 4, true),
-      new BaseSegmentOperationsThrottler(1, 2, true));
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(1, 2, true),
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(1, 2, true));
   public static final String COLUMN_NAME = "col";
   public static final String COLUMN_DAY_NAME = "$col$DAY";
   public static final String COLUMN_MONTH_NAME = "$col$MONTH";

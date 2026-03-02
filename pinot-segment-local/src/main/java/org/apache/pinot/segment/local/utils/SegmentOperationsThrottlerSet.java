@@ -41,10 +41,10 @@ import org.slf4j.LoggerFactory;
 public class SegmentOperationsThrottlerSet implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOperationsThrottlerSet.class);
 
-  private final BaseSegmentOperationsThrottler _segmentAllIndexPreprocessThrottler;
-  private final BaseSegmentOperationsThrottler _segmentStarTreePreprocessThrottler;
-  private final BaseSegmentOperationsThrottler _segmentMultiColTextIndexPreprocessThrottler;
-  private final BaseSegmentOperationsThrottler _segmentDownloadThrottler;
+  private final SegmentOperationsThrottler _segmentAllIndexPreprocessThrottler;
+  private final SegmentOperationsThrottler _segmentStarTreePreprocessThrottler;
+  private final SegmentOperationsThrottler _segmentMultiColTextIndexPreprocessThrottler;
+  private final SegmentOperationsThrottler _segmentDownloadThrottler;
 
   /**
    * Constructor for SegmentOperationsThrottlerSet
@@ -53,29 +53,29 @@ public class SegmentOperationsThrottlerSet implements PinotClusterConfigChangeLi
    * @param segmentDownloadThrottler segment download throttler to throttle download at server level
    * @param segmentMultiColTextIndexPreprocessThrottler segment preprocess throttler for multi-col text index
    */
-  public SegmentOperationsThrottlerSet(BaseSegmentOperationsThrottler segmentAllIndexPreprocessThrottler,
-      BaseSegmentOperationsThrottler segmentStarTreePreprocessThrottler,
-      BaseSegmentOperationsThrottler segmentDownloadThrottler,
-      BaseSegmentOperationsThrottler segmentMultiColTextIndexPreprocessThrottler) {
+  public SegmentOperationsThrottlerSet(SegmentOperationsThrottler segmentAllIndexPreprocessThrottler,
+      SegmentOperationsThrottler segmentStarTreePreprocessThrottler,
+      SegmentOperationsThrottler segmentDownloadThrottler,
+      SegmentOperationsThrottler segmentMultiColTextIndexPreprocessThrottler) {
     _segmentAllIndexPreprocessThrottler = segmentAllIndexPreprocessThrottler;
     _segmentStarTreePreprocessThrottler = segmentStarTreePreprocessThrottler;
     _segmentDownloadThrottler = segmentDownloadThrottler;
     _segmentMultiColTextIndexPreprocessThrottler = segmentMultiColTextIndexPreprocessThrottler;
   }
 
-  public BaseSegmentOperationsThrottler getSegmentAllIndexPreprocessThrottler() {
+  public SegmentOperationsThrottler getSegmentAllIndexPreprocessThrottler() {
     return _segmentAllIndexPreprocessThrottler;
   }
 
-  public BaseSegmentOperationsThrottler getSegmentStarTreePreprocessThrottler() {
+  public SegmentOperationsThrottler getSegmentStarTreePreprocessThrottler() {
     return _segmentStarTreePreprocessThrottler;
   }
 
-  public BaseSegmentOperationsThrottler getSegmentMultiColTextIndexPreprocessThrottler() {
+  public SegmentOperationsThrottler getSegmentMultiColTextIndexPreprocessThrottler() {
     return _segmentMultiColTextIndexPreprocessThrottler;
   }
 
-  public BaseSegmentOperationsThrottler getSegmentDownloadThrottler() {
+  public SegmentOperationsThrottler getSegmentDownloadThrottler() {
     return _segmentDownloadThrottler;
   }
 
@@ -143,7 +143,7 @@ public class SegmentOperationsThrottlerSet implements PinotClusterConfigChangeLi
   }
 
   protected void updateThrottlerIfConfigChanged(Set<String> changedConfigs, Map<String, String> clusterConfigs,
-      BaseSegmentOperationsThrottler throttler, String maxConcurrencyConfigKey, String maxConcurrencyDefault,
+      SegmentOperationsThrottler throttler, String maxConcurrencyConfigKey, String maxConcurrencyDefault,
       String maxConcurrencyBeforeServingQueriesConfigKey, String maxConcurrencyBeforeServingQueriesDefault) {
     String throttlerName = throttler.getThrottlerName();
     boolean maxConcurrencyChanged = changedConfigs.contains(maxConcurrencyConfigKey);

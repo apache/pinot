@@ -30,7 +30,7 @@ import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
-import org.apache.pinot.segment.local.utils.BaseSegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -75,9 +75,9 @@ public class LoaderTest {
   private static final int VECTOR_DIM_SIZE = 512;
 
   private static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER =
-      new SegmentOperationsThrottlerSet(new BaseSegmentOperationsThrottler(1, 2, true),
-          new BaseSegmentOperationsThrottler(1, 2, true), new BaseSegmentOperationsThrottler(1, 2, true),
-          new BaseSegmentOperationsThrottler(1, 2, true));
+      new SegmentOperationsThrottlerSet(new SegmentOperationsThrottler(1, 2, true),
+          new SegmentOperationsThrottler(1, 2, true), new SegmentOperationsThrottler(1, 2, true),
+          new SegmentOperationsThrottler(1, 2, true));
 
   private File _avroFile;
   private File _vectorAvroFile;

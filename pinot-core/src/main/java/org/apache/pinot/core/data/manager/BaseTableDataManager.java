@@ -78,8 +78,8 @@ import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.segment.local.utils.BaseSegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
@@ -1034,7 +1034,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     try {
       if (_segmentOperationsThrottlerSet != null) {
         long startTime = System.currentTimeMillis();
-        BaseSegmentOperationsThrottler segmentDownloadThrottler =
+        SegmentOperationsThrottler segmentDownloadThrottler =
             _segmentOperationsThrottlerSet.getSegmentDownloadThrottler();
         _logger.info("Acquiring instance level segment download semaphore for segment: {}, queue-length: {} ",
             segmentName, segmentDownloadThrottler.getQueueLength());
@@ -1102,7 +1102,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     if (_segmentOperationsThrottlerSet != null) {
       long startTime = System.currentTimeMillis();
-      BaseSegmentOperationsThrottler segmentDownloadThrottler =
+      SegmentOperationsThrottler segmentDownloadThrottler =
           _segmentOperationsThrottlerSet.getSegmentDownloadThrottler();
       _logger.info("Acquiring instance level segment download semaphore for peer downloading segment: {}, "
           + "queue-length: {} ", segmentName, segmentDownloadThrottler.getQueueLength());
