@@ -23,21 +23,30 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.avro.Schema;
+import org.apache.avro.SchemaBuilder;
+import org.apache.avro.file.DataFileWriter;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.integration.tests.realtime.utils.DelayInjectingRealtimeTableDataManager;
 import org.apache.pinot.integration.tests.realtime.utils.DelayInjectingTableConfig;
 import org.apache.pinot.integration.tests.realtime.utils.DelayInjectingTableDataManagerProvider;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -52,60 +61,37 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * Integration test that validates partial upsert correctness when Helix delivers state transitions out of order.
+ * Integration test that validates partial upsert correctness with multiple comparison columns when Helix delivers
+ * state transitions out of order.
  *
- * <p>A production incident showed that when segment N+1's OFFLINE-CONSUMING transition arrives before segment N's
- * CONSUMING-ONLINE completes, the partial upsert metadata for segment N is missing when segment N+1 starts consuming.
- * This causes INCREMENT merges to be lost. The {@code enforceConsumptionInOrder} flag fixes this by blocking segment
- * N+1's consumption until segment N is registered via the {@code ConsumerCoordinator}.
+ * <p>This test is structurally identical to {@link PartialUpsertOutOfOrderHelixTransitionIntegrationTest} but uses
+ * two comparison columns ({@code scoreTimestamp} and {@code nameTimestamp}) instead of the implicit single comparison
+ * column ({@code timestampInEpoch}). Each record sets exactly one comparison column (the other is null), exercising
+ * the per-column comparison logic in {@code ComparisonColumns.compareTo()}.
  *
- * <p><b>Multi-server approach:</b> This test uses 2 servers with {@code numReplicas=2}. Server 0 has a delay injected
- * into {@code addConsumingSegment()} for segment 1, simulating a slow Helix state transition. Server 1 operates
- * normally and commits segments ahead of Server 0. This causes segment 2's OFFLINE-CONSUMING transition to arrive
- * on Server 0 while segment 1's consuming transition is still delayed, creating the out-of-order condition.
+ * <p>With multiple comparison columns, {@code ComparisonColumns.compareTo()} compares only the column at the
+ * {@code comparableIndex} (the non-null column in the incoming record). When the previous record has null at that
+ * index (because it was updated via a different comparison column), the new record always wins. All INCREMENT merges
+ * happen in the same order as the single-comparison-column case, producing identical expected scores.
  *
- * <p>With {@code enforceConsumptionInOrder=true}, the {@code ConsumerCoordinator} blocks segment 2's consumption
- * on Server 0 until segment 1 is registered (via its eventual CONSUMING-ONLINE transition), ensuring correct
- * partial upsert merges. Without enforcement, segment 2 proceeds immediately without segment 1's data.
+ * <p>Uses Avro format (instead of CSV) to natively handle nullable comparison columns via Avro union types.
  *
- * <p><b>Instrumented assertions:</b> The {@link DelayInjectingRealtimeTableDataManager} captures whether the delayed
- * target segment was present in the segment data manager map at the entry of {@code addConsumingSegment()} for
- * subsequent segments. In both the enforced and non-enforced cases, segment 1 is NOT present at this entry point
- * (proving the out-of-order condition was triggered). The key difference is what happens inside
- * {@code super.addConsumingSegment()}: with enforcement, the {@code ConsumerCoordinator} blocks until segment 1
- * is registered, ensuring correct scores; without enforcement, consumption proceeds immediately, potentially
- * producing degraded scores.
- *
- * <p><b>CRC mismatch detection:</b> The {@link DelayInjectingRealtimeTableDataManager} overrides
- * {@code replaceSegmentIfCrcMismatch} to track whether each server's locally-built segment CRC matches the ZK
- * CRC (set by the committing server). This tracking captures any CRC mismatches that arise from out-of-order
- * consumption on the non-enforced table.
+ * @see PartialUpsertOutOfOrderHelixTransitionIntegrationTest
  */
-public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseClusterIntegrationTest {
-  private static final String TABLE_NAME = "gameScores";
-  private static final String TABLE_NAME_NO_ENFORCE = "gameScoresNoEnforce";
-  private static final String PARTIAL_UPSERT_TABLE_SCHEMA = "partial_upsert_table_test.schema";
-  private static final String INPUT_DATA_TAR_FILE = "gameScores_partial_upsert_csv.tar.gz";
-  private static final String CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";
-  private static final String CSV_DELIMITER = ",";
+public class PartialUpsertMultiComparisonOutOfOrderHelixTransitionIntegrationTest extends BaseClusterIntegrationTest {
+  private static final String TABLE_NAME = "gameScoresMultiComp";
+  private static final String TABLE_NAME_NO_ENFORCE = "gameScoresMultiCompNoEnforce";
+  private static final String PARTIAL_UPSERT_TABLE_SCHEMA = "partial_upsert_multi_comparison_table_test.schema";
   private static final String PRIMARY_KEY_COL = "playerId";
   private static final String TIME_COL_NAME = "timestampInEpoch";
 
   private static final int NUM_SERVERS = 2;
-  // Delay injected into Server 0's addConsumingSegment for segment 1.
-  // Must be long enough for Server 1 to commit segment 1 and for segment 2/3 transitions to arrive on Server 0.
   private static final long CONSUMING_DELAY_MS = 20_000;
 
-  // 10 total records in the CSV data, 3 distinct primary keys (100, 101, 102)
   private static final long TOTAL_DOCS = 10;
   private static final long DISTINCT_KEYS = 3;
 
-  // Expected correct scores when all INCREMENT merges happen properly.
-  // CSV data (10 records, flush=3, all timestamps monotonically increasing):
-  //   Segment 0: player 100(+10), 101(+20), 102(+30)
-  //   Segment 1: player 101(+100), 101(+200), 101(+300)  ← delayed on Server 0
-  //   Segment 2: player 102(+40), 100(+50), 100(+60)
-  //   Segment 3: player 101(+400) — stays CONSUMING (only 1 record, below flush threshold)
+  // Expected correct scores when all INCREMENT merges happen properly (identical to single-comparison test).
   // Player 100: 10 + 50 + 60 = 120
   // Player 101: 20 + 100 + 200 + 300 + 400 = 1020
   // Player 102: 30 + 40 = 70
@@ -114,10 +100,9 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
   private static final float EXPECTED_SCORE_102 = 70.0f;
 
   // Expected degraded score for player 101 when segment 1's data is missing on Server 0.
-  // Only segment 0's base (20) + segment 3's increment (400) = 420
   private static final float DEGRADED_SCORE_101 = 420.0f;
 
-  private File _dataFile;
+  private File _avroFile;
 
   @Override
   protected String getTableName() {
@@ -160,22 +145,16 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
     return DISTINCT_KEYS;
   }
 
-  /**
-   * Configures per-server properties. Server 0 gets a consuming delay on segment 1 for both tables.
-   * Server 1 operates normally (no delay config), allowing it to commit segments ahead of Server 0.
-   */
   @Override
   protected PinotConfiguration getServerConf(int serverId) {
     PinotConfiguration serverConf = super.getServerConf(serverId);
 
-    // All servers use DelayInjectingTableDataManagerProvider
     serverConf.setProperty(
         "pinot.server.instance."
             + CommonConstants.Server.TABLE_DATA_MANAGER_PROVIDER_CLASS,
         DelayInjectingTableDataManagerProvider.class.getName());
 
     if (serverId == 0) {
-      // Server 0: delay segment 1's consuming transition
       String delayPrefix = "pinot.server.instance."
           + DelayInjectingTableDataManagerProvider.DELAY_CONFIG_KEY + ".";
       serverConf.setProperty(delayPrefix + TABLE_NAME,
@@ -193,49 +172,126 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     DelayInjectingRealtimeTableDataManager.resetTracking();
 
-    // Start the Pinot cluster with 2 servers
     startZk();
     startController();
     startBroker();
     startServers(NUM_SERVERS);
 
-    // Start Kafka, create topic, and push CSV data
-    startKafka();
-    List<File> dataFiles = unpackTarData(INPUT_DATA_TAR_FILE, _tempDir);
-    _dataFile = dataFiles.get(0);
-    pushCsvIntoKafka(_dataFile, getKafkaTopic(), 0);
+    // Create Avro data file with nullable comparison columns
+    _avroFile = createAvroDataFile();
+    AvroFileSchemaKafkaAvroMessageDecoder._avroFile = _avroFile;
 
-    // Create schema
-    Schema schema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
+    // Start Kafka and push Avro data
+    startKafka();
+    pushAvroIntoKafka(List.of(_avroFile));
+
+    // Create Pinot schema and table
+    org.apache.pinot.spi.data.Schema schema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
     schema.setSchemaName(TABLE_NAME);
     addSchema(schema);
 
-    // Create partial upsert table config with enforceConsumptionInOrder=true
     TableConfig tableConfig =
         createPartialUpsertTableConfig(TABLE_NAME, getKafkaTopic(), true);
     addTableConfig(tableConfig);
 
-    // Wait for all documents to be loaded (Server 1 loads quickly; Server 0 is delayed)
     waitForAllDocsLoaded(600_000L);
   }
 
   /**
-   * Creates a partial upsert table config with INCREMENT on score and the specified enforcement setting.
+   * Creates an Avro data file with 10 records. Each record sets exactly one of the two comparison columns
+   * (scoreTimestamp or nameTimestamp) to a non-null value, with the other left null.
+   * Avro union types ["null", "long"] natively support nullable LONG fields.
    */
+  private File createAvroDataFile()
+      throws Exception {
+    // Build Avro schema with nullable comparison columns
+    Schema avroSchema = SchemaBuilder.record("playerScoresPartialUpsertMultiComparison")
+        .fields()
+        .requiredInt("playerId")
+        .requiredString("name")
+        .name("game").type().array().items().stringType().noDefault()
+        .requiredFloat("score")
+        .requiredLong("timestampInEpoch")
+        .name("scoreTimestamp").type().optional().longType()
+        .name("nameTimestamp").type().optional().longType()
+        .requiredBoolean("deleted")
+        .endRecord();
+
+    File avroFile = new File(_tempDir, "gameScores_multi_comparison.avro");
+    try (DataFileWriter<GenericData.Record> writer =
+             new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
+      writer.create(avroSchema, avroFile);
+
+      // 10 records, same structure as the CSV-based test.
+      // Each record sets exactly one comparison column; the other is null.
+      //   Segment 0 (records 1-3): player 100(+10), 101(+20), 102(+30)
+      //   Segment 1 (records 4-6, delayed on Server 0): player 101(+100), 101(+200), 101(+300)
+      //   Segment 2 (records 7-9): player 102(+40), 100(+50), 100(+60)
+      //   Segment 3 (record 10, stays CONSUMING): player 101(+400)
+      Object[][] data = {
+          // {playerId, name, game, score, timestampInEpoch, scoreTimestamp, nameTimestamp, deleted}
+          {100, "Alice", "chess", 10.0f, 1000L, 1000L, null, false},
+          {101, "Bob", "chess", 20.0f, 2000L, null, 2000L, false},
+          {102, "Carol", "chess", 30.0f, 3000L, 3000L, null, false},
+          {101, "Bob", "chess", 100.0f, 4000L, 4000L, null, false},
+          {101, "Bob", "chess", 200.0f, 5000L, null, 5000L, false},
+          {101, "Bob", "chess", 300.0f, 6000L, 6000L, null, false},
+          {102, "Carol", "chess", 40.0f, 7000L, null, 7000L, false},
+          {100, "Alice", "chess", 50.0f, 8000L, 8000L, null, false},
+          {100, "Alice", "chess", 60.0f, 9000L, null, 9000L, false},
+          {101, "Bob", "chess", 400.0f, 10000L, 10000L, null, false},
+      };
+
+      for (Object[] row : data) {
+        GenericData.Record record = new GenericData.Record(avroSchema);
+        record.put("playerId", row[0]);
+        record.put("name", row[1]);
+        record.put("game", List.of(row[2]));
+        record.put("score", row[3]);
+        record.put("timestampInEpoch", row[4]);
+        record.put("scoreTimestamp", row[5]);
+        record.put("nameTimestamp", row[6]);
+        record.put("deleted", row[7]);
+        writer.append(record);
+      }
+    }
+    return avroFile;
+  }
+
   private TableConfig createPartialUpsertTableConfig(String tableName,
       String kafkaTopicName, boolean enforceConsumptionInOrder) {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfig.setPartialUpsertStrategies(
         Map.of("score", UpsertConfig.Strategy.INCREMENT));
+    upsertConfig.setComparisonColumns(List.of("scoreTimestamp", "nameTimestamp"));
 
-    Map<String, String> csvDecoderProperties =
-        getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    TableConfig tableConfig = createCSVUpsertTableConfig(
-        tableName, kafkaTopicName, getNumKafkaPartitions(),
-        csvDecoderProperties, upsertConfig, PRIMARY_KEY_COL);
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap =
+        Map.of(PRIMARY_KEY_COL, new ColumnPartitionConfig("Murmur", getNumKafkaPartitions()));
 
-    // Move stream configs from indexingConfig to ingestionConfig.streamIngestionConfig
-    // (controller rejects having both set simultaneously)
+    // Build stream config with the correct Kafka topic
+    Map<String, String> streamConfigsMap = getStreamConfigMap();
+    streamConfigsMap.put(
+        org.apache.pinot.spi.stream.StreamConfigProperties.constructStreamProperty(
+            "kafka", org.apache.pinot.spi.stream.StreamConfigProperties.STREAM_TOPIC_NAME),
+        kafkaTopicName);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(tableName)
+        .setTimeColumnName(getTimeColumnName())
+        .setNumReplicas(getNumReplicas())
+        .setStreamConfigs(streamConfigsMap)
+        .setNullHandlingEnabled(true)
+        .setRoutingConfig(
+            new RoutingConfig(null, null,
+                RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
+        .setReplicaGroupStrategyConfig(
+            new org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig(PRIMARY_KEY_COL, 1))
+        .setOptimizeNoDictStatsCollection(true)
+        .setUpsertConfig(upsertConfig)
+        .build();
+
+    // Move stream configs to ingestionConfig.streamIngestionConfig with enforceConsumptionInOrder
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig == null) {
       ingestionConfig = new IngestionConfig();
@@ -271,17 +327,8 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
     }, timeoutMs, "Failed to load all documents for table: " + tableName);
   }
 
-  /**
-   * Waits for Server 0's consuming delay to complete and all segments to settle.
-   * After the delay, segment 1 goes through CONSUMING-ONLINE on Server 0, which
-   * triggers register() and unblocks any enforced segments waiting on it.
-   * With enforcement, segments 1, 2, 3 are processed sequentially, so we need
-   * sufficient time for all three to complete after the 20s delay.
-   */
   private void waitForServerSettling()
       throws InterruptedException {
-    // Wait for the consuming delay plus extra time for sequential segment
-    // processing under enforcement (3 segments × ~10s each after delay)
     Thread.sleep(CONSUMING_DELAY_MS + 40_000);
   }
 
@@ -303,38 +350,12 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
         + EXPECTED_SCORE_101 + " on Server 1");
   }
 
-  /**
-   * Validates that with enforceConsumptionInOrder=true, partial upsert merges produce correct results even when
-   * segment 1's OFFLINE-CONSUMING transition is delayed on Server 0 (simulating out-of-order Helix transitions).
-   *
-   * <p>With the flag enabled, the ConsumerCoordinator blocks segment 2's consumption on Server 0 until segment 1
-   * is registered (via its CONSUMING-ONLINE transition after the delay completes). This ensures all prior segment
-   * data is in the upsert metadata before subsequent segments start consuming, producing correct INCREMENT merges.
-   *
-   * <p>The test also verifies via instrumentation that the out-of-order condition was actually triggered: on
-   * Server 0, segment 1 was NOT present in the segment data manager map when segment 2's consuming transition
-   * entered {@code addConsumingSegment()}. The tracking captures this state at the entry point, before the
-   * ConsumerCoordinator blocks inside {@code super.addConsumingSegment()}. Despite the out-of-order arrival,
-   * enforcement ensures correct scores because the ConsumerCoordinator blocks segment 2's consumption until
-   * segment 1 is registered.
-   *
-   * <p><b>CRC consistency:</b> With enforcement, both servers have identical upsert state when consuming,
-   * so any locally-built segments should have matching CRCs. The {@code replaceSegmentIfCrcMismatch} override
-   * tracks CRC comparisons for segments that reach the ONLINE state while already immutable.
-   */
   @Test
   public void testOutOfOrderTransitionWithEnforcedOrdering()
       throws InterruptedException {
-    // Wait for Server 0 to fully settle after the consuming delay.
-    // With enforcement, segments 1→2→3 are processed sequentially on Server 0, requiring
-    // more time than the non-enforced case. Use condition-based wait for correctness.
     waitForServerSettling();
     waitForCorrectEnforcedScores(60_000L);
 
-    // Verify that the out-of-order condition was triggered on Server 0 via instrumented tracking.
-    // The tracking captures segment state at the ENTRY of addConsumingSegment(), BEFORE
-    // super.addConsumingSegment() (which contains the ConsumerCoordinator blocking logic).
-    // Segment 1 should NOT be present at that entry point, proving the out-of-order condition was triggered.
     Map<Integer, Boolean> enforceStateMap =
         DelayInjectingRealtimeTableDataManager
             .SEGMENT_STATE_AT_CONSUME_START.get(TABLE_NAME);
@@ -356,9 +377,6 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
         EXPECTED_SCORE_100, DEGRADED_SCORE_101, EXPECTED_SCORE_102,
         "Enforced table server 0");
 
-    // Verify CRC consistency via replaceSegmentIfCrcMismatch tracking. This method is called in
-    // doAddOnlineSegment when the segment is already immutable (committing server). With enforcement,
-    // all locally-built segments should match the ZK CRC (set by the committing server).
     Map<Integer, List<Boolean>> enforcedCrcMap =
         DelayInjectingRealtimeTableDataManager.CRC_MATCH_AFTER_ONLINE.get(TABLE_NAME);
     if (enforcedCrcMap != null) {
@@ -372,49 +390,30 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
     }
   }
 
-  /**
-   * Validates behavior with enforceConsumptionInOrder=false and the same consuming delay on Server 0.
-   *
-   * <p>Without enforcement, Server 0's segment 2 and 3 start consuming immediately while segment 1 is delayed.
-   * The instrumented tracking in {@link DelayInjectingRealtimeTableDataManager} captures that segment 1 was NOT
-   * present in Server 0's segment data manager when segment 2's consuming transition started, proving the
-   * out-of-order condition occurred and was not blocked.
-   *
-   * <p>Score assertions for players 100 and 102 are unaffected because segment 1 only contains player 101
-   * records. Player 101's score may be correct or degraded depending on broker routing.
-   *
-   * <p><b>CRC mismatch detection:</b> The {@code replaceSegmentIfCrcMismatch} override in
-   * {@link DelayInjectingRealtimeTableDataManager} tracks CRC comparisons when segments transition to ONLINE
-   * while already immutable. If Server 0 consumed a segment with degraded data and then the committing server
-   * set a different CRC, the mismatch is detected during the CONSUMING→ONLINE transition.
-   */
   @Test
   public void testOutOfOrderTransitionWithoutEnforcedOrdering()
       throws Exception {
-    // Create a separate Kafka topic and push the same CSV data
     String kafkaTopicName = TABLE_NAME_NO_ENFORCE;
     createKafkaTopic(kafkaTopicName);
-    pushCsvIntoKafka(_dataFile, kafkaTopicName, 0);
 
-    // Create schema for the second table
-    Schema schema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
+    // Push the same Avro data to the new topic
+    ClusterIntegrationTestUtils.pushAvroIntoKafka(
+        List.of(_avroFile), "localhost:" + getKafkaPort(), kafkaTopicName,
+        getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(),
+        getPartitionColumn(), injectTombstones());
+
+    org.apache.pinot.spi.data.Schema schema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
     schema.setSchemaName(TABLE_NAME_NO_ENFORCE);
     addSchema(schema);
 
-    // Create the table with enforceConsumptionInOrder=false
     TableConfig tableConfig = createPartialUpsertTableConfig(
         TABLE_NAME_NO_ENFORCE, kafkaTopicName, false);
     addTableConfig(tableConfig);
 
-    // Wait for all documents to be loaded
     waitForAllDocsLoaded(TABLE_NAME_NO_ENFORCE, 600_000L);
 
-    // Wait for Server 0 to fully settle after the consuming delay
     waitForServerSettling();
 
-    // Verify the out-of-order condition via instrumented tracking on Server 0.
-    // Without enforcement, segment 2's consuming transition starts immediately on Server 0
-    // while segment 1 is still delayed, so segment 1 should NOT be present.
     Map<Integer, Boolean> noEnforceStateMap =
         DelayInjectingRealtimeTableDataManager
             .SEGMENT_STATE_AT_CONSUME_START.get(TABLE_NAME_NO_ENFORCE);
@@ -435,10 +434,6 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
         EXPECTED_SCORE_100, EXPECTED_SCORE_101, EXPECTED_SCORE_102,
         "Non-enforced table server 1 (all correct)");
 
-    // Check CRC tracking via replaceSegmentIfCrcMismatch. This is called in doAddOnlineSegment when the
-    // segment is already immutable (committing server). For the non-enforced table, if the server that
-    // consumed with missing segment 1 data wins the commit, the losing server's locally-built segment
-    // will have a CRC mismatch that gets detected and corrected by replaceSegmentIfCrcMismatch.
     Map<Integer, List<Boolean>> noEnforceCrcMap =
         DelayInjectingRealtimeTableDataManager.CRC_MATCH_AFTER_ONLINE.get(TABLE_NAME_NO_ENFORCE);
     if (noEnforceCrcMap != null) {
@@ -446,8 +441,6 @@ public class PartialUpsertOutOfOrderHelixTransitionIntegrationTest extends BaseC
           .flatMap(List::stream)
           .anyMatch(match -> !match);
       if (hasMismatch) {
-        // CRC mismatch detected — this confirms that a server built segment 3 from different
-        // consumed data than the committing server (expected without enforcement).
         assertTrue(true, "CRC mismatch detected as expected for non-enforced table");
       }
     }
