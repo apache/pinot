@@ -33,9 +33,9 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
-import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.distinct.table.StringDistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -281,7 +281,9 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
   }
 
   /**
-   * Returns true if the expression is jsonExtractIndex on a column with JSON index.
+   * Returns true if the expression is jsonExtractIndex on a column with JSON index and the path is indexed.
+   * For OSS JSON index all paths are indexed. For composite JSON index, only paths in invertedIndexConfigs
+   * are indexed per key.
    */
   public static boolean canUseJsonIndexDistinct(IndexSegment indexSegment, ExpressionContext expr) {
     ParsedJsonExtractIndex parsed = parseJsonExtractIndex(expr);
@@ -292,13 +294,19 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
     if (dataSource == null) {
       return false;
     }
+    JsonIndexReader reader = null;
     if (dataSource.getJsonIndex() != null) {
-      return true;
+      reader = dataSource.getJsonIndex();
+    } else {
+      Optional<IndexType<?, ?, ?>> compositeIndex =
+          IndexService.getInstance().getOptional("composite_json_index");
+      if (compositeIndex.isPresent()) {
+        reader = (JsonIndexReader) dataSource.getIndex(compositeIndex.get());
+      }
     }
-
-    //for composite Json index check for key
-    Optional<IndexType<?, ?, ?>> compositeIndex =
-        IndexService.getInstance().getOptional("composite_json_index");
-    return compositeIndex.isPresent() && dataSource.getIndex(compositeIndex.get()) != null;
+    if (reader == null) {
+      return false;
+    }
+    return reader.isPathIndexed(parsed._jsonPathString);
   }
 }
