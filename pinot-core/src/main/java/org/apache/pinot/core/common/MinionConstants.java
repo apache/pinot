@@ -257,6 +257,16 @@ public class MinionConstants {
      * number of segments to query in one batch to fetch valid doc id metadata, by default 500
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
+
+    /**
+     * Valid doc ids comparison mode used by the executor only (generator unchanged). Values: NONE, EQUAL_CONSENSUS,
+     * MAX_VALID_DOCS. NONE = use first server with matching CRC and READY; EQUAL_CONSENSUS = require all replicas
+     * to have same valid doc count (default); MAX_VALID_DOCS = use replica with most valid docs.
+     */
+    public static final String VALID_DOC_IDS_COMPARISON_MODE_KEY = "validDocIdsComparisonMode";
+
+    /** Default: equal valid doc consensus across replicas. */
+    public static final String DEFAULT_VALID_DOC_IDS_COMPARISON_MODE = "EQUAL_CONSENSUS";
   }
 
   public static class UpsertCompactMergeTask {

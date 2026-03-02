@@ -297,18 +297,6 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       SegmentZKMetadata segment = candidateSegmentsMap.get(segmentName);
       List<ValidDocIdsMetadataInfo> replicaMetadataList = validDocIdsMetadataInfoMap.get(segmentName);
 
-      // Check consensus across all replicas before proceeding with any operations
-      if (!MinionTaskUtils.hasValidDocConsensus(segmentName, replicaMetadataList)) {
-        LOGGER.info("Skipping segment {} for table {} - no consensus on validDoc counts across replicas",
-            segmentName, tableNameWithType);
-
-        // Emit metric to track segments skipped due to consensus failure
-        if (controllerMetrics != null) {
-          controllerMetrics.addMeteredTableValue(tableNameWithType,
-              ControllerMeter.UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE, 1L);
-        }
-        continue;
-      }
 
       // Process with existing logic using the first replica with matching CRC (since all have consensus)
       for (ValidDocIdsMetadataInfo validDocIdsMetadata : replicaMetadataList) {
