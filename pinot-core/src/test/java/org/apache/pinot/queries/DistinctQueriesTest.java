@@ -22,15 +22,18 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -46,6 +49,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -66,7 +70,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME_PREFIX = "testSegment_";
 
-  private static final int NUM_RECORDS_PER_SEGMENT = 10000;
+  private static final int NUM_RECORDS_PER_SEGMENT = 10_000;
   private static final int NUM_UNIQUE_RECORDS_PER_SEGMENT = 100;
 
   private static final String INT_COLUMN = "intColumn";
@@ -382,6 +386,66 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
       assertEquals(actualValues, expectedValues);
     }
+  }
+
+  @Test
+  public void testMaxRowsInDistinctEarlyTerminationInnerSegment() {
+    String query =
+        "SET \"maxRowsInDistinct\" = 5; SELECT DISTINCT(rawIntColumn) FROM testTable LIMIT 100";
+    BaseOperator<DistinctResultsBlock> operator = getOperator(query);
+    DistinctResultsBlock resultsBlock = operator.nextBlock();
+    assertEquals(resultsBlock.getEarlyTerminationReason(), BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_ROWS);
+    assertEquals(resultsBlock.getDistinctTable().size(), 5);
+  }
+
+  @Test
+  public void testNumRowsWithoutChangeEarlyTerminationInnerSegment() {
+    String query =
+        "SET \"numRowsWithoutChangeInDistinct\" = 10; SELECT DISTINCT(rawIntColumn) FROM testTable LIMIT 200";
+    BaseOperator<DistinctResultsBlock> operator = getOperator(query);
+    DistinctResultsBlock resultsBlock = operator.nextBlock();
+    assertEquals(resultsBlock.getEarlyTerminationReason(),
+        BaseResultsBlock.EarlyTerminationReason.DISTINCT_NO_NEW_VALUES);
+    // First block with size 10_000 already have 100 unique values.
+    assertEquals(resultsBlock.getDistinctTable().size(), 100);
+  }
+
+  @Test
+  public void testTimeLimitEarlyTerminationInnerSegment() {
+    String query =
+        "SET \"maxExecutionTimeMsInDistinct\" = 0; SELECT DISTINCT(rawIntColumn) FROM testTable LIMIT 200";
+    BaseOperator<DistinctResultsBlock> operator = getOperator(query);
+    DistinctResultsBlock resultsBlock = operator.nextBlock();
+    assertEquals(resultsBlock.getEarlyTerminationReason(), BaseResultsBlock.EarlyTerminationReason.DISTINCT_TIME_LIMIT);
+    assertEquals(resultsBlock.getDistinctTable().size(), 0);
+  }
+
+  @Test
+  public void testTimeLimitIgnoredWithinDictionaryBasedInnerSegment() {
+    String query =
+        "SET \"maxExecutionTimeMsInDistinct\" = 0; SELECT DISTINCT(intColumn) FROM testTable LIMIT 200";
+    BaseOperator<DistinctResultsBlock> operator = getOperator(query);
+    DistinctResultsBlock resultsBlock = operator.nextBlock();
+    assertEquals(resultsBlock.getEarlyTerminationReason(), BaseResultsBlock.EarlyTerminationReason.NONE);
+  }
+
+  @Test
+  public void testBrokerResponseIncludesDistinctEarlyTerminationFlags() {
+    String query = "SELECT DISTINCT(rawIntColumn) FROM testTable LIMIT 200";
+    BrokerResponseNative response =
+        getBrokerResponse(query, Collections.singletonMap(QueryOptionKey.MAX_ROWS_IN_DISTINCT, "5"));
+    assertTrue(response.isMaxRowsInDistinctReached());
+    assertTrue(response.isPartialResult());
+
+    BrokerResponseNative noChangeResponse = getBrokerResponse(query,
+        Collections.singletonMap(QueryOptionKey.NUM_ROWS_WITHOUT_CHANGE_IN_DISTINCT, "10"));
+    assertTrue(noChangeResponse.isNumRowsWithoutChangeInDistinctReached());
+    assertTrue(noChangeResponse.isPartialResult());
+
+    BrokerResponseNative timeResponse = getBrokerResponse(query,
+        Collections.singletonMap(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT, "0"));
+    assertTrue(timeResponse.isTimeLimitInDistinctReached());
+    assertTrue(timeResponse.isPartialResult());
   }
 
   @Test
