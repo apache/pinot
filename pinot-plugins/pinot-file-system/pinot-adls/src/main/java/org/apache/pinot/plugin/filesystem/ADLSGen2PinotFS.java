@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.filesystem;
 
 import com.azure.core.credential.AzureSasCredential;
+import com.azure.core.credential.TokenCredential;
 import com.azure.core.http.ProxyOptions;
 import com.azure.core.http.netty.NettyAsyncHttpClientBuilder;
 import com.azure.core.http.rest.PagedIterable;
@@ -26,6 +27,13 @@ import com.azure.core.util.Context;
 import com.azure.identity.ClientSecretCredential;
 import com.azure.identity.ClientSecretCredentialBuilder;
 import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.storage.blob.BlobClient;
+import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.BlobServiceClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.azure.storage.blob.models.BlobHttpHeaders;
+import com.azure.storage.blob.models.BlobStorageException;
+import com.azure.storage.blob.specialized.BlockBlobClient;
 import com.azure.storage.common.StorageSharedKeyCredential;
 import com.azure.storage.common.Utility;
 import com.azure.storage.file.datalake.DataLakeDirectoryClient;
@@ -51,6 +59,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
@@ -58,6 +67,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -114,6 +124,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
 
   private DataLakeFileSystemClient _fileSystemClient;
 
+  // Blob API client used for file uploads to support Azure storage accounts with Blob Soft Delete enabled.
+  // The DFS API (Data Lake) does not support Soft Delete, causing 409 EndpointUnsupportedAccountFeatures errors.
+  private BlobContainerClient _blobContainerClient;
+
   // If enabled, pinotFS implementation will guarantee that the bits you've read are the same as the ones you wrote.
   // However, there's some overhead in computing hash. (Adds roughly 3 seconds for 1GB file)
   private boolean _enableChecksum;
@@ -121,8 +135,23 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   public ADLSGen2PinotFS() {
   }
 
+  @VisibleForTesting
   public ADLSGen2PinotFS(DataLakeFileSystemClient fileSystemClient) {
     _fileSystemClient = fileSystemClient;
+  }
+
+  @VisibleForTesting
+  public ADLSGen2PinotFS(DataLakeFileSystemClient fileSystemClient, BlobContainerClient blobContainerClient) {
+    _fileSystemClient = fileSystemClient;
+    _blobContainerClient = blobContainerClient;
+  }
+
+  @VisibleForTesting
+  public ADLSGen2PinotFS(DataLakeFileSystemClient fileSystemClient, BlobContainerClient blobContainerClient,
+      boolean enableChecksum) {
+    _fileSystemClient = fileSystemClient;
+    _blobContainerClient = blobContainerClient;
+    _enableChecksum = enableChecksum;
   }
 
   @Override
@@ -156,9 +185,12 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     String sasToken = config.getProperty(SAS_TOKEN);
 
     String dfsServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_STORAGE_DNS_SUFFIX;
+    String blobServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_BLOB_DNS_SUFFIX;
 
     DataLakeServiceClientBuilder dataLakeServiceClientBuilder =
         new DataLakeServiceClientBuilder().endpoint(dfsServiceEndpointUrl);
+    BlobServiceClientBuilder blobServiceClientBuilder =
+        new BlobServiceClientBuilder().endpoint(blobServiceEndpointUrl);
 
     switch (authType) {
       case ACCESS_KEY: {
@@ -168,6 +200,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
 
         StorageSharedKeyCredential sharedKeyCredential = new StorageSharedKeyCredential(accountName, accessKey);
         dataLakeServiceClientBuilder.credential(sharedKeyCredential);
+        blobServiceClientBuilder.credential(sharedKeyCredential);
         break;
       }
       case SAS_TOKEN: {
@@ -177,6 +210,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
 
         AzureSasCredential azureSasCredential = new AzureSasCredential(sasToken);
         dataLakeServiceClientBuilder.credential(azureSasCredential);
+        blobServiceClientBuilder.credential(azureSasCredential);
         break;
       }
       case AZURE_AD: {
@@ -189,6 +223,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
             new ClientSecretCredentialBuilder().clientId(clientId).clientSecret(clientSecret).tenantId(tenantId)
                 .build();
         dataLakeServiceClientBuilder.credential(clientSecretCredential);
+        blobServiceClientBuilder.credential(clientSecretCredential);
         break;
       }
       case AZURE_AD_WITH_PROXY: {
@@ -209,7 +244,9 @@ public class ADLSGen2PinotFS extends BasePinotFS {
             new ClientSecretCredentialBuilder().clientId(clientId).clientSecret(clientSecret).tenantId(tenantId);
         clientSecretCredentialBuilder.httpClient(builder.build());
 
-        dataLakeServiceClientBuilder.credential(clientSecretCredentialBuilder.build());
+        ClientSecretCredential credential = clientSecretCredentialBuilder.build();
+        dataLakeServiceClientBuilder.credential(credential);
+        blobServiceClientBuilder.credential(credential);
         break;
       }
       case DEFAULT: {
@@ -227,7 +264,9 @@ public class ADLSGen2PinotFS extends BasePinotFS {
           LOGGER.info("Set authority host to {}", authorityHost);
           defaultAzureCredentialBuilder.authorityHost(authorityHost);
         }
-        dataLakeServiceClientBuilder.credential(defaultAzureCredentialBuilder.build());
+        TokenCredential tokenCredential = defaultAzureCredentialBuilder.build();
+        dataLakeServiceClientBuilder.credential(tokenCredential);
+        blobServiceClientBuilder.credential(tokenCredential);
         break;
       }
       case ANONYMOUS_ACCESS: {
@@ -243,8 +282,12 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     DataLakeServiceClient serviceClient = dataLakeServiceClientBuilder.buildClient();
     _fileSystemClient = getOrCreateClientWithFileSystem(serviceClient, fileSystemName);
 
+    BlobServiceClient blobServiceClient = blobServiceClientBuilder.buildClient();
+    _blobContainerClient = blobServiceClient.getBlobContainerClient(fileSystemName);
+
     LOGGER.info("ADLSGen2PinotFS is initialized (accountName={}, fileSystemName={}, dfsServiceEndpointUrl={}, "
-        + "enableChecksum={})", accountName, fileSystemName, dfsServiceEndpointUrl, _enableChecksum);
+        + "blobServiceEndpointUrl={}, enableChecksum={})", accountName, fileSystemName, dfsServiceEndpointUrl,
+        blobServiceEndpointUrl, _enableChecksum);
   }
 
   /**
@@ -590,7 +633,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     LOGGER.debug("copyFromLocalFile is called with srcFile='{}', dstUri='{}'", srcFile, dstUri);
     byte[] contentMd5 = _enableChecksum ? computeContentMd5(srcFile) : null;
     try (InputStream fileInputStream = new FileInputStream(srcFile)) {
-      copyInputStreamToDst(fileInputStream, dstUri, contentMd5);
+      copyInputStreamToDst(fileInputStream, dstUri, contentMd5, srcFile.length());
     }
   }
 
@@ -677,34 +720,120 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     PathProperties pathProperties =
         _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(srcUri)).getProperties();
     try (InputStream inputStream = open(srcUri)) {
-      return copyInputStreamToDst(inputStream, dstUri, pathProperties.getContentMd5());
+      return copyInputStreamToDst(inputStream, dstUri, pathProperties.getContentMd5(),
+          pathProperties.getFileSize());
     }
   }
 
   /**
    * Helper function to copy input stream to destination URI.
    *
+   * <p>Uses the Azure Blob API for uploads, which is compatible with storage accounts that have Blob Soft Delete
+   * enabled. The DFS (Data Lake) API does not support Soft Delete and will fail with 409
+   * EndpointUnsupportedAccountFeatures on such accounts.</p>
+   *
    * NOTE: the caller has to close the input stream.
    *
    * @param inputStream input stream that will be written to dstUri
    * @param dstUri destination URI
+   * @param contentMd5 optional MD5 hash of the content
+   * @param contentLength length of the content in bytes
    * @return true if the copy succeeds
    */
-  private boolean copyInputStreamToDst(InputStream inputStream, URI dstUri, byte[] contentMd5)
+  private boolean copyInputStreamToDst(InputStream inputStream, URI dstUri, byte[] contentMd5, long contentLength)
+      throws IOException {
+    String path = AzurePinotFSUtil.convertUriToAzureStylePath(dstUri);
+
+    if (_blobContainerClient != null) {
+      return copyInputStreamToDstViaBlob(inputStream, dstUri, path, contentMd5, contentLength);
+    }
+    return copyInputStreamToDstViaDfs(inputStream, dstUri, path, contentMd5);
+  }
+
+  /**
+   * Upload via Azure Blob API. Compatible with Blob Soft Delete.
+   */
+  private boolean copyInputStreamToDstViaBlob(InputStream inputStream, URI dstUri, String path, byte[] contentMd5,
+      long contentLength)
+      throws IOException {
+    try {
+      BlobClient blobClient = _blobContainerClient.getBlobClient(path);
+      BlobHttpHeaders blobHttpHeaders = contentMd5 != null ? getBlobHttpHeadersWithContentMd5(contentMd5)
+          : null;
+      if (_enableChecksum) {
+        uploadWithBlockLevelChecksum(blobClient.getBlockBlobClient(), inputStream, blobHttpHeaders);
+      } else if (blobHttpHeaders != null) {
+        blobClient.uploadWithResponse(inputStream, contentLength, null, blobHttpHeaders, null, null, null, null,
+            Context.NONE);
+      } else {
+        blobClient.upload(inputStream, contentLength, true);
+      }
+      return true;
+    } catch (BlobStorageException e) {
+      LOGGER.error("Exception thrown while uploading to destination via Blob API (dstUri={}, errorStatus={})", dstUri,
+          e.getStatusCode(), e);
+      throw new IOException(e);
+    }
+  }
+
+  /**
+   * Uploads stream using block staging with per-block MD5 for transactional integrity.
+   */
+  private void uploadWithBlockLevelChecksum(BlockBlobClient blockBlobClient, InputStream inputStream,
+      BlobHttpHeaders blobHttpHeaders)
+      throws IOException, BlobStorageException {
+    int bytesRead;
+    int blockIdCounter = 0;
+    byte[] buffer = new byte[BUFFER_SIZE];
+    List<String> blockIds = new ArrayList<>();
+
+    try {
+      MessageDigest md5Block = MessageDigest.getInstance("MD5");
+      while ((bytesRead = inputStream.read(buffer)) != -1) {
+        md5Block.reset();
+        md5Block.update(buffer, 0, bytesRead);
+        byte[] md5BlockHash = md5Block.digest();
+
+        String blockId = Base64.getEncoder()
+            .encodeToString(String.format("%08d", blockIdCounter).getBytes(StandardCharsets.UTF_8));
+        blockIdCounter++;
+        blockIds.add(blockId);
+
+        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer, 0, bytesRead)) {
+          blockBlobClient.stageBlockWithResponse(blockId, byteArrayInputStream, bytesRead, md5BlockHash, null, null,
+              Context.NONE);
+        }
+      }
+      if (blobHttpHeaders != null) {
+        blockBlobClient.commitBlockListWithResponse(blockIds, blobHttpHeaders, null, null, null, null, Context.NONE);
+      } else {
+        blockBlobClient.commitBlockList(blockIds);
+      }
+    } catch (NoSuchAlgorithmException e) {
+      throw new IOException(e);
+    }
+  }
+
+  private BlobHttpHeaders getBlobHttpHeadersWithContentMd5(byte[] contentMd5) {
+    return new BlobHttpHeaders().setContentMd5(contentMd5);
+  }
+
+  /**
+   * Upload via DFS (Data Lake) API. Does NOT support Blob Soft Delete.
+   * Kept as fallback for backward compatibility when BlobContainerClient is not initialized.
+   */
+  private boolean copyInputStreamToDstViaDfs(InputStream inputStream, URI dstUri, String path, byte[] contentMd5)
       throws IOException {
     int bytesRead;
     long totalBytesRead = 0;
     byte[] buffer = new byte[BUFFER_SIZE];
-    // TODO: the newer client now has the API 'uploadFromFile' that directly takes the file as an input. We can replace
-    // this upload logic with the 'uploadFromFile'/
     DataLakeFileClient fileClient;
     try {
-      fileClient = _fileSystemClient.createFile(AzurePinotFSUtil.convertUriToAzureStylePath(dstUri));
+      fileClient = _fileSystemClient.createFile(path);
     } catch (DataLakeStorageException e) {
-      // If the path already exists, doing nothing and return true
       if (e.getStatusCode() == ALREADY_EXISTS_STATUS_CODE && e.getErrorCode().equals(PATH_ALREADY_EXISTS_ERROR_CODE)) {
         LOGGER.info("The destination path already exists and we are overwriting the file (dstUri={})", dstUri);
-        fileClient = _fileSystemClient.createFile(AzurePinotFSUtil.convertUriToAzureStylePath(dstUri), true);
+        fileClient = _fileSystemClient.createFile(path, true);
       } else {
         LOGGER.error("Exception thrown while calling copy stream to destination (dstUri={}, errorStatus ={})", dstUri,
             e.getStatusCode(), e);
@@ -712,7 +841,6 @@ public class ADLSGen2PinotFS extends BasePinotFS {
       }
     }
 
-    // Update MD5 metadata
     if (contentMd5 != null) {
       PathHttpHeaders pathHttpHeaders = getPathHttpHeaders(fileClient.getProperties());
       pathHttpHeaders.setContentMd5(contentMd5);
@@ -723,21 +851,17 @@ public class ADLSGen2PinotFS extends BasePinotFS {
       while ((bytesRead = inputStream.read(buffer)) != -1) {
         byte[] md5BlockHash = null;
         if (_enableChecksum) {
-          // Compute md5 for the current block
           MessageDigest md5Block = MessageDigest.getInstance("MD5");
           md5Block.update(buffer, 0, bytesRead);
           md5BlockHash = md5Block.digest();
         }
-        // Upload 4MB at a time since Azure's limit for each append call is 4MB.
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer, 0, bytesRead);
         fileClient.appendWithResponse(byteArrayInputStream, totalBytesRead, bytesRead, md5BlockHash, null, null,
             Context.NONE);
         byteArrayInputStream.close();
         totalBytesRead += bytesRead;
       }
-      // Call flush on ADLS Gen 2
       fileClient.flush(totalBytesRead, true);
-
       return true;
     } catch (DataLakeStorageException | NoSuchAlgorithmException e) {
       throw new IOException(e);
