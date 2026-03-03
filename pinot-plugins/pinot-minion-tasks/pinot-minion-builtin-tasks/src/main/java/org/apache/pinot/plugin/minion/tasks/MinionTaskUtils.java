@@ -48,7 +48,6 @@ import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -316,8 +315,8 @@ public class MinionTaskUtils {
   }
 
   /**
-   * Returns the validDocIds bitmap from server(s). {@code comparisonMode} is the task config value: NONE, EQUAL_CONSENSUS
-   * (default), or MAX_VALID_DOCS.
+   * Returns the validDocIds bitmap from server(s). {@code comparisonMode} is the task config value: NONE,
+   * EQUAL_CONSENSUS(default), or MAX_VALID_DOCS.
    */
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,

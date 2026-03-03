@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import java.io.File;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
