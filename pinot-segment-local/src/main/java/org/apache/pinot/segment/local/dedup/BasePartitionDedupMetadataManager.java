@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -72,6 +74,9 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   // The lock and boolean flag ensure only one thread can start preloading and preloading happens only once.
   private final Lock _preloadLock = new ReentrantLock();
   private volatile boolean _isPreloading;
+  // Background cleanup thread for TTL expiration
+  @Nullable
+  private ScheduledExecutorService _realtimeTTLCleanupExecutor;
 
   protected BasePartitionDedupMetadataManager(String tableNameWithType, int partitionId, DedupContext dedupContext) {
     _tableNameWithType = tableNameWithType;
@@ -99,6 +104,36 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   @Override
   public DedupContext getContext() {
     return _context;
+  }
+
+  @Override
+  public void start() {
+    startRealtimeTTLCleanup();
+  }
+
+  /**
+   * Starts the background realtime TTL cleanup thread if enabled via configuration.
+   * This method should be called after the partition metadata manager is initialized.
+   */
+  protected void startRealtimeTTLCleanup() {
+    double cleanupIntervalSeconds = _context.getRealtimeTTLCleanupIntervalSeconds();
+    if (cleanupIntervalSeconds <= 0 || _metadataTTL <= 0) {
+      _logger.info("Realtime TTL cleanup is disabled for partition: {}", _partitionId);
+      return;
+    }
+    _logger.info("Starting realtime TTL cleanup with interval: {} seconds for partition: {}", cleanupIntervalSeconds,
+        _partitionId);
+    _realtimeTTLCleanupExecutor =
+        Executors.newSingleThreadScheduledExecutor(r -> new Thread(r,
+            _tableNameWithType + "-partition-" + _partitionId + "-dedup-ttl-cleanup"));
+    long intervalMillis = (long) (cleanupIntervalSeconds * 1000);
+    _realtimeTTLCleanupExecutor.scheduleAtFixedRate(() -> {
+      try {
+        removeExpiredPrimaryKeys();
+      } catch (Exception e) {
+        _logger.error("Error during realtime TTL cleanup for partition: {}", _partitionId, e);
+      }
+    }, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -381,6 +416,21 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     _numPendingOperations--;
     _logger.info("Stopped the metadata manager with {} pending operations, current primary key count: {}",
         _numPendingOperations, getNumPrimaryKeys());
+    // Shutdown the realtime TTL cleanup executor if it was started
+    if (_realtimeTTLCleanupExecutor != null) {
+      _logger.info("Shutting down realtime TTL cleanup executor for partition: {}", _partitionId);
+      _realtimeTTLCleanupExecutor.shutdown();
+      try {
+        if (!_realtimeTTLCleanupExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+          _logger.warn("Realtime TTL cleanup executor did not terminate in 30 seconds, forcing shutdown");
+          _realtimeTTLCleanupExecutor.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        _logger.warn("Interrupted while waiting for realtime TTL cleanup executor to terminate", e);
+        _realtimeTTLCleanupExecutor.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   @Override
