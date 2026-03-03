@@ -118,6 +118,7 @@ import org.apache.calcite.sql.parser.Span;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.pinot.sql.parsers.parser.SqlArrayJoinTableFunction;
 import org.apache.calcite.sql.parser.SqlParserImplFactory;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.parser.SqlParserUtil;
@@ -620,6 +621,20 @@ JAVACODE boolean matchesPrefix(int[] seq, int[][] prefixes)
         }
     }
     return false;
+}
+
+JAVACODE boolean isUpcomingArrayJoin()
+{
+    Token next = getToken(1);
+    Token nextNext = getToken(2);
+    Token nextNextNext = getToken(3);
+    if (next == null || nextNext == null) {
+        return false;
+    }
+    if (next.kind == ARRAY && nextNext.kind == JOIN) {
+        return true;
+    }
+    return nextNextNext != null && next.kind == LEFT && nextNext.kind == ARRAY && nextNextNext.kind == JOIN;
 }
 
 /*****************************************
@@ -2088,7 +2103,9 @@ SqlNode JoinTable(SqlNode e) :
 {
     SqlNode e2, condition, matchCondition = null;
     final SqlLiteral natural, joinType, on, using;
-    SqlNodeList list;
+    SqlNodeList list, arrayJoinOperands;
+    SqlLiteral arrayJoinJoinLiteral;
+    boolean isLeftArrayJoin;
 }
 {
     // LOOKAHEAD(3) is needed here rather than a LOOKAHEAD(2) because JavaCC
@@ -2159,6 +2176,25 @@ SqlNode JoinTable(SqlNode e) :
                 null);
         }
     )
+    |
+    (
+        { isLeftArrayJoin = false; }
+        [ <LEFT> { isLeftArrayJoin = true; } ]
+        <ARRAY> <JOIN>
+    )
+    arrayJoinOperands = ArrayJoinOperandList() {
+        arrayJoinJoinLiteral = (isLeftArrayJoin ? JoinType.LEFT : JoinType.INNER).symbol(getPos());
+        SqlLiteral arrayJoinNatural = SqlLiteral.createBoolean(false, arrayJoinJoinLiteral.getParserPosition());
+        SqlArrayJoinTableFunction arrayJoinTable =
+            new SqlArrayJoinTableFunction(arrayJoinOperands.getParserPosition(), arrayJoinOperands);
+        return new SqlJoin(arrayJoinJoinLiteral.getParserPosition(),
+            e,
+            arrayJoinNatural,
+            arrayJoinJoinLiteral,
+            arrayJoinTable,
+            JoinConditionType.NONE.symbol(SqlParserPos.ZERO),
+            null);
+    }
 |
     <CROSS> { joinType = JoinType.CROSS.symbol(getPos()); } <APPLY>
     e2 = TableRef2(true) {
@@ -2187,6 +2223,39 @@ SqlNode JoinTable(SqlNode e) :
             JoinConditionType.ON.symbol(SqlParserPos.ZERO),
             SqlLiteral.createBoolean(true, joinType.getParserPosition()));
     }
+}
+
+SqlNodeList ArrayJoinOperandList() :
+{
+    final List<SqlNode> operands = new ArrayList<SqlNode>();
+    SqlNode operand;
+}
+{
+    operand = ArrayJoinOperand() { operands.add(operand); }
+    (
+        <COMMA> operand = ArrayJoinOperand() { operands.add(operand); }
+    )*
+    {
+        return new SqlNodeList(operands, SqlParserPos.ZERO);
+    }
+}
+
+SqlNode ArrayJoinOperand() :
+{
+    SqlNode expression;
+    SqlIdentifier alias;
+}
+{
+    expression = Expression(ExprContext.ACCEPT_SUB_QUERY)
+    [
+        [ <AS> ]
+        alias = SimpleIdentifier()
+        {
+            final Span aliasSpan = Span.of(expression);
+            expression = SqlStdOperatorTable.AS.createCall(aliasSpan.end(this), expression, alias);
+        }
+    ]
+    { return expression; }
 }
 
 /**
@@ -2283,6 +2352,7 @@ SqlNode TableRef3(ExprContext exprContext, boolean lateral) :
         tableRef = Unpivot(tableRef)
     ]
     [
+        LOOKAHEAD( ( <AS> SimpleIdentifier() | SimpleIdentifier() ), { !isUpcomingArrayJoin() } )
         [ <AS> ] alias = SimpleIdentifier()
         (
             columnAliasList = ParenthesizedSimpleIdentifierList()
@@ -4266,6 +4336,9 @@ SqlNode AtomicRowExpression() :
     |
         e = ArrayConstructor()
     |
+        LOOKAHEAD( { getToken(1).kind == LBRACKET } )
+        e = BracketArrayConstructor()
+    |
         LOOKAHEAD(3)
         e = MapConstructor()
     |
@@ -4997,6 +5070,25 @@ SqlNode ArrayConstructor() :
         }
 </#if>
     )
+}
+
+SqlNode BracketArrayConstructor() :
+{
+    final SqlNodeList args;
+    final Span s;
+}
+{
+    <LBRACKET> { s = span(); }
+    (
+        args = ExpressionCommaList(s, ExprContext.ACCEPT_SUB_QUERY)
+    |
+        { args = SqlNodeList.EMPTY; }
+    )
+    <RBRACKET>
+    {
+        return SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR.createCall(
+            s.end(this), args.getList());
+    }
 }
 
 SqlCall ArrayLiteral() :
