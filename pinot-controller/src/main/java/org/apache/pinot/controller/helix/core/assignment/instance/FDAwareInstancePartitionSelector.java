@@ -190,8 +190,10 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       // preprocess the problem of numReplicaGroups >= numFaultDomains to a problem
       replicaGroupBasedAssignmentState.normalize(faultDomainToCandidateInstancesMap);
 
-      // fill the remaining vacant seats
-      replicaGroupBasedAssignmentState.fill(faultDomainToCandidateInstancesMap);
+      // fill the remaining vacant seats if any
+      if (faultDomainToCandidateInstancesMap.values().stream().anyMatch(v -> !v.isEmpty())) {
+        replicaGroupBasedAssignmentState.fill(faultDomainToCandidateInstancesMap);
+      }
 
       // adjust the instance assignment to achieve the invariant state
       replicaGroupBasedAssignmentState.swapToInvariantState();
