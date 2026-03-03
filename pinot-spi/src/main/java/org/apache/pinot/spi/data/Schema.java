@@ -31,11 +31,10 @@ import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -850,9 +849,7 @@ public final class Schema implements Serializable {
     // Check primary key columns are not changed
     List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
     List<String> newPrimaryKeys = getPrimaryKeyColumns();
-    Set<String> oldSet = oldPrimaryKeys == null ? Collections.emptySet() : new HashSet<>(oldPrimaryKeys);
-    Set<String> newSet = newPrimaryKeys == null ? Collections.emptySet() : new HashSet<>(newPrimaryKeys);
-    if (!oldSet.equals(newSet)) {
+    if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
       return false;
     }
 
