@@ -20,8 +20,10 @@ package org.apache.pinot.core.segment.processing.genericrow;
 
 import it.unimi.dsi.fastutil.Arrays;
 import java.io.File;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -84,6 +86,35 @@ public class GenericRowFileRecordReader implements RecordReader {
       rowId = _sortedRowIds[rowId];
     }
     _fileReader.read(rowId, buffer);
+  }
+
+
+  public void prepareAggregatedMetrics(GenericRow buffer,
+      Map<String, Set<AggregationFunctionType>> metrics) {
+
+    if (metrics == null || metrics.isEmpty()) {
+      return;
+    }
+
+    for (Map.Entry<String, Set<AggregationFunctionType>> metric : metrics.entrySet()) {
+      String key = metric.getKey();
+      Object value = buffer.getValue(key);
+      if (value == null) {
+        continue;
+      }
+
+      for (AggregationFunctionType aggFunction : metric.getValue()) {
+        String outKey = key + "_" + aggFunction.getName();
+        // TODO: only support parts of aggregation function
+        buffer.putValue(outKey, value);
+      }
+      buffer.removeValue(key);
+    }
+  }
+
+  public void readAndTransform(int rowId, GenericRow buffer, Map<String, Set<AggregationFunctionType>> metrics) {
+    read(rowId, buffer);
+    prepareAggregatedMetrics(buffer, metrics);
   }
 
   /**
