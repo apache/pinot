@@ -681,6 +681,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           instanceConfig.addTag(instanceTag);
         }
         shouldUpdateBrokerResource = true;
+      } else if (_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS,
+          Broker.DEFAULT_BROKER_ENFORCE_INSTANCE_TAGS)) {
+        throw new IllegalStateException(String.format(
+            "Broker instance tags enforcement is enabled ('%s' = true), but '%s' is not configured. "
+                + "Please set it for this broker or disable enforcement to allow startup.",
+            Broker.CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS,
+            Broker.CONFIG_OF_BROKER_INSTANCE_TAGS));
       } else if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
         shouldUpdateBrokerResource = true;
