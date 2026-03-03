@@ -159,14 +159,15 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       Map<String, SegmentZKMetadata> completedSegmentsMap =
           completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
 
+      int maxTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableNameWithType);
       SegmentSelectionResult segmentSelectionResult =
-          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList);
+          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList, maxTasks);
       int skippedSegmentsCount = validDocIdsMetadataList.size()
-              - segmentSelectionResult.getSegmentsForCompaction().size()
-              - segmentSelectionResult.getSegmentsForDeletion().size();
+          - segmentSelectionResult.getSegmentsForCompaction().size()
+          - segmentSelectionResult.getSegmentsForDeletion().size();
       LOGGER.info("Selected {} segments for compaction, {} segments for deletion and skipped {} segments for table: {}",
           segmentSelectionResult.getSegmentsForCompaction().size(),
-              segmentSelectionResult.getSegmentsForDeletion().size(), skippedSegmentsCount, tableNameWithType);
+          segmentSelectionResult.getSegmentsForDeletion().size(), skippedSegmentsCount, tableNameWithType);
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
@@ -177,7 +178,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       }
 
       int numTasks = 0;
-      int maxTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableNameWithType);
       for (SegmentZKMetadata segment : segmentSelectionResult.getSegmentsForCompaction()) {
         if (numTasks == maxTasks) {
           break;
@@ -195,7 +195,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType.toString());
         configs.put(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
             taskConfigs.getOrDefault(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
-            String.valueOf(UpsertCompactionTask.DEFAULT_IGNORE_CRC_MISMATCH)));
+                String.valueOf(UpsertCompactionTask.DEFAULT_IGNORE_CRC_MISMATCH)));
         pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
         numTasks++;
       }
@@ -204,10 +204,17 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
+  /**
+   * Process valid doc IDs metadata and select segments for compaction.
+   * Note: This method can produce non-deterministic segment selection when
+   * segmentSelectionRandomizationFactor > 1.0 is configured in taskConfigs.
+   * When randomization is disabled (factor <= 1.0), selection is deterministic
+   * based on invalid record counts.
+   */
   @VisibleForTesting
   public static SegmentSelectionResult processValidDocIdsMetadata(Map<String, String> taskConfigs,
       Map<String, SegmentZKMetadata> completedSegmentsMap,
-      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap) {
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap, int maxTasks) {
     double invalidRecordsThresholdPercent = Double.parseDouble(
         taskConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
@@ -263,16 +270,25 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       }
     }
     segmentsForCompaction.sort((o1, o2) -> {
-      if (o1.getValue() > o2.getValue()) {
+      if (o1.getRight() > o2.getRight()) {
         return -1;
-      } else if (o1.getValue().equals(o2.getValue())) {
+      } else if (o1.getRight().equals(o2.getRight())) {
         return 0;
       }
       return 1;
     });
 
-    return new SegmentSelectionResult(
-        segmentsForCompaction.stream().map(Map.Entry::getKey).collect(Collectors.toList()), segmentsForDeletion);
+    // Apply randomization if configured
+    List<SegmentZKMetadata> finalSegmentsForCompaction;
+    double randomizationFactor = Double.parseDouble(
+        taskConfigs.getOrDefault(UpsertCompactionTask.SEGMENT_SELECTION_RANDOMIZATION_FACTOR,
+            String.valueOf(UpsertCompactionTask.DEFAULT_SEGMENT_SELECTION_RANDOMIZATION_FACTOR)));
+
+    // Apply segment selection with randomization using BaseTaskGenerator utility
+    finalSegmentsForCompaction = BaseTaskGenerator.selectRandomItems(segmentsForCompaction, maxTasks,
+        randomizationFactor);
+
+    return new SegmentSelectionResult(finalSegmentsForCompaction, segmentsForDeletion);
   }
 
   @VisibleForTesting
@@ -321,6 +337,13 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         taskConfigs.containsKey(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT) || taskConfigs.containsKey(
             UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT),
         "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
+
+    // check segmentSelectionRandomizationFactor
+    if (taskConfigs.containsKey(UpsertCompactionTask.SEGMENT_SELECTION_RANDOMIZATION_FACTOR)) {
+      Preconditions.checkState(
+          Double.parseDouble(taskConfigs.get(UpsertCompactionTask.SEGMENT_SELECTION_RANDOMIZATION_FACTOR)) >= 1.0,
+          "segmentSelectionRandomizationFactor must be >= 1.0");
+    }
 
     // validate validDocIdsType default logic
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
