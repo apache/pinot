@@ -128,6 +128,7 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("unused")
 public abstract class BaseBrokerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerStarter.class);
+  public static final String READINESS_CALLBACK_SUFFIX = "-readiness";
 
   protected PinotConfiguration _brokerConf;
   protected List<ListenerConfig> _listenerConfigs;
@@ -733,6 +734,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
                 _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup))));
+
+    /*
+     * Register readiness callbacks for /health/readiness endpoint.
+     * TenantTagReadinessCallback must precede RoutingReadinessCallback because an untagged broker
+     * has no tables assigned, so RoutingReadinessCallback would return GOOD prematurely.
+     */
+    ServiceStatus.setServiceStatusCallback(_instanceId + READINESS_CALLBACK_SUFFIX,
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(List.of(
+            new TenantTagReadinessCallback(_participantHelixManager, _clusterName, _instanceId),
+            new RoutingReadinessCallback(_helixAdmin, _routingManager, _clusterName, _instanceId))));
   }
 
   private String getDefaultBrokerId() {
@@ -767,6 +778,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   public void stop() {
     LOGGER.info("Shutting down Pinot broker");
     _isShuttingDown = true;
+    _brokerAdminApplication.startShuttingDown();
 
     LOGGER.info("Disconnecting participant Helix manager");
     _participantHelixManager.disconnect();
@@ -813,6 +825,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
+    ServiceStatus.removeServiceStatusCallback(_instanceId + READINESS_CALLBACK_SUFFIX);
     LOGGER.info("Shutdown Broker Metrics Registry");
     _metricsRegistry.shutdown();
     LOGGER.info("Finish shutting down Pinot broker for {}", _instanceId);
