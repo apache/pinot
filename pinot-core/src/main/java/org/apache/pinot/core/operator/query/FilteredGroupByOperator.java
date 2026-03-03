@@ -222,7 +222,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
       List<IntermediateRecord> intermediateRecords =
           tableResizer.sortInSegmentResults(groupKeyGenerator,
-              groupByResultHolders, trimSize);
+              groupByResultHolders);
       groupKeyGenerator.close();
       resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
     } else {
