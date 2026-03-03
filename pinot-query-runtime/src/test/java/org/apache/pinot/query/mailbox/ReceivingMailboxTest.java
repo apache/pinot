@@ -343,14 +343,14 @@ public class ReceivingMailboxTest {
 
     // Receive after setting thread context
     TestReceivingMailbox receivingMailbox = new TestReceivingMailbox("id", threadContext);
-    receivingMailbox.setThreadContext(threadContext);
+    receivingMailbox.registerReceiveOperatorThreadContext(threadContext);
     receivingMailbox.offerRaw(DataBlockUtils.serialize(DATA_BLOCK.asSerialized().getDataBlock()), 10_000);
     assertTrue(receivingMailbox._resourceUsageUpdated);
 
     // Receive before setting thread context
     receivingMailbox = new TestReceivingMailbox("id", threadContext);
     receivingMailbox.offerRaw(DataBlockUtils.serialize(DATA_BLOCK.asSerialized().getDataBlock()), 10_000);
-    receivingMailbox.setThreadContext(threadContext);
+    receivingMailbox.registerReceiveOperatorThreadContext(threadContext);
     assertTrue(receivingMailbox._resourceUsageUpdated);
   }
 

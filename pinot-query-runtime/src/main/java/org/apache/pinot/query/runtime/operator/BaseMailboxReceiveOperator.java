@@ -74,7 +74,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
       _receivingStats = new ArrayList<>(numMailboxes);
       for (String mailboxId : _mailboxIds) {
         ReceivingMailbox receivingMailbox = _mailboxService.getReceivingMailbox(mailboxId);
-        receivingMailbox.setThreadContext(QueryThreadContext.getIfAvailable());
+        receivingMailbox.registerReceiveOperatorThreadContext(QueryThreadContext.getIfAvailable());
         ReadMailboxAsyncStream asyncStream = new ReadMailboxAsyncStream(receivingMailbox, this);
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());

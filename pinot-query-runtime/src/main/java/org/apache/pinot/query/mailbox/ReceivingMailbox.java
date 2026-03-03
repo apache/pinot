@@ -51,16 +51,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Mailbox that's used to receive data. Ownership of the ReceivingMailbox is with the MailboxService, which is unlike
-/// the [SendingMailbox] whose ownership lies with the send operator. This is because the ReceivingMailbox can be
-/// initialized even before the corresponding OpChain is registered on the receiver, whereas the SendingMailbox is
+/// Mailbox that's used to receive data. Ownership of the [ReceivingMailbox] is with the [MailboxService], unlike the
+/// [SendingMailbox] whose ownership lies with the send operator. This is because the [ReceivingMailbox] can be
+/// initialized even before the corresponding OpChain is registered on the receiver, whereas the [SendingMailbox] is
 /// initialized when the send operator is running.
 ///
-/// There is a single ReceivingMailbox for each pair of (sender, receiver). This means that each receive operator will
-/// have multiple ReceivingMailbox instances, one for each sender. They are coordinated by a
+/// There is a single [ReceivingMailbox] for each pair of (sender, receiver). This means that each receive operator will
+/// have multiple [ReceivingMailbox] instances, one for each sender. They are coordinated by a
 /// [org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer].
 ///
-/// A ReceivingMailbox can have at most one reader and one writer at any given time. This means that different threads
+/// A [ReceivingMailbox] can have at most one reader and one writer at any given time. This means that different threads
 /// writing to the same mailbox must be externally synchronized.
 ///
 /// The offer methods will be called when new blocks are received from different sources. For example local workers will
@@ -69,6 +69,23 @@ import org.slf4j.LoggerFactory;
 ///
 /// All exceptions thrown from the offer methods should be handled within this class, and converted into a proper error
 /// block to be consumed by the reader.
+///
+/// Resource tracking (CPU / memory usage):
+///
+/// - For blocks received from local workers:
+///   [#offer(MseBlock, List, long)] is invoked by the sender's query execution thread.
+///   Since this thread is already associated with the query, resource usage is tracked automatically.
+///
+/// - For blocks received from remote workers:
+///   [#offerRaw(List, long)] is invoked by a shared gRPC executor thread.
+///   Because this thread is shared across multiple queries, resource usage is not tracked by default.
+///
+///   To enable tracking, [#registerReceiveOperatorThreadContext(QueryThreadContext)] can be used to register the
+///   mailbox receive operator’s [QueryThreadContext].
+///
+///   NOTE:
+///   Blocks may arrive before or after the mailbox receive operator is constructed. Therefore, resource usage must be
+///   accumulated even before the [QueryThreadContext] is registered, and then reconciled when registration occurs.
 @ThreadSafe
 public class ReceivingMailbox {
   public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
@@ -85,7 +102,7 @@ public class ReceivingMailbox {
 
   /// Following variables are protected with synchronized block.
   private long _lastArriveTime = System.currentTimeMillis();
-  private QueryThreadContext _threadContext;
+  private QueryThreadContext _receiveOperatorThreadContext;
   private long _untrackedCpuTimeNs;
   private long _untrackedAllocatedBytes;
 
@@ -102,15 +119,15 @@ public class ReceivingMailbox {
     _blocks.registerReader(reader);
   }
 
-  /// Sets the context of the thread owning this [ReceivingMailbox].
-  public synchronized void setThreadContext(@Nullable QueryThreadContext threadContext) {
-    assert _threadContext == null;
+  /// Registers the [QueryThreadContext] of the mailbox receive operator.
+  public synchronized void registerReceiveOperatorThreadContext(@Nullable QueryThreadContext threadContext) {
+    assert _receiveOperatorThreadContext == null;
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext == null) {
       return;
     }
-    _threadContext = threadContext;
+    _receiveOperatorThreadContext = threadContext;
     if (_untrackedCpuTimeNs > 0 || _untrackedAllocatedBytes > 0) {
       updateResourceUsage(threadContext, _untrackedCpuTimeNs, _untrackedAllocatedBytes);
       _untrackedCpuTimeNs = 0;
@@ -133,8 +150,9 @@ public class ReceivingMailbox {
 
   /// Offers a raw block into the mailbox within the timeout specified, returns the status of the mailbox.
   ///
-  /// NOTE: This method is invoked by gRPC executor thread, not query execution thread. We need to track CPU/memory
-  /// usage separately.
+  /// NOTE:
+  /// This method is executed by a shared gRPC executor thread rather than a query execution thread.
+  /// Therefore, CPU and memory usage must be tracked explicitly and independently.
   public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs) {
     ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
     updateWaitCpuTime();
@@ -170,8 +188,8 @@ public class ReceivingMailbox {
       // Use the terminate exception when query is explicitly terminated.
       TerminationException terminateException = null;
       synchronized (this) {
-        if (_threadContext != null) {
-          terminateException = _threadContext.getExecutionContext().getTerminateException();
+        if (_receiveOperatorThreadContext != null) {
+          terminateException = _receiveOperatorThreadContext.getExecutionContext().getTerminateException();
         }
       }
       if (terminateException != null) {
@@ -187,8 +205,8 @@ public class ReceivingMailbox {
     long cpuTimeNs = resourceSnapshot.getCpuTimeNs();
     long allocatedBytes = resourceSnapshot.getAllocatedBytes();
     synchronized (this) {
-      if (_threadContext != null) {
-        updateResourceUsage(_threadContext, cpuTimeNs, allocatedBytes);
+      if (_receiveOperatorThreadContext != null) {
+        updateResourceUsage(_receiveOperatorThreadContext, cpuTimeNs, allocatedBytes);
       } else {
         _untrackedCpuTimeNs += cpuTimeNs;
         _untrackedAllocatedBytes += allocatedBytes;
@@ -377,7 +395,7 @@ public class ReceivingMailbox {
   /// +-------------------+   offerEos   +-------------------+
   /// |   WAITING_EOS     | -----------> |   FULL_CLOSED     |
   /// +-------------------+              +-------------------+
-  ///```
+  /// ```
   private enum State {
     /// The queue is open for both read and write.
     ///
