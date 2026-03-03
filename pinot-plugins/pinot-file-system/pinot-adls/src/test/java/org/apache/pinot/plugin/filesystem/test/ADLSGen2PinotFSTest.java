@@ -21,6 +21,11 @@ package org.apache.pinot.plugin.filesystem.test;
 import com.azure.core.http.rest.PagedIterable;
 import com.azure.core.http.rest.SimpleResponse;
 import com.azure.core.util.Context;
+import com.azure.storage.blob.BlobClient;
+import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.models.BlobHttpHeaders;
+import com.azure.storage.blob.models.BlobStorageException;
+import com.azure.storage.blob.specialized.BlockBlobClient;
 import com.azure.storage.file.datalake.DataLakeDirectoryClient;
 import com.azure.storage.file.datalake.DataLakeFileClient;
 import com.azure.storage.file.datalake.DataLakeFileSystemClient;
@@ -35,10 +40,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Stream;
@@ -48,6 +56,7 @@ import org.apache.pinot.plugin.filesystem.AzurePinotFSUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -89,6 +98,10 @@ public class ADLSGen2PinotFSTest {
   private PagedIterable _mockPagedIterable;
   @Mock
   private PathItem _mockPathItem;
+  @Mock
+  private BlobContainerClient _mockBlobContainerClient;
+  @Mock
+  private BlobClient _mockBlobClient;
 
   private URI _mockURI;
   private ADLSGen2PinotFS _adlsGen2PinotFsUnderTest;
@@ -107,7 +120,7 @@ public class ADLSGen2PinotFSTest {
   public void tearDown() {
     verifyNoMoreInteractions(_mockDataLakeStorageException, _mockServiceClient, _mockFileSystemClient,
         _mockSimpleResponse, _mockDirectoryClient, _mockPathItem, _mockPagedIterable, _mockPathProperties,
-        _mockFileClient, _mockFileOpenInputStreamResult, _mockInputStream);
+        _mockFileClient, _mockFileOpenInputStreamResult, _mockInputStream, _mockBlobContainerClient, _mockBlobClient);
   }
 
   @Test(expectedExceptions = NullPointerException.class)
@@ -640,6 +653,184 @@ public class ADLSGen2PinotFSTest {
       if (tempDir.exists()) {
         FileUtils.deleteQuietly(tempDir);
       }
+    }
+  }
+
+  @Test
+  public void testCopyFromLocalFileViaBlobApi() throws Exception {
+    // Create a test instance with Blob API support
+    ADLSGen2PinotFS blobEnabledFs = new ADLSGen2PinotFS(_mockFileSystemClient, _mockBlobContainerClient);
+
+    // Create a temporary file with test data
+    File tempFile = File.createTempFile("pinot_blob_test", ".tmp");
+    byte[] testData = "test segment data".getBytes();
+    Files.write(tempFile.toPath(), testData);
+
+    URI dstUri = new URI("adl2://account/container/test_segment");
+    String expectedPath = AzurePinotFSUtil.convertUriToAzureStylePath(dstUri);
+
+    when(_mockBlobContainerClient.getBlobClient(expectedPath)).thenReturn(_mockBlobClient);
+    doNothing().when(_mockBlobClient).upload(any(InputStream.class), eq((long) testData.length), eq(true));
+
+    try {
+      blobEnabledFs.copyFromLocalFile(tempFile, dstUri);
+
+      verify(_mockBlobContainerClient).getBlobClient(expectedPath);
+      verify(_mockBlobClient).upload(any(InputStream.class), eq((long) testData.length), eq(true));
+      // _enableChecksum defaults to false for this test instance, so no content MD5 header is set.
+      verify(_mockBlobClient, never()).setHttpHeaders(any(BlobHttpHeaders.class));
+    } finally {
+      FileUtils.deleteQuietly(tempFile);
+    }
+  }
+
+  @Test
+  public void testCopyFromLocalFileViaBlobApiWithChecksumEnabled() throws Exception {
+    // Create a test instance with Blob API support and checksum enabled
+    ADLSGen2PinotFS blobEnabledFs = new ADLSGen2PinotFS(_mockFileSystemClient, _mockBlobContainerClient, true);
+
+    // Create a temporary file with test data
+    File tempFile = File.createTempFile("pinot_blob_checksum_test", ".tmp");
+    byte[] testData = "test segment data".getBytes(StandardCharsets.UTF_8);
+    Files.write(tempFile.toPath(), testData);
+
+    URI dstUri = new URI("adl2://account/container/test_segment");
+    String expectedPath = AzurePinotFSUtil.convertUriToAzureStylePath(dstUri);
+    String expectedBlockId =
+        Base64.getEncoder().encodeToString(String.format("%08d", 0).getBytes(StandardCharsets.UTF_8));
+
+    BlockBlobClient mockBlockBlobClient = mock(BlockBlobClient.class);
+    when(_mockBlobContainerClient.getBlobClient(expectedPath)).thenReturn(_mockBlobClient);
+    when(_mockBlobClient.getBlockBlobClient()).thenReturn(mockBlockBlobClient);
+
+    ArgumentCaptor<BlobHttpHeaders> headersCaptor = ArgumentCaptor.forClass(BlobHttpHeaders.class);
+
+    try {
+      blobEnabledFs.copyFromLocalFile(tempFile, dstUri);
+
+      verify(_mockBlobContainerClient).getBlobClient(expectedPath);
+      verify(_mockBlobClient).getBlockBlobClient();
+      verify(_mockBlobClient, never()).getProperties();
+      verify(_mockBlobClient, never()).upload(any(InputStream.class), anyLong(), anyBoolean());
+      verify(_mockBlobClient, never()).setHttpHeaders(any(BlobHttpHeaders.class));
+
+      verify(mockBlockBlobClient).stageBlockWithResponse(eq(expectedBlockId), any(InputStream.class),
+          eq((long) testData.length), any(byte[].class), isNull(), isNull(), eq(Context.NONE));
+      verify(mockBlockBlobClient).commitBlockListWithResponse(eq(List.of(expectedBlockId)), headersCaptor.capture(),
+          isNull(), isNull(), isNull(), isNull(), eq(Context.NONE));
+
+      byte[] expectedContentMd5 = MessageDigest.getInstance("MD5").digest(testData);
+      BlobHttpHeaders uploadedHeaders = headersCaptor.getValue();
+      assertArrayEquals(uploadedHeaders.getContentMd5(), expectedContentMd5);
+      verifyNoMoreInteractions(mockBlockBlobClient);
+    } finally {
+      FileUtils.deleteQuietly(tempFile);
+    }
+  }
+
+  @Test
+  public void testCopyDirViaBlobApiWithChecksumEnabledAndNoContentMd5() throws Exception {
+    DataLakeFileSystemClient mockFileSystemClient = mock(DataLakeFileSystemClient.class);
+    BlobContainerClient mockBlobContainerClient = mock(BlobContainerClient.class);
+    BlobClient mockBlobClient = mock(BlobClient.class);
+    BlockBlobClient mockBlockBlobClient = mock(BlockBlobClient.class);
+    DataLakeDirectoryClient mockSrcDirectoryClient = mock(DataLakeDirectoryClient.class);
+    DataLakeDirectoryClient mockDstDirectoryClient = mock(DataLakeDirectoryClient.class);
+    DataLakeStorageException mockNotFoundException = mock(DataLakeStorageException.class);
+    PathProperties mockSrcDirectoryPathProperties = mock(PathProperties.class);
+    DataLakeFileClient mockSrcFileClient = mock(DataLakeFileClient.class);
+    PathProperties mockSrcFilePathProperties = mock(PathProperties.class);
+    DataLakeFileOpenInputStreamResult mockOpenInputStreamResult = mock(DataLakeFileOpenInputStreamResult.class);
+
+    ADLSGen2PinotFS blobEnabledFs = new ADLSGen2PinotFS(mockFileSystemClient, mockBlobContainerClient, true);
+
+    URI srcUri = new URI("adl2://account/container/src");
+    URI dstUri = new URI("adl2://account/container/dst");
+    String srcPath = AzurePinotFSUtil.convertUriToAzureStylePath(srcUri);
+    String dstPath = AzurePinotFSUtil.convertUriToAzureStylePath(dstUri);
+
+    byte[] testData = "test segment data".getBytes(StandardCharsets.UTF_8);
+    String expectedBlockId =
+        Base64.getEncoder().encodeToString(String.format("%08d", 0).getBytes(StandardCharsets.UTF_8));
+
+    when(mockFileSystemClient.getDirectoryClient(dstPath)).thenReturn(mockDstDirectoryClient);
+    when(mockDstDirectoryClient.getProperties()).thenThrow(mockNotFoundException);
+    when(mockNotFoundException.getStatusCode()).thenReturn(404);
+
+    when(mockFileSystemClient.getDirectoryClient(srcPath)).thenReturn(mockSrcDirectoryClient);
+    when(mockSrcDirectoryClient.getProperties()).thenReturn(mockSrcDirectoryPathProperties);
+    HashMap<String, String> srcMetadata = new HashMap<>();
+    srcMetadata.put("hdi_isfolder", "false");
+    when(mockSrcDirectoryPathProperties.getMetadata()).thenReturn(srcMetadata);
+
+    when(mockFileSystemClient.getFileClient(srcPath)).thenReturn(mockSrcFileClient);
+    when(mockSrcFileClient.getProperties()).thenReturn(mockSrcFilePathProperties);
+    when(mockSrcFilePathProperties.getContentMd5()).thenReturn(null);
+    when(mockSrcFilePathProperties.getFileSize()).thenReturn((long) testData.length);
+    when(mockSrcFileClient.openInputStream()).thenReturn(mockOpenInputStreamResult);
+    when(mockOpenInputStreamResult.getInputStream()).thenReturn(new ByteArrayInputStream(testData));
+
+    when(mockBlobContainerClient.getBlobClient(dstPath)).thenReturn(mockBlobClient);
+    when(mockBlobClient.getBlockBlobClient()).thenReturn(mockBlockBlobClient);
+
+    assertTrue(blobEnabledFs.copyDir(srcUri, dstUri));
+
+    verify(mockFileSystemClient).getDirectoryClient(dstPath);
+    verify(mockDstDirectoryClient).getProperties();
+    verify(mockNotFoundException).getStatusCode();
+    verify(mockFileSystemClient).getDirectoryClient(srcPath);
+    verify(mockSrcDirectoryClient).getProperties();
+    verify(mockSrcDirectoryPathProperties).getMetadata();
+    verify(mockFileSystemClient, times(2)).getFileClient(srcPath);
+    verify(mockSrcFileClient).getProperties();
+    verify(mockSrcFilePathProperties).getContentMd5();
+    verify(mockSrcFilePathProperties).getFileSize();
+    verify(mockSrcFileClient).openInputStream();
+    verify(mockOpenInputStreamResult).getInputStream();
+
+    verify(mockBlobContainerClient).getBlobClient(dstPath);
+    verify(mockBlobClient).getBlockBlobClient();
+    verify(mockBlobClient, never()).getProperties();
+    verify(mockBlobClient, never()).upload(any(InputStream.class), anyLong(), anyBoolean());
+    verify(mockBlobClient, never()).setHttpHeaders(any(BlobHttpHeaders.class));
+
+    verify(mockBlockBlobClient).stageBlockWithResponse(eq(expectedBlockId), any(InputStream.class),
+        eq((long) testData.length), any(byte[].class), isNull(), isNull(), eq(Context.NONE));
+    verify(mockBlockBlobClient).commitBlockList(eq(List.of(expectedBlockId)));
+    verify(mockBlockBlobClient, never()).commitBlockListWithResponse(anyList(), any(BlobHttpHeaders.class), any(),
+        any(), any(), any(), any());
+
+    verifyNoMoreInteractions(mockFileSystemClient, mockBlobContainerClient, mockBlobClient, mockBlockBlobClient,
+        mockSrcDirectoryClient, mockDstDirectoryClient, mockNotFoundException, mockSrcDirectoryPathProperties,
+        mockSrcFileClient, mockSrcFilePathProperties, mockOpenInputStreamResult);
+  }
+
+  @Test
+  public void testCopyFromLocalFileViaBlobApiWithException() throws Exception {
+    // Create a test instance with Blob API support
+    ADLSGen2PinotFS blobEnabledFs = new ADLSGen2PinotFS(_mockFileSystemClient, _mockBlobContainerClient);
+
+    // Create a temporary file with test data
+    File tempFile = File.createTempFile("pinot_blob_test", ".tmp");
+    byte[] testData = "test segment data".getBytes();
+    Files.write(tempFile.toPath(), testData);
+
+    URI dstUri = new URI("adl2://account/container/test_segment");
+    String expectedPath = AzurePinotFSUtil.convertUriToAzureStylePath(dstUri);
+
+    BlobStorageException blobException = mock(BlobStorageException.class);
+    when(blobException.getStatusCode()).thenReturn(500);
+    when(_mockBlobContainerClient.getBlobClient(expectedPath)).thenReturn(_mockBlobClient);
+    doThrow(blobException).when(_mockBlobClient).upload(any(InputStream.class), eq((long) testData.length), eq(true));
+
+    try {
+      expectThrows(IOException.class, () -> blobEnabledFs.copyFromLocalFile(tempFile, dstUri));
+
+      verify(_mockBlobContainerClient).getBlobClient(expectedPath);
+      verify(_mockBlobClient).upload(any(InputStream.class), eq((long) testData.length), eq(true));
+      verify(blobException).getStatusCode();
+    } finally {
+      FileUtils.deleteQuietly(tempFile);
     }
   }
 }
