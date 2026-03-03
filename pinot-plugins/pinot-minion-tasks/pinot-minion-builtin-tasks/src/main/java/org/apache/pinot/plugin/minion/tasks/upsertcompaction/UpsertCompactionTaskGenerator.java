@@ -222,7 +222,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         continue;
       }
       SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
-
       for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {
         long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
 
