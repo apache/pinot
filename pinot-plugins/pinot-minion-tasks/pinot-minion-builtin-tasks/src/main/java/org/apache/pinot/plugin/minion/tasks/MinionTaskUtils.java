@@ -265,40 +265,6 @@ public class MinionTaskUtils {
   }
 
   /**
-   * Fetches validDocIds metadata from all servers that host the segment. Used by the executor to perform
-   * the same consensus check as the generator before fetching the validDocIds bitmap.
-   *
-   * @param tableNameWithType table name with type
-   * @param segmentName segment name
-   * @param validDocIdsType validDocIds type string (e.g. SNAPSHOT)
-   * @param minionContext minion context for Helix access
-   * @param timeoutMs timeout in ms for server requests
-   * @return list of ValidDocIdsMetadataInfo from each replica (one per server), or empty list if none
-   */
-  public static List<ValidDocIdsMetadataInfo> getValidDocIdsMetadataForSegment(String tableNameWithType,
-      String segmentName, String validDocIdsType, MinionContext minionContext, int timeoutMs) {
-    String clusterName = minionContext.getHelixManager().getClusterName();
-    HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
-    List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
-    Map<String, List<String>> serverToSegments = new HashMap<>();
-    for (String server : servers) {
-      serverToSegments.put(server, Collections.singletonList(segmentName));
-    }
-    BiMap<String, String> serverToEndpoints = HashBiMap.create();
-    for (String server : servers) {
-      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
-      String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
-      serverToEndpoints.put(server, endpoint);
-    }
-    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
-    Map<String, List<ValidDocIdsMetadataInfo>> result =
-        serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
-            serverToEndpoints, Collections.singletonList(segmentName), timeoutMs, validDocIdsType, 1);
-    List<ValidDocIdsMetadataInfo> list = result.get(segmentName);
-    return list != null ? list : Collections.emptyList();
-  }
-
-  /**
    * Extract allowDownloadFromServer config from table task config
    */
   public static boolean extractMinionAllowDownloadFromServer(TableConfig tableConfig, String taskType,
@@ -474,48 +440,5 @@ public class MinionTaskUtils {
           "'deleteRecordColumn' must be provided with validDocIdsType: %s", validDocIdsType);
     }
     return validDocIdsType;
-  }
-
-  /**
-   * Checks if all replicas have consensus on validDoc counts for a segment.
-   * SAFETY LOGIC:
-   * 1. Only proceed with operations when ALL replicas agree on totalValidDocs count
-   * 2. Skip operations if ANY server hosting the segment is not in READY state
-   * 3. Include all replicas (even those with CRC mismatches) in consensus for safety
-   *
-   * @param segmentName the name of the segment being checked
-   * @param replicaMetadataList list of metadata from all replicas of the segment
-   * @return true if all replicas have consensus on validDoc counts, false otherwise
-   */
-  public static boolean hasValidDocConsensus(String segmentName,
-      List<ValidDocIdsMetadataInfo> replicaMetadataList) {
-
-    if (replicaMetadataList == null || replicaMetadataList.isEmpty()) {
-      LOGGER.warn("No replica metadata available for segment: {}", segmentName);
-      return false;
-    }
-
-    // Check server readiness and validDoc consensus
-    Long consensusValidDocs = null;
-    for (ValidDocIdsMetadataInfo metadata : replicaMetadataList) {
-      // Check server readiness - skip if ANY server is not ready
-      if (metadata.getServerStatus() != null && !metadata.getServerStatus().equals(ServiceStatus.Status.GOOD)) {
-        LOGGER.warn("Server {} is in {} state for segment: {}, skipping consensus check",
-            metadata.getInstanceId(), metadata.getServerStatus(), segmentName);
-        return false;
-      }
-
-      // Check if all replicas have the same totalValidDocs count
-      long validDocs = metadata.getTotalValidDocs();
-      if (consensusValidDocs == null) {
-        // First iteration, we record the value to compare against
-        consensusValidDocs = validDocs;
-      } else if (!consensusValidDocs.equals(validDocs)) {
-        LOGGER.warn("Inconsistent validDoc counts across replicas for segment: {}. Expected: {}, but found: {}",
-            segmentName, consensusValidDocs, validDocs);
-        return false;
-      }
-    }
-    return true;
   }
 }
