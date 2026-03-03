@@ -97,6 +97,7 @@ public class ControllerConf extends PinotConfiguration {
   // Used to determine whether to use group commit idealstate on segment completion
   public static final String CONTROLLER_SEGMENT_COMPLETION_GROUP_COMMIT_ENABLED =
       "controller.segment.completion.group.commit.enabled";
+
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
   }
@@ -371,6 +372,14 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DISK_UTILIZATION_CHECK_TIMEOUT_MS = "controller.disk.utilization.check.timeoutMs";
   public static final String DISK_UTILIZATION_PATH = "controller.disk.utilization.path";
   public static final String ENABLE_RESOURCE_UTILIZATION_CHECK = "controller.enable.resource.utilization.check";
+  // Explicitly enables all resource utilization checkers
+  public static final String ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS =
+      "controller.enable.all.resource.utilization.checkers";
+  // If controller.enable.all.resource.utilization.checkers = false, each individual utilization checker can be enabled.
+  // When a new resource utilization checker is added, a new config must be added to have the option to specifically
+  // enable/disable it.
+  public static final String ENABLE_DISK_UTILIZATION_CHECKER =
+      "controller.enable.disk.utilization.checker";
   public static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
       "controller.resource.utilization.checker.initial.delay";
   public static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
@@ -405,6 +414,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS = 30_000;
   public static final String DEFAULT_DISK_UTILIZATION_PATH = "/home/pinot/data";
   public static final boolean DEFAULT_ENABLE_RESOURCE_UTILIZATION_CHECK = false;
+  // Include all resource utilization checkers by default
+  public static final boolean DEFAULT_ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS = true;
+  public static final boolean DEFAULT_ENABLE_DISK_UTILIZATION_CHECKER = false;
   public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY = 300L; // 5 minutes
   public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY = 300L; // 5 minutes
   public static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
@@ -1138,6 +1150,14 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isResourceUtilizationCheckEnabled() {
     return getProperty(ENABLE_RESOURCE_UTILIZATION_CHECK, DEFAULT_ENABLE_RESOURCE_UTILIZATION_CHECK);
+  }
+
+  public boolean isAllResourceUtilizationCheckersEnabled() {
+    return getProperty(ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS, DEFAULT_ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS);
+  }
+
+  public boolean isDiskUtilizationCheckerEnabled() {
+    return getProperty(ENABLE_DISK_UTILIZATION_CHECKER, DEFAULT_ENABLE_DISK_UTILIZATION_CHECKER);
   }
 
   public boolean getEnableBatchMessageMode() {
