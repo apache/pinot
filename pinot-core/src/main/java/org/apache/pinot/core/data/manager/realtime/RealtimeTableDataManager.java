@@ -24,6 +24,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalNotification;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
@@ -696,7 +697,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
       ConsumerCoordinator consumerCoordinator, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
-      throws AttemptsExceededException, RetriableOperationException {
+      throws AttemptsExceededException, FileNotFoundException, RetriableOperationException {
     return new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
         indexLoadingConfig, schema, llcSegmentName, consumerCoordinator, _serverMetrics, partitionUpsertMetadataManager,
         partitionDedupMetadataManager, isTableReadyToConsumeData);
