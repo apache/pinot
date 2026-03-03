@@ -35,6 +35,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -126,6 +127,9 @@ public abstract class BaseQueryKillingIntegrationTest extends BaseClusterIntegra
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    // Skip GC/IHOP enforcement checks only for these query-killing integration tests
+    brokerConf.setProperty(
+        CommonConstants.Accounting.FULLY_QUALIFIED_CONFIG_OF_SKIP_OOM_GC_ENFORCEMENT_FOR_TESTS, true);
   }
 
   @Override
@@ -133,6 +137,9 @@ public abstract class BaseQueryKillingIntegrationTest extends BaseClusterIntegra
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
     serverConf.setProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, Integer.MAX_VALUE);
+    // Skip GC/IHOP enforcement checks only for these query-killing integration tests
+    serverConf.setProperty(
+        CommonConstants.Accounting.FULLY_QUALIFIED_CONFIG_OF_SKIP_OOM_GC_ENFORCEMENT_FOR_TESTS, true);
   }
 
   @Override
