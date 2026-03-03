@@ -846,7 +846,6 @@ public final class Schema implements Serializable {
    * @param oldSchema old schema
    */
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
-    // Check primary key columns are not changed
     List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
     List<String> newPrimaryKeys = getPrimaryKeyColumns();
     if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
