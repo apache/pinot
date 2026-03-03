@@ -25,20 +25,21 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.mockito.Mockito;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.testng.Assert.*;
 
 
 public class ReceivingMailboxTest {
@@ -48,9 +49,15 @@ public class ReceivingMailboxTest {
   private static final MseBlock.Data DATA_BLOCK = new RowHeapDataBlock(List.of(), DATA_SCHEMA, null);
   private ReceivingMailbox.Reader _reader;
 
-  @BeforeMethod
+  @BeforeClass
   public void setUp() {
-    _reader = Mockito.mock(ReceivingMailbox.Reader.class);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+  }
+
+  @BeforeMethod
+  public void setUpMethod() {
+    _reader = mock(ReceivingMailbox.Reader.class);
   }
 
   @Test
@@ -108,10 +115,10 @@ public class ReceivingMailboxTest {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
     receivingMailbox.registeredReader(_reader);
 
-    MseBlock[] offeredBlocks = new MseBlock[] {
-      new RowHeapDataBlock(List.of(), DATA_SCHEMA, null),
-      new RowHeapDataBlock(List.of(), DATA_SCHEMA, null),
-      new RowHeapDataBlock(List.of(), DATA_SCHEMA, null)
+    MseBlock[] offeredBlocks = new MseBlock[]{
+        new RowHeapDataBlock(List.of(), DATA_SCHEMA, null),
+        new RowHeapDataBlock(List.of(), DATA_SCHEMA, null),
+        new RowHeapDataBlock(List.of(), DATA_SCHEMA, null)
     };
     for (MseBlock block : offeredBlocks) {
       ReceivingMailbox.ReceivingMailboxStatus status = receivingMailbox.offer(block, List.of(), 10);
@@ -132,7 +139,7 @@ public class ReceivingMailboxTest {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
     receivingMailbox.registeredReader(_reader);
 
-    MseBlock[] offeredBlocks = new MseBlock[] {
+    MseBlock[] offeredBlocks = new MseBlock[]{
         new RowHeapDataBlock(List.of(), DATA_SCHEMA, null),
         new RowHeapDataBlock(List.of(), DATA_SCHEMA, null),
         new RowHeapDataBlock(List.of(), DATA_SCHEMA, null)
@@ -172,7 +179,7 @@ public class ReceivingMailboxTest {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
     receivingMailbox.registeredReader(_reader);
 
-    MseBlock[] offeredBlocks = new MseBlock[] {
+    MseBlock[] offeredBlocks = new MseBlock[]{
         new RowHeapDataBlock(List.of(), DATA_SCHEMA, null),
         new RowHeapDataBlock(List.of(), DATA_SCHEMA, null),
         new RowHeapDataBlock(List.of(), DATA_SCHEMA, null)
@@ -201,7 +208,7 @@ public class ReceivingMailboxTest {
     receivingMailbox.registeredReader(_reader);
     ErrorMseBlock errorBlock = ErrorMseBlock.fromException(new RuntimeException("Test error"));
 
-    MseBlock[] offeredBlocks = new MseBlock[] {
+    MseBlock[] offeredBlocks = new MseBlock[]{
         new RowHeapDataBlock(List.of(), DATA_SCHEMA, null),
         new RowHeapDataBlock(List.of(), DATA_SCHEMA, null),
         new RowHeapDataBlock(List.of(), DATA_SCHEMA, null)
@@ -327,5 +334,41 @@ public class ReceivingMailboxTest {
   CompletableFuture<ReceivingMailbox.ReceivingMailboxStatus> offer(MseBlock block, ReceivingMailbox receivingMailbox,
       ExecutorService executor) {
     return CompletableFuture.supplyAsync(() -> receivingMailbox.offer(block, List.of(), 10_000), executor);
+  }
+
+  @Test
+  public void testResourceTracking()
+      throws Exception {
+    QueryThreadContext threadContext = mock(QueryThreadContext.class);
+
+    // Receive after setting thread context
+    TestReceivingMailbox receivingMailbox = new TestReceivingMailbox("id", threadContext);
+    receivingMailbox.setThreadContext(threadContext);
+    receivingMailbox.offerRaw(DataBlockUtils.serialize(DATA_BLOCK.asSerialized().getDataBlock()), 10_000);
+    assertTrue(receivingMailbox._resourceUsageUpdated);
+
+    // Receive before setting thread context
+    receivingMailbox = new TestReceivingMailbox("id", threadContext);
+    receivingMailbox.offerRaw(DataBlockUtils.serialize(DATA_BLOCK.asSerialized().getDataBlock()), 10_000);
+    receivingMailbox.setThreadContext(threadContext);
+    assertTrue(receivingMailbox._resourceUsageUpdated);
+  }
+
+  private static class TestReceivingMailbox extends ReceivingMailbox {
+    final QueryThreadContext _expectedThreadContext;
+    boolean _resourceUsageUpdated;
+
+    public TestReceivingMailbox(String id, QueryThreadContext expectedThreadContext) {
+      super(id);
+      _expectedThreadContext = expectedThreadContext;
+    }
+
+    @Override
+    void updateResourceUsage(QueryThreadContext threadContext, long cpuTimeNs, long allocatedBytes) {
+      assertSame(threadContext, _expectedThreadContext);
+      assertTrue(cpuTimeNs > 0);
+      assertTrue(allocatedBytes > 0);
+      _resourceUsageUpdated = true;
+    }
   }
 }

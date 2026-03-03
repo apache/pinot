@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.ThreadSafe;
 import java.nio.ByteBuffer;
@@ -39,11 +40,16 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /// Mailbox that's used to receive data. Ownership of the ReceivingMailbox is with the MailboxService, which is unlike
 /// the [SendingMailbox] whose ownership lies with the send operator. This is because the ReceivingMailbox can be
@@ -74,9 +80,14 @@ public class ReceivingMailbox {
   // TODO: Apply backpressure at the sender side when the queue is full.
   /// The queue where blocks are going to be stored.
   private final CancellableBlockingQueue _blocks;
-  private long _lastArriveTime = System.currentTimeMillis();
 
   private final StatMap<StatKey> _stats = new StatMap<>(StatKey.class);
+
+  /// Following variables are protected with synchronized block.
+  private long _lastArriveTime = System.currentTimeMillis();
+  private QueryThreadContext _threadContext;
+  private long _untrackedCpuTimeNs;
+  private long _untrackedAllocatedBytes;
 
   public ReceivingMailbox(String id, int maxPendingBlocks) {
     _id = id;
@@ -91,14 +102,42 @@ public class ReceivingMailbox {
     _blocks.registerReader(reader);
   }
 
+  /// Sets the context of the thread owning this [ReceivingMailbox].
+  public synchronized void setThreadContext(@Nullable QueryThreadContext threadContext) {
+    assert _threadContext == null;
+    // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
+    //       is not set up.
+    if (threadContext == null) {
+      return;
+    }
+    _threadContext = threadContext;
+    if (_untrackedCpuTimeNs > 0 || _untrackedAllocatedBytes > 0) {
+      updateResourceUsage(threadContext, _untrackedCpuTimeNs, _untrackedAllocatedBytes);
+      _untrackedCpuTimeNs = 0;
+      _untrackedAllocatedBytes = 0;
+    }
+  }
+
+  @VisibleForTesting
+  void updateResourceUsage(QueryThreadContext threadContext, long cpuTimeNs, long allocatedBytes) {
+    ThreadAccountant accountant = threadContext.getAccountant();
+    QueryExecutionContext executionContext = threadContext.getExecutionContext();
+    accountant.updateUntrackedResourceUsage(executionContext.getCid(), cpuTimeNs, allocatedBytes, TrackingScope.QUERY);
+    accountant.updateUntrackedResourceUsage(executionContext.getWorkloadName(), cpuTimeNs, allocatedBytes,
+        TrackingScope.WORKLOAD);
+  }
+
   public String getId() {
     return _id;
   }
 
   /// Offers a raw block into the mailbox within the timeout specified, returns the status of the mailbox.
+  ///
+  /// NOTE: This method is invoked by gRPC executor thread, not query execution thread. We need to track CPU/memory
+  /// usage separately.
   public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs) {
+    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
     updateWaitCpuTime();
-
     MseBlock block;
     List<DataBuffer> stats;
     try {
@@ -129,7 +168,12 @@ public class ReceivingMailbox {
       }
     } catch (Exception e) {
       // Use the terminate exception when query is explicitly terminated.
-      TerminationException terminateException = QueryThreadContext.getTerminateException();
+      TerminationException terminateException = null;
+      synchronized (this) {
+        if (_threadContext != null) {
+          terminateException = _threadContext.getExecutionContext().getTerminateException();
+        }
+      }
       if (terminateException != null) {
         block = ErrorMseBlock.fromException(terminateException);
       } else {
@@ -139,7 +183,18 @@ public class ReceivingMailbox {
       }
       stats = List.of();
     }
-    return offerPrivate(block, stats, timeoutMs);
+    ReceivingMailboxStatus status = offerPrivate(block, stats, timeoutMs);
+    long cpuTimeNs = resourceSnapshot.getCpuTimeNs();
+    long allocatedBytes = resourceSnapshot.getAllocatedBytes();
+    synchronized (this) {
+      if (_threadContext != null) {
+        updateResourceUsage(_threadContext, cpuTimeNs, allocatedBytes);
+      } else {
+        _untrackedCpuTimeNs += cpuTimeNs;
+        _untrackedAllocatedBytes += allocatedBytes;
+      }
+    }
+    return status;
   }
 
   /// Offers a block into the mailbox within the timeout specified, returns the status of the mailbox.
@@ -322,7 +377,7 @@ public class ReceivingMailbox {
   /// +-------------------+   offerEos   +-------------------+
   /// |   WAITING_EOS     | -----------> |   FULL_CLOSED     |
   /// +-------------------+              +-------------------+
-  /// ```
+  ///```
   private enum State {
     /// The queue is open for both read and write.
     ///
