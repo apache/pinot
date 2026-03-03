@@ -63,6 +63,7 @@ public class CommonConstants {
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
+  public static final String CONFIG_OF_PINOT_MD5_DISABLED = "pinot.md5.disabled";
   @Deprecated
   public static final String DEFAULT_PINOT_INSECURE_MODE = "false";
 

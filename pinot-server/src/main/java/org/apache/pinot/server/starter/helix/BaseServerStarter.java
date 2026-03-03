@@ -134,6 +134,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -204,6 +205,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     PinotInsecureMode.setPinotInInsecureMode(
         _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
+    PinotMd5Mode.setPinotMd5Disabled(_serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
+        PinotMd5Mode.isPinotMd5Disabled()));
 
     String tarCompressionCodecName =
         _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME);
