@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -191,9 +192,7 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       replicaGroupBasedAssignmentState.normalize(faultDomainToCandidateInstancesMap);
 
       // fill the remaining vacant seats if any
-      if (faultDomainToCandidateInstancesMap.values().stream().anyMatch(v -> !v.isEmpty())) {
-        replicaGroupBasedAssignmentState.fill(faultDomainToCandidateInstancesMap);
-      }
+      replicaGroupBasedAssignmentState.fill(faultDomainToCandidateInstancesMap);
 
       // adjust the instance assignment to achieve the invariant state
       replicaGroupBasedAssignmentState.swapToInvariantState();
@@ -391,6 +390,11 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
      * Fill the vacant instances
      */
     public void fill(Map<Integer, LinkedHashSet<String>> faultDomainToCandidateInstancesMap) {
+      // skip filling if there is no candidate instance, which can happen when minimize data movement is enabled and
+      // no new instances are added to any pool
+      if (faultDomainToCandidateInstancesMap.values().stream().allMatch(HashSet::isEmpty)) {
+        return;
+      }
       // convert set to que and start to assign
       CandidateQueue candidateQueue = new CandidateQueue(faultDomainToCandidateInstancesMap);
       if (_numReplicaGroups != 0) { // uplift instance per replica group first if not a fresh new assignment
