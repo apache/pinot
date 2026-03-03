@@ -91,13 +91,39 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    * @param value should be verified to be a multi-value type prior to calling this method
    */
   protected Object[] convertMultiValue(Object value) {
+    Object[] result;
     if (value instanceof Collection) {
-      return convertCollection((Collection) value);
+      result = convertCollection((Collection) value);
+    } else if (value instanceof Object[]) {
+      result = convertArray((Object[]) value);
+    } else {
+      return convertPrimitiveArray(value);
     }
-    if (value instanceof Object[]) {
-      return convertArray((Object[]) value);
+    return unwrapElementMapsInArray(result);
+  }
+
+  /**
+   * Unwraps arrays where each element is a map with a single key "element" (Parquet/Avro list element convention).
+   * E.g. [{"element":"abc"}, {"element":"xyz"}] becomes ["abc", "xyz"].
+   */
+  protected static Object[] unwrapElementMapsInArray(Object[] array) {
+    if (array == null || array.length == 0) {
+      return array;
     }
-    return convertPrimitiveArray(value);
+    for (Object o : array) {
+      if (!(o instanceof Map)) {
+        return array;
+      }
+      Map<?, ?> m = (Map<?, ?>) o;
+      if (m.size() != 1 || !m.containsKey("element")) {
+        return array;
+      }
+    }
+    Object[] unwrapped = new Object[array.length];
+    for (int i = 0; i < array.length; i++) {
+      unwrapped[i] = ((Map<?, ?>) array[i]).get("element");
+    }
+    return unwrapped;
   }
 
   protected Object[] convertCollection(Collection collection) {
