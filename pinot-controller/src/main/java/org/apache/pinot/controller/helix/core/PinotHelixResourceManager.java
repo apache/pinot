@@ -1017,6 +1017,51 @@ public class PinotHelixResourceManager {
     return partitionIdToLastLLCCompletedSegmentMap.values();
   }
 
+  /**
+   * Returns the last completed LLC segments for each partition that belongs to a valid stream config.
+   * This method filters out segments whose partition group ID maps to a stream config index
+   * that is >= numStreamConfigs (i.e., segments from deleted topics in multi-topic setup).
+   *
+   * <p>In multi-topic setups, partition IDs are encoded as: streamConfigIndex * 10000 + streamPartitionId.
+   * When a topic is deleted (stream config removed), segments from that topic still have high partition IDs
+   * but the table config no longer has a corresponding stream config at that index.
+   *
+   * @param tableNameWithType the table name with type suffix
+   * @param numStreamConfigs the number of stream configs currently in the table config
+   * @return collection of last completed segment names for valid partitions only
+   */
+  public Collection<String> getLastLLCCompletedSegments(String tableNameWithType, int numStreamConfigs) {
+    Map<Integer, String> partitionIdToLastLLCCompletedSegmentMap = new HashMap<>();
+    for (SegmentZKMetadata zkMetadata : getSegmentsZKMetadata(tableNameWithType)) {
+      if (zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
+        LLCSegmentName llcName = LLCSegmentName.of(zkMetadata.getSegmentName());
+        if (llcName == null) {
+          continue;
+        }
+        int partitionGroupId = llcName.getPartitionGroupId();
+
+        // Filter out segments from deleted topics in multi-topic setup
+        // For multi-topic, partition ID is encoded as: streamConfigIndex * 10000 + streamPartitionId
+        if (numStreamConfigs > 1) {
+          int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionGroupId);
+          if (streamConfigIndex >= numStreamConfigs) {
+            // This segment belongs to a deleted topic, skip it
+            continue;
+          }
+        }
+
+        int sequenceNumber = llcName.getSequenceNumber();
+        String lastCompletedSegName = partitionIdToLastLLCCompletedSegmentMap.get(partitionGroupId);
+        if (lastCompletedSegName == null
+            || LLCSegmentName.of(lastCompletedSegName).getSequenceNumber() < sequenceNumber) {
+          partitionIdToLastLLCCompletedSegmentMap.put(partitionGroupId, zkMetadata.getSegmentName());
+        }
+      }
+    }
+    return partitionIdToLastLLCCompletedSegmentMap.values();
+  }
+
+
   public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames) {
     return deleteSegments(tableNameWithType, segmentNames, null);
   }
