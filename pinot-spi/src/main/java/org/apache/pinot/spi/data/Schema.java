@@ -73,6 +73,7 @@ public final class Schema implements Serializable {
   private TimeFieldSpec _timeFieldSpec;
   private final List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
   private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
+  private final List<IntermediateFieldSpec> _intermediateFieldSpecs = new ArrayList<>();
   // names of the columns that used as primary keys
   // TODO(yupeng): add validation checks like duplicate columns and use of time column
   @Nullable
@@ -85,6 +86,7 @@ public final class Schema implements Serializable {
   private final List<String> _metricNames = new ArrayList<>();
   private final List<String> _dateTimeNames = new ArrayList<>();
   private final List<String> _complexNames = new ArrayList<>();
+  private final List<String> _intermediateNames = new ArrayList<>();
   // Set to true if this schema has a JSON column (used to quickly decide whether to run JsonStatementOptimizer on
   // queries or not).
   private boolean _hasJSONColumn;
@@ -115,6 +117,7 @@ public final class Schema implements Serializable {
       case DIMENSION:
       case TIME:
       case DATE_TIME:
+      case INTERMEDIATE:
         switch (dataType) {
           case INT:
           case LONG:
@@ -243,6 +246,10 @@ public final class Schema implements Serializable {
     return _timeFieldSpec;
   }
 
+  public List<IntermediateFieldSpec> getIntermediateFieldSpecs() {
+    return _intermediateFieldSpecs;
+  }
+
   /**
    * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
    * Adding @Deprecated to prevent usage
@@ -299,6 +306,10 @@ public final class Schema implements Serializable {
         _complexNames.add(columnName);
         _complexFieldSpecs.add((ComplexFieldSpec) fieldSpec);
         break;
+      case INTERMEDIATE:
+        _intermediateNames.add(columnName);
+        _intermediateFieldSpecs.add((IntermediateFieldSpec) fieldSpec);
+        break;
       default:
         throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
     }
@@ -340,6 +351,11 @@ public final class Schema implements Serializable {
           index = _complexNames.indexOf(columnName);
           _complexNames.remove(index);
           _complexFieldSpecs.remove(index);
+          break;
+        case INTERMEDIATE:
+          index = _intermediateNames.indexOf(columnName);
+          _intermediateNames.remove(index);
+          _intermediateFieldSpecs.remove(index);
           break;
         default:
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
@@ -546,6 +562,13 @@ public final class Schema implements Serializable {
         jsonArray.add(column);
       }
       jsonObject.set("primaryKeyColumns", jsonArray);
+    }
+    if (!_intermediateFieldSpecs.isEmpty()) {
+      ArrayNode jsonArray = JsonUtils.newArrayNode();
+      for (IntermediateFieldSpec intermediateFieldSpec : _intermediateFieldSpecs) {
+        jsonArray.add(intermediateFieldSpec.toJsonObject());
+      }
+      jsonObject.set("intermediateFieldSpecs", jsonArray);
     }
     return jsonObject;
   }
