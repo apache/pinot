@@ -295,11 +295,9 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         continue;
       }
       SegmentZKMetadata segment = candidateSegmentsMap.get(segmentName);
-      List<ValidDocIdsMetadataInfo> replicaMetadataList = validDocIdsMetadataInfoMap.get(segmentName);
-
 
       // Process with existing logic using the first replica with matching CRC (since all have consensus)
-      for (ValidDocIdsMetadataInfo validDocIdsMetadata : replicaMetadataList) {
+      for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {
         long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
         long totalValidDocs = validDocIdsMetadata.getTotalValidDocs();
         long segmentSizeInBytes = validDocIdsMetadata.getSegmentSizeInBytes();

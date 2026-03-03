@@ -381,8 +381,7 @@ public class MinionTaskUtils {
       int cardinality = bitmap.getCardinality();
 
       if (comparisonMode == ValidDocIdsComparisonMode.NONE) {
-        LOGGER.info("Using first server {} with {} valid docs for segment {} (mode=NONE)", server, cardinality,
-            segmentName);
+        LOGGER.info("Using server {} with {} valid docs for segment {} (mode=NONE)", server, cardinality, segmentName);
         return bitmap;
       }
 

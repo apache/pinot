@@ -213,7 +213,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     long invalidRecordsThresholdCount = Long.parseLong(
         taskConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT)));
-
     List<Pair<SegmentZKMetadata, Long>> segmentsForCompaction = new ArrayList<>();
     List<String> segmentsForDeletion = new ArrayList<>();
     for (String segmentName : validDocIdsMetadataInfoMap.keySet()) {
@@ -223,9 +222,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         continue;
       }
       SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
-      List<ValidDocIdsMetadataInfo> replicaMetadataList = validDocIdsMetadataInfoMap.get(segmentName);
 
-      for (ValidDocIdsMetadataInfo validDocIdsMetadata : replicaMetadataList) {
+      for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {
         long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
 
         // Skip segments if the crc from zk metadata and server does not match. They may be being reloaded.
