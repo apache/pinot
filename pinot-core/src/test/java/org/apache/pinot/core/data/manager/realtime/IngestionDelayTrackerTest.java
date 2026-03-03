@@ -127,8 +127,9 @@ public class IngestionDelayTrackerTest {
           metricToValuesForPartition.get(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName())
               .add(getLatestPartitionOffset(partitionId));
         }
+        Long ingestionDelayMs = getPartitionIngestionDelayMs(partitionId);
         metricToValuesForPartition.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName())
-            .add(getPartitionIngestionDelayMs(partitionId));
+            .add(ingestionDelayMs != null ? ingestionDelayMs : 0L);
         return metricToValuesForPartition;
       }), 0, 10, TimeUnit.MILLISECONDS);
     }
@@ -159,19 +160,18 @@ public class IngestionDelayTrackerTest {
     Clock clock = Clock.systemUTC();
     ingestionDelayTracker.setClock(clock);
 
-    Assert.assertTrue(ingestionDelayTracker.getPartitionIngestionDelayMs(0) <= clock.millis());
-    // Untracked partitions should return 0 for end-to-end delay (not current time since epoch)
-    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 0);
+    // Untracked partitions should return null (metric not emitted)
+    Assert.assertNull(ingestionDelayTracker.getPartitionIngestionDelayMs(0));
+    Assert.assertNull(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0));
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
     ingestionDelayTracker.shutdown();
     // Test constructor with timer arguments
     ingestionDelayTracker =
         new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER,
             METRICS_CLEANUP_TICK_INTERVAL_MS, METRICS_TRACKING_TICK_INTERVAL_MS, () -> true);
-    Assert.assertTrue(ingestionDelayTracker.getPartitionIngestionDelayMs(0) <= clock.millis());
-    // Untracked partitions should return 0 (not current time since epoch)
-    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 0);
+    // Untracked partitions should return null (metric not emitted)
+    Assert.assertNull(ingestionDelayTracker.getPartitionIngestionDelayMs(0));
+    Assert.assertNull(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0));
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
     // Test bad timer args to the constructor
     try {
@@ -337,9 +337,9 @@ public class IngestionDelayTrackerTest {
       ingestionDelayTracker.stopTrackingPartition(partitionId);
     }
     for (int partitionId = 0; partitionId <= maxTestDelay; partitionId++) {
-      // Untracked partitions must return 0 (not current time since epoch)
-      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partitionId), 0);
-      Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partitionId), 0);
+      // Untracked partitions must return null (metric not emitted)
+      Assert.assertNull(ingestionDelayTracker.getPartitionIngestionDelayMs(partitionId));
+      Assert.assertNull(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partitionId));
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partitionId), Long.MIN_VALUE);
     }
   }
@@ -361,14 +361,14 @@ public class IngestionDelayTrackerTest {
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), ingestionTimeMs);
 
     ingestionDelayTracker.stopTrackingPartition(segmentName);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 0);
+    Assert.assertNull(ingestionDelayTracker.getPartitionIngestionDelayMs(0));
+    Assert.assertNull(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0));
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
 
     // Should not update metrics for removed segment
     ingestionDelayTracker.updateMetrics(segmentName, 0, ingestionTimeMs, ingestionTimeMs, null);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 0);
+    Assert.assertNull(ingestionDelayTracker.getPartitionIngestionDelayMs(0));
+    Assert.assertNull(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0));
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
   }
 
@@ -536,7 +536,8 @@ public class IngestionDelayTrackerTest {
     assertMinMax(metrics, ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName(), 200L, 350L);
     assertMinMax(metrics, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName(), 200L, 350L);
     assertEqualsFirstAndLast(metrics, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName(), 0L);
-    // partition1 has no updateMetrics called, so ingestion delay should be 0 (not time since epoch)
+    // partition1 has no updateMetrics called, so ingestion delay returns null (metric not emitted).
+    // The mock converts null to 0L for recording purposes.
     assertEqualsFirstAndLast(metrics, ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName(), 0L);
   }
 

@@ -551,12 +551,13 @@ public class IngestionDelayTracker {
    *
    * @param partitionId partition for which we are retrieving the delay
    *
-   * @return End to end ingestion delay in milliseconds for the given partition ID.
+   * @return End to end ingestion delay in milliseconds for the given partition ID, 
+   * or null if first stream ingestion time is not available for the partition.
    */
-  public long getPartitionEndToEndIngestionDelayMs(int partitionId) {
+  public Long getPartitionEndToEndIngestionDelayMs(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     if (ingestionInfo == null || ingestionInfo._firstStreamIngestionTimeMs < 0) {
-      return 0;
+      return null;
     }
     // Compute aged delay for current partition
     long agedIngestionDelayMs = _clock.millis() - ingestionInfo._firstStreamIngestionTimeMs;
@@ -569,12 +570,13 @@ public class IngestionDelayTracker {
    *
    * @param partitionId partition for which we are retrieving the delay
    *
-   * @return ingestion delay in milliseconds for the given partition ID.
+   * @return ingestion delay in milliseconds for the given partition ID, 
+   * or null if ingestion time is not available for the partition.
    */
-  public long getPartitionIngestionDelayMs(int partitionId) {
+  public Long getPartitionIngestionDelayMs(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     if (ingestionInfo == null || ingestionInfo._ingestionTimeMs < 0) {
-      return 0;
+      return null;
     }
     // Compute aged delay for current partition
     long agedIngestionDelayMs = _clock.millis() - ingestionInfo._ingestionTimeMs;
