@@ -25,7 +25,9 @@ import java.time.Duration;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,6 +128,10 @@ public class S3Config {
     _responseChecksumValidationWhenRequired = ResponseChecksumValidation.fromValue(
         pinotConfig.getProperty(RESPONSE_CHECKSUM_VALIDATION, ResponseChecksumValidation.WHEN_REQUIRED.name()));
     _useLegacyMd5Plugin = Boolean.parseBoolean(pinotConfig.getProperty(USE_LEGACY_MD5_PLUGIN, "false"));
+    if (_useLegacyMd5Plugin && PinotMd5Mode.isPinotMd5Disabled()) {
+      throw new IllegalStateException(String.format("S3 config '%s=true' is not allowed when '%s=true'",
+          USE_LEGACY_MD5_PLUGIN, CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+    }
 
     _storageClass = pinotConfig.getProperty(STORAGE_CLASS);
     if (_storageClass != null) {
