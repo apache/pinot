@@ -105,7 +105,7 @@ public class LogicalTableMetadataCacheTest {
 
   @Test
   public void testLogicalTableCacheWithUpdates()
-      throws IOException {
+      throws Exception {
     String logicalTableName = "testLogicalTable1";
     LogicalTableConfig logicalTableConfig = addLogicalTableAndValidateCache(
         logicalTableName, List.of(_offlineTableConfig.getTableName(), _realtimeTableConfig.getTableName()));
