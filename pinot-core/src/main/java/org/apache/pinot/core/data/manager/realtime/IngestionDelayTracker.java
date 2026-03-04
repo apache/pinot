@@ -389,7 +389,7 @@ public class IngestionDelayTracker {
     _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
         ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> getPartitionEndToEndIngestionDelayMs(partitionId));
     _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-        ServerGauge.REALTIME_INGESTION_DELAY_HAS_DATA, () -> getPartitionIngestionDelayHasData(partitionId));
+        ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS, () -> getPartitionIngestionReportingStatus(partitionId));
 
     LOGGER.info("Successfully created ingestion metrics for partition id: {}", partitionId);
   }
@@ -409,7 +409,7 @@ public class IngestionDelayTracker {
     _serverMetrics.removePartitionGauge(_metricName, partitionId,
         ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
     _serverMetrics.removePartitionGauge(_metricName, partitionId,
-        ServerGauge.REALTIME_INGESTION_DELAY_HAS_DATA);
+        ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS);
 
     LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
   }
@@ -558,6 +558,7 @@ public class IngestionDelayTracker {
    * @return End to end ingestion delay in milliseconds for the given partition ID,
    * or null if first stream ingestion time is not available for the partition.
    */
+  @Nullable
   public Long getPartitionEndToEndIngestionDelayMs(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     if (ingestionInfo == null || ingestionInfo._firstStreamIngestionTimeMs < 0) {
@@ -577,6 +578,7 @@ public class IngestionDelayTracker {
    * @return ingestion delay in milliseconds for the given partition ID,
    * or null if ingestion time is not available for the partition.
    */
+  @Nullable
   public Long getPartitionIngestionDelayMs(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     if (ingestionInfo == null || ingestionInfo._ingestionTimeMs < 0) {
@@ -589,18 +591,16 @@ public class IngestionDelayTracker {
   }
 
   /**
-   * Method to get if ingestion delay data is available for the given partition (i.e. ingestion info has been
-   * reported and both timestamps are valid)
+   * Method to get if ingestion delay data is available for the given partition (i.e.  
+   * ingestion info has been reported)
    *
    * @param partitionId partition for which we are checking data availability
    *
    * @return 1 if ingestion delay data is available, 0 otherwise
    */
-  public long getPartitionIngestionDelayHasData(int partitionId) {
+  public long getPartitionIngestionReportingStatus(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
-    if (ingestionInfo == null
-        || ingestionInfo._ingestionTimeMs < 0
-        || ingestionInfo._firstStreamIngestionTimeMs < 0) {
+    if (ingestionInfo == null) {
       return 0;
     }
     return 1;
