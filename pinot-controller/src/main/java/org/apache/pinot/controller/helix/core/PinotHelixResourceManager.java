@@ -1587,7 +1587,7 @@ public class PinotHelixResourceManager {
         errorMsg.append("\n\nIncompatibility Details:");
 
         // Check for primary key column changes
-        // Allow adding primary keys if not present
+        // Allow adding primary keys if not present. Helps add upsert and dedup configs to existing tables.
         List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
         List<String> newPrimaryKeys = schema.getPrimaryKeyColumns();
         if (CollectionUtils.isNotEmpty(oldPrimaryKeys)) {

@@ -849,7 +849,7 @@ public final class Schema implements Serializable {
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
     List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
     List<String> newPrimaryKeys = getPrimaryKeyColumns();
-    // Allow adding primary keys if not present
+    // Allow adding primary keys if not present. Helps add upsert and dedup configs to existing tables.
     if (CollectionUtils.isNotEmpty(oldPrimaryKeys)) {
       if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
         return false;
