@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -848,8 +849,10 @@ public final class Schema implements Serializable {
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
     List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
     List<String> newPrimaryKeys = getPrimaryKeyColumns();
-    if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
-      return false;
+    if (CollectionUtils.isNotEmpty(oldPrimaryKeys)) {
+      if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
+        return false;
+      }
     }
 
     Set<String> columnNames = getColumnNames();

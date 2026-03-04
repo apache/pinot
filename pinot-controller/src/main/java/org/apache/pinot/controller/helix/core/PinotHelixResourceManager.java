@@ -43,6 +43,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -1588,9 +1589,11 @@ public class PinotHelixResourceManager {
         // Check for primary key column changes
         List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
         List<String> newPrimaryKeys = schema.getPrimaryKeyColumns();
-        if (oldPrimaryKeys != null && !oldPrimaryKeys.isEmpty() && !oldPrimaryKeys.equals(newPrimaryKeys)) {
-          errorMsg.append("\n- Primary key columns changed (").append(oldPrimaryKeys).append(" -> ")
-              .append(newPrimaryKeys).append(")");
+        if (CollectionUtils.isNotEmpty(oldPrimaryKeys)) {
+          if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
+            errorMsg.append("\n- Primary key columns changed (").append(oldPrimaryKeys).append(" -> ")
+                .append(newPrimaryKeys).append(")");
+          }
         }
 
         // Check for missing columns
