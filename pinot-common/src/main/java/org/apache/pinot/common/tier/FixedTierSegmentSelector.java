@@ -39,8 +39,12 @@ public class FixedTierSegmentSelector implements TierSegmentSelector {
 
   @Override
   public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
-    return _segmentsToSelect.contains(segmentZKMetadata.getSegmentName()) && segmentZKMetadata.getStatus()
-        .isCompleted();
+    // ["*"] means select all completed segments
+    if (_segmentsToSelect.contains("*")) {
+      return segmentZKMetadata.getStatus().isCompleted();
+    }
+    return _segmentsToSelect.contains(segmentZKMetadata.getSegmentName())
+        && segmentZKMetadata.getStatus().isCompleted();
   }
 
   public Set<String> getSegmentsToSelect() {
