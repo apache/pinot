@@ -1587,6 +1587,7 @@ public class PinotHelixResourceManager {
         errorMsg.append("\n\nIncompatibility Details:");
 
         // Check for primary key column changes
+        // Allow adding primary keys if not present
         List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
         List<String> newPrimaryKeys = schema.getPrimaryKeyColumns();
         if (CollectionUtils.isNotEmpty(oldPrimaryKeys)) {

@@ -842,13 +842,14 @@ public final class Schema implements Serializable {
    * Backward compatibility requires
    * (1) all columns in oldSchema should be retained.
    * (2) all column fieldSpecs should be backward compatible with the old ones.
-   * (3) primary key columns should not be changed (used in dimension tables, upsert, and dedup).
+   * (3) primary key columns should not be changed if present(used in dimension tables, upsert, and dedup).
    *
    * @param oldSchema old schema
    */
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
     List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
     List<String> newPrimaryKeys = getPrimaryKeyColumns();
+    // Allow adding primary keys if not present
     if (CollectionUtils.isNotEmpty(oldPrimaryKeys)) {
       if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
         return false;
