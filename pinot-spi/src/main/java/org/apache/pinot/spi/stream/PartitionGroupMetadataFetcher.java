@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
  */
 public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupMetadataFetcher.class);
+  private static final int METADATA_FETCH_TIMEOUT_MS = 15000;
 
   private final List<StreamConfig> _streamConfigs;
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
@@ -52,7 +54,17 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   }
 
   public List<StreamMetadata> getStreamMetadataList() {
-    return _streamMetadataList;
+    return Collections.unmodifiableList(_streamMetadataList);
+  }
+
+  /**
+   * @deprecated after 1.5.0 release. Use {@link #getStreamMetadataList()} instead.
+   */
+  @Deprecated
+  public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
+    return _streamMetadataList.stream()
+        .flatMap(sm -> sm.getPartitionGroupMetadataList().stream())
+        .collect(Collectors.toList());
   }
 
   public Exception getException() {
@@ -68,6 +80,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   public Boolean call()
       throws Exception {
     _streamMetadataList.clear();
+    _exception = null;
     return _streamConfigs.size() == 1 ? fetchSingleStream() : fetchMultipleStreams();
   }
 
@@ -83,18 +96,16 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         StreamConsumerFactory.getUniqueClientId(clientId))) {
       List<PartitionGroupMetadata> partitionGroupMetadataList =
           streamMetadataProvider.computePartitionGroupMetadata(clientId, streamConfig,
-              _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000, _forceGetOffsetFromStream);
-      _streamMetadataList.add(new StreamMetadata(streamConfig, 0, partitionGroupMetadataList));
-      if (_exception != null) {
-        // We had at least one failure, but succeeded now. Log an info
-        LOGGER.info("Successfully retrieved PartitionGroupMetadata for topic {}", topicName);
-      }
+              _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/METADATA_FETCH_TIMEOUT_MS,
+              _forceGetOffsetFromStream);
+      _streamMetadataList.add(
+          new StreamMetadata(streamConfig, partitionGroupMetadataList.size(), partitionGroupMetadataList));
     } catch (TransientConsumerException e) {
-      LOGGER.warn("Transient Exception: Could not get partition count for topic {}", topicName, e);
+      LOGGER.warn("Transient Exception: Could not get StreamMetadata for topic {}", topicName, e);
       _exception = e;
       return Boolean.FALSE;
     } catch (Exception e) {
-      LOGGER.warn("Could not get partition count for topic {}", topicName, e);
+      LOGGER.warn("Could not get StreamMetadata for topic {}", topicName, e);
       _exception = e;
       throw e;
     }
@@ -106,7 +117,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     int numStreams = _streamConfigs.size();
     for (int i = 0; i < numStreams; i++) {
       if (_pausedTopicIndices.contains(i)) {
-        LOGGER.info("Skipping fetching PartitionGroupMetadata for paused topic: {}",
+        LOGGER.info("Skipping fetching StreamMetadata for paused topic: {}",
             _streamConfigs.get(i).getTopicName());
         continue;
       }
@@ -126,24 +137,22 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
           StreamConsumerFactory.getUniqueClientId(clientId))) {
         List<PartitionGroupMetadata> partitionGroupMetadataList =
             streamMetadataProvider.computePartitionGroupMetadata(clientId,
-                    streamConfig, topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000,
+                    streamConfig, topicPartitionGroupConsumptionStatusList,
+                    /*maxWaitTimeMs=*/METADATA_FETCH_TIMEOUT_MS,
                     _forceGetOffsetFromStream)
                 .stream()
                 .map(metadata -> new PartitionGroupMetadata(
                     IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(metadata.getPartitionGroupId(),
-                        index), metadata.getStartOffset()))
+                        index), metadata.getStartOffset(), metadata.getSequenceNumber()))
                 .collect(Collectors.toList());
-        _streamMetadataList.add(new StreamMetadata(streamConfig, index, partitionGroupMetadataList));
-        if (_exception != null) {
-          // We had at least one failure, but succeeded now. Log an info
-          LOGGER.info("Successfully retrieved PartitionGroupMetadata for topic {}", topicName);
-        }
+        _streamMetadataList.add(
+            new StreamMetadata(streamConfig, partitionGroupMetadataList.size(), partitionGroupMetadataList));
       } catch (TransientConsumerException e) {
-        LOGGER.warn("Transient Exception: Could not get partition count for topic {}", topicName, e);
+        LOGGER.warn("Transient Exception: Could not get StreamMetadata for topic {}", topicName, e);
         _exception = e;
         return Boolean.FALSE;
       } catch (Exception e) {
-        LOGGER.warn("Could not get partition count for topic {}", topicName, e);
+        LOGGER.warn("Could not get StreamMetadata for topic {}", topicName, e);
         _exception = e;
         throw e;
       }

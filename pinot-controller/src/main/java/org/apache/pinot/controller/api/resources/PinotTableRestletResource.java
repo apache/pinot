@@ -129,8 +129,11 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -351,17 +354,13 @@ public class PinotTableRestletResource {
         return new CopyTableResponse("success", "Dry run", schema, realtimeTableConfig, watermarkInductionResult);
       }
 
-      List<Pair<PartitionGroupMetadata, Integer>> partitionGroupInfos = watermarkInductionResult.getWatermarks()
-          .stream()
-          .map(watermark -> Pair.of(
-              new PartitionGroupMetadata(watermark.getPartitionGroupId(), new LongMsgOffset(watermark.getOffset())),
-              watermark.getSequenceNumber()))
-          .collect(Collectors.toList());
+      List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(realtimeTableConfig);
+      List<StreamMetadata> streamMetadataList = getStreamMetadataList(streamConfigs, watermarkInductionResult);
 
       _pinotHelixResourceManager.addSchema(schema, true, false);
       LOGGER.info("[copyTable] Successfully added schema for table: {}", tableName);
       // Add the table with designated starting kafka offset and segment sequence number to create consuming segments
-      _pinotHelixResourceManager.addTable(realtimeTableConfig, partitionGroupInfos);
+      _pinotHelixResourceManager.addTable(realtimeTableConfig, streamMetadataList);
       LOGGER.info("[copyTable] Successfully added table config: {} with designated high watermark", tableName);
       CopyTableResponse response = new CopyTableResponse("success", "Table copied successfully", null, null, null);
       if (hasOffline) {
@@ -379,6 +378,42 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, "Error copying table: " + e.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  @VisibleForTesting
+  List<StreamMetadata> getStreamMetadataList(List<StreamConfig> streamConfigs,
+      WatermarkInductionResult watermarkInductionResult)
+      throws Exception {
+    Map<Integer, Integer> streamPartitionCountMap =
+        _pinotHelixResourceManager.getRealtimeSegmentManager().getPartitionCountMap(streamConfigs);
+    Map<Integer, List<PartitionGroupMetadata>> partitionGroupMetadataByStreamConfigIndex = new HashMap<>();
+    for (WatermarkInductionResult.Watermark watermark : watermarkInductionResult.getWatermarks()) {
+      int streamConfigIndex =
+          IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(watermark.getPartitionGroupId());
+      Preconditions.checkArgument(streamConfigIndex >= 0 && streamConfigIndex < streamConfigs.size(),
+          "Invalid stream config index %s from watermark partition ID %s. Expected index in range [0, %s)",
+          streamConfigIndex, watermark.getPartitionGroupId(), streamConfigs.size());
+      partitionGroupMetadataByStreamConfigIndex.computeIfAbsent(streamConfigIndex, ignored -> new ArrayList<>()).add(
+          new PartitionGroupMetadata(watermark.getPartitionGroupId(), new LongMsgOffset(watermark.getOffset()),
+              watermark.getSequenceNumber()));
+    }
+
+    // Iterate in order by streamConfigIndex to ensure deterministic ordering
+    List<StreamMetadata> streamMetadataList = new ArrayList<>(partitionGroupMetadataByStreamConfigIndex.size());
+    for (int streamConfigIndex = 0; streamConfigIndex < streamConfigs.size(); streamConfigIndex++) {
+      List<PartitionGroupMetadata> partitionGroupMetadataList =
+          partitionGroupMetadataByStreamConfigIndex.get(streamConfigIndex);
+      if (partitionGroupMetadataList == null) {
+        // No watermarks for this stream config index, skip it
+        continue;
+      }
+      Integer partitionCount = streamPartitionCountMap.get(streamConfigIndex);
+      Preconditions.checkState(partitionCount != null,
+          "Cannot find partition count for stream config index: %s", streamConfigIndex);
+      streamMetadataList.add(new StreamMetadata(streamConfigs.get(streamConfigIndex),
+          partitionCount, partitionGroupMetadataList));
+    }
+    return streamMetadataList;
   }
 
   /**

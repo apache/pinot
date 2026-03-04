@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.stream;
 
-import java.util.Collections;
 import java.util.List;
 
 
@@ -35,22 +34,18 @@ import java.util.List;
 public class StreamMetadata {
 
   private final StreamConfig _streamConfig;
-  private final int _streamConfigIndex;
+  private final int _numPartitions;
   private final List<PartitionGroupMetadata> _partitionGroupMetadataList;
 
-  public StreamMetadata(StreamConfig streamConfig, int streamConfigIndex,
+  public StreamMetadata(StreamConfig streamConfig, int numPartitions,
       List<PartitionGroupMetadata> partitionGroupMetadataList) {
     _streamConfig = streamConfig;
-    _streamConfigIndex = streamConfigIndex;
-    _partitionGroupMetadataList = partitionGroupMetadataList;
+    _numPartitions = numPartitions;
+    _partitionGroupMetadataList = List.copyOf(partitionGroupMetadataList);
   }
 
   public StreamConfig getStreamConfig() {
     return _streamConfig;
-  }
-
-  public int getStreamConfigIndex() {
-    return _streamConfigIndex;
   }
 
   public String getTopicName() {
@@ -58,10 +53,14 @@ public class StreamMetadata {
   }
 
   public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
-    return Collections.unmodifiableList(_partitionGroupMetadataList);
+    return _partitionGroupMetadataList;
   }
 
-  public int getPartitionCount() {
-    return _partitionGroupMetadataList.size();
+  /**
+   * Returns the total number of partitions for this stream. This may be greater than the size of
+   * {@link #getPartitionGroupMetadataList()} when only a subset of partitions is assigned.
+   */
+  public int getNumPartitions() {
+    return _numPartitions;
   }
 }

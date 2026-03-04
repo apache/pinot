@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -102,7 +103,7 @@ public class PinotTableIdealStateBuilder {
       Exception fetcherException = partitionGroupMetadataFetcher.getException();
       String tableNameWithType = streamConfigs.get(0).getTableNameWithType();
       LOGGER.error("Could not get StreamMetadata for topic: {} of table: {}",
-          streamConfigs.stream().map(streamConfig -> streamConfig.getTopicName()).reduce((a, b) -> a + "," + b),
+          streamConfigs.stream().map(StreamConfig::getTopicName).collect(Collectors.joining(",")),
           tableNameWithType, fetcherException);
       ControllerMetrics controllerMetrics = ControllerMetrics.get();
       controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.PARTITION_GROUP_METADATA_FETCH_ERROR,
