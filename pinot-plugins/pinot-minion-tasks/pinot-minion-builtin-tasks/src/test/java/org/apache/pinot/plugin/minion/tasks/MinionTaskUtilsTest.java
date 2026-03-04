@@ -21,11 +21,22 @@ package org.apache.pinot.plugin.minion.tasks;
 import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
+import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -33,15 +44,25 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.MockedConstruction;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -273,6 +294,294 @@ public class MinionTaskUtilsTest {
         () -> MinionTaskUtils.getValidDocIdsType(upsertConfig4, taskConfigs4, UpsertCompactionTask.VALID_DOC_IDS_TYPE));
     assertEquals(exception4.getMessage(),
         "'snapshot' must not be 'DISABLE' with validDocIdsType: SNAPSHOT_WITH_DELETE");
+  }
+
+  @Test
+  public void testParseValidDocIdsComparisonMode() {
+    // Null or blank defaults to EQUAL_CONSENSUS
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode(null),
+        MinionTaskUtils.ValidDocIdsComparisonMode.EQUAL_CONSENSUS);
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode(""),
+        MinionTaskUtils.ValidDocIdsComparisonMode.EQUAL_CONSENSUS);
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("   "),
+        MinionTaskUtils.ValidDocIdsComparisonMode.EQUAL_CONSENSUS);
+
+    // NONE
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("NONE"),
+        MinionTaskUtils.ValidDocIdsComparisonMode.NONE);
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("none"),
+        MinionTaskUtils.ValidDocIdsComparisonMode.NONE);
+
+    // EQUAL_CONSENSUS
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("EQUAL_CONSENSUS"),
+        MinionTaskUtils.ValidDocIdsComparisonMode.EQUAL_CONSENSUS);
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("  EQUAL_CONSENSUS  "),
+        MinionTaskUtils.ValidDocIdsComparisonMode.EQUAL_CONSENSUS);
+
+    // MAX_VALID_DOCS
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("MAX_VALID_DOCS"),
+        MinionTaskUtils.ValidDocIdsComparisonMode.MAX_VALID_DOCS);
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("max_valid_docs"),
+        MinionTaskUtils.ValidDocIdsComparisonMode.MAX_VALID_DOCS);
+
+    // Invalid value throws
+    expectThrows(IllegalArgumentException.class,
+        () -> MinionTaskUtils.parseValidDocIdsComparisonMode("INVALID_MODE"));
+  }
+
+  @Test
+  public void testValidDocIdsComparisonModeConstants() {
+    assertEquals(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_COMPARISON_MODE_KEY, "validDocIdsComparisonMode");
+    assertEquals(MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_COMPARISON_MODE, "EQUAL_CONSENSUS");
+  }
+
+  /**
+   * Builds a RoaringBitmap with {@code numDocs} valid doc ids (0..numDocs-1).
+   */
+  private static RoaringBitmap makeBitmap(int numDocs) {
+    RoaringBitmap b = new RoaringBitmap();
+    for (int i = 0; i < numDocs; i++) {
+      b.add(i);
+    }
+    return b;
+  }
+
+  /**
+   * Builds a ValidDocIdsBitmapResponse for testing: same segmentCrc and GOOD status.
+   */
+  private static ValidDocIdsBitmapResponse makeResponse(String segmentName, String crc, String instanceId,
+      RoaringBitmap bitmap) {
+    return new ValidDocIdsBitmapResponse(segmentName, crc, ValidDocIdsType.SNAPSHOT,
+        RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD);
+  }
+
+  /**
+   * Creates an InstanceConfig so that InstanceUtils.getServerAdminEndpoint() returns a valid URL.
+   */
+  private static InstanceConfig makeInstanceConfig(String instanceId) {
+    InstanceConfig config = new InstanceConfig(instanceId);
+    config.setHostName("localhost");
+    config.getRecord().setIntField(Helix.Instance.ADMIN_PORT_KEY, 8098);
+    return config;
+  }
+
+  /**
+   * Sets up MinionContext with mock Helix so getServers() returns the given server list.
+   */
+  private void setupMinionContextWithServers(String tableNameWithType, String segmentName, String[] servers) {
+    ExternalView externalView = new ExternalView(tableNameWithType);
+    Map<String, String> assignment = new HashMap<>();
+    for (String s : servers) {
+      assignment.put(s, SegmentStateModel.ONLINE);
+    }
+    externalView.getRecord().getMapFields().put(segmentName, assignment);
+
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(helixAdmin.getResourceExternalView(anyString(), eq(tableNameWithType))).thenReturn(externalView);
+    for (String server : servers) {
+      when(helixAdmin.getInstanceConfig(anyString(), eq(server))).thenReturn(makeInstanceConfig(server));
+    }
+
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.getClusterName()).thenReturn("testCluster");
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+
+    MinionContext.getInstance().setHelixManager(helixManager);
+  }
+
+  /**
+   * Calls getValidDocIdFromServerMatchingCrc with ServerSegmentMetadataReader mocked. Each invocation of
+   * getValidDocIdsBitmapFromServer returns the next element of responseOrThrowByCallOrder; if it is an Exception,
+   * that exception is thrown (simulating fetch failure).
+   */
+  private static RoaringBitmap getValidDocIdFromServerMatchingCrcWithMockedReader(String tableName,
+      String segmentName, String expectedCrc, String comparisonMode, List<Object> responseOrThrowByCallOrder,
+      String[] servers, MinionTaskUtilsTest testInstance) {
+    testInstance.setupMinionContextWithServers(tableName, segmentName, servers);
+    // Shared across all mock instances (production creates one reader per server).
+    AtomicInteger callIndex = new AtomicInteger(0);
+    try (MockedConstruction<ServerSegmentMetadataReader> ignored = mockConstruction(ServerSegmentMetadataReader.class,
+        (mock, context) -> {
+          when(mock.getValidDocIdsBitmapFromServer(anyString(), anyString(), anyString(), anyString(), anyInt()))
+              .thenAnswer(inv -> {
+                int i = callIndex.getAndIncrement();
+                if (i >= responseOrThrowByCallOrder.size()) {
+                  throw new IllegalStateException("Mock received more calls than expected");
+                }
+                Object action = responseOrThrowByCallOrder.get(i);
+                if (action instanceof Exception) {
+                  throw (Exception) action;
+                }
+                return (ValidDocIdsBitmapResponse) action;
+              });
+        })) {
+      return MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableName, segmentName,
+          ValidDocIdsType.SNAPSHOT.name(), MinionContext.getInstance(), expectedCrc, comparisonMode);
+    }
+  }
+
+  @Test
+  public void testSameValidDocsEqualConsensus() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
+        makeResponse(segmentName, expectedCrc, "server2", makeBitmap(5)),
+        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(5)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+        "EQUAL_CONSENSUS", responses, new String[]{"server1", "server2", "server3"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 5);
+  }
+
+  @Test
+  public void testSameValidDocsMaxValidDocs() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
+        makeResponse(segmentName, expectedCrc, "server2", makeBitmap(5)),
+        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(5)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+        "MAX_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 5);
+  }
+
+  @Test
+  public void testSameValidDocsNone() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
+        makeResponse(segmentName, expectedCrc, "server2", makeBitmap(5)),
+        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(5)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+        "NONE", responses, new String[]{"server1", "server2", "server3"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 5);
+  }
+
+  @Test
+  public void testDifferentValidDocsMaxValidDocsMax() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
+        makeResponse(segmentName, expectedCrc, "server2", makeBitmap(3)),
+        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(4)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+        "MAX_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 5);
+  }
+
+  @Test
+  public void testsomeServersNoValidDocsEqualConsensus() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        makeResponse(segmentName, expectedCrc, "server1", makeBitmap(0)),
+        makeResponse(segmentName, expectedCrc, "server2", makeBitmap(0)),
+        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(3)));
+    expectThrows(IllegalStateException.class,
+        () -> getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+            "EQUAL_CONSENSUS", responses, new String[]{"server1", "server2", "server3"}, this));
+  }
+
+  @Test
+  public void testsomeServersNoValidDocsMaxValidDocs() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        makeResponse(segmentName, expectedCrc, "server1", makeBitmap(0)),
+        makeResponse(segmentName, expectedCrc, "server2", makeBitmap(0)),
+        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(3)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+        "MAX_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 3);
+  }
+
+  @Test
+  public void testSomeServersNoValidDocsNone() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        makeResponse(segmentName, expectedCrc, "server1", makeBitmap(0)),
+        makeResponse(segmentName, expectedCrc, "server2", makeBitmap(0)),
+        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(3)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+        "NONE", responses, new String[]{"server1", "server2", "server3"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 0);
+  }
+
+  // --- one server fails (returns null): EQUAL_CONSENSUS throws; others skip and use remaining ---
+
+  @Test
+  public void testOneServerFailsEqualConsensus() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
+        new RuntimeException("simulated fetch failure"),
+        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(5)));
+    expectThrows(IllegalStateException.class,
+        () -> getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+            "EQUAL_CONSENSUS", responses, new String[]{"server1", "server2", "server3"}, this));
+  }
+
+  @Test
+  public void testOneServerFailsMaxValidDocs() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
+        new RuntimeException("simulated fetch failure"),
+        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(4)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+        "MAX_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 5);
+  }
+
+  @Test
+  public void testOneServerFailsNone() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        new RuntimeException("simulated fetch failure"),
+        makeResponse(segmentName, expectedCrc, "server2", makeBitmap(3)),
+        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(5)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+        "NONE", responses, new String[]{"server1", "server2", "server3"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 3);
+  }
+
+  @Test
+  public void testAllServersFailMaxValidDocsNull() {
+    String tableName = "myTable_REALTIME";
+    String segmentName = "seg1";
+    String expectedCrc = "crc1";
+    List<Object> responses = List.of(
+        new RuntimeException("simulated"),
+        new RuntimeException("simulated"),
+        new RuntimeException("simulated"));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+        "MAX_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
+    assertNull(result);
   }
 
   @Test

@@ -67,13 +67,14 @@ public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
   /** Valid doc ids comparison mode (executor-only). Kept internal; executors pass config string. */
-  private enum ValidDocIdsComparisonMode {
+  enum ValidDocIdsComparisonMode {
     NONE,
     EQUAL_CONSENSUS,
     MAX_VALID_DOCS
   }
 
-  private static ValidDocIdsComparisonMode parseValidDocIdsComparisonMode(String value) {
+  /** Package-private for testing: parses validDocIdsComparisonMode config string. */
+  static ValidDocIdsComparisonMode parseValidDocIdsComparisonMode(String value) {
     if (value == null || value.isBlank()) {
       return ValidDocIdsComparisonMode.EQUAL_CONSENSUS;
     }
@@ -304,8 +305,8 @@ public class MinionTaskUtils {
           throw new IllegalStateException(
               "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint, e);
         }
-        LOGGER.warn("Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint,
-            e);
+        LOGGER.warn(
+            "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint, e);
         continue;
       }
 
