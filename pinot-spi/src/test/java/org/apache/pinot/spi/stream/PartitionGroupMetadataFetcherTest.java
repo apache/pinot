@@ -70,7 +70,10 @@ public class PartitionGroupMetadataFetcherTest {
 
       // Verify
       Assert.assertTrue(result);
-      Assert.assertEquals(fetcher.getPartitionGroupMetadataList().size(), 1);
+      List<StreamMetadata> streamMetadataList = fetcher.getStreamMetadataList();
+      Assert.assertEquals(streamMetadataList.size(), 1);
+      Assert.assertEquals(streamMetadataList.get(0).getPartitionCount(), 1);
+      Assert.assertEquals(streamMetadataList.get(0).getStreamConfigIndex(), 0);
       Assert.assertNull(fetcher.getException());
     }
   }
@@ -143,12 +146,19 @@ public class PartitionGroupMetadataFetcherTest {
 
       // Verify
       Assert.assertTrue(result);
-      Assert.assertEquals(fetcher.getPartitionGroupMetadataList().size(), 4);
+      List<StreamMetadata> streamMetadataList = fetcher.getStreamMetadataList();
+      Assert.assertEquals(streamMetadataList.size(), 2);
       Assert.assertNull(fetcher.getException());
 
+      // Verify per-stream metadata
+      Assert.assertEquals(streamMetadataList.get(0).getStreamConfigIndex(), 0);
+      Assert.assertEquals(streamMetadataList.get(0).getPartitionCount(), 2);
+      Assert.assertEquals(streamMetadataList.get(1).getStreamConfigIndex(), 1);
+      Assert.assertEquals(streamMetadataList.get(1).getPartitionCount(), 2);
+
       // Verify the correct partition group IDs: 0, 1, 10000, 10001
-      List<PartitionGroupMetadata> resultMetadata = fetcher.getPartitionGroupMetadataList();
-      List<Integer> partitionIds = resultMetadata.stream()
+      List<Integer> partitionIds = streamMetadataList.stream()
+          .flatMap(sm -> sm.getPartitionGroupMetadataList().stream())
           .map(PartitionGroupMetadata::getPartitionGroupId)
           .sorted()
           .collect(Collectors.toList());
@@ -191,14 +201,15 @@ public class PartitionGroupMetadataFetcherTest {
       // Execute
       Boolean result = fetcher.call();
 
-      // Verify
+      // Verify - 2 streams active (topic1 at index 0, topic3 at index 2; topic2 at index 1 is paused)
       Assert.assertTrue(result);
-      Assert.assertEquals(fetcher.getPartitionGroupMetadataList().size(), 4);
+      List<StreamMetadata> streamMetadataList = fetcher.getStreamMetadataList();
+      Assert.assertEquals(streamMetadataList.size(), 2);
       Assert.assertNull(fetcher.getException());
 
       // Verify the correct partition group IDs
-      List<PartitionGroupMetadata> resultMetadata = fetcher.getPartitionGroupMetadataList();
-      List<Integer> partitionIds = resultMetadata.stream()
+      List<Integer> partitionIds = streamMetadataList.stream()
+          .flatMap(sm -> sm.getPartitionGroupMetadataList().stream())
           .map(PartitionGroupMetadata::getPartitionGroupId)
           .sorted()
           .collect(Collectors.toList());

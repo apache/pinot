@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Fetches the list of {@link PartitionGroupMetadata} for all partition groups of the streams,
+ * Fetches the {@link StreamMetadata} for all streams of a table,
  * using the {@link StreamMetadataProvider}
  */
 public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
@@ -37,7 +37,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private final List<StreamConfig> _streamConfigs;
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
   private final boolean _forceGetOffsetFromStream;
-  private final List<PartitionGroupMetadata> _newPartitionGroupMetadataList = new ArrayList<>();
+  private final List<StreamMetadata> _streamMetadataList = new ArrayList<>();
   private final List<Integer> _pausedTopicIndices;
 
   private Exception _exception;
@@ -51,8 +51,8 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     _pausedTopicIndices = pausedTopicIndices;
   }
 
-  public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
-    return _newPartitionGroupMetadataList;
+  public List<StreamMetadata> getStreamMetadataList() {
+    return _streamMetadataList;
   }
 
   public Exception getException() {
@@ -60,14 +60,14 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   }
 
   /**
-   * Callable to fetch the {@link PartitionGroupMetadata} list, from the stream.
+   * Callable to fetch the {@link StreamMetadata} list from the streams.
    * The stream requires the list of {@link PartitionGroupConsumptionStatus} to compute the new
    * {@link PartitionGroupMetadata}
    */
   @Override
   public Boolean call()
       throws Exception {
-    _newPartitionGroupMetadataList.clear();
+    _streamMetadataList.clear();
     return _streamConfigs.size() == 1 ? fetchSingleStream() : fetchMultipleStreams();
   }
 
@@ -81,8 +81,10 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     try (StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(
         StreamConsumerFactory.getUniqueClientId(clientId))) {
-      _newPartitionGroupMetadataList.addAll(streamMetadataProvider.computePartitionGroupMetadata(clientId, streamConfig,
-          _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000, _forceGetOffsetFromStream));
+      List<PartitionGroupMetadata> partitionGroupMetadataList =
+          streamMetadataProvider.computePartitionGroupMetadata(clientId, streamConfig,
+              _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000, _forceGetOffsetFromStream);
+      _streamMetadataList.add(new StreamMetadata(streamConfig, 0, partitionGroupMetadataList));
       if (_exception != null) {
         // We had at least one failure, but succeeded now. Log an info
         LOGGER.info("Successfully retrieved PartitionGroupMetadata for topic {}", topicName);
@@ -122,7 +124,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
               .collect(Collectors.toList());
       try (StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(
           StreamConsumerFactory.getUniqueClientId(clientId))) {
-        _newPartitionGroupMetadataList.addAll(
+        List<PartitionGroupMetadata> partitionGroupMetadataList =
             streamMetadataProvider.computePartitionGroupMetadata(clientId,
                     streamConfig, topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000,
                     _forceGetOffsetFromStream)
@@ -130,7 +132,8 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
                 .map(metadata -> new PartitionGroupMetadata(
                     IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(metadata.getPartitionGroupId(),
                         index), metadata.getStartOffset()))
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList());
+        _streamMetadataList.add(new StreamMetadata(streamConfig, index, partitionGroupMetadataList));
         if (_exception != null) {
           // We had at least one failure, but succeeded now. Log an info
           LOGGER.info("Successfully retrieved PartitionGroupMetadata for topic {}", topicName);

@@ -91,6 +91,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -297,12 +298,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
       // Expected
     }
 
-    // committing segment's partitionGroupId no longer in the newPartitionGroupMetadataList
-    List<PartitionGroupMetadata> partitionGroupMetadataListWithout0 =
-        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfigs, Collections.emptyList(),
+    // committing segment's partitionGroupId no longer in the newStreamMetadataList
+    List<StreamMetadata> streamMetadataListWithout0 =
+        segmentManager.getNewStreamMetadataList(segmentManager._streamConfigs, Collections.emptyList(),
             mock(IdealState.class));
-    partitionGroupMetadataListWithout0.remove(0);
-    segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout0;
+    // Remove partition 0 from the first stream's metadata
+    StreamMetadata originalSm = streamMetadataListWithout0.get(0);
+    List<PartitionGroupMetadata> filteredList = new ArrayList<>(originalSm.getPartitionGroupMetadataList());
+    filteredList.remove(0);
+    segmentManager._streamMetadataList = Collections.singletonList(
+        new StreamMetadata(originalSm.getStreamConfig(), originalSm.getStreamConfigIndex(), filteredList));
 
     // Commit a segment for partition 0 - No new entries created for partition which reached end of life
     committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 2, CURRENT_TIME_MS).getSegmentName();
@@ -852,11 +857,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
      * End of shard cases
      */
     // 1 reached end of shard.
-    List<PartitionGroupMetadata> partitionGroupMetadataListWithout1 =
-        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfigs, Collections.emptyList(),
+    List<StreamMetadata> streamMetadataListWithout1 =
+        segmentManager.getNewStreamMetadataList(segmentManager._streamConfigs, Collections.emptyList(),
             mock(IdealState.class));
-    partitionGroupMetadataListWithout1.remove(1);
-    segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout1;
+    // Remove partition 1 from the first stream's metadata
+    StreamMetadata origSm = streamMetadataListWithout1.get(0);
+    List<PartitionGroupMetadata> filteredPgList = new ArrayList<>(origSm.getPartitionGroupMetadataList());
+    filteredPgList.remove(1);
+    segmentManager._streamMetadataList = Collections.singletonList(
+        new StreamMetadata(origSm.getStreamConfig(), origSm.getStreamConfigIndex(), filteredPgList));
     // noop
     testRepairs(segmentManager, Collections.emptyList());
 
@@ -871,7 +880,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     testRepairs(segmentManager, Lists.newArrayList(1));
 
     // make the last ONLINE segment of the shard as CONSUMING (failed between step1 and 3)
-    segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout1;
     consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 1, 1, CURRENT_TIME_MS).getSegmentName();
     turnNewConsumingSegmentConsuming(instanceStatesMap, consumingSegment);
 
@@ -1282,9 +1290,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     FakePinotLLCRealtimeSegmentManager segmentManager =
         spy(new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager));
     setUpNewTable(segmentManager, 2, 5, 4);
-    segmentManager._partitionGroupMetadataList = IntStream.range(0, 4)
-        .mapToObj(partition -> new PartitionGroupMetadata(partition, PARTITION_OFFSET))
-        .collect(Collectors.toList());
+    segmentManager._streamMetadataList = Collections.singletonList(
+        new StreamMetadata(segmentManager._streamConfigs.get(0), 0,
+            IntStream.range(0, 4)
+                .mapToObj(partition -> new PartitionGroupMetadata(partition, PARTITION_OFFSET))
+                .collect(Collectors.toList())));
 
     String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
@@ -1300,9 +1310,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testCommitSegmentMetadataSkipsCreatingNewMetadataWhenTopicPausedIfPartitionIdsFallbackNeeded() {
     FakePinotLLCRealtimeSegmentManager segmentManager = spy(new FakePinotLLCRealtimeSegmentManager());
     setUpNewTable(segmentManager, 2, 5, 4);
-    segmentManager._partitionGroupMetadataList = IntStream.range(0, 4)
-        .mapToObj(partition -> new PartitionGroupMetadata(partition, PARTITION_OFFSET))
-        .collect(Collectors.toList());
+    segmentManager._streamMetadataList = Collections.singletonList(
+        new StreamMetadata(segmentManager._streamConfigs.get(0), 0,
+            IntStream.range(0, 4)
+                .mapToObj(partition -> new PartitionGroupMetadata(partition, PARTITION_OFFSET))
+                .collect(Collectors.toList())));
 
     PauseState pauseState =
         new PauseState(false, PauseState.ReasonCode.ADMINISTRATIVE, "pause-topic-for-test",
@@ -1855,11 +1867,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
             new PartitionGroupConsumptionStatus(1, 12, new LongMsgOffset(123), new LongMsgOffset(345), "ONLINE"));
     doReturn(partitionGroupConsumptionStatusList).when(segmentManagerSpy)
         .getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
-    List<PartitionGroupMetadata> partitionGroupMetadataList =
-        List.of(new PartitionGroupMetadata(0, new LongMsgOffset(234)),
-            new PartitionGroupMetadata(1, new LongMsgOffset(345)));
-    doReturn(partitionGroupMetadataList).when(segmentManagerSpy)
-        .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList, idealState);
+    List<StreamMetadata> streamMetadataList =
+        List.of(new StreamMetadata(streamConfigs.get(0), 0,
+            List.of(new PartitionGroupMetadata(0, new LongMsgOffset(234)),
+                new PartitionGroupMetadata(1, new LongMsgOffset(345)))));
+    doReturn(streamMetadataList).when(segmentManagerSpy)
+        .getNewStreamMetadataList(streamConfigs, partitionGroupConsumptionStatusList, idealState);
     partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState);
     Assert.assertEquals(partitionIds.size(), 2);
   }
@@ -2250,7 +2263,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Map<String, Integer> _segmentZKMetadataVersionMap = new HashMap<>();
     IdealState _idealState;
     int _numPartitions;
-    List<PartitionGroupMetadata> _partitionGroupMetadataList = null;
+    List<StreamMetadata> _streamMetadataList = null;
     boolean _exceededMaxSegmentCompletionTime = false;
     FileUploadDownloadClient _mockedFileUploadDownloadClient;
     PinotHelixResourceManager _mockResourceManager;
@@ -2330,7 +2343,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     public void ensureAllPartitionsConsuming() {
       ensureAllPartitionsConsuming(_tableConfig, _streamConfigs, _idealState,
-          getNewPartitionGroupMetadataList(_streamConfigs, Collections.emptyList(), mock(IdealState.class)), null);
+          getNewStreamMetadataList(_streamConfigs, Collections.emptyList(), mock(IdealState.class)), null);
     }
 
     @Override
@@ -2407,28 +2420,31 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     Set<Integer> getPartitionIds(StreamConfig streamConfig) {
-      if (_partitionGroupMetadataList != null) {
+      if (_streamMetadataList != null) {
         throw new UnsupportedOperationException();
       }
       return IntStream.range(0, _numPartitions).boxed().collect(Collectors.toSet());
     }
 
     @Override
-    List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
+    List<StreamMetadata> getNewStreamMetadataList(List<StreamConfig> streamConfigs,
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState) {
-      if (_partitionGroupMetadataList != null) {
-        return _partitionGroupMetadataList;
+      if (_streamMetadataList != null) {
+        return _streamMetadataList;
       } else {
-        return IntStream.range(0, _numPartitions).mapToObj(i -> new PartitionGroupMetadata(i, PARTITION_OFFSET))
-            .collect(Collectors.toList());
+        List<PartitionGroupMetadata> partitionGroupMetadataList =
+            IntStream.range(0, _numPartitions).mapToObj(i -> new PartitionGroupMetadata(i, PARTITION_OFFSET))
+                .collect(Collectors.toList());
+        return Collections.singletonList(
+            new StreamMetadata(streamConfigs.get(0), 0, partitionGroupMetadataList));
       }
     }
 
     @Override
-    List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
+    List<StreamMetadata> getNewStreamMetadataList(List<StreamConfig> streamConfigs,
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState,
         boolean forceGetOffsetFromStream) {
-      return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
+      return getNewStreamMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
     }
 
     @Override
