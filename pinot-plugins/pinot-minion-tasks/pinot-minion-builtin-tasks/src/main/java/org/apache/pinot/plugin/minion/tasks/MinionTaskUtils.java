@@ -66,19 +66,12 @@ import org.slf4j.LoggerFactory;
 public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
-  /** Valid doc ids comparison mode (executor-only). Kept internal; executors pass config string. */
-  enum ValidDocIdsComparisonMode {
-    NONE,
-    EQUAL_CONSENSUS,
-    MAX_VALID_DOCS
-  }
-
   /** Package-private for testing: parses validDocIdsComparisonMode config string. */
-  static ValidDocIdsComparisonMode parseValidDocIdsComparisonMode(String value) {
+  static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsComparisonMode(String value) {
     if (value == null || value.isBlank()) {
-      return ValidDocIdsComparisonMode.EQUAL_CONSENSUS;
+      return MinionConstants.ValidDocIdsConsensusMode.EQUAL;
     }
-    return ValidDocIdsComparisonMode.valueOf(value.toUpperCase().trim());
+    return MinionConstants.ValidDocIdsConsensusMode.valueOf(value.toUpperCase().trim());
   }
 
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
@@ -278,13 +271,13 @@ public class MinionTaskUtils {
   }
 
   /**
-   * Returns the validDocIds bitmap from server(s). {@code comparisonMode} is the task config value: NONE,
-   * EQUAL_CONSENSUS(default), or MAX_VALID_DOCS.
+   * Returns the validDocIds bitmap from server(s). {@code comparisonMode} is the task config value: UNSAFE,
+   * EQUAL (default), or MOST_VALID_DOCS.
    */
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, String comparisonModeStr) {
-    ValidDocIdsComparisonMode comparisonMode = parseValidDocIdsComparisonMode(comparisonModeStr);
+    MinionConstants.ValidDocIdsConsensusMode comparisonMode = parseValidDocIdsComparisonMode(comparisonModeStr);
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
@@ -301,13 +294,14 @@ public class MinionTaskUtils {
             serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
                 validDocIdsType, 60_000);
       } catch (Exception e) {
-        if (comparisonMode == ValidDocIdsComparisonMode.EQUAL_CONSENSUS) {
+        if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+          LOGGER.warn(
+              "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint, e);
+          continue;
+        } else {
           throw new IllegalStateException(
               "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint, e);
         }
-        LOGGER.warn(
-            "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint, e);
-        continue;
       }
 
       String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
@@ -318,32 +312,34 @@ public class MinionTaskUtils {
       // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
       // against the crc from the current segment zk metadata, so we don't need to check that here.
       if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
-        if (comparisonMode == ValidDocIdsComparisonMode.EQUAL_CONSENSUS) {
+        if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+          LOGGER.warn("CRC mismatch for segment: {} from endpoint {}, skipping", segmentName, endpoint);
+          continue;
+        } else {
           throw new IllegalStateException(
               "CRC mismatch for segment: " + segmentName + ", expected: " + expectedCrc + ", actual from endpoint "
                   + endpoint + ": " + crcFromValidDocIdsBitmap);
         }
-        LOGGER.warn("CRC mismatch for segment: {} from endpoint {}, skipping", segmentName, endpoint);
-        continue;
       }
 
       if (validDocIdsBitmapResponse.getServerStatus() != null && !validDocIdsBitmapResponse.getServerStatus()
           .equals(ServiceStatus.Status.GOOD)) {
-        if (comparisonMode == ValidDocIdsComparisonMode.EQUAL_CONSENSUS) {
+        if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+          LOGGER.warn("Server {} not READY for segment {}, skipping", validDocIdsBitmapResponse.getInstanceId(),
+              segmentName);
+          continue;
+        } else {
           throw new IllegalStateException("Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
               + validDocIdsBitmapResponse.getServerStatus() + " state for segment: " + segmentName
               + ". Failing task to avoid inconsistency among replicas.");
         }
-        LOGGER.warn("Server {} not READY for segment {}, skipping", validDocIdsBitmapResponse.getInstanceId(),
-            segmentName);
-        continue;
       }
 
       RoaringBitmap bitmap = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
       int cardinality = bitmap.getCardinality();
 
-      if (comparisonMode == ValidDocIdsComparisonMode.NONE) {
-        LOGGER.info("Using server {} with {} valid docs for segment {} (mode=NONE)", server, cardinality, segmentName);
+      if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+        LOGGER.info("Using server {} with {} valid docs for segment {} (mode=UNSAFE)", server, cardinality, segmentName);
         return bitmap;
       }
 
@@ -354,21 +350,20 @@ public class MinionTaskUtils {
       return null;
     }
 
-    if (comparisonMode == ValidDocIdsComparisonMode.EQUAL_CONSENSUS) {
+    if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL) {
       RoaringBitmap consensusBitMap = matchingBitmaps.get(0);
-      long consensusCardinality = consensusBitMap.getCardinality();
       for (RoaringBitmap b : matchingBitmaps) {
-        if (b.getCardinality() != consensusCardinality) {
-          throw new IllegalStateException("No consensus on validDoc counts across replicas for segment: " + segmentName
+        if (!b.equals(consensusBitMap)) {
+          throw new IllegalStateException("No consensus on validDocs across replicas for segment: " + segmentName
               + ". Failing task to avoid replica inconsistency.");
         }
       }
-      LOGGER.info("Consensus: all {} servers have {} valid docs for segment {}", servers.size(), consensusCardinality,
+      LOGGER.info("All {} servers have {} valid docs for segment {}", servers.size(), consensusBitMap.getCardinality(),
           segmentName);
       return consensusBitMap;
     }
 
-    // MAX_VALID_DOCS: explicitly pick the bitmap with the maximum valid doc count
+    // MOST_VALID_DOCS: explicitly pick the bitmap with the maximum valid doc count
     RoaringBitmap maxCardinalityMap = null;
     int maxCard = -1;
     for (RoaringBitmap b : matchingBitmaps) {
@@ -379,7 +374,7 @@ public class MinionTaskUtils {
       }
     }
     if (maxCardinalityMap != null) {
-      LOGGER.info("Selected server with {} valid docs for segment {} (mode=MAX_VALID_DOCS, checked {} servers)",
+      LOGGER.info("Selected server with {} valid docs for segment {} (mode=MOST_VALID_DOCS, checked {} servers)",
           maxCard, segmentName, servers.size());
     }
     return maxCardinalityMap;

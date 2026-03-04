@@ -300,29 +300,29 @@ public class MinionTaskUtilsTest {
   public void testParseValidDocIdsComparisonMode() {
     // Null or blank defaults to EQUAL_CONSENSUS
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode(null),
-        MinionTaskUtils.ValidDocIdsComparisonMode.EQUAL_CONSENSUS);
+        MinionConstants.ValidDocIdsConsensusMode.EQUAL);
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode(""),
-        MinionTaskUtils.ValidDocIdsComparisonMode.EQUAL_CONSENSUS);
+        MinionConstants.ValidDocIdsConsensusMode.EQUAL);
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("   "),
-        MinionTaskUtils.ValidDocIdsComparisonMode.EQUAL_CONSENSUS);
+        MinionConstants.ValidDocIdsConsensusMode.EQUAL);
 
     // NONE
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("NONE"),
-        MinionTaskUtils.ValidDocIdsComparisonMode.NONE);
+        MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("none"),
-        MinionTaskUtils.ValidDocIdsComparisonMode.NONE);
+        MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
 
     // EQUAL_CONSENSUS
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("EQUAL_CONSENSUS"),
-        MinionTaskUtils.ValidDocIdsComparisonMode.EQUAL_CONSENSUS);
+        MinionConstants.ValidDocIdsConsensusMode.EQUAL);
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("  EQUAL_CONSENSUS  "),
-        MinionTaskUtils.ValidDocIdsComparisonMode.EQUAL_CONSENSUS);
+        MinionConstants.ValidDocIdsConsensusMode.EQUAL);
 
     // MAX_VALID_DOCS
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("MAX_VALID_DOCS"),
-        MinionTaskUtils.ValidDocIdsComparisonMode.MAX_VALID_DOCS);
+        MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("max_valid_docs"),
-        MinionTaskUtils.ValidDocIdsComparisonMode.MAX_VALID_DOCS);
+        MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
 
     // Invalid value throws
     expectThrows(IllegalArgumentException.class,

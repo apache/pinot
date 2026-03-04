@@ -92,6 +92,11 @@ public class MinionConstants {
    */
   public static final String SEGMENT_DOWNLOAD_PARALLELISM = "segmentDownloadParallelism";
 
+  /** Valid doc ids comparison mode (executor-only). Kept internal; executors pass config string. */
+  public enum ValidDocIdsConsensusMode {
+    UNSAFE, EQUAL, MOST_VALID_DOCS
+  }
+
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
     public static final String TASK_TYPE = "PurgeTask";
