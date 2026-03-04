@@ -22,13 +22,13 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -392,7 +392,7 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
     public void fill(Map<Integer, LinkedHashSet<String>> faultDomainToCandidateInstancesMap) {
       // skip filling if there is no candidate instance, which can happen when minimize data movement is enabled and
       // no new instances are added to any pool
-      if (faultDomainToCandidateInstancesMap.values().stream().allMatch(HashSet::isEmpty)) {
+      if (faultDomainToCandidateInstancesMap.values().stream().allMatch(Set::isEmpty)) {
         return;
       }
       // convert set to que and start to assign

@@ -1,20 +1,14 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.pinot.controller.helix.core.assignment.instance;
 
@@ -3329,5 +3323,66 @@ public class InstanceAssignmentTest {
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + "10" + SERVER_INSTANCE_POOL_PREFIX + 0,
             SERVER_INSTANCE_ID_PREFIX + "11" + SERVER_INSTANCE_POOL_PREFIX + 1,
             SERVER_INSTANCE_ID_PREFIX + "17" + SERVER_INSTANCE_POOL_PREFIX + 2));
+  }
+
+  @Test
+  public void testPoolBasedFDAwareSteadyStateMinimizeDataMovement() {
+    // Test that a rebalance with minimizeDataMovement=true and no instance changes does not throw
+    // NoSuchElementException. This is a regression test for the case where all candidate instances are empty
+    // after preprocessing (no new instances added to any pool).
+
+    // 21 instances in 5 pools, with [5,4,4,4,4] instances in each pool
+    int numInstances = 21;
+    int numPools = 5;
+    int numReplicaGroups = 3;
+    int numInstancesPerReplicaGroup = numInstances / numReplicaGroups;
+    List<InstanceConfig> instanceConfigs = new ArrayList<>(numInstances);
+    for (int i = 0; i < numInstances; i++) {
+      int pool = i % numPools;
+      InstanceConfig instanceConfig =
+          new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i + SERVER_INSTANCE_POOL_PREFIX + pool);
+      instanceConfig.addTag(OFFLINE_TAG);
+      instanceConfig.getRecord()
+          .setMapField(InstanceUtils.POOL_KEY, Collections.singletonMap(OFFLINE_TAG, Integer.toString(pool)));
+      instanceConfigs.add(instanceConfig);
+    }
+
+    // Initial assignment (no minimize data movement, no existing partitions)
+    InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig(OFFLINE_TAG, true, numPools, null);
+    InstanceReplicaGroupPartitionConfig replicaPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, numInstancesPerReplicaGroup, 0, 0, false,
+            null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+            new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
+                InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), false)))
+        .build();
+    InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
+    InstancePartitions initialPartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    assertEquals(initialPartitions.getNumReplicaGroups(), numReplicaGroups);
+    assertEquals(initialPartitions.getNumPartitions(), 1);
+
+    // Now re-run with the same instances and minimizeDataMovement=true, passing existing partitions.
+    // Before the fix in #17799, this would throw NoSuchElementException because CandidateQueue was created with an
+    // empty map (all existing instances were removed from candidates during preprocessing, leaving empty sets).
+    replicaPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, numInstancesPerReplicaGroup, 0, 0, true,
+            null);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+            new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
+                InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), true)))
+        .build();
+    driver = new InstanceAssignmentDriver(tableConfig);
+    InstancePartitions steadyStatePartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, initialPartitions);
+
+    // Assignment should be unchanged
+    assertEquals(steadyStatePartitions.getNumReplicaGroups(), numReplicaGroups);
+    assertEquals(steadyStatePartitions.getNumPartitions(), 1);
+    for (int rg = 0; rg < numReplicaGroups; rg++) {
+      assertEquals(steadyStatePartitions.getInstances(0, rg), initialPartitions.getInstances(0, rg));
+    }
   }
 }
