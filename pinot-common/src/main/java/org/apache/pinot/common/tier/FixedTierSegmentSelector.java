@@ -27,9 +27,12 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
  */
 public class FixedTierSegmentSelector implements TierSegmentSelector {
   private final Set<String> _segmentsToSelect;
+  // ["*"] means select all completed segments
+  private final boolean _selectAllSegments;
 
   public FixedTierSegmentSelector(Set<String> segmentsToSelect) {
     _segmentsToSelect = segmentsToSelect;
+    _selectAllSegments = segmentsToSelect.contains("*");
   }
 
   @Override
@@ -39,8 +42,7 @@ public class FixedTierSegmentSelector implements TierSegmentSelector {
 
   @Override
   public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
-    // ["*"] means select all completed segments
-    if (_segmentsToSelect.contains("*")) {
+    if (_selectAllSegments) {
       return segmentZKMetadata.getStatus().isCompleted();
     }
     return _segmentsToSelect.contains(segmentZKMetadata.getSegmentName())
