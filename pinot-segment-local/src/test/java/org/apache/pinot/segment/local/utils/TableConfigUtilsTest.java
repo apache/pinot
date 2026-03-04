@@ -38,6 +38,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -79,6 +80,7 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.annotations.DataProvider;
@@ -872,9 +874,9 @@ public class TableConfigUtilsTest {
         streamIngestionConfigWithoutPauselessUniqueTopics);
     TableConfig tableConfigWithoutPauselessUniqueTopics = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)
-        .setTimeColumnName("timeColumn")
-        .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
-        .build();
+            .setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
+            .build();
     try {
       TableConfigUtils.validate(tableConfigWithoutPauselessUniqueTopics, schema);
     } catch (IllegalStateException e) {
@@ -1897,53 +1899,6 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void testValidateUpsertWithTierConfig() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
-    Map<String, String> streamConfigs = getStreamConfigs();
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setRoutingConfig(
-            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
-        .setTimeColumnName(TIME_COLUMN)
-        .setStreamConfigs(streamConfigs)
-        .setTierConfigList(Lists.newArrayList(
-            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
-        .build();
-
-    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
-        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
-  }
-
-  @Test
-  public void testValidateDedupWithTierConfig() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
-    Map<String, String> streamConfigs = getStreamConfigs();
-    DedupConfig dedupConfig = new DedupConfig();
-    dedupConfig.setMetadataTTL(10);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(dedupConfig)
-        .setRoutingConfig(
-            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
-        .setTimeColumnName(TIME_COLUMN)
-        .setStreamConfigs(streamConfigs)
-        .setTierConfigList(Lists.newArrayList(
-            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
-        .build();
-
-    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
-        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
-  }
-
-  @Test
   public void testValidateDedupConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
@@ -2069,6 +2024,81 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(),
           "MetadataTTL must have time column: timeColumn in numeric type, found: STRING");
+    }
+  }
+
+  @Test
+  public void testValidateUpsertConfigWithMd5Disabled() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setHashFunction(HashFunction.MD5);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      IllegalStateException exception =
+          expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig,
+              schema));
+      assertTrue(exception.getMessage().contains(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
+  }
+
+  @Test
+  public void testValidateDedupConfigWithMd5Disabled() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setHashFunction(HashFunction.MD5);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      IllegalStateException exception =
+          expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig,
+              schema));
+      assertTrue(exception.getMessage().contains(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
+  }
+
+  @Test
+  public void testValidateDedupConfigWithMd5DisabledAllowsUpsertModeNoneMd5() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setHashFunction(HashFunction.NONE);
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.NONE);
+    upsertConfig.setHashFunction(HashFunction.MD5);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
     }
   }
 

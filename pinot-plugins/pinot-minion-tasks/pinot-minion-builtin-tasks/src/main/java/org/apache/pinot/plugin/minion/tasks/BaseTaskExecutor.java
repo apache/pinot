@@ -21,16 +21,24 @@ package org.apache.pinot.plugin.minion.tasks;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
@@ -38,7 +46,15 @@ import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +62,9 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTaskExecutor.class);
   protected static final MinionContext MINION_CONTEXT = MinionContext.getInstance();
+  protected static final int SEGMENT_PUSH_DEFAULT_ATTEMPTS = 5;
+  protected static final int SEGMENT_PUSH_DEFAULT_PARALLELISM = 1;
+  protected static final long SEGMENT_PUSH_DEFAULT_RETRY_INTERVAL_MILLIS = 1000L;
 
   protected boolean _cancelled = false;
   protected final MinionMetrics _minionMetrics = MinionMetrics.get();
@@ -160,5 +179,115 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
       }
     }
     return indexDir;
+  }
+
+  /**
+   * Builds a {@link PushJobSpec} from task configs. Used for both TAR and METADATA push modes.
+   */
+  protected PushJobSpec getPushJobSpec(Map<String, String> configs) {
+    PushJobSpec pushJobSpec = new PushJobSpec();
+    pushJobSpec.setPushAttempts(SEGMENT_PUSH_DEFAULT_ATTEMPTS);
+    pushJobSpec.setPushParallelism(SEGMENT_PUSH_DEFAULT_PARALLELISM);
+    pushJobSpec.setPushRetryIntervalMillis(SEGMENT_PUSH_DEFAULT_RETRY_INTERVAL_MILLIS);
+    pushJobSpec.setSegmentUriPrefix(configs.get(BatchConfigProperties.PUSH_SEGMENT_URI_PREFIX));
+    pushJobSpec.setSegmentUriSuffix(configs.get(BatchConfigProperties.PUSH_SEGMENT_URI_SUFFIX));
+    boolean batchSegmentUpload = Boolean.parseBoolean(configs.getOrDefault(
+        BatchConfigProperties.BATCH_SEGMENT_UPLOAD, "false"));
+    if (batchSegmentUpload) {
+      pushJobSpec.setBatchSegmentUpload(true);
+    }
+    return pushJobSpec;
+  }
+
+  /**
+   * Builds a {@link SegmentGenerationJobSpec} for segment push (TAR or METADATA). Requires
+   * {@link BatchConfigProperties#PUSH_CONTROLLER_URI} in configs for METADATA push.
+   */
+  protected SegmentGenerationJobSpec generateSegmentGenerationJobSpec(String tableName, Map<String, String> configs,
+      PushJobSpec pushJobSpec) {
+    TableSpec tableSpec = new TableSpec();
+    tableSpec.setTableName(tableName);
+
+    PinotClusterSpec pinotClusterSpec = new PinotClusterSpec();
+    pinotClusterSpec.setControllerURI(configs.get(BatchConfigProperties.PUSH_CONTROLLER_URI));
+    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
+    spec.setPushJobSpec(pushJobSpec);
+    spec.setTableSpec(tableSpec);
+    spec.setPinotClusterSpecs(new PinotClusterSpec[]{pinotClusterSpec});
+    spec.setAuthToken(MinionTaskUtils.resolveAuthToken(configs));
+    return spec;
+  }
+
+  /**
+   * Copies the local segment tar file to the output PinotFS. Requires
+   * {@link BatchConfigProperties#OUTPUT_SEGMENT_DIR_URI} in configs.
+   *
+   * @return the URI of the segment tar on the output filesystem
+   */
+  protected URI moveSegmentToOutputPinotFS(Map<String, String> configs, File localSegmentTarFile)
+      throws Exception {
+    URI outputSegmentDirURI = URI.create(configs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
+    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, outputSegmentDirURI)) {
+      URI outputSegmentTarURI = URI.create(MinionTaskUtils.normalizeDirectoryURI(outputSegmentDirURI)
+          + URIUtils.encode(localSegmentTarFile.getName()));
+      if (!Boolean.parseBoolean(configs.get(BatchConfigProperties.OVERWRITE_OUTPUT))
+          && outputFileFS.exists(outputSegmentTarURI)) {
+        throw new RuntimeException("Output file: " + outputSegmentTarURI + " already exists. Set 'overwriteOutput' to "
+            + "true to ignore this error");
+      }
+      outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
+      return outputSegmentTarURI;
+    }
+  }
+
+  /**
+   * Returns HTTP parameters common to segment upload and metadata push (parallel push protection, table name, type).
+   */
+  protected List<NameValuePair> getSegmentPushCommonParams(String tableNameWithType) {
+    List<NameValuePair> params = new ArrayList<>();
+    params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
+        "true"));
+    params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
+        TableNameBuilder.extractRawTableName(tableNameWithType)));
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType != null) {
+      params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE, tableType.toString()));
+    } else {
+      throw new RuntimeException("Failed to determine the tableType from name: " + tableNameWithType);
+    }
+    return params;
+  }
+
+  /**
+   * Returns HTTP headers for segment metadata push (ZK metadata custom map modifier + auth). Used when pushing
+   * metadata to the controller instead of uploading the tar via HTTP.
+   *
+   * @param segmentConversionResult the conversion result for the segment; may be null when building headers for
+   *                                 multiple segments where a single modifier does not apply
+   */
+  protected List<Header> getSegmentPushMetadataHeaders(PinotTaskConfig pinotTaskConfig, AuthProvider authProvider,
+      SegmentConversionResult segmentConversionResult) {
+    SegmentZKMetadataCustomMapModifier modifier =
+        getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
+    Header modifierHeader =
+        new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
+            modifier.toJsonString());
+    List<Header> headers = new ArrayList<>();
+    headers.add(modifierHeader);
+    headers.addAll(AuthProviderUtils.toRequestHeaders(authProvider));
+    return headers;
+  }
+
+  /**
+   * Returns the segment push mode for upload. Default is TAR (HTTP upload). Subclasses may override to use METADATA
+   * mode (move segment to output PinotFS and send metadata to controller) when needed.
+   *
+   * @param configs task configs; may contain {@link BatchConfigProperties#PUSH_MODE}
+   * @return push type (TAR or METADATA)
+   */
+  protected BatchConfigProperties.SegmentPushType getSegmentPushType(Map<String, String> configs) {
+    String pushMode = configs.getOrDefault(BatchConfigProperties.PUSH_MODE,
+        BatchConfigProperties.SegmentPushType.TAR.name());
+    return BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase());
   }
 }

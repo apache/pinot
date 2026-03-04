@@ -63,6 +63,7 @@ public class CommonConstants {
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
+  public static final String CONFIG_OF_PINOT_MD5_DISABLED = "pinot.md5.disabled";
   @Deprecated
   public static final String DEFAULT_PINOT_INSECURE_MODE = "false";
 
@@ -385,6 +386,11 @@ public class CommonConstants {
     public static final long DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS = 100L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_INSTANCE_TAGS = "pinot.broker.instance.tags";
+    // When enabled, brokers must have pinot.broker.instance.tags configured to start.
+    // Prevents misconfigured brokers from joining multi-tenant clusters without tenant tags.
+    public static final String CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS =
+        "pinot.broker.enforce.instance.tags";
+    public static final boolean DEFAULT_BROKER_ENFORCE_INSTANCE_TAGS = false;
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Comma separated list of packages that contains javax service resources.
@@ -1728,21 +1734,18 @@ public class CommonConstants {
      *  - Instance Config: enableThreadAllocatedBytesMeasurement = true
      */
 
-    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION =
-        "accounting.workload.enable.cost.collection";
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION = "accounting.workload.enable.cost.collection";
     public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION = false;
 
     public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT =
         "accounting.workload.enable.cost.enforcement";
     public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT = false;
 
-    public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS =
-        "accounting.workload.enforcement.window.ms";
+    public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS = "accounting.workload.enforcement.window.ms";
     public static final long DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS = 60_000L;
 
-    public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS =
-        "accounting.workload.sleep.time.ms";
-    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
+    public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS = "accounting.workload.sleep.time.ms";
+    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 100;
 
     public static final String DEFAULT_WORKLOAD_NAME = "default";
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";

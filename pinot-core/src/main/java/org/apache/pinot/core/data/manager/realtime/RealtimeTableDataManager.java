@@ -215,14 +215,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (tableConfig.isDedupEnabled()) {
       _tableDedupMetadataManager =
           TableDedupMetadataManagerFactory.create(_instanceDataManagerConfig.getDedupConfig(), tableConfig, schema,
-              this, _segmentOperationsThrottler);
+              this, _segmentOperationsThrottlerSet);
     }
     if (tableConfig.isUpsertEnabled()) {
       Preconditions.checkState(_tableDedupMetadataManager == null,
           "Dedup and upsert cannot be both enabled for table: %s", _tableNameWithType);
       _tableUpsertMetadataManager =
           TableUpsertMetadataManagerFactory.create(_instanceDataManagerConfig.getUpsertConfig(), tableConfig, schema,
-              this, _segmentOperationsThrottler);
+              this, _segmentOperationsThrottlerSet);
     }
 
     _enforceConsumptionInOrder = isEnforceConsumptionInOrder();
@@ -888,7 +888,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Get a new index loading config with latest table config and schema to load the segment
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler, zkMetadata),
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata),
         zkMetadata);
     _ingestionDelayTracker.markPartitionForVerification(segmentName);
     _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
@@ -914,7 +914,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Get a new index loading config with latest table config and schema to load the segment
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler, zkMetadata);
+        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
 
     addSegment(immutableSegment, zkMetadata);
     _ingestionDelayTracker.markPartitionForVerification(segmentName);
@@ -937,12 +937,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   /**
    * Retrieves a mapping of partition id to the primary key count for the partition.
+   * Supports both upsert and dedup enabled tables.
    *
    * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition.
    */
-  public Map<Integer, Long> getUpsertPartitionToPrimaryKeyCount() {
+  public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
     if (isUpsertEnabled()) {
       return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
+    }
+    if (isDedupEnabled()) {
+      return _tableDedupMetadataManager.getPartitionToPrimaryKeyCount();
     }
     return Collections.emptyMap();
   }

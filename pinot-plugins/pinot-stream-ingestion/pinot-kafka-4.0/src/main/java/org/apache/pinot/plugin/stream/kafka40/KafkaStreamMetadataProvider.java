@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -69,11 +70,12 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
     try {
-      List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis));
+      List<PartitionInfo> partitionInfos = fetchPartitionInfos(timeoutMillis);
       if (CollectionUtils.isNotEmpty(partitionInfos)) {
         return partitionInfos.size();
       }
-      throw new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic));
+      throw new TransientConsumerException(new RuntimeException(
+          String.format("Failed to fetch partition information for topic: %s", _topic)));
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
@@ -82,9 +84,10 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public Set<Integer> fetchPartitionIds(long timeoutMillis) {
     try {
-      List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis));
+      List<PartitionInfo> partitionInfos = fetchPartitionInfos(timeoutMillis);
       if (CollectionUtils.isEmpty(partitionInfos)) {
-        throw new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic));
+        throw new TransientConsumerException(new RuntimeException(
+            String.format("Failed to fetch partition information for topic: %s", _topic)));
       }
       Set<Integer> partitionIds = Sets.newHashSetWithExpectedSize(partitionInfos.size());
       for (PartitionInfo partitionInfo : partitionInfos) {
@@ -281,5 +284,78 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   public void close()
       throws IOException {
     super.close();
+  }
+
+  private List<PartitionInfo> fetchPartitionInfos(long timeoutMillis) {
+    long deadlineMs = System.currentTimeMillis() + timeoutMillis;
+    List<PartitionInfo> partitionInfos = null;
+    Exception lastError = null;
+    boolean topicMissing = false;
+    while (System.currentTimeMillis() < deadlineMs) {
+      long remainingMs = deadlineMs - System.currentTimeMillis();
+      long requestTimeoutMs = Math.min(500L, Math.max(1L, remainingMs));
+      try {
+        partitionInfos = _consumer.partitionsFor(_topic, Duration.ofMillis(requestTimeoutMs));
+      } catch (TimeoutException e) {
+        lastError = e;
+      }
+
+      if (CollectionUtils.isNotEmpty(partitionInfos)) {
+        return partitionInfos;
+      }
+
+      try {
+        if (!topicExists(requestTimeoutMs)) {
+          topicMissing = true;
+          lastError = new RuntimeException(String.format("Topic does not exist: %s", _topic));
+        } else {
+          topicMissing = false;
+        }
+      } catch (TransientConsumerException e) {
+        lastError = e;
+      } catch (RuntimeException e) {
+        lastError = e;
+      }
+
+      if (System.currentTimeMillis() >= deadlineMs) {
+        break;
+      }
+      try {
+        Thread.sleep(100L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
+      }
+    }
+
+    if (lastError != null) {
+      if (topicMissing) {
+        throw new RuntimeException(String.format("Topic does not exist: %s", _topic));
+      }
+      if (lastError instanceof TransientConsumerException) {
+        throw (TransientConsumerException) lastError;
+      }
+      if (lastError instanceof TimeoutException) {
+        throw new TransientConsumerException(lastError);
+      }
+    }
+
+    throw new TransientConsumerException(
+        new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic)));
+  }
+
+  private boolean topicExists(long timeoutMillis) {
+    try {
+      AdminClient adminClient = getOrCreateSharedAdminClient();
+      ListTopicsResult result = adminClient.listTopics();
+      return result.names().get(timeoutMillis, TimeUnit.MILLISECONDS).contains(_topic);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new TransientConsumerException(e);
+    } catch (ExecutionException e) {
+      throw new TransientConsumerException(e);
+    } catch (java.util.concurrent.TimeoutException e) {
+      throw new TransientConsumerException(e);
+    }
   }
 }

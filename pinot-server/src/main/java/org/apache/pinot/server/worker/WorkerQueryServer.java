@@ -21,10 +21,10 @@ package org.apache.pinot.server.worker;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.query.runtime.KeepPipelineBreakerStatsPredicate;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.SendStatsPredicate;
 import org.apache.pinot.query.service.server.QueryServer;
-import org.apache.pinot.server.starter.helix.KeepPipelineBreakerStatsPredicate;
-import org.apache.pinot.server.starter.helix.SendStatsPredicate;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -44,8 +44,8 @@ public class WorkerQueryServer {
     _queryServicePort = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
         MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
     QueryRunner queryRunner = new QueryRunner();
-    queryRunner.init(serverConf, instanceDataManager, tlsConfig, sendStats::isSendStats,
-        keepPipelineBreakerStatsPredicate::isEnabled);
+    queryRunner.init(serverConf, instanceDataManager.getInstanceId(), instanceDataManager, tlsConfig,
+        sendStats::isSendStats, keepPipelineBreakerStatsPredicate::isEnabled);
     _queryWorkerService =
         new QueryServer(serverConf, instanceDataManager.getInstanceId(), _queryServicePort, queryRunner, tlsConfig,
             threadAccountant);

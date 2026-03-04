@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -61,9 +62,10 @@ public class DistinctCountMVAggregationFunction extends BaseDistinctAggregateAgg
     return DataSchema.ColumnDataType.INT;
   }
 
+  @Nullable
   @Override
-  public Integer extractFinalResult(Set intermediateResult) {
-    return intermediateResult.size();
+  public Integer extractFinalResult(@Nullable Set intermediateResult) {
+    return intermediateResult == null ? 0 : intermediateResult.size();
   }
 
   @Override

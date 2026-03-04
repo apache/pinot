@@ -27,10 +27,12 @@ import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -39,7 +41,7 @@ import org.testcontainers.utility.DockerImageName;
  * MiniKafkaCluster for Kafka 4.x using Testcontainers with KRaft mode (no ZooKeeper).
  * Uses the apache/kafka-native image for fast startup.
  */
-public final class MiniKafkaCluster implements Closeable {
+public final class MiniKafkaCluster implements StreamDataServerStartable, Closeable {
 
   private static final String KAFKA_IMAGE = "apache/kafka:4.0.0";
 
@@ -51,15 +53,29 @@ public final class MiniKafkaCluster implements Closeable {
     _kafkaContainer = new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE));
   }
 
-  public void start()
-      throws Exception {
-    _kafkaContainer.start();
+  @Override
+  public void init(Properties props) {
+    // No-op; test cluster is self-contained.
+  }
+
+  @Override
+  public void start() {
+    try {
+      _kafkaContainer.start();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to start Kafka test container", e);
+    }
+  }
+
+  @Override
+  public void stop() {
+    _kafkaContainer.stop();
   }
 
   @Override
   public void close()
       throws IOException {
-    _kafkaContainer.stop();
+    stop();
   }
 
   public String getKafkaServerAddress() {
@@ -72,8 +88,10 @@ public final class MiniKafkaCluster implements Closeable {
     return AdminClient.create(kafkaClientConfig);
   }
 
-  public void createTopic(String topicName, int numPartitions, int replicationFactor)
-      throws ExecutionException, InterruptedException {
+  @Override
+  public void createTopic(String topicName, Properties topicProps) {
+    int numPartitions = Integer.parseInt(String.valueOf(topicProps.getOrDefault("partition", 1)));
+    int replicationFactor = Integer.parseInt(String.valueOf(topicProps.getOrDefault("replicationFactor", 1)));
     try (AdminClient adminClient = getOrCreateAdminClient()) {
       NewTopic newTopic = new NewTopic(topicName, numPartitions, (short) replicationFactor);
       int retries = 5;
@@ -84,30 +102,72 @@ public final class MiniKafkaCluster implements Closeable {
         } catch (ExecutionException e) {
           if (e.getCause() instanceof org.apache.kafka.common.errors.TimeoutException) {
             retries--;
-            TimeUnit.SECONDS.sleep(1);
+            try {
+              TimeUnit.SECONDS.sleep(1);
+            } catch (InterruptedException interruptedException) {
+              Thread.currentThread().interrupt();
+              throw new RuntimeException("Interrupted while creating topic: " + topicName, interruptedException);
+            }
           } else {
-            throw e;
+            throw new RuntimeException("Failed to create topic: " + topicName, e);
           }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException("Interrupted while creating topic: " + topicName, e);
         }
       }
-      throw new ExecutionException("Failed to create topic after retries", null);
+      throw new RuntimeException("Failed to create topic after retries: " + topicName);
     }
   }
 
-  public void deleteTopic(String topicName)
-      throws ExecutionException, InterruptedException {
+  @Override
+  public void deleteTopic(String topicName) {
     try (AdminClient adminClient = getOrCreateAdminClient()) {
       adminClient.deleteTopics(Collections.singletonList(topicName)).all().get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while deleting topic: " + topicName, e);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to delete topic: " + topicName, e);
     }
   }
 
-  public void deleteRecordsBeforeOffset(String topicName, int partitionId, long offset)
-      throws ExecutionException, InterruptedException {
+  @Override
+  public void deleteRecordsBeforeOffset(String topicName, int partitionId, long offset) {
     try (AdminClient adminClient = getOrCreateAdminClient()) {
       Map<TopicPartition, RecordsToDelete> recordsToDelete = new HashMap<>();
       recordsToDelete.put(new TopicPartition(topicName, partitionId), RecordsToDelete.beforeOffset(offset));
       // Wait for the deletion to complete
       adminClient.deleteRecords(recordsToDelete).all().get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(
+          "Interrupted while deleting records for topic: " + topicName + ", partition: " + partitionId, e);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed to delete records for topic: " + topicName + ", partition: " + partitionId, e);
     }
+  }
+
+  @Override
+  public void createPartitions(String topicName, int numPartitions) {
+    try (AdminClient adminClient = getOrCreateAdminClient()) {
+      adminClient.createPartitions(Collections.singletonMap(topicName, NewPartitions.increaseTo(numPartitions))).all()
+          .get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while creating partitions for topic: " + topicName, e);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create partitions for topic: " + topicName, e);
+    }
+  }
+
+  @Override
+  public int getPort() {
+    String bootstrapServers = getKafkaServerAddress();
+    int schemeSeparator = bootstrapServers.indexOf("://");
+    String hostAndPort = schemeSeparator >= 0 ? bootstrapServers.substring(schemeSeparator + 3) : bootstrapServers;
+    int lastColon = hostAndPort.lastIndexOf(':');
+    return lastColon >= 0 ? Integer.parseInt(hostAndPort.substring(lastColon + 1)) : -1;
   }
 }

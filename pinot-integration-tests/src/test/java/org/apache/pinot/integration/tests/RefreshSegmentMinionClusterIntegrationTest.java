@@ -437,7 +437,7 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     }, 60_000L, "Failed to meet condition");
   }
 
-  private TableTaskConfig getRefreshSegmentTaskConfig() {
+  protected TableTaskConfig getRefreshSegmentTaskConfig() {
     Map<String, String> tableTaskConfigs = new HashMap<>();
     return new TableTaskConfig(
         Collections.singletonMap(MinionConstants.RefreshSegmentTask.TASK_TYPE, tableTaskConfigs));
