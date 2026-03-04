@@ -1205,9 +1205,9 @@ public final class TableConfigUtils {
     // Check if upsert is being added or removed
     if (existingUpsertEnabled != newUpsertEnabled) {
       if (existingUpsertEnabled) {
-        violations.add("upsertConfig cannot be removed from existing upsert table");
+        LOGGER.info("upsertConfig is removed from existing upsert table: {}", newConfig.getTableName());
       } else {
-        violations.add("upsertConfig cannot be added to existing non-upsert table");
+        LOGGER.info("upsertConfig is added to existing non-upsert table: {}", newConfig.getTableName());
       }
     } else if (existingUpsertEnabled) {
       UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
@@ -1280,9 +1280,9 @@ public final class TableConfigUtils {
     boolean newDedupEnabled = newConfig.isDedupEnabled();
     if (existingDedupEnabled != newDedupEnabled) {
       if (existingDedupEnabled) {
-        violations.add("dedupConfig cannot be removed from existing dedup table");
+        LOGGER.info("dedupConfig is removed from existing dedup table: {}", newConfig.getTableName());
       } else {
-        violations.add("dedupConfig cannot be added to existing non-dedup table");
+        LOGGER.info("dedupConfig is added into the existing non-dedup table: {}", newConfig.getTableName());
       }
     } else if (existingDedupEnabled) {
       DedupConfig existingDedupConfig = existingConfig.getDedupConfig();
