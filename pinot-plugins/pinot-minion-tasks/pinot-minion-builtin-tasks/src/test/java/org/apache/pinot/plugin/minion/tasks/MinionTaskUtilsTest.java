@@ -298,7 +298,7 @@ public class MinionTaskUtilsTest {
 
   @Test
   public void testParseValidDocIdsComparisonMode() {
-    // Null or blank defaults to EQUAL_CONSENSUS
+    // Null or blank defaults to EQUAL
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode(null),
         MinionConstants.ValidDocIdsConsensusMode.EQUAL);
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode(""),
@@ -306,22 +306,22 @@ public class MinionTaskUtilsTest {
     assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("   "),
         MinionConstants.ValidDocIdsConsensusMode.EQUAL);
 
-    // NONE
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("NONE"),
+    // UNSAFE
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("UNSAFE"),
         MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("none"),
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("unsafe"),
         MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
 
-    // EQUAL_CONSENSUS
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("EQUAL_CONSENSUS"),
+    // EQUAL
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("EQUAL"),
         MinionConstants.ValidDocIdsConsensusMode.EQUAL);
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("  EQUAL_CONSENSUS  "),
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("  EQUAL  "),
         MinionConstants.ValidDocIdsConsensusMode.EQUAL);
 
-    // MAX_VALID_DOCS
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("MAX_VALID_DOCS"),
+    // MOST_VALID_DOCS
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("MOST_VALID_DOCS"),
         MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("max_valid_docs"),
+    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("most_valid_docs"),
         MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
 
     // Invalid value throws
@@ -332,7 +332,7 @@ public class MinionTaskUtilsTest {
   @Test
   public void testValidDocIdsComparisonModeConstants() {
     assertEquals(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_COMPARISON_MODE_KEY, "validDocIdsComparisonMode");
-    assertEquals(MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_COMPARISON_MODE, "EQUAL_CONSENSUS");
+    assertEquals(MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_COMPARISON_MODE, "EQUAL");
   }
 
   /**
@@ -430,7 +430,7 @@ public class MinionTaskUtilsTest {
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(5)),
         makeResponse(segmentName, expectedCrc, "server3", makeBitmap(5)));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "EQUAL_CONSENSUS", responses, new String[]{"server1", "server2", "server3"}, this);
+        "EQUAL", responses, new String[]{"server1", "server2", "server3"}, this);
     assertNotNull(result);
     assertEquals(result.getCardinality(), 5);
   }
@@ -445,7 +445,7 @@ public class MinionTaskUtilsTest {
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(5)),
         makeResponse(segmentName, expectedCrc, "server3", makeBitmap(5)));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "MAX_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
+        "MOST_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
     assertNotNull(result);
     assertEquals(result.getCardinality(), 5);
   }
@@ -460,7 +460,7 @@ public class MinionTaskUtilsTest {
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(5)),
         makeResponse(segmentName, expectedCrc, "server3", makeBitmap(5)));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "NONE", responses, new String[]{"server1", "server2", "server3"}, this);
+        "UNSAFE", responses, new String[]{"server1", "server2", "server3"}, this);
     assertNotNull(result);
     assertEquals(result.getCardinality(), 5);
   }
@@ -475,7 +475,7 @@ public class MinionTaskUtilsTest {
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(3)),
         makeResponse(segmentName, expectedCrc, "server3", makeBitmap(4)));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "MAX_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
+        "MOST_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
     assertNotNull(result);
     assertEquals(result.getCardinality(), 5);
   }
@@ -491,7 +491,7 @@ public class MinionTaskUtilsTest {
         makeResponse(segmentName, expectedCrc, "server3", makeBitmap(3)));
     expectThrows(IllegalStateException.class,
         () -> getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-            "EQUAL_CONSENSUS", responses, new String[]{"server1", "server2", "server3"}, this));
+            "EQUAL", responses, new String[]{"server1", "server2", "server3"}, this));
   }
 
   @Test
@@ -504,7 +504,7 @@ public class MinionTaskUtilsTest {
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(0)),
         makeResponse(segmentName, expectedCrc, "server3", makeBitmap(3)));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "MAX_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
+        "MOST_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
     assertNotNull(result);
     assertEquals(result.getCardinality(), 3);
   }
@@ -519,12 +519,12 @@ public class MinionTaskUtilsTest {
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(0)),
         makeResponse(segmentName, expectedCrc, "server3", makeBitmap(3)));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "NONE", responses, new String[]{"server1", "server2", "server3"}, this);
+        "UNSAFE", responses, new String[]{"server1", "server2", "server3"}, this);
     assertNotNull(result);
     assertEquals(result.getCardinality(), 0);
   }
 
-  // --- one server fails (returns null): EQUAL_CONSENSUS throws; others skip and use remaining ---
+  // --- one server fails (returns null): EQUAL throws; others skip and use remaining ---
 
   @Test
   public void testOneServerFailsEqualConsensus() {
@@ -537,7 +537,7 @@ public class MinionTaskUtilsTest {
         makeResponse(segmentName, expectedCrc, "server3", makeBitmap(5)));
     expectThrows(IllegalStateException.class,
         () -> getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-            "EQUAL_CONSENSUS", responses, new String[]{"server1", "server2", "server3"}, this));
+            "EQUAL", responses, new String[]{"server1", "server2", "server3"}, this));
   }
 
   @Test
@@ -550,7 +550,7 @@ public class MinionTaskUtilsTest {
         new RuntimeException("simulated fetch failure"),
         makeResponse(segmentName, expectedCrc, "server3", makeBitmap(4)));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "MAX_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
+        "MOST_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
     assertNotNull(result);
     assertEquals(result.getCardinality(), 5);
   }
@@ -565,7 +565,7 @@ public class MinionTaskUtilsTest {
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(3)),
         makeResponse(segmentName, expectedCrc, "server3", makeBitmap(5)));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "NONE", responses, new String[]{"server1", "server2", "server3"}, this);
+        "UNSAFE", responses, new String[]{"server1", "server2", "server3"}, this);
     assertNotNull(result);
     assertEquals(result.getCardinality(), 3);
   }
@@ -580,7 +580,7 @@ public class MinionTaskUtilsTest {
         new RuntimeException("simulated"),
         new RuntimeException("simulated"));
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "MAX_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
+        "MOST_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
     assertNull(result);
   }
 

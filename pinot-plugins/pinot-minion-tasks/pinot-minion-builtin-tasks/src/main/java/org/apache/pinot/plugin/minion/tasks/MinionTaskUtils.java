@@ -356,7 +356,8 @@ public class MinionTaskUtils {
       int cardinality = bitmap.getCardinality();
 
       if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
-        LOGGER.info("Using server {} with {} valid docs for segment {} (mode=UNSAFE)", server, cardinality, segmentName);
+        LOGGER.info("Using server {} with {} valid docs for segment {} (mode=UNSAFE)", server, cardinality,
+            segmentName);
         return bitmap;
       }
 
