@@ -236,22 +236,13 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     return spec;
   }
 
-  private URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile)
+  @Override
+  protected URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile)
       throws Exception {
     if (!taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       return localSegmentTarFile.toURI();
     }
-    URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
-      URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
-      if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
-          outputSegmentTarURI)) {
-        LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentTarURI));
-      } else {
-        outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
-      }
-      return outputSegmentTarURI;
-    }
+    return super.moveSegmentToOutputPinotFS(taskConfigs, localSegmentTarFile);
   }
 
   private File tarSegmentDir(SegmentGenerationTaskSpec taskSpec, String segmentName)

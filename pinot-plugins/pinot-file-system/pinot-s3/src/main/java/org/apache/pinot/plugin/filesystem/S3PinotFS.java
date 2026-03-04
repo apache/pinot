@@ -26,8 +26,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -451,10 +449,9 @@ public class S3PinotFS extends BasePinotFS {
   private boolean copyFile(URI srcUri, URI dstUri)
       throws IOException {
     try {
-      String encodedUrl = URLEncoder.encode(srcUri.getHost() + srcUri.getPath(), StandardCharsets.UTF_8);
-
       String dstPath = sanitizePath(dstUri.getPath());
-      CopyObjectRequest copyReq = generateCopyObjectRequest(encodedUrl, dstUri, dstPath, null);
+      CopyObjectRequest copyReq =
+          generateCopyObjectRequest(srcUri.getHost(), sanitizePath(srcUri.getPath()), dstUri, dstPath, null);
       CopyObjectResponse copyObjectResponse = retryWithS3CredentialRefresh(() -> _s3Client.copyObject(copyReq));
       return copyObjectResponse.sdkHttpResponse().isSuccessful();
     } catch (S3Exception e) {
@@ -900,10 +897,9 @@ public class S3PinotFS extends BasePinotFS {
       throws IOException {
     try {
       HeadObjectResponse s3ObjectMetadata = getS3ObjectMetadata(uri);
-      String encodedUrl = URLEncoder.encode(uri.getHost() + uri.getPath(), StandardCharsets.UTF_8);
 
       String path = sanitizePath(uri.getPath());
-      CopyObjectRequest request = generateCopyObjectRequest(encodedUrl, uri, path,
+      CopyObjectRequest request = generateCopyObjectRequest(uri.getHost(), path, uri, path,
           Map.of("lastModified", String.valueOf(System.currentTimeMillis())));
       retryWithS3CredentialRefresh(() -> _s3Client.copyObject(request));
       long newUpdateTime = getS3ObjectMetadata(uri).lastModified().toEpochMilli();
@@ -939,10 +935,11 @@ public class S3PinotFS extends BasePinotFS {
     return putReqBuilder.build();
   }
 
-  private CopyObjectRequest generateCopyObjectRequest(String copySource, URI dest, String path,
+  private CopyObjectRequest generateCopyObjectRequest(String sourceBucket, String sourceKey, URI dest, String path,
       Map<String, String> metadata) {
     CopyObjectRequest.Builder copyReqBuilder =
-        CopyObjectRequest.builder().copySource(copySource).destinationBucket(dest.getHost()).destinationKey(path);
+        CopyObjectRequest.builder().sourceBucket(sourceBucket).sourceKey(sourceKey)
+            .destinationBucket(dest.getHost()).destinationKey(path);
     if (_storageClass != null) {
       copyReqBuilder.storageClass(_storageClass);
     }

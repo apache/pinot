@@ -431,7 +431,7 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
     serverQueryContext.setEndTimeMs(
         System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     Plan plan =
-        planMaker.makeInstancePlan(getSegmentContexts(getIndexSegments()), serverQueryContext, EXECUTOR_SERVICE, null);
+        planMaker.makeInstancePlan(getSegmentContexts(getIndexSegments()), serverQueryContext, EXECUTOR_SERVICE);
     InstanceResponseBlock instanceResponse;
     try {
       instanceResponse = queryContext.isExplain()
@@ -515,9 +515,9 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
     serverQueryContext.setEndTimeMs(
         System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     Plan plan1 =
-        planMaker.makeInstancePlan(getSegmentContexts(instances.get(0)), serverQueryContext, EXECUTOR_SERVICE, null);
+        planMaker.makeInstancePlan(getSegmentContexts(instances.get(0)), serverQueryContext, EXECUTOR_SERVICE);
     Plan plan2 =
-        planMaker.makeInstancePlan(getSegmentContexts(instances.get(1)), serverQueryContext, EXECUTOR_SERVICE, null);
+        planMaker.makeInstancePlan(getSegmentContexts(instances.get(1)), serverQueryContext, EXECUTOR_SERVICE);
 
     InstanceResponseBlock instanceResponse1;
     try {

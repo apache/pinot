@@ -64,6 +64,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,7 +125,14 @@ public class ADLSGen2PinotFS extends BasePinotFS {
 
   @Override
   public void init(PinotConfiguration config) {
-    _enableChecksum = config.getProperty(ENABLE_CHECKSUM, false);
+    boolean checksumEnabled = config.getProperty(ENABLE_CHECKSUM, false);
+    if (checksumEnabled && PinotMd5Mode.isPinotMd5Disabled()) {
+      throw new IllegalStateException(String.format(
+          "ADLS checksum requires MD5, but MD5 is disabled via '%s=true'. Set '%s=false' or '%s=false'.",
+          CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED, CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
+          ENABLE_CHECKSUM));
+    }
+    _enableChecksum = checksumEnabled;
 
     // Azure storage account name
     String accountName = config.getProperty(ACCOUNT_NAME);
@@ -539,7 +548,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   public void copyFromLocalFile(File srcFile, URI dstUri)
       throws Exception {
     LOGGER.debug("copyFromLocalFile is called with srcFile='{}', dstUri='{}'", srcFile, dstUri);
-    byte[] contentMd5 = computeContentMd5(srcFile);
+    byte[] contentMd5 = _enableChecksum ? computeContentMd5(srcFile) : null;
     try (InputStream fileInputStream = new FileInputStream(srcFile)) {
       copyInputStreamToDst(fileInputStream, dstUri, contentMd5);
     }

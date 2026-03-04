@@ -63,6 +63,8 @@ public final class TableConfigValidationUtils {
     checkHybridTableConfig(resourceManager, tableConfig);
     TaskConfigUtils.validateTaskConfigs(tableConfig, schema, taskManager, typesToSkip);
     validateInstanceAssignment(resourceManager, tableConfig);
+    resourceManager.validateTableTenantConfig(tableConfig);
+    resourceManager.validateTableTaskMinionInstanceTagConfig(tableConfig);
   }
 
   private static void checkHybridTableConfig(PinotHelixResourceManager resourceManager, TableConfig tableConfig) {

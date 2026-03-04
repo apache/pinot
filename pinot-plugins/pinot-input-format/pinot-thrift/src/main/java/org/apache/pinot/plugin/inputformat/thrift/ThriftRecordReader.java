@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
@@ -110,7 +111,7 @@ public class ThriftRecordReader implements RecordReader {
       tObject = (TBase) _thriftClass.newInstance();
       tObject.read(_tProtocol);
     } catch (Exception e) {
-      throw new IOException("Caught exception while reading thrift object", e);
+      throw new RecordFetchException("Caught exception while reading thrift object", e);
     }
     _recordExtractor.extract(tObject, reuse);
     _hasNext = hasMoreToRead();

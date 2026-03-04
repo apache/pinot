@@ -192,7 +192,10 @@ public class PluginManagerTest {
     // StreamConsumerFactory
     Assert.assertEquals(PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory"),
-        "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
+        "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+    Assert.assertEquals(PluginManager
+            .loadClassWithBackwardCompatibleCheck("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory"),
+        "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
   }
 
   @DataProvider(name = "recordReaderClassNames")

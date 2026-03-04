@@ -535,10 +535,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     Plan queryPlan;
     if (streamer != null) {
-      queryPlan = _planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService,
-          streamer, _serverMetrics);
+      queryPlan =
+          _planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService, streamer);
     } else {
-      queryPlan = _planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService, _serverMetrics);
+      queryPlan = _planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService);
     }
     planBuildTimer.stopAndRecord();
     return queryPlan;

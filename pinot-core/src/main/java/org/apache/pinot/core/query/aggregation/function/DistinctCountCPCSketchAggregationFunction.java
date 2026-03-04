@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.memory.Memory;
@@ -421,8 +422,12 @@ public class DistinctCountCPCSketchAggregationFunction
     return DataSchema.ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Comparable extractFinalResult(CpcSketchAccumulator intermediateResult) {
+  public Comparable extractFinalResult(@Nullable CpcSketchAccumulator intermediateResult) {
+    if (intermediateResult == null) {
+      return 0L;
+    }
     intermediateResult.setLgNominalEntries(_lgNominalEntries);
     intermediateResult.setThreshold(_accumulatorThreshold);
     return Math.round(intermediateResult.getResult().getEstimate());

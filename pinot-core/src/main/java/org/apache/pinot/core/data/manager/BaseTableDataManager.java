@@ -59,6 +59,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -77,9 +78,9 @@ import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -142,7 +143,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
   @Nullable
-  protected SegmentOperationsThrottler _segmentOperationsThrottler;
+  protected SegmentOperationsThrottlerSet _segmentOperationsThrottlerSet;
 
   // Semaphore to restrict the maximum number of parallel segment downloads from deep store for a table
   protected Semaphore _segmentDownloadSemaphore;
@@ -168,7 +169,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       SegmentLocks segmentLocks, TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
       ExecutorService segmentReloadRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, boolean enableAsyncSegmentRefresh,
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, boolean enableAsyncSegmentRefresh,
       ServerReloadJobStatusCache reloadJobStatusCache) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
@@ -179,8 +180,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = helixManager.getHelixPropertyStore();
     _segmentLocks = segmentLocks;
     _segmentReloadSemaphore = segmentReloadSemaphore;
-    _segmentReloadRefreshExecutor = segmentReloadRefreshExecutor;
-    _segmentPreloadExecutor = segmentPreloadExecutor;
+    _segmentReloadRefreshExecutor = new SegmentOperationsExecutorService(segmentReloadRefreshExecutor,
+        SegmentOperationsTaskType.REFRESH_OR_RELOAD, tableConfig.getTableName());
+    _segmentPreloadExecutor = segmentPreloadExecutor != null
+        ? new SegmentOperationsExecutorService(segmentPreloadExecutor, SegmentOperationsTaskType.PRELOAD,
+        tableConfig.getTableName())
+        : null;
     _enableAsyncSegmentRefresh = enableAsyncSegmentRefresh;
     _authProvider = AuthProviderUtils.extractAuthProvider(instanceDataManagerConfig.getAuthConfig(), null);
 
@@ -200,7 +205,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           + "Please check for available space and write-permissions for this directory.", _resourceTmpDir);
     }
     _errorCache = errorCache;
-    _segmentOperationsThrottler = segmentOperationsThrottler;
+    _segmentOperationsThrottlerSet = segmentOperationsThrottlerSet;
     _recentlyDeletedSegments = CacheBuilder.newBuilder()
         .maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
@@ -440,7 +445,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
     if (!_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
       _logger.info("Skipping replacing segment: {} even though its CRC has changed from: {} to: {} because "
-          + "instance.check.crc.on.segment.load is set to false", segmentName, localMetadata.getCrc(),
+              + "instance.check.crc.on.segment.load is set to false", segmentName, localMetadata.getCrc(),
           zkMetadata.getCrc());
       return;
     }
@@ -457,7 +462,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Downloading and loading segment: {}", segmentName);
     File indexDir = downloadSegment(zkMetadata);
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler, zkMetadata);
+        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
     addSegment(immutableSegment, zkMetadata);
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
@@ -913,7 +918,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
           TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
       ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
-          _segmentOperationsThrottler, zkMetadata);
+          _segmentOperationsThrottlerSet, zkMetadata);
       addSegment(segment, zkMetadata);
 
       // Remove backup directory to mark the completion of segment reloading.
@@ -923,7 +928,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         LoaderUtils.reloadFailureRecovery(indexDir);
       } catch (Exception recoveryFailureException) {
         _logger.error("Failed to recover segment: {} after reload failure", segmentName, recoveryFailureException);
-        reloadFailureException.addSuppressed(recoveryFailureException);
+        ExceptionUtils.suppress(recoveryFailureException, reloadFailureException);
       }
       addSegmentError(segmentName,
           new SegmentErrorInfo(System.currentTimeMillis(), "Caught exception while reloading segment",
@@ -1027,9 +1032,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
           segmentName, System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
     }
     try {
-      if (_segmentOperationsThrottler != null) {
+      if (_segmentOperationsThrottlerSet != null) {
         long startTime = System.currentTimeMillis();
-        SegmentDownloadThrottler segmentDownloadThrottler = _segmentOperationsThrottler.getSegmentDownloadThrottler();
+        SegmentOperationsThrottler segmentDownloadThrottler =
+            _segmentOperationsThrottlerSet.getSegmentDownloadThrottler();
         _logger.info("Acquiring instance level segment download semaphore for segment: {}, queue-length: {} ",
             segmentName, segmentDownloadThrottler.getQueueLength());
         segmentDownloadThrottler.acquire();
@@ -1069,8 +1075,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, 1);
         throw e;
       } finally {
-        if (_segmentOperationsThrottler != null) {
-          _segmentOperationsThrottler.getSegmentDownloadThrottler().release();
+        if (_segmentOperationsThrottlerSet != null) {
+          _segmentOperationsThrottlerSet.getSegmentDownloadThrottler().release();
         }
         long downloadDuration = System.currentTimeMillis() - downloadStartTime;
         _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.SEGMENT_DOWNLOAD_FROM_DEEP_STORE_TIME_MS,
@@ -1094,9 +1100,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Downloading segment: {} from peers", segmentName);
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
     File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
-    if (_segmentOperationsThrottler != null) {
+    if (_segmentOperationsThrottlerSet != null) {
       long startTime = System.currentTimeMillis();
-      SegmentDownloadThrottler segmentDownloadThrottler = _segmentOperationsThrottler.getSegmentDownloadThrottler();
+      SegmentOperationsThrottler segmentDownloadThrottler =
+          _segmentOperationsThrottlerSet.getSegmentDownloadThrottler();
       _logger.info("Acquiring instance level segment download semaphore for peer downloading segment: {}, "
           + "queue-length: {} ", segmentName, segmentDownloadThrottler.getQueueLength());
       segmentDownloadThrottler.acquire();
@@ -1122,8 +1129,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1);
       throw e;
     } finally {
-      if (_segmentOperationsThrottler != null) {
-        _segmentOperationsThrottler.getSegmentDownloadThrottler().release();
+      if (_segmentOperationsThrottlerSet != null) {
+        _segmentOperationsThrottlerSet.getSegmentDownloadThrottler().release();
       }
       long downloadDuration = System.currentTimeMillis() - downloadStartTime;
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.SEGMENT_DOWNLOAD_FROM_PEERS_TIME_MS,
@@ -1302,7 +1309,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         segmentDirectory.copyTo(indexDir);
         // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
         closeSegmentDirectoryQuietly(segmentDirectory);
-        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, _segmentOperationsThrottler, zkMetadata);
+        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
         segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()),
             indexLoadingConfig, zkMetadata);
       }
@@ -1666,9 +1673,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return true;
     }
     return zkMetadata.isUseDataCrc()
-            && zkMetadata.getDataCrc() >= 0
-            && Long.parseLong(localMetadata.getDataCrc()) >= 0
-            && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
+        && zkMetadata.getDataCrc() >= 0
+        && Long.parseLong(localMetadata.getDataCrc()) >= 0
+        && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
   }
 
   private static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {

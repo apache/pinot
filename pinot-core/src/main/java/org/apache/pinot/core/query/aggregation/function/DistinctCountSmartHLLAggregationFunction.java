@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -373,7 +374,10 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
   }
 
   @Override
-  public Integer extractFinalResult(Object intermediateResult) {
+  public Integer extractFinalResult(@Nullable Object intermediateResult) {
+    if (intermediateResult == null) {
+      return 0;
+    }
     if (intermediateResult instanceof HyperLogLog) {
       return (int) ((HyperLogLog) intermediateResult).cardinality();
     } else {

@@ -43,7 +43,7 @@ public interface RebalancePreChecker {
     public PreCheckContext(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig,
         Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
         @Nullable TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, RebalanceConfig rebalanceConfig,
-        RebalanceSummaryResult rebalanceSummaryResult) {
+        @Nullable RebalanceSummaryResult rebalanceSummaryResult) {
       _rebalanceJobId = rebalanceJobId;
       _tableNameWithType = tableNameWithType;
       _tableConfig = tableConfig;

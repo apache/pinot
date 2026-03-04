@@ -72,7 +72,6 @@ repo. It is intentionally short and focused on day-to-day work.
   - pinot-batch-ingestion-standalone: standalone batch ingestion implementation.
 - pinot-stream-ingestion: stream ingestion plugin family.
   - pinot-kafka-base: shared Kafka ingestion base classes.
-  - pinot-kafka-2.0: Kafka 2.x ingestion implementation.
   - pinot-kafka-3.0: Kafka 3.x ingestion implementation.
   - pinot-kinesis: AWS Kinesis ingestion implementation.
   - pinot-pulsar: Apache Pulsar ingestion implementation.

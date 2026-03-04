@@ -153,8 +153,11 @@ public class GcsPinotFS extends BasePinotFS {
       if (existsDirectoryOrBucket(gcsUri)) {
         result &= delete(gcsUri, forceDelete);
       } else {
-        blobIds.add(getBlob(gcsUri).getBlobId());
-        if (blobIds.size() >= DELETE_BATCH_LIMIT || !iterator.hasNext()) {
+        Blob blob = getBlob(gcsUri);
+        if (blob != null) {
+          blobIds.add(blob.getBlobId());
+        }
+        if (blobIds.size() >= DELETE_BATCH_LIMIT || (!blobIds.isEmpty() && !iterator.hasNext())) {
           List<Boolean> deleted = _storage.delete(blobIds);
           result &= deleted.stream().allMatch(Boolean::booleanValue);
           blobIds.clear();
