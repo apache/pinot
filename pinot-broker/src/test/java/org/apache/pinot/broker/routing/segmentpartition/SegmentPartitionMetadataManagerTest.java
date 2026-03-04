@@ -272,7 +272,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     onlineSegments.add(segmentInvalid);
     segmentAssignment.put(segmentInvalid, Collections.singletonMap(SERVER_1, ONLINE));
     // partition ID 10000 greater than NUM_PARTITIONS (2).
-    setSegmentZKMetadata(segmentInvalid,  PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 10000, 0L);
+    setSegmentZKMetadata(segmentInvalid, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 10000, 0L);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
     tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
     partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
