@@ -19,13 +19,10 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -39,7 +36,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
-import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
