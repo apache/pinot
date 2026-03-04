@@ -368,8 +368,7 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload,
       @ApiParam(value = "Force update the table schema") @DefaultValue("false") @QueryParam("forceTableSchemaUpdate")
-      boolean forceTableSchemaUpdate, @ApiParam(value = "Force update config changes") String tableConfigsStr,
-      @Context HttpHeaders headers)
+      boolean forceTableSchemaUpdate, String tableConfigsStr, @Context HttpHeaders headers)
       throws Exception {
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(headers);
     tableName = DatabaseUtils.translateTableName(tableName, databaseName);
