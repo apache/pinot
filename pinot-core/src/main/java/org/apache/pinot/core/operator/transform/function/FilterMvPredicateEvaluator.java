@@ -91,7 +91,7 @@ public final class FilterMvPredicateEvaluator {
         validateFilter(filterContext.getChildren().get(0));
         return;
       default:
-        throw new IllegalStateException("Unsupported filter type: " + filterContext.getType());
+        throw new IllegalArgumentException("Unsupported filter type: " + filterContext.getType());
     }
   }
 
@@ -160,7 +160,7 @@ public final class FilterMvPredicateEvaluator {
         return EvalNode.not(child);
       }
       default:
-        throw new IllegalStateException("Unsupported filter type: " + filterContext.getType());
+        throw new IllegalArgumentException("Unsupported filter type: " + filterContext.getType());
     }
   }
 

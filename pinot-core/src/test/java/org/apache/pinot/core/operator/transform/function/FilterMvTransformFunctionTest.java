@@ -20,12 +20,15 @@ package org.apache.pinot.core.operator.transform.function;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import java.util.function.IntPredicate;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.function.scalar.FilterMvScalarFunction;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -38,7 +41,34 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testFilterMvTransformFunctionInt() {
-    String expressionStr = String.format("filterMv(%s, 'v > 5')", INT_MV_COLUMN);
+    assertFilterMvTransformFunctionInt("v > 5", value -> value > 5);
+  }
+
+  @Test(dataProvider = "filterMvIntPredicates")
+  public void testFilterMvTransformFunctionIntPredicates(String predicate, IntPredicate matcher) {
+    assertFilterMvTransformFunctionInt(predicate, matcher);
+  }
+
+  @DataProvider(name = "filterMvIntPredicates")
+  public Object[][] provideFilterMvIntPredicates() {
+    return new Object[][]{
+        new Object[]{"v != 5", (IntPredicate) value -> value != 5},
+        new Object[]{"v > 5", (IntPredicate) value -> value > 5},
+        new Object[]{"v >= 5", (IntPredicate) value -> value >= 5},
+        new Object[]{"v < 5", (IntPredicate) value -> value < 5},
+        new Object[]{"v <= 5", (IntPredicate) value -> value <= 5},
+        new Object[]{"v IN (1, 3, 5)", (IntPredicate) value -> value == 1 || value == 3 || value == 5},
+        new Object[]{"v NOT IN (1, 3, 5)", (IntPredicate) value -> value != 1 && value != 3 && value != 5},
+        new Object[]{"v BETWEEN 3 AND 7", (IntPredicate) value -> value >= 3 && value <= 7},
+        new Object[]{"v > 3 AND v < 7", (IntPredicate) value -> value > 3 && value < 7},
+        new Object[]{"v < 2 OR v > 9", (IntPredicate) value -> value < 2 || value > 9},
+        new Object[]{"NOT (v = 1)", (IntPredicate) value -> value != 1}
+    };
+  }
+
+  private void assertFilterMvTransformFunctionInt(String predicate, IntPredicate matcher) {
+    String escaped = predicate.replace("'", "''");
+    String expressionStr = String.format("filterMv(%s, '%s')", INT_MV_COLUMN, escaped);
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof FilterMvTransformFunction);
@@ -59,7 +89,7 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       IntList expectedList = new IntArrayList();
       for (int value : _intMVValues[i]) {
-        if (value > 5) {
+        if (matcher.test(value)) {
           expectedList.add(value);
         }
       }
@@ -84,7 +114,7 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     }
   }
 
-  @Test(dataProvider = "testFilterMvTransformFunctionString")
+  @Test(dataProvider = "filterMvStringPredicates")
   public void testFilterMvTransformFunctionString(String predicate, boolean expectMatch) {
     String escaped = predicate.replace("'", "''");
     String expressionStr = String.format("filterMv(%s, '%s')", STRING_ALPHANUM_MV_COLUMN_2, escaped);
@@ -108,8 +138,8 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     }
   }
 
-  @DataProvider(name = "testFilterMvTransformFunctionString")
-  public Object[][] testFilterMvTransformFunctionString() {
+  @DataProvider(name = "filterMvStringPredicates")
+  public Object[][] provideFilterMvStringPredicates() {
     return new Object[][]{
         new Object[]{"v = 'a'", true},
         new Object[]{"v = 'b'", false},
@@ -118,14 +148,36 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     };
   }
 
-  @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
+  @Test
+  public void testFilterMvScalarFunctionBytes() {
+    // Test the scalar function BYTES overload directly since the base test class has no BYTES MV column
+    byte[] val1 = BytesUtils.toBytes("aabb");
+    byte[] val2 = BytesUtils.toBytes("ccdd");
+    byte[] val3 = BytesUtils.toBytes("eeff");
+    byte[][] values = new byte[][]{val1, val2, val3};
+
+    // Positive match: filter to values equal to 'ccdd'
+    byte[][] filtered = FilterMvScalarFunction.filterMv(values, "v = 'ccdd'");
+    assertEquals(filtered.length, 1);
+    assertEquals(filtered[0], val2);
+
+    // Negative match: filter to values equal to non-existent value
+    byte[][] filteredNone = FilterMvScalarFunction.filterMv(values, "v = '0000'");
+    assertEquals(filteredNone.length, 0);
+
+    // All match: always-true predicate returns original array
+    byte[][] filteredAll = FilterMvScalarFunction.filterMv(values, "v != '0000'");
+    assertEquals(filteredAll.length, 3);
+  }
+
+  @Test(dataProvider = "illegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
-  @DataProvider(name = "testIllegalArguments")
-  public Object[][] testIllegalArguments() {
+  @DataProvider(name = "illegalArguments")
+  public Object[][] provideIllegalArguments() {
     return new Object[][]{
         new Object[]{String.format("filterMv(%s)", INT_MV_COLUMN)},
         new Object[]{String.format("filterMv(%s, 'v > 0')", INT_SV_COLUMN)},

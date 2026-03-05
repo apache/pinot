@@ -243,8 +243,16 @@ public class FilterMvScalarFunction implements PinotScalarFunction {
 
   private static FilterMvPredicateEvaluator evaluatorFor(String predicate, DataType dataType) {
     CacheKey key = new CacheKey(predicate, dataType);
-    return EVALUATOR_CACHE.asMap().computeIfAbsent(key,
-        cacheKey -> FilterMvPredicateEvaluator.forPredicate(cacheKey._predicate, cacheKey._dataType, null));
+    try {
+      return EVALUATOR_CACHE.get(key,
+          () -> FilterMvPredicateEvaluator.forPredicate(predicate, dataType, null));
+    } catch (Exception e) {
+      Throwable cause = e.getCause() != null ? e.getCause() : e;
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
+      }
+      throw new IllegalArgumentException("Failed to create predicate evaluator for: " + predicate, cause);
+    }
   }
 
   private static final class CacheKey {

@@ -732,7 +732,8 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   public void testFilterMvLongArrayFilterValues(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = String.format("SELECT filterMv(%s, 'v > 1') FROM %s LIMIT 1", LONG_ARRAY_COLUMN, getTableName());
+    String query = String.format("SELECT filterMv(%s, 'v > 1') FROM %s WHERE %s = 0 LIMIT 1", LONG_ARRAY_COLUMN,
+        getTableName(), INT_COLUMN);
     JsonNode result = postQuery(query).get("resultTable");
     assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "LONG_ARRAY");
     JsonNode rows = result.get("rows");
@@ -759,8 +760,8 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   public void testFilterMvRegexpLikeFilterValues(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = String.format("SELECT filterMv(%s, 'REGEXP_LIKE(v, ''^/api/.*'')') FROM %s LIMIT 1",
-        STRING_ARRAY_COLUMN, getTableName());
+    String query = String.format("SELECT filterMv(%s, 'REGEXP_LIKE(v, ''^/api/.*'')') FROM %s WHERE %s = 0 LIMIT 1",
+        STRING_ARRAY_COLUMN, getTableName(), INT_COLUMN);
     JsonNode result = postQuery(query).get("resultTable");
     assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "STRING_ARRAY");
     JsonNode rows = result.get("rows");
