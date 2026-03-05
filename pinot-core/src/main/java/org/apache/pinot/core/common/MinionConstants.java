@@ -133,6 +133,15 @@ public class MinionConstants {
     public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
     public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
 
+    // Reducer config
+    /**
+     * Maximum number of rows to batch before aggregating during rollup reduce phase.
+     * Higher values improve performance for sketch aggregations but use more memory.
+     * Default is 1000.
+     */
+    public static final String REDUCER_MAX_BATCH_SIZE_KEY = "reducerMaxBatchSize";
+    public static final int DEFAULT_REDUCER_MAX_BATCH_SIZE = 1000;
+
     // See AdaptiveSizeBasedWriter for documentation of these configs
     public static final String SEGMENT_MAPPER_FILE_SIZE_IN_BYTES = "segmentMapperFileSizeThresholdInBytes";
     public static final String MAX_DISK_USAGE_PERCENTAGE = "maxDiskUsagePercentage";

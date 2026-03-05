@@ -101,6 +101,12 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     // Segment config
     segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));
 
+    // Reducer config
+    String reducerMaxBatchSizeStr = configs.get(MinionConstants.MergeTask.REDUCER_MAX_BATCH_SIZE_KEY);
+    if (reducerMaxBatchSizeStr != null) {
+      segmentProcessorConfigBuilder.setReducerMaxBatchSize(Integer.parseInt(reducerMaxBatchSizeStr));
+    }
+
     // Progress observer
     segmentProcessorConfigBuilder.setProgressObserver(p -> _eventObserver.notifyProgress(_pinotTaskConfig, p));
 

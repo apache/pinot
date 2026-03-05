@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.segment.processing.aggregator.ValueAggregator;
 import org.apache.pinot.core.segment.processing.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
@@ -50,16 +51,25 @@ public class RollupReducer implements Reducer {
   private final Map<String, AggregationFunctionType> _aggregationTypes;
   private final Map<String, Map<String, String>> _aggregationFunctionParameters;
   private final File _reducerOutputDir;
+  private final int _maxBatchSize;
   private GenericRowFileManager _rollupFileManager;
 
   public RollupReducer(String partitionId, GenericRowFileManager fileManager,
       Map<String, AggregationFunctionType> aggregationTypes,
       Map<String, Map<String, String>> aggregationFunctionParameters, File reducerOutputDir) {
+    this(partitionId, fileManager, aggregationTypes, aggregationFunctionParameters, reducerOutputDir,
+        MinionConstants.MergeTask.DEFAULT_REDUCER_MAX_BATCH_SIZE);
+  }
+
+  public RollupReducer(String partitionId, GenericRowFileManager fileManager,
+      Map<String, AggregationFunctionType> aggregationTypes,
+      Map<String, Map<String, String>> aggregationFunctionParameters, File reducerOutputDir, int maxBatchSize) {
     _partitionId = partitionId;
     _fileManager = fileManager;
     _aggregationTypes = aggregationTypes;
     _aggregationFunctionParameters = aggregationFunctionParameters;
     _reducerOutputDir = reducerOutputDir;
+    _maxBatchSize = maxBatchSize;
   }
 
   @Override
@@ -106,6 +116,32 @@ public class RollupReducer implements Reducer {
     long rollupFileCreationStartTimeMs = System.currentTimeMillis();
     _rollupFileManager = new GenericRowFileManager(partitionOutputDir, fieldSpecs, includeNullFields, 0);
     GenericRowFileWriter rollupFileWriter = _rollupFileManager.getFileWriter();
+
+    // Check if any aggregators support batch aggregation
+    boolean useBatchAggregation = aggregatorContextList.stream()
+        .anyMatch(ctx -> ctx._aggregator.supportsBatchAggregation());
+
+    if (useBatchAggregation) {
+      LOGGER.info("Using batch aggregation for partition: {}", _partitionId);
+      reduceBatch(recordReader, numRows, aggregatorContextList, rollupFileWriter, includeNullFields);
+    } else {
+      reducePairwise(recordReader, numRows, aggregatorContextList, rollupFileWriter, includeNullFields);
+    }
+
+    _rollupFileManager.closeFileWriter();
+    LOGGER.info("Finish creating rollup file in {}ms", System.currentTimeMillis() - rollupFileCreationStartTimeMs);
+
+    _fileManager.cleanUp();
+    LOGGER.info("Finish reducing in {}ms", System.currentTimeMillis() - reduceStartTimeMs);
+    return _rollupFileManager;
+  }
+
+  /**
+   * Pairwise reduce - the original implementation that aggregates rows one at a time.
+   */
+  private void reducePairwise(GenericRowFileRecordReader recordReader, int numRows,
+      List<AggregatorContext> aggregatorContextList, GenericRowFileWriter rollupFileWriter, boolean includeNullFields)
+      throws Exception {
     GenericRow previousRow = new GenericRow();
     recordReader.read(0, previousRow);
     int previousRowId = 0;
@@ -140,12 +176,112 @@ public class RollupReducer implements Reducer {
       }
     }
     rollupFileWriter.write(previousRow);
-    _rollupFileManager.closeFileWriter();
-    LOGGER.info("Finish creating rollup file in {}ms", System.currentTimeMillis() - rollupFileCreationStartTimeMs);
+  }
 
-    _fileManager.cleanUp();
-    LOGGER.info("Finish reducing in {}ms", System.currentTimeMillis() - reduceStartTimeMs);
-    return _rollupFileManager;
+  /**
+   * Batch reduce - collects all rows for the same key before aggregating.
+   * This is more efficient for sketch aggregators that can batch merge.
+   */
+  private void reduceBatch(GenericRowFileRecordReader recordReader, int numRows,
+      List<AggregatorContext> aggregatorContextList, GenericRowFileWriter rollupFileWriter, boolean includeNullFields)
+      throws Exception {
+    // Collect values for each metric column across rows with the same key
+    List<List<Object>> batchValues = new ArrayList<>(aggregatorContextList.size());
+    for (int j = 0; j < aggregatorContextList.size(); j++) {
+      batchValues.add(new ArrayList<>());
+    }
+
+    GenericRow baseRow = new GenericRow();
+    recordReader.read(0, baseRow);
+    int baseRowId = 0;
+
+    // Initialize batch with first row's values
+    for (int j = 0; j < aggregatorContextList.size(); j++) {
+      String column = aggregatorContextList.get(j)._column;
+      if (!includeNullFields || !baseRow.isNullValue(column)) {
+        batchValues.get(j).add(baseRow.getValue(column));
+      }
+    }
+
+    GenericRow currentRow = new GenericRow();
+    for (int i = 1; i < numRows; i++) {
+      currentRow.clear();
+      recordReader.read(i, currentRow);
+
+      if (recordReader.compare(baseRowId, i) == 0) {
+        // Same key - add values to batch
+        for (int j = 0; j < aggregatorContextList.size(); j++) {
+          String column = aggregatorContextList.get(j)._column;
+          if (!includeNullFields || !currentRow.isNullValue(column)) {
+            batchValues.get(j).add(currentRow.getValue(column));
+          }
+        }
+
+        // Memory safety: flush partial result if batch gets too large
+        if (batchValues.get(0).size() >= _maxBatchSize) {
+          flushBatchToBaseRow(baseRow, batchValues, aggregatorContextList, includeNullFields);
+        }
+      } else {
+        // Key changed - aggregate batch and write
+        aggregateBatchAndWrite(baseRow, batchValues, aggregatorContextList, rollupFileWriter, includeNullFields);
+
+        // Start new batch with current row
+        baseRowId = i;
+        baseRow.clear();
+        recordReader.read(i, baseRow);
+
+        for (int j = 0; j < aggregatorContextList.size(); j++) {
+          batchValues.get(j).clear();
+          String column = aggregatorContextList.get(j)._column;
+          if (!includeNullFields || !baseRow.isNullValue(column)) {
+            batchValues.get(j).add(baseRow.getValue(column));
+          }
+        }
+      }
+    }
+
+    // Write final key
+    aggregateBatchAndWrite(baseRow, batchValues, aggregatorContextList, rollupFileWriter, includeNullFields);
+  }
+
+  /**
+   * Flush batch values into the base row (partial aggregation for memory safety).
+   */
+  private void flushBatchToBaseRow(GenericRow baseRow, List<List<Object>> batchValues,
+      List<AggregatorContext> aggregatorContextList, boolean includeNullFields) {
+    for (int j = 0; j < aggregatorContextList.size(); j++) {
+      AggregatorContext ctx = aggregatorContextList.get(j);
+      List<Object> values = batchValues.get(j);
+      if (!values.isEmpty()) {
+        Object aggregated = ctx._aggregator.aggregateBatch(values, ctx._functionParameters);
+        baseRow.putValue(ctx._column, aggregated);
+        if (includeNullFields) {
+          baseRow.removeNullValueField(ctx._column);
+        }
+        values.clear();
+        values.add(aggregated);  // Continue with partial result
+      }
+    }
+  }
+
+  /**
+   * Aggregate batch values and write the result.
+   */
+  private void aggregateBatchAndWrite(GenericRow baseRow, List<List<Object>> batchValues,
+      List<AggregatorContext> aggregatorContextList, GenericRowFileWriter rollupFileWriter, boolean includeNullFields)
+      throws Exception {
+    for (int j = 0; j < aggregatorContextList.size(); j++) {
+      AggregatorContext ctx = aggregatorContextList.get(j);
+      List<Object> values = batchValues.get(j);
+      if (!values.isEmpty()) {
+        Object aggregated = ctx._aggregator.aggregateBatch(values, ctx._functionParameters);
+        baseRow.putValue(ctx._column, aggregated);
+        if (includeNullFields) {
+          baseRow.removeNullValueField(ctx._column);
+        }
+      }
+    }
+    rollupFileWriter.write(baseRow);
   }
 
   private static void aggregateWithNullFields(GenericRow aggregatedRow, GenericRow rowToAggregate,
