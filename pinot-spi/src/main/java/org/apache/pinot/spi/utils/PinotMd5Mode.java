@@ -16,29 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.regex;
+package org.apache.pinot.spi.utils;
 
-import java.util.regex.Pattern;
+/**
+ * Global runtime switch for disabling MD5-dependent code paths in Pinot.
+ */
+public class PinotMd5Mode {
+  private static volatile boolean _pinotMd5Disabled = readFromSystemProperty();
 
-public class JavaUtilPattern implements org.apache.pinot.common.utils.regex.Pattern {
-  final Pattern _pattern;
-
-  public JavaUtilPattern(String regex) {
-    _pattern = Pattern.compile(regex, 0);
+  private PinotMd5Mode() {
   }
 
-  public JavaUtilPattern(String regex, boolean caseInsensitive) {
-    _pattern = caseInsensitive
-        ? Pattern.compile(regex, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE)
-        : Pattern.compile(regex, 0);
+  public static void setPinotMd5Disabled(boolean pinotMd5Disabled) {
+    _pinotMd5Disabled = pinotMd5Disabled;
   }
 
-  @Override
-  public Matcher matcher(CharSequence input) {
-    return MatcherFactory.matcher(this, input);
+  public static boolean isPinotMd5Disabled() {
+    return _pinotMd5Disabled;
   }
 
-  protected Pattern getPattern() {
-    return _pattern;
+  // Visible for tests in the same package.
+  static void resetFromSystemProperty() {
+    _pinotMd5Disabled = readFromSystemProperty();
+  }
+
+  private static boolean readFromSystemProperty() {
+    return Boolean.getBoolean(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
   }
 }

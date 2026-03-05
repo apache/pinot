@@ -33,7 +33,7 @@ import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -54,19 +54,19 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
   private HelixManager _helixManager;
   private SegmentLocks _segmentLocks;
   private Semaphore _segmentBuildSemaphore;
-  private SegmentOperationsThrottler _segmentOperationsThrottler;
+  private SegmentOperationsThrottlerSet _segmentOperationsThrottlerSet;
   private ServerReloadJobStatusCache _reloadJobStatusCache;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
-      SegmentLocks segmentLocks, @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      SegmentLocks segmentLocks, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
       ServerReloadJobStatusCache reloadJobStatusCache) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     _helixManager = helixManager;
     _segmentLocks = segmentLocks;
     int maxParallelSegmentBuilds = instanceDataManagerConfig.getMaxParallelSegmentBuilds();
     _segmentBuildSemaphore = maxParallelSegmentBuilds > 0 ? new Semaphore(maxParallelSegmentBuilds, true) : null;
-    _segmentOperationsThrottler = segmentOperationsThrottler;
+    _segmentOperationsThrottlerSet = segmentOperationsThrottlerSet;
     _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
   }
 
@@ -101,7 +101,7 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
     }
     tableDataManager.init(_instanceDataManagerConfig, _helixManager, _segmentLocks, tableConfig, schema,
         segmentReloadSemaphore, segmentReloadRefreshExecutor, segmentPreloadExecutor, errorCache,
-        _segmentOperationsThrottler, enableAsyncSegmentRefresh, reloadJobStatusCache);
+        _segmentOperationsThrottlerSet, enableAsyncSegmentRefresh, reloadJobStatusCache);
     return tableDataManager;
   }
 }

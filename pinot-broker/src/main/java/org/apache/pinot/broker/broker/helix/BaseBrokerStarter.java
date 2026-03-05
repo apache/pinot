@@ -116,6 +116,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.slf4j.Logger;
@@ -190,6 +191,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     PinotInsecureMode.setPinotInInsecureMode(
         _brokerConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
+    PinotMd5Mode.setPinotMd5Disabled(_brokerConf.getProperty(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
+        PinotMd5Mode.isPinotMd5Disabled()));
 
     if (_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT) == 0) {
@@ -681,6 +684,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           instanceConfig.addTag(instanceTag);
         }
         shouldUpdateBrokerResource = true;
+      } else if (_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS,
+          Broker.DEFAULT_BROKER_ENFORCE_INSTANCE_TAGS)) {
+        throw new IllegalStateException(String.format(
+            "Broker instance tags enforcement is enabled ('%s' = true), but '%s' is not configured. "
+                + "Please set it for this broker or disable enforcement to allow startup.",
+            Broker.CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS,
+            Broker.CONFIG_OF_BROKER_INSTANCE_TAGS));
       } else if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
         shouldUpdateBrokerResource = true;

@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -43,13 +43,13 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
   protected final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
   protected String _tableNameWithType;
   protected DedupContext _context;
-  protected SegmentOperationsThrottler _segmentOperationsThrottler;
+  protected SegmentOperationsThrottlerSet _segmentOperationsThrottlerSet;
 
   @Override
   public void init(PinotConfiguration instanceDedupConfig, TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
+      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet) {
     _tableNameWithType = tableConfig.getTableName();
-    _segmentOperationsThrottler = segmentOperationsThrottler;
+    _segmentOperationsThrottlerSet = segmentOperationsThrottlerSet;
 
     Preconditions.checkArgument(tableConfig.isDedupEnabled(), "Dedup must be enabled for table: %s",
         _tableNameWithType);

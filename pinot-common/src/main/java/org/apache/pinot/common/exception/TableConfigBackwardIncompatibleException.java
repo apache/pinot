@@ -16,29 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.regex;
+package org.apache.pinot.common.exception;
 
-import java.util.regex.Pattern;
+public class TableConfigBackwardIncompatibleException extends Exception {
 
-public class JavaUtilPattern implements org.apache.pinot.common.utils.regex.Pattern {
-  final Pattern _pattern;
-
-  public JavaUtilPattern(String regex) {
-    _pattern = Pattern.compile(regex, 0);
-  }
-
-  public JavaUtilPattern(String regex, boolean caseInsensitive) {
-    _pattern = caseInsensitive
-        ? Pattern.compile(regex, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE)
-        : Pattern.compile(regex, 0);
-  }
-
-  @Override
-  public Matcher matcher(CharSequence input) {
-    return MatcherFactory.matcher(this, input);
-  }
-
-  protected Pattern getPattern() {
-    return _pattern;
+  public TableConfigBackwardIncompatibleException(String message) {
+    super(message);
   }
 }
