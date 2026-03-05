@@ -541,21 +541,6 @@ public class MinionTaskUtilsTest {
   }
 
   @Test
-  public void testOneServerFailsMaxValidDocs() {
-    String tableName = "myTable_REALTIME";
-    String segmentName = "seg1";
-    String expectedCrc = "crc1";
-    List<Object> responses = List.of(
-        makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
-        new RuntimeException("simulated fetch failure"),
-        makeResponse(segmentName, expectedCrc, "server3", makeBitmap(4)));
-    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "MOST_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
-    assertNotNull(result);
-    assertEquals(result.getCardinality(), 5);
-  }
-
-  @Test
   public void testOneServerFailsNone() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
@@ -571,7 +556,7 @@ public class MinionTaskUtilsTest {
   }
 
   @Test
-  public void testAllServersFailMaxValidDocsNull() {
+  public void testAllServersFailMOST_VALID_DOCS_throws() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
     String expectedCrc = "crc1";
@@ -579,9 +564,9 @@ public class MinionTaskUtilsTest {
         new RuntimeException("simulated"),
         new RuntimeException("simulated"),
         new RuntimeException("simulated"));
-    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-        "MOST_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this);
-    assertNull(result);
+    expectThrows(IllegalStateException.class,
+        () -> getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
+            "MOST_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this));
   }
 
   @Test
