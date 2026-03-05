@@ -497,7 +497,14 @@ abstract class BaseStarTreeV2Test<R, A> {
   CompressionCodec getCompressionCodec() {
     CompressionCodec[] compressionCodecs = CompressionCodec.values();
     CompressionCodec compressionCodec = compressionCodecs[RANDOM.nextInt(compressionCodecs.length)];
-    return compressionCodec.isApplicableToRawIndex() ? compressionCodec : null;
+    // Generic byte compressors can be used to compress Star-tree aggregated values.
+    return isApplicableToStartreeIndex(compressionCodec) ? compressionCodec : null;
+  }
+
+  protected boolean isApplicableToStartreeIndex(CompressionCodec compressionCodec) {
+    // Exclude sequence codecs (Delta, DeltaDelta) that require fixed numeric streams.
+    return compressionCodec.isApplicableToRawIndex() && compressionCodec != CompressionCodec.DELTA
+        && compressionCodec != CompressionCodec.DELTADELTA;
   }
 
   /**
