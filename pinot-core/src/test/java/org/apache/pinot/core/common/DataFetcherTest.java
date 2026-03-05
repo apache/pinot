@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -147,7 +148,7 @@ public class DataFetcherTest {
     for (String column : _indexSegment.getPhysicalColumnNames()) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
     }
-    _dataFetcher = new DataFetcher(dataSourceMap);
+    _dataFetcher = new DataFetcher(dataSourceMap, Collections.emptyMap());
   }
 
   @Test
