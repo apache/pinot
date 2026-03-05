@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import java.util.Map;
+
+
 /**
  * Interface for the context of the forward index reader.
  * <p>The forward index reader itself is always stateless because it needs to be accessed by multiple threads. The
@@ -25,6 +28,13 @@ package org.apache.pinot.segment.spi.index.reader;
  * inside the context in order to accelerate the following reads.
  */
 public interface ForwardIndexReaderContext extends AutoCloseable {
+
+  /**
+   * Applies query-level options to this context so that reader implementations can adjust behavior per-query
+   * (e.g., bypassing caches). The default implementation is a no-op for backward compatibility.
+   */
+  default void applyQueryOptions(Map<String, String> queryOptions) {
+  }
 
   @Override
   void close();

@@ -106,3 +106,7 @@ hf_cache/
 # LangChain / LlamaIndex
 .langchain/
 .llamaindex/
+
+# Python
+__pycache__/
+*.py[cod]
