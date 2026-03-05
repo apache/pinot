@@ -2688,7 +2688,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     // Only restrict force commit for tables with inconsistent state configs
     // (partial upsert or dropOutOfOrder tables with replication > 1)
-    boolean hasInconsistentConfigs = TableConfigUtils.checkForInconsistentStateConfigs(tableConfig);
+    boolean hasInconsistentConfigs = TableConfigUtils.requireConsistentMetadataDuringConsumption(tableConfig);
     ConsumingSegmentConsistencyModeListener configInstance = ConsumingSegmentConsistencyModeListener.getInstance();
     if (!configInstance.isForceCommitAllowed() && hasInconsistentConfigs) {
       throw new IllegalStateException("Force commit disabled for table: " + tableNameWithType

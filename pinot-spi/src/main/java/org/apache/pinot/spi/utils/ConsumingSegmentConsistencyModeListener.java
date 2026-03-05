@@ -43,7 +43,7 @@ public class ConsumingSegmentConsistencyModeListener implements PinotClusterConf
      * Force commit is disabled for tables with inconsistent state configurations.
      * Safe option that prevents potential data inconsistency issues.
      */
-    DEFAULT(false),
+    RESTRICTED(false),
 
     /**
      * Force commit is enabled but tables with partial upsert or dropOutOfOrderRecord=true (with replication > 1)
@@ -59,6 +59,8 @@ public class ConsumingSegmentConsistencyModeListener implements PinotClusterConf
      */
     UNSAFE(true);
 
+    public static final Mode DEFAULT_CONSUMING_SEGMENT_CONSISTENCY_MODE = RESTRICTED;
+
     private final boolean _forceCommitAllowed;
 
     Mode(boolean forceCommitAllowed) {
@@ -71,17 +73,19 @@ public class ConsumingSegmentConsistencyModeListener implements PinotClusterConf
 
     public static Mode fromString(String value) {
       if (value == null || value.trim().isEmpty()) {
-        return DEFAULT;
+        return DEFAULT_CONSUMING_SEGMENT_CONSISTENCY_MODE;
       }
+      String normalized = value.trim().toUpperCase();
       try {
-        return Mode.valueOf(value.trim().toUpperCase());
+        return Mode.valueOf(normalized);
       } catch (IllegalArgumentException e) {
-        return DEFAULT;
+        return DEFAULT_CONSUMING_SEGMENT_CONSISTENCY_MODE;
       }
     }
   }
 
-  private final AtomicReference<Mode> _consistencyMode = new AtomicReference<>(Mode.DEFAULT);
+  private final AtomicReference<Mode> _consistencyMode =
+      new AtomicReference<>(Mode.DEFAULT_CONSUMING_SEGMENT_CONSISTENCY_MODE);
 
   private ConsumingSegmentConsistencyModeListener() {
   }
@@ -125,6 +129,6 @@ public class ConsumingSegmentConsistencyModeListener implements PinotClusterConf
 
   @VisibleForTesting
   public void reset() {
-    _consistencyMode.set(Mode.DEFAULT);
+    _consistencyMode.set(Mode.DEFAULT_CONSUMING_SEGMENT_CONSISTENCY_MODE);
   }
 }
