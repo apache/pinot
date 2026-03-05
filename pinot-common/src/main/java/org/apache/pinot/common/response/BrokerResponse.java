@@ -161,9 +161,26 @@ public interface BrokerResponse {
   boolean isMaxRowsInJoinReached();
 
   /**
+   * Returns the max number of rows seen across all join operators.
+   */
+  long getMaxRowsInJoin();
+
+  /**
    * Returns whether the limit for max rows in window has been reached.
    */
   boolean isMaxRowsInWindowReached();
+
+  /**
+   * Returns the max number of rows seen across all window operators.
+   */
+  long getMaxRowsInWindow();
+
+  /**
+   * Returns the max number of groups seen across all aggregate operators.
+   * TODO: Currently only populated for multi-stage queries. Single-stage
+   * tracks group limit flags but not actual group counts.
+   */
+  long getNumGroups();
 
   /**
    * Returns the total time used for query execution in milliseconds.
