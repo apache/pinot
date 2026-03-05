@@ -716,7 +716,7 @@ WTFPL License
 org.reflections:reflections:0.10.2
 
 
-Bounty Castle License
+Bouncy Castle License
 ---------------------
 org.bouncycastle:bcpkix-jdk18on:1.78.1
 org.bouncycastle:bcprov-jdk18on:1.78.1
