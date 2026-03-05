@@ -144,7 +144,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
-                  if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment) {
+                  if (_context.requireConsistentMetadataDuringConsumption()
+                      && currentSegment instanceof MutableSegment) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue,
@@ -503,7 +504,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 // For consistent ParallelSegmentConsumptionPolicy like DISALLOW_ALWAYS and ALLOW_DURING_BUILD_ONLY,
                 // we shouldn't be seeing two mutable segments, so ideally current segment shouldn't point to
                 // mutable segment, unless other modes are enabled which could lead to inconsistent behaviour
-                if (_context.requireConsistentMetadataDuringConsumption() && !(currentSegment instanceof MutableSegment)) {
+                if (_context.requireConsistentMetadataDuringConsumption()
+                    && !(currentSegment instanceof MutableSegment)) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);

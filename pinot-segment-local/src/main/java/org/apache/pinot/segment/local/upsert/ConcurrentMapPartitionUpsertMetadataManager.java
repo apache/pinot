@@ -116,15 +116,16 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
-                  if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment) {
+                  if (_context.requireConsistentMetadataDuringConsumption()
+                      && currentSegment instanceof MutableSegment) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                  if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment && (
-                      prevRecordLocation == null
-                          || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
+                  if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment
+                      && (prevRecordLocation == null
+                      || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
                     RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
                     _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
                   }
@@ -142,9 +143,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                  if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment && (
-                      prevRecordLocation == null
-                          || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
+                  if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment
+                      && (prevRecordLocation == null
+                      || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
                     RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
                     _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
                   }
@@ -163,9 +164,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 return new RecordLocation(segment, newDocId, newComparisonValue);
               } else {
                 RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment && (
-                    prevRecordLocation == null
-                        || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
+                if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment
+                    && (prevRecordLocation == null
+                    || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
                   RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
                   _previousKeyToRecordLocationMap.put(primaryKey, newRecordLocation);
                 }
@@ -361,7 +362,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 // For consistent ParallelSegmentConsumptionPolicy like DISALLOW_ALWAYS and ALLOW_DURING_BUILD_ONLY,
                 // we shouldn't be seeing two mutable segments, so ideally current segment shouldn't point to
                 // Mutable segment, unless other modes are enabled which could lead to inconsistent behaviour
-                if (_context.requireConsistentMetadataDuringConsumption() && !(currentSegment instanceof MutableSegment)) {
+                if (_context.requireConsistentMetadataDuringConsumption()
+                    && !(currentSegment instanceof MutableSegment)) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
