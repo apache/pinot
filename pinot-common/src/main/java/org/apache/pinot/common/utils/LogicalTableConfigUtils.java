@@ -23,13 +23,10 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -54,11 +51,7 @@ public class LogicalTableConfigUtils {
     return LogicalTableConfigSerDeProvider.getInstance().toZNRecord(logicalTableConfig);
   }
 
-  public static void validateLogicalTableConfig(
-      LogicalTableConfig logicalTableConfig,
-      Predicate<String> physicalTableExistsPredicate,
-      Predicate<String> brokerTenantExistsPredicate,
-      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public static void validateLogicalTableConfig(LogicalTableConfig logicalTableConfig) {
     String tableName = logicalTableConfig.getTableName();
     if (StringUtils.isEmpty(tableName)) {
       throw new IllegalArgumentException("Invalid logical table name. Reason: 'tableName' should not be null or empty");
@@ -99,12 +92,6 @@ public class LogicalTableConfigUtils {
               "Invalid logical table. Reason: '" + physicalTableName
                   + "' should have the same database name as logical table: " + databaseName + " != "
                   + physicalTableDatabaseName);
-        }
-
-        // validate physical table exists
-        if (!physicalTableExistsPredicate.test(physicalTableName)) {
-          throw new IllegalArgumentException(
-              "Invalid logical table. Reason: '" + physicalTableName + "' should be one of the existing tables");
         }
       }
 
@@ -173,19 +160,6 @@ public class LogicalTableConfigUtils {
     if (quotaConfig != null && !StringUtils.isEmpty(quotaConfig.getStorage())) {
       throw new IllegalArgumentException(
           "Invalid logical table. Reason: 'quota.storage' should not be set for logical table");
-    }
-
-    // validate broker tenant exists
-    String brokerTenant = logicalTableConfig.getBrokerTenant();
-    if (!brokerTenantExistsPredicate.test(brokerTenant)) {
-      throw new IllegalArgumentException(
-          "Invalid logical table. Reason: '" + brokerTenant + "' should be one of the existing broker tenants");
-    }
-
-    // Validate schema with same name as logical table exists
-    if (!ZKMetadataProvider.isSchemaExists(propertyStore, tableName)) {
-      throw new IllegalArgumentException(
-          "Invalid logical table. Reason: Schema with same name as logical table '" + tableName + "' does not exist");
     }
 
     // validate time boundary config is not null for hybrid tables
