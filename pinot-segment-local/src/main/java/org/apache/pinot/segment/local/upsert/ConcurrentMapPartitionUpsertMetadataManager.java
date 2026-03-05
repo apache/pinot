@@ -116,14 +116,14 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
-                  if (_context.requireConsistentMetadataDuringConsumption()
+                  if (_context.isTableTypeInconsistentDuringConsumption()
                       && currentSegment instanceof MutableSegment) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                  if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment
+                  if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment
                       && (prevRecordLocation == null
                       || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
                     RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
@@ -143,7 +143,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
                   RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                  if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment
+                  if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment
                       && (prevRecordLocation == null
                       || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
                     RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
@@ -164,7 +164,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 return new RecordLocation(segment, newDocId, newComparisonValue);
               } else {
                 RecordLocation prevRecordLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-                if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment
+                if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment
                     && (prevRecordLocation == null
                     || newComparisonValue.compareTo(prevRecordLocation.getComparisonValue()) >= 0)) {
                   RecordLocation newRecordLocation = new RecordLocation(segment, newDocId, newComparisonValue);
@@ -207,7 +207,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             if (recordLocation.getSegment() == segment) {
-              if (_context.requireConsistentMetadataDuringConsumption() && segment instanceof MutableSegment) {
+              if (_context.isTableTypeInconsistentDuringConsumption() && segment instanceof MutableSegment) {
                 _previousKeyToRecordLocationMap.remove(pk);
               }
               return null;
@@ -362,7 +362,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 // For consistent ParallelSegmentConsumptionPolicy like DISALLOW_ALWAYS and ALLOW_DURING_BUILD_ONLY,
                 // we shouldn't be seeing two mutable segments, so ideally current segment shouldn't point to
                 // Mutable segment, unless other modes are enabled which could lead to inconsistent behaviour
-                if (_context.requireConsistentMetadataDuringConsumption()
+                if (_context.isTableTypeInconsistentDuringConsumption()
                     && !(currentSegment instanceof MutableSegment)) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }

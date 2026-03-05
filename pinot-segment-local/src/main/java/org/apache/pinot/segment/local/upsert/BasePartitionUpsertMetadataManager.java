@@ -661,7 +661,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     }
     if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-      if (_context.requireConsistentMetadataDuringConsumption()) {
+      if (_context.isTableTypeInconsistentDuringConsumption()) {
         if (shouldRevertMetadataOnInconsistency(oldSegment)) {
           // If there are still valid docs in the old segment, validate and revert the metadata of the
           // consuming segment in place
@@ -686,7 +686,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   public boolean shouldRevertMetadataOnInconsistency(IndexSegment oldSegment) {
     return ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode()
         .equals(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED) && oldSegment instanceof MutableSegment
-        && _context.requireConsistentMetadataDuringConsumption();
+        && _context.isTableTypeInconsistentDuringConsumption();
   }
 
   /**

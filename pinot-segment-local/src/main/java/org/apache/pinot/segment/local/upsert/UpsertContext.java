@@ -198,7 +198,7 @@ public class UpsertContext {
    * - Partial upsert is enabled (records need to be merged with previous values)
    * - dropOutOfOrderRecord is enabled with NONE consistency mode (records may have been dropped)
    */
-  public boolean requireConsistentMetadataDuringConsumption() {
+  public boolean isTableTypeInconsistentDuringConsumption() {
     return _dropOutOfOrderRecord || _outOfOrderRecordColumn != null || _partialUpsertHandler != null;
   }
 

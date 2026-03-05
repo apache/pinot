@@ -834,7 +834,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
         ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
         boolean isInconsistentMetadataDuringConsumption =
-            TableConfigUtils.isInconsistentMetadataDuringConsumption(tableConfig);
+            TableConfigUtils.isTableTypeInconsistentDuringConsumption(tableConfig);
         // Allow force commit if:
         // 1. Table doesn't have inconsistent configs (non-upsert or standard upsert tables), OR
         // 2. Consistency mode is PROTECTED or UNSAFE (isForceCommitAllowed = true)
