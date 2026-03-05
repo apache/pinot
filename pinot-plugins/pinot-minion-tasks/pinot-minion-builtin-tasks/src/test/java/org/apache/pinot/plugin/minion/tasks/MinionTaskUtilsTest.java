@@ -62,7 +62,6 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -556,17 +555,15 @@ public class MinionTaskUtilsTest {
   }
 
   @Test
-  public void testAllServersFailMOST_VALID_DOCS_throws() {
+  public void testAllServersFailMostValidDocs() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
     String expectedCrc = "crc1";
-    List<Object> responses = List.of(
-        new RuntimeException("simulated"),
-        new RuntimeException("simulated"),
+    List<Object> responses = List.of(new RuntimeException("simulated"), new RuntimeException("simulated"),
         new RuntimeException("simulated"));
     expectThrows(IllegalStateException.class,
-        () -> getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc,
-            "MOST_VALID_DOCS", responses, new String[]{"server1", "server2", "server3"}, this));
+        () -> getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc, "MOST_VALID_DOCS",
+            responses, new String[]{"server1", "server2", "server3"}, this));
   }
 
   @Test
