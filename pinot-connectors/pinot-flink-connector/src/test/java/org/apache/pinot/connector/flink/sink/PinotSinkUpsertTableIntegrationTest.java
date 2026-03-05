@@ -59,7 +59,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationTest {
+public class PinotSinkUpsertTableIntegrationTest extends BaseClusterIntegrationTest {
 
   private List<Row> _data;
   public RowTypeInfo _typeInfo;
