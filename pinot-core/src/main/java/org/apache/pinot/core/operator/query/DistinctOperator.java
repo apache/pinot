@@ -58,13 +58,22 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   protected DistinctResultsBlock getNextBlock() {
     DistinctExecutor executor = DistinctExecutorFactory.getDistinctExecutor(_projectOperator, _queryContext);
     ValueBlock valueBlock;
+    boolean brokeEarly = false;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
       if (executor.process(valueBlock)) {
+        // executor signaled it has enough rows to satisfy the limit; treat as early if more blocks may remain
+        brokeEarly = true;
         break;
       }
     }
-    return new DistinctResultsBlock(executor.getResult(), _queryContext);
+    DistinctResultsBlock results = new DistinctResultsBlock(executor.getResult(), _queryContext);
+    String prov = _queryContext.getQueryOptions().get("leafLimitProvenance");
+    if ("LITE_CAP".equals(prov) && brokeEarly) {
+      results.setLiteLeafLimitReached(true);
+      results.setLeafTruncationReason(prov);
+    }
+    return results;
   }
 
   @Override
