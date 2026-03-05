@@ -878,6 +878,77 @@ public class PinotLLCRealtimeSegmentManagerTest {
     testRepairs(segmentManager, Lists.newArrayList(1));
   }
 
+  @Test
+  public void testPartialOfflineReplicaRepair() {
+    // Set up a new table with 3 replicas, 5 instances, 2 partitions
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, true);
+    setUpNewTable(segmentManager, 3, 5, 2);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+
+    // Turn one replica OFFLINE for the CONSUMING segment in partition group 0 (simulating issue #11314)
+    String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    Map<String, String> consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
+    assertNotNull(consumingSegmentInstanceStateMap);
+    assertEquals(consumingSegmentInstanceStateMap.size(), 3);
+
+    // Find the first instance and mark it OFFLINE
+    String offlineInstance = consumingSegmentInstanceStateMap.keySet().iterator().next();
+    assertEquals(consumingSegmentInstanceStateMap.get(offlineInstance), SegmentStateModel.CONSUMING);
+    consumingSegmentInstanceStateMap.put(offlineInstance, SegmentStateModel.OFFLINE);
+
+    // Verify we have mixed state: 2 CONSUMING, 1 OFFLINE
+    long consumingCount = consumingSegmentInstanceStateMap.values().stream()
+        .filter(s -> s.equals(SegmentStateModel.CONSUMING)).count();
+    long offlineCount = consumingSegmentInstanceStateMap.values().stream()
+        .filter(s -> s.equals(SegmentStateModel.OFFLINE)).count();
+    assertEquals(consumingCount, 2);
+    assertEquals(offlineCount, 1);
+
+    // Run repair - should set the OFFLINE replica back to CONSUMING
+    segmentManager._exceededMaxSegmentCompletionTime = true;
+    segmentManager.ensureAllPartitionsConsuming();
+
+    // Verify all replicas are now CONSUMING
+    consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
+    assertEquals(new HashSet<>(consumingSegmentInstanceStateMap.values()),
+        Collections.singleton(SegmentStateModel.CONSUMING));
+    assertEquals(consumingSegmentInstanceStateMap.size(), 3);
+    assertEquals(consumingSegmentInstanceStateMap.get(offlineInstance), SegmentStateModel.CONSUMING);
+  }
+
+  @Test
+  public void testPartialOfflineReplicaRepairDisabled() {
+    // Set up a new table with 3 replicas, 5 instances, 2 partitions
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    // Create segment manager with partial repair DISABLED
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, false);
+    setUpNewTable(segmentManager, 3, 5, 2);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+
+    // Turn one replica OFFLINE for the CONSUMING segment in partition group 0
+    String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    Map<String, String> consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
+    assertNotNull(consumingSegmentInstanceStateMap);
+
+    String offlineInstance = consumingSegmentInstanceStateMap.keySet().iterator().next();
+    consumingSegmentInstanceStateMap.put(offlineInstance, SegmentStateModel.OFFLINE);
+
+    // Store old state
+    Map<String, Map<String, String>> oldInstanceStatesMap = cloneInstanceStatesMap(instanceStatesMap);
+
+    // Run repair - should NOT change anything since the feature is disabled
+    segmentManager._exceededMaxSegmentCompletionTime = true;
+    segmentManager.ensureAllPartitionsConsuming();
+
+    // Verify the OFFLINE replica is still OFFLINE (no repair)
+    consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
+    assertEquals(consumingSegmentInstanceStateMap.get(offlineInstance), SegmentStateModel.OFFLINE);
+    assertEquals(oldInstanceStatesMap.get(consumingSegment), consumingSegmentInstanceStateMap);
+  }
+
   /**
    * Removes the new CONSUMING segment and sets the latest committed (ONLINE) segment to CONSUMING if exists in the
    * ideal state.
@@ -2125,6 +2196,21 @@ public class PinotLLCRealtimeSegmentManagerTest {
     FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager) {
       super(pinotHelixResourceManager, CONTROLLER_CONF, mock(ControllerMetrics.class));
       _mockResourceManager = pinotHelixResourceManager;
+    }
+
+    FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
+        boolean enablePartialOfflineReplicaRepair) {
+      super(pinotHelixResourceManager, createControllerConf(enablePartialOfflineReplicaRepair),
+          mock(ControllerMetrics.class));
+      _mockResourceManager = pinotHelixResourceManager;
+    }
+
+    private static ControllerConf createControllerConf(boolean enablePartialOfflineReplicaRepair) {
+      ControllerConf config = new ControllerConf();
+      config.setDataDir(TEMP_DIR.toString());
+      config.setProperty(ControllerConf.ControllerPeriodicTasksConf.ENABLE_PARTIAL_OFFLINE_REPLICA_REPAIR,
+          enablePartialOfflineReplicaRepair);
+      return config;
     }
 
     private static PinotHelixResourceManager createMockedResourceManager() {

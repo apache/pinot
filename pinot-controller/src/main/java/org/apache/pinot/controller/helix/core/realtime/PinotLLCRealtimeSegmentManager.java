@@ -213,6 +213,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
   private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
   private final boolean _isTmpSegmentAsyncDeletionEnabled;
+  private final boolean _isPartialOfflineReplicaRepairEnabled;
   private final int _deepstoreUploadRetryTimeoutMs;
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
@@ -241,6 +242,7 @@ public class PinotLLCRealtimeSegmentManager {
     _deepStoreUploadExecutorPendingSegments = ConcurrentHashMap.newKeySet();
 
     _isTmpSegmentAsyncDeletionEnabled = controllerConf.isTmpSegmentAsyncDeletionEnabled();
+    _isPartialOfflineReplicaRepairEnabled = controllerConf.isPartialOfflineReplicaRepairEnabled();
     _deepstoreUploadRetryTimeoutMs = controllerConf.getDeepStoreRetryUploadTimeoutMs();
   }
 
@@ -1802,6 +1804,27 @@ public class PinotLLCRealtimeSegmentManager {
                   latestSegmentName);
               updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, null, segmentAssignment,
                   instancePartitionsMap);
+            }
+          } else if (latestSegmentZKMetadata.getStatus() == Status.IN_PROGRESS
+              && _isPartialOfflineReplicaRepairEnabled) {
+            // Handle case where some replicas are OFFLINE while others are CONSUMING
+            // This happens when one replica fails (e.g., KafkaConsumer init error) and marks itself OFFLINE
+            // while other replicas continue consuming
+            List<String> offlineInstances = new ArrayList<>();
+            for (Map.Entry<String, String> instanceEntry : instanceStateMap.entrySet()) {
+              if (SegmentStateModel.OFFLINE.equals(instanceEntry.getValue())) {
+                offlineInstances.add(instanceEntry.getKey());
+              }
+            }
+
+            if (!offlineInstances.isEmpty()) {
+              LOGGER.info("Repairing segment: {} with {} OFFLINE replicas out of {} total replicas. "
+                      + "Setting OFFLINE replicas back to CONSUMING: {}", latestSegmentName, offlineInstances.size(),
+                  instanceStateMap.size(), offlineInstances);
+              // Set the OFFLINE replicas back to CONSUMING so they can retry
+              for (String offlineInstance : offlineInstances) {
+                instanceStateMap.put(offlineInstance, SegmentStateModel.CONSUMING);
+              }
             }
           }
           // else, the metadata should be IN_PROGRESS, which is the right state for a consuming segment.
