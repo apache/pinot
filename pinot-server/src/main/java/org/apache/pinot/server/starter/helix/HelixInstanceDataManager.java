@@ -553,7 +553,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       // Use cached table config for performance - properties we check (replication, upsert mode)
       // rarely change after table creation, and cache is refreshed on reload
       TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
-      boolean hasInconsistentConfigs = TableConfigUtils.requireConsistentMetadataDuringConsumption(tableConfig);
+      boolean hasInconsistentConfigs = TableConfigUtils.isInconsistentMetadataDuringConsumption(tableConfig);
       ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
 
       // Only restrict force commit for tables with inconsistent state configs

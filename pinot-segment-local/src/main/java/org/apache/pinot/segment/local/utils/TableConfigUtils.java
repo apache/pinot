@@ -1779,7 +1779,7 @@ public final class TableConfigUtils {
    * @param tableConfig the table config to check, may be null
    * @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
    */
-  public static boolean requireConsistentMetadataDuringConsumption(@Nullable TableConfig tableConfig) {
+  public static boolean isInconsistentMetadataDuringConsumption(@Nullable TableConfig tableConfig) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig == null) {
       return false;
