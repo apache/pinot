@@ -144,7 +144,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                       validDocIdsForOldSegment.remove(currentDocId);
                     }
                   }
-                  if (_context.hasInconsistentTableConfigs() && currentSegment instanceof MutableSegment) {
                   if (_context.requireConsistentMetadataDuringConsumption() && currentSegment instanceof MutableSegment) {
                     _previousKeyToRecordLocationMap.remove(primaryKey);
                   }
