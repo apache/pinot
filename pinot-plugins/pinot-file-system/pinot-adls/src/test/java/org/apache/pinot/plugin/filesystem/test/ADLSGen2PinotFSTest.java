@@ -25,6 +25,7 @@ import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.models.BlobHttpHeaders;
 import com.azure.storage.blob.models.BlobStorageException;
+import com.azure.storage.blob.options.BlobParallelUploadOptions;
 import com.azure.storage.blob.specialized.BlockBlobClient;
 import com.azure.storage.file.datalake.DataLakeDirectoryClient;
 import com.azure.storage.file.datalake.DataLakeFileClient;
@@ -663,22 +664,21 @@ public class ADLSGen2PinotFSTest {
 
     // Create a temporary file with test data
     File tempFile = File.createTempFile("pinot_blob_test", ".tmp");
-    byte[] testData = "test segment data".getBytes();
+    byte[] testData = "test segment data".getBytes(StandardCharsets.UTF_8);
     Files.write(tempFile.toPath(), testData);
 
     URI dstUri = new URI("adl2://account/container/test_segment");
     String expectedPath = AzurePinotFSUtil.convertUriToAzureStylePath(dstUri);
 
     when(_mockBlobContainerClient.getBlobClient(expectedPath)).thenReturn(_mockBlobClient);
-    doNothing().when(_mockBlobClient).upload(any(InputStream.class), eq((long) testData.length), eq(true));
+    when(_mockBlobClient.uploadWithResponse(any(BlobParallelUploadOptions.class), isNull(), any(Context.class)))
+        .thenReturn(null);
 
     try {
       blobEnabledFs.copyFromLocalFile(tempFile, dstUri);
 
       verify(_mockBlobContainerClient).getBlobClient(expectedPath);
-      verify(_mockBlobClient).upload(any(InputStream.class), eq((long) testData.length), eq(true));
-      // _enableChecksum defaults to false for this test instance, so no content MD5 header is set.
-      verify(_mockBlobClient, never()).setHttpHeaders(any(BlobHttpHeaders.class));
+      verify(_mockBlobClient).uploadWithResponse(any(BlobParallelUploadOptions.class), isNull(), any(Context.class));
     } finally {
       FileUtils.deleteQuietly(tempFile);
     }
@@ -812,7 +812,7 @@ public class ADLSGen2PinotFSTest {
 
     // Create a temporary file with test data
     File tempFile = File.createTempFile("pinot_blob_test", ".tmp");
-    byte[] testData = "test segment data".getBytes();
+    byte[] testData = "test segment data".getBytes(StandardCharsets.UTF_8);
     Files.write(tempFile.toPath(), testData);
 
     URI dstUri = new URI("adl2://account/container/test_segment");
@@ -821,13 +821,14 @@ public class ADLSGen2PinotFSTest {
     BlobStorageException blobException = mock(BlobStorageException.class);
     when(blobException.getStatusCode()).thenReturn(500);
     when(_mockBlobContainerClient.getBlobClient(expectedPath)).thenReturn(_mockBlobClient);
-    doThrow(blobException).when(_mockBlobClient).upload(any(InputStream.class), eq((long) testData.length), eq(true));
+    doThrow(blobException).when(_mockBlobClient)
+        .uploadWithResponse(any(BlobParallelUploadOptions.class), isNull(), any(Context.class));
 
     try {
       expectThrows(IOException.class, () -> blobEnabledFs.copyFromLocalFile(tempFile, dstUri));
 
       verify(_mockBlobContainerClient).getBlobClient(expectedPath);
-      verify(_mockBlobClient).upload(any(InputStream.class), eq((long) testData.length), eq(true));
+      verify(_mockBlobClient).uploadWithResponse(any(BlobParallelUploadOptions.class), isNull(), any(Context.class));
       verify(blobException).getStatusCode();
     } finally {
       FileUtils.deleteQuietly(tempFile);
