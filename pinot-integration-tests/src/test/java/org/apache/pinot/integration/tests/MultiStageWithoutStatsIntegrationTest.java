@@ -97,7 +97,7 @@ public class MultiStageWithoutStatsIntegrationTest extends BaseClusterIntegratio
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_SEND_STATS_MODE,
-        SendStatsPredicate.Mode.NEVER.name());
+        "NEVER");
     super.overrideServerConf(serverConf);
   }
 
