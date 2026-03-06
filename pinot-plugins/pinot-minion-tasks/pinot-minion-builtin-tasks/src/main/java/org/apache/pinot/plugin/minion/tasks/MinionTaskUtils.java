@@ -294,7 +294,7 @@ public class MinionTaskUtils {
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, String comparisonModeStr) {
-    MinionConstants.ValidDocIdsConsensusMode comparisonMode = parseValidDocIdsComparisonMode(comparisonModeStr);
+    MinionConstants.ValidDocIdsConsensusMode consensusMode = parseValidDocIdsComparisonMode(comparisonModeStr);
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
@@ -311,7 +311,7 @@ public class MinionTaskUtils {
             serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
                 validDocIdsType, 60_000);
       } catch (Exception e) {
-        if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+        if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
           LOGGER.warn(
               "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint, e);
           continue;
@@ -329,7 +329,7 @@ public class MinionTaskUtils {
       // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
       // against the crc from the current segment zk metadata, so we don't need to check that here.
       if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
-        if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+        if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
           LOGGER.warn("CRC mismatch for segment: {} from endpoint {}, skipping", segmentName, endpoint);
           continue;
         } else {
@@ -341,7 +341,7 @@ public class MinionTaskUtils {
 
       if (validDocIdsBitmapResponse.getServerStatus() != null && !validDocIdsBitmapResponse.getServerStatus()
           .equals(ServiceStatus.Status.GOOD)) {
-        if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+        if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
           LOGGER.warn("Server {} not READY for segment {}, skipping", validDocIdsBitmapResponse.getInstanceId(),
               segmentName);
           continue;
@@ -355,7 +355,7 @@ public class MinionTaskUtils {
       RoaringBitmap bitmap = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
       int cardinality = bitmap.getCardinality();
 
-      if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+      if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
         LOGGER.info("Using server {} with {} valid docs for segment {} (mode=UNSAFE)", server, cardinality,
             segmentName);
         return bitmap;
@@ -368,7 +368,7 @@ public class MinionTaskUtils {
       return null;
     }
 
-    if (comparisonMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL) {
+    if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL) {
       RoaringBitmap consensusBitMap = matchingBitmaps.get(0);
       for (RoaringBitmap b : matchingBitmaps) {
         if (!b.equals(consensusBitMap)) {

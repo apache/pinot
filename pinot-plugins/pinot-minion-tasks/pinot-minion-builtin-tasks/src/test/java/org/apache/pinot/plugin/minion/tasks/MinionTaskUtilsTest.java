@@ -394,7 +394,7 @@ public class MinionTaskUtilsTest {
    * that exception is thrown (simulating fetch failure).
    */
   private static RoaringBitmap getValidDocIdFromServerMatchingCrcWithMockedReader(String tableName,
-      String segmentName, String expectedCrc, String comparisonMode, List<Object> responseOrThrowByCallOrder,
+      String segmentName, String expectedCrc, String consensusMode, List<Object> responseOrThrowByCallOrder,
       String[] servers, MinionTaskUtilsTest testInstance) {
     testInstance.setupMinionContextWithServers(tableName, segmentName, servers);
     // Shared across all mock instances (production creates one reader per server).
@@ -415,7 +415,7 @@ public class MinionTaskUtilsTest {
               });
         })) {
       return MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableName, segmentName,
-          ValidDocIdsType.SNAPSHOT.name(), MinionContext.getInstance(), expectedCrc, comparisonMode);
+          ValidDocIdsType.SNAPSHOT.name(), MinionContext.getInstance(), expectedCrc, consensusMode);
     }
   }
 

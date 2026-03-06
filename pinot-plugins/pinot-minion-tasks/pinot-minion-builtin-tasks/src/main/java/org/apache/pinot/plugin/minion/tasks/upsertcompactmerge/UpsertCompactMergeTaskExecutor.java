@@ -112,14 +112,14 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     // Executor-only: read comparison mode string from task config (no auth resolution or URL hits).
     Map<String, String> taskConfigs =
         tableConfig.getTaskConfig() != null ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
-    String comparisonMode = taskConfigs != null ? taskConfigs.getOrDefault(
+    String consensusMode = taskConfigs != null ? taskConfigs.getOrDefault(
         MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
         MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
         : MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
 
     List<RecordReader> recordReaders = segmentMetadataList.stream().map(x -> {
       RoaringBitmap validDocIds = MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
-          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc(), comparisonMode);
+          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc(), consensusMode);
       if (validDocIds == null) {
         // no valid crc match found or no validDocIds obtained from all servers
         // error out the task instead of silently failing so that we can track it via task-error metrics
