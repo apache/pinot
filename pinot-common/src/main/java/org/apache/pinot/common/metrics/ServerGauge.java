@@ -153,7 +153,13 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
 
   // ThrottleOnCriticalHeapUsageExecutor metrics
   THROTTLE_EXECUTOR_QUEUE_SIZE("count", true,
-      "Current number of tasks in the throttle executor queue");
+      "Current number of tasks in the throttle executor queue"),
+
+  // Offline table ingestion delay metrics
+  OFFLINE_INGESTION_DELAY_MS("milliseconds", false,
+      "Ingestion delay of offline table data: current_time - max(segment_end_time) per partition"),
+  OFFLINE_TABLE_INGESTION_DELAY_MS("milliseconds", false,
+      "Ingestion delay of offline table data: worst partition lag across all partitions");
 
   private final String _gaugeName;
   private final String _unit;
