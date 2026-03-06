@@ -833,12 +833,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // `pinot.server.consuming.segment.consistency.mode` to PROTECTED for safer reload.
         TableConfig tableConfig = indexLoadingConfig.getTableConfig();
         ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
-        boolean isInconsistentMetadataDuringConsumption =
+        boolean isTableTypeInconsistentDuringConsumption =
             TableConfigUtils.isTableTypeInconsistentDuringConsumption(tableConfig);
         // Allow force commit if:
         // 1. Table doesn't have inconsistent configs (non-upsert or standard upsert tables), OR
         // 2. Consistency mode is PROTECTED or UNSAFE (isForceCommitAllowed = true)
-        if (tableConfig == null || (isInconsistentMetadataDuringConsumption && !config.isForceCommitAllowed())) {
+        if (tableConfig == null || (isTableTypeInconsistentDuringConsumption && !config.isForceCommitAllowed())) {
           _logger.warn("Skipping reload (force commit) on consuming segment: {} due to inconsistent state config. "
               + "Change the cluster config: {} to `PROTECTED` for safer commit", segmentName, config.getConfigKey());
         } else {

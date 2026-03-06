@@ -2696,7 +2696,7 @@ public class PinotLLCRealtimeSegmentManager {
           + ". Table is configured as partial upsert or dropOutOfOrderRecord=true with replication > 1, "
           + "which can cause data inconsistency during force commit. " + "Current cluster config '"
           + configInstance.getConfigKey() + "' is set to: " + configInstance.getConsistencyMode()
-          + ". To enable safer force commit, set this config to 'PROTECTED'.");
+          + ". To enable safer force commit, set isTableTypeInconsistentDuringConsumption config to 'PROTECTED'.");
     }
   }
 
