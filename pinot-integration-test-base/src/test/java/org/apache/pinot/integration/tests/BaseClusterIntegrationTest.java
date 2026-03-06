@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.ServerSocket;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -41,7 +40,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
@@ -69,7 +67,7 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.plugin.stream.kafka30.server.KafkaServerStartable;
+import org.apache.pinot.plugin.stream.kafka30.server.EmbeddedKafkaCluster;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -125,8 +123,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
   protected static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
   protected static final int DEFAULT_MAX_NUM_KAFKA_MESSAGES_PER_BATCH = 10000;
-  private static final int KAFKA_START_MAX_ATTEMPTS = 3;
-  private static final long KAFKA_START_RETRY_WAIT_MS = 2_000L;
   private static final long KAFKA_CLUSTER_READY_TIMEOUT_MS = 120_000L;
   private static final long KAFKA_TOPIC_READY_TIMEOUT_MS = 120_000L;
   protected static final List<String> DEFAULT_NO_DICTIONARY_COLUMNS =
@@ -142,7 +138,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
   protected final File _tarDir = new File(_tempDir, "tarDir");
   protected List<StreamDataServerStartable> _kafkaStarters;
-  private List<KafkaBrokerConfig> _kafkaBrokerConfigs;
 
   protected org.apache.pinot.client.Connection _pinotConnection;
   protected org.apache.pinot.client.Connection _pinotConnectionV2;
@@ -427,6 +422,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected String getKafkaBrokerList() {
+    StreamDataServerStartable firstStarter = _kafkaStarters.get(0);
+    if (firstStarter instanceof EmbeddedKafkaCluster) {
+      return ((EmbeddedKafkaCluster) firstStarter).bootstrapServers();
+    }
     StringBuilder builder = new StringBuilder();
     for (int i = 0; i < _kafkaStarters.size(); i++) {
       if (i > 0) {
@@ -816,107 +815,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void startKafkaWithoutTopic() {
     int requestedBrokers = getNumKafkaBrokers();
-    List<KafkaBrokerConfig> brokerConfigs = getOrCreateKafkaBrokerConfigs(requestedBrokers);
-    Throwable lastFailure = null;
-    for (int attempt = 1; attempt <= KAFKA_START_MAX_ATTEMPTS; attempt++) {
-      String clusterId = UUID.randomUUID().toString().replace("-", "");
-      String networkName = "pinot-it-kafka-" + UUID.randomUUID().toString().replace("-", "");
-      String quorumVoters = brokerConfigs.stream()
-          .map(config -> config._brokerId + "@" + config._containerName + ":9093")
-          .collect(Collectors.joining(","));
-
-      List<StreamDataServerStartable> kafkaStarters = new ArrayList<>(requestedBrokers);
+    Properties props = new Properties();
+    props.setProperty(EmbeddedKafkaCluster.BROKER_COUNT_PROP, Integer.toString(requestedBrokers));
+    EmbeddedKafkaCluster cluster = new EmbeddedKafkaCluster();
+    cluster.init(props);
+    cluster.start();
+    _kafkaStarters = Collections.singletonList(cluster);
+    try {
+      waitForKafkaClusterReady(getKafkaBrokerList(), requestedBrokers, useKafkaTransaction());
+    } catch (RuntimeException e) {
       try {
-        for (KafkaBrokerConfig brokerConfig : brokerConfigs) {
-          StreamDataServerStartable kafkaStarter =
-              createKafkaServerStarter(brokerConfig, clusterId, networkName, quorumVoters, requestedBrokers);
-          kafkaStarter.start();
-          kafkaStarters.add(kafkaStarter);
-        }
-        _kafkaStarters = kafkaStarters;
-        waitForKafkaClusterReady(getKafkaBrokerList(), requestedBrokers, useKafkaTransaction());
-        if (attempt > 1) {
-          LOGGER.info("Kafka startup succeeded on retry attempt {}/{}", attempt, KAFKA_START_MAX_ATTEMPTS);
-        }
-        return;
-      } catch (Throwable t) {
-        if (t instanceof Error && !(t instanceof AssertionError)) {
-          throw (Error) t;
-        }
-
-        lastFailure = t;
-        LOGGER.warn("Kafka startup attempt {}/{} failed; stopping started brokers before retry", attempt,
-            KAFKA_START_MAX_ATTEMPTS, t);
-        _kafkaStarters = kafkaStarters;
-        try {
-          stopKafka();
-        } catch (RuntimeException stopException) {
-          LOGGER.warn("Kafka cleanup failed after startup attempt {}/{}", attempt, KAFKA_START_MAX_ATTEMPTS,
-              stopException);
-          t.addSuppressed(stopException);
-        }
-
-        if (attempt < KAFKA_START_MAX_ATTEMPTS) {
-          try {
-            Thread.sleep(KAFKA_START_RETRY_WAIT_MS);
-          } catch (InterruptedException interruptedException) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted while waiting to retry Kafka startup", interruptedException);
-          }
-        }
+        cluster.stop();
+      } catch (Exception suppressed) {
+        e.addSuppressed(suppressed);
       }
-    }
-
-    _kafkaBrokerConfigs = null;
-    throw new RuntimeException("Failed to start Kafka cluster after " + KAFKA_START_MAX_ATTEMPTS + " attempts",
-        lastFailure);
-  }
-
-  private List<KafkaBrokerConfig> getOrCreateKafkaBrokerConfigs(int brokerCount) {
-    if (_kafkaBrokerConfigs != null && _kafkaBrokerConfigs.size() == brokerCount) {
-      return _kafkaBrokerConfigs;
-    }
-    _kafkaBrokerConfigs = createKafkaBrokerConfigs(brokerCount);
-    return _kafkaBrokerConfigs;
-  }
-
-  private StreamDataServerStartable createKafkaServerStarter(KafkaBrokerConfig brokerConfig, String clusterId,
-      String networkName, String quorumVoters, int clusterSize) {
-    Properties serverProperties = new Properties();
-    serverProperties.put("kafka.server.owner.name", getClass().getSimpleName());
-    serverProperties.put("kafka.server.bootstrap.servers", "localhost:" + brokerConfig._port);
-    serverProperties.put("kafka.server.port", Integer.toString(brokerConfig._port));
-    serverProperties.put("kafka.server.broker.id", Integer.toString(brokerConfig._brokerId));
-    serverProperties.put("kafka.server.allow.managed.for.configured.broker", "true");
-    serverProperties.put("kafka.server.container.name", brokerConfig._containerName);
-    serverProperties.put("kafka.server.network.name", networkName);
-    serverProperties.put("kafka.server.cluster.id", clusterId);
-    serverProperties.put("kafka.server.cluster.size", Integer.toString(clusterSize));
-    serverProperties.put("kafka.server.controller.quorum.voters", quorumVoters);
-    serverProperties.put("kafka.server.internal.host", brokerConfig._containerName);
-    serverProperties.put("kafka.server.skip.readiness.check", "true");
-    KafkaServerStartable kafkaServerStartable = new KafkaServerStartable();
-    kafkaServerStartable.init(serverProperties);
-    return kafkaServerStartable;
-  }
-
-  private List<KafkaBrokerConfig> createKafkaBrokerConfigs(int brokerCount) {
-    String containerPrefix = "pinot-it-kafka-" + UUID.randomUUID().toString().replace("-", "");
-    List<KafkaBrokerConfig> brokerConfigs = new ArrayList<>(brokerCount);
-    for (int i = 0; i < brokerCount; i++) {
-      int brokerId = i + 1;
-      int port = getAvailablePort();
-      String containerName = containerPrefix + "-" + brokerId;
-      brokerConfigs.add(new KafkaBrokerConfig(brokerId, port, containerName));
-    }
-    return brokerConfigs;
-  }
-
-  private static int getAvailablePort() {
-    try (ServerSocket socket = new ServerSocket(0)) {
-      return socket.getLocalPort();
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to find an available port for Kafka", e);
+      _kafkaStarters = null;
+      throw e;
     }
   }
 
@@ -961,20 +875,19 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void createKafkaTopic(String topic) {
-    int replicationFactor = Math.max(1, Math.min(getNumKafkaBrokers(), _kafkaStarters.size()));
-    createKafkaTopic(topic, getNumKafkaPartitions(), replicationFactor);
+    createKafkaTopic(topic, getNumKafkaPartitions(), getNumKafkaBrokers());
   }
 
   protected void createKafkaTopic(String topic, int numPartitions) {
-    createKafkaTopic(topic, numPartitions, Math.max(1, Math.min(getNumKafkaBrokers(), _kafkaStarters.size())));
+    createKafkaTopic(topic, numPartitions, getNumKafkaBrokers());
   }
 
   protected void createKafkaTopic(String topic, int numPartitions, int replicationFactor) {
-    int expectedReplicationFactor = Math.max(1, Math.min(replicationFactor, _kafkaStarters.size()));
+    int effectiveReplicationFactor = Math.max(1, Math.min(replicationFactor, getNumKafkaBrokers()));
     _kafkaStarters.get(0).createTopic(
         topic,
-        KafkaStarterUtils.getTopicCreationProps(numPartitions, expectedReplicationFactor));
-    waitForKafkaTopicReady(topic, numPartitions, expectedReplicationFactor);
+        KafkaStarterUtils.getTopicCreationProps(numPartitions, effectiveReplicationFactor));
+    waitForKafkaTopicReady(topic, numPartitions, effectiveReplicationFactor);
     waitForKafkaTopicMetadataReadyForConsumer(topic, numPartitions);
   }
 
@@ -1016,13 +929,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
       return false;
     }
-    for (StreamDataServerStartable kafkaStarter : _kafkaStarters) {
-      if (!isKafkaTopicReadyOnBroker("localhost:" + kafkaStarter.getPort(), topic, expectedPartitions,
-          expectedReplicationFactor)) {
-        return false;
-      }
-    }
-    return true;
+    return isKafkaTopicReadyOnBroker(getKafkaBrokerList(), topic, expectedPartitions, expectedReplicationFactor);
   }
 
   private boolean isKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions) {
@@ -1069,73 +976,26 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void stopKafka() {
-    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
-      return;
-    }
-    List<StreamDataServerStartable> kafkaStarters = _kafkaStarters;
-    _kafkaStarters = null;
-
-    RuntimeException stopException = null;
-    for (int i = kafkaStarters.size() - 1; i >= 0; i--) {
-      StreamDataServerStartable kafkaStarter = kafkaStarters.get(i);
+    if (_kafkaStarters != null) {
+      Exception firstException = null;
       try {
-        kafkaStarter.stop();
-      } catch (Exception e) {
-        RuntimeException wrapped = new RuntimeException(
-            "Failed to stop Kafka broker on port: " + kafkaStarter.getPort(), e);
-        if (stopException == null) {
-          stopException = wrapped;
-        } else {
-          stopException.addSuppressed(wrapped);
+        for (StreamDataServerStartable starter : _kafkaStarters) {
+          try {
+            starter.stop();
+          } catch (Exception e) {
+            if (firstException == null) {
+              firstException = e;
+            } else {
+              firstException.addSuppressed(e);
+            }
+          }
         }
+      } finally {
+        _kafkaStarters = null;
       }
-    }
-
-    for (StreamDataServerStartable kafkaStarter : kafkaStarters) {
-      try {
-        waitForKafkaBrokerStopped(kafkaStarter.getPort());
-      } catch (RuntimeException e) {
-        if (stopException == null) {
-          stopException = e;
-        } else {
-          stopException.addSuppressed(e);
-        }
+      if (firstException != null) {
+        throw new RuntimeException("Failed to stop Kafka starters cleanly", firstException);
       }
-    }
-
-    if (stopException != null) {
-      throw stopException;
-    }
-  }
-
-  private void waitForKafkaBrokerStopped(int brokerPort) {
-    String brokerList = "localhost:" + brokerPort;
-    TestUtils.waitForCondition(aVoid -> !isKafkaBrokerAvailable(brokerList), 200L, 60_000L,
-        "Kafka broker is still reachable after stop: " + brokerList);
-  }
-
-  private boolean isKafkaBrokerAvailable(String brokerList) {
-    Properties adminProps = new Properties();
-    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);
-    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "2000");
-    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "2000");
-    try (AdminClient adminClient = AdminClient.create(adminProps)) {
-      adminClient.describeCluster().nodes().get(2, TimeUnit.SECONDS);
-      return true;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  private static final class KafkaBrokerConfig {
-    private final int _brokerId;
-    private final int _port;
-    private final String _containerName;
-
-    private KafkaBrokerConfig(int brokerId, int port, String containerName) {
-      _brokerId = brokerId;
-      _port = port;
-      _containerName = containerName;
     }
   }
 
