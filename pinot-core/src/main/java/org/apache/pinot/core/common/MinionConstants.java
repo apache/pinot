@@ -92,7 +92,7 @@ public class MinionConstants {
    */
   public static final String SEGMENT_DOWNLOAD_PARALLELISM = "segmentDownloadParallelism";
 
-  /** Valid doc ids comparison mode (executor-only). Kept internal; executors pass config string. */
+  /** Valid doc ids consensus mode (executor-only). Kept internal; executors pass config string. */
   public enum ValidDocIdsConsensusMode {
     UNSAFE, EQUAL, MOST_VALID_DOCS
   }
@@ -264,7 +264,7 @@ public class MinionConstants {
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
 
     /**
-     * Valid doc ids comparison mode used by the executor only (generator unchanged). Values: UNSAFE, EQUAL,
+     * Valid doc ids consensus mode used by the executor only (generator unchanged). Values: UNSAFE, EQUAL,
      * MOST_VALID_DOCS. UNSAFE = use first server with matching CRC and READY; EQUAL = require all replicas
      * to have the same valid doc set (default); MOST_VALID_DOCS = use replica with most valid docs.
      */
