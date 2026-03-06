@@ -36,7 +36,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
-import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -66,6 +65,14 @@ import org.slf4j.LoggerFactory;
 
 public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
+
+  /** Package-private for testing: parses validDocIdsComparisonMode config string. */
+  static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsConsensusMode(String value) {
+    if (value == null || value.isBlank()) {
+      return MinionConstants.ValidDocIdsConsensusMode.EQUAL;
+    }
+    return MinionConstants.ValidDocIdsConsensusMode.valueOf(value.toUpperCase().trim());
+  }
 
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
 
@@ -281,22 +288,22 @@ public class MinionTaskUtils {
   }
 
   /**
-   * Returns the validDocID bitmap from the server whose local segment crc matches both crc of ZK metadata and
-   * deepstore copy (expectedCrc).
+   * Returns the validDocIds bitmap from server(s). {@code comparisonMode} is the task config value: UNSAFE,
+   * EQUAL (default), or MOST_VALID_DOCS.
    */
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
-      String validDocIdsType, MinionContext minionContext, String expectedCrc) {
+      String validDocIdsType, MinionContext minionContext, String expectedCrc, String comparisonModeStr) {
+    MinionConstants.ValidDocIdsConsensusMode consensusMode = parseValidDocIdsConsensusMode(comparisonModeStr);
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
-    RoaringBitmap validDocIds = null;
     List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
+    List<RoaringBitmap> matchingBitmaps = new ArrayList<>();
+
     for (String server : servers) {
       InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
       String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
 
-      // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
-      // passing an empty list.
       ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
       ValidDocIdsBitmapResponse validDocIdsBitmapResponse;
       try {
@@ -304,43 +311,91 @@ public class MinionTaskUtils {
             serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
                 validDocIdsType, 60_000);
       } catch (Exception e) {
-        LOGGER.warn("Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: "
-            + endpoint, e);
-        continue;
+        if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+          LOGGER.warn(
+              "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint, e);
+          continue;
+        } else {
+          throw new IllegalStateException(
+              "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint, e);
+        }
       }
 
+      String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
       // Check crc from the downloaded segment against the crc returned from the server along with the valid doc id
       // bitmap. If this doesn't match, this means that we are hitting the race condition where the segment has been
       // uploaded successfully while the server is still reloading the segment. Reloading can take a while when the
       // offheap upsert is used because we will need to delete & add all primary keys.
       // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
       // against the crc from the current segment zk metadata, so we don't need to check that here.
-      String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
       if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
-        // In this scenario, we are hitting the other replica of the segment which did not commit to ZK or deepstore.
-        // We will skip processing this bitmap to query other server to confirm if there is a valid matching CRC.
-        String message = "CRC mismatch for segment: " + segmentName + ", expected value based on task generator: "
-            + expectedCrc + ", actual crc from validDocIdsBitmapResponse from endpoint " + endpoint + ": "
-            + crcFromValidDocIdsBitmap;
-        LOGGER.warn(message);
-        continue;
+        if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+          LOGGER.warn("CRC mismatch for segment: {} from endpoint {}, skipping", segmentName, endpoint);
+          continue;
+        } else {
+          throw new IllegalStateException(
+              "CRC mismatch for segment: " + segmentName + ", expected: " + expectedCrc + ", actual from endpoint "
+                  + endpoint + ": " + crcFromValidDocIdsBitmap);
+        }
       }
 
-      // skipping servers which are not in READY state. The bitmaps would be inconsistent when
-      // server is NOT READY as UPDATING segments might be updating the ONLINE segments
       if (validDocIdsBitmapResponse.getServerStatus() != null && !validDocIdsBitmapResponse.getServerStatus()
           .equals(ServiceStatus.Status.GOOD)) {
-        String message = "Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
-            + validDocIdsBitmapResponse.getServerStatus() + " state, skipping it for execution for segment: "
-            + validDocIdsBitmapResponse.getSegmentName() + ". Will try other servers.";
-        LOGGER.warn(message);
-        continue;
+        if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+          LOGGER.warn("Server {} not READY for segment {}, skipping", validDocIdsBitmapResponse.getInstanceId(),
+              segmentName);
+          continue;
+        } else {
+          throw new IllegalStateException("Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
+              + validDocIdsBitmapResponse.getServerStatus() + " state for segment: " + segmentName
+              + ". Failing task to avoid inconsistency among replicas.");
+        }
       }
 
-      validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
-      break;
+      RoaringBitmap bitmap = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
+      int cardinality = bitmap.getCardinality();
+
+      if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+        LOGGER.info("Using server {} with {} valid docs for segment {} (mode=UNSAFE)", server, cardinality,
+            segmentName);
+        return bitmap;
+      }
+
+      matchingBitmaps.add(bitmap);
     }
-    return validDocIds;
+
+    if (matchingBitmaps.isEmpty()) {
+      return null;
+    }
+
+    if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL) {
+      RoaringBitmap consensusBitMap = matchingBitmaps.get(0);
+      for (RoaringBitmap b : matchingBitmaps) {
+        if (!b.equals(consensusBitMap)) {
+          throw new IllegalStateException("No consensus on validDocs across replicas for segment: " + segmentName
+              + ". Failing task to avoid replica inconsistency.");
+        }
+      }
+      LOGGER.info("All {} servers have {} valid docs for segment {}", servers.size(), consensusBitMap.getCardinality(),
+          segmentName);
+      return consensusBitMap;
+    }
+
+    // MOST_VALID_DOCS: explicitly pick the bitmap with the maximum valid doc count
+    RoaringBitmap maxCardinalityMap = null;
+    int maxCard = -1;
+    for (RoaringBitmap b : matchingBitmaps) {
+      int card = b.getCardinality();
+      if (card > maxCard) {
+        maxCard = card;
+        maxCardinalityMap = b;
+      }
+    }
+    if (maxCardinalityMap != null) {
+      LOGGER.info("Selected server with {} valid docs for segment {} (mode=MOST_VALID_DOCS, checked {} servers)",
+          maxCard, segmentName, servers.size());
+    }
+    return maxCardinalityMap;
   }
 
   public static String toUTCString(long epochMillis) {
@@ -395,48 +450,5 @@ public class MinionTaskUtils {
           "'deleteRecordColumn' must be provided with validDocIdsType: %s", validDocIdsType);
     }
     return validDocIdsType;
-  }
-
-  /**
-   * Checks if all replicas have consensus on validDoc counts for a segment.
-   * SAFETY LOGIC:
-   * 1. Only proceed with operations when ALL replicas agree on totalValidDocs count
-   * 2. Skip operations if ANY server hosting the segment is not in READY state
-   * 3. Include all replicas (even those with CRC mismatches) in consensus for safety
-   *
-   * @param segmentName the name of the segment being checked
-   * @param replicaMetadataList list of metadata from all replicas of the segment
-   * @return true if all replicas have consensus on validDoc counts, false otherwise
-   */
-  public static boolean hasValidDocConsensus(String segmentName,
-      List<ValidDocIdsMetadataInfo> replicaMetadataList) {
-
-    if (replicaMetadataList == null || replicaMetadataList.isEmpty()) {
-      LOGGER.warn("No replica metadata available for segment: {}", segmentName);
-      return false;
-    }
-
-    // Check server readiness and validDoc consensus
-    Long consensusValidDocs = null;
-    for (ValidDocIdsMetadataInfo metadata : replicaMetadataList) {
-      // Check server readiness - skip if ANY server is not ready
-      if (metadata.getServerStatus() != null && !metadata.getServerStatus().equals(ServiceStatus.Status.GOOD)) {
-        LOGGER.warn("Server {} is in {} state for segment: {}, skipping consensus check",
-            metadata.getInstanceId(), metadata.getServerStatus(), segmentName);
-        return false;
-      }
-
-      // Check if all replicas have the same totalValidDocs count
-      long validDocs = metadata.getTotalValidDocs();
-      if (consensusValidDocs == null) {
-        // First iteration, we record the value to compare against
-        consensusValidDocs = validDocs;
-      } else if (!consensusValidDocs.equals(validDocs)) {
-        LOGGER.warn("Inconsistent validDoc counts across replicas for segment: {}. Expected: {}, but found: {}",
-            segmentName, consensusValidDocs, validDocs);
-        return false;
-      }
-    }
-    return true;
   }
 }
