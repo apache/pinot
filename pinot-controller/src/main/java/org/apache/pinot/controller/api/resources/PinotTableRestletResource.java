@@ -48,6 +48,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
@@ -109,6 +110,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.replication.TableReplicator;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
@@ -205,6 +207,9 @@ public class PinotTableRestletResource {
 
   @Inject
   HttpClientConnectionManager _connectionManager;
+
+  @Inject
+  TableReplicator _tableReplicator;
 
   /**
    * API to create a table. Before adding, validations will be done (min number of replicas, checking offline and
@@ -305,6 +310,17 @@ public class PinotTableRestletResource {
       }
 
       CopyTablePayload copyTablePayload = JsonUtils.stringToObject(payload, CopyTablePayload.class);
+
+      // Validate jobType - only CONTROLLER is currently supported
+      CopyTablePayload.JobType jobType = copyTablePayload.getJobType();
+      if (jobType == CopyTablePayload.JobType.MINION) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Job type '%s' is not supported. Only 'CONTROLLER' job type is currently supported.",
+                jobType),
+            Response.Status.BAD_REQUEST);
+      }
+      LOGGER.info("[copyTable] Job type: {}", jobType);
+
       String sourceControllerUri = copyTablePayload.getSourceClusterUri();
       Map<String, String> requestHeaders = copyTablePayload.getHeaders();
 
@@ -373,6 +389,9 @@ public class PinotTableRestletResource {
         response.setTableConfig(realtimeTableConfig);
         response.setWatermarkInductionResult(watermarkInductionResult);
       }
+      String jobID = UUID.randomUUID().toString();
+      _tableReplicator.replicateTable(jobID, realtimeTableConfig.getTableName(), copyTablePayload,
+          watermarkInductionResult);
       return response;
     } catch (Exception e) {
       LOGGER.error("[copyTable] Error copying table: {}", tableName, e);
@@ -414,6 +433,18 @@ public class PinotTableRestletResource {
         tagPoolConfig.put("tag", tagPoolReplacementMap.get(srcTag));
       }
     }
+  }
+
+  @GET
+  @Path("/tables/copyStatus/{jobId}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_COPY_STATUS)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get status for a submitted table replication job",
+      notes = "Get status for a submitted table replication job")
+  public JsonNode getForceCommitJobStatus(
+      @ApiParam(value = "job id", required = true) @PathParam("jobId") String id) {
+    return JsonUtils.objectToJsonNode(
+        _pinotHelixResourceManager.getControllerJobZKMetadata(id, ControllerJobTypes.TABLE_REPLICATION));
   }
 
   @PUT

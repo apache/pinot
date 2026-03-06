@@ -25,6 +25,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.expectThrows;
 
 public class PinotTableRestletResourceTest {
 
@@ -36,8 +37,9 @@ public class PinotTableRestletResourceTest {
 
       String brokerTenant = "testBroker";
       String serverTenant = "testServer";
-      CopyTablePayload copyTablePayload = new CopyTablePayload("http://localhost:9000", null, brokerTenant,
-          serverTenant, Map.of("server1_REALTIME", "testServer_REALTIME"));
+      CopyTablePayload copyTablePayload = new CopyTablePayload("http://localhost:9000", null,
+          "http://localhost:9000", null, brokerTenant, serverTenant,
+          Map.of("server1_REALTIME", "testServer_REALTIME"), null, null);
       PinotTableRestletResource.tweakRealtimeTableConfig(tableConfig, copyTablePayload);
 
       assertEquals(tableConfig.get("tenants").get("broker").asText(), brokerTenant);
@@ -45,5 +47,30 @@ public class PinotTableRestletResourceTest {
       assertEquals(tableConfig.path("instanceAssignmentConfigMap").path("CONSUMING").path("tagPoolConfig").path("tag")
           .asText(), serverTenant + "_REALTIME");
     }
+  }
+
+  @Test
+  public void testCopyTablePayloadJobType() throws Exception {
+    // Test 1: Backwards compatibility - null jobType defaults to CONTROLLER
+    CopyTablePayload payload1 = new CopyTablePayload("http://src", null, "http://dest", null,
+        "broker", "server", null, null, null);
+    assertEquals(payload1.getJobType(), CopyTablePayload.JobType.CONTROLLER);
+
+    // Test 2: Explicit CONTROLLER (uppercase)
+    String json2 = "{\"sourceClusterUri\":\"http://src\",\"destinationClusterUri\":\"http://dest\","
+        + "\"brokerTenant\":\"broker\",\"serverTenant\":\"server\",\"jobType\":\"CONTROLLER\"}";
+    CopyTablePayload payload2 = JsonUtils.stringToObject(json2, CopyTablePayload.class);
+    assertEquals(payload2.getJobType(), CopyTablePayload.JobType.CONTROLLER);
+
+    // Test 3: MINION enum value deserializes correctly
+    String json3 = "{\"sourceClusterUri\":\"http://src\",\"destinationClusterUri\":\"http://dest\","
+        + "\"brokerTenant\":\"broker\",\"serverTenant\":\"server\",\"jobType\":\"MINION\"}";
+    CopyTablePayload payload3 = JsonUtils.stringToObject(json3, CopyTablePayload.class);
+    assertEquals(payload3.getJobType(), CopyTablePayload.JobType.MINION);
+
+    // Test 4: Invalid job type throws exception during deserialization
+    String json4 = "{\"sourceClusterUri\":\"http://src\",\"destinationClusterUri\":\"http://dest\","
+        + "\"brokerTenant\":\"broker\",\"serverTenant\":\"server\",\"jobType\":\"invalid\"}";
+    expectThrows(Exception.class, () -> JsonUtils.stringToObject(json4, CopyTablePayload.class));
   }
 }
