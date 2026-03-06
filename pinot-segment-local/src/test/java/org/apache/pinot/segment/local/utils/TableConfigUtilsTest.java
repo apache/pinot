@@ -1956,12 +1956,18 @@ public class TableConfigUtilsTest {
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Lists.newArrayList("myCol"), null,
         Collections.singletonList(
             new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "myCol").toColumnName()), null, 10);
+    StreamIngestionConfig streamIngestionConfigWithOrder = new StreamIngestionConfig(
+        List.of(streamConfigs));
+    streamIngestionConfigWithOrder.setEnforceConsumptionInOrder(true);
+    IngestionConfig ingestionConfigWithOrder = new IngestionConfig();
+    ingestionConfigWithOrder.setStreamIngestionConfig(streamIngestionConfigWithOrder);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setDedupConfig(new DedupConfig())
         .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setStarTreeIndexConfigs(Lists.newArrayList(starTreeIndexConfig))
         .setStreamConfigs(streamConfigs)
+        .setIngestionConfig(ingestionConfigWithOrder)
         .build();
     TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
 
@@ -1989,11 +1995,17 @@ public class TableConfigUtilsTest {
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
         .build();
+    StreamIngestionConfig timestampStreamIngestionConfig = new StreamIngestionConfig(
+        List.of(streamConfigs));
+    timestampStreamIngestionConfig.setEnforceConsumptionInOrder(true);
+    IngestionConfig timestampIngestionConfig = new IngestionConfig();
+    timestampIngestionConfig.setStreamIngestionConfig(timestampStreamIngestionConfig);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setDedupConfig(dedupConfig)
         .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setStreamConfigs(streamConfigs)
+        .setIngestionConfig(timestampIngestionConfig)
         .build();
     // Should not throw an exception - TIMESTAMP is a valid type for dedupTimeColumn
     TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
@@ -2009,6 +2021,10 @@ public class TableConfigUtilsTest {
         .build();
 
     Map<String, String> streamConfigs = getStreamConfigs();
+    StreamIngestionConfig invalidDedupStreamConfig = new StreamIngestionConfig(List.of(streamConfigs));
+    invalidDedupStreamConfig.setEnforceConsumptionInOrder(true);
+    IngestionConfig invalidDedupIngestionConfig = new IngestionConfig();
+    invalidDedupIngestionConfig.setStreamIngestionConfig(invalidDedupStreamConfig);
     DedupConfig dedupConfig = new DedupConfig();
     dedupConfig.setMetadataTTL(10);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
@@ -2017,6 +2033,7 @@ public class TableConfigUtilsTest {
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setTimeColumnName(TIME_COLUMN)
         .setStreamConfigs(streamConfigs)
+        .setIngestionConfig(invalidDedupIngestionConfig)
         .build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
@@ -2083,6 +2100,11 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
         .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+    StreamIngestionConfig md5StreamConfig = new StreamIngestionConfig(List.of(streamConfigs));
+    md5StreamConfig.setEnforceConsumptionInOrder(true);
+    IngestionConfig md5IngestionConfig = new IngestionConfig();
+    md5IngestionConfig.setStreamIngestionConfig(md5StreamConfig);
     DedupConfig dedupConfig = new DedupConfig();
     dedupConfig.setHashFunction(HashFunction.NONE);
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.NONE);
@@ -2092,7 +2114,8 @@ public class TableConfigUtilsTest {
         .setDedupConfig(dedupConfig)
         .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
-        .setStreamConfigs(getStreamConfigs())
+        .setStreamConfigs(streamConfigs)
+        .setIngestionConfig(md5IngestionConfig)
         .build();
     try {
       PinotMd5Mode.setPinotMd5Disabled(true);
@@ -2100,6 +2123,92 @@ public class TableConfigUtilsTest {
     } finally {
       PinotMd5Mode.setPinotMd5Disabled(false);
     }
+  }
+
+  @Test
+  public void testValidateEnforceConsumptionInOrderForPartialUpsert() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+
+    // Partial upsert without enforceConsumptionInOrder should fail
+    UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    partialUpsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(partialUpsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(streamConfigs)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "enforceConsumptionInOrder must be enabled for partial upsert tables");
+    }
+
+    // Partial upsert with enforceConsumptionInOrder=true should pass
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
+    streamIngestionConfig.setEnforceConsumptionInOrder(true);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(partialUpsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(streamConfigs)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
+    // Full upsert without enforceConsumptionInOrder should pass
+    UpsertConfig fullUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(fullUpsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(streamConfigs)
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+  }
+
+  @Test
+  public void testValidateEnforceConsumptionInOrderForDedup() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+
+    // Dedup without enforceConsumptionInOrder should fail
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(new DedupConfig())
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(streamConfigs)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "enforceConsumptionInOrder must be enabled for dedup tables");
+    }
+
+    // Dedup with enforceConsumptionInOrder=true should pass
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
+    streamIngestionConfig.setEnforceConsumptionInOrder(true);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(new DedupConfig())
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(streamConfigs)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
   }
 
   @Test

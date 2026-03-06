@@ -907,6 +907,18 @@ public final class TableConfigUtils {
       }
     }
 
+    // Partial upsert and dedup tables must have enforceConsumptionInOrder enabled
+    boolean isPartialUpsert = tableConfig.getUpsertMode() == UpsertConfig.Mode.PARTIAL;
+    if (isPartialUpsert || isDedupEnabled) {
+      IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+      StreamIngestionConfig streamIngestionConfig =
+          ingestionConfig != null ? ingestionConfig.getStreamIngestionConfig() : null;
+      Preconditions.checkState(
+          streamIngestionConfig != null && streamIngestionConfig.isEnforceConsumptionInOrder(),
+          "enforceConsumptionInOrder must be enabled for %s tables",
+          isPartialUpsert ? "partial upsert" : "dedup");
+    }
+
     Preconditions.checkState(
         tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
             .containsKey(InstancePartitionsType.COMPLETED.name()),
