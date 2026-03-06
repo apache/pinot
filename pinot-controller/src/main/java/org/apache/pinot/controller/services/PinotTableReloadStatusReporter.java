@@ -70,7 +70,8 @@ public class PinotTableReloadStatusReporter {
 
   private static double computeEstimatedRemainingTimeInMinutes(PinotTableReloadStatusResponse finalResponse,
       double timeElapsedInMinutes) {
-    int remainingSegments = finalResponse.getTotalSegmentCount() - finalResponse.getSuccessCount();
+    // Clamp to 0 to handle cases where successCount > totalSegmentCount (e.g. segments added after job started)
+    int remainingSegments = Math.max(0, finalResponse.getTotalSegmentCount() - finalResponse.getSuccessCount());
 
     double estimatedRemainingTimeInMinutes = -1;
     if (finalResponse.getSuccessCount() > 0) {
@@ -78,6 +79,26 @@ public class PinotTableReloadStatusReporter {
           ((double) remainingSegments / (double) finalResponse.getSuccessCount()) * timeElapsedInMinutes;
     }
     return estimatedRemainingTimeInMinutes;
+  }
+
+  /**
+   * Derives the overall reload job status from aggregated counts.
+   * - COMPLETED: all segments reloaded successfully, no server call failures
+   * - COMPLETED_WITH_ERRORS: reload finished but some segments failed
+   * - IN_PROGRESS: reload is still running
+   */
+  private static String deriveReloadStatus(PinotTableReloadStatusResponse response) {
+    int processed = response.getSuccessCount() + (response.getFailureCount() != null
+        ? response.getFailureCount().intValue() : 0);
+    boolean allProcessed = processed >= response.getTotalSegmentCount();
+
+    if (allProcessed && response.getTotalServerCallsFailed() == 0) {
+      if (response.getFailureCount() != null && response.getFailureCount() > 0) {
+        return "COMPLETED_WITH_ERRORS";
+      }
+      return "COMPLETED";
+    }
+    return "IN_PROGRESS";
   }
 
   private static double computeTimeElapsedInMinutes(double submissionTime) {
@@ -210,7 +231,8 @@ public class PinotTableReloadStatusReporter {
 
     return response.setMetadata(reloadJobMetadata)
         .setTimeElapsedInMinutes(timeElapsedInMinutes)
-        .setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
+        .setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes)
+        .setStatus(deriveReloadStatus(response));
   }
 
   private PinotControllerJobMetadataDto getControllerJobMetadataFromZk(String reloadJobId) {

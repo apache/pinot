@@ -196,9 +196,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   @Override
   public void onNoop(String msg) {
     _controllerMetrics.setValueOfTableGauge(_tableNameWithType, ControllerGauge.TABLE_REBALANCE_IN_PROGRESS, 0);
-    long timeToFinishInSeconds = (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000L;
     _tableRebalanceProgressStats.setCompletionStatusMsg(msg);
-    _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
+    _tableRebalanceProgressStats.setTimeToFinishInSeconds(computeElapsedTimeInSeconds());
     _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.NO_OP);
     trackStatsInZk();
   }
@@ -208,9 +207,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     Preconditions.checkState(RebalanceResult.Status.DONE != _tableRebalanceProgressStats.getStatus(),
         "Table Rebalance already completed");
     _controllerMetrics.setValueOfTableGauge(_tableNameWithType, ControllerGauge.TABLE_REBALANCE_IN_PROGRESS, 0);
-    long timeToFinishInSeconds = (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000L;
     _tableRebalanceProgressStats.setCompletionStatusMsg(msg);
-    _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
+    _tableRebalanceProgressStats.setTimeToFinishInSeconds(computeElapsedTimeInSeconds());
     _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.DONE);
     // Zero out the in_progress convergence stats
     TableRebalanceProgressStats.RebalanceStateStats stats = new TableRebalanceProgressStats.RebalanceStateStats();
@@ -226,11 +224,23 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   @Override
   public void onError(String errorMsg) {
     _controllerMetrics.setValueOfTableGauge(_tableNameWithType, ControllerGauge.TABLE_REBALANCE_IN_PROGRESS, 0);
-    long timeToFinishInSeconds = (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000L;
-    _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
+    _tableRebalanceProgressStats.setTimeToFinishInSeconds(computeElapsedTimeInSeconds());
     _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.FAILED);
     _tableRebalanceProgressStats.setCompletionStatusMsg(errorMsg);
     trackStatsInZk();
+  }
+
+  /**
+   * Safely computes elapsed time in seconds since rebalance started.
+   * Returns 0 if startTimeMs was never set (i.e. still at default 0), which happens
+   * when the rebalance completes as NO_OP or fails before START_TRIGGER fires.
+   */
+  private long computeElapsedTimeInSeconds() {
+    long startTimeMs = _tableRebalanceProgressStats.getStartTimeMs();
+    if (startTimeMs <= 0) {
+      return 0L;
+    }
+    return (System.currentTimeMillis() - startTimeMs) / 1000L;
   }
 
   @Override
