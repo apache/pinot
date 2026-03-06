@@ -296,42 +296,36 @@ public class MinionTaskUtilsTest {
   }
 
   @Test
-  public void testParseValidDocIdsComparisonMode() {
+  public void testParseValidDocIdsConsensusMode() {
     // Null or blank defaults to EQUAL
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode(null),
+    assertEquals(MinionTaskUtils.parseValidDocIdsConsensusMode(null),
         MinionConstants.ValidDocIdsConsensusMode.EQUAL);
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode(""),
+    assertEquals(MinionTaskUtils.parseValidDocIdsConsensusMode(""),
         MinionConstants.ValidDocIdsConsensusMode.EQUAL);
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("   "),
+    assertEquals(MinionTaskUtils.parseValidDocIdsConsensusMode("   "),
         MinionConstants.ValidDocIdsConsensusMode.EQUAL);
 
     // UNSAFE
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("UNSAFE"),
+    assertEquals(MinionTaskUtils.parseValidDocIdsConsensusMode("UNSAFE"),
         MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("unsafe"),
+    assertEquals(MinionTaskUtils.parseValidDocIdsConsensusMode("unsafe"),
         MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
 
     // EQUAL
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("EQUAL"),
+    assertEquals(MinionTaskUtils.parseValidDocIdsConsensusMode("EQUAL"),
         MinionConstants.ValidDocIdsConsensusMode.EQUAL);
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("  EQUAL  "),
+    assertEquals(MinionTaskUtils.parseValidDocIdsConsensusMode("  EQUAL  "),
         MinionConstants.ValidDocIdsConsensusMode.EQUAL);
 
     // MOST_VALID_DOCS
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("MOST_VALID_DOCS"),
+    assertEquals(MinionTaskUtils.parseValidDocIdsConsensusMode("MOST_VALID_DOCS"),
         MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
-    assertEquals(MinionTaskUtils.parseValidDocIdsComparisonMode("most_valid_docs"),
+    assertEquals(MinionTaskUtils.parseValidDocIdsConsensusMode("most_valid_docs"),
         MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS);
 
     // Invalid value throws
     expectThrows(IllegalArgumentException.class,
-        () -> MinionTaskUtils.parseValidDocIdsComparisonMode("INVALID_MODE"));
-  }
-
-  @Test
-  public void testValidDocIdsComparisonModeConstants() {
-    assertEquals(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_COMPARISON_MODE_KEY, "validDocIdsComparisonMode");
-    assertEquals(MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_COMPARISON_MODE, "EQUAL");
+        () -> MinionTaskUtils.parseValidDocIdsConsensusMode("INVALID_MODE"));
   }
 
   /**

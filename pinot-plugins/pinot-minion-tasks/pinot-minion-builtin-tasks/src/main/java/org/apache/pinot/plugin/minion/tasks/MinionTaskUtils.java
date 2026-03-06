@@ -67,7 +67,7 @@ public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
   /** Package-private for testing: parses validDocIdsComparisonMode config string. */
-  static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsComparisonMode(String value) {
+  static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsConsensusMode(String value) {
     if (value == null || value.isBlank()) {
       return MinionConstants.ValidDocIdsConsensusMode.EQUAL;
     }
@@ -294,7 +294,7 @@ public class MinionTaskUtils {
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, String comparisonModeStr) {
-    MinionConstants.ValidDocIdsConsensusMode consensusMode = parseValidDocIdsComparisonMode(comparisonModeStr);
+    MinionConstants.ValidDocIdsConsensusMode consensusMode = parseValidDocIdsConsensusMode(comparisonModeStr);
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
