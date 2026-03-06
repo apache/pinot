@@ -33,6 +33,7 @@ import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.models.BlobHttpHeaders;
 import com.azure.storage.blob.models.BlobStorageException;
+import com.azure.storage.blob.options.BlobParallelUploadOptions;
 import com.azure.storage.blob.specialized.BlockBlobClient;
 import com.azure.storage.common.StorageSharedKeyCredential;
 import com.azure.storage.common.Utility;
@@ -71,6 +72,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
@@ -125,7 +127,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
 
   // Blob API client used for file uploads to support Azure storage accounts with Blob Soft Delete enabled.
   // The DFS API (Data Lake) does not support Soft Delete, causing 409 EndpointUnsupportedAccountFeatures errors.
-  private BlobContainerClient _blobContainerClient;
+  private @Nullable BlobContainerClient _blobContainerClient;
 
   // If enabled, pinotFS implementation will guarantee that the bits you've read are the same as the ones you wrote.
   // However, there's some overhead in computing hash. (Adds roughly 3 seconds for 1GB file)
@@ -723,11 +725,12 @@ public class ADLSGen2PinotFS extends BasePinotFS {
           : null;
       if (_enableChecksum) {
         uploadWithBlockLevelChecksum(blobClient.getBlockBlobClient(), inputStream, blobHttpHeaders);
-      } else if (blobHttpHeaders != null) {
-        blobClient.uploadWithResponse(inputStream, contentLength, null, blobHttpHeaders, null, null, null, null,
-            Context.NONE);
       } else {
-        blobClient.upload(inputStream, contentLength, true);
+        BlobParallelUploadOptions uploadOptions = new BlobParallelUploadOptions(inputStream);
+        if (blobHttpHeaders != null) {
+          uploadOptions.setHeaders(blobHttpHeaders);
+        }
+        blobClient.uploadWithResponse(uploadOptions, null, Context.NONE);
       }
       return true;
     } catch (BlobStorageException e) {

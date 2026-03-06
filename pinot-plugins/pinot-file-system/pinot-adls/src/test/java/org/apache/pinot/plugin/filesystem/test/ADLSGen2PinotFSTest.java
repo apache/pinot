@@ -663,7 +663,7 @@ public class ADLSGen2PinotFSTest {
 
     // Create a temporary file with test data
     File tempFile = File.createTempFile("pinot_blob_test", ".tmp");
-    byte[] testData = "test segment data".getBytes();
+    byte[] testData = "test segment data".getBytes(StandardCharsets.UTF_8);
     Files.write(tempFile.toPath(), testData);
 
     URI dstUri = new URI("adl2://account/container/test_segment");
@@ -812,7 +812,7 @@ public class ADLSGen2PinotFSTest {
 
     // Create a temporary file with test data
     File tempFile = File.createTempFile("pinot_blob_test", ".tmp");
-    byte[] testData = "test segment data".getBytes();
+    byte[] testData = "test segment data".getBytes(StandardCharsets.UTF_8);
     Files.write(tempFile.toPath(), testData);
 
     URI dstUri = new URI("adl2://account/container/test_segment");
