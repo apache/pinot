@@ -965,7 +965,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
-    _helixResourceManager.updateTableConfig(tableConfig);
+    _helixResourceManager.updateTableConfig(tableConfig, false);
     tierToSegmentsMap = _helixResourceManager.updateTargetTier("j2", tableConfig.getTableName(), tableConfig);
     retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
     retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);

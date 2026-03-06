@@ -2160,16 +2160,6 @@ public class PinotHelixResourceManager {
 
   /**
    * Validate the table config and update it
-   * @throws IOException
-   * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible
-   */
-  public void updateTableConfig(TableConfig tableConfig)
-      throws IOException, TableConfigBackwardIncompatibleException {
-    updateTableConfig(tableConfig, false);
-  }
-
-  /**
-   * Validate the table config and update it
    * @param tableConfig the table config to update
    * @param force if true, allows upsert/dedup config changes with a warning
    * @throws IOException
@@ -2180,15 +2170,6 @@ public class PinotHelixResourceManager {
     validateTableTenantConfig(tableConfig);
     validateTableTaskMinionInstanceTagConfig(tableConfig);
     setExistingTableConfig(tableConfig, -1, force);
-  }
-
-  /**
-   * Sets the given table config into zookeeper bypassing validations in updateTableConfig
-   * TODO - Make this private and always use updateTableConfig ?
-   */
-  public void setExistingTableConfig(TableConfig tableConfig)
-      throws IOException, TableConfigBackwardIncompatibleException {
-    setExistingTableConfig(tableConfig, -1);
   }
 
   /**
@@ -2283,17 +2264,6 @@ public class PinotHelixResourceManager {
           "Invalid logical table. Reason: Schema with same name as logical table '"
               + logicalTableConfig.getTableName() + "' does not exist");
     }
-  }
-
-  /**
-   * Sets the given table config into zookeeper with the expected version, which is the previous tableConfig znRecord
-   * version. If the expected version is -1, the version check is ignored.
-   *
-   * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible
-   */
-  public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion)
-      throws TableConfigBackwardIncompatibleException {
-    setExistingTableConfig(tableConfig, expectedVersion, false);
   }
 
   /**

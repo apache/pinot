@@ -84,11 +84,8 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
       // Add the new topic to the table config.
       TableConfig currentTableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (getOrAddBackfillTopic(newTopicStreamConfig, currentTableConfig)) {
-        _pinotHelixResourceManager.setExistingTableConfig(currentTableConfig);
+        _pinotHelixResourceManager.setExistingTableConfig(currentTableConfig, -1, false);
       }
-    } catch (IOException e) {
-      LOGGER.error("Cannot add backfill topic to the table config", e);
-      return false;
     } catch (TableConfigBackwardIncompatibleException e) {
       LOGGER.error("Cannot change backfill job to the table config", e);
       return false;
