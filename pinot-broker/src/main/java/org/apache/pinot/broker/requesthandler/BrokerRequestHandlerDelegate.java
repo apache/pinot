@@ -43,20 +43,21 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 /**
  * {@code BrokerRequestHandlerDelegate} delegates the inbound broker request to one of the enabled
- * {@link BrokerRequestHandler} based on the requested handle type.
- *
- * {@see: @CommonConstant
+ * {@link BrokerRequestHandler} implementations based on the request type.
  */
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
+  private final SystemTableBrokerRequestHandler _systemTableBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
   private final TimeSeriesRequestHandler _timeSeriesRequestHandler;
   private final AbstractResponseStore _responseStore;
 
   public BrokerRequestHandlerDelegate(BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler,
+      SystemTableBrokerRequestHandler systemTableBrokerRequestHandler,
       @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler,
       @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler, AbstractResponseStore responseStore) {
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
+    _systemTableBrokerRequestHandler = systemTableBrokerRequestHandler;
     _multiStageBrokerRequestHandler = multiStageBrokerRequestHandler;
     _timeSeriesRequestHandler = timeSeriesRequestHandler;
     _responseStore = responseStore;
@@ -69,6 +70,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public void start() {
+    _systemTableBrokerRequestHandler.start();
     _singleStageBrokerRequestHandler.start();
     if (_multiStageBrokerRequestHandler != null) {
       _multiStageBrokerRequestHandler.start();
@@ -80,6 +82,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public void shutDown() {
+    _systemTableBrokerRequestHandler.shutDown();
     _singleStageBrokerRequestHandler.shutDown();
     if (_multiStageBrokerRequestHandler != null) {
       _multiStageBrokerRequestHandler.shutDown();
@@ -111,13 +114,18 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       }
     }
 
-    BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
-    if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
+    // System table queries always use the single-stage engine, regardless of the useMultistageEngine option.
+    BaseBrokerRequestHandler requestHandler;
+    if (isSystemTableQuery(sqlNodeAndOptions)) {
+      requestHandler = _systemTableBrokerRequestHandler;
+    } else if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
       if (_multiStageBrokerRequestHandler != null) {
         requestHandler = _multiStageBrokerRequestHandler;
       } else {
         return new BrokerResponseNative(QueryErrorCode.INTERNAL, "V2 Multi-Stage query engine not enabled.");
       }
+    } else {
+      requestHandler = _singleStageBrokerRequestHandler;
     }
 
     BrokerResponse response = requestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
@@ -165,7 +173,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       throws Exception {
     if (_multiStageBrokerRequestHandler != null && _multiStageBrokerRequestHandler.cancelQuery(
         queryId, timeoutMs, executor, connMgr, serverResponses)) {
-        return true;
+      return true;
     }
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }
@@ -191,6 +199,11 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       }
     }
     return _singleStageBrokerRequestHandler.getRequestIdByClientId(clientQueryId);
+  }
+
+  private static boolean isSystemTableQuery(@Nullable SqlNodeAndOptions sqlNodeAndOptions) {
+    return sqlNodeAndOptions != null
+        && SystemTableQueryDetector.containsSystemTableReference(sqlNodeAndOptions.getSqlNode());
   }
 
   private CursorResponse getCursorResponse(Integer numRows, BrokerResponse response)

@@ -46,7 +46,8 @@ public class QueryExecutionContext {
   public enum QueryType {
     SSE,  // Single-stage engine
     MSE,  // Multi-stage engine
-    TSE   // Time-series engine
+    TSE,  // Time-series engine
+    STE   // System table engine (broker-local)
   }
 
   private final QueryType _queryType;
