@@ -77,12 +77,12 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     }
 
     // Executor-only: read comparison mode string from task config (no auth resolution or URL hits).
-    Map<String, String> taskConfigs = tableConfig.getTaskConfig() != null
-        ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
-    String comparisonMode = taskConfigs != null
-        ? taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_COMPARISON_MODE_KEY,
-            UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_COMPARISON_MODE)
-        : UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_COMPARISON_MODE;
+    Map<String, String> taskConfigs =
+        tableConfig.getTaskConfig() != null ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
+    String comparisonMode =
+        taskConfigs != null ? taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+            UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
+            : UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
     RoaringBitmap validDocIds =
         MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
             MINION_CONTEXT, originalSegmentCrcFromTaskGenerator, comparisonMode);

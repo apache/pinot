@@ -268,10 +268,10 @@ public class MinionConstants {
      * MOST_VALID_DOCS. UNSAFE = use first server with matching CRC and READY; EQUAL = require all replicas
      * to have the same valid doc set (default); MOST_VALID_DOCS = use replica with most valid docs.
      */
-    public static final String VALID_DOC_IDS_COMPARISON_MODE_KEY = "validDocIdsComparisonMode";
+    public static final String VALID_DOC_IDS_CONSENSUS_MODE_KEY = "validDocIdsConsensusMode";
 
     /** Default: equal valid doc set consensus across replicas. */
-    public static final String DEFAULT_VALID_DOC_IDS_COMPARISON_MODE = "EQUAL";
+    public static final String DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE = "EQUAL";
   }
 
   public static class UpsertCompactMergeTask {

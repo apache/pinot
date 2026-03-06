@@ -113,9 +113,9 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     Map<String, String> taskConfigs =
         tableConfig.getTaskConfig() != null ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
     String comparisonMode = taskConfigs != null ? taskConfigs.getOrDefault(
-        MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_COMPARISON_MODE_KEY,
-        MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_COMPARISON_MODE)
-        : MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_COMPARISON_MODE;
+        MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+        MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
+        : MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
 
     List<RecordReader> recordReaders = segmentMetadataList.stream().map(x -> {
       RoaringBitmap validDocIds = MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
