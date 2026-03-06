@@ -161,7 +161,7 @@ public class PinotQueryResource {
   public StreamingOutput handleTimeSeriesQueryRange(@QueryParam("language") String language,
     @QueryParam("query") String query, @QueryParam("start") String start, @QueryParam("end") String end,
     @QueryParam("step") String step, @Context HttpHeaders httpHeaders) {
-    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step);
+    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step, Map.of(), null, false);
   }
 
   @POST
@@ -680,11 +680,44 @@ public class PinotQueryResource {
     Map<String, String> headers) {
     return outputStream -> {
       final long startTime = System.currentTimeMillis();
-      sendRequestRaw(url, method, requestJson.toString(), headers, outputStream);
+
+      /* START GENAI@CLINE */
+      // Use a temporary buffer to capture the broker response
+      java.io.ByteArrayOutputStream tempBuffer = new java.io.ByteArrayOutputStream();
+      sendRequestRaw(url, method, requestJson.toString(), headers, tempBuffer);
       final long queryTime = System.currentTimeMillis() - startTime;
       LOGGER.info("Query: {} Time: {}ms", query, queryTime);
+
+      // Parse the broker response, add controller execution time as an additional field, and write to output
+      try {
+        String brokerResponseStr = tempBuffer.toString(StandardCharsets.UTF_8.name());
+        ObjectNode brokerResponseJson = (ObjectNode) JsonUtils.stringToJsonNode(brokerResponseStr);
+        // Add controller execution time as an additional field in the response
+        brokerResponseJson.put("controllerExecutionTimeMs", queryTime);
+        JsonUtils.objectToOutputStream(brokerResponseJson, outputStream);
+      } catch (Exception e) {
+        // If parsing fails, just write the original response
+        LOGGER.warn("Failed to add controller execution time to broker response", e);
+        outputStream.write(tempBuffer.toByteArray());
+      }
+      /* END GENAI@CLINE */
     };
   }
+
+  /* START GENAI@CLINE */
+  public StreamingOutput sendTimeSeriesRequestRaw(String url, String method, String query, ObjectNode requestJson,
+    Map<String, String> headers) {
+    return outputStream -> {
+      final long startTime = System.currentTimeMillis();
+
+      // For timeseries requests, just forward the raw response without modification
+      // since timeseries responses have a different structure (PinotBrokerTimeSeriesResponse)
+      sendRequestRaw(url, method, requestJson.toString(), headers, outputStream);
+      final long queryTime = System.currentTimeMillis() - startTime;
+      LOGGER.info("TimeSeries Query: {} Time: {}ms", query, queryTime);
+    };
+  }
+  /* END GENAI@CLINE */
 
   private static StreamingOutput constructQueryExceptionResponse(QueryErrorCode errorCode, String message) {
     return outputStream -> {
@@ -769,11 +802,11 @@ public class PinotQueryResource {
         queryOptions.forEach(queryOptionsNode::put);
         requestJson.set("queryOptions", queryOptionsNode);
       }
-      return sendRequestRaw(url, "POST", query, requestJson, headers);
+      return sendTimeSeriesRequestRaw(url, "POST", query, requestJson, headers);
     } else {
       // Use GET /timeseries/api/v1/query_range endpoint (Prometheus compatible API)
       String url = getTimeSeriesQueryURL(protocol, hostName, port, language, query, start, end, step);
-      return sendRequestRaw(url, "GET", query, JsonUtils.newObjectNode(), headers);
+      return sendTimeSeriesRequestRaw(url, "GET", query, JsonUtils.newObjectNode(), headers);
     }
   }
 
