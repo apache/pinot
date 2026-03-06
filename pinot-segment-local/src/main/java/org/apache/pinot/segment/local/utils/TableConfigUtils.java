@@ -1779,15 +1779,13 @@ public final class TableConfigUtils {
    * @param tableConfig the table config to check, may be null
    * @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
    */
-  public static boolean checkForInconsistentStateConfigs(@Nullable TableConfig tableConfig) {
+  public static boolean isTableTypeInconsistentDuringConsumption(@Nullable TableConfig tableConfig) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig == null) {
       return false;
     }
-    return tableConfig.getReplication() > 1 && (
-        upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL
-            || (upsertConfig.isDropOutOfOrderRecord()
-            && upsertConfig.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
+    return tableConfig.getReplication() > 1 && (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL
+        || upsertConfig.isDropOutOfOrderRecord() || upsertConfig.getOutOfOrderRecordColumn() != null);
   }
 
   // enum of all the skip-able validation types.
