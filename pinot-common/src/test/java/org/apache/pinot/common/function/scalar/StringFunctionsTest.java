@@ -42,6 +42,8 @@ public class StringFunctionsTest {
         {"org.apache.pinot.common.function", ".", 3, 3, "common", "null"},
         {"+++++", "+", 0, 100, "", ""},
         {"+++++", "+", 1, 100, "null", "null"},
+        {"+++++org++apache++", "", 1, 100, "null", "null"},
+        {"+++++org++apache++", "", 0, 100, "+++++org++apache++", "+++++org++apache++"},
         // note that splitPart will split with limit first, then lookup by index from START or END.
         {"org.apache.pinot.common.function", ".", -1, 100, "function", "function"},
         {"org.apache.pinot.common.function", ".", -10, 100, "null", "null"},
@@ -64,6 +66,86 @@ public class StringFunctionsTest {
         {"org.apache.pinot.common.function", ".", -6, 6, "null", "null"},
         {"+++++", "+", -1, 100, "", ""},
         {"+++++", "+", -2, 100, "null", "null"},
+
+        // Empty delimiter: index=-1 returns input, other negative indices return "null"
+        {"hello", "", -1, 100, "hello", "hello"},
+        {"hello", "", -2, 100, "null", "null"},
+
+        // Single field with no delimiter present
+        {"abc", ".", 0, 100, "abc", "abc"},
+        {"abc", ".", 1, 100, "null", "null"},
+        {"abc", ".", -1, 100, "abc", "abc"},
+        {"abc", ".", -2, 100, "null", "null"},
+
+        // Input equals delimiter
+        {".", ".", 0, 100, "", ""},
+        {".", ".", 1, 100, "null", "null"},
+        {".", ".", -1, 100, "", ""},
+
+        // Trailing delimiters with content (single-char): exercises splitPartNegativeIdxSingleCharDelim
+        // trailing-delimiter handling (resultIdx decrement, empty trailing field)
+        {"org++apache++", "+", 0, 100, "org", "org"},
+        {"org++apache++", "+", 1, 100, "apache", "apache"},
+        {"org++apache++", "+", 2, 100, "", ""},
+        {"org++apache++", "+", 3, 100, "null", "null"},
+        {"org++apache++", "+", -1, 100, "", ""},
+        {"org++apache++", "+", -2, 100, "apache", "apache"},
+        {"org++apache++", "+", -3, 100, "org", "org"},
+        {"org++apache++", "+", -4, 100, "null", "null"},
+
+        // Leading AND trailing delimiters (single-char): exercises backward scan with
+        // both leading delimiter skip and trailing delimiter adjustment
+        {"++org++apache++", "+", 0, 100, "org", "org"},
+        {"++org++apache++", "+", 1, 100, "apache", "apache"},
+        {"++org++apache++", "+", -1, 100, "", ""},
+        {"++org++apache++", "+", -2, 100, "apache", "apache"},
+        {"++org++apache++", "+", -3, 100, "org", "org"},
+        {"++org++apache++", "+", -4, 100, "null", "null"},
+
+        // Single field surrounded by delimiters
+        {"++abc++", "+", 0, 100, "abc", "abc"},
+        {"++abc++", "+", -1, 100, "", ""},
+        {"++abc++", "+", -2, 100, "abc", "abc"},
+        {"++abc++", "+", -3, 100, "null", "null"},
+
+        // Multi-char delimiter: exercises forward scan and multi-char negative index
+        // path (totalFields counting + adjustedIndex conversion) which is separate from
+        // the single-char optimized path
+        {"org::apache::pinot", "::", 0, 100, "org", "org"},
+        {"org::apache::pinot", "::", 1, 100, "apache", "apache"},
+        {"org::apache::pinot", "::", 2, 100, "pinot", "pinot"},
+        {"org::apache::pinot", "::", 3, 100, "null", "null"},
+        {"org::apache::pinot", "::", -1, 100, "pinot", "pinot"},
+        {"org::apache::pinot", "::", -2, 100, "apache", "apache"},
+        {"org::apache::pinot", "::", -3, 100, "org", "org"},
+        {"org::apache::pinot", "::", -4, 100, "null", "null"},
+
+        // Multi-char delimiter with consecutive delimiters: exercises the consecutive
+        // delimiter skip in both leading-skip loop and the totalFields counting loop
+        {"::::org::::apache", "::", 0, 100, "org", "org"},
+        {"::::org::::apache", "::", 1, 100, "apache", "apache"},
+        {"::::org::::apache", "::", 2, 100, "null", "null"},
+        {"::::org::::apache", "::", -1, 100, "apache", "apache"},
+        {"::::org::::apache", "::", -2, 100, "org", "org"},
+        {"::::org::::apache", "::", -3, 100, "null", "null"},
+
+        // Multi-char delimiter with leading AND trailing delimiters: exercises the
+        // trailing empty field in the multi-char totalFields counting path
+        {"::org::apache::", "::", 0, 100, "org", "org"},
+        {"::org::apache::", "::", 1, 100, "apache", "apache"},
+        {"::org::apache::", "::", 2, 100, "", ""},
+        {"::org::apache::", "::", -1, 100, "", ""},
+        {"::org::apache::", "::", -2, 100, "apache", "apache"},
+        {"::org::apache::", "::", -3, 100, "org", "org"},
+        {"::org::apache::", "::", -4, 100, "null", "null"},
+
+        // Empty input with non-empty delimiter
+        {"", ".", 0, 100, "", "null"},
+        {"", ".", -1, 100, "", "null"},
+        {"", ".", -2, 100, "null", "null"},
+
+        // Empty input with multi-char delimiter and negative index
+        {"", "::", -1, 100, "", "null"},
     };
   }
 
