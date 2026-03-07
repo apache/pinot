@@ -1904,6 +1904,7 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
+    // OFFLINE table without primary key columns should fail with primary key error (OFFLINE is now allowed)
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)
         .setDedupConfig(new DedupConfig())
@@ -1912,7 +1913,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       fail();
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Upsert/Dedup table is for realtime table only.");
+      assertEquals(e.getMessage(), "Upsert/Dedup table must have primary key columns in the schema");
     }
 
     tableConfig =
@@ -2108,6 +2109,7 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
+    // OFFLINE table without primary key columns should fail with primary key error (OFFLINE is now allowed)
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setUpsertConfig(upsertConfig)
@@ -2117,7 +2119,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       fail();
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Upsert/Dedup table is for realtime table only.");
+      assertEquals(e.getMessage(), "Upsert/Dedup table must have primary key columns in the schema");
     }
 
     tableConfig =

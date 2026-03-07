@@ -352,7 +352,7 @@ public class UpsertContext {
       Preconditions.checkState(_schema != null, "Schema must be set");
       Preconditions.checkState(CollectionUtils.isNotEmpty(_primaryKeyColumns), "Primary key columns must be set");
       Preconditions.checkState(_hashFunction != null, "Hash function must be set");
-      Preconditions.checkState(CollectionUtils.isNotEmpty(_comparisonColumns), "Comparison columns must be set");
+      Preconditions.checkState(_comparisonColumns != null, "Comparison columns must be set");
       Preconditions.checkState(_consistencyMode != null, "Consistency mode must be set");
       if (_tableIndexDir == null) {
         Preconditions.checkState(_tableDataManager != null, "Either table data manager or table index dir must be set");
