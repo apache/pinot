@@ -24,17 +24,6 @@
         "module": "commonjs",
         "target": "es6",
         "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true,
-        "jsx": "react",
-        "skipLibCheck": true,
-        "moduleResolution": "node",
-        "resolveJsonModule": true
-    },
-    "include": [
-        "app/**/*"
-    ],
-    "exclude": [
-        "node_modules",
-        "dist"
-    ]
+        "jsx": "react"
+    }
 }
