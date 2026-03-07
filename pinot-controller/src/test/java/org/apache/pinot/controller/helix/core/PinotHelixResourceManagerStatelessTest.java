@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
@@ -82,6 +81,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
@@ -1690,17 +1691,16 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     waitForEVToDisappear(tableConfig.getTableName());
     addDummySchema(rawTableName);
 
-    List<Pair<PartitionGroupMetadata, Integer>> consumingMetadata = new ArrayList<>();
-    PartitionGroupMetadata metadata0 = mock(PartitionGroupMetadata.class);
-    when(metadata0.getPartitionGroupId()).thenReturn(0);
-    when(metadata0.getStartOffset()).thenReturn(mock(StreamPartitionMsgOffset.class));
-    consumingMetadata.add(Pair.of(metadata0, 5));
-    PartitionGroupMetadata metadata1 = mock(PartitionGroupMetadata.class);
-    when(metadata1.getPartitionGroupId()).thenReturn(1);
-    when(metadata1.getStartOffset()).thenReturn(mock(StreamPartitionMsgOffset.class));
-    consumingMetadata.add(Pair.of(metadata1, 10));
+    StreamConfig streamConfig = new StreamConfig(rawTableName + "_REALTIME",
+        FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap());
+    PartitionGroupMetadata metadata0 =
+        new PartitionGroupMetadata(0, mock(StreamPartitionMsgOffset.class), 5);
+    PartitionGroupMetadata metadata1 =
+        new PartitionGroupMetadata(1, mock(StreamPartitionMsgOffset.class), 10);
+    List<StreamMetadata> streamMetadataList = Collections.singletonList(
+        new StreamMetadata(streamConfig, 2, Arrays.asList(metadata0, metadata1)));
 
-    _helixResourceManager.addTable(tableConfig, consumingMetadata);
+    _helixResourceManager.addTable(tableConfig, streamMetadataList);
 
     IdealState idealState = _helixResourceManager.getTableIdealState(realtimeTableName);
     assertNotNull(idealState);
