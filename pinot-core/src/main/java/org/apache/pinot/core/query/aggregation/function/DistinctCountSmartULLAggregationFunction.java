@@ -351,6 +351,9 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
 
   @Override
   public Integer extractFinalResult(Object intermediateResult) {
+    if (intermediateResult == null) {
+      return 0;
+    }
     if (intermediateResult instanceof UltraLogLog) {
       return (int) Math.round(((UltraLogLog) intermediateResult).getDistinctCountEstimate());
     } else {

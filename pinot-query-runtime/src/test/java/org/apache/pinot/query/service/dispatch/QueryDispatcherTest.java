@@ -19,6 +19,7 @@
 package org.apache.pinot.query.service.dispatch;
 
 import io.grpc.stub.StreamObserver;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -73,7 +74,9 @@ public class QueryDispatcherTest extends QueryTestSet {
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(1, portList.get(0), portList.get(1),
         QueryEnvironmentTestBase.TABLE_SCHEMAS, QueryEnvironmentTestBase.SERVER1_SEGMENTS,
         QueryEnvironmentTestBase.SERVER2_SEGMENTS, null);
-    _queryDispatcher = new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class));
+    _queryDispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, true,
+            Duration.ofSeconds(1));
   }
 
   @AfterClass
@@ -140,7 +143,7 @@ public class QueryDispatcherTest extends QueryTestSet {
   }
 
   @Test
-  public void testQueryDispatcherCancelWhenQueryReducerThrowsError()
+  public void testQueryDispatcherCancelWhenQueryReducerReturnsError()
       throws Exception {
     String sql = "SELECT * FROM a";
     long requestId = REQUEST_ID_GEN.getAndIncrement();

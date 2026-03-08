@@ -18,14 +18,32 @@
  */
 package org.apache.pinot.controller.api.dto;
 
+import java.util.List;
+import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
+import org.apache.pinot.spi.annotations.InterfaceStability;
+
+
+@InterfaceStability.Evolving
 public class PinotTableReloadStatusResponse {
+  private String _status;
   private double _timeElapsedInMinutes;
   private double _estimatedTimeRemainingInMinutes;
   private int _totalSegmentCount;
   private int _successCount;
   private int _totalServersQueried;
   private int _totalServerCallsFailed;
+  private Long _failureCount;
   private PinotControllerJobMetadataDto _metadata;
+  private List<SegmentReloadFailureResponse> _segmentReloadFailures;
+
+  public String getStatus() {
+    return _status;
+  }
+
+  public PinotTableReloadStatusResponse setStatus(String status) {
+    _status = status;
+    return this;
+  }
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;
@@ -83,12 +101,31 @@ public class PinotTableReloadStatusResponse {
     return this;
   }
 
+  public Long getFailureCount() {
+    return _failureCount;
+  }
+
+  public PinotTableReloadStatusResponse setFailureCount(Long failureCount) {
+    _failureCount = failureCount;
+    return this;
+  }
+
   public PinotControllerJobMetadataDto getMetadata() {
     return _metadata;
   }
 
   public PinotTableReloadStatusResponse setMetadata(PinotControllerJobMetadataDto metadata) {
     _metadata = metadata;
+    return this;
+  }
+
+  public List<SegmentReloadFailureResponse> getSegmentReloadFailures() {
+    return _segmentReloadFailures;
+  }
+
+  public PinotTableReloadStatusResponse setSegmentReloadFailures(
+      List<SegmentReloadFailureResponse> segmentReloadFailures) {
+    _segmentReloadFailures = segmentReloadFailures;
     return this;
   }
 }

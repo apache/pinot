@@ -35,6 +35,7 @@ import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -62,6 +63,7 @@ public class AdminApiApplication extends ResourceConfig {
 
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
+      ServerReloadJobStatusCache reloadJobStatusCache,
       PinotConfiguration serverConf) {
     _serverInstance = instance;
 
@@ -79,6 +81,8 @@ public class AdminApiApplication extends ResourceConfig {
         bind(_serverInstance.getHelixManager()).to(HelixManager.class);
         bind(_serverInstance.getServerMetrics()).to(ServerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
+        bind(reloadJobStatusCache).to(ServerReloadJobStatusCache.class);
+
         bind(serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID)).named(SERVER_INSTANCE_ID);
         String loggerRootDir = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {

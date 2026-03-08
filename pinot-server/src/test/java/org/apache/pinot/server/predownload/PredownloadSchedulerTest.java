@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.InstanceConfig;
@@ -286,5 +287,63 @@ public class PredownloadSchedulerTest {
         assertEquals(reason, PredownloadCompletionReason.ALL_SEGMENTS_DOWNLOADED);
       }
     }
+  }
+
+  @Test
+  public void testPredownloadParallelismConfiguration() throws Exception {
+    // Test default parallelism (should use numProcessors * 3)
+    Map<String, Object> defaultProps = Map.of(
+        "pinot.server.instance.id", INSTANCE_ID,
+        "pinot.server.instance.dataDir", INSTANCE_DATA_DIR,
+        "pinot.server.instance.readMode", READ_MODE,
+        "pinot.cluster.name", CLUSTER_NAME,
+        "pinot.zk.server", ZK_ADDRESS
+    );
+    PropertiesConfiguration defaultConfig = new PropertiesConfiguration();
+    defaultProps.forEach((key, value) -> defaultConfig.setProperty(key, value));
+
+    PredownloadScheduler defaultScheduler = new PredownloadScheduler(defaultConfig);
+    ThreadPoolExecutor defaultExecutor = (ThreadPoolExecutor) defaultScheduler._executor;
+    int expectedDefaultThreads = Runtime.getRuntime().availableProcessors() * 3;
+    assertEquals(defaultExecutor.getCorePoolSize(), expectedDefaultThreads,
+        "Default parallelism should be numProcessors * 3");
+    defaultScheduler.stop();
+
+    // Test custom parallelism
+    int customParallelism = 10;
+    Map<String, Object> customProps = Map.of(
+        "pinot.server.instance.id", INSTANCE_ID,
+        "pinot.server.instance.dataDir", INSTANCE_DATA_DIR,
+        "pinot.server.instance.readMode", READ_MODE,
+        "pinot.cluster.name", CLUSTER_NAME,
+        "pinot.zk.server", ZK_ADDRESS,
+        "pinot.server.predownload.parallelism", String.valueOf(customParallelism)
+    );
+    PropertiesConfiguration customConfig = new PropertiesConfiguration();
+    customProps.forEach((key, value) -> customConfig.setProperty(key, value));
+
+    PredownloadScheduler customScheduler = new PredownloadScheduler(customConfig);
+    ThreadPoolExecutor customExecutor = (ThreadPoolExecutor) customScheduler._executor;
+    assertEquals(customExecutor.getCorePoolSize(), customParallelism,
+        "Custom parallelism should match configured value");
+    customScheduler.stop();
+
+    // Test zero/negative parallelism (should fall back to default)
+    Map<String, Object> zeroProps = Map.of(
+        "pinot.server.instance.id", INSTANCE_ID,
+        "pinot.server.instance.dataDir", INSTANCE_DATA_DIR,
+        "pinot.server.instance.readMode", READ_MODE,
+        "pinot.cluster.name", CLUSTER_NAME,
+        "pinot.zk.server", ZK_ADDRESS,
+        "pinot.server.predownload.parallelism", "0"
+    );
+    PropertiesConfiguration zeroConfig = new PropertiesConfiguration();
+    zeroProps.forEach((key, value) -> zeroConfig.setProperty(key, value));
+
+    PredownloadScheduler zeroScheduler = new PredownloadScheduler(zeroConfig);
+    ThreadPoolExecutor zeroExecutor = (ThreadPoolExecutor) zeroScheduler._executor;
+    assertEquals(zeroExecutor.getCorePoolSize(), expectedDefaultThreads,
+        "Zero parallelism should fall back to default");
+    zeroScheduler.stop();
   }
 }

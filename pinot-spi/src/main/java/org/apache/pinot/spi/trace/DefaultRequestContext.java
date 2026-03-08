@@ -37,6 +37,7 @@ public class DefaultRequestContext implements RequestScope {
 
   private int _errorCode = 0;
   private String _query;
+  private QueryFingerprint _queryFingerprint;
   private List<String> _tableNames = new ArrayList<>();
   private long _processingTimeMillis = -1;
   private long _totalDocs;
@@ -194,6 +195,11 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public void setQueryFingerprint(QueryFingerprint queryFingerprint) {
+    _queryFingerprint = queryFingerprint;
+  }
+
+  @Override
   public void setTableName(String tableName) {
     _tableNames.add(tableName);
   }
@@ -266,6 +272,11 @@ public class DefaultRequestContext implements RequestScope {
   @Override
   public String getQuery() {
     return _query;
+  }
+
+  @Override
+  public QueryFingerprint getQueryFingerprint() {
+    return _queryFingerprint;
   }
 
   @Override

@@ -22,11 +22,15 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.instance.context.BrokerContext;
+import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
+import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -54,14 +58,17 @@ public class OpChainExecutionContext {
   @Nullable
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
+  private final QueryOperatorFactoryProvider _queryOperatorFactoryProvider;
   @Nullable
   private ServerPlanRequestContext _leafStageContext;
   private final boolean _sendStats;
+  private final boolean _keepPipelineBreakerStats;
 
   @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, String cid, long activeDeadlineMs,
       long passiveDeadlineMs, String brokerId, Map<String, String> opChainMetadata, StageMetadata stageMetadata,
-      WorkerMetadata workerMetadata, @Nullable PipelineBreakerResult pipelineBreakerResult, boolean sendStats) {
+      WorkerMetadata workerMetadata, @Nullable PipelineBreakerResult pipelineBreakerResult, boolean sendStats,
+      boolean keepPipelineBreakerStats) {
     _mailboxService = mailboxService;
     // TODO: Consider removing info included in QueryExecutionContext
     _requestId = requestId;
@@ -78,24 +85,26 @@ public class OpChainExecutionContext {
     _id = new OpChainId(requestId, workerMetadata.getWorkerId(), stageMetadata.getStageId());
     _pipelineBreakerResult = pipelineBreakerResult;
     _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
+    _queryOperatorFactoryProvider = getDefaultQueryOperatorFactoryProvider();
+    _keepPipelineBreakerStats = keepPipelineBreakerStats;
   }
 
   public static OpChainExecutionContext fromQueryContext(MailboxService mailboxService,
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
-      @Nullable PipelineBreakerResult pipelineBreakerResult, boolean sendStats) {
+      @Nullable PipelineBreakerResult pipelineBreakerResult, boolean sendStats, boolean keepPipelineBreakerStats) {
     return fromQueryContext(mailboxService, opChainMetadata, stageMetadata, workerMetadata, pipelineBreakerResult,
-        sendStats, QueryThreadContext.get().getExecutionContext());
+        sendStats, keepPipelineBreakerStats, QueryThreadContext.get().getExecutionContext());
   }
 
   @VisibleForTesting
   public static OpChainExecutionContext fromQueryContext(MailboxService mailboxService,
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
-      @Nullable PipelineBreakerResult pipelineBreakerResult, boolean sendStats,
+      @Nullable PipelineBreakerResult pipelineBreakerResult, boolean sendStats, boolean keepPipelineBreakerStats,
       QueryExecutionContext queryExecutionContext) {
     return new OpChainExecutionContext(mailboxService, queryExecutionContext.getRequestId(),
         queryExecutionContext.getCid(), queryExecutionContext.getActiveDeadlineMs(),
         queryExecutionContext.getPassiveDeadlineMs(), queryExecutionContext.getBrokerId(), opChainMetadata,
-        stageMetadata, workerMetadata, pipelineBreakerResult, sendStats);
+        stageMetadata, workerMetadata, pipelineBreakerResult, sendStats, keepPipelineBreakerStats);
   }
 
   public MailboxService getMailboxService() {
@@ -177,6 +186,10 @@ public class OpChainExecutionContext {
     return _traceEnabled;
   }
 
+  public QueryOperatorFactoryProvider getQueryOperatorFactoryProvider() {
+    return _queryOperatorFactoryProvider;
+  }
+
   @Nullable
   public ServerPlanRequestContext getLeafStageContext() {
     return _leafStageContext;
@@ -188,5 +201,22 @@ public class OpChainExecutionContext {
 
   public boolean isSendStats() {
     return _sendStats;
+  }
+
+  public boolean isKeepPipelineBreakerStats() {
+    return _keepPipelineBreakerStats;
+  }
+
+  private static QueryOperatorFactoryProvider getDefaultQueryOperatorFactoryProvider() {
+    // Prefer server context when explicitly configured, otherwise fall back to broker, then default.
+    Object serverProvider = ServerContext.getInstance().getQueryOperatorFactoryProvider();
+    if (serverProvider instanceof QueryOperatorFactoryProvider) {
+      return (QueryOperatorFactoryProvider) serverProvider;
+    }
+    Object brokerProvider = BrokerContext.getInstance().getQueryOperatorFactoryProvider();
+    if (brokerProvider instanceof QueryOperatorFactoryProvider) {
+      return (QueryOperatorFactoryProvider) brokerProvider;
+    }
+    return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }
 }

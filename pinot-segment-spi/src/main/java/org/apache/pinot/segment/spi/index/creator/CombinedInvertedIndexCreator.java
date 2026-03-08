@@ -103,4 +103,117 @@ public interface CombinedInvertedIndexCreator
       }
     }
   }
+
+  /**
+   * Primitive type additions for columnar processing optimization.
+   * These methods avoid boxing overhead when iterating over columnar data.
+   */
+
+  @Override
+  default void addInt(int value, int dictId) {
+    if (dictId >= 0) {
+      add(dictId);
+    } else {
+      add(value);
+    }
+  }
+
+  @Override
+  default void addLong(long value, int dictId) {
+    if (dictId >= 0) {
+      add(dictId);
+    } else {
+      add(value);
+    }
+  }
+
+  @Override
+  default void addFloat(float value, int dictId) {
+    if (dictId >= 0) {
+      add(dictId);
+    } else {
+      add(value);
+    }
+  }
+
+  @Override
+  default void addDouble(double value, int dictId) {
+    if (dictId >= 0) {
+      add(dictId);
+    } else {
+      add(value);
+    }
+  }
+
+  @Override
+  default void addString(String value, int dictId) {
+    if (dictId >= 0) {
+      add(dictId);
+    } else {
+      throw new RuntimeException("String not supported for range index");
+    }
+  }
+
+  @Override
+  default void addBytes(byte[] value, int dictId) {
+    if (dictId >= 0) {
+      add(dictId);
+    } else {
+      throw new RuntimeException("Bytes not supported for range index");
+    }
+  }
+
+  @Override
+  default void addIntMV(int[] values, @Nullable int[] dictIds) {
+    if (dictIds != null) {
+      add(dictIds, dictIds.length);
+    } else {
+      add(values, values.length);
+    }
+  }
+
+  @Override
+  default void addLongMV(long[] values, @Nullable int[] dictIds) {
+    if (dictIds != null) {
+      add(dictIds, dictIds.length);
+    } else {
+      add(values, values.length);
+    }
+  }
+
+  @Override
+  default void addFloatMV(float[] values, @Nullable int[] dictIds) {
+    if (dictIds != null) {
+      add(dictIds, dictIds.length);
+    } else {
+      add(values, values.length);
+    }
+  }
+
+  @Override
+  default void addDoubleMV(double[] values, @Nullable int[] dictIds) {
+    if (dictIds != null) {
+      add(dictIds, dictIds.length);
+    } else {
+      add(values, values.length);
+    }
+  }
+
+  @Override
+  default void addStringMV(String[] values, @Nullable int[] dictIds) {
+    if (dictIds != null) {
+      add(dictIds, dictIds.length);
+    } else {
+      throw new RuntimeException("String MV not supported for range index");
+    }
+  }
+
+  @Override
+  default void addBytesMV(byte[][] values, @Nullable int[] dictIds) {
+    if (dictIds != null) {
+      add(dictIds, dictIds.length);
+    } else {
+      throw new RuntimeException("Bytes MV not supported for range index");
+    }
+  }
 }

@@ -66,13 +66,14 @@ public class WorkloadResourceAggregator implements ResourceAggregator {
   private Map<String, LongLongMutablePair> _currentCpuMemUsage = new HashMap<>();
 
   public WorkloadResourceAggregator(String instanceId, InstanceType instanceType, boolean cpuSamplingEnabled,
-      boolean memorySamplingEnabled, AtomicReference<QueryMonitorConfig> queryMonitorConfig) {
+      boolean memorySamplingEnabled, AtomicReference<QueryMonitorConfig> queryMonitorConfig,
+      WorkloadBudgetManager workloadBudgetManager) {
+    assert workloadBudgetManager.isCostCollectionEnabled();
     _instanceId = instanceId;
     _instanceType = instanceType;
     _cpuSamplingEnabled = cpuSamplingEnabled;
     _memorySamplingEnabled = memorySamplingEnabled;
     _queryMonitorConfig = queryMonitorConfig;
-    _workloadBudgetManager = WorkloadBudgetManagerFactory.get();
     switch (_instanceType) {
       case SERVER:
         _metrics = ServerMetrics.get();
@@ -88,6 +89,7 @@ public class WorkloadResourceAggregator implements ResourceAggregator {
         _workloadBudgetExceededMeter = ServerMeter.WORKLOAD_BUDGET_EXCEEDED;
         break;
     }
+    _workloadBudgetManager = workloadBudgetManager;
   }
 
   @Override

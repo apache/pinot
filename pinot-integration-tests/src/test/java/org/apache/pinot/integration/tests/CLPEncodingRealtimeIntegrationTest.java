@@ -22,7 +22,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -38,7 +37,6 @@ import org.testng.annotations.Test;
 public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTestSet {
   private List<File> _avroFiles;
   private FieldConfig.CompressionCodec _selectedCompressionCodec;
-  private final Random _random = new Random();
 
   @BeforeClass
   public void setUp()
@@ -48,7 +46,7 @@ public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTe
 
     // Randomly select CLP or CLPV2 compression codec
     _selectedCompressionCodec =
-        _random.nextBoolean() ? FieldConfig.CompressionCodec.CLP : FieldConfig.CompressionCodec.CLPV2;
+        RANDOM.nextBoolean() ? FieldConfig.CompressionCodec.CLP : FieldConfig.CompressionCodec.CLPV2;
 
     // Start the Pinot cluster
     startZk();

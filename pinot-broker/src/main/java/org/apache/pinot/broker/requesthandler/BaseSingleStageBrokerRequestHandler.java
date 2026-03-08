@@ -80,6 +80,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
@@ -90,6 +91,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.routing.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.routing.TableRouteProvider;
@@ -113,8 +115,10 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -140,7 +144,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
-  private static final Map<String, String> DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP = Map.ofEntries(
+  // TODO: After the next release, remove overrides here for consolidated aggregation functions
+  //  (see https://github.com/apache/pinot/issues/17061)
+  private static final Map<String, String> MV_COL_AGG_FUNCTION_OVERRIDE_MAP = Map.ofEntries(
       Map.entry("distinctcount", "distinctcountmv"),
       Map.entry("distinctcountbitmap", "distinctcountbitmapmv"),
       Map.entry("distinctcounthll", "distinctcounthllmv"),
@@ -170,6 +176,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final int _defaultQueryLimit;
   protected final boolean _enableMultistageMigrationMetric;
   protected final boolean _useMSEToFillEmptyResponseSchema;
+  protected final boolean _enableQueryFingerprinting;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
   protected ImplicitHybridTableRouteProvider _implicitHybridTableRouteProvider;
@@ -178,9 +185,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadAccountant threadAccountant) {
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        threadAccountant);
+        threadAccountant, multiClusterRoutingContext);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
@@ -200,6 +207,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
         Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
+    _enableQueryFingerprinting = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+        Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
     if (_enableMultistageMigrationMetric) {
       _multistageCompileExecutor = Executors.newSingleThreadExecutor();
       _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
@@ -209,7 +218,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         Broker.DEFAULT_USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
 
     _implicitHybridTableRouteProvider = new ImplicitHybridTableRouteProvider();
-    _logicalTableRouteProvider = new LogicalTableRouteProvider();
+    _logicalTableRouteProvider = new LogicalTableRouteProvider(multiClusterRoutingContext);
 
     LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, "
             + "default query limit {}, query log max length: {}, query log max rate: {}, query cancellation "
@@ -327,7 +336,20 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
-    _queryLogger.log(requestId, query);
+    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query);
+
+    String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
+    if (_enableQueryFingerprinting) {
+      try {
+        QueryFingerprint queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+        if (queryFingerprint != null) {
+          queryHash = queryFingerprint.getQueryHash();
+          requestContext.setQueryFingerprint(queryFingerprint);
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId, query, e.getMessage());
+      }
+    }
 
     String cid = extractClientRequestId(sqlNodeAndOptions);
     if (cid == null) {
@@ -341,10 +363,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // TODO: Revisit whether we should set deadline here
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.SSE, requestId, cid, workloadName,
-            requestContext.getRequestArrivalTimeMillis(), Long.MAX_VALUE, Long.MAX_VALUE, _brokerId, _brokerId);
+            requestContext.getRequestArrivalTimeMillis(), Long.MAX_VALUE, Long.MAX_VALUE, _brokerId, _brokerId,
+            queryHash);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
-          httpHeaders, accessControl);
+          httpHeaders, accessControl, queryWasLogged);
     }
   }
 
@@ -385,7 +408,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   protected BrokerResponse doHandleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
-      @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
+      @Nullable HttpHeaders httpHeaders, AccessControl accessControl, boolean queryWasLogged)
       throws Exception {
     // Compile the request into PinotQuery
     long compilationStartTimeNs = System.nanoTime();
@@ -409,6 +432,18 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
     String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
     long compilationEndTimeNs = System.nanoTime();
+
+    // Validate that physical tables are not queried with multi-cluster routing enabled.
+    // Unlike the MSE, the SSE has no centralized exception handler that converts QueryException into
+    // BrokerResponseNative, so we must catch and convert here to return a proper JSON error response.
+    try {
+      validatePhysicalTablesWithMultiClusterRouting(Set.of(tableName), sqlNodeAndOptions.getOptions());
+    } catch (QueryException e) {
+      LOGGER.warn("Request {}: {}", requestId, e.getMessage());
+      requestContext.setErrorCode(e.getErrorCode());
+      return new BrokerResponseNative(e.getErrorCode(), e.getMessage());
+    }
+
     // full request compile time = compilationTimeNs + parserTimeNs
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs());
@@ -505,8 +540,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       routeProvider = _implicitHybridTableRouteProvider;
     }
 
+    // Get the appropriate routing manager based on query options
+    RoutingManager selectedRoutingManager = _multiClusterRoutingContext != null && logicalTableConfig != null
+        ? _multiClusterRoutingContext.getRoutingManager(pinotQuery.getQueryOptions())
+        : _routingManager;
     // Get the tables hit by the request
-    TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, _routingManager);
+    TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, selectedRoutingManager);
 
     if (!routeInfo.isExists()) {
       LOGGER.info("Table not found for request {}: {}", requestId, query);
@@ -571,6 +610,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
+      // Re-optimize after attaching the time boundary filter so that filter optimizers (e.g. NumericalFilterOptimizer,
+      // FlattenAndOrFilterOptimizer, MergeRangeFilterOptimizer) are applied to the time boundary predicate.
+      _queryOptimizer.optimize(offlinePinotQuery, schema);
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
 
       PinotQuery realtimePinotQuery = serverPinotQuery.deepCopy();
@@ -578,6 +620,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
       handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
+      _queryOptimizer.optimize(realtimePinotQuery, schema);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
 
       requestContext.setFanoutType(RequestContext.FanoutType.HYBRID);
@@ -615,7 +658,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
-          schema, query, database, workloadName);
+          schema, query, database, workloadName, queryWasLogged);
     }
 
     if (offlineBrokerRequest != null && isFilterAlwaysTrue(offlineBrokerRequest.getPinotQuery())) {
@@ -630,7 +673,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Calculate routing table for the query
     // TODO: Modify RoutingManager interface to directly take PinotQuery
     long routingStartTimeNs = System.nanoTime();
-    routeProvider.calculateRoutes(routeInfo, _routingManager, offlineBrokerRequest, realtimeBrokerRequest,
+    routeProvider.calculateRoutes(routeInfo, selectedRoutingManager, offlineBrokerRequest, realtimeBrokerRequest,
         requestId);
 
     Set<ServerInstance> offlineExecutionServers = routeInfo.getOfflineExecutionServers();
@@ -693,7 +736,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       } else {
         // If no route is found, send an empty response
         return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
-            schema, query, database, workloadName);
+            schema, query, database, workloadName, queryWasLogged);
       }
     }
     long routingEndTimeNs = System.nanoTime();
@@ -824,6 +867,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     for (QueryProcessingException errorMsg : errorMsgs) {
       brokerResponse.addException(errorMsg);
     }
+
+    // Add warnings for unavailable remote clusters in multi-cluster routing.
+    if (_multiClusterRoutingContext != null && QueryOptionsUtils.isMultiClusterRoutingEnabled(
+        pinotQuery.getQueryOptions(), false)) {
+      for (QueryProcessingException clusterException : _multiClusterRoutingContext.getUnavailableClusterExceptions()) {
+        brokerResponse.addException(clusterException);
+      }
+    }
+
     brokerResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
@@ -876,9 +928,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());
 
     // Log query and stats
-    _queryLogger.log(
+    _queryLogger.logQueryCompleted(
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
-            QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats, workloadName));
+            QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats, workloadName),
+        queryWasLogged);
 
     return brokerResponse;
   }
@@ -904,6 +957,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       } else {
         return new CompileResult(
             new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage()));
+      }
+    }
+
+    // Add queryHash to pinotQuery so it gets passed to servers for observability
+    if (_enableQueryFingerprinting) {
+      QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
+      if (queryFingerprint != null) {
+        pinotQuery.putToQueryOptions(
+              CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
+              queryFingerprint.getQueryHash());
       }
     }
 
@@ -1013,7 +1076,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     Schema schema = _tableCache.getSchema(rawTableName);
     if (schema != null) {
-      handleDistinctMultiValuedOverride(serverPinotQuery, schema);
+      handleAggFunctionMVOverride(serverPinotQuery, schema);
     }
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
@@ -1073,7 +1136,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, PinotQuery serverPinotQuery,
       RequestContext requestContext, String tableName, @Nullable RequesterIdentity requesterIdentity, Schema schema,
-      String query, String database, String workloadName) {
+      String query, String database, String workloadName, boolean queryWasLogged) {
     if (pinotQuery.isExplain()) {
       // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
       return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
@@ -1099,9 +1162,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       LOGGER.warn("Caught exception while building empty response for request {}: {}, {}",
           requestContext.getRequestId(), query, e.getMessage());
     }
+    brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
-    _queryLogger.log(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
-        QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null, workloadName));
+    _queryLogger.logQueryCompleted(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
+        QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null, workloadName), queryWasLogged);
     return brokerResponse;
   }
 
@@ -1230,9 +1294,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, _regexDictSizeThreshold);
       }
 
+      // Pass false for queryWasLogged to avoid logging subqueries separately
       BrokerResponse response =
           doHandleRequest(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
-              httpHeaders, accessControl);
+              httpHeaders, accessControl, false);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }
@@ -1314,7 +1379,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * @return multivalued columns of the table .
    */
   private static boolean isMultiValueColumn(Schema tableSchema, String columnName) {
-
     DimensionFieldSpec dimensionFieldSpec = tableSchema.getDimensionSpec(columnName);
     return dimensionFieldSpec != null && !dimensionFieldSpec.isSingleValueField();
   }
@@ -1453,39 +1517,39 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   /**
-   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   * Rewrites aggregation functions to MV equivalents if the function operand is an MV column
    */
   @VisibleForTesting
-  static void handleDistinctMultiValuedOverride(PinotQuery pinotQuery, Schema tableSchema) {
+  static void handleAggFunctionMVOverride(PinotQuery pinotQuery, Schema tableSchema) {
     for (Expression expression : pinotQuery.getSelectList()) {
-      handleDistinctMultiValuedOverride(expression, tableSchema);
+      handleAggFunctionMVOverride(expression, tableSchema);
     }
     List<Expression> orderByExpressions = pinotQuery.getOrderByList();
     if (orderByExpressions != null) {
       for (Expression expression : orderByExpressions) {
         // NOTE: Order-by is always a Function with the ordering of the Expression
-        handleDistinctMultiValuedOverride(expression.getFunctionCall().getOperands().get(0), tableSchema);
+        handleAggFunctionMVOverride(expression.getFunctionCall().getOperands().get(0), tableSchema);
       }
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      handleDistinctMultiValuedOverride(havingExpression, tableSchema);
+      handleAggFunctionMVOverride(havingExpression, tableSchema);
     }
   }
 
   /**
-   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   * Rewrites aggregation functions to MV equivalents if the function operand is an MV column
    */
-  private static void handleDistinctMultiValuedOverride(Expression expression, Schema tableSchema) {
+  private static void handleAggFunctionMVOverride(Expression expression, Schema tableSchema) {
     Function function = expression.getFunctionCall();
     if (function == null) {
       return;
     }
 
-    String overrideOperator = DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
+    String overrideOperator = MV_COL_AGG_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
     if (overrideOperator != null) {
       List<Expression> operands = function.getOperands();
-      if (operands.size() >= 1 && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
+      if (!operands.isEmpty() && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
           operands.get(0).getIdentifier().getName())) {
         // we are only checking the first operand that if its a MV column as all the overriding agg. fn.'s have
         // first operator is column name
@@ -1493,7 +1557,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     } else {
       for (Expression operand : function.getOperands()) {
-        handleDistinctMultiValuedOverride(operand, tableSchema);
+        handleAggFunctionMVOverride(operand, tableSchema);
       }
     }
   }

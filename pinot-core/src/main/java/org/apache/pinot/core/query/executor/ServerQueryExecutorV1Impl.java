@@ -77,9 +77,9 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.Tracer;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -141,16 +141,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (!queryRequest.isEnableTrace()) {
       return executeInternal(queryRequest, executorService, streamer);
     }
+    Tracer tracer = Tracing.getTracer();
+    tracer.register();
     try {
-      long requestId = queryRequest.getRequestId();
-      // NOTE: Use negative request id as trace id for REALTIME table to prevent id conflict when the same request
-      //       hitting both OFFLINE and REALTIME table (hybrid table setup)
-      long traceId =
-          TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
-      Tracing.getTracer().register(traceId);
       return executeInternal(queryRequest, executorService, streamer);
     } finally {
-      Tracing.getTracer().unregister();
+      tracer.unregister();
     }
   }
 
@@ -539,10 +535,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     Plan queryPlan;
     if (streamer != null) {
-      queryPlan = _planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService,
-          streamer, _serverMetrics);
+      queryPlan =
+          _planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService, streamer);
     } else {
-      queryPlan = _planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService, _serverMetrics);
+      queryPlan = _planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService);
     }
     planBuildTimer.stopAndRecord();
     return queryPlan;

@@ -210,7 +210,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       String segment = entry.getKey();
       SegmentInfo segmentInfo = entry.getValue();
       int partitionId = segmentInfo._partitionId;
-      if (partitionId == INVALID_PARTITION_ID) {
+      if (partitionId == INVALID_PARTITION_ID || partitionId >= _numPartitions) {
         segmentsWithInvalidPartition.add(segment);
         continue;
       }

@@ -65,7 +65,7 @@ public class TimeSeriesResponseMapperTest {
   @Test
   public void toBrokerResponseWithException() {
     BrokerResponseNativeV2 resp = (BrokerResponseNativeV2) TimeSeriesResponseMapper.toBrokerResponse(
-      new QueryException(QueryErrorCode.INTERNAL, "time series exception"));
+        new QueryException(QueryErrorCode.INTERNAL, "time series exception"));
     List<QueryProcessingException> exceptions = resp.getExceptions();
     assertEquals(exceptions.size(), 1);
     assertEquals(exceptions.get(0).getErrorCode(), QueryErrorCode.INTERNAL.getId());

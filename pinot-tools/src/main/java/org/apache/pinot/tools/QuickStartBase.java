@@ -37,7 +37,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
@@ -99,7 +99,9 @@ public abstract class QuickStartBase {
   protected String _zkExternalAddress;
   protected String _configFilePath;
   protected StreamDataServerStartable _kafkaStarter;
-  protected ZkStarter.ZookeeperInstance _zookeeperInstance;
+  protected String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
+  private boolean _kafkaBrokerListOverridden;
+  private String _resolvedKafkaBrokerList;
 
   public QuickStartBase setDataDir(String dataDir) {
     _dataDir = new File(dataDir);
@@ -139,6 +141,13 @@ public abstract class QuickStartBase {
 
   public QuickStartBase setConfigFilePath(String configFilePath) {
     _configFilePath = configFilePath;
+    return this;
+  }
+
+  public QuickStartBase setKafkaBrokerList(String kafkaBrokerList) {
+    _kafkaBrokerList = kafkaBrokerList;
+    _kafkaBrokerListOverridden = true;
+    _resolvedKafkaBrokerList = null;
     return this;
   }
 
@@ -341,8 +350,9 @@ public abstract class QuickStartBase {
     return DEFAULT_STREAM_TABLE_DIRECTORIES;
   }
 
-  protected static void publishStreamDataToKafka(String tableName, File dataDir)
+  protected void publishStreamDataToKafka(String tableName, File dataDir)
       throws Exception {
+    resolveKafkaBrokerList();
     switch (tableName) {
       case "githubEvents":
         publishLineSplitFileToKafka("githubEvents", new File(dataDir, "/rawdata/2021-07-21-few-hours.json"));
@@ -359,10 +369,10 @@ public abstract class QuickStartBase {
     }
   }
 
-  protected static void publishLineSplitFileToKafka(String topicName, File dataFile)
+  protected void publishLineSplitFileToKafka(String topicName, File dataFile)
       throws Exception {
     Properties properties = new Properties();
-    properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+    properties.put("metadata.broker.list", resolveKafkaBrokerList());
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
     StreamDataProducer producer =
@@ -399,22 +409,33 @@ public abstract class QuickStartBase {
     }
   }
 
-  protected void startKafka() {
+  public final void startKafka() {
+    if (_kafkaStarter != null) {
+      return;
+    }
     printStatus(Quickstart.Color.CYAN, "***** Starting Kafka *****");
-    _zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
+      String configuredBrokerList = getConfiguredKafkaBrokerList();
+      Properties props = new Properties();
+      props.put(KafkaStarterUtils.KAFKA_SERVER_OWNER_NAME, getClass().getSimpleName());
+      props.put(KafkaStarterUtils.KAFKA_SERVER_BOOTSTRAP_SERVERS, configuredBrokerList);
+      props.put(KafkaStarterUtils.KAFKA_SERVER_PORT,
+          String.valueOf(KafkaStarterUtils.parsePort(configuredBrokerList, KafkaStarterUtils.DEFAULT_KAFKA_PORT)));
+      props.put(KafkaStarterUtils.KAFKA_SERVER_BROKER_ID, String.valueOf(KafkaStarterUtils.DEFAULT_BROKER_ID));
+      props.put(KafkaStarterUtils.KAFKA_SERVER_ALLOW_MANAGED_FOR_CONFIGURED_BROKER, "false");
       _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
+          props);
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
     _kafkaStarter.start();
+    _resolvedKafkaBrokerList = resolveKafkaBrokerList();
+    printStatus(Quickstart.Color.CYAN, "***** Using Kafka at " + _resolvedKafkaBrokerList + " *****");
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
-        printStatus(Quickstart.Color.GREEN, "***** Shutting down kafka and zookeeper *****");
+        printStatus(Quickstart.Color.GREEN, "***** Shutting down kafka *****");
         _kafkaStarter.stop();
-        ZkStarter.stopLocalZkServer(_zookeeperInstance);
       } catch (Exception e) {
         e.printStackTrace();
       }
@@ -425,6 +446,9 @@ public abstract class QuickStartBase {
 
   public void startAllDataStreams(StreamDataServerStartable kafkaStarter, File quickstartTmpDir)
       throws Exception {
+    if (kafkaStarter == null) {
+      throw new IllegalArgumentException("Kafka starter must not be null");
+    }
     for (String streamName : getDefaultStreamTableDirectories().keySet()) {
       switch (streamName) {
         case "airlineStats":
@@ -967,5 +991,36 @@ public abstract class QuickStartBase {
     printStatus(Quickstart.Color.CYAN, "Query : " + q7);
     printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q7)));
     printStatus(Quickstart.Color.GREEN, "***************************************************");
+  }
+
+  protected AdminClient createKafkaAdminClient() {
+    Properties props = new Properties();
+    props.put("bootstrap.servers", resolveKafkaBrokerList());
+    return AdminClient.create(props);
+  }
+
+  private String resolveKafkaBrokerList() {
+    if (_resolvedKafkaBrokerList != null) {
+      return _resolvedKafkaBrokerList;
+    }
+    _resolvedKafkaBrokerList =
+        KafkaStarterUtils.resolveKafkaBrokerList(getConfiguredKafkaBrokerList(), _kafkaBrokerListOverridden);
+    return _resolvedKafkaBrokerList;
+  }
+
+  private String getConfiguredKafkaBrokerList() {
+    String envKafka = firstNonEmpty(System.getProperty("pinot.kafka.broker.list"),
+        System.getenv("PINOT_KAFKA_BROKER_LIST"),
+        System.getenv("KAFKA_BROKER_LIST"));
+    return _kafkaBrokerListOverridden ? _kafkaBrokerList : (envKafka != null ? envKafka : _kafkaBrokerList);
+  }
+
+  private static String firstNonEmpty(String... values) {
+    for (String value : values) {
+      if (value != null && !value.isBlank()) {
+        return value;
+      }
+    }
+    return null;
   }
 }

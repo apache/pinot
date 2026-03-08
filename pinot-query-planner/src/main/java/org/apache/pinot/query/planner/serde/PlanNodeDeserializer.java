@@ -45,6 +45,7 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
@@ -81,6 +82,8 @@ public class PlanNodeDeserializer {
         return deserializeExplainedNode(protoNode);
       case ENRICHEDJOINNODE:
         return deserializeEnrichedJoinNode(protoNode);
+      case UNNESTNODE:
+        return deserializeUnnestNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -136,7 +139,7 @@ public class PlanNodeDeserializer {
         filterProjectRexes,
         protoEnrichedJoinNode.getFetch(),
         protoEnrichedJoinNode.getOffset()
-        );
+    );
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {
@@ -217,6 +220,31 @@ public class PlanNodeDeserializer {
     Plan.ExplainNode protoExplainNode = protoNode.getExplainNode();
     return new ExplainedNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), protoExplainNode.getTitle(), protoExplainNode.getAttributesMap());
+  }
+
+  private static UnnestNode deserializeUnnestNode(Plan.PlanNode protoNode) {
+    Plan.UnnestNode protoUnnestNode = protoNode.getUnnestNode();
+
+    // Convert array expressions
+    List<RexExpression> arrayExprs = new ArrayList<>();
+    for (Expressions.Expression expr : protoUnnestNode.getArrayExprsList()) {
+      arrayExprs.add(ProtoExpressionToRexExpression.convertExpression(expr));
+    }
+
+    // Convert element indexes
+    List<Integer> elementIndexes = new ArrayList<>();
+    for (int idx : protoUnnestNode.getElementIndexesList()) {
+      elementIndexes.add(idx);
+    }
+
+    int ordIdx = protoUnnestNode.hasOrdinalityIndex() ? protoUnnestNode.getOrdinalityIndex()
+        : UnnestNode.UNSPECIFIED_INDEX;
+
+    UnnestNode.TableFunctionContext context =
+        new UnnestNode.TableFunctionContext(protoUnnestNode.getWithOrdinality(), elementIndexes, ordIdx);
+
+    return new UnnestNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), arrayExprs, context);
   }
 
   private static DataSchema extractDataSchema(Plan.DataSchema protoDataSchema) {

@@ -29,4 +29,14 @@ public class NoOpPartitioner implements Partitioner {
   public String getPartition(GenericRow genericRow) {
     return "0";
   }
+
+  @Override
+  public String[] getPartitionColumns() {
+    return new String[0]; // No columns needed
+  }
+
+  @Override
+  public String getPartitionFromColumns(Object[] columnValues) {
+    return "0";
+  }
 }

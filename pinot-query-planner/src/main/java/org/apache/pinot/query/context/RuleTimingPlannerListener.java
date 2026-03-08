@@ -90,7 +90,7 @@ public class RuleTimingPlannerListener implements RelOptListener {
   }
 
   public void printRuleTimings() {
-    LOGGER.info(getRuleTimings(SqlExplainFormat.DOT));
+    LOGGER.debug(getRuleTimings(SqlExplainFormat.DOT));
   }
 
   public void populateRuleTimings() {

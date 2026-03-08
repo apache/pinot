@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import static java.lang.Character.isDigit;
-import static java.lang.Math.abs;
 import static java.lang.Math.max;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
@@ -47,13 +46,6 @@ public final class TimeZoneKey {
   public static final short MAX_TIME_ZONE_KEY;
   private static final Map<String, TimeZoneKey> ZONE_ID_TO_KEY;
   private static final Set<TimeZoneKey> ZONE_KEYS;
-
-  private static final TimeZoneKey[] TIME_ZONE_KEYS;
-
-  private static final short OFFSET_TIME_ZONE_MIN = -14 * 60;
-  private static final short OFFSET_TIME_ZONE_MAX = 14 * 60;
-  private static final TimeZoneKey[] OFFSET_TIME_ZONE_KEYS =
-      new TimeZoneKey[OFFSET_TIME_ZONE_MAX - OFFSET_TIME_ZONE_MIN + 1];
 
   static {
     try (InputStream in = TimeZoneKey.class.getClassLoader().getResourceAsStream("zone-index.properties")) {
@@ -80,7 +72,7 @@ public final class TimeZoneKey {
 
       short maxZoneKey = 0;
       for (Entry<Object, Object> entry : data.entrySet()) {
-        short zoneKey = Short.valueOf(((String) entry.getKey()).trim());
+        short zoneKey = Short.parseShort(((String) entry.getKey()).trim());
         String zoneId = ((String) entry.getValue()).trim();
 
         maxZoneKey = (short) max(maxZoneKey, zoneKey);
@@ -90,20 +82,6 @@ public final class TimeZoneKey {
       MAX_TIME_ZONE_KEY = maxZoneKey;
       ZONE_ID_TO_KEY = Collections.unmodifiableMap(new LinkedHashMap<>(zoneIdToKey));
       ZONE_KEYS = Collections.unmodifiableSet(new LinkedHashSet<>(zoneIdToKey.values()));
-
-      TIME_ZONE_KEYS = new TimeZoneKey[maxZoneKey + 1];
-      for (TimeZoneKey timeZoneKey : zoneIdToKey.values()) {
-        TIME_ZONE_KEYS[timeZoneKey.getKey()] = timeZoneKey;
-      }
-
-      for (short offset = OFFSET_TIME_ZONE_MIN; offset <= OFFSET_TIME_ZONE_MAX; offset++) {
-        if (offset == 0) {
-          continue;
-        }
-        String zoneId = zoneIdForOffset(offset);
-        TimeZoneKey zoneKey = ZONE_ID_TO_KEY.get(zoneId);
-        OFFSET_TIME_ZONE_KEYS[offset - OFFSET_TIME_ZONE_MIN] = zoneKey;
-      }
     } catch (IOException e) {
       throw new AssertionError("Error loading time zone index file", e);
     }
@@ -252,13 +230,15 @@ public final class TimeZoneKey {
   }
 
   private static boolean isUtcEquivalentName(String zoneId) {
-    return zoneId.equals("utc") || zoneId.equals("z") || zoneId.equals("ut") || zoneId.equals("uct") || zoneId
-        .equals("ut") || zoneId.equals("gmt") || zoneId.equals("gmt0") || zoneId.equals("greenwich") || zoneId
-        .equals("universal") || zoneId.equals("zulu");
-  }
-
-  private static String zoneIdForOffset(long offset) {
-    return String.format("%s%02d:%02d", offset < 0 ? "-" : "+", abs(offset / 60), abs(offset % 60));
+    return zoneId.equals("utc")
+        || zoneId.equals("z")
+        || zoneId.equals("ut")
+        || zoneId.equals("uct")
+        || zoneId.equals("gmt")
+        || zoneId.equals("gmt0")
+        || zoneId.equals("greenwich")
+        || zoneId.equals("universal")
+        || zoneId.equals("zulu");
   }
 
   private static void checkArgument(boolean check, String message, Object... args) {

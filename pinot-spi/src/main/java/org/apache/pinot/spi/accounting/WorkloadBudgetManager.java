@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * Interface for managing workload budgets.
  */
 public interface WorkloadBudgetManager {
-
   /**
    * Adds or updates budget for a workload (Thread-Safe).
    */

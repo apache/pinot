@@ -191,6 +191,7 @@ public class MutableSegmentImpl implements MutableSegment {
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
+  private volatile long _minimumIngestionLagMs = Long.MAX_VALUE;
 
   // multi-column text index fields
   private final MultiColumnRealtimeLuceneTextIndex _multiColumnTextIndex;
@@ -222,6 +223,11 @@ public class MutableSegmentImpl implements MutableSegment {
       @Override
       public long getLatestIngestionTimestamp() {
         return _latestIngestionTimeMs;
+      }
+
+      @Override
+      public long getMinimumIngestionLagMs() {
+        return _minimumIngestionLagMs;
       }
 
       @Override
@@ -640,6 +646,11 @@ public class MutableSegmentImpl implements MutableSegment {
     if (isUpsertEnabled()) {
       RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
+      // NOTE: out-of-order records can not be dropped or marked when consistent upsert view is enabled.
+      // Since Indexing the record and updation of _numDocsIndexed counter happens before updating the upsert
+      // metadata, we wouldn't be able to actually drop or mark those records as dropped. This order is important for
+      // consistent upsert view, otherwise the latest doc can be missed by query due to 'docId < _numDocs' check
+      // in query filter operators. Here the record becomes queryable before validDocIds bitmaps are updated.
       if (_upsertConsistencyMode != UpsertConfig.ConsistencyMode.NONE) {
         updateDictionary(updatedRow);
         addNewRow(numDocsIndexed, updatedRow);
@@ -696,6 +707,10 @@ public class MutableSegmentImpl implements MutableSegment {
     _lastIndexedTimeMs = System.currentTimeMillis();
     if (metadata != null) {
       _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, metadata.getRecordIngestionTimeMs());
+      // if for some reason the record ingestion time is in the future, we should not
+      // update the minimum ingestion lag past 0
+      long ingestionLagMs = Math.max(0, _lastIndexedTimeMs - _latestIngestionTimeMs);
+      _minimumIngestionLagMs = Math.min(_minimumIngestionLagMs, ingestionLagMs);
     }
 
     return canTakeMore;

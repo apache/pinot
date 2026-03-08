@@ -24,7 +24,6 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.restlet.resources.PrimaryKeyCountInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,14 +59,9 @@ public class PrimaryKeyCount {
         LOGGER.warn("TableDataManager for table: {} is null, skipping", tableNameWithType);
         continue;
       }
-      if (tableDataManager instanceof RealtimeTableDataManager) {
-        Map<Integer, Long> partitionToPrimaryKeyCount =
-            getPartitionToPrimaryKeyCount((RealtimeTableDataManager) tableDataManager);
-
-        if (!partitionToPrimaryKeyCount.isEmpty()) {
-          tablesWithPrimaryKeys.add(tableNameWithType);
-        }
-
+      Map<Integer, Long> partitionToPrimaryKeyCount = tableDataManager.getPartitionToPrimaryKeyCount();
+      if (!partitionToPrimaryKeyCount.isEmpty()) {
+        tablesWithPrimaryKeys.add(tableNameWithType);
         for (Long numPrimaryKeys : partitionToPrimaryKeyCount.values()) {
           totalPrimaryKeyCount += numPrimaryKeys == null ? 0 : numPrimaryKeys;
         }
@@ -75,15 +69,5 @@ public class PrimaryKeyCount {
     }
 
     return new PrimaryKeyCountInfo(instanceId, totalPrimaryKeyCount, tablesWithPrimaryKeys, System.currentTimeMillis());
-  }
-
-  private static Map<Integer, Long> getPartitionToPrimaryKeyCount(RealtimeTableDataManager tableDataManager) {
-    // Fetch the primary key count per partition if either upsert or dedup is enabled
-    if (tableDataManager.isUpsertEnabled()) {
-      return tableDataManager.getTableUpsertMetadataManager().getPartitionToPrimaryKeyCount();
-    } else if (tableDataManager.isDedupEnabled()) {
-      return tableDataManager.getTableDedupMetadataManager().getPartitionToPrimaryKeyCount();
-    }
-    return Map.of();
   }
 }

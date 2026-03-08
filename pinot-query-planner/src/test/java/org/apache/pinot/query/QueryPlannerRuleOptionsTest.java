@@ -218,6 +218,13 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testRandFunctionNotEvaluatedInMultiStagePlanner() {
+    String query = "EXPLAIN PLAN FOR SELECT rand() FROM b";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("RAND()"), "Expected RAND() to remain in logical plan");
+  }
+
+  @Test
   public void testDisablePinotProjectJoinTransposeRule() {
     // Test the knob of turning off PinotProjectJoinTransposeRule
     String query = "EXPLAIN PLAN FOR \n"

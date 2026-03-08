@@ -28,7 +28,7 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.config.table.TableConfig;

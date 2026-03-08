@@ -55,20 +55,7 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
       return;
     }
 
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-
-    Double sum;
-    sum = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
-      double innerSum = 0;
-      for (int i = from; i < to; i++) {
-        for (double value : valuesArray[i]) {
-          innerSum += value;
-        }
-      }
-      return acum == null ? innerSum : acum + innerSum;
-    });
-
-    updateAggregationResultHolder(aggregationResultHolder, sum);
+    aggregateMV(blockValSet, length, aggregationResultHolder);
   }
 
   @Override
@@ -79,85 +66,16 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
     if (blockValSet.isSingleValue()) {
       // star-tree pre-aggregated values: During star-tree creation, the multi-value column is pre-aggregated
       // per star-tree node, resulting in a single value per node.
-      double[] valueArray = blockValSet.getDoubleValuesSV();
-      if (_nullHandlingEnabled) {
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          Double result = groupByResultHolder.getResult(groupKey);
-          groupByResultHolder.setValueForKey(groupKey, result == null ? valueArray[i] : result + valueArray[i]);
-        }
-      } else {
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
-        }
-      }
+      aggregateSVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
       return;
     }
 
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-
-    if (_nullHandlingEnabled) {
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          int groupKey = groupKeyArray[i];
-          if (valuesArray[i].length > 0) {
-            // "i" has to be non-null here so we can use the default value as the initial value instead of null
-            double sum = DEFAULT_VALUE;
-            for (double value : valuesArray[i]) {
-              sum += value;
-            }
-            Double result = groupByResultHolder.getResult(groupKey);
-            groupByResultHolder.setValueForKey(groupKey, result == null ? sum : result + sum);
-          }
-        }
-      });
-    } else {
-      for (int i = 0; i < length; i++) {
-        int groupKey = groupKeyArray[i];
-        double sum = groupByResultHolder.getDoubleResult(groupKey);
-        for (double value : valuesArray[i]) {
-          sum += value;
-        }
-        groupByResultHolder.setValueForKey(groupKey, sum);
-      }
-    }
+    aggregateMVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
-
-    if (_nullHandlingEnabled) {
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          double[] values = valuesArray[i];
-          if (values.length > 0) {
-            // "i" has to be non-null here so we can use the default value as the initial value instead of null
-            double sum = DEFAULT_VALUE;
-            for (double value : values) {
-              sum += value;
-            }
-            for (int groupKey : groupKeysArray[i]) {
-              Double result = groupByResultHolder.getResult(groupKey);
-              groupByResultHolder.setValueForKey(groupKey, result == null ? sum : result + sum);
-            }
-          }
-        }
-      });
-    } else {
-      for (int i = 0; i < length; i++) {
-        double[] values = valuesArray[i];
-        for (int groupKey : groupKeysArray[i]) {
-          double sum = groupByResultHolder.getDoubleResult(groupKey);
-          for (double value : values) {
-            sum += value;
-          }
-          groupByResultHolder.setValueForKey(groupKey, sum);
-        }
-      }
-    }
+    aggregateMVGroupByMV(blockValSetMap.get(_expression), length, groupKeysArray, groupByResultHolder);
   }
 }

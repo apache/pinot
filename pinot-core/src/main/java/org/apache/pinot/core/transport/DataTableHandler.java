@@ -99,5 +99,12 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
     LOGGER.error("Caught exception while handling response from server: {}", _serverRoutingInstance, cause);
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESPONSE_FETCH_EXCEPTIONS, 1);
+    /*
+     * No ctx.fireExceptionCaught() — this is the last handler in the pipeline.
+     * Firing would only reach Netty's TailContext which logs a redundant warning.
+     * Direct memory OOM from the upstream frame decoder is caught by DirectOOMHandler
+     * before it reaches here. Any OOM that arrives here is heap OOM from channelRead0()
+     * deserialization, which does not corrupt the channel's byte stream.
+     */
   }
 }

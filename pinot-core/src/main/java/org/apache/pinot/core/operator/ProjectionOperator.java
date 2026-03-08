@@ -50,7 +50,7 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
       @Nullable BaseDocIdSetOperator docIdSetOperator, QueryContext queryContext) {
     _dataSourceMap = dataSourceMap;
     _docIdSetOperator = docIdSetOperator;
-    _dataFetcher = new DataFetcher(dataSourceMap);
+    _dataFetcher = new DataFetcher(dataSourceMap, queryContext.getQueryOptions());
     _dataBlockCache = new DataBlockCache(_dataFetcher);
     _columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
     dataSourceMap.forEach(

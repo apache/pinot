@@ -33,14 +33,17 @@ import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+
+import static java.util.Objects.requireNonNull;
 
 
 /**
@@ -51,17 +54,20 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
   private HelixManager _helixManager;
   private SegmentLocks _segmentLocks;
   private Semaphore _segmentBuildSemaphore;
-  private SegmentOperationsThrottler _segmentOperationsThrottler;
+  private SegmentOperationsThrottlerSet _segmentOperationsThrottlerSet;
+  private ServerReloadJobStatusCache _reloadJobStatusCache;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
-      SegmentLocks segmentLocks, @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
+      SegmentLocks segmentLocks, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
+      ServerReloadJobStatusCache reloadJobStatusCache) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     _helixManager = helixManager;
     _segmentLocks = segmentLocks;
     int maxParallelSegmentBuilds = instanceDataManagerConfig.getMaxParallelSegmentBuilds();
     _segmentBuildSemaphore = maxParallelSegmentBuilds > 0 ? new Semaphore(maxParallelSegmentBuilds, true) : null;
-    _segmentOperationsThrottler = segmentOperationsThrottler;
+    _segmentOperationsThrottlerSet = segmentOperationsThrottlerSet;
+    _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
   }
 
   @Override
@@ -69,7 +75,8 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
       SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      BooleanSupplier isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh) {
+      BooleanSupplier isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh,
+      ServerReloadJobStatusCache reloadJobStatusCache) {
     TableDataManager tableDataManager;
     switch (tableConfig.getTableType()) {
       case OFFLINE:
@@ -94,7 +101,7 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
     }
     tableDataManager.init(_instanceDataManagerConfig, _helixManager, _segmentLocks, tableConfig, schema,
         segmentReloadSemaphore, segmentReloadRefreshExecutor, segmentPreloadExecutor, errorCache,
-        _segmentOperationsThrottler, enableAsyncSegmentRefresh);
+        _segmentOperationsThrottlerSet, enableAsyncSegmentRefresh, reloadJobStatusCache);
     return tableDataManager;
   }
 }

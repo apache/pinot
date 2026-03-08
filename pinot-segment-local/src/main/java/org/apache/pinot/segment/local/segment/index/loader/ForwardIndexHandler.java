@@ -853,7 +853,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       }
       DictionaryIndexConfig dictConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.dictionary());
       boolean optimizeDictionaryType = _tableConfig.getIndexingConfig().isOptimizeDictionaryType();
-      boolean useVarLength = dictConf.getUseVarLengthDictionary() || DictionaryIndexType.shouldUseVarLengthDictionary(
+      boolean useVarLength = dictConf.isUseVarLengthDictionary() || DictionaryIndexType.shouldUseVarLengthDictionary(
           reader.getStoredType(), statsCollector) || (optimizeDictionaryType
           && DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(reader.getStoredType(), statsCollector));
       dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, segmentMetadata.getIndexDir(), useVarLength);

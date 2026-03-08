@@ -111,6 +111,7 @@ public class QueryRunner {
   private ExecutorService _executorService;
   private OpChainSchedulerService _opChainScheduler;
   private MailboxService _mailboxService;
+  private boolean _ownsMailboxService = true;
   private QueryExecutor _leafQueryExecutor;
 
   // Group-by settings
@@ -140,13 +141,18 @@ public class QueryRunner {
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
   private BooleanSupplier _sendStats;
+  private BooleanSupplier _keepPipelineBreakerStats;
 
   /**
-   * Initializes the query executor.
+   * Initializes the query runner.
    * <p>Should be called only once and before calling any other method.
+   *
+   * @param instanceDataManager when non-null, the leaf query executor and time series visitor are initialized
+   *                            for processing leaf-stage queries. When null, only intermediate-stage execution
+   *                            is supported.
    */
-  public void init(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
-      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats) {
+  public void init(PinotConfiguration serverConf, String instanceId, @Nullable InstanceDataManager instanceDataManager,
+      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats) {
     String hostname = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
@@ -220,34 +226,62 @@ public class QueryRunner {
     _executorService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
         _executorService, serverConf, "multi-stage executor");
 
-    _opChainScheduler = new OpChainSchedulerService(instanceDataManager.getInstanceId(), _executorService, serverConf);
-    _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
-    try {
-      _leafQueryExecutor = new ServerQueryExecutorV1Impl();
-      _leafQueryExecutor.init(serverConf.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
-          serverMetrics);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    _opChainScheduler = new OpChainSchedulerService(instanceId, _executorService, serverConf);
+    if (_mailboxService == null) {
+      _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
     }
-    if (StringUtils.isNotBlank(serverConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
-      _timeSeriesPhysicalPlanVisitor =
-          new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService, serverMetrics);
-      TimeSeriesBuilderFactoryProvider.init(serverConf);
+
+    if (instanceDataManager != null) {
+      try {
+        _leafQueryExecutor = new ServerQueryExecutorV1Impl();
+        _leafQueryExecutor.init(serverConf.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
+            serverMetrics);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      if (StringUtils.isNotBlank(
+          serverConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
+        _timeSeriesPhysicalPlanVisitor =
+            new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService, serverMetrics);
+        TimeSeriesBuilderFactoryProvider.init(serverConf);
+      }
     }
 
     _sendStats = sendStats;
+    _keepPipelineBreakerStats = keepPipelineBreakerStats;
 
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
   }
 
+  /**
+   * Initializes the query runner with a shared {@link MailboxService}.
+   */
+  public void init(PinotConfiguration serverConf, String instanceId, @Nullable InstanceDataManager instanceDataManager,
+      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats,
+      @Nullable MailboxService sharedMailboxService) {
+    if (sharedMailboxService != null) {
+      _mailboxService = sharedMailboxService;
+      _ownsMailboxService = false;
+    }
+    init(serverConf, instanceId, instanceDataManager, tlsConfig, sendStats, keepPipelineBreakerStats);
+  }
+
   public void start() {
-    _mailboxService.start();
-    _leafQueryExecutor.start();
+    if (_ownsMailboxService) {
+      _mailboxService.start();
+    }
+    if (_leafQueryExecutor != null) {
+      _leafQueryExecutor.start();
+    }
   }
 
   public void shutDown() {
-    _leafQueryExecutor.shutDown();
-    _mailboxService.shutdown();
+    if (_leafQueryExecutor != null) {
+      _leafQueryExecutor.shutDown();
+    }
+    if (_ownsMailboxService) {
+      _mailboxService.shutdown();
+    }
     ExecutorServiceUtils.close(_executorService);
   }
 
@@ -273,9 +307,9 @@ public class QueryRunner {
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
-    PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService,
-            workerMetadata, stagePlan, opChainMetadata, _sendStats.getAsBoolean());
+    PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
+        _opChainScheduler, _mailboxService, workerMetadata, stagePlan, opChainMetadata,
+        _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -287,17 +321,17 @@ public class QueryRunner {
     // run OpChain
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-            pipelineBreakerResult, _sendStats.getAsBoolean());
-    OpChain opChain;
-    if (workerMetadata.isLeafStageWorker()) {
-      Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
-      opChain =
-          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-              rlsFilters);
-    } else {
-      opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
-    }
+            pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
     try {
+      OpChain opChain;
+      if (workerMetadata.isLeafStageWorker()) {
+        Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
+        opChain =
+            ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+                rlsFilters);
+      } else {
+        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+      }
       // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
     } catch (RuntimeException e) {
@@ -404,9 +438,12 @@ public class QueryRunner {
             currentPlanId = fragmentRoots.get(index).getId();
             BaseTimeSeriesOperator fragmentOpChain = fragmentOpChains.get(index);
             TimeSeriesBlock seriesBlock = fragmentOpChain.nextBlock();
+            Map<String, String> metadataMap = new HashMap<>(seriesBlock.getMetadata());
+            metadataMap.put(Response.MetadataKeys.TimeSeries.PLAN_ID, currentPlanId);
+            TimeSeriesBlockSerde.encodeExceptionsToMetadata(seriesBlock, metadataMap);
             Worker.TimeSeriesResponse response = Worker.TimeSeriesResponse.newBuilder()
                 .setPayload(TimeSeriesBlockSerde.serializeTimeSeriesBlock(seriesBlock))
-                .putAllMetadata(Map.of(Response.MetadataKeys.TimeSeries.PLAN_ID, currentPlanId))
+                .putAllMetadata(metadataMap)
                 .build();
             responseObserver.onNext(response);
           }
@@ -540,7 +577,7 @@ public class QueryRunner {
     // compile OpChain
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata, null,
-            false);
+            false, false);
 
     OpChain opChain =
         ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,

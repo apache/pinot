@@ -180,7 +180,7 @@ public class ServerQueryLogger {
     // Please keep the format as name=value comma-separated with no spaces
     // Please add new entries at the end
     if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned, numSegmentsPrunedInvalid)) {
-      LOGGER.info("Processed requestId={},table={},"
+      LOGGER.info("Processed requestId={},table={},queryHash={},"
               + "segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/"
               + "invalid/limit/value)={}/{}/{}/{}/{}/{}/{}/{}/{},"
               + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},"
@@ -190,6 +190,7 @@ public class ServerQueryLogger {
               + "workloadName={}",
           request.getRequestId(),
           tableNameWithType,
+          request.getQueryHash(),
           numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numConsumingSegmentsQueried,
           numConsumingSegmentsProcessed, numConsumingSegmentsMatched, numSegmentsPrunedInvalid,
           numSegmentsPrunedByLimit, numSegmentsPrunedByValue, schedulerWaitMs,

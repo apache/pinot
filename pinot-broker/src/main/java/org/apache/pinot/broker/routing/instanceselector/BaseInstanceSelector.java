@@ -47,6 +47,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -81,38 +82,42 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID
 /// creation time more than 5 minutes ago).
 /// TODO: refresh new/old segment state where there is no update from helix for long time.
 ///
-abstract class BaseInstanceSelector implements InstanceSelector {
+public abstract class BaseInstanceSelector implements InstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
   // To prevent int overflow, reset the request id once it reaches this value
-  private static final long MAX_REQUEST_ID = 1_000_000_000;
+  protected static final long MAX_REQUEST_ID = 1_000_000_000;
 
-  final String _tableNameWithType;
-  final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  final BrokerMetrics _brokerMetrics;
-  final AdaptiveServerSelector _adaptiveServerSelector;
+  protected TableConfig _tableConfig;
+  protected String _tableNameWithType;
+  protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected BrokerMetrics _brokerMetrics;
+  protected AdaptiveServerSelector _adaptiveServerSelector;
   // Will be null if and only if adaptiveServerSelector is null
-  final PriorityPoolInstanceSelector _priorityPoolInstanceSelector;
-  final Clock _clock;
-  final InstanceSelectorConfig _config;
-  final long _newSegmentExpirationTimeInSeconds;
-  final boolean _emitSinglePoolSegmentsMetric;
-  final int _tableNameHashForFixedReplicaRouting;
+  protected PriorityPoolInstanceSelector _priorityPoolInstanceSelector;
+  protected Clock _clock;
+  protected InstanceSelectorConfig _config;
+  protected long _newSegmentExpirationTimeInSeconds;
+  protected boolean _emitSinglePoolSegmentsMetric;
+  protected int _tableNameHashForFixedReplicaRouting;
 
   // These 3 variables are the cached states to help accelerate the change processing
-  Set<String> _enabledInstances;
+  protected Set<String> _enabledInstances;
   // For old segments, all candidates are online
   // Reduce this map to reduce garbage
-  final Map<String, List<SegmentInstanceCandidate>> _oldSegmentCandidatesMap = new HashMap<>();
-  Map<String, NewSegmentState> _newSegmentStateMap;
+  protected final Map<String, List<SegmentInstanceCandidate>> _oldSegmentCandidatesMap = new HashMap<>();
+  protected Map<String, NewSegmentState> _newSegmentStateMap;
 
   // _segmentStates is needed for instance selection (multi-threaded), so it is made volatile.
-  private volatile SegmentStates _segmentStates;
-  private Map<String, ServerInstance> _enabledServerStore;
+  protected volatile SegmentStates _segmentStates;
+  protected Map<String, ServerInstance> _enabledServerStore;
 
-  BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
+  @Override
+  public void init(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      InstanceSelectorConfig config) {
-    _tableNameWithType = tableNameWithType;
+      InstanceSelectorConfig config, Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap,
+      IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
+    _tableConfig = tableConfig;
+    _tableNameWithType = tableConfig.getTableName();
     _propertyStore = propertyStore;
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
@@ -124,7 +129,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     // instance
     // Math.abs(Integer.MIN_VALUE) = Integer.MIN_VALUE, so we use & 0x7FFFFFFF to get a positive value
     _tableNameHashForFixedReplicaRouting =
-        TableNameBuilder.extractRawTableName(tableNameWithType).hashCode() & 0x7FFFFFFF;
+        TableNameBuilder.extractRawTableName(_tableNameWithType).hashCode() & 0x7FFFFFFF;
 
     _priorityPoolInstanceSelector =
         _adaptiveServerSelector == null ? null : new PriorityPoolInstanceSelector(_adaptiveServerSelector);
@@ -132,11 +137,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       throw new IllegalArgumentException(
           "AdaptiveServerSelector and consistent routing cannot be enabled at the same time");
     }
-  }
-
-  @Override
-  public void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
-      ExternalView externalView, Set<String> onlineSegments) {
     _enabledInstances = enabledInstances;
     _enabledServerStore = enabledServerMap;
     Map<String, Long> newSegmentCreationTimeMap =
@@ -261,17 +261,22 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     Set<Integer> pools = new HashSet<>();
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      // TODO: Verify whether sorting is actually needed
+      Map<String, String> sortedIdealStateMap = convertToSortedMap(idealStateInstanceStateMap);
       Long newSegmentCreationTimeMs = newSegmentCreationTimeMap.get(segment);
       Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
+
       if (externalViewInstanceStateMap == null) {
         if (newSegmentCreationTimeMs != null) {
           // New segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-          for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
+          int idealStateReplicaId = 0;
+          for (Map.Entry<String, String> entry : sortedIdealStateMap.entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
-              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance)));
+              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance), idealStateReplicaId));
             }
+            idealStateReplicaId++;
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
         } else {
@@ -283,19 +288,26 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         if (newSegmentCreationTimeMs != null) {
           // New segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-          for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
+          int idealStateReplicaId = 0;
+          for (Map.Entry<String, String> entry : sortedIdealStateMap.entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
               candidates.add(
-                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance)));
+                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance),
+                      idealStateReplicaId));
             }
+            idealStateReplicaId++;
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
         } else {
           // Old segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
-          for (String instance : onlineInstances) {
-            candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance)));
+          int idealStateReplicaId = 0;
+          for (String instance : sortedIdealStateMap.keySet()) {
+            if (onlineInstances.contains(instance)) {
+              candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance), idealStateReplicaId));
+            }
+            idealStateReplicaId++;
           }
           _oldSegmentCandidatesMap.put(segment, candidates);
         }
@@ -457,6 +469,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     Pair<Map<String, String>, Map<String, String>> segmentToInstanceMap =
         select(segments, requestIdInt, segmentStates, queryOptions);
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
+
     if (unavailableSegments.isEmpty()) {
       return new SelectionResult(segmentToInstanceMap, Collections.emptyList(), 0);
     } else {
@@ -494,6 +507,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * segments are used to get the new segments that are not online yet. Instead of simply skipping them by broker at
    * routing time, we can send them to servers and let servers decide how to handle them.
    */
-  abstract Pair<Map<String, String>, Map<String, String>/*optional segments*/> select(List<String> segments,
+  protected abstract Pair<Map<String, String>, Map<String, String>/*optional segments*/> select(List<String> segments,
       int requestId, SegmentStates segmentStates, Map<String, String> queryOptions);
 }

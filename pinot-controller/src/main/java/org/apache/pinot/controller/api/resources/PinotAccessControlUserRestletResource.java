@@ -67,166 +67,163 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
 @Path("/")
 public class PinotAccessControlUserRestletResource {
-    /**
-     * URI Mappings:
-     * - "/user", "/users/": List all the users
-     * - "/users/{username}", "/users/{username}/": List config for specified username.
-     *
-     * - "/user", "/users/" : Add a user
-     * <pre>
-     *       POST Request Body Example :
-     *        {
-     *         "username": "user1",
-     *         "password": "user1@passwd",
-     *         "component": "BROKER",
-     *         "role" : "ADMIN",
-     *         "tables": ["table1", "table2"],
-     *         "permissions": ["READ"]
-     *        }
-     *  </pre>
-     *
-     *  - "/users/{username}", "/users/{username}/"
-     *  PUT Request body example : same as POST Request Body
-     * {@inheritDoc}
-     */
-    public static final Logger LOGGER = LoggerFactory.getLogger(PinotAccessControlUserRestletResource.class);
+  /**
+   * URI Mappings:
+   * - "/user", "/users/": List all the users
+   * - "/users/{username}", "/users/{username}/": List config for specified username.
+   *
+   * - "/user", "/users/" : Add a user
+   * <pre>
+   *       POST Request Body Example :
+   *        {
+   *         "username": "user1",
+   *         "password": "user1@passwd",
+   *         "component": "BROKER",
+   *         "role" : "ADMIN",
+   *         "tables": ["table1", "table2"],
+   *         "permissions": ["READ"]
+   *        }
+   *  </pre>
+   *
+   *  - "/users/{username}", "/users/{username}/"
+   *  PUT Request body example : same as POST Request Body
+   * {@inheritDoc}
+   */
+  public static final Logger LOGGER = LoggerFactory.getLogger(PinotAccessControlUserRestletResource.class);
 
-    @Inject
-    PinotHelixResourceManager _pinotHelixResourceManager;
+  @Inject
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    @Path("/users")
-    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_USER)
-    @ApiOperation(value = "List all uses in cluster", notes = "List all users in cluster")
-    public String listUsers() {
-        try {
-            ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-            Map<String, UserConfig> allUserInfo = ZKMetadataProvider.getAllUserInfo(propertyStore);
-            return JsonUtils.newObjectNode().set("users", JsonUtils.objectToJsonNode(allUserInfo)).toString();
-        } catch (Exception e) {
-            throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
-        }
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/users")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_USER)
+  @ApiOperation(value = "List all uses in cluster", notes = "List all users in cluster")
+  public String listUsers() {
+    try {
+      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+      Map<String, UserConfig> allUserInfo = ZKMetadataProvider.getAllUserInfo(propertyStore);
+      return JsonUtils.newObjectNode().set("users", JsonUtils.objectToJsonNode(allUserInfo)).toString();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
+    }
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/users/{username}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_USER)
+  @ApiOperation(value = "Get an user in cluster", notes = "Get an user in cluster")
+  public String getUser(@PathParam("username") String username,
+      @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr) {
+    try {
+      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+      ComponentType componentType = Constants.validateComponentType(componentTypeStr);
+      String usernameWithType = username + "_" + componentType.name();
+
+      UserConfig userConfig = ZKMetadataProvider.getUserConfig(propertyStore, usernameWithType);
+      return JsonUtils.newObjectNode().set(usernameWithType, JsonUtils.objectToJsonNode(userConfig)).toString();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
+    }
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/users")
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_USER)
+  @ApiOperation(value = "Add a user", notes = "Add a user")
+  public SuccessResponse addUser(String userConfigStr) {
+    // TODO introduce a table config ctor with json string.
+
+    UserConfig userConfig;
+    String username;
+    try {
+      userConfig = JsonUtils.stringToObject(userConfigStr, UserConfig.class);
+      username = userConfig.getUserName();
+      if (username.contains(".") || username.contains(" ")) {
+        throw new IllegalStateException("Username: " + username + " containing '.' or space is not allowed");
+      }
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
+    }
+    try {
+      _pinotHelixResourceManager.addUser(userConfig);
+      return new SuccessResponse(
+          "User " + userConfig.getUserName() + '_' + userConfig.getComponentType() + " has been successfully added!");
+    } catch (Exception e) {
+      if (e instanceof UserAlreadyExistsException) {
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
+      } else {
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
+      }
+    }
+  }
+
+  @DELETE
+  @Path("/users/{username}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_USER)
+  @Authenticate(AccessType.DELETE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Delete a user", notes = "Delete a user")
+  public SuccessResponse deleteUser(@PathParam("username") String username,
+      @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr) {
+
+    List<String> usersDeleted = new LinkedList<>();
+    String usernameWithComponentType = username + "_" + componentTypeStr;
+
+    try {
+
+      boolean userExist = false;
+      userExist = _pinotHelixResourceManager.hasUser(username, componentTypeStr);
+
+      _pinotHelixResourceManager.deleteUser(usernameWithComponentType);
+      if (userExist) {
+        usersDeleted.add(username);
+      }
+      if (!usersDeleted.isEmpty()) {
+        return new SuccessResponse("User: " + usernameWithComponentType + " has been successfully deleted");
+      }
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
 
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    @Path("/users/{username}")
-    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_USER)
-    @ApiOperation(value = "Get an user in cluster", notes = "Get an user in cluster")
-    public String getUser(@PathParam("username") String username,
-        @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr) {
-        try {
-            ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-            ComponentType componentType = Constants.validateComponentType(componentTypeStr);
-            String usernameWithType = username + "_" + componentType.name();
+    throw new ControllerApplicationException(LOGGER, "User " + usernameWithComponentType + " does not exists",
+        Response.Status.NOT_FOUND);
+  }
 
-            UserConfig userConfig = ZKMetadataProvider.getUserConfig(propertyStore, usernameWithType);
-            return JsonUtils.newObjectNode().set(usernameWithType, JsonUtils.objectToJsonNode(userConfig)).toString();
-        } catch (Exception e) {
-            throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
-        }
-    }
+  @PUT
+  @Path("/users/{username}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_USER)
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update user config for a user", notes = "Update user config for user")
+  public SuccessResponse updateUserConfig(@PathParam("username") String username,
+      @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr,
+      @QueryParam("passwordChanged") boolean passwordChanged, String userConfigString) {
 
-    @POST
-    @Produces(MediaType.APPLICATION_JSON)
-    @Path("/users")
-    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_USER)
-    @ApiOperation(value = "Add a user", notes = "Add a user")
-    public SuccessResponse addUser(String userConfigStr) {
-        // TODO introduce a table config ctor with json string.
-
-        UserConfig userConfig;
-        String username;
-        try {
-            userConfig = JsonUtils.stringToObject(userConfigStr, UserConfig.class);
-            username = userConfig.getUserName();
-            if (username.contains(".") || username.contains(" ")) {
-                throw new IllegalStateException("Username: " + username + " containing '.' or space is not allowed");
-            }
-        } catch (Exception e) {
-            throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
-        }
-        try {
-            _pinotHelixResourceManager.addUser(userConfig);
-            return new SuccessResponse("User " + userConfig.getUserName() + '_' + userConfig.getComponentType()
-                + " has been successfully added!");
-        } catch (Exception e) {
-            if (e instanceof UserAlreadyExistsException) {
-                throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
-            } else {
-                throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
-            }
-        }
-    }
-
-    @DELETE
-    @Path("/users/{username}")
-    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_USER)
-    @Authenticate(AccessType.DELETE)
-    @Produces(MediaType.APPLICATION_JSON)
-    @ApiOperation(value = "Delete a user", notes = "Delete a user")
-    public SuccessResponse deleteUser(@PathParam("username") String username,
-        @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr) {
-
-        List<String> usersDeleted = new LinkedList<>();
-        String usernameWithComponentType = username + "_" + componentTypeStr;
-
-        try {
-
-            boolean userExist = false;
-            userExist = _pinotHelixResourceManager.hasUser(username, componentTypeStr);
-
-            _pinotHelixResourceManager.deleteUser(usernameWithComponentType);
-            if (userExist) {
-                usersDeleted.add(username);
-            }
-            if (!usersDeleted.isEmpty()) {
-                return new SuccessResponse("User: " + usernameWithComponentType + " has been successfully deleted");
-            }
-        } catch (Exception e) {
-            throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
-        }
-
+    UserConfig userConfig;
+    String usernameWithComponentType = username + "_" + componentTypeStr;
+    try {
+      userConfig = JsonUtils.stringToObject(userConfigString, UserConfig.class);
+      if (passwordChanged) {
+        userConfig.setPassword(BcryptUtils.encrypt(userConfig.getPassword()));
+      }
+      String usernameWithComponentTypeFromUserConfig = userConfig.getUsernameWithComponent();
+      if (!usernameWithComponentType.equals(usernameWithComponentTypeFromUserConfig)) {
         throw new ControllerApplicationException(LOGGER,
-            "User " + usernameWithComponentType + " does not exists", Response.Status.NOT_FOUND);
+            "Request user " + usernameWithComponentType + " does not match " + usernameWithComponentTypeFromUserConfig
+                + " in the Request body", Response.Status.BAD_REQUEST);
+      }
+      if (!_pinotHelixResourceManager.hasUser(username, componentTypeStr)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Request user " + usernameWithComponentType + " does not exist", Response.Status.NOT_FOUND);
+      }
+      _pinotHelixResourceManager.updateUserConfig(userConfig);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
-
-
-    @PUT
-    @Path("/users/{username}")
-    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_USER)
-    @Authenticate(AccessType.UPDATE)
-    @Produces(MediaType.APPLICATION_JSON)
-    @ApiOperation(value = "Update user config for a user", notes = "Update user config for user")
-    public SuccessResponse updateUserConfig(
-        @PathParam("username") String username,
-        @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr,
-        @QueryParam("passwordChanged") boolean passwordChanged,
-        String userConfigString) {
-
-        UserConfig userConfig;
-        String usernameWithComponentType = username + "_" + componentTypeStr;
-        try {
-            userConfig = JsonUtils.stringToObject(userConfigString, UserConfig.class);
-            if (passwordChanged) {
-                userConfig.setPassword(BcryptUtils.encrypt(userConfig.getPassword()));
-            }
-            String usernameWithComponentTypeFromUserConfig = userConfig.getUsernameWithComponent();
-            if (!usernameWithComponentType.equals(usernameWithComponentTypeFromUserConfig)) {
-                throw new ControllerApplicationException(LOGGER, "Request user " + usernameWithComponentType
-                    + " does not match " + usernameWithComponentTypeFromUserConfig + " in the Request body",
-                    Response.Status.BAD_REQUEST);
-            }
-            if (!_pinotHelixResourceManager.hasUser(username, componentTypeStr)) {
-                throw new ControllerApplicationException(LOGGER,
-                    "Request user " + usernameWithComponentType + " does not exist",
-                    Response.Status.NOT_FOUND);
-            }
-            _pinotHelixResourceManager.updateUserConfig(userConfig);
-        } catch (Exception e) {
-            throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
-        }
-        return new SuccessResponse("User config update for " + usernameWithComponentType);
-    }
+    return new SuccessResponse("User config update for " + usernameWithComponentType);
+  }
 }

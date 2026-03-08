@@ -122,8 +122,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
             writer.writeInt(i, value);
           }
         }
-        LOGGER.info("Created dictionary for INT column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedInts[0], sortedInts[numValues - 1]);
+        LOGGER.info("Created dictionary for INT column: {} with cardinality: {}", _columnName, numValues);
         return;
 
       case LONG:
@@ -142,8 +141,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
             writer.writeLong(i, value);
           }
         }
-        LOGGER.info("Created dictionary for LONG column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedLongs[0], sortedLongs[numValues - 1]);
+        LOGGER.info("Created dictionary for LONG column: {} with cardinality: {}", _columnName, numValues);
         return;
 
       case FLOAT:
@@ -162,8 +160,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
             writer.writeFloat(i, value);
           }
         }
-        LOGGER.info("Created dictionary for FLOAT column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedFloats[0], sortedFloats[numValues - 1]);
+        LOGGER.info("Created dictionary for FLOAT column: {} with cardinality: {}", _columnName, numValues);
         return;
 
       case DOUBLE:
@@ -182,8 +179,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
             writer.writeDouble(i, value);
           }
         }
-        LOGGER.info("Created dictionary for DOUBLE column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedDoubles[0], sortedDoubles[numValues - 1]);
+        LOGGER.info("Created dictionary for DOUBLE column: {} with cardinality: {}", _columnName, numValues);
         return;
 
       case BIG_DECIMAL:
@@ -203,9 +199,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         }
 
         writeBytesValueDictionary(sortedBigDecimalBytes);
-        LOGGER.info("Created dictionary for BIG_DECIMAL column: {} with cardinality: {}, max length in bytes: {}, "
-                + "range: {} to {}", _columnName, numValues, _numBytesPerEntry, sortedBigDecimals[0],
-            sortedBigDecimals[numValues - 1]);
+        LOGGER.info("Created dictionary for BIG_DECIMAL column: {} with cardinality: {}, max length in bytes: {}",
+            _columnName, numValues, _numBytesPerEntry);
         return;
 
       case STRING:
@@ -225,9 +220,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         }
 
         writeBytesValueDictionary(sortedStringBytes);
-        LOGGER.info(
-            "Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
-            _columnName, numValues, _numBytesPerEntry, sortedStrings[0], sortedStrings[numValues - 1]);
+        LOGGER.info("Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}",
+            _columnName, numValues, _numBytesPerEntry);
         return;
 
       case BYTES:
@@ -246,9 +240,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         }
 
         writeBytesValueDictionary(sortedByteArrays);
-        LOGGER.info(
-            "Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
-            _columnName, numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
+        LOGGER.info("Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}",
+            _columnName, numValues, _numBytesPerEntry);
         return;
 
       default:
@@ -331,6 +324,96 @@ public class SegmentDictionaryCreator implements IndexCreator {
     }
   }
 
+  /**
+   * Get dictionary index for a primitive int value without boxing.
+   */
+  public int indexOfSV(int value) {
+    return _intValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a primitive long value without boxing.
+   */
+  public int indexOfSV(long value) {
+    return _longValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a primitive float value without boxing.
+   */
+  public int indexOfSV(float value) {
+    return _floatValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a primitive double value without boxing.
+   */
+  public int indexOfSV(double value) {
+    return _doubleValueToIndexMap.get(value);
+  }
+
+  /**
+   * Get dictionary index for a String value.
+   */
+  public int indexOfSV(String value) {
+    return _objectValueToIndexMap.getInt(value);
+  }
+
+  /**
+   * Get dictionary index for a byte array value.
+   */
+  public int indexOfSV(byte[] value) {
+    return _objectValueToIndexMap.getInt(new ByteArray(value));
+  }
+
+  public int[] indexOfMV(int[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _intValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(long[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _longValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(float[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _floatValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(double[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _doubleValueToIndexMap.get(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(String[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+    }
+    return indexes;
+  }
+
+  public int[] indexOfMV(byte[][] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _objectValueToIndexMap.getInt(new ByteArray(values[i]));
+    }
+    return indexes;
+  }
+
   public int[] indexOfMV(Object value) {
     Object[] multiValues = (Object[]) value;
     int[] indexes = new int[multiValues.length];
@@ -390,5 +473,9 @@ public class SegmentDictionaryCreator implements IndexCreator {
 
   @Override
   public void close() {
+  }
+
+  public File getDictionaryFile() {
+    return _dictionaryFile;
   }
 }

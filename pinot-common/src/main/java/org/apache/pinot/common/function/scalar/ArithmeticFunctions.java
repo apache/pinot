@@ -20,6 +20,7 @@ package org.apache.pinot.common.function.scalar;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -27,6 +28,8 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
  * Arithmetic scalar functions.
  */
 public class ArithmeticFunctions {
+  private static final double DOUBLE_UNIT = 0x1.0p-53;
+
   private ArithmeticFunctions() {
   }
 
@@ -199,6 +202,34 @@ public class ArithmeticFunctions {
   @ScalarFunction
   public static double truncate(double a) {
     return Math.signum(a) * Math.floor(Math.abs(a));
+  }
+
+  @ScalarFunction(isDeterministic = false)
+  public static double rand() {
+    return ThreadLocalRandom.current().nextDouble();
+  }
+
+  @ScalarFunction
+  public static double rand(long seed) {
+    return deterministicRand(seed);
+  }
+
+  private static double deterministicRand(long seed) {
+    // The XOR with 0x5DEECE66DL is inspired by java.util.Random's initial LCG multiplier scramble,
+    // but unlike Random, we use a custom non-linear mix64 routine for diffusion and reproducible output.
+    // This approach is chosen to provide deterministic, well-diffused pseudo-random values, not to match Random's
+    // output.
+    // Reference for multiplier: https://docs.oracle.com/javase/8/docs/api/java/util/Random.html
+    long mixed = mix64(seed ^ 0x5DEECE66DL);
+    // Right-shift by 11 bits to extract the top 53 bits for use as the mantissa of an IEEE 754 double-precision value.
+    // This produces a double in [0,1) with full precision.
+    return (mixed >>> 11) * DOUBLE_UNIT;
+  }
+
+  private static long mix64(long z) {
+    z = (z ^ (z >>> 33)) * 0xff51afd7ed558ccdL;
+    z = (z ^ (z >>> 33)) * 0xc4ceb9fe1a85ec53L;
+    return z ^ (z >>> 33);
   }
 
   @ScalarFunction

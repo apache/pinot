@@ -19,9 +19,10 @@
 package org.apache.pinot.common.utils.grpc;
 
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
+import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
@@ -37,6 +38,7 @@ import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +50,11 @@ public abstract class BaseGrpcQueryClient<REQUEST, RESPONSE> implements Closeabl
   // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
   // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
   private static final Map<Integer, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
+  /**
+   * Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
+   * Using a static allocator allows for better memory pooling across all client instances.
+   */
+  private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
 
   private final ManagedChannel _managedChannel;
   private final int _channelShutdownTimeoutSeconds;
@@ -57,16 +64,20 @@ public abstract class BaseGrpcQueryClient<REQUEST, RESPONSE> implements Closeabl
   }
 
   public BaseGrpcQueryClient(String host, int port, GrpcConfig config) {
-    ManagedChannelBuilder<?> channelBuilder;
+    // Always use NettyChannelBuilder to allow setting Netty-specific channel options like the buffer allocator.
+    // This ensures we can explicitly configure direct (off-heap) buffers for better performance.
+    NettyChannelBuilder channelBuilder;
     if (config.isUsePlainText()) {
-      channelBuilder = ManagedChannelBuilder
+      channelBuilder = NettyChannelBuilder
           .forAddress(host, port)
           .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
+          .withOption(ChannelOption.ALLOCATOR, BUF_ALLOCATOR)
           .usePlaintext();
     } else {
       channelBuilder = NettyChannelBuilder
           .forAddress(host, port)
           .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
+          .withOption(ChannelOption.ALLOCATOR, BUF_ALLOCATOR)
           .sslContext(buildSslContext(config.getTlsConfig()));
     }
 
@@ -88,6 +99,9 @@ public abstract class BaseGrpcQueryClient<REQUEST, RESPONSE> implements Closeabl
       try {
         SSLFactory sslFactory = RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig,
             PinotInsecureMode::isPinotInInsecureMode);
+        // Runtime visibility for Platform-FIPS-JDK deployments: warn & log the actual JSSE provider/protocol once.
+        TlsUtils.warnIfNonJdkProviderConfigured("grpc.query.client", tlsConfig);
+        TlsUtils.logJsseDiagnosticsOnce("grpc.query.client", sslFactory, tlsConfig);
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
         sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
         sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);

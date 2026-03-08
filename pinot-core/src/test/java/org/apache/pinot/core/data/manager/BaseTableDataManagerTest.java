@@ -44,13 +44,11 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
-import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
-import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -109,11 +107,11 @@ public class BaseTableDataManagerTest {
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
           .addMetric(LONG_COLUMN, DataType.LONG).build();
-  static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
-      new SegmentAllIndexPreprocessThrottler(2, 4, true),
-      new SegmentStarTreePreprocessThrottler(2, 4, true),
-      new SegmentDownloadThrottler(2, 4, true),
-      new SegmentMultiColTextIndexPreprocessThrottler(2, 4, true));
+  static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottlerSet(
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(2, 4, true),
+      new SegmentOperationsThrottler(2, 4, true));
 
   @BeforeClass
   public void setUp()
@@ -801,6 +799,76 @@ public class BaseTableDataManagerTest {
     }
   }
 
+  @Test
+  public void testReplaceSegmentIfCrcMismatchWhenFlagDisabledSegmentCrcMismatchShouldDownload()
+      throws Exception {
+    // When flag is disabled and segment CRCs don't match, should download
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    zkMetadata.setCrc(2048L); // Different from local
+    zkMetadata.setDataCrc(99999L);
+    zkMetadata.setUseDataCrc(false);
+
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 1024L);
+    SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+    when(segmentMetadata.getDataCrc()).thenReturn("99999");
+
+    BaseTableDataManager tableDataManager = createTableManager();
+    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+    assertFalse(dataDir.exists());
+
+    // Should download because segment CRCs don't match (ignores data CRC)
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
+
+    assertTrue(dataDir.exists());
+    assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
+  }
+
+  @Test
+  public void testReplaceSegmentIfCrcMismatchWhenFlagEnabledAndSegmentCrcMatchShouldNoDownload()
+      throws Exception {
+    // When flag is enabled and segment CRCs match, should not download
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    long segmentCrc = zkMetadata.getCrc();
+    zkMetadata.setDataCrc(99999L);
+    zkMetadata.setUseDataCrc(true);
+
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, segmentCrc);
+    SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+    when(segmentMetadata.getDataCrc()).thenReturn("11111");
+
+    BaseTableDataManager tableDataManager = createTableManager();
+    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+
+    assertTrue(dataDir.mkdirs());
+
+    // Should NOT download because segment CRCs match
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
+  }
+
+  @Test
+  public void testReplaceSegmentIfCrcMismatchWhenFlagEnabledAndSegmentCrcMismatchWithInvalidZkDataCrc()
+      throws Exception {
+    // When ZK data CRC is invalid (-1), should download if segment CRCs don't match
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    zkMetadata.setCrc(2048L);
+    zkMetadata.setDataCrc(-1L);
+    zkMetadata.setUseDataCrc(true);
+
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 1024L);
+    SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+    when(segmentMetadata.getDataCrc()).thenReturn("99999");
+
+    BaseTableDataManager tableDataManager = createTableManager();
+    File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+    assertFalse(dataDir.exists());
+
+    // Should download because ZK data CRC is invalid
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
+
+    assertTrue(dataDir.exists());
+    assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
+  }
+
   // Has to be public class for the class loader to work.
   public static class FakePinotCrypter implements PinotCrypter {
     private File _origFile;
@@ -834,7 +902,7 @@ public class BaseTableDataManagerTest {
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
         SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
-        SEGMENT_OPERATIONS_THROTTLER, false);
+        SEGMENT_OPERATIONS_THROTTLER, false, mock(ServerReloadJobStatusCache.class));
     return tableDataManager;
   }
 
@@ -843,7 +911,7 @@ public class BaseTableDataManagerTest {
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
         SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
-        SEGMENT_OPERATIONS_THROTTLER, true);
+        SEGMENT_OPERATIONS_THROTTLER, true, mock(ServerReloadJobStatusCache.class));
     return tableDataManager;
   }
 

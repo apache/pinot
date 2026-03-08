@@ -162,21 +162,25 @@ public abstract class QueryScheduler {
 
       // TODO: Perform this check sooner during the serialization of DataTable.
       Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
-      Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
-      if (maxResponseSizeBytes != null && responseBytes != null && responseBytes.length > maxResponseSizeBytes) {
-        String errMsg =
-            "Serialized query response size " + responseBytes.length + " exceeds threshold " + maxResponseSizeBytes
-                + " for requestId " + requestId + " from broker " + queryRequest.getBrokerId();
-        LOGGER.error(errMsg);
-        _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(),
-            ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
+      if (responseBytes != null) {
+        int responseSizeBytes = responseBytes.length;
+        String tableNameWithType = queryRequest.getTableNameWithType();
+        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_RESPONSE_SIZE, responseSizeBytes);
+        Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
+        if (maxResponseSizeBytes != null && responseSizeBytes > maxResponseSizeBytes) {
+          String errMsg =
+              "Serialized query response size " + responseSizeBytes + " exceeds threshold " + maxResponseSizeBytes
+                  + " for requestId " + requestId + " from broker " + queryRequest.getBrokerId();
+          LOGGER.error(errMsg);
+          _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
 
-        instanceResponse = new InstanceResponseBlock();
-        instanceResponse.addException(QueryErrorCode.QUERY_CANCELLATION, errMsg);
-        instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
-        instanceResponse.addMetadata(MetadataKey.QUERY_ID.getName(), queryId);
-        instanceResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
-        responseBytes = serializeResponse(queryRequest, instanceResponse);
+          instanceResponse = new InstanceResponseBlock();
+          instanceResponse.addException(QueryErrorCode.QUERY_CANCELLATION, errMsg);
+          instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+          instanceResponse.addMetadata(MetadataKey.QUERY_ID.getName(), queryId);
+          instanceResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
+          responseBytes = serializeResponse(queryRequest, instanceResponse);
+        }
       }
 
       return responseBytes;
@@ -209,12 +213,12 @@ public abstract class QueryScheduler {
         if (e instanceof QueryException) {
           queryException = (QueryException) e;
           // TODO: Revisit if we should log exception here
-          LOGGER.warn("Caught QueryException while serializing response from response for requestId: {}, brokerId: {}",
-              requestId, brokerId, queryException);
+          LOGGER.warn("Caught QueryException while serializing response for requestId: {}, brokerId: {}", requestId,
+              brokerId, queryException);
         } else {
           _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
-          LOGGER.error("Caught exception while serializing response from response for requestId: {}, brokerId: {}",
-              requestId, brokerId, e);
+          LOGGER.error("Caught exception while serializing response for requestId: {}, brokerId: {}", requestId,
+              brokerId, e);
           queryException = QueryErrorCode.INTERNAL.asException("Error serializing response", e);
         }
       }

@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -38,6 +39,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import javax.inject.Singleton;
+import javax.net.ssl.SSLContext;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
@@ -78,6 +81,7 @@ import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.IdealStateGroupCommit;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
@@ -85,6 +89,7 @@ import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
@@ -130,11 +135,14 @@ import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.controller.validation.UtilizationChecker;
+import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
+import org.apache.pinot.core.instance.context.ControllerContext;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
@@ -153,6 +161,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
@@ -223,7 +232,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
   protected final List<UtilizationChecker> _utilizationCheckers = new ArrayList<>();
-  protected DiskUtilizationChecker _diskUtilizationChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
@@ -244,6 +252,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     applyCustomConfigs(_config);
 
     PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
+    PinotMd5Mode.setPinotMd5Disabled(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
+        PinotMd5Mode.isPinotMd5Disabled()));
 
     setupHelixSystemProperties();
     IdealStateGroupCommit.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
@@ -369,6 +379,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixControllerManager.getClusterManagmentTool()
         .setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
             MAX_STATE_TRANSITIONS_PER_RESOURCE, constraintItemResource);
+  }
+
+  protected boolean shouldAddUtilizationChecker(boolean isSpecificUtilizationCheckerEnabled) {
+    // Add utilization checker if:
+    // 1. All resource utilization checkers are enabled (on by default for backwards compatibility), OR
+    // 2. This specific utilization checker is enabled
+    return _config.isAllResourceUtilizationCheckersEnabled() || isSpecificUtilizationCheckerEnabled;
   }
 
   protected void addUtilizationChecker(UtilizationChecker utilizationChecker) {
@@ -523,6 +540,29 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         tlsDefaults.getTrustStorePath())) {
       LOGGER.info("Installing default SSL context for any client requests");
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
+      SSLFactory sslFactory =
+          RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsDefaults,
+              PinotInsecureMode::isPinotInInsecureMode);
+      SSLContext sslContext = sslFactory.getSslContext();
+      ControllerContext controllerContext = ControllerContext.getInstance();
+      if (controllerContext.getClientHttpsContext() != null) {
+        LOGGER.warn("Overriding controller client HTTPS context during startup");
+      }
+      controllerContext.setClientHttpsContext(sslContext);
+      if (controllerContext.getServerHttpsContext() != null) {
+        LOGGER.warn("Overriding controller server HTTPS context during startup");
+      }
+      controllerContext.setServerHttpsContext(sslContext);
+      if (controllerContext.getClientGrpcSslContext() != null) {
+        LOGGER.warn("Overriding controller client gRPC SSL context during startup");
+      }
+      SslContext clientSslContext = ServerGrpcQueryClient.buildSslContext(tlsDefaults);
+      controllerContext.setClientGrpcSslContext(clientSslContext);
+      if (controllerContext.getServerGrpcSslContext() != null) {
+        LOGGER.warn("Overriding controller server gRPC SSL context during startup");
+      }
+      SslContext serverSslContext = GrpcQueryServer.buildGrpcSslContext(tlsDefaults);
+      controllerContext.setServerGrpcSslContext(serverSslContext);
     }
 
     // Set up Pinot cluster in Helix if needed
@@ -566,7 +606,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager =
         new PinotHelixTaskResourceManager(_helixResourceManager, new TaskDriver(_helixParticipantManager),
-            _config.getPinotTaskExpireTimeInMs());
+            _config.getPinotTaskExpireTimeInMs(), _config.getPinotTaskTerminalStateExpireTimeInMs(),
+            _config.getPinotTaskQueueCapacity());
 
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
@@ -583,7 +624,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     } catch (Exception e) {
       throw new RuntimeException("Failed to register cluster config change handler", e);
     }
-
 
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
 
@@ -604,8 +644,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
         _helixResourceManager, _config);
 
-    _diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
-    addUtilizationChecker(_diskUtilizationChecker);
+    DiskUtilizationChecker diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
+    if (shouldAddUtilizationChecker(_config.isDiskUtilizationCheckerEnabled())) {
+      addUtilizationChecker(diskUtilizationChecker);
+    }
     _resourceUtilizationManager = new ResourceUtilizationManager(_config, _utilizationCheckers);
     _rebalancePreChecker = RebalancePreCheckerFactory.create(_config.getRebalancePreCheckerClass());
     _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getRebalanceDiskUtilizationThreshold());
@@ -679,7 +721,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_tenantRebalancer).to(TenantRebalancer.class);
         bind(_tableSizeReader).to(TableSizeReader.class);
         bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
-        bind(_diskUtilizationChecker).to(DiskUtilizationChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
 
@@ -727,6 +768,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(UpsertInconsistentStateConfig.getInstance());
+    LOGGER.info("Registered UpsertInconsistentStateConfig as cluster config change listener");
   }
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
@@ -998,7 +1041,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   /**
    * Creates a TaskManager instance  as specified in the configuration.
    */
-  private PinotTaskManager createTaskManager() {
+  protected PinotTaskManager createTaskManager() {
     String taskManagerClass = _config.getProperty(CommonConstants.Controller.CONFIG_OF_TASK_MANAGER_CLASS,
         CommonConstants.Controller.DEFAULT_TASK_MANAGER_CLASS);
     LOGGER.info("Creating TaskManager with class: {}", taskManagerClass);

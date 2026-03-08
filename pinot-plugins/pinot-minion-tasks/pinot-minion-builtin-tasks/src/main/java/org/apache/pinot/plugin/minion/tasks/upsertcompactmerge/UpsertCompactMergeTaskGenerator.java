@@ -34,10 +34,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.SegmentUtils;
-import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -187,7 +187,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
       SegmentSelectionResult segmentSelectionResult =
           processValidDocIdsMetadata(tableNameWithType, taskConfigs, candidateSegmentsMap, validDocIdsMetadataList,
-              alreadyMergedSegments);
+              alreadyMergedSegments, _clusterInfoAccessor.getControllerMetrics());
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
@@ -201,6 +201,9 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       // Get max number of subtasks for this table
       int maxTasks = getAndUpdateMaxNumSubTasks(taskConfigs,
           MinionConstants.DEFAULT_TABLE_MAX_NUM_TASKS, tableNameWithType);
+      long minNumSegments = Long.parseLong(
+          taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MIN_NUM_SEGMENTS_PER_TASK_KEY,
+              String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MIN_NUM_SEGMENTS_PER_TASK)));
       for (Map.Entry<Integer, List<List<SegmentMergerMetadata>>> entry
           : segmentSelectionResult.getSegmentsForCompactMergeByPartition().entrySet()) {
         if (numTasks == maxTasks) {
@@ -211,16 +214,17 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         if (groups.isEmpty()) {
           continue;
         }
-        // there are no groups with more than 1 segment to merge
-        // TODO this can be later removed if we want to just do single-segment compaction from this task
-        if (groups.get(0).size() <= 1) {
+        //there are no groups with more than minNumSegmentsPerTask segment to merge. Groups are already sorted, so we
+        // just check the first entry.
+        if (groups.get(0).size() < minNumSegments) {
           continue;
         }
         // TODO see if multiple groups of same partition can be added
         Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig,
             groups.get(0).stream().map(x -> x.getSegmentZKMetadata().getSegmentName()).collect(Collectors.toList())));
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, getDownloadUrl(groups.get(0)));
-        configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+        configs.put(MinionConstants.UPLOAD_URL_KEY,
+            _clusterInfoAccessor.getVipUrlForLeadController(tableNameWithType) + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, getSegmentCrcList(groups.get(0)));
         configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY,
             String.valueOf(getMaxZKCreationTimeMillis(groups.get(0))));
@@ -236,10 +240,17 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
+  /**
+   * Processes validDocIds metadata to determine segments eligible for deletion or compaction.
+   * Evaluates segments based on valid/invalid document counts, server readiness, and CRC consistency.
+   * Requires consensus across all replicas on validDoc counts before proceeding with any operations.
+   * Marks segments with zero valid documents for deletion and groups others by partition for compaction.
+   */
   @VisibleForTesting
   public static SegmentSelectionResult processValidDocIdsMetadata(String tableNameWithType,
       Map<String, String> taskConfigs, Map<String, SegmentZKMetadata> candidateSegmentsMap,
-      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap, Set<String> alreadyMergedSegments) {
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap, Set<String> alreadyMergedSegments,
+      ControllerMetrics controllerMetrics) {
     Map<Integer, List<SegmentMergerMetadata>> segmentsEligibleForCompactMerge = new HashMap<>();
     Set<String> segmentsForDeletion = new HashSet<>();
 
@@ -253,6 +264,9 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     long maxNumSegments = Long.parseLong(
         taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MAX_NUM_SEGMENTS_PER_TASK_KEY,
             String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MAX_NUM_SEGMENTS_PER_TASK)));
+    long minNumSegments = Long.parseLong(
+        taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MIN_NUM_SEGMENTS_PER_TASK_KEY,
+            String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MIN_NUM_SEGMENTS_PER_TASK)));
 
     // default to Long.MAX_VALUE to avoid size-based compaction by default
     long outputSegmentMaxSizeInBytes = Long.MAX_VALUE;
@@ -279,6 +293,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         continue;
       }
       SegmentZKMetadata segment = candidateSegmentsMap.get(segmentName);
+
+      // Process with existing logic using the first replica with matching CRC (since all have consensus)
       for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {
         long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
         long totalValidDocs = validDocIdsMetadata.getTotalValidDocs();
@@ -288,16 +304,6 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         if (segment.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
           LOGGER.warn("CRC mismatch for segment: {}, (segmentZKMetadata={}, validDocIdsMetadata={})", segmentName,
               segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
-          continue;
-        }
-
-        // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
-        // server is NOT READY as UPDATING segments might be updating the ONLINE segments
-        if (validDocIdsMetadata.getServerStatus() != null && !validDocIdsMetadata.getServerStatus()
-            .equals(ServiceStatus.Status.GOOD)) {
-          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
-              validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
-              MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segmentName);
           continue;
         }
 
@@ -380,20 +386,21 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
       // Sort groups by total invalidDocs in descending order, if invalidDocs count are same, prefer group with
       // higher number of small segments in them
-      // remove the groups having only 1 segments in them
-      // TODO this check can be later removed if we want single-segment compaction from this task itself
+      // remove the groups having less than minNumSegments segments in them
       List<List<SegmentMergerMetadata>> compactMergeGroups =
-          groups.stream().filter(x -> x.size() > 1).sorted((group1, group2) -> {
-            long invalidDocsSum1 = group1.stream().mapToLong(SegmentMergerMetadata::getInvalidDocIds).sum();
-            long invalidDocsSum2 = group2.stream().mapToLong(SegmentMergerMetadata::getInvalidDocIds).sum();
-            if (invalidDocsSum2 < invalidDocsSum1) {
-              return -1;
-            } else if (invalidDocsSum2 == invalidDocsSum1) {
-              return Long.compare(group2.size(), group1.size());
-            } else {
-              return 1;
-            }
-          }).collect(Collectors.toList());
+          groups.stream()
+              .filter(x -> x.size() >= minNumSegments)
+              .sorted((group1, group2) -> {
+                long invalidDocsSum1 = group1.stream().mapToLong(SegmentMergerMetadata::getInvalidDocIds).sum();
+                long invalidDocsSum2 = group2.stream().mapToLong(SegmentMergerMetadata::getInvalidDocIds).sum();
+                if (invalidDocsSum2 < invalidDocsSum1) {
+                  return -1;
+                } else if (invalidDocsSum2 == invalidDocsSum1) {
+                  return Long.compare(group2.size(), group1.size());
+                } else {
+                  return 1;
+                }
+              }).collect(Collectors.toList());
 
       if (!compactMergeGroups.isEmpty()) {
         groupedSegments.put(partitionID, compactMergeGroups);

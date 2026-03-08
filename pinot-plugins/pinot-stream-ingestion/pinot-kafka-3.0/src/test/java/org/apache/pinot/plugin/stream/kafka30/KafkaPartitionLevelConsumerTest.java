@@ -43,7 +43,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.plugin.stream.kafka30.utils.MiniKafkaCluster;
+import org.apache.pinot.plugin.stream.kafka30.server.EmbeddedKafkaCluster;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -83,18 +83,22 @@ public class KafkaPartitionLevelConsumerTest {
   private static final long TIMESTAMP = Instant.now().toEpochMilli();
   private static final Random RANDOM = new Random();
 
-  private MiniKafkaCluster _kafkaCluster;
+  private EmbeddedKafkaCluster _kafkaCluster;
   private String _kafkaBrokerAddress;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    _kafkaCluster = new MiniKafkaCluster("0");
+    Properties props = new Properties();
+    props.setProperty(EmbeddedKafkaCluster.BROKER_COUNT_PROP, "1");
+
+    _kafkaCluster = new EmbeddedKafkaCluster();
+    _kafkaCluster.init(props);
     _kafkaCluster.start();
-    _kafkaBrokerAddress = _kafkaCluster.getKafkaServerAddress();
-    _kafkaCluster.createTopic(TEST_TOPIC_1, 1, 1);
-    _kafkaCluster.createTopic(TEST_TOPIC_2, 2, 1);
-    _kafkaCluster.createTopic(TEST_TOPIC_3, 1, 1);
+    _kafkaBrokerAddress = _kafkaCluster.bootstrapServers();
+    _kafkaCluster.createTopic(TEST_TOPIC_1, 1);
+    _kafkaCluster.createTopic(TEST_TOPIC_2, 2);
+    _kafkaCluster.createTopic(TEST_TOPIC_3, 1);
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
     produceMsgToKafka();
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
@@ -127,7 +131,7 @@ public class KafkaPartitionLevelConsumerTest {
       _kafkaCluster.deleteTopic(TEST_TOPIC_2);
       _kafkaCluster.deleteTopic(TEST_TOPIC_3);
     } finally {
-      _kafkaCluster.close();
+      _kafkaCluster.stop();
     }
   }
 

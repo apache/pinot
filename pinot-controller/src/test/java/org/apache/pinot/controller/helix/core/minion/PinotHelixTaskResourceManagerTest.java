@@ -27,11 +27,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
 import org.apache.helix.task.JobDag;
+import org.apache.helix.task.JobQueue;
 import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskPartitionState;
@@ -39,18 +41,24 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskStatusSummary;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.TABLE_NAME;
+import static org.apache.pinot.spi.utils.CommonConstants.UNKNOWN;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -303,7 +311,7 @@ public class PinotHelixTaskResourceManagerTest {
   }
 
   @Test
-  public void testGetTableTaskCount() {
+  public void testGetTableTaskStatusSummary() {
     String taskName = "Task_TestTask_12345";
     String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
     TaskDriver taskDriver = mock(TaskDriver.class);
@@ -324,25 +332,234 @@ public class PinotHelixTaskResourceManagerTest {
     when(jobContext.getTaskIdForPartition(1)).thenReturn("taskId1");
     when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
     when(jobContext.getPartitionState(1)).thenReturn(TaskPartitionState.COMPLETED);
+    long partitionStartTime0 = System.currentTimeMillis() - 120000; // 2 minutes ago
+    when(jobContext.getPartitionStartTime(0)).thenReturn(partitionStartTime0);
+    when(jobContext.getPartitionStartTime(1)).thenReturn(System.currentTimeMillis() - 60000); // 1 minute ago
+    long jobStartTime = System.currentTimeMillis() - 300000; // 5 minutes ago
+    when(jobContext.getStartTime()).thenReturn(jobStartTime);
 
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
-    Map<String, PinotHelixTaskResourceManager.TaskCount> tableTaskCount = mgr.getTableTaskCount(taskName);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
     assertEquals(tableTaskCount.size(), 2);
-    PinotHelixTaskResourceManager.TaskCount taskCount = tableTaskCount.get("table1_OFFLINE");
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    PinotHelixTaskResourceManager.TaskCount taskCount = taskStatusSummary.getTaskCount();
     assertEquals(taskCount.getTotal(), 1);
     assertEquals(taskCount.getCompleted(), 1);
     assertEquals(taskCount.getRunning(), 0);
     assertEquals(taskCount.getWaiting(), 0);
     assertEquals(taskCount.getError(), 0);
     assertEquals(taskCount.getUnknown(), 0);
-    taskCount = tableTaskCount.get("unknown");
+    taskStatusSummary = tableTaskCount.get(UNKNOWN);
+    taskCount = taskStatusSummary.getTaskCount();
     assertEquals(taskCount.getTotal(), 1);
     assertEquals(taskCount.getCompleted(), 0);
     assertEquals(taskCount.getRunning(), 1);
     assertEquals(taskCount.getWaiting(), 0);
     assertEquals(taskCount.getError(), 0);
     assertEquals(taskCount.getUnknown(), 0);
+
+    // Verify running time is calculated for RUNNING subtask (taskId0) - in milliseconds
+    Map<String, Long> runningTimes = taskStatusSummary.getSubtaskRunningTimes();
+    assertEquals(runningTimes.size(), 1);
+    assertTrue(runningTimes.containsKey("taskId0"));
+    // Running time should be approximately 120000 ms (2 minutes)
+    long runningTime = runningTimes.get("taskId0");
+    assertTrue(runningTime >= 115000 && runningTime <= 125000);
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryWithTiming() {
+    String taskName = "Task_TestTask_67890";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    taskConfigMap.put("taskId1", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
+    Map<String, Integer> taskIdPartitionMap = new HashMap<>();
+    taskIdPartitionMap.put("taskId0", 0);
+    // taskId1 has no partition (null state - waiting)
+    when(jobContext.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap);
+    when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
+    long partitionStartTime = System.currentTimeMillis() - 180000; // 3 minutes ago
+    when(jobContext.getPartitionStartTime(0)).thenReturn(partitionStartTime);
+    long jobStartTime = System.currentTimeMillis() - 600000; // 10 minutes ago
+    when(jobContext.getStartTime()).thenReturn(jobStartTime);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+    assertEquals(tableTaskCount.size(), 1);
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    PinotHelixTaskResourceManager.TaskCount taskCount = taskStatusSummary.getTaskCount();
+    assertEquals(taskCount.getTotal(), 2);
+    assertEquals(taskCount.getRunning(), 1);
+    assertEquals(taskCount.getWaiting(), 1);
+
+    // Verify running time for RUNNING subtask (taskId0) - in milliseconds
+    Map<String, Long> runningTimes = taskStatusSummary.getSubtaskRunningTimes();
+    assertEquals(runningTimes.size(), 1);
+    assertTrue(runningTimes.containsKey("taskId0"));
+    // Running time should be approximately 180000 ms (3 minutes)
+    long runningTime = runningTimes.get("taskId0");
+    assertTrue(runningTime >= 175000 && runningTime <= 185000);
+
+    // Verify waiting time for null state subtask (taskId1) - in milliseconds
+    Map<String, Long> waitingTimes = taskStatusSummary.getSubtaskWaitingTimes();
+    assertEquals(waitingTimes.size(), 1);
+    assertTrue(waitingTimes.containsKey("taskId1"));
+    // Waiting time should be approximately 600000 ms (10 minutes)
+    long waitingTime = waitingTimes.get("taskId1");
+    assertTrue(waitingTime >= 595000 && waitingTime <= 605000);
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryWithNullJobContext() {
+    String taskName = "Task_TestTask_NullContext";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    taskConfigMap.put("taskId1", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table2_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(null);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+    assertEquals(tableTaskCount.size(), 2);
+
+    // Verify that timing maps are empty when jobContext is null
+    for (TaskStatusSummary timing : tableTaskCount.values()) {
+      assertTrue(timing.getSubtaskWaitingTimes().isEmpty());
+      assertTrue(timing.getSubtaskRunningTimes().isEmpty());
+      assertEquals(timing.getTaskCount().getWaiting(), 1);
+    }
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryWithZeroJobStartTime() {
+    String taskName = "Task_TestTask_ZeroStart";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
+    Map<String, Integer> taskIdPartitionMap = new HashMap<>();
+    // taskId0 has no partition (null state - waiting)
+    when(jobContext.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap);
+    when(jobContext.getStartTime()).thenReturn(0L); // Zero job start time
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    // When jobStartTime is 0, waiting time should not be calculated
+    assertTrue(taskStatusSummary.getSubtaskWaitingTimes().isEmpty());
+    assertEquals(taskStatusSummary.getTaskCount().getWaiting(), 1);
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryWithZeroPartitionStartTime() {
+    String taskName = "Task_TestTask_ZeroPartition";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
+    Map<String, Integer> taskIdPartitionMap = new HashMap<>();
+    taskIdPartitionMap.put("taskId0", 0);
+    when(jobContext.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap);
+    when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
+    when(jobContext.getPartitionStartTime(0)).thenReturn(0L); // Zero partition start time
+    when(jobContext.getStartTime()).thenReturn(System.currentTimeMillis() - 300000);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    // When partitionStartTime is 0, running time should not be calculated
+    assertTrue(taskStatusSummary.getSubtaskRunningTimes().isEmpty());
+    assertEquals(taskStatusSummary.getTaskCount().getRunning(), 1);
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryWithNonRunningStates() {
+    String taskName = "Task_TestTask_NonRunning";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    taskConfigMap.put("taskId1", new TaskConfig("",
+        new HashMap<>(Collections.singletonMap("tableName", "table1_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
+    Map<String, Integer> taskIdPartitionMap = new HashMap<>();
+    taskIdPartitionMap.put("taskId0", 0);
+    taskIdPartitionMap.put("taskId1", 1);
+    when(jobContext.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap);
+    when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.COMPLETED);
+    when(jobContext.getPartitionState(1)).thenReturn(TaskPartitionState.TASK_ERROR);
+    when(jobContext.getPartitionStartTime(0)).thenReturn(System.currentTimeMillis() - 60000);
+    when(jobContext.getPartitionStartTime(1)).thenReturn(System.currentTimeMillis() - 120000);
+    when(jobContext.getStartTime()).thenReturn(System.currentTimeMillis() - 300000);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskCount = mgr.getTableTaskStatusSummary(taskName);
+
+    TaskStatusSummary taskStatusSummary = tableTaskCount.get("table1_OFFLINE");
+    // COMPLETED and ERROR states should not have running times
+    assertTrue(taskStatusSummary.getSubtaskRunningTimes().isEmpty());
+    // They also should not have waiting times (only null state gets waiting time)
+    assertTrue(taskStatusSummary.getSubtaskWaitingTimes().isEmpty());
+    assertEquals(taskStatusSummary.getTaskCount().getCompleted(), 1);
+    assertEquals(taskStatusSummary.getTaskCount().getError(), 1);
+  }
+
+  @Test
+  public void testTaskCountWithTimingConstructorWithNullMaps() {
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+
+    // Test default constructor and setters
+    TaskStatusSummary timing = new TaskStatusSummary();
+    timing.setTaskCount(taskCount);
+    timing.setSubtaskWaitingTimes(new HashMap<>());
+    timing.setSubtaskRunningTimes(new HashMap<>());
+
+    assertNotNull(timing.getSubtaskWaitingTimes());
+    assertNotNull(timing.getSubtaskRunningTimes());
+    assertTrue(timing.getSubtaskWaitingTimes().isEmpty());
+    assertTrue(timing.getSubtaskRunningTimes().isEmpty());
+    assertEquals(timing.getTaskCount().getRunning(), 1);
   }
 
   @Test
@@ -1046,6 +1263,396 @@ public class PinotHelixTaskResourceManagerTest {
     assertTrue(allTasks.containsKey(taskName1));
   }
 
+  // ==================== Tests for task queue bounding ====================
+
+  @Test
+  public void testTrimTaskQueueIfNeededDisabled() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+
+    // maxQueueSize <= 0 means disabled
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, -1, 50), 0);
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 0, 50), 0);
+
+    // null workflowConfig
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", null, 100, 50), 0);
+
+    // maxDeletesPerCycle <= 0 means disabled (prevents IllegalArgumentException on PriorityQueue)
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 100, 0), 0);
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 100, -1), 0);
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 100, -999), 0);
+  }
+
+  @Test
+  public void testTrimTaskQueueIfNeededUnderLimit() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    Set<String> jobs = new HashSet<>();
+    jobs.add("TaskQueue_TestTask_Task_TestTask_a");
+    jobs.add("TaskQueue_TestTask_Task_TestTask_b");
+    when(jobDag.getAllNodes()).thenReturn(jobs);
+
+    // Queue size 2 <= maxQueueSize 5, no trimming needed
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 5, 50), 0);
+  }
+
+  @Test
+  public void testTrimTaskQueueIfNeededDeletesOldestTerminal() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    String helixJobQueueName = "TaskQueue_TestTask";
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    String job1 = "TaskQueue_TestTask_Task_TestTask_a"; // oldest, COMPLETED
+    String job2 = "TaskQueue_TestTask_Task_TestTask_b"; // FAILED
+    String job3 = "TaskQueue_TestTask_Task_TestTask_c"; // IN_PROGRESS (should NOT be deleted)
+    String job4 = "TaskQueue_TestTask_Task_TestTask_d"; // TIMED_OUT
+    String job5 = "TaskQueue_TestTask_Task_TestTask_e"; // ABORTED
+
+    Set<String> allJobs = new HashSet<>();
+    allJobs.add(job1);
+    allJobs.add(job2);
+    allJobs.add(job3);
+    allJobs.add(job4);
+    allJobs.add(job5);
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+
+    Map<String, TaskState> jobStates = new HashMap<>();
+    jobStates.put(job1, TaskState.COMPLETED);
+    jobStates.put(job2, TaskState.FAILED);
+    jobStates.put(job3, TaskState.IN_PROGRESS);
+    jobStates.put(job4, TaskState.TIMED_OUT);
+    jobStates.put(job5, TaskState.ABORTED);
+    when(workflowContext.getJobStates()).thenReturn(jobStates);
+
+    // Start times: job1 is oldest (1000), job2 next (2000), etc.
+    when(workflowContext.getJobStartTime(job1)).thenReturn(1000L);
+    when(workflowContext.getJobStartTime(job2)).thenReturn(2000L);
+    when(workflowContext.getJobStartTime(job3)).thenReturn(3000L);
+    when(workflowContext.getJobStartTime(job4)).thenReturn(4000L);
+    when(workflowContext.getJobStartTime(job5)).thenReturn(5000L);
+
+    // maxQueueSize = 3, so need to delete 2 oldest terminal jobs (job1 and job2)
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 3, 50);
+    assertEquals(deleted, 2);
+
+    verify(taskDriver).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_a"), eq(true));
+    verify(taskDriver).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_b"), eq(true));
+
+    // IN_PROGRESS job should NOT be deleted
+    verify(taskDriver, Mockito.never()).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_c"), anyBoolean());
+  }
+
+  @Test
+  public void testTrimTaskQueueIfNeededRespectsMaxDeletesPerCycle() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    String helixJobQueueName = "TaskQueue_TestTask";
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    Set<String> allJobs = new HashSet<>();
+    Map<String, TaskState> jobStates = new HashMap<>();
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    for (int i = 0; i < 10; i++) {
+      String job = String.format("TaskQueue_TestTask_Task_TestTask_uuid%d", i);
+      allJobs.add(job);
+      jobStates.put(job, TaskState.COMPLETED);
+      when(workflowContext.getJobStartTime(job)).thenReturn((long) ((i + 1) * 1000));
+    }
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+    when(workflowContext.getJobStates()).thenReturn(jobStates);
+
+    // maxQueueSize = 2, so need to delete 8, but maxDeletesPerCycle = 3
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 2, 3);
+    assertEquals(deleted, 3);
+  }
+
+  @Test
+  public void testTrimTaskQueueIfNeededNoTerminalJobs() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    String helixJobQueueName = "TaskQueue_TestTask";
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    Set<String> allJobs = new HashSet<>();
+    Map<String, TaskState> jobStates = new HashMap<>();
+    for (int i = 0; i < 5; i++) {
+      String job = String.format("TaskQueue_TestTask_Task_TestTask_uuid%d", i);
+      allJobs.add(job);
+      jobStates.put(job, TaskState.IN_PROGRESS);
+    }
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+    when(workflowContext.getJobStates()).thenReturn(jobStates);
+
+    // maxQueueSize = 2, but no terminal jobs to delete
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 2, 50);
+    assertEquals(deleted, 0);
+  }
+
+  @Test
+  public void testTrimTaskQueueIfNeededNullWorkflowContext() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    Set<String> allJobs = new HashSet<>();
+    for (int i = 0; i < 5; i++) {
+      allJobs.add("TaskQueue_TestTask_Task_TestTask_uuid" + i);
+    }
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    when(taskDriver.getWorkflowContext("TaskQueue_TestTask")).thenReturn(null);
+
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 2, 50);
+    assertEquals(deleted, 0);
+  }
+
+  @Test
+  public void testEnsureTaskQueueExistsReturnsWorkflowConfig() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    WorkflowConfig existingConfig = mock(WorkflowConfig.class);
+    when(taskDriver.getWorkflowConfig("TaskQueue_TestTask")).thenReturn(existingConfig);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig result = mgr.ensureTaskQueueExists("TestTask");
+    assertSame(result, existingConfig);
+  }
+
+  @Test
+  public void testEnsureTaskQueueExistsCreationReturnsNull() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    when(taskDriver.getWorkflowConfig("TaskQueue_TestTask")).thenReturn(null);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig result = mgr.ensureTaskQueueExists("TestTask");
+    assertNull(result);
+    verify(taskDriver).createQueue(any());
+  }
+
+  @Test
+  public void testSettersUpdateVolatileFields() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver,
+            1000L, 2000L, 100);
+
+    // Verify setQueueCapacity takes effect when creating a new queue
+    mgr.setQueueCapacity(500);
+    when(taskDriver.getWorkflowConfig("TaskQueue_SetterTest")).thenReturn(null);
+    mgr.ensureTaskQueueExists("SetterTest");
+
+    ArgumentCaptor<JobQueue> queueCaptor = ArgumentCaptor.forClass(JobQueue.class);
+    verify(taskDriver).createQueue(queueCaptor.capture());
+    assertEquals(queueCaptor.getValue().getWorkflowConfig().getCapacity(), 500);
+
+    // Verify setTaskExpireTimeMs and setTerminalStateExpireTimeMs take effect when submitting a task
+    mgr.setTaskExpireTimeMs(5000L);
+    mgr.setTerminalStateExpireTimeMs(10000L);
+
+    WorkflowConfig mockConfig = mock(WorkflowConfig.class);
+    when(taskDriver.getWorkflowConfig("TaskQueue_SetterTest")).thenReturn(mockConfig);
+
+    Map<String, String> configs = new HashMap<>();
+    configs.put("tableName", "testTable_OFFLINE");
+    List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    pinotTaskConfigs.add(new PinotTaskConfig("SetterTest", configs));
+    mgr.submitTask(pinotTaskConfigs, 60000L, 1, 1);
+
+    ArgumentCaptor<JobConfig.Builder> jobCaptor = ArgumentCaptor.forClass(JobConfig.Builder.class);
+    verify(taskDriver).enqueueJob(eq("TaskQueue_SetterTest"), anyString(), jobCaptor.capture());
+    JobConfig builtJob = jobCaptor.getValue().setWorkflow("TaskQueue_SetterTest").build();
+    assertEquals(builtJob.getExpiry(), 5000L);
+    assertEquals(builtJob.getTerminalStateExpiry(), 10000L);
+  }
+
+  @Test
+  public void testSubmitTaskIncludesTerminalStateExpiry() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    long terminalExpiry = 48 * 60 * 60 * 1000L; // 48 hours
+    long taskExpiry = TimeUnit.HOURS.toMillis(24);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver,
+            taskExpiry, terminalExpiry, -1);
+
+    WorkflowConfig mockConfig = mock(WorkflowConfig.class);
+    when(taskDriver.getWorkflowConfig("TaskQueue_TestTask")).thenReturn(mockConfig);
+
+    Map<String, String> configs = new HashMap<>();
+    configs.put("tableName", "testTable_OFFLINE");
+    List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    pinotTaskConfigs.add(new PinotTaskConfig("TestTask", configs));
+
+    mgr.submitTask(pinotTaskConfigs, 60000L, 1, 1);
+
+    ArgumentCaptor<JobConfig.Builder> jobCaptor = ArgumentCaptor.forClass(JobConfig.Builder.class);
+    verify(taskDriver).enqueueJob(eq("TaskQueue_TestTask"), anyString(), jobCaptor.capture());
+    JobConfig builtJob = jobCaptor.getValue().setWorkflow("TaskQueue_TestTask").build();
+    assertEquals(builtJob.getExpiry(), taskExpiry);
+    assertEquals(builtJob.getTerminalStateExpiry(), terminalExpiry);
+  }
+
+  @Test
+  public void testTrimTaskQueueExactlyOnOverLimit() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    String helixJobQueueName = "TaskQueue_TestTask";
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    // 4 jobs, limit = 3 => excess = 1
+    String job1 = "TaskQueue_TestTask_Task_TestTask_a";
+    String job2 = "TaskQueue_TestTask_Task_TestTask_b";
+    String job3 = "TaskQueue_TestTask_Task_TestTask_c";
+    String job4 = "TaskQueue_TestTask_Task_TestTask_d";
+
+    Set<String> allJobs = new HashSet<>();
+    allJobs.add(job1);
+    allJobs.add(job2);
+    allJobs.add(job3);
+    allJobs.add(job4);
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+
+    Map<String, TaskState> jobStates = new HashMap<>();
+    jobStates.put(job1, TaskState.COMPLETED);
+    jobStates.put(job2, TaskState.COMPLETED);
+    jobStates.put(job3, TaskState.IN_PROGRESS);
+    jobStates.put(job4, TaskState.COMPLETED);
+    when(workflowContext.getJobStates()).thenReturn(jobStates);
+
+    when(workflowContext.getJobStartTime(job1)).thenReturn(1000L);
+    when(workflowContext.getJobStartTime(job2)).thenReturn(2000L);
+    when(workflowContext.getJobStartTime(job3)).thenReturn(3000L);
+    when(workflowContext.getJobStartTime(job4)).thenReturn(4000L);
+
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 3, 50);
+    assertEquals(deleted, 1);
+
+    // The oldest terminal (start time 1000) should be the one deleted
+    verify(taskDriver).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_a"), eq(true));
+    verify(taskDriver, Mockito.never()).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_b"), anyBoolean());
+    verify(taskDriver, Mockito.never()).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_d"), anyBoolean());
+  }
+
+  @Test
+  public void testTrimTaskQueueAtExactLimit() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    Set<String> allJobs = new HashSet<>();
+    allJobs.add("TaskQueue_TestTask_Task_TestTask_a");
+    allJobs.add("TaskQueue_TestTask_Task_TestTask_b");
+    allJobs.add("TaskQueue_TestTask_Task_TestTask_c");
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    // Queue size 3 == limit 3, no trimming
+    assertEquals(mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 3, 50), 0);
+  }
+
+  @Test
+  public void testTrimTaskQueueWithUnknownStartTimes() {
+    // Jobs with unknown start times (-1) should be treated as newest and not deleted
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    String helixJobQueueName = "TaskQueue_TestTask";
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    JobDag jobDag = mock(JobDag.class);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    String knownJob = "TaskQueue_TestTask_Task_TestTask_known";
+    String unknownJob1 = "TaskQueue_TestTask_Task_TestTask_unknown1";
+    String unknownJob2 = "TaskQueue_TestTask_Task_TestTask_unknown2";
+
+    Set<String> allJobs = new HashSet<>();
+    allJobs.add(knownJob);
+    allJobs.add(unknownJob1);
+    allJobs.add(unknownJob2);
+    when(jobDag.getAllNodes()).thenReturn(allJobs);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+
+    Map<String, TaskState> jobStates = new HashMap<>();
+    jobStates.put(knownJob, TaskState.COMPLETED);
+    jobStates.put(unknownJob1, TaskState.COMPLETED);
+    jobStates.put(unknownJob2, TaskState.COMPLETED);
+    when(workflowContext.getJobStates()).thenReturn(jobStates);
+
+    when(workflowContext.getJobStartTime(knownJob)).thenReturn(1000L);
+    when(workflowContext.getJobStartTime(unknownJob1)).thenReturn(-1L);
+    when(workflowContext.getJobStartTime(unknownJob2)).thenReturn(-1L);
+
+    // Delete 1 of 3. The known-start-time job (1000ms) is oldest; unknowns sort as newest.
+    int deleted = mgr.trimTaskQueueIfNeeded("TestTask", workflowConfig, 2, 50);
+    assertEquals(deleted, 1);
+
+    verify(taskDriver).deleteJob(eq(helixJobQueueName), eq("Task_TestTask_known"), eq(true));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testSetTaskExpireTimeMsRejectsNonPositive() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    mgr.setTaskExpireTimeMs(0);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testSetTerminalStateExpireTimeMsRejectsNonPositive() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    mgr.setTerminalStateExpireTimeMs(-1);
+  }
+
   /**
    * Helper method to mock JobConfig and JobContext for a task
    */
@@ -1062,5 +1669,688 @@ public class PinotHelixTaskResourceManagerTest {
     taskIdPartitionMap.put("taskId0", 0);
     when(jobContext.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap);
     when(jobContext.getPartitionState(0)).thenReturn(state);
+  }
+
+  @Test
+  public void testGetTasksSummaryWithEmptyTaskTypes() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.emptySet());
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 0);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertTrue(response.getTaskBreakdown().isEmpty());
+  }
+
+  @Test
+  public void testGetTasksSummaryWithNullTaskTypes() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(null);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 0);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertTrue(response.getTaskBreakdown().isEmpty());
+  }
+
+  @Test
+  public void testGetTasksSummaryWithNoActiveTasks() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task with no running/waiting tasks (all completed)
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.COMPLETED);
+    taskCount.addTaskState(TaskPartitionState.COMPLETED);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName, taskCount);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 0);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertTrue(response.getTaskBreakdown().isEmpty());
+  }
+
+  @Test
+  public void testGetTasksSummaryWithSingleTenant() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+    String tableName = "testTable_OFFLINE";
+    String tenant = "defaultTenant";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task with running and waiting tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+    taskCount.addTaskState(null); // null state counts as waiting
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName, taskCount);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock subtask configs with table name
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.TABLE_NAME_KEY, tableName);
+    PinotTaskConfig subtaskConfig = new PinotTaskConfig(taskType, configs);
+    when(spyMgr.getSubtaskConfigs(taskName)).thenReturn(Collections.singletonList(subtaskConfig));
+
+    // Mock tenant lookup
+    TableConfig tableConfig = mock(TableConfig.class);
+    TenantConfig tenantConfig = mock(TenantConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(tenantConfig);
+    when(tenantConfig.getServer()).thenReturn(tenant);
+    when(helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 2);
+    assertEquals(response.getTotalWaitingTasks(), 1);
+    assertEquals(response.getTaskBreakdown().size(), 1);
+
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown = response.getTaskBreakdown().get(0);
+    assertEquals(tenantBreakdown.getTenant(), tenant);
+    assertEquals(tenantBreakdown.getRunningTasks(), 2);
+    assertEquals(tenantBreakdown.getWaitingTasks(), 1);
+    assertEquals(tenantBreakdown.getTaskTypeBreakdown().size(), 1);
+
+    PinotHelixTaskResourceManager.TaskTypeBreakdown taskTypeBreakdown = tenantBreakdown.getTaskTypeBreakdown().get(0);
+    assertEquals(taskTypeBreakdown.getTaskType(), taskType);
+    assertEquals(taskTypeBreakdown.getRunningCount(), 2);
+    assertEquals(taskTypeBreakdown.getWaitingCount(), 1);
+  }
+
+  @Test
+  public void testGetTasksSummaryWithMultipleTenants() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName1 = "Task_TestTask_12345";
+    String taskName2 = "Task_TestTask_67890";
+    String tableName1 = "table1_OFFLINE";
+    String tableName2 = "table2_OFFLINE";
+    String tenant1 = "tenant1";
+    String tenant2 = "tenant2";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task 1: tenant1 with running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount1 = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount1.addTaskState(TaskPartitionState.RUNNING);
+    taskCount1.addTaskState(TaskPartitionState.RUNNING);
+
+    // Task 2: tenant2 with waiting tasks (null state means waiting/not yet assigned)
+    PinotHelixTaskResourceManager.TaskCount taskCount2 = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount2.addTaskState(null);  // null state counts as waiting
+    taskCount2.addTaskState(null);  // null state counts as waiting
+
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName1, taskCount1);
+    taskCounts.put(taskName2, taskCount2);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock subtask configs
+    Map<String, String> configs1 = new HashMap<>();
+    configs1.put(MinionConstants.TABLE_NAME_KEY, tableName1);
+    when(spyMgr.getSubtaskConfigs(taskName1))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType, configs1)));
+
+    Map<String, String> configs2 = new HashMap<>();
+    configs2.put(MinionConstants.TABLE_NAME_KEY, tableName2);
+    when(spyMgr.getSubtaskConfigs(taskName2))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType, configs2)));
+
+    // Mock tenant lookups
+    TableConfig tableConfig1 = mock(TableConfig.class);
+    TenantConfig tenantConfig1 = mock(TenantConfig.class);
+    when(tableConfig1.getTenantConfig()).thenReturn(tenantConfig1);
+    when(tenantConfig1.getServer()).thenReturn(tenant1);
+    when(helixResourceManager.getTableConfig(tableName1)).thenReturn(tableConfig1);
+
+    TableConfig tableConfig2 = mock(TableConfig.class);
+    TenantConfig tenantConfig2 = mock(TenantConfig.class);
+    when(tableConfig2.getTenantConfig()).thenReturn(tenantConfig2);
+    when(tenantConfig2.getServer()).thenReturn(tenant2);
+    when(helixResourceManager.getTableConfig(tableName2)).thenReturn(tableConfig2);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 2);
+    assertEquals(response.getTotalWaitingTasks(), 2);
+    assertEquals(response.getTaskBreakdown().size(), 2);
+
+    // Verify tenant1 breakdown
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown1 = response.getTaskBreakdown().get(0);
+    assertEquals(tenantBreakdown1.getTenant(), tenant1);
+    assertEquals(tenantBreakdown1.getRunningTasks(), 2);
+    assertEquals(tenantBreakdown1.getWaitingTasks(), 0);
+
+    // Verify tenant2 breakdown
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown2 = response.getTaskBreakdown().get(1);
+    assertEquals(tenantBreakdown2.getTenant(), tenant2);
+    assertEquals(tenantBreakdown2.getRunningTasks(), 0);
+    assertEquals(tenantBreakdown2.getWaitingTasks(), 2);
+  }
+
+  @Test
+  public void testGetTasksSummaryWithTenantFilter() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName1 = "Task_TestTask_12345";
+    String taskName2 = "Task_TestTask_67890";
+    String tableName1 = "table1_OFFLINE";
+    String tableName2 = "table2_OFFLINE";
+    String tenant1 = "tenant1";
+    String tenant2 = "tenant2";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Both tasks have running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount1 = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount1.addTaskState(TaskPartitionState.RUNNING);
+    PinotHelixTaskResourceManager.TaskCount taskCount2 = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount2.addTaskState(TaskPartitionState.RUNNING);
+
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName1, taskCount1);
+    taskCounts.put(taskName2, taskCount2);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock subtask configs
+    Map<String, String> configs1 = new HashMap<>();
+    configs1.put(MinionConstants.TABLE_NAME_KEY, tableName1);
+    when(spyMgr.getSubtaskConfigs(taskName1))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType, configs1)));
+
+    Map<String, String> configs2 = new HashMap<>();
+    configs2.put(MinionConstants.TABLE_NAME_KEY, tableName2);
+    when(spyMgr.getSubtaskConfigs(taskName2))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType, configs2)));
+
+    // Mock tenant lookups
+    TableConfig tableConfig1 = mock(TableConfig.class);
+    TenantConfig tenantConfig1 = mock(TenantConfig.class);
+    when(tableConfig1.getTenantConfig()).thenReturn(tenantConfig1);
+    when(tenantConfig1.getServer()).thenReturn(tenant1);
+    when(helixResourceManager.getTableConfig(tableName1)).thenReturn(tableConfig1);
+
+    TableConfig tableConfig2 = mock(TableConfig.class);
+    TenantConfig tenantConfig2 = mock(TenantConfig.class);
+    when(tableConfig2.getTenantConfig()).thenReturn(tenantConfig2);
+    when(tenantConfig2.getServer()).thenReturn(tenant2);
+    when(helixResourceManager.getTableConfig(tableName2)).thenReturn(tableConfig2);
+
+    // Filter by tenant1
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(tenant1);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 1);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertEquals(response.getTaskBreakdown().size(), 1);
+
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown = response.getTaskBreakdown().get(0);
+    assertEquals(tenantBreakdown.getTenant(), tenant1);
+    assertEquals(tenantBreakdown.getRunningTasks(), 1);
+  }
+
+  @Test
+  public void testGetTasksSummaryWithUnknownTableName() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task with running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName, taskCount);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock subtask configs with unknown table name
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.TABLE_NAME_KEY, UNKNOWN);
+    when(spyMgr.getSubtaskConfigs(taskName))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType, configs)));
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 0);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertTrue(response.getTaskBreakdown().isEmpty());
+  }
+
+  @Test
+  public void testGetTasksSummaryWithEmptySubtaskConfigs() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task with running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName, taskCount);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock empty subtask configs
+    when(spyMgr.getSubtaskConfigs(taskName)).thenReturn(Collections.emptyList());
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 0);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertTrue(response.getTaskBreakdown().isEmpty());
+  }
+
+  @Test
+  public void testGetTasksSummaryWithMultipleTaskTypes() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType1 = "TaskType1";
+    String taskType2 = "TaskType2";
+    String taskName1 = "Task_TaskType1_12345";
+    String taskName2 = "Task_TaskType2_67890";
+    String tableName = "testTable_OFFLINE";
+    String tenant = "defaultTenant";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    Set<String> taskTypes = new HashSet<>();
+    taskTypes.add(taskType1);
+    taskTypes.add(taskType2);
+    when(spyMgr.getTaskTypes()).thenReturn(taskTypes);
+
+    // Task 1: TaskType1 with running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount1 = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount1.addTaskState(TaskPartitionState.RUNNING);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts1 = new HashMap<>();
+    taskCounts1.put(taskName1, taskCount1);
+    when(spyMgr.getTaskCounts(taskType1)).thenReturn(taskCounts1);
+
+    // Task 2: TaskType2 with waiting tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount2 = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount2.addTaskState(null); // null state counts as waiting
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts2 = new HashMap<>();
+    taskCounts2.put(taskName2, taskCount2);
+    when(spyMgr.getTaskCounts(taskType2)).thenReturn(taskCounts2);
+
+    // Mock subtask configs
+    Map<String, String> configs1 = new HashMap<>();
+    configs1.put(MinionConstants.TABLE_NAME_KEY, tableName);
+    when(spyMgr.getSubtaskConfigs(taskName1))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType1, configs1)));
+
+    Map<String, String> configs2 = new HashMap<>();
+    configs2.put(MinionConstants.TABLE_NAME_KEY, tableName);
+    when(spyMgr.getSubtaskConfigs(taskName2))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType2, configs2)));
+
+    // Mock tenant lookup
+    TableConfig tableConfig = mock(TableConfig.class);
+    TenantConfig tenantConfig = mock(TenantConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(tenantConfig);
+    when(tenantConfig.getServer()).thenReturn(tenant);
+    when(helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 1);
+    assertEquals(response.getTotalWaitingTasks(), 1);
+    assertEquals(response.getTaskBreakdown().size(), 1);
+
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown = response.getTaskBreakdown().get(0);
+    assertEquals(tenantBreakdown.getTenant(), tenant);
+    assertEquals(tenantBreakdown.getRunningTasks(), 1);
+    assertEquals(tenantBreakdown.getWaitingTasks(), 1);
+    assertEquals(tenantBreakdown.getTaskTypeBreakdown().size(), 2);
+
+    // Verify both task types are included
+    Set<String> taskTypesInBreakdown = new HashSet<>();
+    for (PinotHelixTaskResourceManager.TaskTypeBreakdown breakdown : tenantBreakdown.getTaskTypeBreakdown()) {
+      taskTypesInBreakdown.add(breakdown.getTaskType());
+    }
+    assertTrue(taskTypesInBreakdown.contains(taskType1));
+    assertTrue(taskTypesInBreakdown.contains(taskType2));
+  }
+
+  @Test
+  public void testGetTasksSummaryWithNullTableName() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task with running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName, taskCount);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock subtask configs with null table name
+    Map<String, String> configs = new HashMap<>();
+    // Don't put TABLE_NAME_KEY, so getTableName() returns null
+    when(spyMgr.getSubtaskConfigs(taskName))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType, configs)));
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 0);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertTrue(response.getTaskBreakdown().isEmpty());
+  }
+
+  @Test
+  public void testGetTasksSummaryWithTenantException() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+    String tableName = "testTable_OFFLINE";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task with running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName, taskCount);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock subtask configs
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.TABLE_NAME_KEY, tableName);
+    when(spyMgr.getSubtaskConfigs(taskName))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType, configs)));
+
+    // Mock tenant lookup to throw exception (getTenantForTable catches it and returns UNKNOWN)
+    when(helixResourceManager.getTableConfig(tableName)).thenThrow(new RuntimeException("Test exception"));
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    // Task should be included with tenant="unknown" even when an exception is thrown
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 1);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertEquals(response.getTaskBreakdown().size(), 1);
+
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown = response.getTaskBreakdown().get(0);
+    assertEquals(tenantBreakdown.getTenant(), UNKNOWN);
+    assertEquals(tenantBreakdown.getRunningTasks(), 1);
+    assertEquals(tenantBreakdown.getWaitingTasks(), 0);
+  }
+
+  @Test
+  public void testGetTasksSummaryWithNullTableConfig() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+    String tableName = "testTable_OFFLINE";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task with running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName, taskCount);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock subtask configs
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.TABLE_NAME_KEY, tableName);
+    when(spyMgr.getSubtaskConfigs(taskName))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType, configs)));
+
+    // Mock tenant lookup to return null (getTenantForTable will return UNKNOWN)
+    when(helixResourceManager.getTableConfig(tableName)).thenReturn(null);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    // Task should be included with tenant="unknown"
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 1);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertEquals(response.getTaskBreakdown().size(), 1);
+
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown = response.getTaskBreakdown().get(0);
+    assertEquals(tenantBreakdown.getTenant(), UNKNOWN);
+    assertEquals(tenantBreakdown.getRunningTasks(), 1);
+    assertEquals(tenantBreakdown.getWaitingTasks(), 0);
+  }
+
+  @Test
+  public void testGetTasksSummaryWithNullTenantConfig() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+    String tableName = "testTable_OFFLINE";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task with running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName, taskCount);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock subtask configs
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.TABLE_NAME_KEY, tableName);
+    when(spyMgr.getSubtaskConfigs(taskName))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType, configs)));
+
+    // Mock tenant lookup to return table config with null tenant config (getTenantForTable will return UNKNOWN)
+    TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(null);
+    when(helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    // Task should be included with tenant="unknown"
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 1);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertEquals(response.getTaskBreakdown().size(), 1);
+
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown = response.getTaskBreakdown().get(0);
+    assertEquals(tenantBreakdown.getTenant(), UNKNOWN);
+    assertEquals(tenantBreakdown.getRunningTasks(), 1);
+    assertEquals(tenantBreakdown.getWaitingTasks(), 0);
+  }
+
+  @Test
+  public void testGetTasksSummaryWithNullServerTenant() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+    String tableName = "testTable_OFFLINE";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task with running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName, taskCount);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock subtask configs
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.TABLE_NAME_KEY, tableName);
+    when(spyMgr.getSubtaskConfigs(taskName))
+        .thenReturn(Collections.singletonList(new PinotTaskConfig(taskType, configs)));
+
+    // Mock tenant lookup to return table config with null server tenant (getTenantForTable will return UNKNOWN)
+    TableConfig tableConfig = mock(TableConfig.class);
+    TenantConfig tenantConfig = mock(TenantConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(tenantConfig);
+    when(tenantConfig.getServer()).thenReturn(null);
+    when(helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    // Task should be included with tenant="unknown"
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 1);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertEquals(response.getTaskBreakdown().size(), 1);
+
+    PinotHelixTaskResourceManager.TenantTaskBreakdown tenantBreakdown = response.getTaskBreakdown().get(0);
+    assertEquals(tenantBreakdown.getTenant(), UNKNOWN);
+    assertEquals(tenantBreakdown.getRunningTasks(), 1);
+    assertEquals(tenantBreakdown.getWaitingTasks(), 0);
+  }
+
+  @Test
+  public void testGetTasksSummaryWithEmptyTaskCounts() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Empty task counts
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(Collections.emptyMap());
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 0);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertTrue(response.getTaskBreakdown().isEmpty());
+  }
+
+  @Test
+  public void testGetTasksSummaryWithNullTaskCounts() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Null task counts
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(null);
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 0);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertTrue(response.getTaskBreakdown().isEmpty());
+  }
+
+  @Test
+  public void testGetTasksSummaryWithNullConfigs() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager mgr = new PinotHelixTaskResourceManager(helixResourceManager, taskDriver);
+
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+
+    PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
+    when(spyMgr.getTaskTypes()).thenReturn(Collections.singleton(taskType));
+
+    // Task with running tasks
+    PinotHelixTaskResourceManager.TaskCount taskCount = new PinotHelixTaskResourceManager.TaskCount();
+    taskCount.addTaskState(TaskPartitionState.RUNNING);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> taskCounts = new HashMap<>();
+    taskCounts.put(taskName, taskCount);
+    when(spyMgr.getTaskCounts(taskType)).thenReturn(taskCounts);
+
+    // Mock subtask config with null configs (getConfigs() returns null)
+    PinotTaskConfig taskConfig = mock(PinotTaskConfig.class);
+    when(taskConfig.getConfigs()).thenReturn(null);
+    when(spyMgr.getSubtaskConfigs(taskName))
+        .thenReturn(Collections.singletonList(taskConfig));
+
+    PinotHelixTaskResourceManager.TaskSummaryResponse response = spyMgr.getTasksSummary(null);
+
+    // Should handle null configs gracefully by treating it as unknown table
+    assertNotNull(response);
+    assertEquals(response.getTotalRunningTasks(), 0);
+    assertEquals(response.getTotalWaitingTasks(), 0);
+    assertTrue(response.getTaskBreakdown().isEmpty());
   }
 }

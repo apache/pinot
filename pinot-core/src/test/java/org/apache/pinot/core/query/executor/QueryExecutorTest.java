@@ -55,6 +55,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -161,7 +162,8 @@ public class QueryExecutorTest {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
-    tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), null);
+    tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), null,
+        mock(ServerReloadJobStatusCache.class));
     TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(tableConfig, schema);
     tableDataManager.start();
     for (ImmutableSegment indexSegment : _indexSegments) {
@@ -233,7 +235,7 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = execute(queryRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets,
-        (AggregationResultsBlock) instanceResponse.getResultsBlock());
+        (AggregationResultsBlock) instanceResponse.getResultsBlock(), instanceResponse.getResponseMetadata());
     assertEquals(timeSeriesBlock.getSeriesMap().size(), 1);
     assertNull(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getDoubleValues()[0]);
     assertEquals(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getDoubleValues()[1], 29885544.0);
@@ -249,7 +251,8 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = execute(queryRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof GroupByResultsBlock);
     GroupByResultsBlock resultsBlock = (GroupByResultsBlock) instanceResponse.getResultsBlock();
-    TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets, resultsBlock);
+    TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets, resultsBlock,
+        instanceResponse.getResponseMetadata());
     assertEquals(5, timeSeriesBlock.getSeriesMap().size());
     // For any city, say "New York", the max order item count should be 4
     boolean foundNewYork = false;
@@ -278,7 +281,7 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = execute(queryRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof GroupByResultsBlock);
     TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets,
-        (GroupByResultsBlock) instanceResponse.getResultsBlock());
+        (GroupByResultsBlock) instanceResponse.getResultsBlock(), instanceResponse.getResponseMetadata());
     assertEquals(5, timeSeriesBlock.getSeriesMap().size());
     // For any city, say "Chicago", the min order item count should be 0
     boolean foundChicago = false;

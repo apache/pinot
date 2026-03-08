@@ -23,10 +23,8 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.List;
-import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -174,21 +172,18 @@ public class CpcSketchTest extends CustomDataQueryClusterIntegrationTest {
             null), new org.apache.avro.Schema.Field(MET_CPC_SKETCH_BYTES,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES), null, null)));
 
-    // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    Random random = new Random();
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
+    try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
+      List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
-        record.put(ID, random.nextInt(10));
+        record.put(ID, RANDOM.nextInt(10));
         record.put(MET_CPC_SKETCH_BYTES, ByteBuffer.wrap(getRandomRawValue()));
         // add avro record to file
-        fileWriter.append(record);
+        writers.get(i % getNumAvroFiles()).append(record);
       }
+      return avroFilesAndWriters.getAvroFiles();
     }
-    return List.of(avroFile);
   }
 
   private byte[] getRandomRawValue() {

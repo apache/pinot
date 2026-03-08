@@ -78,9 +78,9 @@ public class QueryOverrideTest {
         + "{\"name\":\"col3\",\"dataType\":\"LONG\",\"singleValueField\":\"false\"}],"
         + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"x:HOURS:EPOCH\","
         + "\"granularity\":\"1:HOURS\"}]}");
-    BaseSingleStageBrokerRequestHandler.handleDistinctMultiValuedOverride(pinotQuery1, tableSchema);
+    BaseSingleStageBrokerRequestHandler.handleAggFunctionMVOverride(pinotQuery1, tableSchema);
     assertEquals(pinotQuery1.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcount");
-    BaseSingleStageBrokerRequestHandler.handleDistinctMultiValuedOverride(pinotQuery2, tableSchema);
+    BaseSingleStageBrokerRequestHandler.handleAggFunctionMVOverride(pinotQuery2, tableSchema);
     assertEquals(pinotQuery2.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcountmv");
   }
 

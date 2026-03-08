@@ -38,4 +38,15 @@ public class TransformFunctionPartitioner implements Partitioner {
   public String getPartition(GenericRow genericRow) {
     return String.valueOf(_functionEvaluator.evaluate(genericRow));
   }
+
+  @Override
+  public String[] getPartitionColumns() {
+    return null;
+  }
+
+  @Override
+  public String getPartitionFromColumns(Object[] columnValues) {
+    // TODO - Implement
+    throw new UnsupportedOperationException("TransformFunctionPartitioner does not support getPartitionFromColumns");
+  }
 }

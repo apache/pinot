@@ -140,6 +140,7 @@ public class ResponseStoreResource {
       @ApiParam(value = "Offset in the result set", required = true) @QueryParam("offset") int offset,
       @ApiParam(value = "Number of rows to fetch") @QueryParam("numRows") Integer numRows,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
+      @Context HttpHeaders headers,
       @Suspended AsyncResponse asyncResponse) {
     try {
       checkRequestExistsAndAuthorized(requestId, requestContext);
@@ -148,7 +149,8 @@ public class ResponseStoreResource {
             CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
       }
       asyncResponse.resume(
-          PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows)));
+          PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows),
+              headers, _brokerMetrics));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {

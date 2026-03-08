@@ -127,6 +127,9 @@ public class TextIndexHandler extends BaseIndexHandler {
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
     // Handle configuration changes for existing indexes
     for (String column : existingColumns) {
+      if (!columnsToAddIdx.contains(column)) {
+        continue;
+      }
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (columnMetadata != null && hasTextIndexConfigurationChanged(column, segmentWriter)) {
         LOGGER.info("Updating text index configuration for segment: {}, column: {}", segmentName, column);

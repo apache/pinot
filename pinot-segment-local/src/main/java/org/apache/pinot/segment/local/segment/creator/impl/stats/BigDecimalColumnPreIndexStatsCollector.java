@@ -106,6 +106,10 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
     return _sealed ? _sortedValues.length : _values.size();
   }
 
+  BigDecimal[] getValues() {
+    return _values.toArray(new BigDecimal[0]);
+  }
+
   @Override
   public void seal() {
     if (!_sealed) {

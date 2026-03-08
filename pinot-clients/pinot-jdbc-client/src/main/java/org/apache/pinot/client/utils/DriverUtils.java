@@ -35,7 +35,7 @@ import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.net.URLEncodedUtils;
-import org.apache.pinot.common.auth.BasicAuthUtils;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -79,7 +79,7 @@ public class DriverUtils {
       if (StringUtils.isAnyEmpty(username, password)) {
         throw new SQLException("Empty username or password provided.");
       }
-      String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
+      String authToken = BasicAuthTokenUtils.toBasicAuthToken(username, password);
       headers.put(AUTH_HEADER, authToken);
       info.setProperty(AUTH_HEADER_CONFIG_KEY, authToken);
     }

@@ -152,7 +152,7 @@ public class PinotConfigUtils {
   }
 
   public static Map<String, Object> generateBrokerConf(String clusterName, String zkAddress, String brokerHost,
-      int brokerPort, int brokerMultiStageRunnerPort)
+      int brokerPort, int brokerGrpcPort, int brokerMultiStageRunnerPort)
       throws SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
@@ -160,6 +160,11 @@ public class PinotConfigUtils {
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME,
         !StringUtils.isEmpty(brokerHost) ? brokerHost : NetUtils.getHostAddress());
     properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort != 0 ? brokerPort : getAvailablePort());
+    if (brokerGrpcPort > 0) {
+      properties.put(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, brokerGrpcPort);
+    } else if (brokerGrpcPort == 0) {
+      properties.put(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, getAvailablePort());
+    }
     properties.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, brokerMultiStageRunnerPort != 0
         ? brokerMultiStageRunnerPort : getAvailablePort());
     return properties;

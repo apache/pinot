@@ -29,13 +29,10 @@ import java.util.Properties;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.helix.model.InstanceConfig;
@@ -66,7 +63,9 @@ import org.slf4j.LoggerFactory;
  */
 public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResponseStoreCleaner.class);
-  private static final int TIMEOUT_MS = 3000;
+  // Increased timeout to handle large response stores
+  private static final int GET_TIMEOUT_MS = 60_000;
+  private static final int DELETE_TIMEOUT_MS = 10_000;
   private static final String QUERY_RESULT_STORE = "%s://%s:%d/responseStore";
   private static final String DELETE_QUERY_RESULT = "%s://%s:%d/responseStore/%s";
   // Used in tests to trigger the delete instead of waiting for the wall clock to move to an appropriate time.
@@ -132,32 +131,104 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
               Integer.parseInt(HelixHelper.getGrpcPort(broker))));
     }
 
+    Map<String, String> requestHeaders;
     try {
-      Map<String, String> requestHeaders = AuthProviderUtils.makeAuthHeadersMap(_authProvider);
+      requestHeaders = AuthProviderUtils.makeAuthHeadersMap(_authProvider);
+    } catch (Exception e) {
+      LOGGER.error("Failed to create auth headers for response store cleanup", e);
+      return;
+    }
 
-      Map<String, List<CursorResponseNative>> brokerCursorsMap = getAllQueryResults(brokers, requestHeaders);
+    Map<String, List<CursorResponseNative>> brokerCursorsMap;
+    try {
+      brokerCursorsMap = getAllQueryResults(brokers, requestHeaders);
+    } catch (Exception e) {
+      LOGGER.error("Failed to get query results from brokers for cleanup", e);
+      return;
+    }
 
-      String protocol = _controllerConf.getControllerBrokerProtocol();
-      int portOverride = _controllerConf.getControllerBrokerPortOverride();
+    String protocol = _controllerConf.getControllerBrokerProtocol();
+    int portOverride = _controllerConf.getControllerBrokerPortOverride();
 
+    // Process each broker independently to ensure partial failures don't block cleanup of other brokers
+    for (Map.Entry<String, List<CursorResponseNative>> entry : brokerCursorsMap.entrySet()) {
+      String brokerKey = entry.getKey();
+      InstanceInfo broker = brokers.get(brokerKey);
+
+      // Collect URLs for expired responses for THIS broker only
       List<String> brokerUrls = new ArrayList<>();
-      for (Map.Entry<String, List<CursorResponseNative>> entry : brokerCursorsMap.entrySet()) {
-        for (CursorResponse response : entry.getValue()) {
-          if (response.getExpirationTimeMs() <= currentTime) {
-            InstanceInfo broker = brokers.get(entry.getKey());
-            int port = portOverride > 0 ? portOverride : broker.getPort();
-            brokerUrls.add(
-                String.format(DELETE_QUERY_RESULT, protocol, broker.getHost(), port, response.getRequestId()));
-          }
+      for (CursorResponse response : entry.getValue()) {
+        if (response.getExpirationTimeMs() <= currentTime) {
+          int port = portOverride > 0 ? portOverride : broker.getPort();
+          brokerUrls.add(
+              String.format(DELETE_QUERY_RESULT, protocol, broker.getHost(), port, response.getRequestId()));
         }
-        Map<String, String> deleteStatus = getResponseMap(requestHeaders, brokerUrls, "DELETE", HttpDelete::new);
+      }
 
+      if (brokerUrls.isEmpty()) {
+        LOGGER.debug("No expired responses to clean up for broker: {}", brokerKey);
+        continue;
+      }
+
+      LOGGER.info("Cleaning up {} expired responses from broker: {}", brokerUrls.size(), brokerKey);
+
+      try {
+        Map<String, String> deleteStatus =
+            deleteExpiredResponses(requestHeaders, brokerUrls);
         deleteStatus.forEach(
             (key, value) -> LOGGER.info("ResponseStore delete response - Broker: {}. Response: {}", key, value));
+      } catch (Exception e) {
+        // Log error but continue with other brokers - don't let one broker failure block cleanup of others
+        LOGGER.error("Failed to delete expired responses from broker: {}. Will retry on next cleanup cycle.",
+            brokerKey, e);
       }
-    } catch (Exception e) {
-      LOGGER.error(e.getMessage());
     }
+  }
+
+  /**
+   * Delete expired responses from brokers. Treats 404 responses as success since the goal
+   * is to ensure the response doesn't exist (idempotent delete).
+   */
+  private Map<String, String> deleteExpiredResponses(Map<String, String> requestHeaders, List<String> brokerUrls)
+      throws Exception {
+    List<Pair<String, String>> urlsAndRequestBodies = new ArrayList<>(brokerUrls.size());
+    brokerUrls.forEach((url) -> urlsAndRequestBodies.add(Pair.of(url, "")));
+
+    CompletionService<MultiHttpRequestResponse> completionService =
+        new MultiHttpRequest(_executor, _connectionManager).execute(urlsAndRequestBodies, requestHeaders,
+            DELETE_TIMEOUT_MS, "DELETE", HttpDelete::new);
+
+    Map<String, String> responseMap = new HashMap<>();
+    List<String> errMessages = new ArrayList<>();
+
+    for (int i = 0; i < brokerUrls.size(); i++) {
+      try (MultiHttpRequestResponse httpRequestResponse = completionService.take().get()) {
+        URI uri = httpRequestResponse.getURI();
+        int status = httpRequestResponse.getResponse().getCode();
+        String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
+
+        if (status == 200) {
+          responseMap.put(getInstanceKey(uri.getHost(), Integer.toString(uri.getPort())), responseString);
+        } else if (status == 404) {
+          // 404 means the response is already deleted - this is acceptable for idempotent cleanup
+          LOGGER.debug("Response already deleted (404) for uri: {}", uri);
+          responseMap.put(getInstanceKey(uri.getHost(), Integer.toString(uri.getPort())),
+              "Already deleted (was 404)");
+        } else {
+          // Other errors are unexpected and should be logged
+          LOGGER.warn("Unexpected status={} from uri='{}', response='{}'", status, uri, responseString);
+          errMessages.add(String.format("Unexpected status=%d from uri='%s'", status, uri));
+        }
+      } catch (Exception e) {
+        LOGGER.error("Failed to execute DELETE op", e);
+        errMessages.add(e.getMessage());
+      }
+    }
+
+    if (!errMessages.isEmpty()) {
+      throw new RuntimeException("Some delete operations failed: " + StringUtils.join(errMessages, ", "));
+    }
+    return responseMap;
   }
 
   private Map<String, List<CursorResponseNative>> getAllQueryResults(Map<String, InstanceInfo> brokers,
@@ -170,51 +241,54 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
       int port = portOverride > 0 ? portOverride : broker.getPort();
       brokerUrls.add(String.format(QUERY_RESULT_STORE, protocol, broker.getHost(), port));
     }
-    LOGGER.debug("Getting running queries via broker urls: {}", brokerUrls);
-    Map<String, String> strResponseMap = getResponseMap(requestHeaders, brokerUrls, "GET", HttpGet::new);
-    return strResponseMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> {
-      try {
-        return JsonUtils.stringToObject(e.getValue(), new TypeReference<>() {
-        });
-      } catch (IOException ex) {
-        throw new RuntimeException(ex);
-      }
-    }));
-  }
+    LOGGER.debug("Getting stored responses via broker urls: {}", brokerUrls);
 
-  private <T extends HttpUriRequestBase> Map<String, String> getResponseMap(Map<String, String> requestHeaders,
-      List<String> brokerUrls, String methodName, Function<String, T> httpRequestBaseSupplier)
-      throws Exception {
     List<Pair<String, String>> urlsAndRequestBodies = new ArrayList<>(brokerUrls.size());
     brokerUrls.forEach((url) -> urlsAndRequestBodies.add(Pair.of(url, "")));
 
     CompletionService<MultiHttpRequestResponse> completionService =
         new MultiHttpRequest(_executor, _connectionManager).execute(urlsAndRequestBodies, requestHeaders,
-            ResponseStoreCleaner.TIMEOUT_MS, methodName, httpRequestBaseSupplier);
-    Map<String, String> responseMap = new HashMap<>();
-    List<String> errMessages = new ArrayList<>(brokerUrls.size());
+            GET_TIMEOUT_MS, "GET", HttpGet::new);
+
+    Map<String, List<CursorResponseNative>> responseMap = new HashMap<>();
+    List<String> errMessages = new ArrayList<>();
+
     for (int i = 0; i < brokerUrls.size(); i++) {
       try (MultiHttpRequestResponse httpRequestResponse = completionService.take().get()) {
-        // The completion order is different from brokerUrls, thus use uri in the response.
         URI uri = httpRequestResponse.getURI();
         int status = httpRequestResponse.getResponse().getCode();
         String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
-        // Unexpected server responses are collected and returned as exception.
+
         if (status != 200) {
-          throw new Exception(
-              String.format("Unexpected status=%d and response='%s' from uri='%s'", status, responseString, uri));
+          errMessages.add(String.format("Unexpected status=%d from uri='%s', response='%s'",
+              status, uri, responseString));
+          continue;
         }
-        responseMap.put((getInstanceKey(uri.getHost(), Integer.toString(uri.getPort()))), responseString);
+
+        String brokerKey = getInstanceKey(uri.getHost(), Integer.toString(uri.getPort()));
+        try {
+          List<CursorResponseNative> responses = JsonUtils.stringToObject(responseString, new TypeReference<>() {
+          });
+          responseMap.put(brokerKey, responses);
+          LOGGER.debug("Got {} stored responses from broker: {}", responses.size(), brokerKey);
+        } catch (IOException ex) {
+          LOGGER.error("Failed to parse response from broker: {}", brokerKey, ex);
+          errMessages.add(String.format("Failed to parse response from broker '%s': %s", brokerKey, ex.getMessage()));
+        }
       } catch (Exception e) {
-        LOGGER.error("Failed to execute {} op. ", methodName, e);
-        // Can't just throw exception from here as there is a need to release the other connections.
-        // So just collect the error msg to throw them together after the for-loop.
+        LOGGER.error("Failed to execute GET op", e);
         errMessages.add(e.getMessage());
       }
     }
+
     if (!errMessages.isEmpty()) {
-      throw new Exception("Unexpected responses from brokers: " + StringUtils.join(errMessages, ","));
+      LOGGER.warn("Some brokers failed to respond: {}", errMessages);
+      // Only throw if ALL brokers failed - allow partial success
+      if (responseMap.isEmpty()) {
+        throw new RuntimeException("All brokers failed to respond: " + StringUtils.join(errMessages, ", "));
+      }
     }
+
     return responseMap;
   }
 

@@ -653,4 +653,58 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
         .containsMessage("TableDoesNotExistError");
   }
+
+  @Test
+  void testPhysicalOptimizerWithLogicalTable()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    setUsePhysicalOptimizer(true);
+
+    // Test simple count query with physical optimizer
+    @Language("sql")
+    String query = "SET usePhysicalOptimizer=true; SELECT count(*) FROM " + getLogicalTableName();
+    JsonNode response = postQueryToController(query);
+    assertNoError(response);
+    assertTrue(response.get("numDocsScanned").asLong() > 0,
+        "Expected some documents to be scanned");
+
+    // Test query with filter
+    query = "SET usePhysicalOptimizer=true; SELECT count(*) FROM " + getLogicalTableName()
+        + " WHERE FlightNum > 0";
+    response = postQueryToController(query);
+    assertNoError(response);
+
+    // Test query with aggregation
+    query = "SET usePhysicalOptimizer=true; SELECT Carrier, count(*) FROM " + getLogicalTableName()
+        + " GROUP BY Carrier LIMIT 10";
+    response = postQueryToController(query);
+    assertNoError(response);
+
+    // Test query with order by
+    query = "SET usePhysicalOptimizer=true; SELECT FlightNum, Carrier FROM " + getLogicalTableName()
+        + " ORDER BY FlightNum LIMIT 10";
+    response = postQueryToController(query);
+    assertNoError(response);
+
+    // Test query with join
+    query = "SET usePhysicalOptimizer=true; SELECT count(*) FROM " + getLogicalTableName() + " JOIN "
+        + getPhysicalTableNames().get(0) + " ON " + getLogicalTableName() + ".FlightNum = "
+        + getPhysicalTableNames().get(0) + ".FlightNum";
+    response = postQueryToController(query);
+    assertNoError(response);
+
+    // Test error case: unknown table in join
+    query = "SET usePhysicalOptimizer=true; SELECT count(*) FROM unknown JOIN " + getPhysicalTableNames().get(0)
+        + " ON unknown.FlightNum = " + getPhysicalTableNames().get(0) + ".FlightNum";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
+
+    // Test error case: unknown table alias
+    query = "SET usePhysicalOptimizer=true; SELECT count(*) FROM " + getLogicalTableName() + " JOIN known ON "
+        + getLogicalTableName() + ".FlightNum = unknown.FlightNum";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
+  }
 }

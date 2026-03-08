@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
-import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.utils.SpecialValueTransformerUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
@@ -56,19 +52,13 @@ import org.apache.pinot.spi.recordtransformer.RecordTransformer;
  * all the null values properly.
  */
 public class SpecialValueTransformer implements RecordTransformer {
-  private final static int NEGATIVE_ZERO_FLOAT_BITS = Float.floatToRawIntBits(-0.0f);
-  private final static long NEGATIVE_ZERO_DOUBLE_BITS = Double.doubleToLongBits(-0.0d);
 
   private final Set<String> _columnsToCheck = new HashSet<>();
 
   public SpecialValueTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        DataType dataType = fieldSpec.getDataType();
-        if (dataType == DataType.FLOAT || dataType == DataType.DOUBLE
-            || (dataType == DataType.BIG_DECIMAL && !fieldSpec.isAllowTrailingZeros())) {
-          _columnsToCheck.add(fieldSpec.getName());
-        }
+      if (!fieldSpec.isVirtualColumn() && SpecialValueTransformerUtils.needsTransformation(fieldSpec)) {
+        _columnsToCheck.add(fieldSpec.getName());
       }
     }
   }
@@ -84,56 +74,17 @@ public class SpecialValueTransformer implements RecordTransformer {
       Object value = record.getValue(column);
       if (value instanceof Object[]) {
         // Multi-valued column.
-        Object[] values = (Object[]) value;
-        List<Object> transformedValues = new ArrayList<>(values.length);
-        boolean transformed = false;
-        for (Object v : values) {
-          Object transformedValue = transformValue(v);
-          if (transformedValue != v) {
-            transformed = true;
-          }
-          if (transformedValue != null) {
-            transformedValues.add(transformedValue);
-          }
-          if (transformed) {
-            record.putValue(column, !transformedValues.isEmpty() ? transformedValues.toArray() : null);
-          }
+        Object[] transformedValues = SpecialValueTransformerUtils.transformValues((Object[]) value);
+        if (transformedValues != value) {
+          record.putValue(column, transformedValues);
         }
       } else if (value != null) {
         // Single-valued column.
-        Object transformedValue = transformValue(value);
+        Object transformedValue = SpecialValueTransformerUtils.transformValue(value);
         if (transformedValue != value) {
           record.putValue(column, transformedValue);
         }
       }
     }
-  }
-
-  @Nullable
-  private Object transformValue(Object value) {
-    if (value instanceof Float) {
-      Float floatValue = (Float) value;
-      if (floatValue.isNaN()) {
-        return null;
-      }
-      if (Float.floatToRawIntBits(floatValue) == NEGATIVE_ZERO_FLOAT_BITS) {
-        return 0.0f;
-      }
-    } else if (value instanceof Double) {
-      Double doubleValue = (Double) value;
-      if (doubleValue.isNaN()) {
-        return null;
-      }
-      if (Double.doubleToRawLongBits(doubleValue) == NEGATIVE_ZERO_DOUBLE_BITS) {
-        return 0.0d;
-      }
-    } else if (value instanceof BigDecimal) {
-      BigDecimal bigDecimalValue = (BigDecimal) value;
-      BigDecimal stripped = bigDecimalValue.stripTrailingZeros();
-      if (!stripped.equals(bigDecimalValue)) {
-        return stripped;
-      }
-    }
-    return value;
   }
 }

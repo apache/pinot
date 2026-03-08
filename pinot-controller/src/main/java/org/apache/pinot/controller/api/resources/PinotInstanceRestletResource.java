@@ -66,6 +66,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -159,6 +160,10 @@ public class PinotInstanceRestletResource {
     if ("true".equalsIgnoreCase(queriesDisabled)) {
       response.put(CommonConstants.Helix.QUERIES_DISABLED, "true");
     }
+    // Add shutdown in progress status
+    boolean shutdownInProgress = instanceConfig.getRecord().getBooleanField(
+        CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+    response.put(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, shutdownInProgress);
     response.put("systemResourceInfo", JsonUtils.objectToJsonNode(getSystemResourceInfo(instanceConfig)));
     return response.toString();
   }
@@ -252,7 +257,9 @@ public class PinotInstanceRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Enable/disable an instance", notes = "Enable/disable an instance")
+  @ApiOperation(value = "Enable/disable/drain an instance", notes = "Enable/disable/drain an instance. "
+      + "DRAIN state is only applicable to minion instances and retags them from minion_untagged to minion_drained, "
+      + "preventing new task assignments while allowing existing tasks to complete.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 400, message = "Bad Request"),
@@ -260,9 +267,10 @@ public class PinotInstanceRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   public SuccessResponse toggleInstanceState(
-      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000 "
+          + "| Minion_hostname_9514")
       @PathParam("instanceName") String instanceName,
-      @ApiParam(value = "enable|disable", required = true) @QueryParam("state") String state) {
+      @ApiParam(value = "enable|disable|drain", required = true) @QueryParam("state") String state) {
     if (!_pinotHelixResourceManager.instanceExists(instanceName)) {
       throw new ControllerApplicationException(LOGGER, "Instance '" + instanceName + "' does not exist",
           Response.Status.NOT_FOUND);
@@ -280,6 +288,18 @@ public class PinotInstanceRestletResource {
       if (!response.isSuccessful()) {
         throw new ControllerApplicationException(LOGGER,
             "Failed to disable instance '" + instanceName + "': " + response.getMessage(),
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
+    } else if (StateType.DRAIN.name().equalsIgnoreCase(state)) {
+      if (!InstanceTypeUtils.isMinion(instanceName)) {
+        throw new ControllerApplicationException(LOGGER,
+            "DRAIN state only applies to minion instances. Instance '" + instanceName + "' is not a minion.",
+            Response.Status.BAD_REQUEST);
+      }
+      PinotResourceManagerResponse response = _pinotHelixResourceManager.drainMinionInstance(instanceName);
+      if (!response.isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to drain minion instance '" + instanceName + "': " + response.getMessage(),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
     } else {

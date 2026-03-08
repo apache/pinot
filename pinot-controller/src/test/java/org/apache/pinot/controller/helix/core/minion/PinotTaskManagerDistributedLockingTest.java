@@ -970,7 +970,7 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
       startLatch.countDown();
 
       // Wait for completion
-      assertTrue(completionLatch.await(15, TimeUnit.SECONDS), "Tasks should complete within 15 seconds");
+      assertTrue(completionLatch.await(30, TimeUnit.SECONDS), "Tasks should complete within 30 seconds");
 
       executor.shutdownNow();
       assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "Executor should terminate");

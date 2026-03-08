@@ -20,6 +20,7 @@ package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -33,6 +34,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -40,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -503,6 +506,7 @@ public final class Schema implements Serializable {
   /**
    * Returns a json representation of the schema.
    */
+  @JsonValue
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("schemaName", _schemaName);
@@ -838,10 +842,20 @@ public final class Schema implements Serializable {
    * Backward compatibility requires
    * (1) all columns in oldSchema should be retained.
    * (2) all column fieldSpecs should be backward compatible with the old ones.
+   * (3) primary key columns should not be changed if present(used in dimension tables, upsert, and dedup).
    *
    * @param oldSchema old schema
    */
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
+    List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
+    List<String> newPrimaryKeys = getPrimaryKeyColumns();
+    // Allow adding primary keys if not present. Helps add upsert and dedup configs to existing tables.
+    if (CollectionUtils.isNotEmpty(oldPrimaryKeys)) {
+      if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
+        return false;
+      }
+    }
+
     Set<String> columnNames = getColumnNames();
     for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
       String oldSchemaColumnName = entry.getKey();
@@ -885,6 +899,17 @@ public final class Schema implements Serializable {
         .build();
     getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
     return cloned;
+  }
+
+  public static Schema cloneSchemaWithName(Schema source, String newName) {
+    try {
+      String json = JsonUtils.objectToString(source);
+      Schema cloned = JsonUtils.stringToObject(json, Schema.class);
+      cloned.setSchemaName(newName);
+      return cloned;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to clone schema", e);
+    }
   }
 
   /**

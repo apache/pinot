@@ -205,7 +205,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           _clusterInfoAccessor);
       configs.putAll(getBaseTaskConfigs(tableConfig, segmentNames));
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, StringUtils.join(downloadURLs, MinionConstants.URL_SEPARATOR));
-      configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+      configs.put(MinionConstants.UPLOAD_URL_KEY,
+          _clusterInfoAccessor.getVipUrlForLeadController(tableConfig.getTableName()) + "/segments");
 
       // Segment processor configs
       configs.put(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, String.valueOf(windowStartMs));

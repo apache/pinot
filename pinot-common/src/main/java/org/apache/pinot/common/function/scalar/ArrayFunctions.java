@@ -204,6 +204,56 @@ public class ArrayFunctions {
   }
 
   @ScalarFunction
+  public static int[] arrayPushBackInt(int[] values, int element) {
+    return ArrayUtils.add(values, element);
+  }
+
+  @ScalarFunction
+  public static long[] arrayPushBackLong(long[] values, long element) {
+    return ArrayUtils.add(values, element);
+  }
+
+  @ScalarFunction
+  public static float[] arrayPushBackFloat(float[] values, float element) {
+    return ArrayUtils.add(values, element);
+  }
+
+  @ScalarFunction
+  public static double[] arrayPushBackDouble(double[] values, double element) {
+    return ArrayUtils.add(values, element);
+  }
+
+  @ScalarFunction
+  public static String[] arrayPushBackString(String[] values, String element) {
+    return ArrayUtils.add(values, element);
+  }
+
+  @ScalarFunction
+  public static int[] arrayPushFrontInt(int[] values, int element) {
+    return ArrayUtils.insert(0, values, element);
+  }
+
+  @ScalarFunction
+  public static long[] arrayPushFrontLong(long[] values, long element) {
+    return ArrayUtils.insert(0, values, element);
+  }
+
+  @ScalarFunction
+  public static float[] arrayPushFrontFloat(float[] values, float element) {
+    return ArrayUtils.insert(0, values, element);
+  }
+
+  @ScalarFunction
+  public static double[] arrayPushFrontDouble(double[] values, double element) {
+    return ArrayUtils.insert(0, values, element);
+  }
+
+  @ScalarFunction
+  public static String[] arrayPushFrontString(String[] values, String element) {
+    return ArrayUtils.insert(0, values, element);
+  }
+
+  @ScalarFunction
   public static int arrayElementAtInt(int[] arr, int idx) {
     return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.INT;
   }

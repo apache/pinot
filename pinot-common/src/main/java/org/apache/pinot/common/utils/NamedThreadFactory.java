@@ -53,6 +53,7 @@ public class NamedThreadFactory implements ThreadFactory {
   private final ThreadGroup _group;
   private final AtomicInteger _threadNumber = new AtomicInteger(1);
   private final String _threadNamePrefix;
+  private final boolean _daemon;
 
   /**
    * Creates a new {@link NamedThreadFactory} instance
@@ -60,10 +61,21 @@ public class NamedThreadFactory implements ThreadFactory {
    * @param threadNamePrefix the name prefix assigned to each thread created.
    */
   public NamedThreadFactory(String threadNamePrefix) {
+    this(threadNamePrefix, false);
+  }
+
+  /**
+   * Creates a new {@link NamedThreadFactory} instance
+   *
+   * @param threadNamePrefix the name prefix assigned to each thread created.
+   * @param daemon if true, creates daemon threads
+   */
+  public NamedThreadFactory(String threadNamePrefix, boolean daemon) {
     final SecurityManager s = System.getSecurityManager();
     _group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
     _threadNamePrefix =
-        String.format(NAME_PATTERN, checkPrefix(threadNamePrefix), THREAD_POOL_NUMBER.getAndIncrement());
+            String.format(NAME_PATTERN, checkPrefix(threadNamePrefix), THREAD_POOL_NUMBER.getAndIncrement());
+    _daemon = daemon;
   }
 
   private static String checkPrefix(String prefix) {
@@ -78,7 +90,7 @@ public class NamedThreadFactory implements ThreadFactory {
   public Thread newThread(Runnable r) {
     final Thread t =
         new Thread(_group, r, String.format("%s-%d", _threadNamePrefix, _threadNumber.getAndIncrement()), 0);
-    t.setDaemon(false);
+    t.setDaemon(_daemon);
     t.setPriority(Thread.NORM_PRIORITY);
     return t;
   }

@@ -53,6 +53,8 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.core.data.manager.SegmentOperationsTaskContext;
+import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.DedupContext;
@@ -94,7 +96,6 @@ import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
-import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
@@ -1010,7 +1011,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private boolean startSegmentCommit() {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
-        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason);
+        .withNumRows(_numRowsIndexed).withInstanceId(_instanceId).withReason(_stopReason);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -1082,21 +1083,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /**
    * Returns the {@link ConsumerPartitionState} for the partition group.
    */
-  public Map<String, ConsumerPartitionState> getConsumerPartitionState() {
+  public Map<String, ConsumerPartitionState> getConsumerPartitionState(
+      @Nullable StreamPartitionMsgOffset latestMsgOffset) {
     String partitionGroupId = String.valueOf(_partitionGroupId);
-    return Collections.singletonMap(partitionGroupId, new ConsumerPartitionState(partitionGroupId, getCurrentOffset(),
-        getLastConsumedTimestamp(), fetchLatestStreamOffset(5_000), _lastRowMetadata));
-  }
-
-  /**
-   * Returns the {@link PartitionLagState} for the partition group.
-   */
-  public Map<String, PartitionLagState> getPartitionToLagState(
-      Map<String, ConsumerPartitionState> consumerPartitionStateMap) {
-    if (_partitionMetadataProvider == null) {
-      createPartitionMetadataProvider("Get Partition Lag State");
-    }
-    return _partitionMetadataProvider.getCurrentPartitionLagState(consumerPartitionStateMap);
+    return Collections.singletonMap(partitionGroupId,
+        new ConsumerPartitionState(partitionGroupId, getCurrentOffset(), getLastConsumedTimestamp(), latestMsgOffset,
+            _lastRowMetadata));
   }
 
   /**
@@ -1117,6 +1109,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public StreamPartitionMsgOffset getCurrentOffset() {
     return _currentOffset;
+  }
+
+  public String getTableStreamName() {
+    return _tableStreamName;
+  }
+
+  public int getStreamPartitionId() {
+    return _streamPartitionId;
+  }
+
+  public StreamConsumerFactory getStreamConsumerFactory() {
+    return _streamConsumerFactory;
   }
 
   @Nullable
@@ -1293,7 +1297,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
-        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
+        .withNumRows(_numRowsIndexed).withInstanceId(_instanceId);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -1306,7 +1310,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
-        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason)
+        .withNumRows(_numRowsIndexed).withInstanceId(_instanceId).withReason(_stopReason)
         .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
         .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
         .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
@@ -1436,12 +1440,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } while (!_shouldStop);
   }
 
+  public StreamMetadataProvider getPartitionMetadataProvider() {
+    return _partitionMetadataProvider;
+  }
+
   protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
     // Post segmentConsumed to current leader.
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withStreamPartitionMsgOffset(_currentOffset.toString()).withSegmentName(_segmentNameStr)
-        .withReason(_stopReason).withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
+        .withReason(_stopReason).withNumRows(_numRowsIndexed).withInstanceId(_instanceId);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -1502,6 +1510,23 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
           // Allow to catch up upto final offset, and then replace.
           if (_currentOffset.compareTo(endOffset) > 0) {
+            // For partial-upsert tables or upserts with out-of-order events enabled, force-committing
+            // consuming segments is disabled. In certain cases (especially when replication > 1),
+            // the server that has consumed fewer rows may be incorrectly selected as the winner.
+            // This causes other servers to reconsume rows, which can lead to inconsistent data
+            // when previous states must be referenced to add or update rows.
+            // In these scenarios, the record location stored in the metadata can become stale or
+            // incorrect. Primary keys may be treated as new instead of being merged with existing
+            // entries, and records that should have been dropped during reconsumption may not be
+            // dropped at all.
+            if (_realtimeTableDataManager.isUpsertEnabled()
+                && _realtimeTableDataManager.getTableUpsertMetadataManager() != null) {
+              UpsertContext context = _realtimeTableDataManager.getTableUpsertMetadataManager().getContext();
+              if (_realtimeTableDataManager.isPartialUpsertEnabled() || context.isDropOutOfOrderRecord()
+                  || context.getOutOfOrderRecordColumn() != null) {
+                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_AHEAD_OF_ZK, 1L);
+              }
+            }
             // We moved ahead of the offset that is committed in ZK.
             _segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace",
                 _currentOffset, endOffset);
@@ -1610,7 +1635,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   public void startConsumption() {
-    _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
+    Runnable consumer =
+        SegmentOperationsTaskContext.wrap(new PartitionConsumer(), SegmentOperationsTaskType.CONSUMER,
+            _tableNameWithType);
+    _consumerThread = new Thread(consumer, _segmentNameStr);
     _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this);
     _consumerThread.start();
   }
@@ -1854,8 +1882,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     //     TODO: Revisit the non-pauseless handling
     if (_partitionUpsertMetadataManager != null) {
       UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
-      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit()
-          || upsertContext.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
+      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit() || (
+          upsertContext.getUpsertMode() != UpsertConfig.Mode.PARTIAL && !upsertContext.isDropOutOfOrderRecord()
+              && upsertContext.getOutOfOrderRecordColumn() == null)) {
         return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
       }
       return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY
@@ -1896,41 +1925,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   @Nullable
-  public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
-    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
+  private StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
+    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
   }
 
   @Nullable
-  public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
-    return fetchLatestStreamOffset(maxWaitTimeMs, false);
-  }
-
-  @Nullable
-  public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
-    return fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
-  }
-
-  @Nullable
-  public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs) {
-    return fetchEarliestStreamOffset(maxWaitTimeMs, false);
-  }
-
-  @Nullable
-  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs,
-      boolean useDebugLog) {
+  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs) {
     if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("Fetch latest stream offset");
     }
     try {
       return _partitionMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
     } catch (Exception e) {
-      String logMessage = "Cannot fetch stream offset with criteria " + offsetCriteria + " for clientId " + _clientId
-          + " and partitionGroupId " + _partitionGroupId + " with maxWaitTime " + maxWaitTimeMs;
-      if (!useDebugLog) {
-        _segmentLogger.warn(logMessage, e);
-      } else {
-        _segmentLogger.debug(logMessage, e);
-      }
+      _segmentLogger.warn(
+          "Cannot fetch stream offset with criteria {} for clientId {} and partitionGroupId {} with maxWaitTime {}",
+          offsetCriteria, _clientId, _partitionGroupId, maxWaitTimeMs, e);
     }
     return null;
   }
@@ -2043,7 +2052,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (metadata != null) {
       try {
         _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId,
-            metadata.getRecordIngestionTimeMs(), metadata.getOffset());
+            metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset());
       } catch (Exception e) {
         _segmentLogger.warn("Failed to update the ingestion metrics", e);
       }
@@ -2056,7 +2065,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
-    _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, null);
+    _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, currentTimeMs,
+        null);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

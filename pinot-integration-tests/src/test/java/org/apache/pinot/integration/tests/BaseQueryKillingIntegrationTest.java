@@ -77,7 +77,7 @@ public abstract class BaseQueryKillingIntegrationTest extends BaseClusterIntegra
       "SET sortAggregateSingleThreadedNumSegmentsThreshold=10000; SET sortAggregateLimitThreshold=3000001; "
           + "SELECT DISTINCT_COUNT_HLL(intDimSV1, 14), stringDimSV2 FROM mytable GROUP BY 2 ORDER BY 2 LIMIT 3000000";
 
-  protected static final String AGGREGATE_QUERY = "SELECT DISTINCT_COUNT_HLL(intDimSV1, 14) FROM mytable";
+  protected static final String AGGREGATE_QUERY = "SELECT MIN(intDimSV1) FROM mytable";
   protected static final String SELECT_STAR_QUERY = "SELECT * FROM mytable LIMIT 5";
 
   @BeforeClass

@@ -35,6 +35,7 @@ import org.apache.parquet.io.ColumnIOFactory;
 import org.apache.parquet.io.MessageColumnIO;
 import org.apache.parquet.schema.MessageType;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
@@ -94,8 +95,6 @@ public class ParquetNativeRecordReader implements RecordReader {
       return false;
     }
     if (_pageReadStore.getRowCount() - _currentPageIdx >= 1) {
-      // System.out.println("_pageReadStore.getRowCount() = " + _pageReadStore.getRowCount() + ", _currentPageIdx = "
-      // + _currentPageIdx);
       return true;
     }
     try {
@@ -114,7 +113,13 @@ public class ParquetNativeRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    _nextRecord = _parquetRecordReader.read();
+    // Record fetch: read next record from Parquet page.
+    try {
+      _nextRecord = _parquetRecordReader.read();
+    } catch (Exception e) {
+      throw new RecordFetchException("Failed to read next Parquet native record", e);
+    }
+    // Data parsing: extract into GenericRow.
     _recordExtractor.extract(_nextRecord, reuse);
     _currentPageIdx++;
     return reuse;

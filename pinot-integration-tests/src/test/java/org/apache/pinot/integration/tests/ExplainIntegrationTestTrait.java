@@ -41,7 +41,7 @@ public interface ExplainIntegrationTestTrait {
   default void explainLogical(@Language("sql") String query, String expected, Map<String, String> queryOptions) {
     try {
       String extraOptions = queryOptions.entrySet().stream()
-          .map(entry -> "SET " + entry.getKey() + "=" + entry.getValue() + ";\n")
+          .map(entry -> "SET " + entry.getKey() + "='" + entry.getValue() + "';\n")
           .collect(Collectors.joining());
       JsonNode jsonNode = postQuery(extraOptions + "explain plan without implementation for " + query);
       if (!jsonNode.get("exceptions").isEmpty()) {

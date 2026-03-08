@@ -30,12 +30,12 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.genericrow.AdaptiveSizeBasedWriter;
 import org.apache.pinot.core.segment.processing.genericrow.FileWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
@@ -43,9 +43,11 @@ import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformerUtils;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
@@ -65,6 +67,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SegmentMapper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMapper.class);
+  private final ThrottledLogger _throttledLogger;
   private final SegmentProcessorConfig _processorConfig;
   private final File _mapperOutputDir;
   private final List<FieldSpec> _fieldSpecs;
@@ -114,14 +117,10 @@ public class SegmentMapper {
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled();
     _transformPipeline = transformPipeline;
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
-    List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
-    int numPartitioners = partitionerConfigs.size();
-    _partitioners = new Partitioner[numPartitioners];
-    for (int i = 0; i < numPartitioners; i++) {
-      _partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
-    }
+    _partitioners = PartitionerFactory.getPartitioners(processorConfig.getPartitionerConfigs());
     // Time partition + partition from partitioners
-    _partitionsBuffer = new String[numPartitioners + 1];
+    _partitionsBuffer = new String[_partitioners.length + 1];
+    _throttledLogger = new ThrottledLogger(LOGGER, tableConfig.getIngestionConfig());
 
     LOGGER.info("Initialized mapper with {} record readers, output dir: {}, timeHandler: {}, partitioners: {}",
         _recordReaderFileConfigs.size(), _mapperOutputDir, _timeHandler.getClass(),
@@ -180,16 +179,23 @@ public class SegmentMapper {
   }
 
 
-//   Returns true if the map phase can continue, false if it should terminate based on the configured threshold for
-//   intermediate file size during map phase.
+  // Returns true if the map phase can continue, false if it should terminate based on the configured threshold for
+  // intermediate file size during map phase.
   protected boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse, Consumer<Object> observer,
       int count, int totalCount) {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
 
-    boolean continueOnError =
-        _processorConfig.getTableConfig().getIngestionConfig() != null && _processorConfig.getTableConfig()
-            .getIngestionConfig().isContinueOnError();
+    boolean continueOnError = false;
+    // skip short-circuiting if maxConsecutiveRecordFetchFailuresAllowed is not explicitly set
+    int maxConsecutiveRecordFetchFailuresAllowed = 0;
+    IngestionConfig ingestionConfig = _processorConfig.getTableConfig().getIngestionConfig();
+    if (ingestionConfig != null) {
+      continueOnError = ingestionConfig.isContinueOnError();
+      maxConsecutiveRecordFetchFailuresAllowed =
+          ingestionConfig.getMaxConsecutiveRecordFetchFailuresAllowed();
+    }
 
+    int consecutiveFetchFailures = 0;
     while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
       try {
         reuse = recordReader.next(reuse);
@@ -200,19 +206,38 @@ public class SegmentMapper {
         _incompleteRowsFound += result.getIncompleteRowCount();
         _skippedRowsFound += result.getSkippedRowCount();
         _sanitizedRowsFound += result.getSanitizedRowCount();
+        // Reset consecutive fetch failures counter on successful read
+        consecutiveFetchFailures = 0;
       } catch (Exception e) {
-        String logMessage = "Caught exception while reading data.";
+        boolean isFetchError = e instanceof RecordFetchException;
+        String errorType = isFetchError ? "fetch" : "parse";
+        String logMessage = String.format("Caught %s exception while reading data.", errorType);
         observer.accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()
             .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.ERROR)
             .withStatus(logMessage + " Reason: " + e.getMessage())
             .build());
         if (!continueOnError) {
           throw new RuntimeException(logMessage, e);
+        } else if (isFetchError && maxConsecutiveRecordFetchFailuresAllowed > 0) {
+          consecutiveFetchFailures++;
+          LOGGER.debug("{} Consecutive fetch failures: {}", consecutiveFetchFailures, logMessage, e);
+          if (consecutiveFetchFailures >= maxConsecutiveRecordFetchFailuresAllowed) {
+            String warningMessage = String.format(
+                "Stopping at record reader %d out of %d due to %d consecutive fetch failures. "
+                    + "This may indicate the reader is stuck and unable to advance. Last error: %s",
+                count, totalCount, consecutiveFetchFailures, e.getMessage());
+            observer.accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()
+                .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.WARN)
+                .withStatus(warningMessage)
+                .build());
+            LOGGER.warn(warningMessage, e);
+            throw new RuntimeException(warningMessage, e);
+          }
         } else {
-          LOGGER.debug(logMessage, e);
-          _incompleteRowsFound++;
-          continue;
+          // Parse error - log and continue without counting toward threshold
+          _throttledLogger.warn(logMessage + "Processing RecordReader " + count + " out of " + totalCount, e);
         }
+        _incompleteRowsFound++;
       }
       reuse.clear();
     }

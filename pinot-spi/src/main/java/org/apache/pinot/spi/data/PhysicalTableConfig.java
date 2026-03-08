@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -26,4 +27,18 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  * This is empty by design and more docs would be added as features are added.
  */
 public class PhysicalTableConfig extends BaseJsonConfig {
+  @JsonProperty("multiCluster")
+  private final boolean _isMultiCluster;
+
+  public PhysicalTableConfig() {
+    this(false);
+  }
+
+  public PhysicalTableConfig(boolean isMultiCluster) {
+    _isMultiCluster = isMultiCluster;
+  }
+
+  public boolean isMultiCluster() {
+    return _isMultiCluster;
+  }
 }

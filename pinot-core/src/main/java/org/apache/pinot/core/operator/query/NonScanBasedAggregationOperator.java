@@ -53,6 +53,7 @@ import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -248,36 +249,42 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
       case INT:
         IntOpenHashSet intSet = new IntOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           intSet.add(dictionary.getIntValue(dictId));
         }
         return intSet;
       case LONG:
         LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           longSet.add(dictionary.getLongValue(dictId));
         }
         return longSet;
       case FLOAT:
         FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           floatSet.add(dictionary.getFloatValue(dictId));
         }
         return floatSet;
       case DOUBLE:
         DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           doubleSet.add(dictionary.getDoubleValue(dictId));
         }
         return doubleSet;
       case STRING:
         ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           stringSet.add(dictionary.getStringValue(dictId));
         }
         return stringSet;
       case BYTES:
         ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
           bytesSet.add(new ByteArray(dictionary.getBytesValue(dictId)));
         }
         return bytesSet;
@@ -290,6 +297,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     HyperLogLog hll = new HyperLogLog(log2m);
     int length = dictionary.length();
     for (int i = 0; i < length; i++) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
       hll.offer(dictionary.get(i));
     }
     return hll;
@@ -299,6 +307,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     UltraLogLog ull = UltraLogLog.create(p);
     int length = dictionary.length();
     for (int i = 0; i < length; i++) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
       Object value = dictionary.get(i);
       UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
     }
@@ -309,6 +318,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     HyperLogLogPlus hllPlus = new HyperLogLogPlus(p, sp);
     int length = dictionary.length();
     for (int i = 0; i < length; i++) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
       hllPlus.offer(dictionary.get(i));
     }
     return hllPlus;
@@ -319,9 +329,11 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     if (dictionary.getValueType() == DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLog
       try {
+        QueryThreadContext.checkTerminationAndSampleUsage(EXPLAIN_NAME);
         HyperLogLog hll = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           hll.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return hll;
@@ -338,9 +350,11 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     if (dictionary.getValueType() == DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLogPlus
       try {
+        QueryThreadContext.checkTerminationAndSampleUsage(EXPLAIN_NAME);
         HyperLogLogPlus hllplus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           hllplus.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return hllplus;
@@ -361,6 +375,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
       return getDistinctValueSet(dictionary);
     }
   }
+
   private static Object getDistinctCountSmartHLLPlusResult(Dictionary dictionary,
       DistinctCountSmartHLLPlusAggregationFunction function) {
     if (dictionary.length() > function.getThreshold()) {
@@ -376,9 +391,11 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     if (dictionary.getValueType() == DataType.BYTES) {
       // Treat BYTES value as serialized UltraLogLog and merge
       try {
+        QueryThreadContext.checkTerminationAndSampleUsage(EXPLAIN_NAME);
         UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, EXPLAIN_NAME);
           ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return ull;

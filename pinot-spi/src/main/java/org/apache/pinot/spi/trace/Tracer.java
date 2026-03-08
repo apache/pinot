@@ -26,12 +26,9 @@ package org.apache.pinot.spi.trace;
 public interface Tracer {
 
   /**
-   * Registers the requestId on the current thread. This means the request will be traced.
-   * TODO: Consider using string id or random id. Currently different broker might send query with the same request id.
-   *
-   * @param requestId the requestId
+   * Registers the current thread for tracing.
    */
-  void register(long requestId);
+  void register();
 
   /**
    * Detach a trace from the current thread.

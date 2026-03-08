@@ -126,7 +126,7 @@ export const App = () => {
   const componentRender = (Component, props, role) => {
     return (
       <div className="p-8">
-        <Layout clusterName={clusterName} {...props} role={role}>
+        <Layout clusterName={clusterName} {...props} role={role} authWorkflow={authWorkflow}>
           <Component {...props} />
         </Layout>
       </div>

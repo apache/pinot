@@ -28,25 +28,36 @@ import ZookeeperIcon from './SvgIcons/ZookeeperIcon';
 import app_state from '../app_state';
 import AccountCircleOutlinedIcon from '@material-ui/icons/AccountCircleOutlined';
 
-let navigationItems = [
+const BASE_NAVIGATION_ITEMS = [
   { id: 1, name: 'Cluster Manager', link: '/', icon: <ClusterManagerIcon /> },
   { id: 2, name: 'Query Console', link: '/query', icon: <QueryConsoleIcon /> },
-  { id: 3, name: 'Zookeeper Browser', link: '/zookeeper', icon: <ZookeeperIcon /> },
   { id: 4, name: 'Swagger REST API', link: 'help', target: '_blank', icon: <SwaggerIcon /> }
 ];
 
 const Layout = (props) => {
   const role = props.role;
-  if(role === 'ADMIN'){
-    if(navigationItems.length <5){
-      navigationItems = [
-        ...navigationItems,
-        {id: 5, name: "User Console", link: '/user', icon: <AccountCircleOutlinedIcon style={{ width: 24, height: 24, verticalAlign: 'sub' }}/>}
-      ]
+  const navigationItems = React.useMemo(() => {
+    // IMPORTANT: do not mutate a module-level array here. Layout can re-render many times,
+    // and mutation would duplicate entries in the sidebar.
+    if (props.authWorkflow === 'NONE') {
+      return [
+        ...BASE_NAVIGATION_ITEMS,
+        { id: 3, name: 'Zookeeper Browser', link: '/zookeeper', icon: <ZookeeperIcon /> }
+      ];
     }
-  }
+    if (role === 'ADMIN') {
+      return [
+        ...BASE_NAVIGATION_ITEMS,
+        { id: 3, name: 'Zookeeper Browser', link: '/zookeeper', icon: <ZookeeperIcon /> },
+        { id: 5, name: 'User Console', link: '/user',
+          icon: <AccountCircleOutlinedIcon style={{ width: 24, height: 24, verticalAlign: 'sub' }} /> }
+      ];
+    }
+    return BASE_NAVIGATION_ITEMS;
+  }, [props.authWorkflow, role]);
+
   const hash = `/${window.location.hash.split('/')[1]}`;
-  const routeObj = navigationItems.find((obj)=>{ return obj.link === hash;});
+  const routeObj = navigationItems.find((obj) => obj.link === hash);
 
   const [selectedId, setSelectedId] = React.useState(routeObj?.id || 1);
   const sidebarOpenState = !(localStorage.getItem('pinot_ui:sidebarState') === 'false');
@@ -58,7 +69,7 @@ const Layout = (props) => {
     }
     if (app_state.hideQueryConsoleTab) {
       return navigationItems.filter((navItem) => navItem.link !== '/query');
-  }
+    }
 
     return navigationItems;
   }, [navigationItems, app_state.queryConsoleOnlyView, app_state.hideQueryConsoleTab]);

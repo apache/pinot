@@ -77,6 +77,7 @@ public class UnionAllOperator extends SetOperator {
           return block;
         }
       } else if (block.isData()) {
+        checkTerminationAndSampleUsage();
         return block;
       }
     }

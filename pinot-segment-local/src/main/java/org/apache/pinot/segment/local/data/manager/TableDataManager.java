@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.data.manager;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import java.io.File;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -32,9 +33,11 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -52,11 +55,18 @@ public interface TableDataManager {
   /**
    * Initializes the table data manager. Should be called only once and before calling any other method.
    */
-  void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
-      TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
-      ExecutorService segmentReloadRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
+  void init(InstanceDataManagerConfig instanceDataManagerConfig,
+      HelixManager helixManager,
+      SegmentLocks segmentLocks,
+      TableConfig tableConfig,
+      Schema schema,
+      SegmentReloadSemaphore segmentReloadSemaphore,
+      ExecutorService segmentReloadRefreshExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, boolean enableAsyncSegmentRefresh);
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
+      boolean enableAsyncSegmentRefresh,
+      ServerReloadJobStatusCache reloadJobStatusCache);
 
   /**
    * Returns the instance id of the server.
@@ -191,19 +201,19 @@ public interface TableDataManager {
    * This operation is conducted within a failure handling framework and made transparent to ongoing queries, because
    * the segment is in online serving state.
    */
-  void reloadSegment(String segmentName, boolean forceDownload)
+  void reloadSegment(String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
    * Reloads all segments.
    */
-  void reloadAllSegments(boolean forceDownload)
+  void reloadAllSegments(boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
    * Reloads a list of segments.
    */
-  void reloadSegments(List<String> segmentNames, boolean forceDownload)
+  void reloadSegments(List<String> segmentNames, boolean forceDownload, String reloadJobId)
       throws Exception;
 
   /**
@@ -350,4 +360,26 @@ public interface TableDataManager {
    * @return List of {@link StaleSegment} with segment names and reason why it is stale
    */
   List<StaleSegment> getStaleSegments();
+
+  /**
+   * Returns whether upsert is enabled for this table.
+   */
+  default boolean isUpsertEnabled() {
+    return false;
+  }
+
+  /**
+   * Returns the table upsert metadata manager if upsert is enabled, null otherwise.
+   */
+  @Nullable
+  default TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return null;
+  }
+
+  /**
+   * Returns a mapping of partition id to primary key count. Supports both upsert and dedup enabled tables.
+   */
+  default Map<Integer, Long> getPartitionToPrimaryKeyCount() {
+    return Collections.emptyMap();
+  }
 }

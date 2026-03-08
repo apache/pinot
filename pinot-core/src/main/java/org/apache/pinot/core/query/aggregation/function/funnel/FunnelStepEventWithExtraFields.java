@@ -40,7 +40,8 @@ public class FunnelStepEventWithExtraFields implements Comparable<FunnelStepEven
   public FunnelStepEventWithExtraFields(byte[] bytes) {
     _funnelStepEvent = new FunnelStepEvent(Arrays.copyOf(bytes, FunnelStepEvent.SIZE_IN_BYTES));
     try {
-      _extraFields = OBJECT_MAPPER.readValue(bytes, 2, bytes.length, new TypeReference<List<Object>>() {
+      int offset = FunnelStepEvent.SIZE_IN_BYTES;
+      _extraFields = OBJECT_MAPPER.readValue(bytes, offset, bytes.length - offset, new TypeReference<List<Object>>() {
       });
     } catch (IOException e) {
       throw new RuntimeException("Caught exception while converting byte[] to FunnelStepEventWithExtraFields", e);

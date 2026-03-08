@@ -24,7 +24,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
@@ -53,16 +52,16 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
       throws Exception {
     LOGGER.info("Starting testDecreasePartitions");
     LOGGER.info("Creating Kafka topic with {} partitions", NUM_PARTITIONS + 2);
-    _kafkaStarters.get(0).createTopic(KAFKA_TOPIC, KafkaStarterUtils.getTopicCreationProps(NUM_PARTITIONS + 2));
+    createKafkaTopic(KAFKA_TOPIC, NUM_PARTITIONS + 2);
     String tableName = createTable();
     waitForNumSegmentsInDesiredStateInEV(tableName, CONSUMING, NUM_PARTITIONS + 2, TableType.REALTIME);
 
     pauseTable(tableName);
 
     LOGGER.info("Deleting Kafka topic");
-    _kafkaStarters.get(0).deleteTopic(KAFKA_TOPIC);
+    deleteKafkaTopic(KAFKA_TOPIC);
     LOGGER.info("Creating Kafka topic with {} partitions", NUM_PARTITIONS);
-    _kafkaStarters.get(0).createTopic(KAFKA_TOPIC, KafkaStarterUtils.getTopicCreationProps(NUM_PARTITIONS));
+    createKafkaTopic(KAFKA_TOPIC, NUM_PARTITIONS);
 
     resumeTable(tableName);
     waitForNumSegmentsInDesiredStateInEV(tableName, CONSUMING, NUM_PARTITIONS, TableType.REALTIME);

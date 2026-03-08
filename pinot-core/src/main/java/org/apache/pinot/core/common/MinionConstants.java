@@ -92,6 +92,11 @@ public class MinionConstants {
    */
   public static final String SEGMENT_DOWNLOAD_PARALLELISM = "segmentDownloadParallelism";
 
+  /** Valid doc ids consensus mode (executor-only). Kept internal; executors pass config string. */
+  public enum ValidDocIdsConsensusMode {
+    UNSAFE, EQUAL, MOST_VALID_DOCS
+  }
+
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
     public static final String TASK_TYPE = "PurgeTask";
@@ -257,6 +262,16 @@ public class MinionConstants {
      * number of segments to query in one batch to fetch valid doc id metadata, by default 500
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
+
+    /**
+     * Valid doc ids consensus mode used by the executor only (generator unchanged). Values: UNSAFE, EQUAL,
+     * MOST_VALID_DOCS. UNSAFE = use first server with matching CRC and READY; EQUAL = require all replicas
+     * to have the same valid doc set (default); MOST_VALID_DOCS = use replica with most valid docs.
+     */
+    public static final String VALID_DOC_IDS_CONSENSUS_MODE_KEY = "validDocIdsConsensusMode";
+
+    /** Default: equal valid doc set consensus across replicas. */
+    public static final String DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE = "EQUAL";
   }
 
   public static class UpsertCompactMergeTask {
@@ -315,6 +330,18 @@ public class MinionConstants {
      * default maximum number of segments to process in a single task
      */
     public static final long DEFAULT_MAX_NUM_SEGMENTS_PER_TASK = 10;
+
+    /**
+     * minimum number of segments to process in a single task
+     */
+    public static final String MIN_NUM_SEGMENTS_PER_TASK_KEY = "minNumSegmentsPerTask";
+
+    /**
+     * default minimum number of segments to process in a single task.
+     * Keeping this default to 2 means that we won't run this task if there is only one segment which can be merged.
+     * If this is set to 1, this task can act as UpsertCompact task as well.
+     */
+    public static final long DEFAULT_MIN_NUM_SEGMENTS_PER_TASK = 2;
 
     public static final String MERGED_SEGMENTS_ZK_SUFFIX = ".mergedSegments";
 

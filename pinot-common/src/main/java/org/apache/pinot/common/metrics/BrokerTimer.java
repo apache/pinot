@@ -63,7 +63,9 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   AUDIT_REQUEST_PROCESSING_TIME(true),
   AUDIT_RESPONSE_PROCESSING_TIME(true),
   // The total time spent in processing the workload queries
-  WORKLOAD_TOTAL_QUERY_TIME_MS(false);
+  WORKLOAD_TOTAL_QUERY_TIME_MS(false),
+  // Time taken for remote cluster broker to compute routing table
+  REMOTE_CLUSTER_BROKER_ROUTING_CALCULATION_TIME_MS(true);
 
   private final String _timerName;
   private final boolean _global;

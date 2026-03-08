@@ -78,8 +78,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private String _segmentName;
   private final Schema _schema;
   private long _crc = Long.MIN_VALUE;
+  private long _dataCrc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
   private long _zkCreationTime = Long.MIN_VALUE;  // ZooKeeper creation time for upsert consistency
+  private long _zkPushTime = Long.MIN_VALUE; // ZooKeeper push time for upsert consistency
   private String _timeColumn;
   private TimeUnit _timeUnit;
   private Duration _timeGranularity;
@@ -189,10 +191,15 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private void loadCreationMeta(File crcFile)
       throws IOException {
     if (crcFile.exists()) {
-      final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
-      _crc = ds.readLong();
-      _creationTime = ds.readLong();
-      ds.close();
+      try (DataInputStream ds = new DataInputStream(new FileInputStream(crcFile))) {
+        _crc = ds.readLong();
+        _creationTime = ds.readLong();
+        try {
+          _dataCrc = ds.readLong();
+        } catch (IOException e) {
+          LOGGER.debug("Could not find data crc, falling back to default LONG_MIN value");
+        }
+      }
     }
   }
 
@@ -201,6 +208,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     try (DataInputStream ds = new DataInputStream(crcFileInputStream)) {
       _crc = ds.readLong();
       _creationTime = ds.readLong();
+      try {
+        _dataCrc = ds.readLong();
+      } catch (IOException e) {
+        LOGGER.debug("Could not find data crc, falling back to default LONG_MIN value");
+      }
     }
   }
 
@@ -364,6 +376,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
+  public String getDataCrc() {
+    return String.valueOf(_dataCrc);
+  }
+
+  @Override
   public SegmentVersion getVersion() {
     return _segmentVersion;
   }
@@ -396,9 +413,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   /**
    * Returns the ZooKeeper creation time for upsert consistency.
-   * This refers to the time set by controller while creating the consuming segment. It is used to ensure consistent
-   * creation time across replicas for upsert operations.
-   * @return ZK creation time in milliseconds, or Long.MIN_VALUE if not set
+   * For REALTIME tables, this is set by the controller when the consuming segment is created, ensuring consistent
+   * creation time across replicas. For segments loaded from disk, this returns {@code Long.MIN_VALUE} until
+   * {@link #setZkCreationTime(long)} is explicitly called (e.g. from ZK metadata during segment loading).
+   * @return ZK creation time in milliseconds, or {@code Long.MIN_VALUE} if not explicitly set
    */
   public long getZkCreationTime() {
     return _zkCreationTime;
@@ -412,6 +430,24 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _zkCreationTime = zkCreationTime;
   }
 
+  /**
+   * Returns the ZooKeeper push time for upsert consistency.
+   * This refers to the time set by controller while pushing the segment. It is used to ensure consistent
+   * push time across replicas for upsert operations.
+   * @return ZK push time in milliseconds, or Long.MIN_VALUE if not set
+   */
+  public long getZkPushTime() {
+    return _zkPushTime;
+  }
+
+  /**
+   * Sets the ZooKeeper push time for upsert consistency.
+   * @param zkPushTime ZK push time in milliseconds
+   */
+  public void setZkPushTime(long zkPushTime) {
+    _zkPushTime = zkPushTime;
+  }
+
   @Override
   public long getLastIndexedTimestamp() {
     return Long.MIN_VALUE;
@@ -420,6 +456,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public long getLatestIngestionTimestamp() {
     return Long.MIN_VALUE;
+  }
+
+  @Override
+  public long getMinimumIngestionLagMs() {
+    return Long.MAX_VALUE;
   }
 
   @Nullable
@@ -467,6 +508,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     segmentMetadata.put("segmentName", _segmentName);
     segmentMetadata.put("schemaName", _schema != null ? _schema.getSchemaName() : null);
     segmentMetadata.put("crc", _crc);
+    if (_dataCrc != Long.MIN_VALUE) {
+      segmentMetadata.put("dataCrc", _dataCrc);
+    }
     segmentMetadata.put("creationTimeMillis", _creationTime);
     TimeZone timeZone = TimeZone.getTimeZone("UTC");
     DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");

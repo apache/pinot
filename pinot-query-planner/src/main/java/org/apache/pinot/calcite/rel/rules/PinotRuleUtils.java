@@ -139,9 +139,9 @@ public class PinotRuleUtils {
     // Supported window functions
     // OTHER_FUNCTION supported are: BOOL_AND, BOOL_OR
     private static final EnumSet<SqlKind> SUPPORTED_WINDOW_FUNCTION_KIND =
-        EnumSet.of(SqlKind.SUM, SqlKind.SUM0, SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.ROW_NUMBER, SqlKind.RANK,
-            SqlKind.DENSE_RANK, SqlKind.NTILE, SqlKind.LAG, SqlKind.LEAD, SqlKind.FIRST_VALUE, SqlKind.LAST_VALUE,
-            SqlKind.OTHER_FUNCTION);
+        EnumSet.of(SqlKind.SUM, SqlKind.SUM0, SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.AVG, SqlKind.ROW_NUMBER,
+            SqlKind.RANK, SqlKind.DENSE_RANK, SqlKind.NTILE, SqlKind.LAG, SqlKind.LEAD, SqlKind.FIRST_VALUE,
+            SqlKind.LAST_VALUE, SqlKind.OTHER_FUNCTION);
 
     public static void validateWindows(Window window) {
       int numGroups = window.groups.size();

@@ -34,7 +34,7 @@ import org.apache.hc.core5.util.Timeout;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.audit.AuditLogFilter;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;

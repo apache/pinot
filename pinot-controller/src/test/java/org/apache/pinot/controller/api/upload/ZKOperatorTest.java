@@ -159,6 +159,7 @@ public class ZKOperatorTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(segmentName);
     when(segmentMetadata.getCrc()).thenReturn("12345");
+    when(segmentMetadata.getDataCrc()).thenReturn("432");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
 
@@ -200,6 +201,7 @@ public class ZKOperatorTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn("12345");
+    when(segmentMetadata.getDataCrc()).thenReturn("432");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
 
@@ -331,6 +333,7 @@ public class ZKOperatorTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn("12345");
+    when(segmentMetadata.getDataCrc()).thenReturn("432");
     zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
         "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
 

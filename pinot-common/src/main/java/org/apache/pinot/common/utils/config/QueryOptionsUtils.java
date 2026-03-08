@@ -41,7 +41,6 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOv
  * Utils to parse query options.
  */
 public class QueryOptionsUtils {
-
   private QueryOptionsUtils() {
   }
 
@@ -112,6 +111,14 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static String getTableSampler(@Nullable Map<String, String> queryOptions) {
+    if (queryOptions == null || queryOptions.isEmpty()) {
+      return null;
+    }
+    return queryOptions.get(QueryOptionKey.TABLE_SAMPLER);
+  }
+
+  @Nullable
   public static Long getExtraPassiveTimeoutMs(Map<String, String> queryOptions) {
     String extraPassiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
     return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, extraPassiveTimeoutMsString, 0);
@@ -165,6 +172,10 @@ public class QueryOptionsUtils {
   public static boolean isCollectGcStats(Map<String, String> queryOptions) {
     // Disabled by default
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.COLLECT_GC_STATS));
+  }
+
+  public static String getQueryHash(Map<String, String> queryOptions) {
+    return queryOptions.getOrDefault(QueryOptionKey.QUERY_HASH, CommonConstants.Broker.DEFAULT_QUERY_HASH);
   }
 
   @Nullable
@@ -471,6 +482,11 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
+  public static boolean isMultiClusterRoutingEnabled(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
   public static boolean isUseLiteMode(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.USE_LITE_MODE);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
@@ -590,5 +606,18 @@ public class QueryOptionsUtils {
   public static Integer getRegexDictSizeThreshold(Map<String, String> queryOptions) {
     String regexDictSizeThreshold = queryOptions.get(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD);
     return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
+  }
+
+  public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
+    String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
+    if (sortExchangeCopyThreshold != null) {
+      try {
+        return Integer.parseInt(sortExchangeCopyThreshold);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(String.format("%s must be an integer, got: %s",
+            QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD, sortExchangeCopyThreshold));
+      }
+    }
+    return i;
   }
 }

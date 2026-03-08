@@ -22,13 +22,17 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -36,6 +40,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.glassfish.grizzly.http.server.Request;
@@ -56,12 +61,20 @@ import static org.testng.Assert.assertFalse;
 
 public class PinotClientRequestTest {
 
-  @Mock private SqlQueryExecutor _sqlQueryExecutor;
-  @Mock private BrokerRequestHandler _requestHandler;
-  @Mock private BrokerMetrics _brokerMetrics;
-  @Mock private Executor _executor;
-  @Mock private HttpClientConnectionManager _httpConnMgr;
-  @InjectMocks private PinotClientRequest _pinotClientRequest;
+  @Mock
+  private SqlQueryExecutor _sqlQueryExecutor;
+  @Mock
+  private BrokerRequestHandler _requestHandler;
+  @Mock
+  private BrokerMetrics _brokerMetrics;
+  @Mock
+  private Executor _executor;
+  @Mock
+  private HttpClientConnectionManager _httpConnMgr;
+  @Mock
+  private HttpHeaders _httpHeaders;
+  @InjectMocks
+  private PinotClientRequest _pinotClientRequest;
 
   @BeforeMethod
   public void setUp() {
@@ -79,7 +92,8 @@ public class PinotClientRequestTest {
 
     // for successful query result the 'X-Pinot-Error-Code' should be -1
     BrokerResponse emptyResultBrokerResponse = BrokerResponseNative.EMPTY_RESULT;
-    Response successfulResponse = PinotClientRequest.getPinotQueryResponse(emptyResultBrokerResponse);
+    Response successfulResponse =
+        PinotClientRequest.getPinotQueryResponse(emptyResultBrokerResponse, _httpHeaders, _brokerMetrics);
     assertEquals(successfulResponse.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertTrue(successfulResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
     assertEquals(successfulResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(), 1);
@@ -87,11 +101,26 @@ public class PinotClientRequestTest {
 
     // for failed query result the 'X-Pinot-Error-Code' should be Error code fo exception.
     BrokerResponse tableDoesNotExistBrokerResponse = BrokerResponseNative.TABLE_DOES_NOT_EXIST;
-    Response tableDoesNotExistResponse = PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse);
+    Response tableDoesNotExistResponse =
+        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders, _brokerMetrics);
     assertEquals(tableDoesNotExistResponse.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertTrue(tableDoesNotExistResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
     assertEquals(tableDoesNotExistResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(), 1);
     assertEquals(tableDoesNotExistResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
+        QueryErrorCode.TABLE_DOES_NOT_EXIST.getId());
+
+    // for failed query result the response code should be corresponding http response code of the Error code if
+    // USE_HTTP_STATUS_FOR_ERRORS_HEADER is set to true.
+    when(_httpHeaders.getHeaderString(
+        CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER)).thenReturn("true");
+    Response tableDoesNotExistResponseWithHttpResponseCode =
+        PinotClientRequest.getPinotQueryResponse(tableDoesNotExistBrokerResponse, _httpHeaders, _brokerMetrics);
+    assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    Assert.assertTrue(
+        tableDoesNotExistResponseWithHttpResponseCode.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
+    assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(),
+        1);
+    assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
         QueryErrorCode.TABLE_DOES_NOT_EXIST.getId());
   }
 
@@ -201,5 +230,85 @@ public class PinotClientRequestTest {
 
     assertEquals(comparisonAnalysis.size(), 1);
     Assert.assertTrue(comparisonAnalysis.get(0).contains("Mismatch in number of rows returned"));
+  }
+
+  @Test
+  public void testGetQueryFingerprintSuccess() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    // single stage query
+    String requestJson = "{\"sql\": \"SELECT * FROM myTable WHERE id IN (1, 2, 3)\"}";
+    Response response = _pinotClientRequest.getQueryFingerprint(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    QueryFingerprint fingerprint = (QueryFingerprint) response.getEntity();
+    Assert.assertNotNull(fingerprint, "Valid Single-stage query should return a non-null QueryFingerprint object");
+    Assert.assertNotNull(fingerprint.getQueryHash(),
+        "Valid Single-stage query fingerprint should contain a non-null query hash");
+    Assert.assertNotNull(fingerprint.getFingerprint(),
+        "Valid Single-stage query fingerprint should contain a non-null SQL fingerprint");
+    assertEquals(fingerprint.getFingerprint(), "SELECT * FROM `myTable` WHERE `id` IN (?)",
+        "Valid Single-stage query fingerprint should normalize literals to placeholders");
+
+    // multi stage query
+    requestJson = "{\"sql\": \"SET useMultistageEngine=true; \\n"
+      + "SELECT * FROM table1 t1 LEFT JOIN table2 t2 ON t1.id = t2.id WHERE t1.col1 > 100\"}";
+    response = _pinotClientRequest.getQueryFingerprint(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    fingerprint = (QueryFingerprint) response.getEntity();
+    Assert.assertNotNull(fingerprint, "Valid Multi-stage query should return a non-null QueryFingerprint object");
+    Assert.assertNotNull(fingerprint.getQueryHash(),
+        "Valid Multi-stage query fingerprint should contain a non-null query hash");
+    Assert.assertNotNull(fingerprint.getFingerprint(),
+        "Valid Multi-stage query fingerprint should contain a non-null SQL fingerprint");
+    assertEquals(fingerprint.getFingerprint(),
+        "SELECT * FROM `table1` AS `t1` LEFT JOIN `table2` AS `t2` ON `t1`.`id` = `t2`.`id` WHERE `t1`.`col1` > ?",
+        "Valid Multi-stage query fingerprint should normalize literals and preserve JOIN structure");
+  }
+
+  @Test
+  public void testGetQueryFingerprintWithInvalidSql() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    String requestJson = "{\"sql\": \"INVALID SQL QUERY\"}";
+    Response response = _pinotClientRequest.getQueryFingerprint(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(),
+        "Invalid SQL query should return INTERNAL_SERVER_ERROR status");
+  }
+
+  @Test
+  public void testQueryResponseSizeMetric()
+      throws Exception {
+    // Create a broker response with some result data
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    DataSchema dataSchema = new DataSchema(new String[]{"col1", "col2"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{"value1", 100});
+    rows.add(new Object[]{"value2", 200});
+    brokerResponse.setResultTable(new ResultTable(dataSchema, rows));
+
+    // Get the response
+    Response response = PinotClientRequest.getPinotQueryResponse(brokerResponse, _httpHeaders, _brokerMetrics);
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+
+    // Write the response to capture the size
+    StreamingOutput streamingOutput = (StreamingOutput) response.getEntity();
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    streamingOutput.write(outputStream);
+
+    // Verify the metric was recorded with the correct size
+    long expectedSize = outputStream.size();
+    Assert.assertTrue(expectedSize > 0, "Response size should be greater than 0");
+
+    // Verify addMeteredGlobalValue was called with QUERY_RESPONSE_SIZE_BYTES and the correct size
+    ArgumentCaptor<Long> sizeCaptor = ArgumentCaptor.forClass(Long.class);
+    verify(_brokerMetrics).addMeteredGlobalValue(eq(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES), sizeCaptor.capture());
+    assertEquals(sizeCaptor.getValue().longValue(), expectedSize,
+        "Metric should record the actual response size in bytes");
   }
 }

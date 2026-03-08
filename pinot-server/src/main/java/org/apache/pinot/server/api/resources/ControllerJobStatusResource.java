@@ -23,7 +23,9 @@ import io.swagger.annotations.ApiOperation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -33,21 +35,30 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.server.starter.helix.SegmentReloadStatusValue;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 @Api(tags = "Tasks")
 @Path("/")
+@Singleton
 public class ControllerJobStatusResource {
 
+  private final ServerInstance _serverInstance;
+  private final ServerReloadJobStatusCache _serverReloadJobStatusCache;
+
   @Inject
-  private ServerInstance _serverInstance;
+  public ControllerJobStatusResource(ServerInstance serverInstance,
+      ServerReloadJobStatusCache serverReloadJobStatusCache) {
+    _serverInstance = serverInstance;
+    _serverReloadJobStatusCache = serverReloadJobStatusCache;
+  }
 
   @GET
   @Path("/controllerJob/reloadStatus/{tableNameWithType}")
@@ -55,7 +66,9 @@ public class ControllerJobStatusResource {
   @ApiOperation(value = "Task status", notes = "Return the status of a given reload job")
   public String reloadJobStatus(@PathParam("tableNameWithType") String tableNameWithType,
       @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp,
-      @QueryParam("segmentName") String segmentName, @Context HttpHeaders headers)
+      @QueryParam("segmentName") String segmentName,
+      @QueryParam("reloadJobId") String reloadJobId,
+      @Context HttpHeaders headers)
       throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     TableDataManager tableDataManager =
@@ -72,13 +85,24 @@ public class ControllerJobStatusResource {
       totalSegmentCount = targetSegments.size();
     }
     try {
-      long successCount = 0;
+      int successCount = 0;
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
           successCount++;
         }
       }
-      return JsonUtils.objectToString(new SegmentReloadStatusValue(totalSegmentCount, successCount));
+
+      ServerReloadStatusResponse response = new ServerReloadStatusResponse()
+          .setTotalSegmentCount(totalSegmentCount)
+          .setSuccessCount(successCount);
+
+      Optional.ofNullable(reloadJobId)
+          .map(_serverReloadJobStatusCache::getJobStatus)
+          .ifPresent(jobStatus -> response
+              .setFailureCount((long) jobStatus.getFailureCount())
+              .setSampleSegmentReloadFailures(jobStatus.getFailedSegmentDetails()));
+
+      return JsonUtils.objectToString(response);
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);

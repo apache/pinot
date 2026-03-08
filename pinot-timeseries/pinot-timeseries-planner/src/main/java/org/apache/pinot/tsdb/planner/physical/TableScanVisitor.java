@@ -36,6 +36,7 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.routing.TableRouteProvider;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -86,19 +87,20 @@ public class TableScanVisitor {
    * @param planNode The {@link BaseTimeSeriesPlanNode} to process.
    * @return The updated {@link BaseTimeSeriesPlanNode} with table type information.
    */
-  public BaseTimeSeriesPlanNode addTableTypeInfoToPlan(BaseTimeSeriesPlanNode planNode) {
+  public BaseTimeSeriesPlanNode addTableTypeInfoToPlan(BaseTimeSeriesPlanNode planNode, RequestContext requestContext) {
     if (planNode instanceof LeafTimeSeriesPlanNode) {
       LeafTimeSeriesPlanNode sfpNode = (LeafTimeSeriesPlanNode) planNode;
       TableRouteInfo routeInfo = _tableRouteProvider.getTableRouteInfo(sfpNode.getTableName(), _tableCache,
         _routingManager);
       String tableNameWithType = getTableNameWithType(routeInfo);
       Preconditions.checkNotNull(tableNameWithType, "Table not found for table name: " + sfpNode.getTableName());
+      requestContext.setTableName(tableNameWithType);
       return sfpNode.withTableName(tableNameWithType);
     }
 
     List<BaseTimeSeriesPlanNode> newInputs = new ArrayList<>();
     for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
-      newInputs.add(addTableTypeInfoToPlan(childNode));
+      newInputs.add(addTableTypeInfoToPlan(childNode, requestContext));
     }
     return planNode.withInputs(newInputs);
   }

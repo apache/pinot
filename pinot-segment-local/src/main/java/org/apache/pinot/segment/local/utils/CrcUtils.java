@@ -24,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.zip.Adler32;
@@ -35,50 +36,78 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("Duplicates")
 public class CrcUtils {
+  private CrcUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(CrcUtils.class);
   private static final int BUFFER_SIZE = 65536;
   private static final String CRC_FILE_EXTENSTION = ".crc";
+  private static final List<String> DATA_FILE_EXTENSIONS = Arrays.asList(".fwd", ".dict");
 
-  private final List<File> _files;
 
-  private CrcUtils(List<File> files) {
-    _files = files;
+  public static long computeCrc(File indexDir) throws IOException {
+    List<File> allNormalFiles = new ArrayList<>();
+    collectFiles(indexDir, allNormalFiles, false);
+    Collections.sort(allNormalFiles);
+    return crcForFiles(allNormalFiles);
   }
 
-  public static CrcUtils forAllFilesInFolder(File dir) {
-    List<File> normalFiles = new ArrayList<>();
-    getAllNormalFiles(dir, normalFiles);
-    Collections.sort(normalFiles);
-    return new CrcUtils(normalFiles);
+  public static long computeDataCrc(File indexDir) throws IOException {
+    List<File> dataFiles = new ArrayList<>();
+    collectFiles(indexDir, dataFiles, true);
+    Collections.sort(dataFiles);
+    return crcForFiles(dataFiles);
   }
 
   /**
-   * Helper method to get all normal (non-directory) files under a directory recursively.
+   * Helper method to get files in the directory to later compute CRC for them.
    * <p>NOTE: do not include the segment creation meta file.
+   * @param dir the directory to collect files from
+   * @param files the list to add collected files to
+   * @param dataFilesOnly if true, only collect data files (.fwd, .dict); if false, collect all normal files
    */
-  private static void getAllNormalFiles(File dir, List<File> normalFiles) {
-    File[] files = dir.listFiles();
-    Preconditions.checkNotNull(files);
-    for (File file : files) {
+  private static void collectFiles(File dir, List<File> files, boolean dataFilesOnly) {
+    File[] dirFiles = dir.listFiles();
+    Preconditions.checkNotNull(dirFiles);
+    for (File file : dirFiles) {
       if (file.isFile()) {
+        String fileName = file.getName();
         // Certain file systems, e.g. HDFS will create .crc files when perform data copy.
         // We should ignore both SEGMENT_CREATION_META and generated '.crc' files.
-        if (!file.getName().equals(V1Constants.SEGMENT_CREATION_META) && !file.getName()
-            .endsWith(CRC_FILE_EXTENSTION)) {
-          normalFiles.add(file);
+        if (!fileName.equals(V1Constants.SEGMENT_CREATION_META) && !fileName.endsWith(CRC_FILE_EXTENSTION)) {
+          if (dataFilesOnly) {
+            // Only add data files
+            if (isDataFile(fileName)) {
+              files.add(file);
+            }
+          } else {
+            // Add all normal files
+            files.add(file);
+          }
         }
       } else {
-        getAllNormalFiles(file, normalFiles);
+        collectFiles(file, files, dataFilesOnly);
       }
     }
   }
 
-  public long computeCrc()
-      throws IOException {
+  /**
+   * Determines if a file is considered a "Data File" (one of ".fwd", ".dict" file types).
+   */
+  private static boolean isDataFile(String fileName) {
+    for (String ext : DATA_FILE_EXTENSIONS) {
+      if (fileName.endsWith(ext)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static long crcForFiles(List<File> filesToComputeCrc) throws IOException {
     byte[] buffer = new byte[BUFFER_SIZE];
     Checksum checksum = new Adler32();
 
-    for (File file : _files) {
+    for (File file : filesToComputeCrc) {
       try (InputStream input = new FileInputStream(file)) {
         int len;
         while ((len = input.read(buffer)) > 0) {
@@ -90,7 +119,7 @@ public class CrcUtils {
       }
     }
     long crc = checksum.getValue();
-    LOGGER.info("Computed crc = {}, based on files {}", crc, _files);
+    LOGGER.info("Computed crc = {}, based on files {}", crc, filesToComputeCrc);
     return crc;
   }
 }

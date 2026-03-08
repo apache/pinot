@@ -23,6 +23,8 @@ import com.google.protobuf.Descriptors;
 
 /**
  * Object for associating a ProtoBuf field value and its field descriptor used when extracting ProtoBuf records.
+ *
+ * <p>This class is mutable to allow reuse and reduce object allocation overhead during extraction.
  */
 public class ProtoBufFieldInfo {
 
@@ -42,9 +44,23 @@ public class ProtoBufFieldInfo {
   }
 
   /**
+   * Sets the field value (allows reuse of the object)
+   */
+  public void setFieldValue(Object fieldValue) {
+    _fieldValue = fieldValue;
+  }
+
+  /**
    * Returns the field descriptor
    */
   public Descriptors.FieldDescriptor getFieldDescriptor() {
     return _fieldDescriptor;
+  }
+
+  /**
+   * Sets the field descriptor (allows reuse of the object)
+   */
+  public void setFieldDescriptor(Descriptors.FieldDescriptor fieldDescriptor) {
+    _fieldDescriptor = fieldDescriptor;
   }
 }

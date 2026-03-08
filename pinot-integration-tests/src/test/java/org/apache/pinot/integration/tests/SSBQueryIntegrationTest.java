@@ -93,6 +93,7 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
       uploadSegments(tableName, _tarDir);
       // H2
       ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
+      waitForNonZeroDocsLoaded(60_000L, true, tableName);
     }
   }
 

@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.HelixManager;
@@ -164,10 +165,15 @@ public class SegmentAssignmentUtils {
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       String segment = entry.getKey();
       Set<String> currentServers = entry.getValue().keySet();
+      List<String> sortedCandidateServers = currentServers.stream().filter(serverIds::containsKey).sorted((s1, s2) -> {
+        Integer serverId1 = serverIds.get(s1);
+        Integer serverId2 = serverIds.get(s2);
+        return Integer.compare(numSegmentsAssignedPerServer[serverId1], numSegmentsAssignedPerServer[serverId2]);
+      }).collect(Collectors.toList());
       int remainingReplicas = replication;
-      for (String server : currentServers) {
+      for (String server : sortedCandidateServers) {
         Integer serverId = serverIds.get(server);
-        if (serverId != null && numSegmentsAssignedPerServer[serverId] < targetNumSegmentsPerServer) {
+        if (numSegmentsAssignedPerServer[serverId] < targetNumSegmentsPerServer) {
           newAssignment.computeIfAbsent(segment, k -> new TreeMap<>()).put(server, SegmentStateModel.ONLINE);
           numSegmentsAssignedPerServer[serverId]++;
           remainingReplicas--;

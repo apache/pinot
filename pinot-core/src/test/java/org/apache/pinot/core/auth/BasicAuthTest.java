@@ -88,7 +88,8 @@ public class BasicAuthTest {
     config.put("principals.user.lesserImportantStuff.rls", "region = 'US'");
 
     PinotConfiguration configuration = new PinotConfiguration(config);
-    List<BasicAuthPrincipal> principals = BasicAuthUtils.extractBasicAuthPrincipals(configuration, "principals");
+    List<BasicAuthPrincipal> principals = BasicAuthPrincipalUtils
+        .extractBasicAuthPrincipals(configuration, "principals");
 
     Assert.assertEquals(principals.size(), 2);
 
@@ -145,7 +146,7 @@ public class BasicAuthTest {
   public void testExtractBasicAuthPrincipalsNoPrincipals() {
     Map<String, Object> config = new HashMap<>();
     PinotConfiguration configuration = new PinotConfiguration(config);
-    BasicAuthUtils.extractBasicAuthPrincipals(configuration, "principals");
+    BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, "principals");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "must provide a "
@@ -154,7 +155,7 @@ public class BasicAuthTest {
     Map<String, Object> config = new HashMap<>();
     config.put("principals", "admin");
     PinotConfiguration configuration = new PinotConfiguration(config);
-    BasicAuthUtils.extractBasicAuthPrincipals(configuration, "principals");
+    BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, "principals");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = ".* is not a valid name")
@@ -164,6 +165,6 @@ public class BasicAuthTest {
     config.put("principals.admin.password", "secret");
     config.put("principals.user.password", "secret");
     PinotConfiguration configuration = new PinotConfiguration(config);
-    BasicAuthUtils.extractBasicAuthPrincipals(configuration, "principals");
+    BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, "principals");
   }
 }

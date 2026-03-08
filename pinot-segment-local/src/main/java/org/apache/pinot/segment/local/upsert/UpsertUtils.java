@@ -185,6 +185,21 @@ public class UpsertUtils {
       }
     }
 
+    /**
+     * Constructor that uses a constant comparison value for all records.
+     * Used when no comparison columns are configured and segment creation time is used as the comparison value.
+     */
+    public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns,
+        Comparable constantComparisonValue, @Nullable String deleteRecordColumn) {
+      _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
+      _comparisonColumnReader = new ConstantComparisonColumnReader(constantComparisonValue);
+      if (deleteRecordColumn != null) {
+        _deleteRecordColumnReader = new PinotSegmentColumnReader(segment, deleteRecordColumn);
+      } else {
+        _deleteRecordColumnReader = null;
+      }
+    }
+
     public RecordInfo getRecordInfo(int docId) {
       PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
       Comparable comparisonValue = _comparisonColumnReader.getComparisonValue(docId);
@@ -264,6 +279,27 @@ public class UpsertUtils {
       for (PinotSegmentColumnReader comparisonColumnReader : _comparisonColumnReaders) {
         comparisonColumnReader.close();
       }
+    }
+  }
+
+  /**
+   * A comparison column reader that returns a constant value for all records.
+   * Used when no comparison columns are configured and segment creation time is used as the comparison value.
+   */
+  public static class ConstantComparisonColumnReader implements ComparisonColumnReader {
+    private final Comparable _constantValue;
+
+    public ConstantComparisonColumnReader(Comparable constantValue) {
+      _constantValue = constantValue;
+    }
+
+    @Override
+    public Comparable getComparisonValue(int docId) {
+      return _constantValue;
+    }
+
+    @Override
+    public void close() {
     }
   }
 }

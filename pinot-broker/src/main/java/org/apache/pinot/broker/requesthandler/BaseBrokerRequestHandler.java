@@ -52,6 +52,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
@@ -62,6 +63,7 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -95,6 +97,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final boolean _enableQueryCancellation;
   @Nullable
   protected final String _enableAutoRewriteAggregationType;
+  @Nullable
+  protected final MultiClusterRoutingContext _multiClusterRoutingContext;
 
   /**
    * Maps broker-generated query id to the query string.
@@ -108,7 +112,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadAccountant threadAccountant) {
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
     _config = config;
     _brokerId = brokerId;
     _requestIdGenerator = requestIdGenerator;
@@ -117,6 +121,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryQuotaManager = queryQuotaManager;
     _tableCache = tableCache;
     _threadAccountant = threadAccountant;
+    _multiClusterRoutingContext = multiClusterRoutingContext;
     _brokerMetrics = BrokerMetrics.get();
     _brokerQueryEventListener = BrokerQueryEventListenerFactory.getBrokerQueryEventListener();
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();
@@ -146,18 +151,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setBrokerId(_brokerId);
     long requestId = _requestIdGenerator.get();
     requestContext.setRequestId(requestId);
-
-    if (httpHeaders != null && !_trackedHeaders.isEmpty()) {
-      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
-      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(_trackedHeaders.size());
-      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
-        String key = entry.getKey().toLowerCase();
-        if (_trackedHeaders.contains(key)) {
-          trackedHeadersMap.put(key, entry.getValue());
-        }
-      }
-      requestContext.setRequestHttpHeaders(trackedHeadersMap);
-    }
+    setTrackedHeadersInRequestContext(requestContext, httpHeaders, _trackedHeaders);
 
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.
@@ -269,6 +263,34 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Validates that tables can be queried with enableMultiClusterRouting if and only if they are logical tables.
+   * Physical tables are cluster-specific and cannot be federated across clusters.
+   * Multi-cluster routing is only supported for logical tables.
+   *
+   * @param tableNames Set of table names to validate
+   * @param queryOptions Map of query options
+   * @throws QueryException if any physical table is queried with enableMultiClusterRouting=true
+   */
+  protected void validatePhysicalTablesWithMultiClusterRouting(Set<String> tableNames,
+      Map<String, String> queryOptions) {
+    Preconditions.checkNotNull(tableNames, "Table names cannot be null when validating multi-cluster routing");
+    Preconditions.checkNotNull(queryOptions, "Query options cannot be null");
+    boolean isMultiClusterRoutingEnabled = queryOptions.containsKey(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING)
+        && Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING));
+
+    if (isMultiClusterRoutingEnabled) {
+      for (String tableName : tableNames) {
+        if (!_tableCache.isLogicalTable(tableName)) {
+          throw QueryErrorCode.QUERY_VALIDATION.asException(
+              "Physical table '" + tableName + "' cannot be queried with enableMultiClusterRouting=true. "
+              + "Multi-cluster routing is only supported for logical tables. "
+              + "Please remove the enableMultiClusterRouting query option or use a logical table instead.");
+        }
+      }
+    }
+  }
+
+  /**
    * Returns true if the QPS quota of query tables, database or application has been exceeded.
    */
   protected boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
@@ -355,6 +377,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
     statistics.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
     statistics.setTraceInfo(response.getTraceInfo());
+  }
+
+  protected static void setTrackedHeadersInRequestContext(RequestContext requestContext,
+      HttpHeaders httpHeaders, Set<String> trackedHeaders) {
+    if (httpHeaders != null && !trackedHeaders.isEmpty()) {
+      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
+      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(trackedHeaders.size());
+      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
+        String key = entry.getKey().toLowerCase();
+        if (trackedHeaders.contains(key)) {
+          trackedHeadersMap.put(key, entry.getValue());
+        }
+      }
+      requestContext.setRequestHttpHeaders(trackedHeadersMap);
+    }
   }
 
   @Override

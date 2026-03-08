@@ -20,7 +20,9 @@ package org.apache.pinot.query.service.dispatch.timeseries;
 
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
+import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import io.grpc.stub.StreamObserver;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
@@ -35,11 +37,21 @@ public class TimeSeriesDispatchClient {
   // TODO(timeseries): Note that time-series engine at present uses QueryServer for data transfer from server to broker.
   //   This will be fixed as we integrate with MSE.
   private static final int INBOUND_SIZE_LIMIT = 256 * 1024 * 1024;
+  /**
+   * Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
+   */
+  private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
+
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
   public TimeSeriesDispatchClient(String host, int port) {
-    _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+    // Use NettyChannelBuilder to allow setting Netty-specific channel options like the buffer allocator.
+    // This ensures we can explicitly configure direct (off-heap) buffers for better performance.
+    _channel = NettyChannelBuilder.forAddress(host, port)
+        .usePlaintext()
+        .withOption(ChannelOption.ALLOCATOR, BUF_ALLOCATOR)
+        .build();
     _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel).withMaxInboundMessageSize(INBOUND_SIZE_LIMIT);
   }
 

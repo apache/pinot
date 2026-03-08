@@ -119,7 +119,7 @@ public class ServerSegmentMetadataReader {
     final Map<String, Double> columnCardinalityMap = new HashMap<>();
     final Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     final Map<String, Map<String, Double>> columnIndexSizeMap = new HashMap<>();
-    final Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap = new HashMap<>();
+    final Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         TableMetadataInfo tableMetadataInfo =
@@ -136,8 +136,8 @@ public class ServerSegmentMetadataReader {
           }
           return l;
         }));
-        tableMetadataInfo.getUpsertPartitionToServerPrimaryKeyCountMap().forEach(
-            (partition, serverToPrimaryKeyCount) -> upsertPartitionToServerPrimaryKeyCountMap.merge(partition,
+        tableMetadataInfo.getPartitionToServerPrimaryKeyCountMap().forEach(
+            (partition, serverToPrimaryKeyCount) -> partitionToServerPrimaryKeyCountMap.merge(partition,
                 new HashMap<>(serverToPrimaryKeyCount), (l, r) -> {
                   for (Map.Entry<String, Long> serverToPKCount : r.entrySet()) {
                     l.merge(serverToPKCount.getKey(), serverToPKCount.getValue(), Long::sum);
@@ -167,7 +167,7 @@ public class ServerSegmentMetadataReader {
 
     TableMetadataInfo aggregateTableMetadataInfo =
         new TableMetadataInfo(tableNameWithType, totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
-            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap, upsertPartitionToServerPrimaryKeyCountMap);
+            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap, partitionToServerPrimaryKeyCountMap);
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
           serverUrls.size());

@@ -1,0 +1,27 @@
+{
+  "schemaName": "testCrcComplexSchema",
+  "dimensionFieldSpecs": [
+    { "name": "campaignId", "dataType": "INT", "defaultNullValue": 0 },
+    { "name": "cityName", "dataType": "STRING", "defaultNullValue": "UNKNOWN" },
+    { "name": "isTestUser", "dataType": "BOOLEAN", "defaultNullValue": "false" },
+    { "name": "rawUUID", "dataType": "STRING", "defaultNullValue": "null" },
+    { "name": "fullReviewText", "dataType": "STRING", "defaultNullValue": "" },
+    { "name": "coordinates", "dataType": "BYTES" },
+    { "name": "userTags", "dataType": "STRING", "singleValueField": false, "defaultNullValue": "null" },
+    { "name": "associatedInts", "dataType": "INT", "singleValueField": false, "defaultNullValue": 0 },
+    { "name": "associatedFloats", "dataType": "FLOAT", "singleValueField": false, "defaultNullValue": 0.0 },
+    { "name": "customerDetailsJson", "dataType": "JSON", "defaultNullValue": "{}" }
+  ],
+  "metricFieldSpecs": [
+    { "name": "clickCount", "dataType": "INT", "defaultNullValue": 0 },
+    { "name": "totalRevenue", "dataType": "DOUBLE", "defaultNullValue": 0.0 }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "eventTime",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}

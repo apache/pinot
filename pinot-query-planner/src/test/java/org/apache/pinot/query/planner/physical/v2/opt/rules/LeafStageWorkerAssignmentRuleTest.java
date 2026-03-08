@@ -30,10 +30,17 @@ import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
+import org.apache.pinot.core.routing.LogicalTableRouteInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionInfo;
+import org.apache.pinot.core.routing.TableRouteInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.physical.v2.HashDistributionDesc;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
+import org.apache.pinot.query.planner.physical.v2.TableScanMetadata;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule.InstanceIdToSegments;
+import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule.LogicalTableScanWorkerAssignmentResult;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule.TableScanWorkerAssignmentResult;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -396,5 +403,316 @@ public class LeafStageWorkerAssignmentRuleTest {
     }
     return new TablePartitionInfo(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(TABLE_NAME),
         PARTITION_COLUMN, PARTITION_FUNCTION, REALTIME_NUM_PARTITIONS, segmentsByPartition, invalidSegments);
+  }
+
+  // ==================== Logical Table Tests ====================
+
+  @Test
+  public void testBuildLogicalTableWorkerAssignmentWithOfflineOnly() {
+    // Setup mock server instances and routing tables
+    ServerInstance server1 = mock(ServerInstance.class);
+    doReturn("server-1").when(server1).getInstanceId();
+    ServerInstance server2 = mock(ServerInstance.class);
+    doReturn("server-2").when(server2).getInstanceId();
+
+    // Create offline routing table
+    Map<ServerInstance, SegmentsToQuery> offlineRouting = new HashMap<>();
+    SegmentsToQuery seg1 = mock(SegmentsToQuery.class);
+    doReturn(List.of("orders_seg1", "orders_seg2")).when(seg1).getSegments();
+    SegmentsToQuery seg2 = mock(SegmentsToQuery.class);
+    doReturn(List.of("orders_seg3")).when(seg2).getSegments();
+    offlineRouting.put(server1, seg1);
+    offlineRouting.put(server2, seg2);
+
+    // Create TableRouteInfo for offline
+    TableRouteInfo offlineTableRoute = mock(TableRouteInfo.class);
+    doReturn("orders_OFFLINE").when(offlineTableRoute).getOfflineTableName();
+    doReturn(offlineRouting).when(offlineTableRoute).getOfflineRoutingTable();
+
+    // Create LogicalTableRouteInfo
+    LogicalTableRouteInfo logicalTableRouteInfo = mock(LogicalTableRouteInfo.class);
+    doReturn(List.of(offlineTableRoute)).when(logicalTableRouteInfo).getOfflineTables();
+    doReturn(null).when(logicalTableRouteInfo).getRealtimeTables();
+    doReturn(null).when(logicalTableRouteInfo).getUnavailableSegments();
+    doReturn(null).when(logicalTableRouteInfo).getTimeBoundaryInfo();
+
+    // Execute
+    LogicalTableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.buildLogicalTableWorkerAssignment(
+        "myLogicalTable", logicalTableRouteInfo, Map.of());
+
+    // Verify distribution
+    assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
+    assertEquals(result._pinotDataDistribution.getWorkers().size(), 2);
+
+    // Verify workers are sorted by instance ID
+    assertTrue(result._pinotDataDistribution.getWorkers().get(0).contains("server-1"));
+    assertTrue(result._pinotDataDistribution.getWorkers().get(1).contains("server-2"));
+
+    // Verify metadata
+    TableScanMetadata metadata = result._tableScanMetadata;
+    assertTrue(metadata.isLogicalTable());
+    assertEquals(metadata.getScannedTables().iterator().next(), "myLogicalTable");
+    assertNull(metadata.getWorkedIdToSegmentsMap());
+    assertNotNull(metadata.getWorkerIdToLogicalTableSegmentsMap());
+
+    // Verify segment mapping
+    Map<Integer, Map<String, List<String>>> segmentsMap = metadata.getWorkerIdToLogicalTableSegmentsMap();
+    assertEquals(segmentsMap.get(0).get("orders_OFFLINE"), List.of("orders_seg1", "orders_seg2"));
+    assertEquals(segmentsMap.get(1).get("orders_OFFLINE"), List.of("orders_seg3"));
+  }
+
+  @Test
+  public void testBuildLogicalTableWorkerAssignmentWithMultiplePhysicalTables() {
+    // Setup mock server instances
+    ServerInstance server1 = mock(ServerInstance.class);
+    doReturn("server-1").when(server1).getInstanceId();
+    ServerInstance server2 = mock(ServerInstance.class);
+    doReturn("server-2").when(server2).getInstanceId();
+
+    // Create offline routing for orders_OFFLINE
+    Map<ServerInstance, SegmentsToQuery> offlineRouting1 = new HashMap<>();
+    SegmentsToQuery offlineSeg1 = mock(SegmentsToQuery.class);
+    doReturn(List.of("orders_seg1")).when(offlineSeg1).getSegments();
+    offlineRouting1.put(server1, offlineSeg1);
+
+    TableRouteInfo offlineTableRoute = mock(TableRouteInfo.class);
+    doReturn("orders_OFFLINE").when(offlineTableRoute).getOfflineTableName();
+    doReturn(offlineRouting1).when(offlineTableRoute).getOfflineRoutingTable();
+
+    // Create realtime routing for orders_REALTIME
+    Map<ServerInstance, SegmentsToQuery> realtimeRouting = new HashMap<>();
+    SegmentsToQuery rtSeg1 = mock(SegmentsToQuery.class);
+    doReturn(List.of("orders_rt_seg1")).when(rtSeg1).getSegments();
+    SegmentsToQuery rtSeg2 = mock(SegmentsToQuery.class);
+    doReturn(List.of("orders_rt_seg2", "orders_rt_seg3")).when(rtSeg2).getSegments();
+    realtimeRouting.put(server1, rtSeg1);
+    realtimeRouting.put(server2, rtSeg2);
+
+    TableRouteInfo realtimeTableRoute = mock(TableRouteInfo.class);
+    doReturn("orders_REALTIME").when(realtimeTableRoute).getRealtimeTableName();
+    doReturn(realtimeRouting).when(realtimeTableRoute).getRealtimeRoutingTable();
+
+    // Create LogicalTableRouteInfo
+    LogicalTableRouteInfo logicalTableRouteInfo = mock(LogicalTableRouteInfo.class);
+    doReturn(List.of(offlineTableRoute)).when(logicalTableRouteInfo).getOfflineTables();
+    doReturn(List.of(realtimeTableRoute)).when(logicalTableRouteInfo).getRealtimeTables();
+    doReturn(null).when(logicalTableRouteInfo).getUnavailableSegments();
+    doReturn(null).when(logicalTableRouteInfo).getTimeBoundaryInfo();
+
+    // Execute
+    LogicalTableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.buildLogicalTableWorkerAssignment(
+        "hybridLogicalTable", logicalTableRouteInfo, Map.of("option1", "value1"));
+
+    // Verify
+    assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
+    assertEquals(result._pinotDataDistribution.getWorkers().size(), 2);
+
+    TableScanMetadata metadata = result._tableScanMetadata;
+    assertTrue(metadata.isLogicalTable());
+    assertEquals(metadata.getTableOptions().get("option1"), "value1");
+
+    // Server1 should have both offline and realtime segments
+    Map<String, List<String>> server1Segments = metadata.getWorkerIdToLogicalTableSegmentsMap().get(0);
+    assertEquals(server1Segments.get("orders_OFFLINE"), List.of("orders_seg1"));
+    assertEquals(server1Segments.get("orders_REALTIME"), List.of("orders_rt_seg1"));
+
+    // Server2 should only have realtime segments
+    Map<String, List<String>> server2Segments = metadata.getWorkerIdToLogicalTableSegmentsMap().get(1);
+    assertNull(server2Segments.get("orders_OFFLINE"));
+    assertEquals(server2Segments.get("orders_REALTIME"), List.of("orders_rt_seg2", "orders_rt_seg3"));
+  }
+
+  @Test
+  public void testBuildLogicalTableWorkerAssignmentSingletonDistribution() {
+    // When there's only one server, distribution should be SINGLETON
+    ServerInstance server1 = mock(ServerInstance.class);
+    doReturn("server-1").when(server1).getInstanceId();
+
+    Map<ServerInstance, SegmentsToQuery> offlineRouting = new HashMap<>();
+    SegmentsToQuery seg1 = mock(SegmentsToQuery.class);
+    doReturn(List.of("seg1", "seg2", "seg3")).when(seg1).getSegments();
+    offlineRouting.put(server1, seg1);
+
+    TableRouteInfo offlineTableRoute = mock(TableRouteInfo.class);
+    doReturn("table_OFFLINE").when(offlineTableRoute).getOfflineTableName();
+    doReturn(offlineRouting).when(offlineTableRoute).getOfflineRoutingTable();
+
+    LogicalTableRouteInfo logicalTableRouteInfo = mock(LogicalTableRouteInfo.class);
+    doReturn(List.of(offlineTableRoute)).when(logicalTableRouteInfo).getOfflineTables();
+    doReturn(null).when(logicalTableRouteInfo).getRealtimeTables();
+    doReturn(null).when(logicalTableRouteInfo).getUnavailableSegments();
+    doReturn(null).when(logicalTableRouteInfo).getTimeBoundaryInfo();
+
+    // Execute
+    LogicalTableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.buildLogicalTableWorkerAssignment(
+        "singleServerTable", logicalTableRouteInfo, Map.of());
+
+    // Verify SINGLETON distribution for single server
+    assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.SINGLETON);
+    assertEquals(result._pinotDataDistribution.getWorkers().size(), 1);
+  }
+
+  @Test
+  public void testBuildLogicalTableWorkerAssignmentWithUnavailableSegments() {
+    ServerInstance server1 = mock(ServerInstance.class);
+    doReturn("server-1").when(server1).getInstanceId();
+
+    Map<ServerInstance, SegmentsToQuery> routing = new HashMap<>();
+    SegmentsToQuery seg = mock(SegmentsToQuery.class);
+    doReturn(List.of("seg1")).when(seg).getSegments();
+    routing.put(server1, seg);
+
+    TableRouteInfo tableRoute = mock(TableRouteInfo.class);
+    doReturn("table_OFFLINE").when(tableRoute).getOfflineTableName();
+    doReturn(routing).when(tableRoute).getOfflineRoutingTable();
+
+    LogicalTableRouteInfo logicalTableRouteInfo = mock(LogicalTableRouteInfo.class);
+    doReturn(List.of(tableRoute)).when(logicalTableRouteInfo).getOfflineTables();
+    doReturn(null).when(logicalTableRouteInfo).getRealtimeTables();
+    doReturn(List.of("unavail_seg1", "unavail_seg2")).when(logicalTableRouteInfo).getUnavailableSegments();
+    doReturn(null).when(logicalTableRouteInfo).getTimeBoundaryInfo();
+
+    // Execute
+    LogicalTableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.buildLogicalTableWorkerAssignment(
+        "tableWithUnavailable", logicalTableRouteInfo, Map.of());
+
+    // Verify unavailable segments are captured
+    TableScanMetadata metadata = result._tableScanMetadata;
+    assertEquals(metadata.getUnavailableSegmentsMap().get("tableWithUnavailable").size(), 2);
+    assertTrue(metadata.getUnavailableSegmentsMap().get("tableWithUnavailable").contains("unavail_seg1"));
+    assertTrue(metadata.getUnavailableSegmentsMap().get("tableWithUnavailable").contains("unavail_seg2"));
+  }
+
+  @Test
+  public void testBuildLogicalTableWorkerAssignmentWithTimeBoundary() {
+    ServerInstance server1 = mock(ServerInstance.class);
+    doReturn("server-1").when(server1).getInstanceId();
+
+    Map<ServerInstance, SegmentsToQuery> routing = new HashMap<>();
+    SegmentsToQuery seg = mock(SegmentsToQuery.class);
+    doReturn(List.of("seg1")).when(seg).getSegments();
+    routing.put(server1, seg);
+
+    TableRouteInfo tableRoute = mock(TableRouteInfo.class);
+    doReturn("table_OFFLINE").when(tableRoute).getOfflineTableName();
+    doReturn(routing).when(tableRoute).getOfflineRoutingTable();
+
+    TimeBoundaryInfo timeBoundaryInfo = new TimeBoundaryInfo("timeColumn", "1234567890");
+
+    LogicalTableRouteInfo logicalTableRouteInfo = mock(LogicalTableRouteInfo.class);
+    doReturn(List.of(tableRoute)).when(logicalTableRouteInfo).getOfflineTables();
+    doReturn(null).when(logicalTableRouteInfo).getRealtimeTables();
+    doReturn(null).when(logicalTableRouteInfo).getUnavailableSegments();
+    doReturn(timeBoundaryInfo).when(logicalTableRouteInfo).getTimeBoundaryInfo();
+
+    // Execute
+    LogicalTableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.buildLogicalTableWorkerAssignment(
+        "tableWithTimeBoundary", logicalTableRouteInfo, Map.of());
+
+    // Verify time boundary info is captured
+    TableScanMetadata metadata = result._tableScanMetadata;
+    assertEquals(metadata.getTimeBoundaryInfo().getTimeColumn(), "timeColumn");
+    assertEquals(metadata.getTimeBoundaryInfo().getTimeValue(), "1234567890");
+  }
+
+  @Test
+  public void testBuildLogicalTableWorkerAssignmentServerInstancesSorted() {
+    // Verify that server instances are sorted by instance ID for deterministic worker assignment
+    ServerInstance serverC = mock(ServerInstance.class);
+    doReturn("server-c").when(serverC).getInstanceId();
+    ServerInstance serverA = mock(ServerInstance.class);
+    doReturn("server-a").when(serverA).getInstanceId();
+    ServerInstance serverB = mock(ServerInstance.class);
+    doReturn("server-b").when(serverB).getInstanceId();
+
+    Map<ServerInstance, SegmentsToQuery> routing = new HashMap<>();
+    SegmentsToQuery segC = mock(SegmentsToQuery.class);
+    doReturn(List.of("segC")).when(segC).getSegments();
+    SegmentsToQuery segA = mock(SegmentsToQuery.class);
+    doReturn(List.of("segA")).when(segA).getSegments();
+    SegmentsToQuery segB = mock(SegmentsToQuery.class);
+    doReturn(List.of("segB")).when(segB).getSegments();
+    routing.put(serverC, segC);
+    routing.put(serverA, segA);
+    routing.put(serverB, segB);
+
+    TableRouteInfo tableRoute = mock(TableRouteInfo.class);
+    doReturn("table_OFFLINE").when(tableRoute).getOfflineTableName();
+    doReturn(routing).when(tableRoute).getOfflineRoutingTable();
+
+    LogicalTableRouteInfo logicalTableRouteInfo = mock(LogicalTableRouteInfo.class);
+    doReturn(List.of(tableRoute)).when(logicalTableRouteInfo).getOfflineTables();
+    doReturn(null).when(logicalTableRouteInfo).getRealtimeTables();
+    doReturn(null).when(logicalTableRouteInfo).getUnavailableSegments();
+    doReturn(null).when(logicalTableRouteInfo).getTimeBoundaryInfo();
+
+    // Execute
+    LogicalTableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.buildLogicalTableWorkerAssignment(
+        "sortedTable", logicalTableRouteInfo, Map.of());
+
+    // Verify workers are sorted alphabetically by server instance ID
+    List<String> workers = result._pinotDataDistribution.getWorkers();
+    assertEquals(workers.size(), 3);
+    assertTrue(workers.get(0).contains("server-a"));
+    assertTrue(workers.get(1).contains("server-b"));
+    assertTrue(workers.get(2).contains("server-c"));
+
+    // Verify server instances are in sorted order
+    assertEquals(result._serverInstances.get(0).getInstanceId(), "server-a");
+    assertEquals(result._serverInstances.get(1).getInstanceId(), "server-b");
+    assertEquals(result._serverInstances.get(2).getInstanceId(), "server-c");
+  }
+
+  @Test
+  public void testTransferToServerInstanceLogicalSegmentsMap() {
+    ServerInstance server1 = mock(ServerInstance.class);
+    doReturn("server-1").when(server1).getInstanceId();
+    ServerInstance server2 = mock(ServerInstance.class);
+    doReturn("server-2").when(server2).getInstanceId();
+
+    Map<ServerInstance, SegmentsToQuery> routingTable = new HashMap<>();
+    SegmentsToQuery seg1 = mock(SegmentsToQuery.class);
+    doReturn(List.of("seg1", "seg2")).when(seg1).getSegments();
+    SegmentsToQuery seg2 = mock(SegmentsToQuery.class);
+    doReturn(List.of("seg3")).when(seg2).getSegments();
+    routingTable.put(server1, seg1);
+    routingTable.put(server2, seg2);
+
+    Map<ServerInstance, Map<String, List<String>>> result = new HashMap<>();
+    LeafStageWorkerAssignmentRule.transferToServerInstanceLogicalSegmentsMap(
+        "orders_OFFLINE", routingTable, result);
+
+    assertEquals(result.size(), 2);
+    assertEquals(result.get(server1).get("orders_OFFLINE"), List.of("seg1", "seg2"));
+    assertEquals(result.get(server2).get("orders_OFFLINE"), List.of("seg3"));
+  }
+
+  @Test
+  public void testTransferToServerInstanceLogicalSegmentsMapMultipleTables() {
+    ServerInstance server1 = mock(ServerInstance.class);
+    doReturn("server-1").when(server1).getInstanceId();
+
+    Map<ServerInstance, Map<String, List<String>>> result = new HashMap<>();
+
+    // Add first table
+    Map<ServerInstance, SegmentsToQuery> routing1 = new HashMap<>();
+    SegmentsToQuery seg1 = mock(SegmentsToQuery.class);
+    doReturn(List.of("offline_seg1")).when(seg1).getSegments();
+    routing1.put(server1, seg1);
+    LeafStageWorkerAssignmentRule.transferToServerInstanceLogicalSegmentsMap("table_OFFLINE", routing1, result);
+
+    // Add second table
+    Map<ServerInstance, SegmentsToQuery> routing2 = new HashMap<>();
+    SegmentsToQuery seg2 = mock(SegmentsToQuery.class);
+    doReturn(List.of("realtime_seg1")).when(seg2).getSegments();
+    routing2.put(server1, seg2);
+    LeafStageWorkerAssignmentRule.transferToServerInstanceLogicalSegmentsMap("table_REALTIME", routing2, result);
+
+    // Verify single server has both tables
+    assertEquals(result.size(), 1);
+    Map<String, List<String>> serverSegments = result.get(server1);
+    assertEquals(serverSegments.size(), 2);
+    assertEquals(serverSegments.get("table_OFFLINE"), List.of("offline_seg1"));
+    assertEquals(serverSegments.get("table_REALTIME"), List.of("realtime_seg1"));
   }
 }

@@ -38,15 +38,26 @@ public class ArrayAggLongFunction extends BaseArrayAggLongFunction<LongArrayList
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    long[] value = blockValSet.getLongValuesSV();
     LongArrayList valueArray =
         aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new LongArrayList(length);
-
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
-      }
-    });
+    if (blockValSet.isSingleValue()) {
+      long[] values = blockValSet.getLongValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueArray.add(values[i]);
+        }
+      });
+    } else {
+      long[][] valuesArray = blockValSet.getLongValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          long[] values = valuesArray[i];
+          for (long v : values) {
+            valueArray.add(v);
+          }
+        }
+      });
+    }
     aggregationResultHolder.setValue(valueArray);
   }
 

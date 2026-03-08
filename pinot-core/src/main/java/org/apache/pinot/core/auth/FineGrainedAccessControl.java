@@ -41,6 +41,17 @@ public interface FineGrainedAccessControl {
   }
 
   /**
+   * Checks whether the user has access to perform action on the particular resource type.
+   *
+   * @param httpHeaders HTTP headers
+   * @param targetType type of resource being accessed
+   * @return true if user is allowed to perform the action
+   */
+  default boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType) {
+    return true;
+  }
+
+  /**
    * Verifies if the user has access to perform a specific action on a particular resource.
    * The default implementation returns a {@link BasicAuthorizationResultImpl} with the result of the hasAccess() of
    * the implementation

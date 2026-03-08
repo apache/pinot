@@ -62,6 +62,11 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     _responseStore = responseStore;
   }
 
+  @Nullable
+  public MultiStageBrokerRequestHandler getMultiStageBrokerRequestHandler() {
+    return _multiStageBrokerRequestHandler;
+  }
+
   @Override
   public void start() {
     _singleStageBrokerRequestHandler.start();
@@ -131,6 +136,15 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     if (_timeSeriesRequestHandler != null) {
       return _timeSeriesRequestHandler.handleTimeSeriesRequest(lang, rawQueryParamString, queryParams, requestContext,
           requesterIdentity, httpHeaders);
+    }
+    throw new QueryException(QueryErrorCode.INTERNAL, "Time series query engine not enabled.");
+  }
+
+  @Override
+  public BrokerResponse handleExplainTimeSeriesRequest(String lang, String rawQueryParamString,
+      Map<String, String> queryParams) {
+    if (_timeSeriesRequestHandler != null) {
+      return _timeSeriesRequestHandler.handleExplainTimeSeriesRequest(lang, rawQueryParamString, queryParams);
     }
     throw new QueryException(QueryErrorCode.INTERNAL, "Time series query engine not enabled.");
   }

@@ -66,6 +66,7 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
+    <!-- Needed for test helpers such as FakeStreamConfigUtils. -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>

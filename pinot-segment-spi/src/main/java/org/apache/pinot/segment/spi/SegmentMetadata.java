@@ -64,6 +64,8 @@ public interface SegmentMetadata {
 
   String getCrc();
 
+  String getDataCrc();
+
   SegmentVersion getVersion();
 
   Schema getSchema();
@@ -92,6 +94,15 @@ public interface SegmentMetadata {
    *         <code>Long.MIN_VALUE</code> if the stream doesn't provide a timestamp
    */
   long getLatestIngestionTimestamp();
+
+  /**
+   * Return the minimum ingestion lag recorded for this segment. Ingestion lag is
+   * the difference between the record ingestion timestamp and current system time.
+   * Applicable for MutableSegments.
+   *
+   * @return minimum ingestion lag recorded for this segment
+   */
+  long getMinimumIngestionLagMs();
 
   @Nullable
   List<StarTreeV2Metadata> getStarTreeV2MetadataList();

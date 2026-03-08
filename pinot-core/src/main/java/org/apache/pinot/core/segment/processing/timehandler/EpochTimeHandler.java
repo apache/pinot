@@ -70,4 +70,48 @@ public class EpochTimeHandler implements TimeHandler {
       return DEFAULT_PARTITION;
     }
   }
+
+  @Override
+  public String getTimeColumn() {
+    return _timeColumn;
+  }
+
+  @Override
+  @Nullable
+  public String handleTimeColumn(Object columnValue) {
+    long timeMs = _formatSpec.fromFormatToMillis(columnValue.toString());
+
+    // Apply time filter
+    if (_startTimeMs > 0) {
+      boolean outsideTimeWindow = (timeMs < _startTimeMs || timeMs >= _endTimeMs);
+      if (outsideTimeWindow != _negateWindowFilter) {
+        return null;
+      }
+    }
+
+    // Round time if needed
+    if (_roundBucketMs > 0) {
+      timeMs = (timeMs / _roundBucketMs) * _roundBucketMs;
+    }
+
+    // Compute partition
+    if (_partitionBucketMs > 0) {
+      return Long.toString(timeMs / _partitionBucketMs);
+    } else {
+      return DEFAULT_PARTITION;
+    }
+  }
+
+  @Override
+  @Nullable
+  public Object getModifiedTimeValue(Object columnValue) {
+    // Round time if needed
+    if (_roundBucketMs > 0) {
+      long timeMs = _formatSpec.fromFormatToMillis(columnValue.toString());
+      timeMs = (timeMs / _roundBucketMs) * _roundBucketMs;
+      return _dataType.convert(_formatSpec.fromMillisToFormat(timeMs));
+    } else {
+      return columnValue;
+    }
+  }
 }

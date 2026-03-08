@@ -2142,6 +2142,17 @@ public class CalciteSqlCompilerTest {
     Assert.assertTrue(nowTs >= lowerBound);
     Assert.assertTrue(nowTs <= upperBound);
 
+    query = "SELECT rand() FROM foo";
+    pinotQuery = compileToPinotQuery(query);
+    Expression randExpression = pinotQuery.getSelectList().get(0);
+    Assert.assertTrue(randExpression.isSetFunctionCall());
+    Assert.assertEquals(randExpression.getFunctionCall().getOperator(), "rand");
+    Assert.assertTrue(randExpression.getFunctionCall().getOperands().isEmpty());
+
+    query = "SELECT rand(123) FROM foo";
+    pinotQuery = compileToPinotQuery(query);
+    Assert.assertTrue(pinotQuery.getSelectList().get(0).isSetLiteral());
+
     query = "select encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
         + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') from mytable";
     pinotQuery = compileToPinotQuery(query);

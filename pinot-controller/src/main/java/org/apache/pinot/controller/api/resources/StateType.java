@@ -19,5 +19,5 @@
 package org.apache.pinot.controller.api.resources;
 
 public enum StateType {
-  ENABLE, DISABLE, DROP
+  ENABLE, DISABLE, DROP, DRAIN
 }

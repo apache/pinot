@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.fail;
 
 
@@ -59,6 +60,20 @@ public class QueryOptionsUtilsTest {
     // Then:
     assertEquals(resolved.get(ENABLE_NULL_HANDLING), "true");
     assertEquals(resolved.get(USE_MULTISTAGE_ENGINE), "false");
+  }
+
+  @Test
+  public void shouldResolveSamplerOptionCaseInsensitively() {
+    Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("SAMPLER", "firstOnly"));
+
+    assertEquals(resolved.get(TABLE_SAMPLER), "firstOnly");
+  }
+
+  @Test
+  public void shouldExtractTableSamplerOption() {
+    assertEquals(QueryOptionsUtils.getTableSampler(Map.of(TABLE_SAMPLER, "firstOnly")), "firstOnly");
+    assertNull(QueryOptionsUtils.getTableSampler(Map.of()));
+    assertNull(QueryOptionsUtils.getTableSampler(null));
   }
 
   @Test
@@ -156,6 +171,27 @@ public class QueryOptionsUtilsTest {
         }
       }
     }
+  }
+
+  @Test
+  public void testGetQueryHashWithValue() {
+    Map<String, String> queryOptions = Map.of(QUERY_HASH, "abc123def456");
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "abc123def456");
+  }
+
+  @Test
+  public void testGetQueryHashWithEmptyString() {
+    Map<String, String> queryOptions = Map.of(QUERY_HASH, "");
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "");
+  }
+
+  @Test
+  public void testGetQueryHashWithoutValue() {
+    Map<String, String> queryOptions = new HashMap<>();
+    String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
+    assertEquals(actualHash, "");
   }
 
   private static Object getValue(Map<String, String> map, String key) {

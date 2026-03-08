@@ -1,0 +1,83 @@
+{
+  "tableName": "testCrcComplexSchema",
+  "tableType": "OFFLINE",
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "invertedIndexColumns": [
+      "cityName",
+      "userTags",
+      "associatedInts",
+      "campaignId"
+    ],
+    "sortedColumn": ["campaignId"],
+    "noDictionaryColumns": [
+      "rawUUID",
+      "totalRevenue",
+      "associatedFloats",
+      "fullReviewText",
+      "customerDetailsJson"
+    ],
+    "rangeIndexColumns": [
+      "totalRevenue",
+      "eventTime"
+    ],
+    "bloomFilterColumns": [
+      "rawUUID"
+    ],
+    "textIndexColumns": [
+      "fullReviewText"
+    ],
+    "h3IndexConfigs": [
+      { "column": "coordinates", "resolution": 8 }
+    ],
+    "starTreeIndexConfigs": [{
+      "dimensionsSplitOrder": ["campaignId", "cityName", "eventTime"],
+      "skipMaterializationForDimensions": ["cityName"],
+      "maxLeafRecords": 10000,
+      "aggregationConfigs": [
+        {
+          "columnName": "totalRevenue",
+          "aggregationFunction": "SUM"
+        },
+        {
+          "columnName": "clickCount",
+          "aggregationFunction": "SUM"
+        }
+      ]
+    }]
+  },
+  "metadata": {},
+  "fieldConfigList": [
+    {
+      "name": "eventTime",
+      "properties": { "isTimeColumn": "true" }
+    },
+    {
+      "name": "fullReviewText",
+      "encodingType": "RAW",
+      "indexType": "TEXT"
+    },
+    {
+      "name": "customerDetailsJson",
+      "indexes": {
+        "json": {
+          "maxLevels": 2,
+          "excludeArray": false,
+          "disableCrossArrayUnnest": true,
+          "includePaths": null,
+          "excludePaths": null,
+          "excludeFields": null,
+          "indexPaths": null
+        }
+      }
+    }
+  ],
+  "routing": {},
+  "segmentsConfig": {
+    "timeColumn": "eventTime",
+    "replication": 1,
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+  }
+}

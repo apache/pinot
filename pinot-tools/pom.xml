@@ -79,16 +79,15 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-orc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-parquet</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-thrift</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-kafka-2.0</artifactId>
-      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -190,6 +189,10 @@
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-java-client</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -470,25 +473,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
         <executions>
-          <execution>
-            <id>copy-kafka-resources</id>
-            <phase>process-resources</phase>
-            <goals>
-              <goal>copy-resources</goal>
-            </goals>
-            <configuration>
-              <!-- this is important -->
-              <overwrite>true</overwrite>
-              <!-- target -->
-              <outputDirectory>${basedir}/target/classes/sample_data/</outputDirectory>
-              <resources>
-                <resource>
-                  <!-- source -->
-                  <directory>src/main/resources/sample_data/kafka_2.0</directory>
-                </resource>
-              </resources>
-            </configuration>
-          </execution>
           <execution>
             <id>copy-batch-ingestion-resources</id>
             <phase>process-resources</phase>

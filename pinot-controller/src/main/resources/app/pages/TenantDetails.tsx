@@ -293,7 +293,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     if(result.error){
       setSchemaJSON(null);
       setTableSchema({
-        columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
+        columns: ['Column', 'Type', 'Field Type', 'Multi Value', 'Primary Key'],
         records: []
       });
     } else {

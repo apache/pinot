@@ -29,4 +29,19 @@ public class NoOpTimeHandler implements TimeHandler {
   public String handleTime(GenericRow row) {
     return DEFAULT_PARTITION;
   }
+
+  @Override
+  public String getTimeColumn() {
+    return null;
+  }
+
+  @Override
+  public String handleTimeColumn(Object columnValue) {
+    return DEFAULT_PARTITION;
+  }
+
+  @Override
+  public Object getModifiedTimeValue(Object columnValue) {
+    return columnValue;
+  }
 }

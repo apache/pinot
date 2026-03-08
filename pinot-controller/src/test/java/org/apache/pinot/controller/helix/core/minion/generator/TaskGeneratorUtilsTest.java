@@ -40,6 +40,7 @@ import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -104,6 +105,7 @@ public class TaskGeneratorUtilsTest {
     when(mockHelixResourceManager.getPropertyStore()).thenReturn(mockPropertyStore);
     ClusterInfoAccessor mockClusterInfoAcessor = mock(ClusterInfoAccessor.class);
     when(mockClusterInfoAcessor.getVipUrl()).thenReturn("http://localhost:9000");
+    when(mockClusterInfoAcessor.getVipUrlForLeadController(anyString())).thenReturn("http://localhost:9000");
     when(mockClusterInfoAcessor.getPinotHelixResourceManager()).thenReturn(mockHelixResourceManager);
     return mockClusterInfoAcessor;
   }

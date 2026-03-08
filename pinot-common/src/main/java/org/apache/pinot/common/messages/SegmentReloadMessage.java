@@ -36,6 +36,7 @@ public class SegmentReloadMessage extends Message {
 
   private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
   private static final String SEGMENT_NAMES = "segmentNames";
+  private static final String RELOAD_JOB_ID_KEY = "reloadJobId";
 
   /**
    * This msg asks server to reload all segments in the given a table.
@@ -62,6 +63,10 @@ public class SegmentReloadMessage extends Message {
     setExecutionTimeout(-1);
 
     ZNRecord znRecord = getRecord();
+
+    // Persisting the msg ID as the reload job ID.
+    znRecord.setSimpleField(RELOAD_JOB_ID_KEY, getMsgId());
+
     znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
     if (CollectionUtils.isNotEmpty(segmentNames)) {
       // TODO: use the new List field and deprecate the partition name in next release.
@@ -84,5 +89,16 @@ public class SegmentReloadMessage extends Message {
   @Nullable
   public List<String> getSegmentList() {
     return getRecord().getListField(SEGMENT_NAMES);
+  }
+
+  /**
+   * Gets the reload job ID that was assigned when this reload operation was initiated on the controller.
+   * This ID is preserved in the message payload and survives Helix's message cloning during distribution.
+   *
+   * @return the reload job ID, or null if not set (for backward compatibility with old messages)
+   */
+  @Nullable
+  public String getReloadJobId() {
+    return getRecord().getSimpleField(RELOAD_JOB_ID_KEY);
   }
 }

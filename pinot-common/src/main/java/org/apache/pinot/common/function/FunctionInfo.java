@@ -26,11 +26,17 @@ public class FunctionInfo {
   private final Method _method;
   private final Class<?> _clazz;
   private final boolean _nullableParameters;
+  private final boolean _deterministic;
 
   public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters) {
+    this(method, clazz, nullableParameters, true);
+  }
+
+  public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters, boolean deterministic) {
     _method = method;
     _clazz = clazz;
     _nullableParameters = nullableParameters;
+    _deterministic = deterministic;
   }
 
   public Method getMethod() {
@@ -45,10 +51,14 @@ public class FunctionInfo {
     return _nullableParameters;
   }
 
+  public boolean isDeterministic() {
+    return _deterministic;
+  }
+
   public static FunctionInfo fromMethod(Method method) {
     ScalarFunction annotation = method.getAnnotation(ScalarFunction.class);
     boolean nullableParameters = annotation != null && annotation.nullableParameters();
-
-    return new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
+    boolean deterministic = annotation == null || annotation.isDeterministic();
+    return new FunctionInfo(method, method.getDeclaringClass(), nullableParameters, deterministic);
   }
 }
