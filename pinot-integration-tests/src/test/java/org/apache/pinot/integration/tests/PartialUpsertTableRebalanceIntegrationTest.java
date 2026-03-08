@@ -37,12 +37,12 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
-import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -154,6 +154,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     serverStarter1.stop();
     serverStarter2.stop();
+    // Re-init the static executor because stopping servers shuts it down; required for subsequent operations.
+    SegmentBuildTimeLeaseExtender.initExecutor();
     TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful()
             && _resourceManager.dropInstance(serverStarter2.getInstanceId()).isSuccessful(), 60_000L,
         "Failed to drop servers");
@@ -218,6 +220,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     serverStarter1.stop();
     serverStarter2.stop();
+    // Re-init the static executor because stopping servers shuts it down; required for subsequent operations.
+    SegmentBuildTimeLeaseExtender.initExecutor();
     TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful()
             && _resourceManager.dropInstance(serverStarter2.getInstanceId()).isSuccessful(), 60_000L,
         "Failed to drop servers");
@@ -249,35 +253,20 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   public void afterMethod()
       throws Exception {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    getControllerRequestClient().pauseConsumption(realtimeTableName);
-    TestUtils.waitForCondition((aVoid) -> {
-      try {
-        PauseStatusDetails pauseStatusDetails = getControllerRequestClient().getPauseStatusDetails(realtimeTableName);
-        return pauseStatusDetails.getConsumingSegments().isEmpty();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to drop the segments");
 
-    // Test dropping all segments one by one
-    List<String> segments = listSegments(realtimeTableName);
-    for (String segment : segments) {
-      dropSegment(realtimeTableName, segment);
-    }
+    // Drop the table entirely to clean up all segments and server-side upsert state.
+    // This is more reliable than the pause/drop-segments/restart cycle because it uses
+    // the standard table lifecycle and avoids issues with stale controller/server state.
+    dropRealtimeTable(getTableName());
+    waitForTableDataManagerRemoved(realtimeTableName);
+    waitForEVToDisappear(realtimeTableName);
 
-    // NOTE: There is a delay to remove the segment from property store
-    TestUtils.waitForCondition((aVoid) -> {
-      try {
-        return listSegments(realtimeTableName).isEmpty();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to drop the segments");
+    // Delete and recreate the Kafka topic for a clean stream
+    deleteKafkaTopic(getKafkaTopic());
+    createKafkaTopic(getKafkaTopic());
 
-    stopKafka(); // to clean up the topic
-    restartServers();
-    startKafka();
-    getControllerRequestClient().resumeConsumption(realtimeTableName);
+    // Recreate the table — this triggers fresh consuming segment creation
+    addTableConfig(_tableConfig);
   }
 
   protected void verifySegmentAssignment(Map<String, Map<String, String>> segmentAssignment, int numSegmentsExpected,
@@ -363,6 +352,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   @AfterClass
   public void tearDown()
       throws IOException {
+    dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();
     stopController();
