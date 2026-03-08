@@ -1143,6 +1143,7 @@ public class PinotHelixResourceManager {
         }
         return idealState;
       }, DEFAULT_RETRY_POLICY);
+
       LOGGER.info("Successfully rebuilt brokerResource for table: {}", tableNameWithType);
       return PinotResourceManagerResponse.success("Rebuilt brokerResource for table: " + tableNameWithType);
     } catch (Exception e) {

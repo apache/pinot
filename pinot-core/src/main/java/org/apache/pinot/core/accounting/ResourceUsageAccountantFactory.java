@@ -34,6 +34,7 @@ import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -102,8 +103,8 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       _queryResourceAggregator =
           new QueryResourceAggregator(instanceId, instanceType, cpuSamplingEnabled, memorySamplingEnabled,
               _watcherTask._queryMonitorConfig);
-      WorkloadBudgetManager workloadBudgetManager = WorkloadBudgetManager.get();
-      if (workloadBudgetManager.isEnabled()) {
+      WorkloadBudgetManager workloadBudgetManager = WorkloadBudgetManagerFactory.get();
+      if (workloadBudgetManager.isCostCollectionEnabled()) {
         _workloadResourceAggregator =
             new WorkloadResourceAggregator(instanceId, instanceType, cpuSamplingEnabled, memorySamplingEnabled,
                 _watcherTask._queryMonitorConfig, workloadBudgetManager);

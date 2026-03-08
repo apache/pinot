@@ -536,7 +536,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
-      boolean rlsFiltersApplied, boolean queryWasLogged, String workloadName) throws QueryException, WebApplicationException {
+      boolean rlsFiltersApplied, boolean queryWasLogged, String workloadName)
+      throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
 

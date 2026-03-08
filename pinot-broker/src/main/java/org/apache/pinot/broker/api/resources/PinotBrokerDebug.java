@@ -35,7 +35,6 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import javax.inject.Inject;
-import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -47,7 +46,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.broker.AccessControlFactory;
-import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -103,10 +101,6 @@ public class PinotBrokerDebug {
 
   @Inject
   ThreadAccountant _threadAccountant;
-
-  @Inject
-  @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
-  private String _instanceId;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)

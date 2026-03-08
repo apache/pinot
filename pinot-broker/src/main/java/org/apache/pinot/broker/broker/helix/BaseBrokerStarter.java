@@ -94,18 +94,16 @@ import org.apache.pinot.core.transport.NettyInspector;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.accounting.DefaultWorkloadBudgetManager;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -413,6 +411,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     // TODO: Hook multiClusterRoutingContext into request handlers subsequently.
     MultiClusterRoutingContext multiClusterRoutingContext = getMultiClusterRoutingContext();
+
     // Create Broker request handler.
     String brokerId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     BrokerRequestIdGenerator requestIdGenerator = new BrokerRequestIdGenerator();

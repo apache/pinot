@@ -113,9 +113,6 @@ public class HelixHelper {
   /**
    * Updates broker resource ideal state for the given broker with the given broker tags. Optional {@code tablesAdded}
    * and {@code tablesRemoved} can be provided to track the tables added/removed during the update.
-   *
-   * <p>This accepts a {@link org.apache.pinot.common.workload.WorkloadChangeListener} to notify
-   * when broker resource changes, enabling workload propagation.</p>
    */
   public static void updateBrokerResource(HelixManager helixManager, String brokerId, List<String> brokerTags,
       @Nullable List<String> tablesAdded, @Nullable List<String> tablesRemoved) {

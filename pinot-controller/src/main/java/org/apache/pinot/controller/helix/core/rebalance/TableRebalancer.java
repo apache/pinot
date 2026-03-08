@@ -77,8 +77,8 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.TableSizeReader;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -175,9 +175,11 @@ public class TableRebalancer {
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
       @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
-      @Nullable TableSizeReader tableSizeReader, @Nullable PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager,
+      @Nullable TableSizeReader tableSizeReader,
+      @Nullable PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager,
       @Nullable QueryWorkloadManager queryWorkloadManager) {
-    this(helixManager, tableRebalanceObserver, controllerMetrics, rebalancePreChecker, tableSizeReader, pinotLLCRealtimeSegmentManager);
+    this(helixManager, tableRebalanceObserver, controllerMetrics, rebalancePreChecker, tableSizeReader,
+        pinotLLCRealtimeSegmentManager);
     _queryWorkloadManager = queryWorkloadManager;
   }
 

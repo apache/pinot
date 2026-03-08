@@ -415,6 +415,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     CompileResult compileResult =
         compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
             accessControl);
+
     if (compileResult._errorOrLiteralOnlyBrokerResponse != null) {
       /*
        * If the compileRequest method sets the BrokerResponse field, then it is either an error response or

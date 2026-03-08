@@ -31,7 +31,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
-import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
