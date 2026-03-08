@@ -296,12 +296,8 @@ public class TablesResource {
       }
     }
 
-    // fetch partition to primary key count for realtime tables that have upsert or dedup enabled
-    Map<Integer, Long> partitionToPrimaryKeyCountMap = new HashMap<>();
-    if (tableDataManager instanceof RealtimeTableDataManager) {
-      RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
-      partitionToPrimaryKeyCountMap = realtimeTableDataManager.getPartitionToPrimaryKeyCount();
-    }
+    // fetch partition to primary key count for tables that have upsert or dedup enabled
+    Map<Integer, Long> partitionToPrimaryKeyCountMap = tableDataManager.getPartitionToPrimaryKeyCount();
 
     // construct partitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
     Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();

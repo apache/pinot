@@ -81,6 +81,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _dataCrc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
   private long _zkCreationTime = Long.MIN_VALUE;  // ZooKeeper creation time for upsert consistency
+  private long _zkPushTime = Long.MIN_VALUE; // ZooKeeper push time for upsert consistency
   private String _timeColumn;
   private TimeUnit _timeUnit;
   private Duration _timeGranularity;
@@ -412,9 +413,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   /**
    * Returns the ZooKeeper creation time for upsert consistency.
-   * This refers to the time set by controller while creating the consuming segment. It is used to ensure consistent
-   * creation time across replicas for upsert operations.
-   * @return ZK creation time in milliseconds, or Long.MIN_VALUE if not set
+   * For REALTIME tables, this is set by the controller when the consuming segment is created, ensuring consistent
+   * creation time across replicas. For segments loaded from disk, this returns {@code Long.MIN_VALUE} until
+   * {@link #setZkCreationTime(long)} is explicitly called (e.g. from ZK metadata during segment loading).
+   * @return ZK creation time in milliseconds, or {@code Long.MIN_VALUE} if not explicitly set
    */
   public long getZkCreationTime() {
     return _zkCreationTime;
@@ -426,6 +428,24 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    */
   public void setZkCreationTime(long zkCreationTime) {
     _zkCreationTime = zkCreationTime;
+  }
+
+  /**
+   * Returns the ZooKeeper push time for upsert consistency.
+   * This refers to the time set by controller while pushing the segment. It is used to ensure consistent
+   * push time across replicas for upsert operations.
+   * @return ZK push time in milliseconds, or Long.MIN_VALUE if not set
+   */
+  public long getZkPushTime() {
+    return _zkPushTime;
+  }
+
+  /**
+   * Sets the ZooKeeper push time for upsert consistency.
+   * @param zkPushTime ZK push time in milliseconds
+   */
+  public void setZkPushTime(long zkPushTime) {
+    _zkPushTime = zkPushTime;
   }
 
   @Override

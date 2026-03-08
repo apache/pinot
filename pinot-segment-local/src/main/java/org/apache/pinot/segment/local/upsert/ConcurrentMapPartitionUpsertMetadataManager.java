@@ -145,8 +145,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               // current value, but the segment has a larger sequence number (the segment is newer than the current
               // segment).
               if (comparisonResult > 0 || (comparisonResult == 0 && shouldReplaceOnComparisonTie(segmentName,
-                  currentSegmentName, getAuthoritativeCreationTime(segment),
-                  getAuthoritativeCreationTime(currentSegment)))) {
+                  currentSegmentName, getAuthoritativeUpdateOrCreationTime(segment),
+                  getAuthoritativeUpdateOrCreationTime(currentSegment)))) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 if (currentSegment != segment) {
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);

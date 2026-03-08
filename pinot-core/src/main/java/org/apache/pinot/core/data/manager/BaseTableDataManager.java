@@ -60,7 +60,9 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.ExceptionUtils;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -78,6 +80,8 @@ import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -107,9 +111,11 @@ import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,6 +128,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
   protected final ServerMetrics _serverMetrics = ServerMetrics.get();
+  protected TableUpsertMetadataManager _tableUpsertMetadataManager;
 
   protected InstanceDataManagerConfig _instanceDataManagerConfig;
   protected String _instanceId;
@@ -784,7 +791,133 @@ public abstract class BaseTableDataManager implements TableDataManager {
       Map<String, String> queryOptions) {
     List<SegmentContext> segmentContexts = new ArrayList<>(selectedSegments.size());
     selectedSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
+    if (isUpsertEnabled() && !QueryOptionsUtils.isSkipUpsert(queryOptions)) {
+      _tableUpsertMetadataManager.setSegmentContexts(segmentContexts, queryOptions);
+    }
     return segmentContexts;
+  }
+
+  @Override
+  public boolean isUpsertEnabled() {
+    return _tableUpsertMetadataManager != null;
+  }
+
+  @VisibleForTesting
+  @Override
+  public TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return _tableUpsertMetadataManager;
+  }
+
+  @Override
+  public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
+    if (isUpsertEnabled()) {
+      return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
+    }
+    return Collections.emptyMap();
+  }
+
+  protected void handleUpsert(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
+    String segmentName = immutableSegment.getSegmentName();
+    _logger.info("Adding immutable segment: {} with upsert enabled", segmentName);
+    Integer partitionId;
+    if (zkMetadata == null && TableNameBuilder.isOfflineTableResource(_tableNameWithType)) {
+      zkMetadata = ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _tableNameWithType,
+          segmentName);
+    }
+    setZkOperationTimeIfAvailable(immutableSegment, zkMetadata);
+    if (TableNameBuilder.isOfflineTableResource(_tableNameWithType)) {
+      Preconditions.checkState(zkMetadata != null,
+          "Failed to find segment ZK metadata for segment: %s of OFFLINE table: %s", segmentName, _tableNameWithType);
+      partitionId = SegmentUtils.getSegmentPartitionId(zkMetadata, null);
+    } else {
+      partitionId = SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
+    }
+
+    Preconditions.checkNotNull(partitionId,
+        "Failed to get partition id for segment: %s (upsert-enabled table: %s). "
+            + "Segment must follow a naming convention that encodes partition id (e.g. LLCSegmentName, "
+            + "UploadedRealtimeSegmentName), or have partition metadata configured via SegmentPartitionConfig.",
+        segmentName, _tableNameWithType);
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+        _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
+
+    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
+        immutableSegment.getSegmentMetadata().getTotalDocs());
+    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
+    ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
+    if (partitionUpsertMetadataManager.isPreloading()) {
+      // Register segment after it is preloaded and has initialized its validDocIds. The order of preloading and
+      // registering segment doesn't matter much as preloading happens before the table partition is ready for queries.
+      partitionUpsertMetadataManager.preloadSegment(immutableSegment);
+      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
+      _logger.info("Preloaded immutable segment: {} with upsert enabled", segmentName);
+      return;
+    }
+    SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
+    if (oldSegmentManager == null) {
+      // When adding a new segment, register it *before* partitionUpsertMetadataManager.addSegment() fully initializes
+      // the validDocIds bitmap. This lets queries access the new segment immediately while the bitmap is being built.
+      // Without early registration, docs in existing segments that get invalidated by this new segment would become
+      // invisible to queries until addSegment() completes.
+      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
+      partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
+      partitionUpsertMetadataManager.addSegment(immutableSegment);
+      _logger.info("Added new immutable segment: {} with upsert enabled", segmentName);
+    } else {
+      replaceUpsertSegment(segmentName, oldSegmentManager, newSegmentManager, partitionUpsertMetadataManager);
+    }
+  }
+
+  protected void replaceUpsertSegment(String segmentName, SegmentDataManager oldSegmentManager,
+      ImmutableSegmentDataManager newSegmentManager, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+    IndexSegment oldSegment = oldSegmentManager.getSegment();
+    ImmutableSegment immutableSegment = newSegmentManager.getSegment();
+    UpsertConfig.ConsistencyMode consistencyMode = _tableUpsertMetadataManager.getContext().getConsistencyMode();
+    if (consistencyMode == UpsertConfig.ConsistencyMode.NONE) {
+      // When replacing a segment, register the new segment *after* replaceSegment() finishes filling its validDocIds
+      // bitmap. Otherwise queries lose access to valid docs in the old segment before the new bitmap is ready.
+      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
+    } else {
+      // For consistency modes, keep both old and new segments visible to queries during replacement so that queries
+      // can see the new updates in the new segment while the old segment's validDocIds are still being updated.
+      // Register the new segment to the upsert metadata manager before making it visible to queries so the upsert
+      // view is updated before any query can access it.
+      SegmentDataManager duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
+      registerSegment(segmentName, duoSegmentDataManager, partitionUpsertMetadataManager);
+      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
+    }
+    _logger.info("Replaced {} segment: {} with upsert enabled and consistency mode: {}",
+        oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, consistencyMode);
+    oldSegmentManager.offload();
+    releaseSegment(oldSegmentManager);
+  }
+
+  protected void registerSegment(String segmentName, SegmentDataManager segmentDataManager,
+      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+    if (partitionUpsertMetadataManager != null) {
+      partitionUpsertMetadataManager.trackSegmentForUpsertView(segmentDataManager.getSegment());
+    }
+    registerSegment(segmentName, segmentDataManager);
+  }
+
+  protected void setZkOperationTimeIfAvailable(ImmutableSegment segment, @Nullable SegmentZKMetadata zkMetadata) {
+    if (zkMetadata == null) {
+      return;
+    }
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    if (segmentMetadata instanceof SegmentMetadataImpl) {
+      SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
+      if (zkMetadata.getCreationTime() > 0) {
+        segmentMetadataImpl.setZkCreationTime(zkMetadata.getCreationTime());
+      }
+      if (zkMetadata.getPushTime() > 0) {
+        segmentMetadataImpl.setZkPushTime(zkMetadata.getPushTime());
+      }
+      _logger.info("Set ZK creation time: {}, push time: {} for segment: {} in upsert table",
+          zkMetadata.getCreationTime(), zkMetadata.getPushTime(), zkMetadata.getSegmentName());
+    }
   }
 
   private void reloadSegments(List<SegmentDataManager> segmentDataManagers, IndexLoadingConfig indexLoadingConfig,
