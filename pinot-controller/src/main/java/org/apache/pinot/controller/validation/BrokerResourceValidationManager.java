@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.validation;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -27,7 +28,10 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
+import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +50,17 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
   }
 
   @Override
+  protected List<String> getTablesToProcess(Properties periodicTaskProperties) {
+    List<String> tables = super.getTablesToProcess(periodicTaskProperties);
+    if (periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME) != null) {
+      return tables;
+    }
+    List<String> combined = new ArrayList<>(tables);
+    combined.addAll(_pinotHelixResourceManager.getBrokerResourceLogicalTablePartitions());
+    return combined;
+  }
+
+  @Override
   protected Context preprocess(Properties periodicTaskProperties) {
     Context context = new Context();
     context._instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
@@ -54,15 +69,26 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
 
   @Override
   protected void processTable(String tableNameWithType, Context context) {
-    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-    if (tableConfig == null) {
-      LOGGER.warn("Failed to find table config for table: {}, skipping broker resource validation", tableNameWithType);
-      return;
+    Set<String> brokerInstances;
+    if (TableNameBuilder.isTableResource(tableNameWithType)) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        LOGGER.warn("Failed to find table config for table: {}, skipping broker resource validation",
+            tableNameWithType);
+        return;
+      }
+      brokerInstances = _pinotHelixResourceManager
+          .getAllInstancesForBrokerTenant(context._instanceConfigs, tableConfig.getTenantConfig().getBroker());
+    } else {
+      LogicalTableConfig logicalTableConfig = _pinotHelixResourceManager.getLogicalTableConfig(tableNameWithType);
+      if (logicalTableConfig == null) {
+        LOGGER.warn("Failed to find logical table config for: {}, skipping broker resource validation",
+            tableNameWithType);
+        return;
+      }
+      brokerInstances = _pinotHelixResourceManager
+          .getAllInstancesForBrokerTenant(context._instanceConfigs, logicalTableConfig.getBrokerTenant());
     }
-
-    // Rebuild broker resource
-    Set<String> brokerInstances = _pinotHelixResourceManager
-        .getAllInstancesForBrokerTenant(context._instanceConfigs, tableConfig.getTenantConfig().getBroker());
     _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
   }
 
