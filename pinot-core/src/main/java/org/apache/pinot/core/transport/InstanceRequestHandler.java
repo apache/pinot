@@ -324,7 +324,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       } else {
         Throwable cause = f.cause();
         LOGGER.error("Failed to send response for request: {} table: {}", requestId, tableNameWithType, cause);
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_SEND_RESPONSE_EXCEPTIONS, 1);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_SEND_RESPONSE_FAILURES, 1);
         ctx.close();
       }
     });
