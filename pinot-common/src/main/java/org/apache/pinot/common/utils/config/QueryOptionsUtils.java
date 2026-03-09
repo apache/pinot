@@ -166,19 +166,27 @@ public class QueryOptionsUtils {
   }
 
   /**
-   * When true, use JsonIndexDistinctOperator for SELECT DISTINCT jsonExtractIndex(...)
-   * instead of default DistinctOperator. Disabled by default; must be enabled via query option.
+   * When true, use index-based distinct operators (JsonIndexDistinctOperator or InvertedIndexDistinctOperator)
+   * when applicable. Set via query option useIndexBasedDistinctOperator=true.
    */
-  public static boolean isUseJsonIndexDistinct(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_JSON_INDEX_DISTINCT));
+  public static boolean isUseIndexBasedDistinctOperator(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR));
   }
 
   /**
-   * When true, use InvertedIndexDistinctOperator for SELECT DISTINCT on columns with inverted index
-   * instead of default DistinctOperator. Disabled by default; must be enabled via query option.
+   * When true, use JsonIndexDistinctOperator for SELECT DISTINCT jsonExtractIndex(...).
+   * Controlled by {@link #isUseIndexBasedDistinctOperator} (useIndexBasedDistinctOperator=true).
+   */
+  public static boolean isUseJsonIndexDistinct(Map<String, String> queryOptions) {
+    return isUseIndexBasedDistinctOperator(queryOptions);
+  }
+
+  /**
+   * When true, use InvertedIndexDistinctOperator for SELECT DISTINCT on columns with inverted index.
+   * Controlled by {@link #isUseIndexBasedDistinctOperator} (useIndexBasedDistinctOperator=true).
    */
   public static boolean isUseInvertedIndexDistinct(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_INVERTED_INDEX_DISTINCT));
+    return isUseIndexBasedDistinctOperator(queryOptions);
   }
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {

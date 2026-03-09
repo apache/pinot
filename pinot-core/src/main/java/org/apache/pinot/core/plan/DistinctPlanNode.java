@@ -76,7 +76,7 @@ public class DistinctPlanNode implements PlanNode {
       }
     }
 
-    // Use JSON index directly for DISTINCT jsonExtractIndex when query option useJsonIndexDistinct=true
+    // Use JSON index directly for DISTINCT jsonExtractIndex when query option useIndexBasedDistinctOperator=true
     // (disabled by default; opt-in via query option)
     if (QueryOptionsUtils.isUseJsonIndexDistinct(_queryContext.getQueryOptions()) && expressions.size() == 1) {
       ExpressionContext expr = expressions.get(0);
@@ -86,7 +86,7 @@ public class DistinctPlanNode implements PlanNode {
       }
     }
 
-    // Use inverted index directly for DISTINCT column when query option useInvertedIndexDistinct=true
+    // Use inverted index directly for DISTINCT column when query option useIndexBasedDistinctOperator=true
     // (disabled by default; opt-in via query option)
     if (QueryOptionsUtils.isUseInvertedIndexDistinct(_queryContext.getQueryOptions()) && expressions.size() == 1) {
       ExpressionContext expr = expressions.get(0);
