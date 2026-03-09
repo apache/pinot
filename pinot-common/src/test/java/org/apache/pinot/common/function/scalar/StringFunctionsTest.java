@@ -146,6 +146,9 @@ public class StringFunctionsTest {
 
         // Empty input with multi-char delimiter and negative index
         {"", "::", -1, 100, "", "null"},
+
+        // Integer.MIN_VALUE: negating it overflows (remains negative), guard must return "null"
+        {"org.apache.pinot", ".", Integer.MIN_VALUE, 100, "null", "null"},
     };
   }
 

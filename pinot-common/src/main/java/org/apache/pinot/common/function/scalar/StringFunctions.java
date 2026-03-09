@@ -597,6 +597,10 @@ public class StringFunctions {
     while (start < len && input.startsWith(delimiter, start)) {
       start += delimLen;
     }
+    // Guard against Integer.MIN_VALUE since negating it overflows (remains negative)
+    if (index == Integer.MIN_VALUE) {
+      return "null";
+    }
     // optimization for negative index with single-char delimiter since common case
     // multi-char delimiter with negative index can be handled in future since less common and more complex
     if (index < 0 && delimLen == 1) {
