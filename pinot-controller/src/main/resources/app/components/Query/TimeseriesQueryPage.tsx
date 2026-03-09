@@ -38,7 +38,7 @@ import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript';
 import { getTimeSeriesLanguages } from '../../requests';
-import { useHistory, useLocation } from 'react-router';
+import { useHistory, useLocation } from 'react-router-dom';
 import TableToolbar from '../TableToolbar';
 import { Resizable } from 're-resizable';
 import SimpleAccordion from '../SimpleAccordion';

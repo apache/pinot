@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import jwtDecode from "jwt-decode";
+import jwtDecode from 'jwt-decode';
 import { get, each, isEqual, isArray, keys, union } from 'lodash';
 import {
   DataTable,
@@ -127,7 +127,8 @@ import { baseApi } from './axios-config';
 import Utils from './Utils';
 import { matchPath } from 'react-router';
 import RouterData from '../router';
-const JSONbig = require('json-bigint')({'storeAsString': true})
+import JSONbigBase from 'json-bigint';
+const JSONbig = JSONbigBase({ storeAsString: true });
 
 // This method is used to display tenants listing on cluster manager home page
 // API: /tenants
