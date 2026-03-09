@@ -325,10 +325,7 @@ public class DataFetcher implements AutoCloseable {
 
     private ForwardIndexReaderContext getReaderContext() {
       if (!_readerContextCreated) {
-        _readerContext = _reader.createContext();
-        if (_readerContext != null) {
-          _readerContext.applyQueryOptions(_queryOptions);
-        }
+        _readerContext = _reader.createContext(_queryOptions);
         _readerContextCreated = true;
       }
       return _readerContext;
