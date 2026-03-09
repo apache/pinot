@@ -20,25 +20,35 @@ package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.IntConsumer;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.HttpVersion;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
@@ -46,6 +56,7 @@ import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
@@ -58,7 +69,15 @@ public class QueryWorkloadConfigUtils {
 
   private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(QueryWorkloadConfigUtils.class);
   private static final HttpClient HTTP_CLIENT = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG,
-          TlsUtils.getSslContext());
+      TlsUtils.getSslContext());
+  private static final Random RANDOM = new Random();
+  private static final int DEFAULT_HTTP_TIMEOUT_MS = 30_000;
+  // Single-threaded executor for background workload config fetching to avoid blocking main thread
+  private static final ExecutorService WORKLOAD_CONFIG_EXECUTOR = Executors.newSingleThreadExecutor(
+      new ThreadFactoryBuilder()
+          .setNameFormat("workload-config-fetcher-%d")
+          .setDaemon(true)
+          .build());
 
   /**
    * Converts a ZNRecord into a QueryWorkloadConfig object by extracting mapFields.
@@ -99,85 +118,134 @@ public class QueryWorkloadConfigUtils {
     }
   }
 
-  public static void updateZNRecordWithInstanceCost(ZNRecord znRecord, String queryWorkloadName,
-      InstanceCost instanceCost) {
-    Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
-    Preconditions.checkNotNull(instanceCost, "InstanceCost cannot be null");
+
+  /**
+   * Gets a random controller URL by dynamically discovering all live controller instances from Helix.
+   * This distributes load across all available controllers instead of always hitting the lead controller.
+   *
+   * @param helixManager The Helix manager to use for dynamic discovery
+   * @return controller URL or null if not available
+   */
+  public static String getControllerUrl(HelixManager helixManager) {
     try {
-      znRecord.setSimpleField(QueryWorkloadRefreshMessage.QUERY_WORKLOAD_NAME, queryWorkloadName);
-      znRecord.setSimpleField(QueryWorkloadRefreshMessage.INSTANCE_COST, JsonUtils.objectToString(instanceCost));
+      HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+      PropertyKey.Builder keyBuilder = helixDataAccessor.keyBuilder();
+
+      // Get all live instances first (this is a single ZK call)
+      List<String> liveInstances = helixDataAccessor.getChildNames(keyBuilder.liveInstances());
+      if (liveInstances == null || liveInstances.isEmpty()) {
+        LOGGER.warn("No live instances found in Helix");
+        return null;
+      }
+
+      // Filter for live controller instances only
+      List<String> liveControllerInstances = new ArrayList<>();
+      for (String instanceName : liveInstances) {
+        if (InstanceTypeUtils.isController(instanceName)) {
+          liveControllerInstances.add(instanceName);
+        }
+      }
+
+      if (liveControllerInstances.isEmpty()) {
+        LOGGER.warn("No live controller instances found in Helix");
+        return null;
+      }
+
+      String selectedInstance = liveControllerInstances.get(RANDOM.nextInt(liveControllerInstances.size()));
+      ExtraInstanceConfig extraInstanceConfig = new ExtraInstanceConfig(
+          helixDataAccessor.getProperty(keyBuilder.instanceConfig(selectedInstance)));
+      String baseUrl = extraInstanceConfig.getComponentUrl();
+      if (baseUrl == null) {
+        LOGGER.warn("Unable to extract the base URL from controller instance config: {}", selectedInstance);
+        return null;
+      }
+      LOGGER.info("Dynamically discovered controller URL from Helix (randomly selected from {} controllers): {}",
+          liveControllerInstances.size(), baseUrl);
+      return baseUrl;
     } catch (Exception e) {
-      String errorMessage = String.format("Failed to convert InstanceCost : %s to ZNRecord",
-          instanceCost);
-      throw new RuntimeException(errorMessage, e);
+      LOGGER.warn("Failed to dynamically discover controller URL from Helix", e);
+      return null;
     }
   }
 
-  public static InstanceCost getInstanceCostFromZNRecord(ZNRecord znRecord) {
-    Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
-    String instanceCostJson = znRecord.getSimpleField(QueryWorkloadRefreshMessage.INSTANCE_COST);
-    Preconditions.checkNotNull(instanceCostJson, "InstanceCost cannot be null");
-    try {
-      return JsonUtils.stringToObject(instanceCostJson, InstanceCost.class);
-    } catch (Exception e) {
-      String errorMessage = String.format("Failed to convert ZNRecord : %s to InstanceCost", znRecord);
-      throw new RuntimeException(errorMessage, e);
-    }
-  }
   /**
-   * Fetches query workload configs for a specific instance from the controller.
+   * Fetches and updates the query workload budgets that this instance should use.
+   * This method is called by the instance at startup. It runs asynchronously in a background thread
+   * to avoid blocking the main thread.
    *
-   * @param controllerUrl The URL of the controller.
    * @param instanceId The ID of the instance to fetch configs for.
-   * @param nodeType The type of node (e.g., BROKER, SERVER).
-   * @return A map of workload names to their corresponding InstanceCost objects.
+   * @param helixManager The Helix manager to use for dynamic controller discovery.
+   * @param budgetFetchStatusCallback Callback to set the fetch status metric (1=success, 0=failure).
    */
-  public static Map<String, InstanceCost> getQueryWorkloadConfigsFromController(String controllerUrl, String instanceId,
-                                                                                NodeConfig.Type nodeType) {
-    try {
-      if (controllerUrl == null || controllerUrl.isEmpty()) {
-        LOGGER.warn("Controller URL is empty, cannot fetch query workload configs for instance: {}", instanceId);
-        return Collections.emptyMap();
-      }
-      URI queryWorkloadURI = new URI(controllerUrl + "/queryWorkloadConfigs/instance/" + instanceId + "?nodeType="
-              + nodeType);
-      ClassicHttpRequest request = ClassicRequestBuilder.get(queryWorkloadURI)
-              .setVersion(HttpVersion.HTTP_1_1)
-              .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
-              .build();
-      AtomicReference<Map<String, InstanceCost>> workloadToInstanceCost = new AtomicReference<>(null);
-      RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(3, 3000L, 1.2f);
-      retryPolicy.attempt(() -> {
-        try {
-          SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
-                  HTTP_CLIENT.sendRequest(request, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS)
-          );
-          if (response.getStatusCode() == HttpStatus.SC_OK) {
-            workloadToInstanceCost.set(JsonUtils.stringToObject(response.getResponse(), new TypeReference<>() { }));
-            LOGGER.info("Successfully fetched query workload configs from controller: {}, Instance: {}",
-                    controllerUrl, instanceId);
-            return true;
-          } else if (response.getStatusCode() == HttpStatus.SC_NOT_FOUND) {
-            LOGGER.info("No query workload configs found for controller: {}, Instance: {}", controllerUrl, instanceId);
-            workloadToInstanceCost.set(Collections.emptyMap());
-            return true;
-          } else {
-            LOGGER.warn("Failed to fetch query workload configs from controller: {}, Instance: {}, Status: {}",
-                    controllerUrl, instanceId, response.getStatusCode());
-            return false;
-          }
-        } catch (Exception e) {
-          LOGGER.warn("Failed to fetch query workload configs from controller: {}, Instance: {}",
-                  controllerUrl, instanceId, e);
-          return false;
+  public static void getAndUpdateWorkloadBudgets(String instanceId, HelixManager helixManager,
+                                                 IntConsumer budgetFetchStatusCallback) {
+    WORKLOAD_CONFIG_EXECUTOR.submit(() -> {
+      int[] fetchStatus = {0}; // Default to failure (0)
+      try {
+        WorkloadBudgetManager workloadBudgetManager = WorkloadBudgetManagerFactory.get();
+        if (workloadBudgetManager == null) {
+          LOGGER.info("WorkloadBudgetManager not initialized for instance: {}. Skipping fetching workload budgets.",
+              instanceId);
+          return;
         }
-      });
-      return workloadToInstanceCost.get();
-    } catch (Exception e) {
-      LOGGER.warn("Failed to fetch query workload configs from controller: {}, Instance: {}",
-              controllerUrl, instanceId, e);
-      return Collections.emptyMap();
-    }
+        String controllerUrl = getControllerUrl(helixManager);
+        if (controllerUrl == null) {
+          LOGGER.warn("Controller URL could not be determined for instance: {}", instanceId);
+          return;
+        }
+        URI queryWorkloadURI = new URI(controllerUrl + "/queryWorkloadConfigs/instance/" + instanceId);
+        ClassicHttpRequest request = ClassicRequestBuilder.get(queryWorkloadURI)
+            .setVersion(HttpVersion.HTTP_1_1)
+            .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
+            .build();
+        Map<String, InstanceCost> workloadToInstanceCost = new HashMap<>();
+        RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(3, 3000L, 1.2f);
+        // Use a local HttpClient so that the connection pool and its SSL buffers are released after this
+        // one-time startup call, instead of leaking them for the lifetime of the process via a static field.
+        try (HttpClient httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG,
+            TlsUtils.getSslContext())) {
+          retryPolicy.attempt(() -> {
+            try {
+              SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+                  httpClient.sendRequest(request, DEFAULT_HTTP_TIMEOUT_MS));
+              if (response.getStatusCode() == HttpStatus.SC_OK) {
+                workloadToInstanceCost.putAll(JsonUtils.stringToObject(response.getResponse(), new TypeReference<>() {
+                }));
+                LOGGER.info("Successfully fetched query workload configs from controller: {}, Instance: {}",
+                    controllerUrl, instanceId);
+                fetchStatus[0] = 1; // Success
+                return true;
+              }
+              return false;
+            } catch (Exception e) {
+              if (e instanceof HttpErrorStatusException) {
+                HttpErrorStatusException httpError = (HttpErrorStatusException) e;
+                int statusCode = httpError.getStatusCode();
+                // Non-retriable errors - stop retrying but these are still failures
+                if (statusCode == HttpStatus.SC_BAD_REQUEST || statusCode == HttpStatus.SC_FORBIDDEN
+                    || statusCode == HttpStatus.SC_NOT_FOUND) {
+                  LOGGER.info("Non-retriable error while fetching query workload configs from controller: {}, "
+                      + "Instance: {}, status code: {}", controllerUrl, instanceId, statusCode);
+                  return true; // Stop retrying
+                }
+              }
+              LOGGER.warn("Failed to fetch query workload configs from controller: {}, Instance: {}",
+                  controllerUrl, instanceId, e);
+              return false; // Retry
+            }
+          });
+        }
+        if (!workloadToInstanceCost.isEmpty()) {
+          workloadToInstanceCost.forEach((workloadName, instanceCost) ->
+              workloadBudgetManager.addOrUpdateWorkload(workloadName, instanceCost.getCpuCostNs(),
+                  instanceCost.getMemoryCostBytes()));
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Failed to fetch query workload configs for instance: {}", instanceId, e);
+      } finally {
+        budgetFetchStatusCallback.accept(fetchStatus[0]);
+      }
+    });
   }
 
   /**

@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
@@ -177,5 +178,42 @@ public class InstanceUtils {
       scheme = "http";
     }
     return String.format("%s://%s:%s", scheme, hostName, adminPort);
+  }
+
+  /**
+   * Returns the base URI for the given instance name.
+   * @param instanceName the instance name in the format of Type_hostname_port e.g. Server_localhost_1234
+   * @param httpScheme the HTTP scheme (http or https)
+   * @param port the port number
+   * @return the base URI for the given instance name
+   */
+  public static String getInstanceBaseUri(String instanceName, String httpScheme, int port) {
+    String hostname = instanceName.split("_")[1];
+    return String.format("%s://%s:%d", httpScheme, hostname, port);
+  }
+
+  /**
+   * Extracts the HTTP scheme and port from the given InstanceConfig.
+   *
+   * @param config The InstanceConfig to extract from.
+   * @return A Pair containing the HTTP scheme and port, or null if extraction fails.
+   */
+  public static Pair<String, Integer> extractHttpSchemeAndPort(InstanceConfig config) {
+    try {
+      Map<String, String> fields = config.getRecord().getSimpleFields();
+      String scheme = "http";
+      String port = fields.getOrDefault(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, config.getPort());
+      // Check for HTTPS configuration
+      if (fields.containsKey(CommonConstants.Helix.Instance.ADMIN_HTTPS_PORT_KEY)) {
+        scheme = "https";
+        port = fields.get(CommonConstants.Helix.Instance.ADMIN_HTTPS_PORT_KEY);
+      } else if (fields.containsKey(ExtraInstanceConfig.PinotInstanceConfigProperty.PINOT_TLS_PORT.toString())) {
+        scheme = "https";
+        port = fields.get(ExtraInstanceConfig.PinotInstanceConfigProperty.PINOT_TLS_PORT.toString());
+      }
+      return Pair.of(scheme, Integer.parseInt(port));
+    } catch (Exception e) {
+      return null;
+    }
   }
 }

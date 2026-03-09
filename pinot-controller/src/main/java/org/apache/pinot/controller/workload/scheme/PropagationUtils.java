@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -78,28 +79,18 @@ public class PropagationUtils {
     for (TableConfig tableConfig : tableConfigs) {
       TenantConfig tenantConfig = tableConfig.getTenantConfig();
       TableType tableType = tableConfig.getTableType();
-      // Gather all relevant tags for this tenant
-      List<String> tenantTags = new ArrayList<>();
       try {
-        collectHelixTagsForTable(tenantTags, tenantConfig, tableType);
+        String brokerTag = TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker());
+        Set<String> brokerTags = Collections.singleton(brokerTag);
+        // Gather server tags based on table type
+        Set<String> serverTags = collectServerHelixTagsForTable(tenantConfig, tableType);
+        Map<NodeConfig.Type, Set<String>> nodeTypeToTags = new EnumMap<>(NodeConfig.Type.class);
+        nodeTypeToTags.put(NodeConfig.Type.BROKER_NODE, brokerTags);
+        nodeTypeToTags.put(NodeConfig.Type.SERVER_NODE, serverTags);
+        tableToTags.put(tableConfig.getTableName(), nodeTypeToTags);
       } catch (Exception e) {
         LOGGER.error("Failed to collect Helix tags for table: {}", tableConfig.getTableName(), e);
-        continue;
       }
-
-      // Populate the helix tags for BROKER_NODE and SERVER_NODE separately to provide flexibility
-      // in workload propagation to direct the workload to only specific node types
-      String brokerTag = TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker());
-      Set<String> brokerTags = Collections.singleton(brokerTag);
-
-      Set<String> serverTags = new HashSet<>(tenantTags);
-      serverTags.remove(brokerTag);
-
-      Map<NodeConfig.Type, Set<String>> nodeTypeToTags = new EnumMap<>(NodeConfig.Type.class);
-      nodeTypeToTags.put(NodeConfig.Type.BROKER_NODE, brokerTags);
-      nodeTypeToTags.put(NodeConfig.Type.SERVER_NODE, serverTags);
-
-      tableToTags.put(tableConfig.getTableName(), nodeTypeToTags);
     }
     return tableToTags;
   }
@@ -112,12 +103,11 @@ public class PropagationUtils {
    * completed tags are both added if they differ; otherwise, a single realtime tag is added.
    * </p>
    *
-   * @param tags The list to populate with resolved tags.
    * @param tenantConfig Tenant configuration containing tenant names.
    * @param tableType The type of the table (OFFLINE or REALTIME).
    */
-  private static void collectHelixTagsForTable(List<String> tags, TenantConfig tenantConfig, TableType tableType) {
-    tags.add(TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker()));
+  private static Set<String> collectServerHelixTagsForTable(TenantConfig tenantConfig, TableType tableType) {
+    Set<String> tags = new HashSet<>();
     if (tableType == TableType.OFFLINE) {
       tags.add(TagNameUtils.getOfflineTagForTenant(tenantConfig.getServer()));
     } else {
@@ -132,6 +122,7 @@ public class PropagationUtils {
         tags.add(completedServerTag);
       }
     }
+    return tags;
   }
 
   /**
@@ -146,12 +137,12 @@ public class PropagationUtils {
    * @param tableName The raw or type-qualified table name.
    * @return A list of Helix tags associated with the table.
    */
-  public static List<String> getHelixTagsForTable(PinotHelixResourceManager pinotResourceManager, String tableName) {
+  public static Set<String> getHelixTagsForTable(PinotHelixResourceManager pinotResourceManager, String tableName,
+                                                 NodeConfig.Type nodeType) {
     if (tableName == null || tableName.trim().isEmpty()) {
       throw new IllegalArgumentException("Table name cannot be null or empty");
     }
-
-    List<String> combinedTags = new ArrayList<>();
+    Set<String> helixTags = new HashSet<>();
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     List<String> tablesWithType = (tableType == null)
         ? Arrays.asList(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
@@ -161,13 +152,18 @@ public class PropagationUtils {
       try {
         TableConfig tableConfig = pinotResourceManager.getTableConfig(table);
         if (tableConfig != null) {
-          collectHelixTagsForTable(combinedTags, tableConfig.getTenantConfig(), tableConfig.getTableType());
+          TenantConfig tenantConfig = tableConfig.getTenantConfig();
+          if (nodeType == NodeConfig.Type.BROKER_NODE) {
+            helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker()));
+          } else if (nodeType == NodeConfig.Type.SERVER_NODE) {
+            helixTags.addAll(collectServerHelixTagsForTable(tenantConfig, tableConfig.getTableType()));
+          }
         }
       } catch (Exception e) {
         throw new RuntimeException("Failed to get table config for table: " + table, e);
       }
     }
-    return combinedTags;
+    return helixTags;
   }
 
   /**
@@ -224,7 +220,7 @@ public class PropagationUtils {
    * @return A set of configs whose propagation scope matches the filter tags.
    */
   public static Set<QueryWorkloadConfig> getQueryWorkloadConfigsForTags(
-      PinotHelixResourceManager pinotHelixResourceManager, List<String> filterTags,
+      PinotHelixResourceManager pinotHelixResourceManager, Set<String> filterTags,
       List<QueryWorkloadConfig> queryWorkloadConfigs) {
     Set<QueryWorkloadConfig> matchedConfigs = new HashSet<>();
     Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags = getTableToHelixTags(pinotHelixResourceManager);
@@ -238,7 +234,7 @@ public class PropagationUtils {
             Set<String> resolvedTags = TagNameUtils.isOfflineServerTag(tenant)
                     || TagNameUtils.isRealtimeServerTag(tenant) || TagNameUtils.isBrokerTag(tenant)
                 ? Collections.singleton(tenant)
-                : new HashSet<>(getAllPossibleHelixTagsFor(tenant));
+                : new HashSet<>(getAllPossibleHelixTagsForTenant(tenant));
             if (!Collections.disjoint(resolvedTags, filterTags)) {
               matchedConfigs.add(queryWorkloadConfig);
               break;
@@ -275,11 +271,28 @@ public class PropagationUtils {
    * @param tenantName Tenant name.
    * @return A list of Helix tags for the tenant.
    */
-  private static List<String> getAllPossibleHelixTagsFor(String tenantName) {
+  public static List<String> getAllPossibleHelixTagsForTenant(String tenantName) {
     List<String> helixTags = new ArrayList<>();
     helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantName));
     helixTags.add(TagNameUtils.getOfflineTagForTenant(tenantName));
     helixTags.add(TagNameUtils.getRealtimeTagForTenant(tenantName));
+    return helixTags;
+  }
+
+  public static Set<String> getHelixTagsForTenant(String tenantName, @Nullable NodeConfig.Type nodeType) {
+    Set<String> helixTags = new HashSet<>();
+    if (nodeType == NodeConfig.Type.BROKER_NODE) {
+      helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantName));
+    } else if (nodeType == NodeConfig.Type.SERVER_NODE) {
+      if (TagNameUtils.isOfflineServerTag(tenantName) || TagNameUtils.isRealtimeServerTag(tenantName)) {
+        helixTags.add(tenantName);
+      } else {
+        helixTags.add(TagNameUtils.getOfflineTagForTenant(tenantName));
+        helixTags.add(TagNameUtils.getRealtimeTagForTenant(tenantName));
+      }
+    } else {
+      helixTags.addAll(getAllPossibleHelixTagsForTenant(tenantName));
+    }
     return helixTags;
   }
 

@@ -356,6 +356,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       cid = Long.toString(requestId);
     }
     String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
+    _brokerMetrics.addMeteredValue(workloadName, BrokerMeter.WORKLOAD_QUERIES, 1);
 
     // NOTE: Timeout hasn't been resolved at this point, so we don't set deadline in the execution context here.
     //       Timeout is currently handled by processBrokerRequest().
@@ -430,6 +431,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     PinotQuery serverPinotQuery = compileResult._serverPinotQuery;
     LogicalTableConfig logicalTableConfig = _tableCache.getLogicalTableConfig(rawTableName);
     String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
+    String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
     long compilationEndTimeNs = System.nanoTime();
 
     // Validate that physical tables are not queried with multi-cluster routing enabled.
@@ -657,7 +659,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
-          schema, query, database, queryWasLogged);
+          schema, query, database, workloadName, queryWasLogged);
     }
 
     if (offlineBrokerRequest != null && isFilterAlwaysTrue(offlineBrokerRequest.getPinotQuery())) {
@@ -735,7 +737,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       } else {
         // If no route is found, send an empty response
         return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
-            schema, query, database, queryWasLogged);
+            schema, query, database, workloadName, queryWasLogged);
       }
     }
     long routingEndTimeNs = System.nanoTime();
@@ -916,6 +918,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           TimeUnit.MILLISECONDS);
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
     }
+    _brokerMetrics.addTimedValue(workloadName, BrokerTimer.WORKLOAD_TOTAL_QUERY_TIME_MS, totalTimeMs,
+        TimeUnit.MILLISECONDS);
 
     for (int pool : brokerResponse.getPools()) {
       _brokerMetrics.addMeteredValue(BrokerMeter.POOL_QUERIES, 1,
@@ -927,7 +931,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Log query and stats
     _queryLogger.logQueryCompleted(
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
-            QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats),
+            QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats, workloadName),
         queryWasLogged);
 
     return brokerResponse;
@@ -1133,7 +1137,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, PinotQuery serverPinotQuery,
       RequestContext requestContext, String tableName, @Nullable RequesterIdentity requesterIdentity, Schema schema,
-      String query, String database, boolean queryWasLogged) {
+      String query, String database, String workloadName, boolean queryWasLogged) {
     if (pinotQuery.isExplain()) {
       // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
       return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
@@ -1162,7 +1166,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     brokerResponse.setTablesQueried(Set.of(TableNameBuilder.extractRawTableName(tableName)));
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.logQueryCompleted(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
-        QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null), queryWasLogged);
+        QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null, workloadName), queryWasLogged);
     return brokerResponse;
   }
 
