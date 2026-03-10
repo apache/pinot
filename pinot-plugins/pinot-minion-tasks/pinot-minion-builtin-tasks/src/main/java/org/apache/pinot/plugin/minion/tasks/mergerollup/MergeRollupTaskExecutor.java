@@ -104,7 +104,18 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     // Reducer config
     String reducerMaxBatchSizeStr = configs.get(MinionConstants.MergeTask.REDUCER_MAX_BATCH_SIZE_KEY);
     if (reducerMaxBatchSizeStr != null) {
-      segmentProcessorConfigBuilder.setReducerMaxBatchSize(Integer.parseInt(reducerMaxBatchSizeStr));
+      try {
+        int reducerMaxBatchSize = Integer.parseInt(reducerMaxBatchSizeStr);
+        if (reducerMaxBatchSize > 0) {
+          segmentProcessorConfigBuilder.setReducerMaxBatchSize(reducerMaxBatchSize);
+        } else {
+          LOGGER.warn("Invalid value for {}: {}. Expected a positive integer; using default reducer max batch size.",
+              MinionConstants.MergeTask.REDUCER_MAX_BATCH_SIZE_KEY, reducerMaxBatchSizeStr);
+        }
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Failed to parse reducer max batch size for {}: '{}'. Using default reducer max batch size.",
+            MinionConstants.MergeTask.REDUCER_MAX_BATCH_SIZE_KEY, reducerMaxBatchSizeStr, e);
+      }
     }
 
     // Progress observer
