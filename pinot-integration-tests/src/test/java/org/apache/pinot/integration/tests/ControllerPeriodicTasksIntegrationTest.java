@@ -460,9 +460,10 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           && is.getInstanceSet(logicalTableName).equals(brokersAfterAdd);
     }, 600_000L, "Timeout when waiting for BrokerResourceValidationManager to repair logical table partition");
 
-    // Cleanup: drop broker and logical table
+    // Cleanup: drop broker, logical table config, and logical table schema
     _helixAdmin.dropInstance(helixClusterName, instanceConfig);
     _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
+    deleteSchema(logicalTableName);
   }
 
   @Test
