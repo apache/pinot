@@ -118,12 +118,14 @@ public class RollupReducer implements Reducer {
     GenericRowFileWriter rollupFileWriter = _rollupFileManager.getFileWriter();
 
     // Check if any aggregators support batch aggregation
-    boolean useBatchAggregation = aggregatorContextList.stream()
-        .anyMatch(ctx -> ctx._aggregator.supportsBatchAggregation());
+    long batchAggregatorCount = aggregatorContextList.stream()
+        .filter(ctx -> ctx._aggregator.supportsBatchAggregation())
+        .count();
 
-    if (useBatchAggregation) {
-      LOGGER.info("Using batch aggregation for partition: {}", _partitionId);
-      reduceBatch(recordReader, numRows, aggregatorContextList, rollupFileWriter, includeNullFields);
+    if (batchAggregatorCount > 0) {
+      LOGGER.info("Using hybrid aggregation for partition: {} ({} batch, {} pairwise)",
+          _partitionId, batchAggregatorCount, aggregatorContextList.size() - batchAggregatorCount);
+      reduceHybrid(recordReader, numRows, aggregatorContextList, rollupFileWriter, includeNullFields);
     } else {
       reducePairwise(recordReader, numRows, aggregatorContextList, rollupFileWriter, includeNullFields);
     }
@@ -179,27 +181,34 @@ public class RollupReducer implements Reducer {
   }
 
   /**
-   * Batch reduce - collects all rows for the same key before aggregating.
-   * This is more efficient for sketch aggregators that can batch merge.
+   * Hybrid reduce - uses batch aggregation only for aggregators that support it,
+   * pairwise aggregation for others. This optimizes memory usage by only buffering
+   * values for columns that benefit from batch aggregation (e.g., sketches).
    */
-  private void reduceBatch(GenericRowFileRecordReader recordReader, int numRows,
+  private void reduceHybrid(GenericRowFileRecordReader recordReader, int numRows,
       List<AggregatorContext> aggregatorContextList, GenericRowFileWriter rollupFileWriter, boolean includeNullFields)
       throws Exception {
-    // Collect values for each metric column across rows with the same key
+    // Only allocate batch storage for aggregators that support it
     List<List<Object>> batchValues = new ArrayList<>(aggregatorContextList.size());
     for (int j = 0; j < aggregatorContextList.size(); j++) {
-      batchValues.add(new ArrayList<>());
+      if (aggregatorContextList.get(j)._aggregator.supportsBatchAggregation()) {
+        batchValues.add(new ArrayList<>());
+      } else {
+        batchValues.add(null);  // null indicates pairwise aggregation
+      }
     }
 
     GenericRow baseRow = new GenericRow();
     recordReader.read(0, baseRow);
     int baseRowId = 0;
 
-    // Initialize batch with first row's values
+    // Initialize batch values for batch-supporting aggregators
     for (int j = 0; j < aggregatorContextList.size(); j++) {
-      String column = aggregatorContextList.get(j)._column;
-      if (!includeNullFields || !baseRow.isNullValue(column)) {
-        batchValues.get(j).add(baseRow.getValue(column));
+      if (batchValues.get(j) != null) {
+        String column = aggregatorContextList.get(j)._column;
+        if (!includeNullFields || !baseRow.isNullValue(column)) {
+          batchValues.get(j).add(baseRow.getValue(column));
+        }
       }
     }
 
@@ -209,57 +218,80 @@ public class RollupReducer implements Reducer {
       recordReader.read(i, currentRow);
 
       if (recordReader.compare(baseRowId, i) == 0) {
-        // Same key - add values to batch
+        // Same key - batch or aggregate pairwise depending on aggregator
         for (int j = 0; j < aggregatorContextList.size(); j++) {
-          String column = aggregatorContextList.get(j)._column;
-          if (!includeNullFields || !currentRow.isNullValue(column)) {
-            batchValues.get(j).add(currentRow.getValue(column));
+          AggregatorContext ctx = aggregatorContextList.get(j);
+          String column = ctx._column;
+
+          if (batchValues.get(j) != null) {
+            // Batch aggregation - collect value
+            if (!includeNullFields || !currentRow.isNullValue(column)) {
+              batchValues.get(j).add(currentRow.getValue(column));
+            }
+          } else {
+            // Pairwise aggregation - aggregate immediately (O(1) memory)
+            if (includeNullFields) {
+              if (!currentRow.isNullValue(column)) {
+                if (baseRow.removeNullValueField(column)) {
+                  baseRow.putValue(column, currentRow.getValue(column));
+                } else {
+                  baseRow.putValue(column, ctx._aggregator.aggregate(
+                      baseRow.getValue(column), currentRow.getValue(column), ctx._functionParameters));
+                }
+              }
+            } else {
+              baseRow.putValue(column, ctx._aggregator.aggregate(
+                  baseRow.getValue(column), currentRow.getValue(column), ctx._functionParameters));
+            }
           }
         }
 
-        // Memory safety: flush partial result if batch gets too large
+        // Memory safety: flush partial batch results if batch gets too large
         int currentBatchSize = 0;
-        for (int k = 0; k < batchValues.size(); k++) {
-          int size = batchValues.get(k).size();
-          if (size > currentBatchSize) {
-            currentBatchSize = size;
+        for (List<Object> batch : batchValues) {
+          if (batch != null && batch.size() > currentBatchSize) {
+            currentBatchSize = batch.size();
           }
         }
         if (currentBatchSize >= _maxBatchSize) {
           flushBatchToBaseRow(baseRow, batchValues, aggregatorContextList, includeNullFields);
         }
       } else {
-        // Key changed - aggregate batch and write
-        aggregateBatchAndWrite(baseRow, batchValues, aggregatorContextList, rollupFileWriter, includeNullFields);
+        // Key changed - finalize batch aggregations and write
+        finalizeBatchAndWrite(baseRow, batchValues, aggregatorContextList, rollupFileWriter, includeNullFields);
 
-        // Start new batch with current row
+        // Start new key
         baseRowId = i;
         baseRow.clear();
         recordReader.read(i, baseRow);
 
+        // Reset batch values for batch-supporting aggregators
         for (int j = 0; j < aggregatorContextList.size(); j++) {
-          batchValues.get(j).clear();
-          String column = aggregatorContextList.get(j)._column;
-          if (!includeNullFields || !baseRow.isNullValue(column)) {
-            batchValues.get(j).add(baseRow.getValue(column));
+          if (batchValues.get(j) != null) {
+            batchValues.get(j).clear();
+            String column = aggregatorContextList.get(j)._column;
+            if (!includeNullFields || !baseRow.isNullValue(column)) {
+              batchValues.get(j).add(baseRow.getValue(column));
+            }
           }
         }
       }
     }
 
     // Write final key
-    aggregateBatchAndWrite(baseRow, batchValues, aggregatorContextList, rollupFileWriter, includeNullFields);
+    finalizeBatchAndWrite(baseRow, batchValues, aggregatorContextList, rollupFileWriter, includeNullFields);
   }
 
   /**
    * Flush batch values into the base row (partial aggregation for memory safety).
+   * Only processes columns that use batch aggregation.
    */
   private void flushBatchToBaseRow(GenericRow baseRow, List<List<Object>> batchValues,
       List<AggregatorContext> aggregatorContextList, boolean includeNullFields) {
     for (int j = 0; j < aggregatorContextList.size(); j++) {
-      AggregatorContext ctx = aggregatorContextList.get(j);
       List<Object> values = batchValues.get(j);
-      if (!values.isEmpty()) {
+      if (values != null && !values.isEmpty()) {
+        AggregatorContext ctx = aggregatorContextList.get(j);
         Object aggregated = ctx._aggregator.aggregateBatch(values, ctx._functionParameters);
         baseRow.putValue(ctx._column, aggregated);
         if (includeNullFields) {
@@ -272,15 +304,16 @@ public class RollupReducer implements Reducer {
   }
 
   /**
-   * Aggregate batch values and write the result.
+   * Finalize batch aggregations and write the result.
+   * Pairwise columns already have their final values in baseRow.
    */
-  private void aggregateBatchAndWrite(GenericRow baseRow, List<List<Object>> batchValues,
+  private void finalizeBatchAndWrite(GenericRow baseRow, List<List<Object>> batchValues,
       List<AggregatorContext> aggregatorContextList, GenericRowFileWriter rollupFileWriter, boolean includeNullFields)
       throws Exception {
     for (int j = 0; j < aggregatorContextList.size(); j++) {
-      AggregatorContext ctx = aggregatorContextList.get(j);
       List<Object> values = batchValues.get(j);
-      if (!values.isEmpty()) {
+      if (values != null && !values.isEmpty()) {
+        AggregatorContext ctx = aggregatorContextList.get(j);
         Object aggregated = ctx._aggregator.aggregateBatch(values, ctx._functionParameters);
         baseRow.putValue(ctx._column, aggregated);
         if (includeNullFields) {
