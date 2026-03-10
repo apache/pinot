@@ -296,23 +296,19 @@ public class TablesResource {
       }
     }
 
-    // fetch partition to primary key count for realtime tables that have upsert enabled
-    Map<Integer, Long> upsertPartitionToPrimaryKeyCountMap = new HashMap<>();
-    if (tableDataManager instanceof RealtimeTableDataManager) {
-      RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
-      upsertPartitionToPrimaryKeyCountMap = realtimeTableDataManager.getUpsertPartitionToPrimaryKeyCount();
-    }
+    // fetch partition to primary key count for tables that have upsert or dedup enabled
+    Map<Integer, Long> partitionToPrimaryKeyCountMap = tableDataManager.getPartitionToPrimaryKeyCount();
 
-    // construct upsertPartitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
-    Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap = new HashMap<>();
-    upsertPartitionToPrimaryKeyCountMap.forEach(
-        (partition, primaryKeyCount) -> upsertPartitionToServerPrimaryKeyCountMap.put(partition,
+    // construct partitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
+    Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
+    partitionToPrimaryKeyCountMap.forEach(
+        (partition, primaryKeyCount) -> partitionToServerPrimaryKeyCountMap.put(partition,
             Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
 
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
             totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
-            upsertPartitionToServerPrimaryKeyCountMap);
+            partitionToServerPrimaryKeyCountMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 

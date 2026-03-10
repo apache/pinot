@@ -496,4 +496,16 @@ public class PluginManager {
       INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP.put(inputFormat.toLowerCase(), recordReaderConfigClass);
     }
   }
+
+  // Register plugin class names when users try to deprecate old plugins/libraries.
+  public void registerBackwardCompatibleClassName(String oldClassName, String newClassName) {
+    String existingNewClassName = PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.put(oldClassName, newClassName);
+    if (existingNewClassName != null) {
+      LOGGER.warn("There is already a mapping for backward compatible class from old [{}] to [{}], override it to [{}]",
+          oldClassName, existingNewClassName, newClassName);
+    } else {
+      LOGGER.info("Registered backward compatible class name mapping from old [{}] to new [{}]", oldClassName,
+          newClassName);
+    }
+  }
 }

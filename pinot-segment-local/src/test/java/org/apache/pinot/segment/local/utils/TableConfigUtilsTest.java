@@ -38,6 +38,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -79,6 +80,7 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.annotations.DataProvider;
@@ -1902,6 +1904,7 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
+    // OFFLINE table should fail because dedup is not yet supported for offline tables
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)
         .setDedupConfig(new DedupConfig())
@@ -1910,7 +1913,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       fail();
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Upsert/Dedup table is for realtime table only.");
+      assertEquals(e.getMessage(), "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE"
+          + " table");
     }
 
     tableConfig =
@@ -2026,11 +2030,87 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateUpsertConfigWithMd5Disabled() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setHashFunction(HashFunction.MD5);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      IllegalStateException exception =
+          expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig,
+              schema));
+      assertTrue(exception.getMessage().contains(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
+  }
+
+  @Test
+  public void testValidateDedupConfigWithMd5Disabled() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setHashFunction(HashFunction.MD5);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      IllegalStateException exception =
+          expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig,
+              schema));
+      assertTrue(exception.getMessage().contains(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
+  }
+
+  @Test
+  public void testValidateDedupConfigWithMd5DisabledAllowsUpsertModeNoneMd5() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setHashFunction(HashFunction.NONE);
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.NONE);
+    upsertConfig.setHashFunction(HashFunction.MD5);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
+  }
+
+  @Test
   public void testValidateUpsertConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
+    // OFFLINE table without segment partition config should fail with partition config error
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setUpsertConfig(upsertConfig)
@@ -2040,7 +2120,9 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       fail();
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Upsert/Dedup table is for realtime table only.");
+      assertEquals(e.getMessage(),
+          "Offline upsert table must have segment partition config to ensure correct partition-based "
+              + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
     }
 
     tableConfig =

@@ -115,6 +115,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
@@ -430,6 +431,18 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     LogicalTableConfig logicalTableConfig = _tableCache.getLogicalTableConfig(rawTableName);
     String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
     long compilationEndTimeNs = System.nanoTime();
+
+    // Validate that physical tables are not queried with multi-cluster routing enabled.
+    // Unlike the MSE, the SSE has no centralized exception handler that converts QueryException into
+    // BrokerResponseNative, so we must catch and convert here to return a proper JSON error response.
+    try {
+      validatePhysicalTablesWithMultiClusterRouting(Set.of(tableName), sqlNodeAndOptions.getOptions());
+    } catch (QueryException e) {
+      LOGGER.warn("Request {}: {}", requestId, e.getMessage());
+      requestContext.setErrorCode(e.getErrorCode());
+      return new BrokerResponseNative(e.getErrorCode(), e.getMessage());
+    }
+
     // full request compile time = compilationTimeNs + parserTimeNs
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs());

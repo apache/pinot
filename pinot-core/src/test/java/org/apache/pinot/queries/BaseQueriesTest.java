@@ -213,8 +213,7 @@ public abstract class BaseQueriesTest {
     byte[] serializedResponse;
     try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
       Plan plan =
-          planMaker.makeInstancePlan(getSegmentContexts(getIndexSegments()), serverQueryContext, EXECUTOR_SERVICE,
-              null);
+          planMaker.makeInstancePlan(getSegmentContexts(getIndexSegments()), serverQueryContext, EXECUTOR_SERVICE);
       InstanceResponseBlock instanceResponse =
           queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan, queryContext)
               : plan.execute();
@@ -298,8 +297,7 @@ public abstract class BaseQueriesTest {
     for (int i = 0; i < 2; i++) {
       try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
         Plan plan =
-            planMaker.makeInstancePlan(getSegmentContexts(instances.get(i)), serverQueryContext, EXECUTOR_SERVICE,
-                null);
+            planMaker.makeInstancePlan(getSegmentContexts(instances.get(i)), serverQueryContext, EXECUTOR_SERVICE);
         InstanceResponseBlock instanceResponse =
             queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan, queryContext)
                 : plan.execute();

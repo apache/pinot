@@ -35,6 +35,7 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.csv.QuoteMode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
@@ -217,10 +218,17 @@ public class CSVRecordReader implements RecordReader {
       LOGGER.warn("Caught exception while reading CSV file: {}, recovering from line: {}", _dataFile, _numSkippedLines,
           exception);
 
-      throw exception;
+      throw new RecordFetchException("Failed to read CSV record", exception);
     }
 
-    CSVRecord record = _iterator.next();
+    // Record fetch: read next CSV record from stream.
+    CSVRecord record;
+    try {
+      record = _iterator.next();
+    } catch (RuntimeException e) {
+      throw new RecordFetchException("Failed to read next CSV record", e);
+    }
+    // Data parsing: extract into GenericRow.
     _recordExtractor.extract(record, reuse);
     _nextLineId = _numSkippedLines + (int) _parser.getCurrentLineNumber();
     return reuse;

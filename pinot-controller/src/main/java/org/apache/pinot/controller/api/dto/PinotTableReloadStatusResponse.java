@@ -25,6 +25,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 
 @InterfaceStability.Evolving
 public class PinotTableReloadStatusResponse {
+  private String _status;
   private double _timeElapsedInMinutes;
   private double _estimatedTimeRemainingInMinutes;
   private int _totalSegmentCount;
@@ -34,6 +35,15 @@ public class PinotTableReloadStatusResponse {
   private Long _failureCount;
   private PinotControllerJobMetadataDto _metadata;
   private List<SegmentReloadFailureResponse> _segmentReloadFailures;
+
+  public String getStatus() {
+    return _status;
+  }
+
+  public PinotTableReloadStatusResponse setStatus(String status) {
+    _status = status;
+    return this;
+  }
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;

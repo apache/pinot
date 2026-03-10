@@ -97,6 +97,7 @@ public class ControllerConf extends PinotConfiguration {
   // Used to determine whether to use group commit idealstate on segment completion
   public static final String CONTROLLER_SEGMENT_COMPLETION_GROUP_COMMIT_ENABLED =
       "controller.segment.completion.group.commit.enabled";
+
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
   }
@@ -173,6 +174,34 @@ public class ControllerConf extends PinotConfiguration {
     // This is the expiry for the ended tasks. Helix cleans up the task info from ZK after the expiry time from the
     // end of the task.
     public static final String PINOT_TASK_EXPIRE_TIME_MS = "controller.task.expire.time.ms";
+    public static final long DEFAULT_TASK_EXPIRE_TIME_MS = 24 * 60 * 60 * 1000L; // 24 hours
+
+    // Terminal state expiry for FAILED/TIMED_OUT jobs. Helix uses this to determine when to purge
+    // jobs in terminal states other than COMPLETED from ZK.
+    public static final String PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS =
+        "controller.task.terminalState.expire.time.ms";
+    public static final long DEFAULT_TERMINAL_STATE_EXPIRE_TIME_MS = 72 * 60 * 60 * 1000L; // 72 hours
+
+    // Maximum number of jobs allowed in a task queue before triggering count-based cleanup.
+    // -1 means disabled (no count-based cleanup).
+    public static final String PINOT_TASK_QUEUE_MAX_SIZE = "controller.task.queue.maxSize";
+    public static final int DEFAULT_TASK_QUEUE_MAX_SIZE = -1;
+
+    // Maximum number of terminal jobs to delete per count based cleanup cycle to bound ZK write overhead.
+    public static final String PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE = "controller.task.queue.maxDeletesPerCycle";
+    public static final int DEFAULT_TASK_QUEUE_MAX_DELETES_PER_CYCLE = 100;
+
+    // Helix WorkflowConfig.capacity: hard ceiling on the number of jobs in a task queue.
+    // When reached during enqueue, Helix purges expired jobs first; if still full, enqueue
+    // fails with HelixException. Only applies to newly created queues (existing queues retain
+    // their original capacity). -1 means unlimited (Integer.MAX_VALUE).
+    // This is a safety net complementing Pinot's own count-based trimming (maxSize).
+    public static final String PINOT_TASK_QUEUE_CAPACITY = "controller.task.queue.capacity";
+    public static final int DEFAULT_TASK_QUEUE_CAPACITY = -1;
+
+    // Queue size threshold above which a warning is logged during prepTaskQueue.
+    public static final String PINOT_TASK_QUEUE_WARNING_THRESHOLD = "controller.task.queue.warningThreshold";
+    public static final int DEFAULT_TASK_QUEUE_WARNING_THRESHOLD = 5000;
 
     // Distributed lock enablement for PinotTaskManager
     public static final String ENABLE_DISTRIBUTED_LOCKING = "controller.task.enableDistributedLocking";
@@ -224,6 +253,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segment.level.validation.intervalPeriod";
     public static final String AUTO_RESET_ERROR_SEGMENTS_VALIDATION =
         "controller.segment.error.autoReset";
+    public static final String ENABLE_PARTIAL_OFFLINE_REPLICA_REPAIR =
+        "controller.realtime.segment.partialOfflineReplicaRepairEnabled";
     public static final String DISASTER_RECOVERY_MODE_CONFIG_KEY = "controller.segment.disaster.recovery.mode";
 
     // Initial delays
@@ -343,6 +374,14 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DISK_UTILIZATION_CHECK_TIMEOUT_MS = "controller.disk.utilization.check.timeoutMs";
   public static final String DISK_UTILIZATION_PATH = "controller.disk.utilization.path";
   public static final String ENABLE_RESOURCE_UTILIZATION_CHECK = "controller.enable.resource.utilization.check";
+  // Explicitly enables all resource utilization checkers
+  public static final String ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS =
+      "controller.enable.all.resource.utilization.checkers";
+  // If controller.enable.all.resource.utilization.checkers = false, each individual utilization checker can be enabled.
+  // When a new resource utilization checker is added, a new config must be added to have the option to specifically
+  // enable/disable it.
+  public static final String ENABLE_DISK_UTILIZATION_CHECKER =
+      "controller.enable.disk.utilization.checker";
   public static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
       "controller.resource.utilization.checker.initial.delay";
   public static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
@@ -377,6 +416,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS = 30_000;
   public static final String DEFAULT_DISK_UTILIZATION_PATH = "/home/pinot/data";
   public static final boolean DEFAULT_ENABLE_RESOURCE_UTILIZATION_CHECK = false;
+  // Include all resource utilization checkers by default
+  public static final boolean DEFAULT_ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS = true;
+  public static final boolean DEFAULT_ENABLE_DISK_UTILIZATION_CHECKER = false;
   public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY = 300L; // 5 minutes
   public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY = 300L; // 5 minutes
   public static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
@@ -1112,6 +1154,14 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ENABLE_RESOURCE_UTILIZATION_CHECK, DEFAULT_ENABLE_RESOURCE_UTILIZATION_CHECK);
   }
 
+  public boolean isAllResourceUtilizationCheckersEnabled() {
+    return getProperty(ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS, DEFAULT_ENABLE_ALL_RESOURCE_UTILIZATION_CHECKERS);
+  }
+
+  public boolean isDiskUtilizationCheckerEnabled() {
+    return getProperty(ENABLE_DISK_UTILIZATION_CHECKER, DEFAULT_ENABLE_DISK_UTILIZATION_CHECKER);
+  }
+
   public boolean getEnableBatchMessageMode() {
     return getProperty(ENABLE_BATCH_MESSAGE_MODE, DEFAULT_ENABLE_BATCH_MESSAGE_MODE);
   }
@@ -1131,6 +1181,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isAutoResetErrorSegmentsOnValidationEnabled() {
     return getProperty(ControllerPeriodicTasksConf.AUTO_RESET_ERROR_SEGMENTS_VALIDATION, true);
+  }
+
+  public boolean isPartialOfflineReplicaRepairEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_PARTIAL_OFFLINE_REPLICA_REPAIR, false);
   }
 
   public DisasterRecoveryMode getDisasterRecoveryMode() {
@@ -1240,7 +1294,33 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public long getPinotTaskExpireTimeInMs() {
-    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS, TimeUnit.HOURS.toMillis(24));
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_EXPIRE_TIME_MS);
+  }
+
+  public long getPinotTaskTerminalStateExpireTimeInMs() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_TERMINAL_STATE_EXPIRE_TIME_MS,
+        ControllerPeriodicTasksConf.DEFAULT_TERMINAL_STATE_EXPIRE_TIME_MS);
+  }
+
+  public int getPinotTaskQueueMaxSize() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_SIZE,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_MAX_SIZE);
+  }
+
+  public int getPinotTaskQueueMaxDeletesPerCycle() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_MAX_DELETES_PER_CYCLE,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_MAX_DELETES_PER_CYCLE);
+  }
+
+  public int getPinotTaskQueueCapacity() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_CAPACITY,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_CAPACITY);
+  }
+
+  public int getPinotTaskQueueWarningThreshold() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_QUEUE_WARNING_THRESHOLD,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_WARNING_THRESHOLD);
   }
 
   /**
