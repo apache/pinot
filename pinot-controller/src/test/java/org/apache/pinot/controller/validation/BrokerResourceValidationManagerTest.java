@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.validation;
 
-import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
@@ -68,14 +67,8 @@ public class BrokerResourceValidationManagerTest {
    * periodic task validates and repairs broker resource for logical tables too.
    */
   @Test
-  public void testGetTablesToProcessIncludesLogicalTablePartitions()
-      throws Exception {
-    Method getTablesToProcess =
-        BrokerResourceValidationManager.class.getDeclaredMethod("getTablesToProcess", Properties.class);
-    getTablesToProcess.setAccessible(true);
-
-    @SuppressWarnings("unchecked")
-    List<String> tables = (List<String>) getTablesToProcess.invoke(_validationManager, new Properties());
+  public void testGetTablesToProcessIncludesLogicalTablePartitions() {
+    List<String> tables = _validationManager.getTablesToProcess(new Properties());
 
     assertTrue(tables.contains(PHYSICAL_TABLE), "Should include physical table: " + PHYSICAL_TABLE);
     assertTrue(tables.contains(LOGICAL_TABLE_PARTITION),
@@ -84,33 +77,21 @@ public class BrokerResourceValidationManagerTest {
   }
 
   @Test
-  public void testGetTablesToProcessWithTableNamePropertyReturnsOnlyThatTable()
-      throws Exception {
+  public void testGetTablesToProcessWithTableNamePropertyReturnsOnlyThatTable() {
     String singleTable = "singleTable_REALTIME";
     Properties props = new Properties();
     props.setProperty(PeriodicTask.PROPERTY_KEY_TABLE_NAME, singleTable);
 
-    Method getTablesToProcess =
-        BrokerResourceValidationManager.class.getDeclaredMethod("getTablesToProcess", Properties.class);
-    getTablesToProcess.setAccessible(true);
-
-    @SuppressWarnings("unchecked")
-    List<String> tables = (List<String>) getTablesToProcess.invoke(_validationManager, props);
+    List<String> tables = _validationManager.getTablesToProcess(props);
 
     assertEquals(tables, List.of(singleTable), "When tableName property is set, only that table should be returned");
   }
 
   @Test
-  public void testGetTablesToProcessWhenNoLogicalPartitions()
-      throws Exception {
+  public void testGetTablesToProcessWhenNoLogicalPartitions() {
     when(_resourceManager.getBrokerResourceLogicalTablePartitions()).thenReturn(Collections.emptyList());
 
-    Method getTablesToProcess =
-        BrokerResourceValidationManager.class.getDeclaredMethod("getTablesToProcess", Properties.class);
-    getTablesToProcess.setAccessible(true);
-
-    @SuppressWarnings("unchecked")
-    List<String> tables = (List<String>) getTablesToProcess.invoke(_validationManager, new Properties());
+    List<String> tables = _validationManager.getTablesToProcess(new Properties());
 
     assertEquals(tables, List.of(PHYSICAL_TABLE));
   }
