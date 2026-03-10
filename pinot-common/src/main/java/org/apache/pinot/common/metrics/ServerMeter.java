@@ -123,6 +123,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+  NETTY_CONNECTION_SEND_RESPONSE_FAILURES("nettyConnection", true),
 
   // GRPC related metrics
   GRPC_QUERIES("grpcQueries", true),
