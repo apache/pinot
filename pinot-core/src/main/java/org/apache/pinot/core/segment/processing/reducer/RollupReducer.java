@@ -218,7 +218,14 @@ public class RollupReducer implements Reducer {
         }
 
         // Memory safety: flush partial result if batch gets too large
-        if (batchValues.get(0).size() >= _maxBatchSize) {
+        int currentBatchSize = 0;
+        for (int k = 0; k < batchValues.size(); k++) {
+          int size = batchValues.get(k).size();
+          if (size > currentBatchSize) {
+            currentBatchSize = size;
+          }
+        }
+        if (currentBatchSize >= _maxBatchSize) {
           flushBatchToBaseRow(baseRow, batchValues, aggregatorContextList, includeNullFields);
         }
       } else {
