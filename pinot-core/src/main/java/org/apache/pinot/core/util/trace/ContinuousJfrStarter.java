@@ -19,24 +19,20 @@
 package org.apache.pinot.core.util.trace;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.text.ParseException;
+import java.lang.management.ManagementFactory;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
-import jdk.jfr.Configuration;
-import jdk.jfr.Recording;
+import javax.management.MBeanServer;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -46,6 +42,11 @@ import org.slf4j.LoggerFactory;
 
 public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ContinuousJfrStarter.class);
+  private static final String JFR_CONFIGURE_COMMAND = "jfrConfigure";
+  private static final String JFR_START_COMMAND = "jfrStart";
+  private static final String JFR_STOP_COMMAND = "jfrStop";
+  private static final String JFR_DIAGNOSTIC_MBEAN = "com.sun.management:type=DiagnosticCommand";
+
   /// Key that controls whether to enable continuous JFR recording.
   public static final String ENABLED = "enabled";
   /// Default value for the enabled key.
@@ -74,24 +75,19 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   ///
   /// If true, the recording will be dumped to a file when the JVM exits.
   public static final boolean DEFAULT_DUMP_ON_EXIT = true;
-  /// Key that controls the directory to store the recordings when dumped on exit.
+  /// Key that controls the JFR repository directory path.
   ///
-  /// The default value is the current working directory.
-  /// The filename will be 'recording-<timestamp>.jfr', where timestamp is in UTC and format is 'yyyy-MM-dd_HH-mm-ss'.
+  /// The default value is the tmp directory of the system, as determined by the `java.io.tmpdir` system property.
+  ///
+  /// If set, this is applied via the JFR DiagnosticCommand MBean as `repositorypath`.
   public static final String DIRECTORY = "directory";
-  /// Key that controls the maximum number of dumps to keep.
-  ///
-  /// If set, the directory will be cleaned up to keep only the most recent dumps.
-  ///
-  /// This is a Pinot feature, not a JFR feature and defaults to 10.
-  /// If negative, no file will be removed.
-  public static final String MAX_DUMPS = "maxDumps";
-  public static final int DEFAULT_MAX_DUMPS = 10;
+  /// Key that controls the JFR default dump directory path.
+  /// If set, this is applied via the JFR DiagnosticCommand MBean as `dumppath`.
+  public static final String DUMP_PATH = "dumpPath";
 
   /// Key that controls whether to buffer the recording to disk.
   /// If false, the recording will only be kept in memory.
-  /// If true, the recording will be written to disk periodically. This may affect performance but increases the window
-  /// of time that can be recorded.
+  /// If true, the recording repository will persist data on disk.
   public static final String TO_DISK = "toDisk";
   /// Default value for the toDisk key.
   public static final boolean DEFAULT_TO_DISK = true;
@@ -127,12 +123,20 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   @GuardedBy("this")
   private Map<String, Object> _currentConfig;
   @GuardedBy("this")
-  private Recording _recording;
-  @GuardedBy("this")
-  private Thread _cleanupThread;
+  private String _recordingName;
+  private final MBeanServer _mBeanServer;
+  @Nullable
+  private final ObjectName _diagnosticCommandObjectName;
 
   @VisibleForTesting
   protected ContinuousJfrStarter() {
+    this(ManagementFactory.getPlatformMBeanServer(), createDiagnosticCommandObjectName());
+  }
+
+  @VisibleForTesting
+  protected ContinuousJfrStarter(MBeanServer mBeanServer, @Nullable ObjectName diagnosticCommandObjectName) {
+    _mBeanServer = mBeanServer;
+    _diagnosticCommandObjectName = diagnosticCommandObjectName;
   }
 
   @Override
@@ -169,24 +173,15 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     if (!_running) {
       return;
     }
-    assert _recording != null;
-    LOGGER.debug("Stopping recording {}", _recording.getName());
-    _recording.stop();
-    _recording.close();
-
-    if (_cleanupThread != null) {
-      _cleanupThread.interrupt();
-      try {
-        _cleanupThread.join(5_000);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        LOGGER.warn("Interrupted while waiting for cleanup thread to stop");
-      }
-      _cleanupThread = null;
+    assert _recordingName != null;
+    if (!isDiagnosticCommandAvailable()) {
+      LOGGER.warn("JFR DiagnosticCommand MBean is unavailable. Marking recording '{}' as stopped in Pinot state only",
+          _recordingName);
+    } else {
+      executeDiagnosticCommand(JFR_STOP_COMMAND, "name=" + _recordingName);
+      LOGGER.info("Stopped continuous JFR recording {}", _recordingName);
     }
-
-    LOGGER.info("Stopped continuous JFR recording {}", _recording.getName());
-    _recording = null;
+    _recordingName = null;
     _running = false;
   }
 
@@ -198,114 +193,88 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     if (_running) {
       return;
     }
+    if (!isDiagnosticCommandAvailable()) {
+      LOGGER.warn("JFR DiagnosticCommand MBean is unavailable. Cannot start continuous JFR recording");
+      return;
+    }
 
-    _recording = createRecording(subset);
-    _recording.setName(subset.getProperty(NAME, DEFAULT_NAME));
+    String recordingName = subset.getProperty(NAME, DEFAULT_NAME);
+    applyRuntimeOptions(subset);
 
-    _recording.setDumpOnExit(subset.getProperty(DUMP_ON_EXIT, DEFAULT_DUMP_ON_EXIT));
-
-    prepareFileDumps(subset);
-
+    String maxAge = subset.getProperty(MAX_AGE, DEFAULT_MAX_AGE);
     try {
+      List<String> startArguments = new ArrayList<>();
+      startArguments.add("name=" + recordingName);
+      startArguments.add("settings=" + subset.getProperty(CONFIGURATION, DEFAULT_CONFIGURATION));
+      startArguments.add("dumponexit=" + subset.getProperty(DUMP_ON_EXIT, DEFAULT_DUMP_ON_EXIT));
       boolean toDisk = subset.getProperty(TO_DISK, DEFAULT_TO_DISK);
+      startArguments.add("disk=" + toDisk);
       if (toDisk) {
-        _recording.setToDisk(true);
-        _recording.setMaxSize(subset.getProperty(MAX_SIZE, DEFAULT_MAX_SIZE));
-        _recording.setMaxAge(Duration.parse(subset.getProperty(MAX_AGE, DEFAULT_MAX_AGE).toUpperCase(Locale.ENGLISH)));
+        startArguments.add("maxsize=" + subset.getProperty(MAX_SIZE, DEFAULT_MAX_SIZE));
+        startArguments.add("maxage=" + toJfrTimeArgument(maxAge));
+      }
+      if (!executeDiagnosticCommand(JFR_START_COMMAND, startArguments.toArray(new String[0]))) {
+        LOGGER.warn("Failed to start continuous JFR recording '{}'", recordingName);
+        return;
       }
     } catch (DateTimeParseException e) {
-      throw new RuntimeException("Failed to parse duration", e);
+      throw new RuntimeException("Failed to parse duration '" + maxAge + "'", e);
     }
-    _recording.start();
-    LOGGER.info("Started continuous JFR recording {} with configuration: {}", _recording.getName(), subset);
+
+    _recordingName = recordingName;
+    LOGGER.info("Started continuous JFR recording {} with configuration: {}", recordingName, subset);
     _running = true;
   }
 
   @VisibleForTesting
-  protected static Path getRecordingPath(Path parentDir, String name, Instant timestamp) {
-    String filename = "recording-" + name + "-" + timestamp + ".jfr";
-    return parentDir.resolve(filename);
+  protected boolean executeDiagnosticCommand(String operationName, String... arguments) {
+    try {
+      _mBeanServer.invoke(_diagnosticCommandObjectName, operationName, new Object[]{arguments},
+          new String[]{String[].class.getName()});
+      return true;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to execute JFR command '{}' with arguments {}", operationName, Arrays.toString(arguments), e);
+      return false;
+    }
   }
 
-  private void prepareFileDumps(PinotConfiguration subset) {
-    try {
-      Path directory = Path.of(subset.getProperty(DIRECTORY, Paths.get(".").toString()));
-      if (!directory.toFile().canWrite()) {
-        throw new RuntimeException("Cannot write: " + directory);
-      }
+  private void applyRuntimeOptions(PinotConfiguration subset) {
+    List<String> configureArguments = new ArrayList<>();
+    String repositoryPath = subset.getProperty(DIRECTORY, (String) null);
+    if (repositoryPath != null && !repositoryPath.isEmpty()) {
+      configureArguments.add("repositorypath=" + repositoryPath);
+    }
+    String dumpPath = subset.getProperty(DUMP_PATH, (String) null);
+    if (dumpPath != null && !dumpPath.isEmpty()) {
+      configureArguments.add("dumppath=" + dumpPath);
+    }
 
-      Path recordingPath = getRecordingPath(directory, _recording.getName(), Instant.now());
-      _recording.setDestination(recordingPath);
-
-      int maxDumps = subset.getProperty(MAX_DUMPS, DEFAULT_MAX_DUMPS);
-      if (maxDumps > 0) {
-        _cleanupThread = createThread(() -> {
-          while (!Thread.currentThread().isInterrupted()) {
-            cleanUpDumps(directory, maxDumps, _recording.getName());
-            try {
-              Thread.sleep(Duration.ofHours(1).toMillis());
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-              break;
-            }
-          }
-        });
-        _cleanupThread.start();
-      }
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to create new recording file", e);
+    if (!configureArguments.isEmpty()) {
+      executeDiagnosticCommand(JFR_CONFIGURE_COMMAND, configureArguments.toArray(new String[0]));
     }
   }
 
   @VisibleForTesting
-  protected Recording createRecording(PinotConfiguration subset) {
-    String jfrConfName = subset.getProperty(CONFIGURATION, DEFAULT_CONFIGURATION);
+  protected boolean isDiagnosticCommandAvailable() {
+    return _mBeanServer != null && _diagnosticCommandObjectName != null
+        && _mBeanServer.isRegistered(_diagnosticCommandObjectName);
+  }
+
+  private static ObjectName createDiagnosticCommandObjectName() {
     try {
-      Configuration configuration = Configuration.getConfiguration(jfrConfName);
-      return new Recording(configuration);
-    } catch (ParseException e) {
-      throw new RuntimeException("Failed to parse JFR configuration '" + jfrConfName + "'", e);
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to read JFR configuration '" + jfrConfName + "'", e);
+      return new ObjectName(JFR_DIAGNOSTIC_MBEAN);
+    } catch (MalformedObjectNameException e) {
+      LOGGER.warn("Invalid JFR DiagnosticCommand MBean name '{}'. Continuous JFR control will be disabled",
+          JFR_DIAGNOSTIC_MBEAN, e);
+      return null;
     }
   }
 
-  private Thread createThread(Runnable runnable) {
-    Thread thread = new Thread(runnable);
-    thread.setName("JFR-Dump-Cleanup");
-    thread.setDaemon(true);
-    return thread;
-  }
-
-  @VisibleForTesting
-  protected static void cleanUpDumps(Path directory, int maxDumps, String recordingName) {
-    if (maxDumps < 0) {
-      LOGGER.debug("maxDumps is negative, no cleanup will be performed");
-      return;
+  private static String toJfrTimeArgument(String durationText) {
+    Duration duration = Duration.parse(durationText.toUpperCase(Locale.ENGLISH));
+    if (duration.isZero()) {
+      return "0s";
     }
-    LOGGER.info("Cleaning up old JFR dumps in {} to keep at most {} dumps", directory, maxDumps);
-    File[] files = directory.toFile()
-        .listFiles((dir, name) -> name.startsWith("recording-" + recordingName) && name.endsWith(".jfr"));
-    if (files == null) {
-      return;
-    }
-    Arrays.sort(files, Comparator.comparing(File::getName).reversed());
-    if (files.length <= maxDumps) {
-      LOGGER.info("No cleanup needed, found {} dumps", files.length);
-      return;
-    }
-    File[] filesToDelete = Arrays.copyOfRange(files, maxDumps, files.length);
-    if (LOGGER.isInfoEnabled()) {
-      String filesToDeleteName = Arrays.stream(filesToDelete)
-          .map(File::getName)
-          .collect(Collectors.joining(", "));
-      LOGGER.info("Found {} dumps, going to delete the following older dumps {}", files.length, filesToDeleteName);
-    }
-    for (int i = maxDumps; i < files.length; i++) {
-      boolean delete = files[i].delete();
-      if (!delete) {
-        LOGGER.warn("Failed to delete file: {}", files[i]);
-      }
-    }
+    return duration.toMillis() + "ms";
   }
 }
