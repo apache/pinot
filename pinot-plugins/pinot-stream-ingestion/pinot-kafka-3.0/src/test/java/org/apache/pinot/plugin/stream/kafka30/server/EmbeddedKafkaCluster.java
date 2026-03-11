@@ -74,7 +74,7 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
           .setConfigProp("transaction.state.log.min.isr", "1")
           .setConfigProp("transaction.state.log.num.partitions", "1")
           .setConfigProp("group.initial.rebalance.delay.ms", "0")
-          .setConfigProp("log.flush.interval.messages", "1")
+          .setConfigProp("log.flush.interval.messages", "10000")
           .build();
 
       _cluster.format();
