@@ -172,6 +172,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 numKeysInWrongSegment.getAndIncrement();
                 if (comparisonResult >= 0) {
                   addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
+                  if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment) {
+                    _previousKeyToRecordLocationMap.remove(primaryKey);
+                  }
                   return new RecordLocation(segment, newDocId, newComparisonValue,
                       RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
                 } else {
@@ -196,6 +199,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   currentSegmentName, getAuthoritativeCreationTime(segment),
                   getAuthoritativeCreationTime(currentSegment)))) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
+                if (_context.isTableTypeInconsistentDuringConsumption() && currentSegment instanceof MutableSegment) {
+                  _previousKeyToRecordLocationMap.remove(primaryKey);
+                }
                 return new RecordLocation(segment, newDocId, newComparisonValue,
                     RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
               } else {
