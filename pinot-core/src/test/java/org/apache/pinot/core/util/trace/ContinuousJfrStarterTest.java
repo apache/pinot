@@ -20,6 +20,7 @@ package org.apache.pinot.core.util.trace;
 
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -195,6 +196,35 @@ public class ContinuousJfrStarterTest {
   }
 
   @Test
+  public void keepsRunningWhenStopCommandFails() {
+    _continuousJfrStarter.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    _continuousJfrStarter.failCommand("jfrStop");
+
+    _continuousJfrStarter.onChange(Set.of("pinot.jfr.enabled"), Map.of("pinot.jfr.enabled", "false"));
+
+    Assertions.assertThat(_continuousJfrStarter.isRunning())
+        .describedAs("Starter should keep running state when stop fails")
+        .isTrue();
+    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=209715200 maxage=86400000ms",
+        "jfrStop name=pinot-continuous");
+  }
+
+  @Test
+  public void keepsRunningWhenMBeanBecomesUnavailableOnStop() {
+    _continuousJfrStarter.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    _continuousJfrStarter.setMBeanAvailable(false);
+
+    _continuousJfrStarter.onChange(Set.of("pinot.jfr.enabled"), Map.of("pinot.jfr.enabled", "false"));
+
+    Assertions.assertThat(_continuousJfrStarter.isRunning())
+        .describedAs("Starter should keep running state when MBean is unavailable for stop")
+        .isTrue();
+    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=209715200 maxage=86400000ms");
+  }
+
+  @Test
   public void integrationTestWithRealDiagnosticCommandMBean() {
     ContinuousJfrStarter starter = new ContinuousJfrStarter();
     if (!starter.isDiagnosticCommandAvailable()) {
@@ -261,6 +291,7 @@ public class ContinuousJfrStarterTest {
 
   private static class TestContinuousJfrStarter extends ContinuousJfrStarter {
     private final List<String> _executedCommands = new ArrayList<>();
+    private final Set<String> _failingCommands = new HashSet<>();
     private boolean _mBeanAvailable = true;
 
     @Override
@@ -270,7 +301,7 @@ public class ContinuousJfrStarterTest {
         command += " " + String.join(" ", arguments);
       }
       _executedCommands.add(command);
-      return true;
+      return !_failingCommands.contains(operationName);
     }
 
     @Override
@@ -280,6 +311,10 @@ public class ContinuousJfrStarterTest {
 
     private void setMBeanAvailable(boolean mBeanAvailable) {
       _mBeanAvailable = mBeanAvailable;
+    }
+
+    private void failCommand(String operationName) {
+      _failingCommands.add(operationName);
     }
 
     private List<String> getExecutedCommands() {

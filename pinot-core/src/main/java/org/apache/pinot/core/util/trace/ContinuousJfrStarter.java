@@ -159,9 +159,15 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
         return;
       }
 
-      stopRecording();
-      _currentConfig = newSubsetMap;
-      startRecording(subset);
+      if (!stopRecording()) {
+        LOGGER.warn("Failed to stop existing continuous JFR recording. Skipping config update");
+        return;
+      }
+      if (startRecording(subset)) {
+        _currentConfig = newSubsetMap;
+      } else {
+        LOGGER.warn("Failed to apply continuous JFR config update");
+      }
     }
   }
 
@@ -169,37 +175,44 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     return _running;
   }
 
-  private void stopRecording() {
+  private boolean stopRecording() {
     if (!_running) {
-      return;
+      return true;
     }
     assert _recordingName != null;
     if (!isDiagnosticCommandAvailable()) {
-      LOGGER.warn("JFR DiagnosticCommand MBean is unavailable. Marking recording '{}' as stopped in Pinot state only",
+      LOGGER.warn("JFR DiagnosticCommand MBean is unavailable. Cannot stop continuous JFR recording '{}'",
           _recordingName);
-    } else {
-      executeDiagnosticCommand(JFR_STOP_COMMAND, "name=" + _recordingName);
-      LOGGER.info("Stopped continuous JFR recording {}", _recordingName);
+      return false;
     }
+    if (!executeDiagnosticCommand(JFR_STOP_COMMAND, "name=" + _recordingName)) {
+      LOGGER.warn("Failed to stop continuous JFR recording '{}'", _recordingName);
+      return false;
+    }
+    LOGGER.info("Stopped continuous JFR recording {}", _recordingName);
     _recordingName = null;
     _running = false;
+    return true;
   }
 
-  private void startRecording(PinotConfiguration subset) {
+  private boolean startRecording(PinotConfiguration subset) {
     if (!subset.getProperty(ENABLED, DEFAULT_ENABLED)) {
       LOGGER.info("Continuous JFR recording is disabled");
-      return;
+      return true;
     }
     if (_running) {
-      return;
+      return true;
     }
     if (!isDiagnosticCommandAvailable()) {
       LOGGER.warn("JFR DiagnosticCommand MBean is unavailable. Cannot start continuous JFR recording");
-      return;
+      return false;
     }
 
     String recordingName = subset.getProperty(NAME, DEFAULT_NAME);
-    applyRuntimeOptions(subset);
+    if (!applyRuntimeOptions(subset)) {
+      LOGGER.warn("Failed to apply JFR runtime options for recording '{}'", recordingName);
+      return false;
+    }
 
     String maxAge = subset.getProperty(MAX_AGE, DEFAULT_MAX_AGE);
     try {
@@ -215,7 +228,7 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
       }
       if (!executeDiagnosticCommand(JFR_START_COMMAND, startArguments.toArray(new String[0]))) {
         LOGGER.warn("Failed to start continuous JFR recording '{}'", recordingName);
-        return;
+        return false;
       }
     } catch (DateTimeParseException e) {
       throw new RuntimeException("Failed to parse duration '" + maxAge + "'", e);
@@ -224,6 +237,7 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     _recordingName = recordingName;
     LOGGER.info("Started continuous JFR recording {} with configuration: {}", recordingName, subset);
     _running = true;
+    return true;
   }
 
   @VisibleForTesting
@@ -238,7 +252,7 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     }
   }
 
-  private void applyRuntimeOptions(PinotConfiguration subset) {
+  private boolean applyRuntimeOptions(PinotConfiguration subset) {
     List<String> configureArguments = new ArrayList<>();
     String repositoryPath = subset.getProperty(DIRECTORY, (String) null);
     if (repositoryPath != null && !repositoryPath.isEmpty()) {
@@ -250,8 +264,9 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     }
 
     if (!configureArguments.isEmpty()) {
-      executeDiagnosticCommand(JFR_CONFIGURE_COMMAND, configureArguments.toArray(new String[0]));
+      return executeDiagnosticCommand(JFR_CONFIGURE_COMMAND, configureArguments.toArray(new String[0]));
     }
+    return true;
   }
 
   @VisibleForTesting
