@@ -180,8 +180,8 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
-import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
@@ -1808,17 +1808,17 @@ public class PinotHelixResourceManager {
    * designated offset and being assigned with a segment sequence number per partition. Otherwise, you should
    * directly call the {@link #addTable(TableConfig)} which will further call this api with an empty list.
    * @param tableConfig The config for the table to be created.
-   * @param consumeMeta A list of pairs, where each pair contains the partition group metadata and the initial sequence
-   *                    number for a consuming segment. This is used to start ingestion from a specific offset.
+   * @param streamMetadataList A list of {@link StreamMetadata}, each containing partition group metadata with
+   *                           sequence numbers. This is used to start ingestion from a specific offset.
    * @throws InvalidTableConfigException if validations fail
    * @throws TableAlreadyExistsException if the table already exists
    */
-  public void addTable(TableConfig tableConfig, List<Pair<PartitionGroupMetadata, Integer>> consumeMeta)
+  public void addTable(TableConfig tableConfig, List<StreamMetadata> streamMetadataList)
       throws IOException {
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Adding table {}: Start", tableNameWithType);
-    if (consumeMeta != null && !consumeMeta.isEmpty()) {
-      LOGGER.info("Adding table {} with {} partition group infos", tableNameWithType, consumeMeta.size());
+    if (streamMetadataList != null && !streamMetadataList.isEmpty()) {
+      LOGGER.info("Adding table {} with {} stream metadata entries", tableNameWithType, streamMetadataList.size());
     }
 
     if (getTableConfig(tableNameWithType) != null) {
@@ -1878,15 +1878,14 @@ public class PinotHelixResourceManager {
         // Add ideal state
         _helixAdmin.addResource(_helixClusterName, tableNameWithType, idealState);
         LOGGER.info("Adding table {}: Added ideal state for offline table", tableNameWithType);
-      } else if (consumeMeta == null || consumeMeta.isEmpty()) {
+      } else if (streamMetadataList == null || streamMetadataList.isEmpty()) {
         // Add ideal state with the first CONSUMING segment
         _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState);
         LOGGER.info("Adding table {}: Added ideal state with first consuming segment", tableNameWithType);
       } else {
-        // Add ideal state with the first CONSUMING segment with designated partition consuming metadata
-        // Add ideal state with the first CONSUMING segment
-        _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState, consumeMeta);
-        LOGGER.info("Adding table {}: Added consuming segments ideal state given the designated consuming metadata",
+        // Add ideal state with consuming segments from designated stream metadata
+        _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState, streamMetadataList);
+        LOGGER.info("Adding table {}: Added consuming segments ideal state given the designated stream metadata",
                 tableNameWithType);
       }
     } catch (Exception e) {
