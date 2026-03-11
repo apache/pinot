@@ -66,6 +66,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -2147,7 +2148,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     // Create second real segment with 2 records (subset of first)
     int[] primaryKeys2 = new int[]{10, 30};
-    int[] timestamps2 = new int[]{1500, 3500};
+    int[] timestamps2 = new int[]{1600, 3600};
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl segment2 = createRealSegment(segmentName, primaryKeys2, timestamps2, validDocIds2);
 
@@ -2155,8 +2156,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.replaceSegment(segment2, segment1);
 
     assertEquals(recordLocationMap.size(), 2);
-    checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, HashFunction.NONE);
-    checkRecordLocation(recordLocationMap, 30, segment2, 1, 3500, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 10, segment2, 0, 1600, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 30, segment2, 1, 3600, HashFunction.NONE);
     assertEquals(segment2.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 2);
 
     upsertMetadataManager.stop();
@@ -2256,6 +2257,62 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(recordLocationMap.size(), 2);
     checkRecordLocation(recordLocationMap, 10, immutableSegment, 0, 1500, HashFunction.NONE);
     checkRecordLocation(recordLocationMap, 20, immutableSegment, 1, 2500, HashFunction.NONE);
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
+
+  @Test
+  public void testProtectedModeRevertsMetadataForConsumingSegmentSeal()
+      throws IOException {
+    UpsertContext upsertContext =
+        _contextBuilder.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).setDropOutOfOrderRecord(true).build();
+
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, upsertContext);
+    Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
+
+    int[] mutablePrimaryKeys = new int[]{10, 20, 30};
+    ThreadSafeMutableRoaringBitmap validDocIdsMutable = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment mutableSegment = mockMutableSegmentWithDataSource(1, validDocIdsMutable, null, mutablePrimaryKeys);
+
+    upsertMetadataManager.addRecord(mutableSegment,
+        new RecordInfo(makePrimaryKey(10), 0, Integer.valueOf(1000), false));
+    upsertMetadataManager.addRecord(mutableSegment,
+        new RecordInfo(makePrimaryKey(20), 1, Integer.valueOf(2000), false));
+    upsertMetadataManager.addRecord(mutableSegment,
+        new RecordInfo(makePrimaryKey(30), 2, Integer.valueOf(3000), false));
+
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    assertEquals(recordLocationMap.size(), 3);
+    assertEquals(validDocIdsMutable.getMutableRoaringBitmap().getCardinality(), 3);
+    trackedSegments.add(mutableSegment);
+
+    int numRecords = 3;
+    int[] primaryKeys = new int[]{10, 20, 30};
+    int[] timestamps = new int[]{900, 1900, 3500};
+    ThreadSafeMutableRoaringBitmap validDocIdsImmutable = new ThreadSafeMutableRoaringBitmap();
+    List<PrimaryKey> primaryKeysList = getPrimaryKeyList(numRecords, primaryKeys);
+    ImmutableSegmentImpl immutableSegment = mockImmutableSegmentWithTimestamps(1, validDocIdsImmutable, null,
+        primaryKeysList, timestamps);
+    trackedSegments.add(immutableSegment);
+
+    ConsumingSegmentConsistencyModeListener consistencyModeListener =
+        ConsumingSegmentConsistencyModeListener.getInstance();
+    consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
+    try {
+      upsertMetadataManager.replaceSegment(immutableSegment, validDocIdsImmutable, null,
+          getRecordInfoListWithIntegerComparison(numRecords, primaryKeys, timestamps, null).iterator(), mutableSegment);
+    } finally {
+      consistencyModeListener.reset();
+    }
+
+    assertEquals(recordLocationMap.size(), 3);
+    checkRecordLocation(recordLocationMap, 10, immutableSegment, 0, 900, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 20, immutableSegment, 1, 1900, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 30, immutableSegment, 2, 3500, HashFunction.NONE);
+    assertTrue(upsertMetadataManager._previousKeyToRecordLocationMap.isEmpty());
+    assertEquals(validDocIdsImmutable.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
 
     upsertMetadataManager.stop();
     upsertMetadataManager.close();

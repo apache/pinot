@@ -361,7 +361,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(primaryKey);
-            if (prevLocation == null || !_trackedSegments.contains(prevLocation.getSegment())) {
+            if (prevLocation == null) {
               _previousKeyToRecordLocationMap.remove(primaryKey);
               return null;
             }
