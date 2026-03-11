@@ -170,13 +170,13 @@ public class BrokerQueryLimitTest extends BaseClusterIntegrationTest {
     dropOfflineTable(getTableName());
     FileUtils.deleteDirectory(_tempDir);
 
-    // Stop Kafka
-    LOGGER.warn("Stop Kafka in the integration test class");
-    stopKafka();
     // Shutdown the Pinot cluster
     stopServer();
     stopBroker();
     stopController();
+    // Stop Kafka
+    LOGGER.warn("Stop Kafka in the integration test class");
+    stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
     LOGGER.warn("Finished tearing down integration test class: {}", getClass().getSimpleName());

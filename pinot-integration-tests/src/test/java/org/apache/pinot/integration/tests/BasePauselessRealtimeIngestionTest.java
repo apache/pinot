@@ -100,6 +100,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     startZk();
+    startKafka();
     startController();
     startBroker();
     startServer();
@@ -113,7 +114,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected void setupNonPauselessTable()
       throws Exception {
     _avroFiles = unpackAvroData(_tempDir);
-    startKafka();
     pushAvroIntoKafka(_avroFiles);
 
     Schema schema = createSchema();

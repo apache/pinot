@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
@@ -52,6 +53,7 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -77,14 +79,13 @@ public class PinotSinkUpsertTableIntegrationTest extends BaseClusterIntegrationT
 
     // Start the Pinot cluster
     startZk();
+    // Start Kafka and push data into Kafka
+    startKafka();
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
     startServers(2);
     startMinion();
-
-    // Start Kafka and push data into Kafka
-    startKafka();
 
     // Push data to Kafka and set up table
     setupTable(getTableName(), getKafkaTopic(), "gameScores_csv.tar.gz", null);
@@ -221,6 +222,19 @@ public class PinotSinkUpsertTableIntegrationTest extends BaseClusterIntegrationT
     pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
 
     return tableConfig;
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    dropRealtimeTable(getTableName());
+    stopMinion();
+    stopServer();
+    stopBroker();
+    stopController();
+    stopKafka();
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 
   @Override

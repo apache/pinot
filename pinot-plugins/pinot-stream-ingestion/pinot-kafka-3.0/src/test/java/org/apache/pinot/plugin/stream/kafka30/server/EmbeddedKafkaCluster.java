@@ -46,12 +46,19 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
   private static final int TOPIC_MUTATION_RETRIES = 5;
 
   private int _brokerCount = 1;
+  private final Properties _extraConfigProps = new Properties();
   private KafkaClusterTestKit _cluster;
   private String _bootstrapServers;
 
   @Override
   public void init(Properties props) {
     _brokerCount = Integer.parseInt(props.getProperty(BROKER_COUNT_PROP, "1"));
+    // Forward any additional properties (excluding our internal ones) as Kafka broker config
+    for (String key : props.stringPropertyNames()) {
+      if (!key.equals(BROKER_COUNT_PROP)) {
+        _extraConfigProps.setProperty(key, props.getProperty(key));
+      }
+    }
   }
 
   @Override
@@ -67,15 +74,20 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
           .setBootstrapMetadataVersion(MetadataVersion.latestProduction())
           .build();
 
-      _cluster = new KafkaClusterTestKit.Builder(nodes)
+      KafkaClusterTestKit.Builder builder = new KafkaClusterTestKit.Builder(nodes)
           .setConfigProp("offsets.topic.replication.factor", String.valueOf(replicationFactor))
           .setConfigProp("offsets.topic.num.partitions", "1")
           .setConfigProp("transaction.state.log.replication.factor", String.valueOf(replicationFactor))
           .setConfigProp("transaction.state.log.min.isr", "1")
           .setConfigProp("transaction.state.log.num.partitions", "1")
-          .setConfigProp("group.initial.rebalance.delay.ms", "0")
+          .setConfigProp("group.initial.rebalance.delay.ms", "0");
 
-          .build();
+      // Apply any extra config properties passed via init()
+      for (String key : _extraConfigProps.stringPropertyNames()) {
+        builder.setConfigProp(key, _extraConfigProps.getProperty(key));
+      }
+
+      _cluster = builder.build();
 
       _cluster.format();
       _cluster.startup();

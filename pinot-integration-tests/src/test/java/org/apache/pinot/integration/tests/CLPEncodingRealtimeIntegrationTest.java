@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -30,6 +31,7 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -50,12 +52,11 @@ public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTe
 
     // Start the Pinot cluster
     startZk();
+    startKafka();
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
     startServer();
-
-    startKafka();
     pushAvroIntoKafka(_avroFiles);
 
     Schema schema = createSchema();
@@ -101,6 +102,18 @@ public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTe
     Assert.assertEquals(getPinotConnection().execute(
             "SELECT count(*) FROM " + getTableName() + " WHERE REGEXP_LIKE(logLine, '.*executor.*')").getResultSet(0)
         .getLong(0), 53);
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    dropRealtimeTable(getTableName());
+    stopServer();
+    stopBroker();
+    stopController();
+    stopKafka();
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 
   protected int getRealtimeSegmentFlushSize() {
