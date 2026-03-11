@@ -35,6 +35,7 @@ import org.testng.annotations.Test;
 
 public class ContinuousJfrStarterTest {
   private static final long DEFAULT_MAX_SIZE_BYTES = DataSizeUtils.toBytes(ContinuousJfrStarter.DEFAULT_MAX_SIZE);
+  private static final long DEFAULT_MAX_AGE_MILLIS = 7L * 24 * 60 * 60 * 1000;
 
   private TestContinuousJfrStarter _continuousJfrStarter;
 
@@ -63,7 +64,7 @@ public class ContinuousJfrStarterTest {
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
         "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=86400000ms");
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
   }
 
   @Test
@@ -87,7 +88,7 @@ public class ContinuousJfrStarterTest {
         .isFalse();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
         "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=86400000ms",
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms",
         "jfrStop name=pinot-continuous");
   }
 
@@ -111,7 +112,7 @@ public class ContinuousJfrStarterTest {
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
         "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=86400000ms");
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
   }
 
   @Test
@@ -188,7 +189,7 @@ public class ContinuousJfrStarterTest {
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
         "jfrConfigure repositorypath=/var/log/pinot/jfr-repository dumppath=/var/log/pinot/jfr-dumps",
         "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=86400000ms");
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
   }
 
   @Test
@@ -215,7 +216,7 @@ public class ContinuousJfrStarterTest {
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
         "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=86400000ms",
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms",
         "jfrStop name=pinot-continuous");
   }
 
@@ -231,7 +232,7 @@ public class ContinuousJfrStarterTest {
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
         "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=86400000ms");
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
   }
 
   @Test
@@ -242,7 +243,8 @@ public class ContinuousJfrStarterTest {
     _continuousJfrStarter.onChange(Set.of(), config);
 
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=536870912 maxage=86400000ms");
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=536870912 maxage="
+            + DEFAULT_MAX_AGE_MILLIS + "ms");
   }
 
   @Test

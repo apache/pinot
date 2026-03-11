@@ -110,11 +110,11 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   ///
   /// This is only used if toDisk is true.
   /// The value is a duration string, as defined by the Duration class.
-  /// The default value is 1 day (P1D).
+  /// The default value is 7 days (P7D).
   ///
   /// @see #MAX_SIZE
   public static final String MAX_AGE = "maxAge";
-  public static final String DEFAULT_MAX_AGE = "P1D";
+  public static final String DEFAULT_MAX_AGE = "P7D";
 
   /// A flag to track whether the JFR recording has been started.
   /// This is specially useful for testing and quickstarts, where servers, brokers and other components are executed
