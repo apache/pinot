@@ -2187,7 +2187,7 @@ public class CommonConstants {
      * for upsert/dedup tables (partial upsert or dropOutOfOrderRecord=true with consistency mode).
      *
      * Supported values:
-     * - RESTRICTED: Force commit is disabled for tables with inconsistent state configurations
+     * - RESTRICTED: Force commit is disabled for tables with inconsistent state table configurations
      * - PROTECTED: Force commit is enabled with metadata reversion on inconsistencies
      * - UNSAFE: Force commit is enabled without metadata reversion (Can lead to inconsistencies)
      */
