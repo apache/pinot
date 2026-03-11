@@ -17,7 +17,8 @@
 # under the License.
 #
 
-apiVersion: v1
+apiVersion: v2
+type: application
 appVersion: 1.0.0
 name: pinot
 description: Apache Pinot is an open-source distributed OLAP database for user-facing and agent-facing real-time analytics. From interactive dashboards to LLM-powered decision engines, Pinot delivers sub-second queries on fresh data at petabyte scale.
@@ -28,6 +29,7 @@ keywords:
   - database
   - pinot
 home: https://pinot.apache.org/
+icon: https://www.apache.org/logos/res/pinot/pinot.png
 sources:
   - https://github.com/apache/pinot/tree/master/helm
 maintainers:
