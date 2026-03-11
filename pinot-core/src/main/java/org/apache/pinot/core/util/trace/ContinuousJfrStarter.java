@@ -36,6 +36,7 @@ import javax.management.ObjectName;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,11 +98,12 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   ///
   /// This is only used if toDisk is true.
   /// The value is in bytes.
-  /// The default value is 200MB.
+  /// The default value is 2G. Valid values are human readable data size strings, as defined by the DataSizeUtils class
+  /// (e.g. '10.5G', '40B') or data size in bytes (e.g. '2147483648').
   ///
   /// @see #MAX_AGE
   public static final String MAX_SIZE = "maxSize";
-  public static final int DEFAULT_MAX_SIZE = 200 * 1024 * 1024;
+  public static final String DEFAULT_MAX_SIZE = "2GB";
   /// Key that controls the maximum age of the recording file.
   /// Once the file reaches this age, older events will be discarded.
   /// If both maxSize and maxAge are set, the recording will be discarded when either condition is met.
@@ -223,8 +225,14 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
       boolean toDisk = subset.getProperty(TO_DISK, DEFAULT_TO_DISK);
       startArguments.add("disk=" + toDisk);
       if (toDisk) {
-        startArguments.add("maxsize=" + subset.getProperty(MAX_SIZE, DEFAULT_MAX_SIZE));
-        startArguments.add("maxage=" + toJfrTimeArgument(maxAge));
+        try {
+          long maxSize = DataSizeUtils.toBytes(subset.getProperty(MAX_SIZE, DEFAULT_MAX_SIZE));
+          startArguments.add("maxsize=" + maxSize);
+          startArguments.add("maxage=" + toJfrTimeArgument(maxAge));
+        } catch (IllegalArgumentException | ClassCastException e) {
+          throw new RuntimeException("Failed to parse maxSize configuration for continuous JFR recording '"
+              + recordingName + "'", e);
+        }
       }
       if (!executeDiagnosticCommand(JFR_START_COMMAND, startArguments.toArray(new String[0]))) {
         LOGGER.warn("Failed to start continuous JFR recording '{}'", recordingName);

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.assertj.core.api.Assertions;
 import org.testng.annotations.BeforeMethod;
 import org.testng.SkipException;
@@ -33,6 +34,7 @@ import org.testng.annotations.Test;
 
 
 public class ContinuousJfrStarterTest {
+  private static final long DEFAULT_MAX_SIZE_BYTES = DataSizeUtils.toBytes(ContinuousJfrStarter.DEFAULT_MAX_SIZE);
 
   private TestContinuousJfrStarter _continuousJfrStarter;
 
@@ -60,7 +62,8 @@ public class ContinuousJfrStarterTest {
         .describedAs("Recording should be enabled")
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=209715200 maxage=86400000ms");
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=86400000ms");
   }
 
   @Test
@@ -83,7 +86,8 @@ public class ContinuousJfrStarterTest {
         .describedAs("Recording should be disabled")
         .isFalse();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=209715200 maxage=86400000ms",
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=86400000ms",
         "jfrStop name=pinot-continuous");
   }
 
@@ -106,7 +110,8 @@ public class ContinuousJfrStarterTest {
         .describedAs("Recording should be enabled")
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=209715200 maxage=86400000ms");
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=86400000ms");
   }
 
   @Test
@@ -165,9 +170,11 @@ public class ContinuousJfrStarterTest {
     _continuousJfrStarter.onChange(changed, updatedConfig);
 
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=209715200 maxage=7200000ms",
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=7200000ms",
         "jfrStop name=pinot-continuous",
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=209715200 maxage=3600000ms");
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=3600000ms");
   }
 
   @Test
@@ -180,7 +187,8 @@ public class ContinuousJfrStarterTest {
 
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
         "jfrConfigure repositorypath=/var/log/pinot/jfr-repository dumppath=/var/log/pinot/jfr-dumps",
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=209715200 maxage=86400000ms");
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=86400000ms");
   }
 
   @Test
@@ -206,7 +214,8 @@ public class ContinuousJfrStarterTest {
         .describedAs("Starter should keep running state when stop fails")
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=209715200 maxage=86400000ms",
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=86400000ms",
         "jfrStop name=pinot-continuous");
   }
 
@@ -221,7 +230,19 @@ public class ContinuousJfrStarterTest {
         .describedAs("Starter should keep running state when MBean is unavailable for stop")
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=209715200 maxage=86400000ms");
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=86400000ms");
+  }
+
+  @Test
+  public void supportsHumanReadableMaxSize() {
+    Map<String, String> config = Map.of(
+        "pinot.jfr.enabled", "true",
+        "pinot.jfr.maxSize", "512MB");
+    _continuousJfrStarter.onChange(Set.of(), config);
+
+    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
+        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=536870912 maxage=86400000ms");
   }
 
   @Test
