@@ -107,13 +107,16 @@ public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTe
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    try {
+      dropRealtimeTable(getTableName());
+      stopServer();
+      stopBroker();
+      stopController();
+      stopKafka();
+      stopZk();
+    } finally {
+      FileUtils.deleteQuietly(_tempDir);
+    }
   }
 
   protected int getRealtimeSegmentFlushSize() {

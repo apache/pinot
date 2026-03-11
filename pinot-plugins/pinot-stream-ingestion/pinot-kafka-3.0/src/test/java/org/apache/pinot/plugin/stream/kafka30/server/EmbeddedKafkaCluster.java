@@ -53,6 +53,7 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
   @Override
   public void init(Properties props) {
     _brokerCount = Integer.parseInt(props.getProperty(BROKER_COUNT_PROP, "1"));
+    _extraConfigProps.clear();
     // Forward any additional properties (excluding our internal ones) as Kafka broker config
     for (String key : props.stringPropertyNames()) {
       if (!key.equals(BROKER_COUNT_PROP)) {

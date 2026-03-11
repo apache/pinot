@@ -227,14 +227,17 @@ public class PinotSinkUpsertTableIntegrationTest extends BaseClusterIntegrationT
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
-    stopMinion();
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    try {
+      dropRealtimeTable(getTableName());
+      stopMinion();
+      stopServer();
+      stopBroker();
+      stopController();
+      stopKafka();
+      stopZk();
+    } finally {
+      FileUtils.deleteQuietly(_tempDir);
+    }
   }
 
   @Override

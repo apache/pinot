@@ -120,14 +120,17 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropOfflineTable(getTableName());
-    dropRealtimeTable(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    try {
+      dropOfflineTable(getTableName());
+      dropRealtimeTable(getTableName());
+      stopServer();
+      stopBroker();
+      stopController();
+      stopKafka();
+      stopZk();
+    } finally {
+      FileUtils.deleteQuietly(_tempDir);
+    }
   }
 
   // TODO: Expand tests to cover more scenarios for workload enforcement

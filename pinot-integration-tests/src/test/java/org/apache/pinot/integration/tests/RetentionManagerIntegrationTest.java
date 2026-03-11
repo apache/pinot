@@ -100,13 +100,16 @@ public class RetentionManagerIntegrationTest extends BaseClusterIntegrationTest 
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    try {
+      dropRealtimeTable(getTableName());
+      stopServer();
+      stopBroker();
+      stopController();
+      stopKafka();
+      stopZk();
+    } finally {
+      FileUtils.deleteQuietly(_tempDir);
+    }
   }
 
   @Test
