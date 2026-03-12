@@ -44,7 +44,7 @@ import static org.testng.Assert.assertTrue;
  * single partition (required by
  * {@link org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadataManager}).
  * Data is split by partition key using the same Murmur function as the table config. Inherits
- * two-table and self-join tests from {@link ColocatedJoinIntegrationTestBase} (with plan
+ * two-table, self, and semi-join tests from {@link ColocatedJoinIntegrationTestBase} (with plan
  * assertion {@code [PARTITIONED]}). Adds third table (userFactEvents) and three-table colocated
  * join tests.
  */

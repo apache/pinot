@@ -18,14 +18,11 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -33,13 +30,19 @@ import static org.testng.Assert.assertTrue;
  *
  * <p>Uses {@code getNumPartitions() = 1} so each segment has exactly one partition (required by
  * {@link org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadataManager}).
- * Validates two-table, self, left, and right joins with joinOptions/tableOptions or
- * inferPartitionHint. For multiple partitions check ColocatedJoinMultiPartitionIntegrationTest
+ * Validates two-table, self, semi, left, and right joins with joinOptions/tableOptions or
+ * inferPartitionHint query options. Broker-config coverage lives in
+ * {@link ColocatedJoinInferPartitionHintBrokerConfigIntegrationTest}. For multiple partitions
+ * check {@link ColocatedJoinMultiPartitionIntegrationTest}.
  */
 public class ColocatedJoinIntegrationTest extends ColocatedJoinIntegrationTestBase {
 
   /** Single partition per segment so ZK partition metadata is valid (segment must have exactly one partition). */
   private static final int NUM_PARTITIONS = 1;
+
+  private static final String INFER_PARTITION_HINT_OPTIONS = "useMultistageEngine=true; inferPartitionHint=true";
+  private static final String SINGLE_PARTITION_PLAN_MSG =
+      "single-partition join should still be recognized as colocated; plan: ";
 
   @Override
   protected int getNumPartitions() {
@@ -69,127 +72,153 @@ public class ColocatedJoinIntegrationTest extends ColocatedJoinIntegrationTestBa
     }
   }
 
+  // --- Two-table join: 3 enablement paths (joinOptions+tableOptions, tableOptions only, inferPartitionHint) ---
+
   @Test
   public void testTwoTableJoinWithJoinOptionsAndTableOptions()
       throws Exception {
-    String sql = "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ COUNT(*) FROM "
-        + "userAttributes ua JOIN userGroups ug ON ua.userUUID = ug.userUUID";
-    JsonNode result = postQuery(sql);
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Join should return at least one row");
+    String tableOpt = getTableOptPerTableHint();
+    String sql =
+        "SELECT /*+ " + JOIN_OPTIONS_COLOCATED + " */ COUNT(*) FROM userAttributes /*+ " + tableOpt
+            + " */ ua JOIN userGroups /*+ " + tableOpt + " */ ug ON ua.userUUID = ug.userUUID";
+    runAndAssertColocatedWithPlanCheck(sql, SINGLE_PARTITION_PLAN_MSG);
   }
 
   @Test
   public void testTwoTableJoinWithTableOptionsOnly()
       throws Exception {
-    String sql = "SELECT COUNT(*) FROM userAttributes ua JOIN userGroups ug ON ua.userUUID = ug.userUUID";
-    JsonNode result = postQuery(sql);
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Join should return at least one row");
+    String tableOpt = getTableOptPerTableHint();
+    String sql =
+        "SELECT COUNT(*) FROM userAttributes /*+ " + tableOpt + " */ ua JOIN userGroups /*+ " + tableOpt
+            + " */ ug ON ua.userUUID = ug.userUUID";
+    runAndAssertColocatedWithPlanCheck(sql, SINGLE_PARTITION_PLAN_MSG);
   }
 
   @Test
   public void testTwoTableJoinWithInferPartitionHintQueryOption()
       throws Exception {
     String sql = "SELECT COUNT(*) FROM userAttributes ua JOIN userGroups ug ON ua.userUUID = ug.userUUID";
-    String queryOptions = "useMultistageEngine=true; inferPartitionHint=true";
-    JsonNode result = postQueryWithOptions(sql, queryOptions);
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Join should return at least one row");
+    runAndAssertColocatedWithQueryOptions(sql, INFER_PARTITION_HINT_OPTIONS, SINGLE_PARTITION_PLAN_MSG);
   }
 
-  /** Same semantic as broker config inferPartitionHint: query option forces inference when not in SQL. */
-  @Test
-  public void testTwoTableJoinWithInferPartitionHintBrokerConfig()
-      throws Exception {
-    String sql = "SELECT COUNT(*) FROM userAttributes ua JOIN userGroups ug ON ua.userUUID = ug.userUUID";
-    String queryOptions = "useMultistageEngine=true; inferPartitionHint=true";
-    JsonNode result = postQueryWithOptions(sql, queryOptions);
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1);
-  }
+  // --- Self-join: 3 enablement paths ---
 
   @Test
   public void testSelfJoinWithJoinOptionsAndTableOptions()
       throws Exception {
-    String sql = "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ COUNT(*) FROM "
-        + "userAttributes ua1 JOIN userAttributes ua2 ON ua1.userUUID = ua2.userUUID";
-    JsonNode result = postQuery(sql);
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Self-join should return at least one row");
+    String tableOpt = getTableOptPerTableHint();
+    String sql =
+        "SELECT /*+ " + JOIN_OPTIONS_COLOCATED + " */ COUNT(*) FROM userAttributes /*+ " + tableOpt
+            + " */ ua1 JOIN userAttributes /*+ " + tableOpt + " */ ua2 ON ua1.userUUID = ua2.userUUID";
+    runAndAssertColocatedWithPlanCheck(sql, SINGLE_PARTITION_PLAN_MSG);
   }
 
   @Test
   public void testSelfJoinWithTableOptionsOnly()
       throws Exception {
-    String sql = "SELECT COUNT(*) FROM userAttributes ua1 JOIN userAttributes ua2 ON ua1.userUUID = ua2.userUUID";
-    JsonNode result = postQuery(sql);
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Self-join should return at least one row");
+    String tableOpt = getTableOptPerTableHint();
+    String sql =
+        "SELECT COUNT(*) FROM userAttributes /*+ " + tableOpt + " */ ua1 JOIN userAttributes /*+ " + tableOpt
+            + " */ ua2 ON ua1.userUUID = ua2.userUUID";
+    runAndAssertColocatedWithPlanCheck(sql, SINGLE_PARTITION_PLAN_MSG);
   }
 
   @Test
   public void testSelfJoinWithInferPartitionHintQueryOption()
       throws Exception {
-    String sql = "SELECT COUNT(*) FROM userAttributes ua1 JOIN userAttributes ua2 ON ua1.userUUID = ua2.userUUID";
-    JsonNode result = postQueryWithOptions(sql, "useMultistageEngine=true; inferPartitionHint=true");
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Self-join should return at least one row");
+    String sql =
+        "SELECT COUNT(*) FROM userAttributes ua1 JOIN userAttributes ua2 ON ua1.userUUID = ua2.userUUID";
+    runAndAssertColocatedWithQueryOptions(sql, INFER_PARTITION_HINT_OPTIONS, SINGLE_PARTITION_PLAN_MSG);
   }
+
+  // --- Semi-join: 3 enablement paths ---
+
+  @Test
+  public void testSemiJoinWithJoinOptionsAndTableOptions()
+      throws Exception {
+    String tableOpt = getTableOptPerTableHint();
+    String sql =
+        "SELECT /*+ " + JOIN_OPTIONS_COLOCATED + " */ ua.userUUID, COUNT(*) FROM userAttributes /*+ " + tableOpt
+            + " */ ua WHERE ua.userUUID IN (SELECT ug.userUUID FROM userGroups /*+ " + tableOpt
+            + " */ ug) GROUP BY ua.userUUID ORDER BY ua.userUUID";
+    runAndAssertSemiJoinWithPlanCheck(sql, SINGLE_PARTITION_PLAN_MSG);
+  }
+
+  @Test
+  public void testSemiJoinWithTableOptionsOnly()
+      throws Exception {
+    String tableOpt = getTableOptPerTableHint();
+    String sql =
+        "SELECT ua.userUUID, COUNT(*) FROM userAttributes /*+ " + tableOpt + " */ ua "
+            + "WHERE ua.userUUID IN (SELECT ug.userUUID FROM userGroups /*+ " + tableOpt
+            + " */ ug) GROUP BY ua.userUUID ORDER BY ua.userUUID";
+    runAndAssertSemiJoinWithPlanCheck(sql, SINGLE_PARTITION_PLAN_MSG);
+  }
+
+  @Test
+  public void testSemiJoinWithInferPartitionHintQueryOption()
+      throws Exception {
+    String sql =
+        "SELECT ua.userUUID, COUNT(*) FROM userAttributes ua "
+            + "WHERE ua.userUUID IN (SELECT ug.userUUID FROM userGroups ug) GROUP BY ua.userUUID ORDER BY ua.userUUID";
+    runAndAssertSemiJoinWithQueryOptions(sql, INFER_PARTITION_HINT_OPTIONS, SINGLE_PARTITION_PLAN_MSG);
+  }
+
+  // --- Left join: 3 enablement paths ---
 
   @Test
   public void testLeftJoinWithJoinOptionsAndTableOptions()
       throws Exception {
-    String sql = "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ COUNT(*) FROM "
-        + "userAttributes ua LEFT JOIN userGroups ug ON ua.userUUID = ug.userUUID";
-    JsonNode result = postQuery(sql);
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Left join should return at least one row");
+    String tableOpt = getTableOptPerTableHint();
+    String sql =
+        "SELECT /*+ " + JOIN_OPTIONS_COLOCATED + " */ COUNT(*) FROM userAttributes /*+ " + tableOpt
+            + " */ ua LEFT JOIN userGroups /*+ " + tableOpt + " */ ug ON ua.userUUID = ug.userUUID";
+    runAndAssertColocatedWithPlanCheck(sql, SINGLE_PARTITION_PLAN_MSG);
   }
 
   @Test
   public void testLeftJoinWithTableOptionsOnly()
       throws Exception {
-    String sql = "SELECT COUNT(*) FROM userAttributes ua LEFT JOIN userGroups ug ON ua.userUUID = ug.userUUID";
-    JsonNode result = postQuery(sql);
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Left join should return at least one row");
+    String tableOpt = getTableOptPerTableHint();
+    String sql =
+        "SELECT COUNT(*) FROM userAttributes /*+ " + tableOpt + " */ ua LEFT JOIN userGroups /*+ " + tableOpt
+            + " */ ug ON ua.userUUID = ug.userUUID";
+    runAndAssertColocatedWithPlanCheck(sql, SINGLE_PARTITION_PLAN_MSG);
   }
 
   @Test
   public void testLeftJoinWithInferPartitionHintQueryOption()
       throws Exception {
     String sql = "SELECT COUNT(*) FROM userAttributes ua LEFT JOIN userGroups ug ON ua.userUUID = ug.userUUID";
-    JsonNode result = postQueryWithOptions(sql, "useMultistageEngine=true; inferPartitionHint=true");
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Left join should return at least one row");
+    runAndAssertColocatedWithQueryOptions(sql, INFER_PARTITION_HINT_OPTIONS, SINGLE_PARTITION_PLAN_MSG);
   }
+
+  // --- Right join: 3 enablement paths ---
 
   @Test
   public void testRightJoinWithJoinOptionsAndTableOptions()
       throws Exception {
-    String sql = "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ COUNT(*) FROM "
-        + "userAttributes ua RIGHT JOIN userGroups ug ON ua.userUUID = ug.userUUID";
-    JsonNode result = postQuery(sql);
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Right join should return at least one row");
+    String tableOpt = getTableOptPerTableHint();
+    String sql =
+        "SELECT /*+ " + JOIN_OPTIONS_COLOCATED + " */ COUNT(*) FROM userAttributes /*+ " + tableOpt
+            + " */ ua RIGHT JOIN userGroups /*+ " + tableOpt + " */ ug ON ua.userUUID = ug.userUUID";
+    runAndAssertColocatedWithPlanCheck(sql, SINGLE_PARTITION_PLAN_MSG);
   }
 
   @Test
   public void testRightJoinWithTableOptionsOnly()
       throws Exception {
-    String sql = "SELECT COUNT(*) FROM userAttributes ua RIGHT JOIN userGroups ug ON ua.userUUID = ug.userUUID";
-    JsonNode result = postQuery(sql);
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Right join should return at least one row");
+    String tableOpt = getTableOptPerTableHint();
+    String sql =
+        "SELECT COUNT(*) FROM userAttributes /*+ " + tableOpt + " */ ua RIGHT JOIN userGroups /*+ " + tableOpt
+            + " */ ug ON ua.userUUID = ug.userUUID";
+    runAndAssertColocatedWithPlanCheck(sql, SINGLE_PARTITION_PLAN_MSG);
   }
 
   @Test
   public void testRightJoinWithInferPartitionHintQueryOption()
       throws Exception {
     String sql = "SELECT COUNT(*) FROM userAttributes ua RIGHT JOIN userGroups ug ON ua.userUUID = ug.userUUID";
-    JsonNode result = postQueryWithOptions(sql, "useMultistageEngine=true; inferPartitionHint=true");
-    assertNoExceptions(result);
-    assertTrue(getCountFromResult(result) >= 1, "Right join should return at least one row");
+    runAndAssertColocatedWithQueryOptions(sql, INFER_PARTITION_HINT_OPTIONS, SINGLE_PARTITION_PLAN_MSG);
   }
 }
