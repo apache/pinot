@@ -51,6 +51,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -232,20 +233,31 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     pushAvroIntoKafka(_avroFiles);
     waitForAllDocsLoaded(600_000L, 300);
 
-    String statusResponse = reloadRealtimeTable(getTableName());
-    Map<String, String> statusResponseJson =
-        JsonUtils.stringToObject(statusResponse, new TypeReference<Map<String, String>>() {
-        });
-    String reloadResponse = statusResponseJson.get("status");
-    int jsonStartIndex = reloadResponse.indexOf("{");
-    String trimmedResponse = reloadResponse.substring(jsonStartIndex);
-    Map<String, Map<String, String>> reloadStatus =
-        JsonUtils.stringToObject(trimmedResponse, new TypeReference<Map<String, Map<String, String>>>() {
-        });
-    String reloadJobId = reloadStatus.get(REALTIME_TABLE_NAME).get("reloadJobId");
-    waitForReloadToComplete(reloadJobId, 600_000L);
-    waitForAllDocsLoaded(600_000L, 300);
-    verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
+    // Partial-upsert tables need PROTECTED consuming segment consistency mode for reload to force-commit
+    // consuming segments; RESTRICTED (default) skips force-commit and reload never completes.
+    try {
+      updateClusterConfig(
+          Map.of(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE,
+              ConsumingSegmentConsistencyModeListener.Mode.PROTECTED.name()));
+      Thread.sleep(5000); // Allow server to pick up cluster config from ZK
+
+      String statusResponse = reloadRealtimeTable(getTableName());
+      Map<String, String> statusResponseJson =
+          JsonUtils.stringToObject(statusResponse, new TypeReference<Map<String, String>>() {
+          });
+      String reloadResponse = statusResponseJson.get("status");
+      int jsonStartIndex = reloadResponse.indexOf("{");
+      String trimmedResponse = reloadResponse.substring(jsonStartIndex);
+      Map<String, Map<String, String>> reloadStatus =
+          JsonUtils.stringToObject(trimmedResponse, new TypeReference<Map<String, Map<String, String>>>() {
+          });
+      String reloadJobId = reloadStatus.get(REALTIME_TABLE_NAME).get("reloadJobId");
+      waitForReloadToComplete(reloadJobId, 600_000L);
+      waitForAllDocsLoaded(600_000L, 300);
+      verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
+    } finally {
+      deleteClusterConfig(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE);
+    }
   }
 
   @AfterMethod
