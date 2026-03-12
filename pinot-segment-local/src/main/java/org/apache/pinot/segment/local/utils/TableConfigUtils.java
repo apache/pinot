@@ -1796,6 +1796,9 @@ public final class TableConfigUtils {
    * @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
    */
   public static boolean isTableTypeInconsistentDuringConsumption(@Nullable TableConfig tableConfig) {
+    if (tableConfig == null) {
+      return false;
+    }
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig == null) {
       return false;
