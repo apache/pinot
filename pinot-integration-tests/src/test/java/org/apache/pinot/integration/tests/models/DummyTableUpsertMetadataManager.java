@@ -105,5 +105,10 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
     protected int getPrevKeyToRecordLocationSize() {
       return 0;
     }
+
+    @Override
+    protected void clearPrevKeyToRecordLocation() {
+
+    }
   }
 }

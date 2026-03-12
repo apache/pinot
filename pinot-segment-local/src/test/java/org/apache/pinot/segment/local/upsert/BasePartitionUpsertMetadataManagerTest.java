@@ -1076,5 +1076,10 @@ public class BasePartitionUpsertMetadataManagerTest {
     protected int getPrevKeyToRecordLocationSize() {
       return 0;
     }
+
+    @Override
+    protected void clearPrevKeyToRecordLocation() {
+
+    }
   }
 }

@@ -717,7 +717,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     int numKeysStillNotReplaced = getPrevKeyToRecordLocationSize();
     if (numKeysStillNotReplaced > 0) {
       logInconsistentResults(segmentName, numKeysStillNotReplaced);
-      removeSegment(oldSegment, validDocIdsForOldSegment);
+      // Clear the map when inconsistencies still exist for the consuming segments
+      clearPrevKeyToRecordLocation();
     }
   }
 
@@ -1296,4 +1297,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected abstract int getPrevKeyToRecordLocationSize();
+
+  protected abstract void clearPrevKeyToRecordLocation();
 }
