@@ -16,97 +16,57 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
-import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
-public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
+
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class RowExpressionTest extends CustomDataQueryClusterIntegrationTest {
+  private static final String TABLE_NAME = "RowExpressionTest";
+  private static final String SCHEMA_FILE_NAME =
+      "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
 
   @Override
-  protected String getSchemaFileName() {
-    return SCHEMA_FILE_NAME;
+  public String getTableName() {
+    return TABLE_NAME;
   }
 
-  @BeforeClass
-  public void setUp()
+  @Override
+  public Schema createSchema() {
+    try {
+      Schema schema = createSchema(SCHEMA_FILE_NAME);
+      schema.setSchemaName(getTableName());
+      return schema;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load schema: " + SCHEMA_FILE_NAME, e);
+    }
+  }
+
+  @Override
+  public List<File> createAvroFiles()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
-    setupTenants();
-
-    // Create and upload the schema and table config
-    Schema schema = createSchema();
-    addSchema(schema);
-    TableConfig tableConfig = createOfflineTableConfig();
-    addTableConfig(tableConfig);
-
-    // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
-
-    // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
-
-    // Set up the H2 connection
-    setUpH2Connection(avroFiles);
-
-    // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
-
-    // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
-
-    // Use multi-stage query engine for all tests
-    setUseMultiStageQueryEngine(true);
+    return unpackAvroData(_tempDir);
   }
 
   @BeforeMethod
-  @Override
   public void resetMultiStage() {
     setUseMultiStageQueryEngine(true);
-  }
-
-  protected void setupTenants()
-      throws Exception {
-    // Use default tenant setup
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    dropOfflineTable(DEFAULT_TABLE_NAME);
-
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
   }
 
   @Test
   public void testRowEqualityTwoFields()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ArrDelay) = (201, 10)";
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE (AirTime, ArrDelay) = (201, 10)";
     JsonNode result = postQuery(query);
     assertNoError(result);
     assertTrue(result.get("numRowsResultSet").asInt() >= 0);
@@ -115,7 +75,8 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowEqualityThreeFields()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ArrDelay, DepDelay) = (201, 10, 5)";
+    String query =
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE (AirTime, ArrDelay, DepDelay) = (201, 10, 5)";
     JsonNode result = postQuery(query);
     assertNoError(result);
     assertTrue(result.get("numRowsResultSet").asInt() >= 0);
@@ -124,7 +85,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowNotEquals()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ArrDelay) <> (0, 0)";
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE (AirTime, ArrDelay) <> (0, 0)";
     JsonNode result = postQuery(query);
     assertNoError(result);
     assertTrue(result.get("numRowsResultSet").asInt() > 0);
@@ -133,7 +94,8 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowGreaterThan()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ActualElapsedTime) > (200, 230)";
+    String query =
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE (AirTime, ActualElapsedTime) > (200, 230)";
     JsonNode result = postQuery(query);
     assertNoError(result);
     long count = result.get("resultTable").get("rows").get(0).get(0).asLong();
@@ -143,7 +105,8 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowGreaterThanOrEqual()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ActualElapsedTime) >= (200, 230)";
+    String query =
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE (AirTime, ActualElapsedTime) >= (200, 230)";
     JsonNode result = postQuery(query);
     assertNoError(result);
     long count = result.get("resultTable").get("rows").get(0).get(0).asLong();
@@ -153,7 +116,8 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowLessThan()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ActualElapsedTime) < (100, 120)";
+    String query =
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE (AirTime, ActualElapsedTime) < (100, 120)";
     JsonNode result = postQuery(query);
     assertNoError(result);
     long count = result.get("resultTable").get("rows").get(0).get(0).asLong();
@@ -163,7 +127,8 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowLessThanOrEqual()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ActualElapsedTime) <= (100, 120)";
+    String query =
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE (AirTime, ActualElapsedTime) <= (100, 120)";
     JsonNode result = postQuery(query);
     assertNoError(result);
     long count = result.get("resultTable").get("rows").get(0).get(0).asLong();
@@ -173,8 +138,8 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowWithFourFields()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable "
-        + "WHERE (AirTime, ArrDelay, DepDelay, Distance) > (200, 0, 0, 1000)";
+    String query = "SELECT COUNT(*) FROM " + getTableName()
+        + " WHERE (AirTime, ArrDelay, DepDelay, Distance) > (200, 0, 0, 1000)";
     JsonNode result = postQuery(query);
     assertNoError(result);
     assertTrue(result.get("numRowsResultSet").asInt() >= 0);
@@ -183,7 +148,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowWithMixedDataTypes()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirlineID, Carrier) > (20000, 'AA')";
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE (AirlineID, Carrier) > (20000, 'AA')";
     JsonNode result = postQuery(query);
     assertNoError(result);
     assertTrue(result.get("numRowsResultSet").asInt() >= 0);
@@ -193,7 +158,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testKeysetPaginationUseCase()
       throws Exception {
     String query1 = "SELECT AirlineID, Carrier, AirTime "
-        + "FROM mytable "
+        + "FROM " + getTableName() + " "
         + "ORDER BY AirlineID, Carrier, AirTime "
         + "LIMIT 10";
     JsonNode result1 = postQuery(query1);
@@ -207,7 +172,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
 
     String query2 = String.format(
         "SELECT AirlineID, Carrier, AirTime "
-        + "FROM mytable "
+        + "FROM " + getTableName() + " "
         + "WHERE (AirlineID, Carrier, AirTime) > (%d, '%s', %d) "
         + "ORDER BY AirlineID, Carrier, AirTime "
         + "LIMIT 10",
@@ -225,7 +190,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testRowInComplexQuery()
       throws Exception {
     String query = "SELECT COUNT(*) FROM ("
-        + "  SELECT AirlineID, Carrier FROM mytable "
+        + "  SELECT AirlineID, Carrier FROM " + getTableName() + " "
         + "  WHERE (AirlineID, Carrier) > (20000, 'AA') "
         + "  ORDER BY AirlineID, Carrier LIMIT 100"
         + ") AS t";
@@ -238,7 +203,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testRowWithCTE()
       throws Exception {
     String query = "WITH filtered AS ("
-        + "  SELECT AirlineID, Carrier, AirTime FROM mytable "
+        + "  SELECT AirlineID, Carrier, AirTime FROM " + getTableName() + " "
         + "  WHERE AirlineID > 19000"
         + ") "
         + "SELECT COUNT(*) FROM filtered "
@@ -251,7 +216,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testMultipleRowComparisons()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable "
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " "
         + "WHERE (AirTime, ActualElapsedTime) > (100, 120) "
         + "AND (AirTime, ActualElapsedTime) < (500, 600)";
     JsonNode result = postQuery(query);
@@ -262,7 +227,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowComparisonWithLiterals()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable "
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " "
         + "WHERE (201, 230) < (AirTime, ActualElapsedTime)";
     JsonNode result = postQuery(query);
     assertNoError(result);
@@ -273,7 +238,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testExplainPlanWithRowExpression()
       throws Exception {
     String query = "EXPLAIN PLAN FOR "
-        + "SELECT * FROM mytable WHERE (AirTime, ActualElapsedTime) > (200, 230) LIMIT 10";
+        + "SELECT * FROM " + getTableName() + " WHERE (AirTime, ActualElapsedTime) > (200, 230) LIMIT 10";
     JsonNode result = postQuery(query);
     assertNoError(result);
     String plan = result.get("resultTable").get("rows").get(0).get(1).asText();
@@ -283,7 +248,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowInSelectList()
       throws Exception {
-    String query = "SELECT (AirTime, ActualElapsedTime) FROM mytable LIMIT 10";
+    String query = "SELECT (AirTime, ActualElapsedTime) FROM " + getTableName() + " LIMIT 10";
     JsonNode result = postQuery(query);
     assertTrue(result.get("exceptions").size() > 0, "Expected validation error");
     String errorMessage = result.get("exceptions").get(0).get("message").asText();
@@ -294,7 +259,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowInGroupBy()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable GROUP BY (AirlineID, Carrier)";
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " GROUP BY (AirlineID, Carrier)";
     JsonNode result = postQuery(query);
     assertTrue(result.get("exceptions").size() > 0, "Expected validation error");
     String errorMessage = result.get("exceptions").get(0).get("message").asText();
@@ -306,7 +271,8 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowInOrderBy()
       throws Exception {
-    String query = "SELECT AirlineID, Carrier FROM mytable ORDER BY (AirlineID, Carrier) LIMIT 10";
+    String query = "SELECT AirlineID, Carrier FROM " + getTableName()
+        + " ORDER BY (AirlineID, Carrier) LIMIT 10";
     JsonNode result = postQuery(query);
     assertTrue(result.get("exceptions").size() > 0, "Expected validation error");
     String errorMessage = result.get("exceptions").get(0).get("message").asText();
@@ -318,7 +284,8 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testSingleSidedRowComparison()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ActualElapsedTime) > 200";
+    String query = "SELECT COUNT(*) FROM " + getTableName()
+        + " WHERE (AirTime, ActualElapsedTime) > 200";
     JsonNode result = postQuery(query);
     assertTrue(result.get("exceptions").size() > 0, "Expected validation error");
     String errorMessage = result.get("exceptions").get(0).get("message").asText();
@@ -329,7 +296,8 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testMismatchedRowSizes()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ActualElapsedTime) > (200, 230, 250)";
+    String query = "SELECT COUNT(*) FROM " + getTableName()
+        + " WHERE (AirTime, ActualElapsedTime) > (200, 230, 250)";
     JsonNode result = postQuery(query);
     assertTrue(result.get("exceptions").size() > 0, "Expected validation error");
     String errorMessage = result.get("exceptions").get(0).get("message").asText();
@@ -340,7 +308,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testEmptyRowExpression()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE () > ()";
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE () > ()";
     JsonNode result = postQuery(query);
     assertTrue(result.get("exceptions").size() > 0, "Expected validation error");
   }
@@ -348,7 +316,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowInFunctionCall()
       throws Exception {
-    String query = "SELECT SUM((AirTime, ActualElapsedTime)) FROM mytable";
+    String query = "SELECT SUM((AirTime, ActualElapsedTime)) FROM " + getTableName();
     JsonNode result = postQuery(query);
     assertTrue(result.get("exceptions").size() > 0, "Expected validation error");
     String errorMessage = result.get("exceptions").get(0).get("message").asText();
@@ -359,7 +327,8 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowWithNullComparison()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ArrDelay) > (200, NULL)";
+    String query = "SELECT COUNT(*) FROM " + getTableName()
+        + " WHERE (AirTime, ArrDelay) > (200, NULL)";
     JsonNode result = postQuery(query);
     assertNoError(result);
   }
@@ -367,7 +336,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowComparisonSameValues()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable "
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " "
         + "WHERE (AirTime, ActualElapsedTime) >= (AirTime, ActualElapsedTime)";
     JsonNode result = postQuery(query);
     assertNoError(result);
@@ -381,7 +350,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
       throws Exception {
     // Test ROW in subquery WHERE clause
     String query = "SELECT COUNT(*) FROM ("
-        + "  SELECT * FROM mytable WHERE (AirTime, ActualElapsedTime) > (200, 230)"
+        + "  SELECT * FROM " + getTableName() + " WHERE (AirTime, ActualElapsedTime) > (200, 230)"
         + ") AS subq";
     JsonNode result = postQuery(query);
     assertNoError(result);
@@ -391,7 +360,7 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowComparisonWithCalculatedFields()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable "
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " "
         + "WHERE (AirTime * 2, ActualElapsedTime + 10) > (400, 240)";
     JsonNode result = postQuery(query);
     assertNoError(result);
@@ -401,12 +370,13 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowGreaterThanOrEqualVsExpanded()
       throws Exception {
-    String rowQuery = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ActualElapsedTime) >= (200, 230)";
+    String rowQuery = "SELECT COUNT(*) FROM " + getTableName()
+        + " WHERE (AirTime, ActualElapsedTime) >= (200, 230)";
     JsonNode rowResult = postQuery(rowQuery);
     assertNoError(rowResult);
     long rowCount = rowResult.get("resultTable").get("rows").get(0).get(0).asLong();
 
-    String expandedQuery = "SELECT COUNT(*) FROM mytable "
+    String expandedQuery = "SELECT COUNT(*) FROM " + getTableName() + " "
         + "WHERE (AirTime > 200) OR ((AirTime = 200) AND (ActualElapsedTime > 230)) "
         + "OR ((AirTime = 200) AND (ActualElapsedTime = 230))";
     JsonNode expandedResult = postQuery(expandedQuery);
@@ -419,12 +389,13 @@ public class RowExpressionIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testRowEqualityVsExpanded()
       throws Exception {
-    String rowQuery = "SELECT COUNT(*) FROM mytable WHERE (AirTime, ActualElapsedTime) = (201, 230)";
+    String rowQuery = "SELECT COUNT(*) FROM " + getTableName()
+        + " WHERE (AirTime, ActualElapsedTime) = (201, 230)";
     JsonNode rowResult = postQuery(rowQuery);
     assertNoError(rowResult);
     long rowCount = rowResult.get("resultTable").get("rows").get(0).get(0).asLong();
 
-    String expandedQuery = "SELECT COUNT(*) FROM mytable "
+    String expandedQuery = "SELECT COUNT(*) FROM " + getTableName() + " "
         + "WHERE (AirTime = 201) AND (ActualElapsedTime = 230)";
     JsonNode expandedResult = postQuery(expandedQuery);
     assertNoError(expandedResult);
