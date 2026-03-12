@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -43,6 +44,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -72,10 +74,10 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Start Zk, Kafka and Pinot
     startZk();
+    startKafka();
     startController();
     startBroker();
     startServer();
-    startKafka();
 
     List<File> avroFiles = getAllAvroFiles();
     List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
@@ -113,6 +115,22 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(100_000L);
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    try {
+      dropOfflineTable(getTableName());
+      dropRealtimeTable(getTableName());
+      stopServer();
+      stopBroker();
+      stopController();
+      stopKafka();
+      stopZk();
+    } finally {
+      FileUtils.deleteQuietly(_tempDir);
+    }
   }
 
   // TODO: Expand tests to cover more scenarios for workload enforcement

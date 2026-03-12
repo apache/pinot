@@ -83,12 +83,11 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     startZk();
+    // Start Kafka
+    startKafka();
     startController();
     startBroker();
     startServers(NUM_SERVERS);
-
-    // Start Kafka and push data into Kafka
-    startKafka();
 
     _resourceManager = _controllerStarter.getHelixResourceManager();
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager());

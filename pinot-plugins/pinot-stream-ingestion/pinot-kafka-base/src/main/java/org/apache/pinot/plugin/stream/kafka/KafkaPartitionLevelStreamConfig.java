@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.stream.kafka;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -118,6 +119,14 @@ public class KafkaPartitionLevelStreamConfig {
 
   public boolean isPopulateMetadata() {
     return _populateMetadata;
+  }
+
+  /**
+   * Returns an unmodifiable view of the stream config map so callers cannot mutate it
+   * and change consumer behavior after construction.
+   */
+  public Map<String, String> getStreamConfigMap() {
+    return Collections.unmodifiableMap(_streamConfigMap);
   }
 
   private int getIntConfigWithDefault(Map<String, String> configMap, String key, int defaultValue) {

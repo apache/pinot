@@ -207,6 +207,8 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "NETTY_CONNECTION_BYTES_SENT", "nettyConnection", true);
   public static final BrokerMeter NETTY_CONNECTION_BYTES_RECEIVED = create(
       "NETTY_CONNECTION_BYTES_RECEIVED", "nettyConnection", true);
+  public static final BrokerMeter NETTY_CONNECTION_SEND_REQUEST_FAILURES = create(
+      "NETTY_CONNECTION_SEND_REQUEST_FAILURES", "nettyConnection", true);
 
   public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
       "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);
