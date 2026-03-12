@@ -146,7 +146,6 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _brokerStats.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
   }
 
-  @Override
   public long getNumGroups() {
     return _brokerStats.getLong(StatKey.NUM_GROUPS);
   }
@@ -173,7 +172,6 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _maxRowsInJoinReached |= maxRowsInJoinReached;
   }
 
-  @Override
   public long getMaxRowsInJoin() {
     return _maxRowsInJoin;
   }
@@ -191,7 +189,6 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _maxRowsInWindowReached |= maxRowsInWindowReached;
   }
 
-  @Override
   public long getMaxRowsInWindow() {
     return _maxRowsInWindow;
   }
