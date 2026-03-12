@@ -137,7 +137,7 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
         }
       }
 
-      if (distinctTable.hasLimit() && distinctTable.size() >= limit) {
+      if (orderByExpression == null && distinctTable.hasLimit() && distinctTable.size() >= limit) {
         break;
       }
     }

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -37,8 +38,15 @@ import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.query.distinct.table.BigDecimalDistinctTable;
+import org.apache.pinot.core.query.distinct.table.DistinctTable;
+import org.apache.pinot.core.query.distinct.table.DoubleDistinctTable;
+import org.apache.pinot.core.query.distinct.table.FloatDistinctTable;
+import org.apache.pinot.core.query.distinct.table.IntDistinctTable;
+import org.apache.pinot.core.query.distinct.table.LongDistinctTable;
 import org.apache.pinot.core.query.distinct.table.StringDistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -99,13 +107,13 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
 
     RoaringBitmap filteredDocIds = buildFilteredDocIds();
 
+    ColumnDataType columnDataType = ColumnDataType.fromDataTypeSV(parsed._dataType);
     DataSchema dataSchema = new DataSchema(
         new String[]{expr.toString()},
-        new ColumnDataType[]{ColumnDataType.STRING});
+        new ColumnDataType[]{columnDataType});
     OrderByExpressionContext orderByExpression = _queryContext.getOrderByExpressions() != null
         ? _queryContext.getOrderByExpressions().get(0) : null;
-    StringDistinctTable distinctTable = new StringDistinctTable(
-        dataSchema, _queryContext.getLimit(), _queryContext.isNullHandlingEnabled(), orderByExpression);
+    DistinctTable distinctTable = createDistinctTable(dataSchema, parsed._dataType, orderByExpression);
 
     int limit = _queryContext.getLimit();
     for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
@@ -122,26 +130,151 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
       }
 
       if (includeValue) {
-        if (distinctTable.hasLimit()) {
-          if (orderByExpression != null) {
-            distinctTable.addWithOrderBy(value);
-          } else {
-            if (distinctTable.addWithoutOrderBy(value)) {
-              break;
-            }
-          }
-        } else {
-          distinctTable.addUnbounded(value);
-        }
+        boolean done = addValueToDistinctTable(distinctTable, value, parsed._dataType, orderByExpression);
         _numValuesProcessed++;
+        if (done) {
+          break;
+        }
       }
 
-      if (distinctTable.hasLimit() && distinctTable.size() >= limit) {
+      if (orderByExpression == null && distinctTable.hasLimit() && distinctTable.size() >= limit) {
         break;
       }
     }
 
     return new DistinctResultsBlock(distinctTable, _queryContext);
+  }
+
+  private DistinctTable createDistinctTable(DataSchema dataSchema, FieldSpec.DataType dataType,
+      @Nullable OrderByExpressionContext orderByExpression) {
+    int limit = _queryContext.getLimit();
+    boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+    switch (dataType) {
+      case INT:
+        return new IntDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case LONG:
+        return new LongDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case FLOAT:
+        return new FloatDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case DOUBLE:
+        return new DoubleDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case BIG_DECIMAL:
+        return new BigDecimalDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case STRING:
+        return new StringDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      default:
+        throw new IllegalStateException("Unsupported data type for JSON index distinct: " + dataType);
+    }
+  }
+
+  private static boolean addValueToDistinctTable(DistinctTable distinctTable, String stringValue,
+      FieldSpec.DataType dataType, @Nullable OrderByExpressionContext orderByExpression) {
+    switch (dataType) {
+      case INT:
+        return addToTable((IntDistinctTable) distinctTable, Integer.parseInt(stringValue), orderByExpression);
+      case LONG:
+        return addToTable((LongDistinctTable) distinctTable, Long.parseLong(stringValue), orderByExpression);
+      case FLOAT:
+        return addToTable((FloatDistinctTable) distinctTable, Float.parseFloat(stringValue), orderByExpression);
+      case DOUBLE:
+        return addToTable((DoubleDistinctTable) distinctTable, Double.parseDouble(stringValue), orderByExpression);
+      case BIG_DECIMAL:
+        return addToTable((BigDecimalDistinctTable) distinctTable, new BigDecimal(stringValue), orderByExpression);
+      case STRING:
+        return addToTable((StringDistinctTable) distinctTable, stringValue, orderByExpression);
+      default:
+        throw new IllegalStateException("Unsupported data type for JSON index distinct: " + dataType);
+    }
+  }
+
+  private static boolean addToTable(IntDistinctTable table, int value,
+      @Nullable OrderByExpressionContext orderByExpression) {
+    if (table.hasLimit()) {
+      if (orderByExpression != null) {
+        table.addWithOrderBy(value);
+        return false;
+      } else {
+        return table.addWithoutOrderBy(value);
+      }
+    } else {
+      table.addUnbounded(value);
+      return false;
+    }
+  }
+
+  private static boolean addToTable(LongDistinctTable table, long value,
+      @Nullable OrderByExpressionContext orderByExpression) {
+    if (table.hasLimit()) {
+      if (orderByExpression != null) {
+        table.addWithOrderBy(value);
+        return false;
+      } else {
+        return table.addWithoutOrderBy(value);
+      }
+    } else {
+      table.addUnbounded(value);
+      return false;
+    }
+  }
+
+  private static boolean addToTable(FloatDistinctTable table, float value,
+      @Nullable OrderByExpressionContext orderByExpression) {
+    if (table.hasLimit()) {
+      if (orderByExpression != null) {
+        table.addWithOrderBy(value);
+        return false;
+      } else {
+        return table.addWithoutOrderBy(value);
+      }
+    } else {
+      table.addUnbounded(value);
+      return false;
+    }
+  }
+
+  private static boolean addToTable(DoubleDistinctTable table, double value,
+      @Nullable OrderByExpressionContext orderByExpression) {
+    if (table.hasLimit()) {
+      if (orderByExpression != null) {
+        table.addWithOrderBy(value);
+        return false;
+      } else {
+        return table.addWithoutOrderBy(value);
+      }
+    } else {
+      table.addUnbounded(value);
+      return false;
+    }
+  }
+
+  private static boolean addToTable(BigDecimalDistinctTable table, BigDecimal value,
+      @Nullable OrderByExpressionContext orderByExpression) {
+    if (table.hasLimit()) {
+      if (orderByExpression != null) {
+        table.addWithOrderBy(value);
+        return false;
+      } else {
+        return table.addWithoutOrderBy(value);
+      }
+    } else {
+      table.addUnbounded(value);
+      return false;
+    }
+  }
+
+  private static boolean addToTable(StringDistinctTable table, String value,
+      @Nullable OrderByExpressionContext orderByExpression) {
+    if (table.hasLimit()) {
+      if (orderByExpression != null) {
+        table.addWithOrderBy(value);
+        return false;
+      } else {
+        return table.addWithoutOrderBy(value);
+      }
+    } else {
+      table.addUnbounded(value);
+      return false;
+    }
   }
 
   @Nullable
@@ -213,6 +346,14 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
       return null;
     }
 
+    String baseType = isSingleValue ? resultsType : resultsType.substring(0, resultsType.length() - 6);
+    FieldSpec.DataType dataType;
+    try {
+      dataType = FieldSpec.DataType.valueOf(baseType);
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+
     try {
       JsonPathCache.INSTANCE.getOrCompute(jsonPathString);
     } catch (Exception e) {
@@ -224,21 +365,23 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
       filterJsonPath = args.get(4).getLiteral().getStringValue();
     }
 
-    return new ParsedJsonExtractIndex(columnName, jsonPathString, isSingleValue, filterJsonPath);
+    return new ParsedJsonExtractIndex(columnName, jsonPathString, isSingleValue, dataType, filterJsonPath);
   }
 
   private static final class ParsedJsonExtractIndex {
     final String _columnName;
     final String _jsonPathString;
     final boolean _isSingleValue;
+    final FieldSpec.DataType _dataType;
     @Nullable
     final String _filterJsonPath;
 
     ParsedJsonExtractIndex(String columnName, String jsonPathString, boolean isSingleValue,
-        @Nullable String filterJsonPath) {
+        FieldSpec.DataType dataType, @Nullable String filterJsonPath) {
       _columnName = columnName;
       _jsonPathString = jsonPathString;
       _isSingleValue = isSingleValue;
+      _dataType = dataType;
       _filterJsonPath = filterJsonPath;
     }
   }
