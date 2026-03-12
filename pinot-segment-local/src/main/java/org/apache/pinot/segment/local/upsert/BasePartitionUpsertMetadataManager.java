@@ -740,19 +740,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
   }
 
-  protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-    try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
-      if (shouldRevertMetadataOnInconsistency(segment)) {
-        revertAndRemoveSegment(segment, UpsertUtils.getRecordIterator(primaryKeyReader, validDocIds));
-      } else {
-        removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Caught exception while removing segment: %s, table: %s, message: %s", segment.getSegmentName(),
-              _tableNameWithType, e.getMessage()), e);
-    }
-  }
+  protected abstract void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds);
 
   protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
     throw new UnsupportedOperationException("Both removeSegment(segment, validDocID) and "
