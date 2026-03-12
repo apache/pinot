@@ -72,8 +72,6 @@ public class ColocatedJoinIntegrationTest extends ColocatedJoinIntegrationTestBa
     }
   }
 
-  // --- Two-table join: 3 enablement paths (joinOptions+tableOptions, tableOptions only, inferPartitionHint) ---
-
   @Test
   public void testTwoTableJoinWithJoinOptionsAndTableOptions()
       throws Exception {
@@ -100,8 +98,6 @@ public class ColocatedJoinIntegrationTest extends ColocatedJoinIntegrationTestBa
     String sql = "SELECT COUNT(*) FROM userAttributes ua JOIN userGroups ug ON ua.userUUID = ug.userUUID";
     runAndAssertColocatedWithQueryOptions(sql, INFER_PARTITION_HINT_OPTIONS, SINGLE_PARTITION_PLAN_MSG);
   }
-
-  // --- Self-join: 3 enablement paths ---
 
   @Test
   public void testSelfJoinWithJoinOptionsAndTableOptions()
@@ -130,8 +126,6 @@ public class ColocatedJoinIntegrationTest extends ColocatedJoinIntegrationTestBa
         "SELECT COUNT(*) FROM userAttributes ua1 JOIN userAttributes ua2 ON ua1.userUUID = ua2.userUUID";
     runAndAssertColocatedWithQueryOptions(sql, INFER_PARTITION_HINT_OPTIONS, SINGLE_PARTITION_PLAN_MSG);
   }
-
-  // --- Semi-join: 3 enablement paths ---
 
   @Test
   public void testSemiJoinWithJoinOptionsAndTableOptions()
@@ -164,8 +158,6 @@ public class ColocatedJoinIntegrationTest extends ColocatedJoinIntegrationTestBa
     runAndAssertSemiJoinWithQueryOptions(sql, INFER_PARTITION_HINT_OPTIONS, SINGLE_PARTITION_PLAN_MSG);
   }
 
-  // --- Left join: 3 enablement paths ---
-
   @Test
   public void testLeftJoinWithJoinOptionsAndTableOptions()
       throws Exception {
@@ -192,8 +184,6 @@ public class ColocatedJoinIntegrationTest extends ColocatedJoinIntegrationTestBa
     String sql = "SELECT COUNT(*) FROM userAttributes ua LEFT JOIN userGroups ug ON ua.userUUID = ug.userUUID";
     runAndAssertColocatedWithQueryOptions(sql, INFER_PARTITION_HINT_OPTIONS, SINGLE_PARTITION_PLAN_MSG);
   }
-
-  // --- Right join: 3 enablement paths ---
 
   @Test
   public void testRightJoinWithJoinOptionsAndTableOptions()
