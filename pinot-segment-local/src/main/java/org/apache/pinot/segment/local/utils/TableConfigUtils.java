@@ -239,7 +239,7 @@ public final class TableConfigUtils {
         "Instance pool and replica group configurations must be enabled");
   }
 
-  private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
+  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
     return typesToSkip == null ? Collections.emptySet()
         : Arrays.stream(typesToSkip.split(",")).map(s -> ValidationType.valueOf(s.toUpperCase()))
             .collect(Collectors.toSet());
@@ -1809,7 +1809,7 @@ public final class TableConfigUtils {
 
   // enum of all the skip-able validation types.
   public enum ValidationType {
-    ALL, TASK, UPSERT
+    ALL, TASK, UPSERT, TENANT, MINION_INSTANCES, ACTIVE_TASKS
   }
 
   /**

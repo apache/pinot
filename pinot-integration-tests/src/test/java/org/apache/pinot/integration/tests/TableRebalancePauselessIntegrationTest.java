@@ -73,6 +73,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     startZk();
+    startKafka();
     startController();
     startBroker();
     startServer();

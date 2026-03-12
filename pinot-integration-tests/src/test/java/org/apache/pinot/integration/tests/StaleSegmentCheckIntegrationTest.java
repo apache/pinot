@@ -73,12 +73,12 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
 
     // Start the Pinot cluster
     startZk();
+    // Start Kafka
+    startKafka();
     startController();
     startBroker();
     startServer();
     startMinion();
-    // Start Kafka
-    startKafka();
 
     _taskManager = _controllerStarter.getTaskManager();
     _taskResourceManager = _controllerStarter.getHelixTaskResourceManager();
@@ -193,6 +193,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
       stopServer();
       stopBroker();
       stopController();
+      stopKafka();
       stopZk();
     } finally {
       FileUtils.deleteQuietly(_tempDir);

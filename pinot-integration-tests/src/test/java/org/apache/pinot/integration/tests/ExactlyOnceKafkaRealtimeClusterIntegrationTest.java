@@ -45,9 +45,12 @@ import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ExactlyOnceKafkaRealtimeClusterIntegrationTest.class);
   private static final int REALTIME_TABLE_CONFIG_RETRY_COUNT = 5;
   private static final long REALTIME_TABLE_CONFIG_RETRY_WAIT_MS = 1_000L;
   private static final long KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS = 30_000L;
@@ -81,6 +84,13 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
   }
 
   @Override
+  protected Properties getKafkaExtraProperties() {
+    Properties props = new Properties();
+    props.setProperty("log.flush.interval.messages", "1");
+    return props;
+  }
+
+  @Override
   protected int getNumKafkaBrokers() {
     return DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS;
   }
@@ -94,9 +104,8 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
     String kafkaBrokerList = getKafkaBrokerList();
-    // Use System.err for diagnostics - log4j2 console appender is filtered to ERROR in CI
-    System.err.println("[ExactlyOnce] Pushing transactional data to Kafka at: " + kafkaBrokerList);
-    System.err.println("[ExactlyOnce] Avro files count: " + avroFiles.size());
+    LOGGER.info("Pushing transactional data to Kafka at: {}", kafkaBrokerList);
+    LOGGER.info("Avro files count: {}", avroFiles.size());
 
     Properties producerProps = new Properties();
     producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerList);
@@ -115,19 +124,19 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     // transaction operations until the abort is fully done (markers written).
     try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(producerProps)) {
       producer.initTransactions();
-      System.err.println("[ExactlyOnce] initTransactions() succeeded");
+      LOGGER.info("initTransactions() succeeded");
 
       // Transaction 1: aborted batch
       long abortedCount = pushAvroRecords(producer, avroFiles, false);
-      System.err.println("[ExactlyOnce] Aborted batch: " + abortedCount + " records");
+      LOGGER.info("Aborted batch: {} records", abortedCount);
 
       // Transaction 2: committed batch
       long committedCount = pushAvroRecords(producer, avroFiles, true);
-      System.err.println("[ExactlyOnce] Committed batch: " + committedCount + " records");
+      LOGGER.info("Committed batch: {} records", committedCount);
     }
 
     // After producer is closed, verify data visibility with independent consumers
-    System.err.println("[ExactlyOnce] Producer closed. Verifying data visibility...");
+    LOGGER.info("Producer closed. Verifying data visibility...");
     waitForCommittedRecordsVisible(kafkaBrokerList);
   }
 
@@ -136,7 +145,7 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
    * This ensures transaction markers have been fully propagated before returning.
    */
   private void waitForCommittedRecordsVisible(String brokerList) {
-    long deadline = System.currentTimeMillis() + 60_000L;
+    long deadline = System.currentTimeMillis() + 120_000L;
     int lastCommitted = 0;
     int lastUncommitted = 0;
     int iteration = 0;
@@ -145,15 +154,14 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
       iteration++;
       lastCommitted = countRecords(brokerList, "read_committed");
       if (lastCommitted > 0) {
-        System.err.println("[ExactlyOnce] Verification OK: read_committed=" + lastCommitted
-            + " after " + iteration + " iterations");
+        LOGGER.info("Verification OK: read_committed={} after {} iterations", lastCommitted, iteration);
         return;
       }
       // Check if data reached Kafka at all
       if (iteration == 1 || iteration % 5 == 0) {
         lastUncommitted = countRecords(brokerList, "read_uncommitted");
-        System.err.println("[ExactlyOnce] Verification iteration " + iteration
-            + ": read_committed=" + lastCommitted + ", read_uncommitted=" + lastUncommitted);
+        LOGGER.info("Verification iteration {}: read_committed={}, read_uncommitted={}", iteration, lastCommitted,
+            lastUncommitted);
       }
       try {
         Thread.sleep(2_000L);
@@ -165,9 +173,9 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
 
     // Final diagnostic dump
     lastUncommitted = countRecords(brokerList, "read_uncommitted");
-    System.err.println("[ExactlyOnce] VERIFICATION FAILED after 60s: read_committed=" + lastCommitted
-        + ", read_uncommitted=" + lastUncommitted);
-    throw new AssertionError("[ExactlyOnce] Transaction markers were not propagated within 60s; "
+    LOGGER.error("VERIFICATION FAILED after 120s: read_committed={}, read_uncommitted={}", lastCommitted,
+        lastUncommitted);
+    throw new AssertionError("[ExactlyOnce] Transaction markers were not propagated within 120s; "
         + "committed records are not visible to read_committed consumers. "
         + "read_committed=" + lastCommitted + ", read_uncommitted=" + lastUncommitted);
   }
@@ -251,7 +259,7 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(props)) {
       List<PartitionInfo> partitions = consumer.partitionsFor(getKafkaTopic(), Duration.ofSeconds(10));
       if (partitions == null || partitions.isEmpty()) {
-        System.err.println("[ExactlyOnce] No partitions found for topic " + getKafkaTopic());
+        LOGGER.warn("No partitions found for topic {}", getKafkaTopic());
         return 0;
       }
       for (PartitionInfo pi : partitions) {
@@ -270,7 +278,7 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
         totalRecords += partitionRecords;
       }
     } catch (Exception e) {
-      System.err.println("[ExactlyOnce] Error counting records with " + isolationLevel + ": " + e.getMessage());
+      LOGGER.error("Error counting records with {}: {}", isolationLevel, e.getMessage());
     }
     return totalRecords;
   }
