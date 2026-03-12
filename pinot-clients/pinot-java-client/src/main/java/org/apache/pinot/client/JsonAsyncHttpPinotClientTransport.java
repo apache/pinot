@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -116,8 +117,10 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       if (_headers != null) {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
       }
-      LOGGER.debug("Sending query {} to {}", query, url);
-      return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
+      String correlationId = UUID.randomUUID().toString();
+      LOGGER.debug("Sending query {} to {} with correlationId {}", query, url, correlationId);
+      return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8")
+          .addHeader("X-Correlation-Id", correlationId).setBody(json.toString())
           .execute().toCompletableFuture().thenApply(httpResponse -> {
             LOGGER.debug("Completed query, HTTP status is {}", httpResponse.getStatusCode());
 
