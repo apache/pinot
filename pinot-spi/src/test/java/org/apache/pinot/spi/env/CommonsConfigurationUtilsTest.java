@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.List;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -141,7 +142,7 @@ public class CommonsConfigurationUtilsTest {
     }
 
     PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true,
-        PropertyIOFactoryKind.DefaultIOFactory);
+        PropertyIOFactoryKind.DefaultIOFactory, true);
     configuration.setProperty(PROPERTY_KEY, replacedValue);
     String recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
@@ -149,7 +150,7 @@ public class CommonsConfigurationUtilsTest {
 
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
     configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true,
-        PropertyIOFactoryKind.DefaultIOFactory);
+        PropertyIOFactoryKind.DefaultIOFactory, true);
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
@@ -158,12 +159,12 @@ public class CommonsConfigurationUtilsTest {
   @Test
   public void testPropertiesConfigurationFromFile()
       throws ConfigurationException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(null, false, null);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(null, false, null, true);
     assertNotNull(configuration);
     configuration.setProperty("Test Key", "Test Value");
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
 
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, null);
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, null, true);
     assertNotNull(configuration);
     assertEquals(configuration.getProperty("Test Key"), "Test Value");
   }
@@ -171,12 +172,12 @@ public class CommonsConfigurationUtilsTest {
   @Test
   public void testPropertiesConfigurationFromPath()
       throws ConfigurationException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromPath(null, false, null);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromPath(null, false, null, true);
     assertNotNull(configuration);
     configuration.setProperty("Test Key", "Test Value");
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
 
-    configuration = CommonsConfigurationUtils.fromPath(CONFIG_FILE.getPath(), false, null);
+    configuration = CommonsConfigurationUtils.fromPath(CONFIG_FILE.getPath(), false, null, true);
     assertNotNull(configuration);
     assertEquals(configuration.getProperty("Test Key"), "Test Value");
   }
@@ -193,5 +194,28 @@ public class CommonsConfigurationUtilsTest {
     configuration = CommonsConfigurationUtils.fromInputStream(inputStream, false, null);
     assertNotNull(configuration);
     assertEquals(configuration.getProperty("Test Key"), "Test Value");
+  }
+
+  @Test
+  public void testConfigFilesWithDuplicatedKeys()
+      throws ConfigurationException, IOException {
+    // Create a config file with duplicated keys
+    String configContent = "key1=value1\n"
+        + "key2=value2\n"
+        + "key1=value3\n"
+        + "key4=value4\n";
+    try {
+      FileUtils.writeStringToFile(CONFIG_FILE, configContent, "UTF-8");
+      PropertiesConfiguration config = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, null, true);
+      Assert.fail("should throw ConfigurationException exception with duplicated keys");
+    } catch (ConfigurationException e) {
+      // Expected exception
+    }
+    FileUtils.writeStringToFile(CONFIG_FILE, configContent, "UTF-8");
+    PropertiesConfiguration config = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, null, false);
+    Assert.assertNotNull(config);
+    Assert.assertEquals(config.getProperty("key1"), List.of("value1", "value3"));
+    Assert.assertEquals(config.getString("key2"), "value2");
+    Assert.assertEquals(config.getString("key4"), "value4");
   }
 }
