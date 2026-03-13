@@ -33,6 +33,8 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.ConfigChangeListenerConstants;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -533,22 +535,29 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     validatePreCommitState(tableNameWithoutCompaction, tableNameWithCompaction,
         tableNameWithCompactionColumnMajor, 3);
 
-    // Perform commit and wait for completion
-    performCommitAndWait(tableNameWithoutCompaction, tableNameWithCompaction,
-        tableNameWithCompactionColumnMajor, 20_000L, 4, 2);
+    try {
+      setConsumingSegmentConsistencyMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
 
-    // Brief wait to ensure all commit operations are complete
-    waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
-    waitForAllDocsLoaded(tableNameWithCompactionColumnMajor, 60_000L, 3);
+      // Perform commit and wait for completion
+      performCommitAndWait(tableNameWithoutCompaction, tableNameWithCompaction,
+          tableNameWithCompactionColumnMajor, 20_000L, 4, 2);
 
-    // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 2 removed)
-    validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
-        tableNameWithCompactionColumnMajor, 3, 2, 0.95);
+      // Brief wait to ensure all commit operations are complete
+      waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
+      waitForAllDocsLoaded(tableNameWithCompactionColumnMajor, 60_000L, 3);
 
-    // Clean up
-    cleanupTablesAndSchemas(
-        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor),
-        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor));
+      // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 2 removed)
+      validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
+          tableNameWithCompactionColumnMajor, 3, 2, 0.95);
+    } finally {
+      try {
+        resetConsumingSegmentConsistencyMode();
+      } finally {
+        cleanupTablesAndSchemas(
+            List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor),
+            List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor));
+      }
+    }
   }
 
   @Test
@@ -1220,6 +1229,25 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
       } catch (IOException ignored) {
       }
     });
+  }
+
+  private void setConsumingSegmentConsistencyMode(ConsumingSegmentConsistencyModeListener.Mode mode)
+      throws Exception {
+    updateClusterConfig(Map.of(ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE, mode.name()));
+    waitForConsumingSegmentConsistencyMode(mode);
+  }
+
+  private void resetConsumingSegmentConsistencyMode()
+      throws Exception {
+    deleteClusterConfig(ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE);
+    waitForConsumingSegmentConsistencyMode(
+        ConsumingSegmentConsistencyModeListener.Mode.DEFAULT_CONSUMING_SEGMENT_CONSISTENCY_MODE);
+  }
+
+  private void waitForConsumingSegmentConsistencyMode(ConsumingSegmentConsistencyModeListener.Mode expectedMode) {
+    TestUtils.waitForCondition(
+        aVoid -> ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode() == expectedMode, 10_000L,
+        "Timed out waiting for consuming segment consistency mode to become: " + expectedMode);
   }
 
   @Test

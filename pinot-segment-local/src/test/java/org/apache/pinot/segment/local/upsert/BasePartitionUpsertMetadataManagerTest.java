@@ -178,24 +178,21 @@ public class BasePartitionUpsertMetadataManagerTest {
     List<String> segmentsTakenSnapshot = new ArrayList<>();
 
     File segDir01 = new File(TEMP_DIR, "seg01");
-    ImmutableSegmentImpl seg01 =
-        createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, new ArrayList<>());
     seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), null);
     upsertMetadataManager.addSegment(seg01);
     // seg01 has a tmp snapshot file, but no snapshot file
     FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
 
     File segDir02 = new File(TEMP_DIR, "seg02");
-    ImmutableSegmentImpl seg02 =
-        createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, new ArrayList<>());
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
     upsertMetadataManager.addSegment(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
     FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
 
     File segDir03 = new File(TEMP_DIR, "seg03");
-    ImmutableSegmentImpl seg03 =
-        createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, new ArrayList<>());
     seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), null);
     upsertMetadataManager.addSegment(seg03);
 
@@ -369,8 +366,7 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     File segDir01 = new File(TEMP_DIR, "seg01");
     ImmutableSegmentImpl seg01 =
-        createImmutableSegment("seg01", segDir01, validDocIdsSegmentsTaken,
-            queryableDocIdsSegmentsTaken);
+        createImmutableSegment("seg01", segDir01, validDocIdsSegmentsTaken, queryableDocIdsSegmentsTaken);
     ThreadSafeMutableRoaringBitmap queryableDocIds01 = createDocIds(0, 1, 2); // Some docs excluded due to deletes
     seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), queryableDocIds01);
     upsertMetadataManager.trackSegment(seg01);
@@ -381,8 +377,7 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     File segDir02 = new File(TEMP_DIR, "seg02");
     ImmutableSegmentImpl seg02 =
-        createImmutableSegment("seg02", segDir02, validDocIdsSegmentsTaken,
-            queryableDocIdsSegmentsTaken);
+        createImmutableSegment("seg02", segDir02, validDocIdsSegmentsTaken, queryableDocIdsSegmentsTaken);
     ThreadSafeMutableRoaringBitmap queryableDocIds02 = createDocIds(0, 2, 3, 5); // Some docs excluded due to deletes
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), queryableDocIds02);
     upsertMetadataManager.trackSegment(seg02);
@@ -393,8 +388,7 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 =
-        createImmutableSegment("seg03", segDir03, validDocIdsSegmentsTaken,
-            queryableDocIdsSegmentsTaken);
+        createImmutableSegment("seg03", segDir03, validDocIdsSegmentsTaken, queryableDocIdsSegmentsTaken);
     ThreadSafeMutableRoaringBitmap queryableDocIds03 = createDocIds(3, 7); // Some docs excluded due to deletes
     seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), queryableDocIds03);
     upsertMetadataManager.trackSegment(seg03);
@@ -1051,10 +1045,6 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
 
     @Override
-    protected void removeNewlyAddedKeys(IndexSegment oldSegment) {
-    }
-
-    @Override
     protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     }
 
@@ -1064,16 +1054,25 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
 
     @Override
+    protected void revertAndRemoveSegment(IndexSegment segment,
+        Iterator<Map.Entry<Integer, PrimaryKey>> primaryKeyIterator) {
+    }
+
+    @Override
+    protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    }
+
+    @Override
     protected void doRemoveExpiredPrimaryKeys() {
     }
 
     @Override
-    protected void revertCurrentSegmentUpsertMetadata(IndexSegment oldSegment,
-        ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds) {
+    protected int getPrevKeyToRecordLocationSize() {
+      return 0;
     }
 
     @Override
-    protected void eraseKeyToPreviousLocationMap() {
+    protected void clearPrevKeyToRecordLocation() {
     }
   }
 }
