@@ -189,6 +189,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return useKafkaTransaction() ? DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS : DEFAULT_LLC_NUM_KAFKA_BROKERS;
   }
 
+  /**
+   * Override to pass extra Kafka broker config properties when starting the embedded Kafka cluster.
+   */
+  protected Properties getKafkaExtraProperties() {
+    return new Properties();
+  }
+
   protected int getKafkaPort() {
     int idx = RANDOM.nextInt(_kafkaStarters.size());
     return _kafkaStarters.get(idx).getPort();
@@ -817,6 +824,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     int requestedBrokers = getNumKafkaBrokers();
     Properties props = new Properties();
     props.setProperty(EmbeddedKafkaCluster.BROKER_COUNT_PROP, Integer.toString(requestedBrokers));
+    props.putAll(getKafkaExtraProperties());
     EmbeddedKafkaCluster cluster = new EmbeddedKafkaCluster();
     cluster.init(props);
     cluster.start();

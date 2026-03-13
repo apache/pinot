@@ -52,7 +52,7 @@ import org.testng.annotations.Test;
 import static org.apache.avro.Schema.create;
 import static org.apache.avro.Schema.createArray;
 import static org.apache.avro.Schema.createUnion;
-import static org.apache.pinot.integration.tests.GroupByOptionsIntegrationTest.toResultStr;
+import static org.apache.pinot.integration.tests.custom.GroupByOptionsTest.toResultStr;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;

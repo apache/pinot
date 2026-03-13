@@ -16,16 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.integration.tests.startree.SegmentInfoProvider;
 import org.apache.pinot.integration.tests.startree.StarTreeQueryGenerator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -33,10 +34,10 @@ import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -48,22 +49,18 @@ import static org.testng.Assert.assertTrue;
  * Integration test for Star-Tree based indexes.
  * <ul>
  *   <li>
- *     Set up the Pinot cluster and create two tables, one with default indexes, one with star tree indexes
+ *     Set up the Pinot cluster and create a table with star tree indexes
  *   </li>
  *   <li>
- *     Send queries to both the tables and assert that results match
- *   </li>
- *   <li>
- *     Query to reference table is sent with TOP 10000, and the comparator ensures that response from star tree is
- *     contained within the reference response. This is to avoid false failures when groups with same value are
- *     truncated due to TOP N
+ *     Send queries with and without star-tree and assert that results match
  *   </li>
  * </ul>
  */
-public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class StarTreeTest extends CustomDataQueryClusterIntegrationTest {
   public static final String FILTER_STARTREE_INDEX = "FILTER_STARTREE_INDEX";
   private static final String SCHEMA_FILE_NAME =
-          "On_Time_On_Time_Performance_2014_100k_subset_nonulls_columns.schema";
+      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_columns.schema";
   private static final int NUM_STAR_TREE_DIMENSIONS = 5;
   private static final int NUM_STAR_TREE_METRICS = 6;
   private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES =
@@ -78,9 +75,38 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private StarTreeQueryGenerator _starTree1QueryGenerator;
   private StarTreeQueryGenerator _starTree2QueryGenerator;
 
+  // Fixed dimensions and metrics for the first star-tree
+  private final List<String> _starTree1Dimensions =
+      Arrays.asList("OriginCityName", "DepTimeBlk", "LongestAddGTime", "CRSDepTime", "DivArrDelay");
+  private final List<String> _starTree1Metrics =
+      Arrays.asList("CarrierDelay", "DepDelay", "LateAircraftDelay", "ArrivalDelayGroups", "ArrDel15", "AirlineID");
+
+  // Randomly picked dimensions and metrics for the second star-tree (initialized in setUp)
+  private List<String> _starTree2Dimensions;
+  private List<String> _starTree2Metrics;
+
   @Override
-  protected String getSchemaFileName() {
-    return SCHEMA_FILE_NAME;
+  public String getTableName() {
+    return "StarTreeTest";
+  }
+
+  @Override
+  public Schema createSchema() {
+    try {
+      InputStream inputStream = getClass().getClassLoader().getResourceAsStream(SCHEMA_FILE_NAME);
+      Assert.assertNotNull(inputStream);
+      Schema schema = Schema.fromInputStream(inputStream);
+      schema.setSchemaName(getTableName());
+      return schema;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public List<File> createAvroFiles()
+      throws Exception {
+    return unpackAvroData(_tempDir);
   }
 
   // NOTE: Star-Tree and SegmentInfoProvider does not work on no-dictionary dimensions
@@ -89,71 +115,67 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay");
   }
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+  @Override
+  public String getTimeColumnName() {
+    return "DaysSinceEpoch";
+  }
 
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServers(2);
-
-    // Create and upload the schema and table config
+  @Override
+  public TableConfig createOfflineTableConfig() {
     Schema schema = createSchema();
-    addSchema(schema);
-
-    // Pick fixed dimensions and metrics for the first star-tree
-    List<String> starTree1Dimensions =
-        Arrays.asList("OriginCityName", "DepTimeBlk", "LongestAddGTime", "CRSDepTime", "DivArrDelay");
-    List<String> starTree1Metrics =
-        Arrays.asList("CarrierDelay", "DepDelay", "LateAircraftDelay", "ArrivalDelayGroups", "ArrDel15", "AirlineID");
-    int starTree1MaxLeafRecords = 10;
 
     // Randomly pick some dimensions and metrics for the second star-tree
     // Exclude TotalAddGTime since it's a multi-value column, should not be in dimension split order.
     List<String> allDimensions = new ArrayList<>(schema.getDimensionNames());
     allDimensions.remove("TotalAddGTime");
     Collections.shuffle(allDimensions, _random);
-    List<String> starTree2Dimensions = allDimensions.subList(0, NUM_STAR_TREE_DIMENSIONS);
+    _starTree2Dimensions = allDimensions.subList(0, NUM_STAR_TREE_DIMENSIONS);
     List<String> allMetrics = new ArrayList<>(schema.getMetricNames());
     Collections.shuffle(allMetrics, _random);
-    List<String> starTree2Metrics = allMetrics.subList(0, NUM_STAR_TREE_METRICS);
+    _starTree2Metrics = allMetrics.subList(0, NUM_STAR_TREE_METRICS);
+
+    int starTree1MaxLeafRecords = 10;
     int starTree2MaxLeafRecords = 100;
+    int starTree3MaxLeafRecords = 10;
 
     // Tests StarTree aggregate for multi-value column
     List<String> starTree3Dimensions =
         Arrays.asList("OriginCityName", "DepTimeBlk", "LongestAddGTime", "CRSDepTime", "DivArrDelay");
-    int starTree3MaxLeafRecords = 10;
 
-    TableConfig tableConfig = createOfflineTableConfig();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(getTableName())
+        .setTimeColumnName(getTimeColumnName())
+        .setNoDictionaryColumns(getNoDictionaryColumns())
+        .setNumReplicas(getNumReplicas())
+        .setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant())
+        .build();
     tableConfig.getIndexingConfig().setStarTreeIndexConfigs(
-        Arrays.asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics, starTree1MaxLeafRecords),
-            getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics, starTree2MaxLeafRecords),
+        Arrays.asList(
+            getStarTreeIndexConfig(_starTree1Dimensions, _starTree1Metrics, starTree1MaxLeafRecords),
+            getStarTreeIndexConfig(_starTree2Dimensions, _starTree2Metrics, starTree2MaxLeafRecords),
             getStarTreeIndexConfigForMVColAgg(starTree3Dimensions, starTree3MaxLeafRecords)));
-    addTableConfig(tableConfig);
 
-    // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    return tableConfig;
+  }
 
-    // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
-
-    // Set up the query generators
-    SegmentInfoProvider segmentInfoProvider = new SegmentInfoProvider(_tarDir.getPath());
-    List<String> aggregationFunctions = new ArrayList<>(AGGREGATION_FUNCTION_TYPES.size());
-    for (AggregationFunctionType functionType : AGGREGATION_FUNCTION_TYPES) {
-      aggregationFunctions.add(functionType.getName());
+  /**
+   * Initialize query generators after segments have been built and uploaded.
+   * This is called lazily before the first test that needs them.
+   */
+  private void ensureQueryGeneratorsInitialized()
+      throws Exception {
+    if (_starTree1QueryGenerator == null || _starTree2QueryGenerator == null) {
+      List<String> aggregationFunctions = new ArrayList<>(AGGREGATION_FUNCTION_TYPES.size());
+      for (AggregationFunctionType functionType : AGGREGATION_FUNCTION_TYPES) {
+        aggregationFunctions.add(functionType.getName());
+      }
+      SegmentInfoProvider segmentInfoProvider = new SegmentInfoProvider(_tarDir.getPath());
+      _starTree1QueryGenerator = new StarTreeQueryGenerator(getTableName(), _starTree1Dimensions, _starTree1Metrics,
+          segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions, _random);
+      _starTree2QueryGenerator = new StarTreeQueryGenerator(getTableName(), _starTree2Dimensions, _starTree2Metrics,
+          segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions, _random);
     }
-    _starTree1QueryGenerator = new StarTreeQueryGenerator(DEFAULT_TABLE_NAME, starTree1Dimensions, starTree1Metrics,
-        segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions, _random);
-    _starTree2QueryGenerator = new StarTreeQueryGenerator(DEFAULT_TABLE_NAME, starTree2Dimensions, starTree2Metrics,
-        segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions, _random);
-
-    // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
   }
 
   private static StarTreeIndexConfig getStarTreeIndexConfig(List<String> dimensions, List<String> metrics,
@@ -186,6 +208,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    ensureQueryGeneratorsInitialized();
     for (int i = 0; i < NUM_QUERIES_TO_GENERATE; i += 2) {
       testStarQuery(_starTree1QueryGenerator.nextQuery(), false);
       testStarQuery(_starTree2QueryGenerator.nextQuery(), false);
@@ -196,19 +219,22 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void testHardCodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String tableName = getTableName();
+
     // This query can test the case of one predicate matches all the child nodes but star-node cannot be used because
     // the predicate is included as remaining predicate from another branch
-    String starQuery = "SELECT DepTimeBlk, COUNT(*) FROM mytable "
-        + "WHERE CRSDepTime BETWEEN 1137 AND 1849 AND DivArrDelay > 218 AND CRSDepTime NOT IN (35, 1633, 1457, 140) "
+    String starQuery = "SELECT DepTimeBlk, COUNT(*) FROM " + tableName
+        + " WHERE CRSDepTime BETWEEN 1137 AND 1849 AND DivArrDelay > 218 AND CRSDepTime NOT IN (35, 1633, 1457, 140) "
         + "AND LongestAddGTime NOT IN (17, 105, 20, 22) GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
 
     // Test MIN, MAX, SUM rewrite on LONG col
-    starQuery =
-        "SELECT MIN(AirlineID), MAX(AirlineID), SUM(AirlineID) FROM mytable WHERE CRSDepTime BETWEEN 1137 AND 1849";
+    starQuery = "SELECT MIN(AirlineID), MAX(AirlineID), SUM(AirlineID) FROM " + tableName
+        + " WHERE CRSDepTime BETWEEN 1137 AND 1849";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
 
-    starQuery = "SET enableNullHandling=true; SELECT COUNT(DivArrDelay) FROM mytable WHERE DivArrDelay > 218";
+    starQuery = "SET enableNullHandling=true; SELECT COUNT(DivArrDelay) FROM " + tableName
+        + " WHERE DivArrDelay > 218";
     testStarQuery(starQuery, false);
   }
 
@@ -216,20 +242,19 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void testHardCodedFilteredAggQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String starQuery = "SELECT DepTimeBlk, COUNT(*), COUNT(*) FILTER (WHERE CRSDepTime = 35) FROM mytable "
-        + "WHERE CRSDepTime != 35 GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
-    // Don't verify that the query plan uses StarTree index, as this query results in FILTER_EMPTY in the query plan.
-    // This is still a valuable test, as it caught a bug where only the subFilterContext was being preserved through
-    // AggregationFunctionUtils#buildFilteredAggregationInfos
+    String tableName = getTableName();
+
+    String starQuery = "SELECT DepTimeBlk, COUNT(*), COUNT(*) FILTER (WHERE CRSDepTime = 35) FROM " + tableName
+        + " WHERE CRSDepTime != 35 GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery, false);
 
     // Ensure the filtered agg and unfiltered agg can co-exist in one query
-    starQuery = "SELECT DepTimeBlk, COUNT(*), COUNT(*) FILTER (WHERE DivArrDelay > 20) FROM mytable "
-        + "WHERE CRSDepTime != 35 GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
+    starQuery = "SELECT DepTimeBlk, COUNT(*), COUNT(*) FILTER (WHERE DivArrDelay > 20) FROM " + tableName
+        + " WHERE CRSDepTime != 35 GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
 
-    starQuery = "SELECT DepTimeBlk, COUNT(*) FILTER (WHERE CRSDepTime != 35) FROM mytable "
-        + "GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
+    starQuery = "SELECT DepTimeBlk, COUNT(*) FILTER (WHERE CRSDepTime != 35) FROM " + tableName
+        + " GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
   }
 
@@ -237,24 +262,25 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void testMultiValueColumnAggregations(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String tableName = getTableName();
 
-    String starQuery = "SELECT COUNTMV(TotalAddGTime), SUMMV(TotalAddGTime), AVGMV(TotalAddGTime) FROM mytable";
+    String starQuery = "SELECT COUNTMV(TotalAddGTime), SUMMV(TotalAddGTime), AVGMV(TotalAddGTime) FROM " + tableName;
     testStarQuery(starQuery, !useMultiStageQueryEngine);
 
-    starQuery = "SELECT OriginCityName, COUNTMV(TotalAddGTime), AVGMV(TotalAddGTime), SUMMV(TotalAddGTime) "
-        + "FROM mytable GROUP BY OriginCityName ORDER BY OriginCityName";
+    starQuery = "SELECT OriginCityName, COUNTMV(TotalAddGTime), AVGMV(TotalAddGTime), SUMMV(TotalAddGTime) FROM "
+        + tableName + " GROUP BY OriginCityName ORDER BY OriginCityName";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
 
-    starQuery = "SELECT DepTimeBlk, SUMMV(TotalAddGTime), AVGMV(TotalAddGTime) FROM mytable "
-        + "WHERE CRSDepTime > 1000 GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
+    starQuery = "SELECT DepTimeBlk, SUMMV(TotalAddGTime), AVGMV(TotalAddGTime) FROM " + tableName
+        + " WHERE CRSDepTime > 1000 GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
 
-    starQuery = "SELECT OriginCityName, DepTimeBlk, SUMMV(TotalAddGTime) FROM mytable "
-        + "GROUP BY OriginCityName, DepTimeBlk ORDER BY OriginCityName, DepTimeBlk LIMIT 100";
+    starQuery = "SELECT OriginCityName, DepTimeBlk, SUMMV(TotalAddGTime) FROM " + tableName
+        + " GROUP BY OriginCityName, DepTimeBlk ORDER BY OriginCityName, DepTimeBlk LIMIT 100";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
 
-    starQuery = "SELECT CRSDepTime, AVGMV(TotalAddGTime) FROM mytable "
-        + "WHERE CRSDepTime BETWEEN 800 AND 1200 AND DivArrDelay < 100 "
+    starQuery = "SELECT CRSDepTime, AVGMV(TotalAddGTime) FROM " + tableName
+        + " WHERE CRSDepTime BETWEEN 800 AND 1200 AND DivArrDelay < 100 "
         + "GROUP BY CRSDepTime ORDER BY CRSDepTime";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
   }
@@ -296,18 +322,5 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
         "Query comparison failed for: \n"
             + "Star Query: %s\nStar Response: %s\nReference Query: %s\nReference Response: %s\nRandom Seed: %d",
         starQuery, starResponse, referenceQuery, referenceResponse, _randomSeed));
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    dropOfflineTable(DEFAULT_TABLE_NAME);
-
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
   }
 }

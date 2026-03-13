@@ -28,6 +28,7 @@ import java.util.function.Function;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.integration.tests.custom.StarTreeTest;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -226,7 +227,7 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
    */
   private void checkQueryDoesNotUseStarTreeIndex(String query, int expectedResult) throws Exception {
     JsonNode explainPlan = postQuery("EXPLAIN PLAN FOR " + query);
-    assertFalse(explainPlan.toString().contains(StarTreeClusterIntegrationTest.FILTER_STARTREE_INDEX));
+    assertFalse(explainPlan.toString().contains(StarTreeTest.FILTER_STARTREE_INDEX));
     assertEquals(getDistinctCountResult(query), expectedResult);
   }
 
@@ -244,7 +245,7 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
-          return result.toString().contains(StarTreeClusterIntegrationTest.FILTER_STARTREE_INDEX);
+          return result.toString().contains(StarTreeTest.FILTER_STARTREE_INDEX);
         }, 1000L, 10_000L, "Failed to use star-tree index for query: " + query
     );
     assertEquals(getDistinctCountResult(query), expectedResult);

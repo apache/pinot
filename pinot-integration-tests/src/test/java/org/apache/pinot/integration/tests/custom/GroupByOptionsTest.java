@@ -16,13 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.File;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,23 +29,20 @@ import java.util.Properties;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
 
 
-public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet {
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
 
   static final int FILES_NO = 4;
   static final int RECORDS_NO = 20;
@@ -55,42 +51,32 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   static final String RESULT_TABLE = "resultTable";
   static final int SERVERS_NO = 2;
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+  @Override
+  public String getTableName() {
+    return "GroupByOptionsTest";
+  }
 
-    startZk();
-    startController();
-    startServers(SERVERS_NO);
-    startBroker();
-
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
+  @Override
+  public Schema createSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(I_COL, FieldSpec.DataType.INT)
         .addSingleValueDimension(J_COL, FieldSpec.DataType.LONG)
         .build();
-    addSchema(schema);
-    TableConfig tableConfig = createOfflineTableConfig();
-    addTableConfig(tableConfig);
-
-    List<File> avroFiles = createAvroFile(_tempDir);
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
-
-    // Wait for all documents loaded
-    TestUtils.waitForCondition(() -> getCurrentCountStarResult(DEFAULT_TABLE_NAME) == FILES_NO * RECORDS_NO, 100L,
-        60_000,
-        "Failed to load  documents", true, Duration.ofMillis(60_000 / 10));
-
-    setUseMultiStageQueryEngine(true);
-
-    Map<String, List<String>> map = getTableServersToSegmentsMap(getTableName(), TableType.OFFLINE);
-
-    // make sure segments are split between multiple servers
-    Assert.assertEquals(map.size(), SERVERS_NO);
   }
 
-  protected TableConfig createOfflineTableConfig() {
+  @Override
+  public List<File> createAvroFiles()
+      throws Exception {
+    return createAvroFile(_tempDir);
+  }
+
+  @Override
+  protected long getCountStarResult() {
+    return FILES_NO * RECORDS_NO;
+  }
+
+  @Override
+  public TableConfig createOfflineTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(getTableName())
         .setNumReplicas(getNumReplicas())
@@ -130,6 +116,12 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testOrderByKeysIsNotPushedToFinalAggregationWhenGroupTrimHintIsDisabled()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
+    Map<String, List<String>> map = getTableServersToSegmentsMap(getTableName(), TableType.OFFLINE);
+    // make sure segments are split between multiple servers
+    Assert.assertEquals(map.size(), SERVERS_NO);
+
     String trimDisabledPlan = "Execution Plan\n"
         + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], offset=[0], fetch=[1])\n"
         + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1 DESC]], isSortOnSender=[false], "
@@ -137,7 +129,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
         + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], fetch=[1])\n"
         + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
-        + "          LeafStageCombineOperator(table=[mytable])\n"
+        + "          LeafStageCombineOperator(table=[" + getTableName() + "])\n"
         + "            StreamingInstanceResponse\n"
         + "              CombineGroupBy\n"
         + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
@@ -171,6 +163,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testOrderByKeysIsPushedToFinalAggregationStageWithoutGroupTrimSize()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     // is_enable_group_trim enables V1-style trimming in leaf nodes,
     // with numGroupsLimit and minSegmentGroupTrimSize,
     // while group_trim_size - in final aggregation node
@@ -197,7 +191,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, 1 "
             + "DESC]], limit=[1])\n"
             + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
-            + "          LeafStageCombineOperator(table=[mytable])\n"
+            + "          LeafStageCombineOperator(table=[" + getTableName() + "])\n"
             + "            StreamingInstanceResponse\n"
             + "              CombineGroupBy\n"
             + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
@@ -209,6 +203,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testOrderByKeysIsPushedToFinalAggregationStageWithGroupTrimSize()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     // is_enable_group_trim enables V1-style trimming in leaf nodes, with numGroupsLimit and minSegmentGroupTrimSize,
     // while group_trim_size - in final aggregation node .
     // Same as above, to stabilize result here, we override global numGroupsLimit option with num_groups_limit hint.
@@ -231,7 +227,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, 1 "
             + "DESC]], limit=[1])\n"
             + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
-            + "          LeafStageCombineOperator(table=[mytable])\n"
+            + "          LeafStageCombineOperator(table=[" + getTableName() + "])\n"
             + "            StreamingInstanceResponse\n"
             + "              CombineGroupBy\n"
             + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
@@ -243,6 +239,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testOrderByKeysIsPushedToFinalAggregationStage()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     assertResultAndPlan(
         // group_trim_size should sort and limit v2 aggregate output if order by and limit is propagated
         " ",
@@ -263,7 +261,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, "
             + "1]], limit=[3])\n"
             + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
-            + "          LeafStageCombineOperator(table=[mytable])\n"
+            + "          LeafStageCombineOperator(table=[" + getTableName() + "])\n"
             + "            StreamingInstanceResponse\n"
             + "              CombineGroupBy\n"
             + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
@@ -275,6 +273,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testHavingOnKeysAndOrderByKeysIsPushedToFinalAggregationStage()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     assertResultAndPlan(
         // group_trim_size should sort and limit v2 aggregate output if order by and limit is propagated
         " ",
@@ -296,7 +296,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, "
             + "1]], limit=[3])\n"
             + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
-            + "          LeafStageCombineOperator(table=[mytable])\n"
+            + "          LeafStageCombineOperator(table=[" + getTableName() + "])\n"
             + "            StreamingInstanceResponse\n"
             + "              CombineGroupBy\n"
             + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
@@ -308,6 +308,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testGroupByKeysWithOffsetIsPushedToFinalAggregationStage()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     // if offset is set, leaf should return more results to intermediate stage
     assertResultAndPlan(
         "",
@@ -329,7 +331,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, "
             + "1]], limit=[4])\n"
             + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
-            + "          LeafStageCombineOperator(table=[mytable])\n"
+            + "          LeafStageCombineOperator(table=[" + getTableName() + "])\n"
             + "            StreamingInstanceResponse\n"
             + "              CombineGroupBy\n"
             + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
@@ -342,6 +344,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testOrderByByKeysAndValuesIsPushedToFinalAggregationStage()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     // group_trim_size should sort and limit v2 aggregate output if order by and limit is propagated
     assertResultAndPlan(
         " ",
@@ -364,7 +368,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0 "
             + "DESC, 1 DESC, 2 DESC]], limit=[3])\n"
             + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
-            + "          LeafStageCombineOperator(table=[mytable])\n"
+            + "          LeafStageCombineOperator(table=[" + getTableName() + "])\n"
             + "            StreamingInstanceResponse\n"
             + "              CombineGroupBy\n"
             + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
@@ -377,6 +381,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testOrderByKeyValueExpressionIsNotPushedToFinalAggregateStage()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     // Order by both expression based on keys and aggregate values.
     // Expression & limit are not available until after aggregation so they can't be pushed down.
     // Because of that, group_trim_size is not applied.
@@ -402,7 +408,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
             + "      LogicalProject(i=[$0], j=[$1], cnt=[$2], EXPR$3=[*(*($0, $1), $2)])\n"
             + "        PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])\n"
             + "          PinotLogicalExchange(distribution=[hash[0, 1]])\n"
-            + "            LeafStageCombineOperator(table=[mytable])\n"
+            + "            LeafStageCombineOperator(table=[" + getTableName() + "])\n"
             + "              StreamingInstanceResponse\n"
             + "                CombineGroupBy\n"
             + "                  GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
@@ -415,6 +421,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testForGroupByOverJoinOrderByKeyIsPushedToAggregationLeafStage()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     // query uses V2 aggregate operator for both leaf and final stages because of join
     assertResultAndPlan(
         " ",
@@ -442,18 +450,18 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
             + "1]], limit=[5])\n"
             + "            LogicalJoin(condition=[true], joinType=[inner])\n"
             + "              PinotLogicalExchange(distribution=[random])\n"
-            + "                LeafStageCombineOperator(table=[mytable])\n"
+            + "                LeafStageCombineOperator(table=[" + getTableName() + "])\n"
             + "                  StreamingInstanceResponse\n"
             + "                    StreamingCombineSelect\n"
-            + "                      SelectStreaming(table=[mytable], totalDocs=[80])\n"
+            + "                      SelectStreaming(table=[" + getTableName() + "], totalDocs=[80])\n"
             + "                        Project(columns=[[i, j]])\n"
             + "                          DocIdSet(maxDocs=[40000])\n"
             + "                            FilterMatchEntireSegment(numDocs=[80])\n"
             + "              PinotLogicalExchange(distribution=[broadcast])\n"
-            + "                LeafStageCombineOperator(table=[mytable])\n"
+            + "                LeafStageCombineOperator(table=[" + getTableName() + "])\n"
             + "                  StreamingInstanceResponse\n"
             + "                    StreamingCombineSelect\n"
-            + "                      SelectStreaming(table=[mytable], totalDocs=[80])\n"
+            + "                      SelectStreaming(table=[" + getTableName() + "], totalDocs=[80])\n"
             + "                        Transform(expressions=[['0']])\n"
             + "                          Project(columns=[[]])\n"
             + "                            DocIdSet(maxDocs=[40000])\n"
@@ -461,7 +469,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     );
   }
 
-  public void assertResultAndPlan(String option, String query, String expectedResult, String expectedPlan)
+  private void assertResultAndPlan(String option, String query, String expectedResult, String expectedPlan)
       throws Exception {
     String sql = option
         //disable timeout in debug
@@ -478,6 +486,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testExceptionIsThrownWhenErrorOnNumGroupsLimitHintIsSetAndLimitIsReachedV1()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     String query = " select /*+  aggOptions(num_groups_limit='1',error_on_num_groups_limit='true') */"
         + " i, j, count(*) as cnt "
         + " from " + getTableName()
@@ -490,6 +500,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testExceptionIsThrownWhenErrorOnNumGroupsLimitHintIsSetAndLimitIsReachedV2()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     String query = " set numGroupsLimit=1;"
         + " select /*+  aggOptions(error_on_num_groups_limit='true') */"
         + " i, j, count(*) as cnt "
@@ -503,6 +515,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testExceptionIsThrownWhenErrorOnNumGroupsLimitOptionIsSetAndLimitIsReachedV1()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     String query = " set errorOnNumGroupsLimit=true; set numGroupsLimit=1;"
         + " select i, j, count(*) as cnt "
         + " from " + getTableName()
@@ -515,6 +529,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testExceptionIsThrownWhenErrorOnNumGroupsLimitOptionIsSetAndLimitIsReachedV2()
       throws Exception {
+    setUseMultiStageQueryEngine(true);
+
     String query = " set errorOnNumGroupsLimit=true; "
         + "select /*+  aggOptions(num_groups_limit='1') */ i, j, count(*) as cnt "
         + " from " + getTableName()
@@ -571,7 +587,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     return toString(node);
   }
 
-  static String toExplainStr(JsonNode mainNode, boolean isMSQE) {
+  public static String toExplainStr(JsonNode mainNode, boolean isMSQE) {
     if (mainNode == null) {
       return "null";
     }
@@ -582,7 +598,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     return toExplainString(node, isMSQE);
   }
 
-  static String toExplainStr(JsonNode mainNode) {
+  public static String toExplainStr(JsonNode mainNode) {
     return toExplainStr(mainNode, false);
   }
 
@@ -642,18 +658,5 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
       }
       return result.toString();
     }
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    dropOfflineTable(DEFAULT_TABLE_NAME);
-
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
   }
 }

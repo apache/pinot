@@ -28,6 +28,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -63,6 +64,32 @@ public class QueryServerTest {
 
     server.shutDown();
     assertFalse(connectionOk(serverAddress));
+  }
+
+  @Test
+  public void testAllChannelsCleanupOnClose()
+      throws Exception {
+    PinotMetricUtils.init(new PinotConfiguration());
+    PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
+    ServerMetrics.register(new ServerMetrics(registry));
+    QueryServer server = new QueryServer(0, new NettyConfig(), null, mock(ChannelHandler.class));
+    server.start();
+
+    InetSocketAddress serverAddress = server.getChannel().localAddress();
+    Socket socket = new Socket(serverAddress.getHostName(), serverAddress.getPort());
+
+    try {
+      TestUtils.waitForCondition(aVoid -> server.getConnectedChannelCount() > 0, 5_000L,
+          "Channel was not registered in _allChannels");
+
+      socket.close();
+
+      TestUtils.waitForCondition(aVoid -> server.getConnectedChannelCount() == 0, 5_000L,
+          "Channel was not removed from _allChannels after close");
+    } finally {
+      IOUtils.closeQuietly(socket);
+      server.shutDown();
+    }
   }
 
   private static boolean connectionOk(InetSocketAddress address) {

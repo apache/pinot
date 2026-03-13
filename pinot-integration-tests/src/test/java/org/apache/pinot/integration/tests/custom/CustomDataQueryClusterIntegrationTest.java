@@ -85,13 +85,13 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   public void tearDownSuite()
       throws Exception {
     LOGGER.warn("Tearing down integration test suite");
-    // Stop Kafka
-    LOGGER.warn("Stop Kafka in the integration test suite");
-    stopKafka();
     // Shutdown the Pinot cluster
     stopServer();
     stopBroker();
     stopController();
+    // Stop Kafka
+    LOGGER.warn("Stop Kafka in the integration test suite");
+    stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
     LOGGER.warn("Finished tearing down integration test suite");

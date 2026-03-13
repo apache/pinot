@@ -93,6 +93,15 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Creates a new {@link ForwardIndexReaderContext} with query-level options so that reader implementations can
+   * adjust per-query behavior (e.g., bypassing caches). Falls back to {@link #createContext()} by default.
+   */
+  @Nullable
+  default T createContext(Map<String, String> queryOptions) {
+    return createContext();
+  }
+
+  /**
    * DICTIONARY-ENCODED INDEX APIs
    */
 

@@ -239,7 +239,7 @@ public final class TableConfigUtils {
         "Instance pool and replica group configurations must be enabled");
   }
 
-  private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
+  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
     return typesToSkip == null ? Collections.emptySet()
         : Arrays.stream(typesToSkip.split(",")).map(s -> ValidationType.valueOf(s.toUpperCase()))
             .collect(Collectors.toSet());
@@ -1795,20 +1795,21 @@ public final class TableConfigUtils {
    * @param tableConfig the table config to check, may be null
    * @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
    */
-  public static boolean checkForInconsistentStateConfigs(@Nullable TableConfig tableConfig) {
+  public static boolean isTableTypeInconsistentDuringConsumption(@Nullable TableConfig tableConfig) {
+    if (tableConfig == null) {
+      return false;
+    }
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig == null) {
       return false;
     }
-    return tableConfig.getReplication() > 1 && (
-        upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL
-            || (upsertConfig.isDropOutOfOrderRecord()
-            && upsertConfig.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE));
+    return (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL || upsertConfig.isDropOutOfOrderRecord()
+        || upsertConfig.getOutOfOrderRecordColumn() != null);
   }
 
   // enum of all the skip-able validation types.
   public enum ValidationType {
-    ALL, TASK, UPSERT
+    ALL, TASK, UPSERT, TENANT, MINION_INSTANCES, ACTIVE_TASKS
   }
 
   /**
