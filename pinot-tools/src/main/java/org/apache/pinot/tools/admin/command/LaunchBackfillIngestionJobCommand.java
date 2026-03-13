@@ -159,7 +159,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
   public Properties getTransportProperties(SegmentGenerationJobSpec spec) {
     Properties transportProperties = new Properties();
     URI controllerURI = URI.create(spec.getPinotClusterSpecs()[0].getControllerURI());
-    transportProperties.setProperty(PinotAdminTransport.ADMIN_TRANSPORT_SCHEME, controllerURI.getScheme());
+    transportProperties.setProperty(PinotAdminTransport.PINOT_ADMIN_SCHEME_PROPERTY_KEY, controllerURI.getScheme());
     return transportProperties;
   }
 

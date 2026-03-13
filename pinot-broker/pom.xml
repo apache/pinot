@@ -35,6 +35,10 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-java-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-query-runtime</artifactId>
     </dependency>
     <dependency>
@@ -88,6 +92,11 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-system-table</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
