@@ -36,5 +36,6 @@ public enum MergeType {
   /**
    * Deduplicates rows with the same values.
    */
-  DEDUP
+  DEDUP,
+  MV_ROLLUP
 }

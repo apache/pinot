@@ -54,4 +54,9 @@ public class SumValueAggregator implements ValueAggregator {
     }
     return result;
   }
+
+  @Override
+  public String getValueType() {
+    return "sum";
+  }
 }

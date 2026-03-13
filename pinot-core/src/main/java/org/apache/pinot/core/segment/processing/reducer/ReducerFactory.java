@@ -42,6 +42,8 @@ public class ReducerFactory {
             processorConfig.getAggregationFunctionParameters(), reducerOutputDir);
       case DEDUP:
         return new DedupReducer(partitionId, fileManager, reducerOutputDir);
+      case MV_ROLLUP:
+        return new MvReducer(partitionId, fileManager, reducerOutputDir, processorConfig);
       default:
         throw new IllegalStateException("Unsupported merge type: " + mergeType);
     }
