@@ -20,11 +20,14 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
+import org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -72,8 +75,30 @@ public class DistinctPlanNode implements PlanNode {
       }
     }
 
-    // DistinctOperator handles inverted index eligibility internally based on cost heuristic.
-    BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
-    return new DistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator);
+    // Use inverted-index-based distinct operator when opted in via query option
+    if (QueryOptionsUtils.isUseInvertedIndexDistinct(_queryContext.getQueryOptions()) && expressions.size() == 1) {
+      String column = expressions.get(0).getIdentifier();
+      if (column != null) {
+        DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
+        if (dataSource.getDictionary() != null && dataSource.getInvertedIndex() != null) {
+          boolean eligible = true;
+          if (_queryContext.isNullHandlingEnabled()) {
+            NullValueVectorReader nullValueReader = dataSource.getNullValueVector();
+            if (nullValueReader != null && !nullValueReader.getNullBitmap().isEmpty()) {
+              eligible = false;
+            }
+          }
+          if (eligible) {
+            BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
+            return new InvertedIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator,
+                dataSource);
+          }
+        }
+      }
+    }
+
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(_segmentContext, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+    return new DistinctOperator(_indexSegment, _queryContext, projectOperator);
   }
 }

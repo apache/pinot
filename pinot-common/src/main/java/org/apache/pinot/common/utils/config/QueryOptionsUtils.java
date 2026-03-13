@@ -166,6 +166,13 @@ public class QueryOptionsUtils {
   }
 
   /**
+   * Returns true if the inverted-index-based distinct operator should be used.
+   */
+  public static boolean isUseInvertedIndexDistinct(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_INVERTED_INDEX_DISTINCT));
+  }
+
+  /**
    * Returns the cost ratio for the inverted-index-based distinct heuristic, or null if not set.
    * The inverted index path is chosen when dictionaryCardinality * costRatio <= filteredDocCount.
    */

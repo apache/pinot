@@ -58,8 +58,9 @@ import static org.testng.Assert.assertTrue;
  *
  * <p>The heuristic: use inverted index when {@code dictCardinality * costRatio <= filteredDocCount}.
  *
- * <p>Test strategy: use the {@code invertedIndexDistinctCostRatio} query option to control the heuristic,
- * then verify which path was taken via {@code toExplainString()}.
+ * <p>Test strategy: enable via {@code useInvertedIndexDistinct=true}, use
+ * {@code invertedIndexDistinctCostRatio} to control the heuristic, then verify which path
+ * was taken via {@code toExplainString()}.
  */
 public class InvertedIndexDistinctCostHeuristicTest extends BaseQueriesTest {
   private static final File INDEX_DIR =
@@ -151,12 +152,22 @@ public class InvertedIndexDistinctCostHeuristicTest extends BaseQueriesTest {
   }
 
   /**
+   * Without the query option, the old DistinctOperator is used (no inverted index path).
+   */
+  @Test
+  public void testDisabledByDefaultWithoutQueryOption() {
+    String query = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0";
+    BaseOperator<DistinctResultsBlock> op = runDistinct(query);
+    assertFalse(usedInvertedIndex(op), "Without useInvertedIndexDistinct=true, should use scan");
+  }
+
+  /**
    * costRatio=1 with wide filter (10K docs): dictCard(100)*1=100 <= 10000 → inverted index.
    */
   @Test
   public void testLowCostRatioForcesInvertedIndex() {
     String query = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0 "
-        + "OPTION(invertedIndexDistinctCostRatio=1)";
+        + "OPTION(useInvertedIndexDistinct=true, invertedIndexDistinctCostRatio=1)";
     BaseOperator<DistinctResultsBlock> op = runDistinct(query);
     assertTrue(usedInvertedIndex(op), "costRatio=1, 10K docs → should use inverted index");
   }
@@ -167,7 +178,7 @@ public class InvertedIndexDistinctCostHeuristicTest extends BaseQueriesTest {
   @Test
   public void testHighCostRatioForcesScan() {
     String query = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0 "
-        + "OPTION(invertedIndexDistinctCostRatio=200)";
+        + "OPTION(useInvertedIndexDistinct=true, invertedIndexDistinctCostRatio=200)";
     BaseOperator<DistinctResultsBlock> op = runDistinct(query);
     assertFalse(usedInvertedIndex(op), "costRatio=200, 10K docs → should use scan");
   }
@@ -178,10 +189,8 @@ public class InvertedIndexDistinctCostHeuristicTest extends BaseQueriesTest {
   @Test
   public void testCostRatio1SelectiveFilterUsesInvertedIndex() {
     String query = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn = 0 "
-        + "OPTION(invertedIndexDistinctCostRatio=1)";
+        + "OPTION(useInvertedIndexDistinct=true, invertedIndexDistinctCostRatio=1)";
     BaseOperator<DistinctResultsBlock> op = runDistinct(query);
-    DistinctTable table = op.nextBlock().getDistinctTable();
-    // First nextBlock already consumed in runDistinct, so use the result from there
     assertTrue(usedInvertedIndex(op), "costRatio=1, 100 docs, dictCard=100 → inverted index");
   }
 
@@ -191,7 +200,7 @@ public class InvertedIndexDistinctCostHeuristicTest extends BaseQueriesTest {
   @Test
   public void testCostRatio2SelectiveFilterUsesScan() {
     String query = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn = 0 "
-        + "OPTION(invertedIndexDistinctCostRatio=2)";
+        + "OPTION(useInvertedIndexDistinct=true, invertedIndexDistinctCostRatio=2)";
     BaseOperator<DistinctResultsBlock> op = runDistinct(query);
     assertFalse(usedInvertedIndex(op), "costRatio=2, 100 docs, dictCard=100 → scan");
   }
@@ -204,7 +213,7 @@ public class InvertedIndexDistinctCostHeuristicTest extends BaseQueriesTest {
     // Force inverted index path with costRatio=1
     String invertedQuery = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn < 10 "
         + "ORDER BY intColumn LIMIT 100 "
-        + "OPTION(invertedIndexDistinctCostRatio=1)";
+        + "OPTION(useInvertedIndexDistinct=true, invertedIndexDistinctCostRatio=1)";
     BaseOperator<DistinctResultsBlock> invertedOp = getOperator(invertedQuery);
     DistinctTable invertedTable = invertedOp.nextBlock().getDistinctTable();
     assertTrue(usedInvertedIndex(invertedOp), "Should use inverted index with costRatio=1");
@@ -212,7 +221,7 @@ public class InvertedIndexDistinctCostHeuristicTest extends BaseQueriesTest {
     // Force scan path with costRatio=10000
     String scanQuery = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn < 10 "
         + "ORDER BY intColumn LIMIT 100 "
-        + "OPTION(invertedIndexDistinctCostRatio=10000)";
+        + "OPTION(useInvertedIndexDistinct=true, invertedIndexDistinctCostRatio=10000)";
     BaseOperator<DistinctResultsBlock> scanOp = getOperator(scanQuery);
     DistinctTable scanTable = scanOp.nextBlock().getDistinctTable();
     assertFalse(usedInvertedIndex(scanOp), "Should use scan with costRatio=10000");
@@ -243,14 +252,14 @@ public class InvertedIndexDistinctCostHeuristicTest extends BaseQueriesTest {
   public void testInvertedIndexAndScanSameCountNoOrderBy() {
     // Force inverted index
     String invertedQuery = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0 LIMIT 200 "
-        + "OPTION(invertedIndexDistinctCostRatio=1)";
+        + "OPTION(useInvertedIndexDistinct=true, invertedIndexDistinctCostRatio=1)";
     BaseOperator<DistinctResultsBlock> invertedOp = getOperator(invertedQuery);
     DistinctTable invertedTable = invertedOp.nextBlock().getDistinctTable();
     assertTrue(usedInvertedIndex(invertedOp));
 
     // Force scan
     String scanQuery = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0 LIMIT 200 "
-        + "OPTION(invertedIndexDistinctCostRatio=10000)";
+        + "OPTION(useInvertedIndexDistinct=true, invertedIndexDistinctCostRatio=10000)";
     BaseOperator<DistinctResultsBlock> scanOp = getOperator(scanQuery);
     DistinctTable scanTable = scanOp.nextBlock().getDistinctTable();
     assertFalse(usedInvertedIndex(scanOp));
@@ -260,11 +269,12 @@ public class InvertedIndexDistinctCostHeuristicTest extends BaseQueriesTest {
   }
 
   /**
-   * With default costRatio=5 and 10K docs, inverted index should be chosen automatically.
+   * With default costRatio=5 and 10K docs, inverted index should be chosen when opted in.
    */
   @Test
-  public void testDefaultBehaviorUsesInvertedIndex() {
-    String query = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0";
+  public void testDefaultCostRatioUsesInvertedIndex() {
+    String query = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0 "
+        + "OPTION(useInvertedIndexDistinct=true)";
     BaseOperator<DistinctResultsBlock> op = runDistinct(query);
     assertTrue(usedInvertedIndex(op), "Default costRatio=5: 100*5=500 <= 10K → inverted index");
   }
@@ -279,19 +289,20 @@ public class InvertedIndexDistinctCostHeuristicTest extends BaseQueriesTest {
   @Test
   public void testDefaultRatioBoundary() {
     // Default costRatio=5: dictCard(100)*5=500 <= 10K docs → inverted index
-    String defaultQuery = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0";
+    String defaultQuery = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0 "
+        + "OPTION(useInvertedIndexDistinct=true)";
     assertTrue(usedInvertedIndex(runDistinct(defaultQuery)),
         "Default costRatio=5: 100*5=500 <= 10K → inverted index");
 
     // costRatio=100: dictCard(100)*100=10000 <= 10K docs → inverted index (boundary)
     String boundaryQuery = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0 "
-        + "OPTION(invertedIndexDistinctCostRatio=100)";
+        + "OPTION(useInvertedIndexDistinct=true, invertedIndexDistinctCostRatio=100)";
     assertTrue(usedInvertedIndex(runDistinct(boundaryQuery)),
         "costRatio=100: 100*100=10000 <= 10000 → inverted index at boundary");
 
     // costRatio=101: dictCard(100)*101=10100 > 10K docs → scan
     String aboveBoundaryQuery = "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0 "
-        + "OPTION(invertedIndexDistinctCostRatio=101)";
+        + "OPTION(useInvertedIndexDistinct=true, invertedIndexDistinctCostRatio=101)";
     assertFalse(usedInvertedIndex(runDistinct(aboveBoundaryQuery)),
         "costRatio=101: 100*101=10100 > 10000 → scan");
   }

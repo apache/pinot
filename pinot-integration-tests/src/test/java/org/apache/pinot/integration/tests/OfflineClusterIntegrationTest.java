@@ -646,24 +646,29 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   /**
-   * SELECT DISTINCT on an inverted-indexed column. DistinctOperator internally decides whether to use the
-   * inverted index path based on cost heuristic. Verifies correctness with and without filter.
+   * SELECT DISTINCT on an inverted-indexed column. InvertedIndexDistinctOperator is used when
+   * opted in via query option. Verifies correctness with and without filter.
+   * Origin already has an inverted index by default (see DEFAULT_INVERTED_INDEX_COLUMNS).
    */
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctWithInvertedIndex(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    addInvertedIndex();
 
-    // Without filter
-    String query = "SELECT DISTINCT Origin FROM mytable ORDER BY Origin";
+    // Without filter — uses InvertedIndexDistinctOperator via query option
+    // Use large LIMIT to fetch all distinct values so subset assertion is valid
+    String query =
+        "SELECT DISTINCT Origin FROM mytable ORDER BY Origin LIMIT 10000 "
+            + "OPTION(useInvertedIndexDistinct=true)";
     JsonNode response = postQuery(query);
     assertEquals(response.get("exceptions").size(), 0);
     Set<String> values = extractDistinctValuesFromResponse(response);
     assertFalse(values.isEmpty(), "DISTINCT on inverted-indexed column should return values");
 
     // With filter
-    String filteredQuery = "SELECT DISTINCT Origin FROM mytable WHERE Carrier = 'AA' ORDER BY Origin";
+    String filteredQuery =
+        "SELECT DISTINCT Origin FROM mytable WHERE Carrier = 'AA' ORDER BY Origin LIMIT 10000 "
+            + "OPTION(useInvertedIndexDistinct=true)";
     JsonNode filteredResponse = postQuery(filteredQuery);
     assertEquals(filteredResponse.get("exceptions").size(), 0);
     Set<String> filteredValues = extractDistinctValuesFromResponse(filteredResponse);

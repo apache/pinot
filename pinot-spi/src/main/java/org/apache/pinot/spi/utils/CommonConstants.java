@@ -655,6 +655,12 @@ public class CommonConstants {
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
         public static final String USE_STAR_TREE = "useStarTree";
         /**
+         * Enable the inverted-index-based distinct operator for single-column DISTINCT queries on columns
+         * with both a dictionary and an inverted index. When enabled, the operator uses a cost heuristic
+         * to choose between the inverted index path and the scan path at runtime.
+         */
+        public static final String USE_INVERTED_INDEX_DISTINCT = "useInvertedIndexDistinct";
+        /**
          * Cost ratio for the inverted-index-based distinct heuristic. The inverted index path is chosen when
          * dictionaryCardinality * costRatio <= filteredDocCount. Default is 5.
          */
