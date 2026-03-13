@@ -38,6 +38,8 @@ import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.jspecify.annotations.Nullable;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -72,6 +74,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   private TransformFunction _jsonFieldTransformFunction;
   private JsonPath _jsonPath;
   private Object _defaultValue;
+  private boolean _defaultIsNull;
   private TransformResultMetadata _resultMetadata;
 
   @Override
@@ -80,8 +83,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    super.init(arguments, columnContextMap);
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      boolean nullHandlingEnabled) {
+    super.init(arguments, columnContextMap, nullHandlingEnabled);
     // Check that there are exactly 3 or 4 arguments
     if (arguments.size() < 3 || arguments.size() > 4) {
       throw new IllegalArgumentException(
@@ -110,7 +114,41 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
               + "/DOUBLE_ARRAY/STRING_ARRAY", resultsType));
     }
     if (arguments.size() == 4) {
-      _defaultValue = dataType.convert(((LiteralTransformFunction) arguments.get(3)).getStringLiteral());
+      LiteralTransformFunction literalTransformFun = (LiteralTransformFunction) arguments.get(3);
+      _defaultIsNull = literalTransformFun.isNull() && _nullHandlingEnabled;
+      switch (dataType) {
+        case INT:
+          _defaultValue = literalTransformFun.getIntLiteral();
+          break;
+        case LONG:
+          _defaultValue = literalTransformFun.getLongLiteral();
+          break;
+        case FLOAT:
+          _defaultValue = literalTransformFun.getFloatLiteral();
+          break;
+        case DOUBLE:
+        case TIMESTAMP:
+          _defaultValue = literalTransformFun.getDoubleLiteral();
+          break;
+        case BOOLEAN:
+          _defaultValue = literalTransformFun.getBooleanLiteral();
+          break;
+        case BIG_DECIMAL:
+          _defaultValue = literalTransformFun.getBigDecimalLiteral();
+          break;
+        case STRING:
+        case JSON:
+          _defaultValue = literalTransformFun.getStringLiteral();
+          break;
+        case BYTES:
+          _defaultValue = literalTransformFun.getBytesLiteral();
+          break;
+        default:
+          throw new IllegalArgumentException(
+              "Unsupported results type: " + dataType + " for jsonExtractScalar function. Supported types are: "
+                  + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/BIG_DECIMAL/TIMESTAMP/STRING/JSON/BYTES"
+          );
+      }
     }
     _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
   }
@@ -118,6 +156,37 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   @Override
   public TransformResultMetadata getResultMetadata() {
     return _resultMetadata;
+  }
+
+  @Override
+  public @Nullable RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    if (!_defaultIsNull) {
+      return super.getNullBitmap(valueBlock);
+    }
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (TransformFunction arg : _arguments.subList(1, _arguments.size() - 1)) {
+      RoaringBitmap argBitmap = arg.getNullBitmap(valueBlock);
+      if (argBitmap != null) {
+        bitmap.or(argBitmap);
+      }
+    }
+    int numDocs = valueBlock.getNumDocs();
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    IntFunction<Object> resultExtractor = getResultExtractor(valueBlock);
+    for (int i = 0; i < numDocs; i++) {
+      Object result = null;
+      try {
+        result = resultExtractor.apply(i);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
+        nullBitmap.add(i);
+      }
+    }
+    if (!nullBitmap.isEmpty()) {
+      bitmap.or(nullBitmap);
+    }
+    return bitmap;
   }
 
   @Override
