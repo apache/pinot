@@ -367,7 +367,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertTrue(brokerResource.getPartitionSet().contains(logicalTableName));
     checkBrokerResourceForPartition(logicalTableName, taggedBrokers);
 
-    // Add a new broker instance with same tenant
+    // Add a new broker instance with same tenant; verify add-broker path updates logical table partition
     Instance newBrokerInstance =
         new Instance("localhost", 3, InstanceType.BROKER, Collections.singletonList(brokerTag), null, 0, 0, 0, 0,
             false);
@@ -376,12 +376,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<String> taggedBrokersAfterAdd = new ArrayList<>(taggedBrokers);
     taggedBrokersAfterAdd.add(newBrokerId);
 
-    // Logical table partition should include the new broker. If broker add path did not update it yet,
-    // rebuildBrokerResourceFromHelixTags (e.g. from BrokerResourceValidationManager) repairs it.
-    PinotResourceManagerResponse rebuildResponse =
-        _helixResourceManager.rebuildBrokerResourceFromHelixTags(logicalTableName);
-    assertTrue(rebuildResponse.isSuccessful(),
-        "Rebuild for logical table should succeed: " + rebuildResponse.getMessage());
     checkBrokerResourceForPartition(logicalTableName, taggedBrokersAfterAdd);
 
     // Cleanup
@@ -445,56 +439,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
 
     // Reset the brokers
-    resetBrokerTags();
-  }
-
-  /**
-   * Verifies that rebuildBrokerResourceFromHelixTags succeeds for a logical table name and
-   * updates the broker resource ideal state correctly (Issue #15751).
-   */
-  @Test
-  public void testRebuildBrokerResourceFromHelixTagsForLogicalTable()
-      throws Exception {
-    // Setup: physical tables (offline + realtime) via manager with test tenants, then logical table
-    addDummySchema(RAW_TABLE_NAME);
-    TableConfig offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
-            .setServerTenant(SERVER_TENANT_NAME).build();
-    waitForEVToDisappear(offlineTableConfig.getTableName());
-    _helixResourceManager.addTable(offlineTableConfig);
-    waitForEVToDisappear(REALTIME_TABLE_NAME);
-    TableConfig realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
-            .setServerTenant(SERVER_TENANT_NAME)
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
-    _helixResourceManager.addTable(realtimeTableConfig);
-    List<String> physicalTableNamesWithType = List.of(OFFLINE_TABLE_NAME, REALTIME_TABLE_NAME);
-    String logicalTableName = "test_logical_table_rebuild";
-    addDummySchema(logicalTableName);
-    LogicalTableConfig logicalTableConfig =
-        ControllerTest.getDummyLogicalTableConfig(logicalTableName, physicalTableNamesWithType, BROKER_TENANT_NAME);
-    addLogicalTableConfig(logicalTableConfig);
-
-    IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
-    assertTrue(idealState.getPartitionSet().contains(logicalTableName));
-    int initialBrokerCount = idealState.getInstanceSet(logicalTableName).size();
-
-    // Rebuild for logical table name should succeed (not return 400)
-    PinotResourceManagerResponse response =
-        _helixResourceManager.rebuildBrokerResourceFromHelixTags(logicalTableName);
-    assertTrue(response.isSuccessful(), "rebuildBrokerResourceFromHelixTags should succeed for logical table: "
-        + response.getMessage());
-
-    idealState = _helixAdmin.getResourceIdealState(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
-    Set<String> brokersForLogicalTable = idealState.getInstanceSet(logicalTableName);
-    assertEquals(brokersForLogicalTable.size(), initialBrokerCount);
-    assertEquals(brokersForLogicalTable,
-        new HashSet<>(_helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)));
-
-    // Cleanup
-    _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
-    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
-    _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
     resetBrokerTags();
   }
 

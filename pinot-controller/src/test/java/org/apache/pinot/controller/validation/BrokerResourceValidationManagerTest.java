@@ -52,7 +52,7 @@ public class BrokerResourceValidationManagerTest {
   public void setUp() {
     _resourceManager = mock(PinotHelixResourceManager.class);
     when(_resourceManager.getAllTables()).thenReturn(List.of(PHYSICAL_TABLE));
-    when(_resourceManager.getBrokerResourceLogicalTablePartitions()).thenReturn(List.of(LOGICAL_TABLE_PARTITION));
+    when(_resourceManager.getBrokerResourceLogicalTables()).thenReturn(List.of(LOGICAL_TABLE_PARTITION));
 
     ControllerConf config = new ControllerConf();
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
@@ -89,7 +89,7 @@ public class BrokerResourceValidationManagerTest {
 
   @Test
   public void testGetTablesToProcessWhenNoLogicalPartitions() {
-    when(_resourceManager.getBrokerResourceLogicalTablePartitions()).thenReturn(Collections.emptyList());
+    when(_resourceManager.getBrokerResourceLogicalTables()).thenReturn(Collections.emptyList());
 
     List<String> tables = _validationManager.getTablesToProcess(new Properties());
 

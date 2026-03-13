@@ -55,7 +55,7 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
       return tables;
     }
     List<String> combined = new ArrayList<>(tables);
-    combined.addAll(_pinotHelixResourceManager.getBrokerResourceLogicalTablePartitions());
+    combined.addAll(_pinotHelixResourceManager.getBrokerResourceLogicalTables());
     return combined;
   }
 

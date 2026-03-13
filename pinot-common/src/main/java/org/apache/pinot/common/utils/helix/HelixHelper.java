@@ -536,24 +536,7 @@ public class HelixHelper {
   }
 
   public static Set<String> getTablesForBrokerTag(HelixManager helixManager, String brokerTag) {
-    Set<String> tablesForBrokerTag = new HashSet<>();
-    ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
-    List<TableConfig> tableConfigs = ZKMetadataProvider.getAllTableConfigs(propertyStore);
-    for (TableConfig tableConfig : tableConfigs) {
-      if (TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker()).equals(brokerTag)) {
-        tablesForBrokerTag.add(tableConfig.getTableName());
-      }
-    }
-    // Include logical tables that use this broker tenant (broker resource partition name = logical table name)
-    for (LogicalTableConfig logicalTableConfig : ZKMetadataProvider.getAllLogicalTableConfigs(propertyStore)) {
-      String logicalBrokerTag =
-          TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant() != null
-              ? logicalTableConfig.getBrokerTenant() : TagNameUtils.DEFAULT_TENANT_NAME);
-      if (logicalBrokerTag.equals(brokerTag)) {
-        tablesForBrokerTag.add(logicalTableConfig.getTableName());
-      }
-    }
-    return tablesForBrokerTag;
+    return getTablesForBrokerTags(helixManager, List.of(brokerTag));
   }
 
   public static Set<String> getTablesForBrokerTags(HelixManager helixManager, List<String> brokerTags) {
@@ -568,8 +551,7 @@ public class HelixHelper {
     // Include logical tables that use any of these broker tenants
     for (LogicalTableConfig logicalTableConfig : ZKMetadataProvider.getAllLogicalTableConfigs(propertyStore)) {
       String logicalBrokerTag =
-          TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant() != null
-              ? logicalTableConfig.getBrokerTenant() : TagNameUtils.DEFAULT_TENANT_NAME);
+          TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant());
       if (brokerTags.contains(logicalBrokerTag)) {
         tablesForBrokerTags.add(logicalTableConfig.getTableName());
       }

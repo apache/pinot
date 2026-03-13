@@ -749,26 +749,11 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Returns partition names in broker resource ideal state that are logical tables (have logical table config
-   * and no physical table config). Used by broker resource validation to repair logical table broker assignments.
-   * Identifies by config presence rather than name to avoid misclassifying logical tables named with
-   * _OFFLINE/_REALTIME.
+   * Returns all logical table names in the cluster. Used by broker resource validation to repair logical table
+   * broker assignments (and to add missing logical tables to the broker resource when needed).
    */
-  public List<String> getBrokerResourceLogicalTablePartitions() {
-    IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(_helixAdmin, _helixClusterName);
-    if (brokerIdealState == null) {
-      return Collections.emptyList();
-    }
-    List<String> logicalPartitions = new ArrayList<>();
-    for (String partition : brokerIdealState.getPartitionSet()) {
-      if (ZKMetadataProvider.getTableConfig(_propertyStore, partition) != null) {
-        continue; // physical table partition, skip
-      }
-      if (ZKMetadataProvider.getLogicalTableConfig(_propertyStore, partition) != null) {
-        logicalPartitions.add(partition);
-      }
-    }
-    return logicalPartitions;
+  public List<String> getBrokerResourceLogicalTables() {
+    return getAllLogicalTableNames();
   }
 
   /**
@@ -1189,12 +1174,9 @@ public class PinotHelixResourceManager {
   private void addInstanceToBrokerIdealState(String brokerTenantTag, String instanceName) {
     // Use atomic read-modify-write so updates (including for logical tables) are persisted and not lost to races.
     HelixHelper.updateIdealState(getHelixZkManager(), Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
-      assert idealState != null;
+      Preconditions.checkNotNull(idealState, "Broker ideal state must not be null");
       for (String partitionName : idealState.getPartitionSet()) {
-        String brokerTag = resolveBrokerTagForBrokerResourcePartition(partitionName);
-        if (brokerTag == null) {
-          continue;
-        }
+        String brokerTag = resolveBrokerTagForTable(partitionName);
         if (brokerTag.equals(brokerTenantTag)) {
           idealState.setPartitionState(partitionName, instanceName, BrokerResourceStateModel.ONLINE);
         }
@@ -1204,25 +1186,22 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Resolves the broker tag for a partition in the broker resource. Tries physical table config first,
-   * then logical table config, so both are handled regardless of partition naming (e.g. a logical table
-   * name ending with _OFFLINE would otherwise be misclassified as physical and skipped).
+   * Resolves the broker tag for a table in the broker resource. Tries physical table config first,
+   * then logical table config.
    *
-   * @param partitionName partition name in broker ideal state (physical table name with type or logical table name)
+   * @param tableName table name in broker ideal state (physical table name with type or logical table name)
    * @return broker tag for the partition, or null if the partition cannot be resolved (unknown or missing config)
    */
-  private String resolveBrokerTagForBrokerResourcePartition(String partitionName) {
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, partitionName);
+  private String resolveBrokerTagForTable(String tableName) {
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableName);
     if (tableConfig != null) {
       return TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig());
     }
-    LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, partitionName);
+    LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
     if (logicalTableConfig != null) {
       return TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant());
     }
-    LOGGER.debug("Skipping partition {} in broker resource: no table config or logical table config found",
-        partitionName);
-    return null;
+    throw new InvalidTableConfigException("Failed to resolve broker tag for table " + tableName + " because no table config or logical table config found");
   }
 
   private PinotResourceManagerResponse scaleDownBroker(Tenant tenant, String brokerTenantTag,

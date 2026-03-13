@@ -449,6 +449,12 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     Set<String> brokersAfterAdd = _helixResourceManager.getAllInstancesForBrokerTenant(TENANT_NAME);
     assertTrue(brokersAfterAdd.contains(brokerId));
 
+    // Assert logical table partition does not yet contain the new broker (periodic task will repair it)
+    idealState = HelixHelper.getBrokerIdealStates(_helixAdmin, helixClusterName);
+    assertNotNull(idealState);
+    assertFalse(idealState.getInstanceSet(logicalTableName).contains(brokerId),
+        "Logical table partition should not yet include the new broker before periodic task runs");
+
     // Wait for BrokerResourceValidationManager to repair both physical and logical table partitions
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     TestUtils.waitForCondition(aVoid -> {
@@ -458,7 +464,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
       }
       return is.getInstanceSet(tableNameWithType).equals(brokersAfterAdd)
           && is.getInstanceSet(logicalTableName).equals(brokersAfterAdd);
-    }, 600_000L, "Timeout when waiting for BrokerResourceValidationManager to repair logical table partition");
+    }, 60_000L, "Timeout when waiting for BrokerResourceValidationManager to repair logical table partition");
 
     // Cleanup: drop broker, logical table config, and logical table schema
     _helixAdmin.dropInstance(helixClusterName, instanceConfig);
