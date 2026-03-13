@@ -134,6 +134,15 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
     _dataSource = dataSource;
     _dictionary = dictionary;
     _invertedIndexReader = invertedIndexReader;
+
+    // Eagerly create project operator when inverted index is not eligible.
+    // This ensures forward-index-disabled validation errors are thrown during plan creation (not deferred to
+    // execution), and that the operator tree is visible for explain plans.
+    // When inverted index IS eligible, project operator is created lazily only if the scan path is chosen.
+    if (dictionary == null || invertedIndexReader == null) {
+      _projectOperator = new ProjectPlanNode(_segmentContext, _queryContext,
+          _queryContext.getSelectExpressions(), DocIdSetPlanNode.MAX_DOC_PER_CALL, _filterOperator).run();
+    }
   }
 
   @Override
@@ -469,8 +478,8 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    if (_usedInvertedIndexPath) {
-      return new ExecutionStatistics(_numValuesProcessed, 0, 0, numTotalDocs);
+    if (_usedInvertedIndexPath || _projectOperator == null) {
+      return new ExecutionStatistics(_numDocsScanned > 0 ? _numDocsScanned : _numValuesProcessed, 0, 0, numTotalDocs);
     }
     long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = (long) _numDocsScanned * _projectOperator.getNumColumnsProjected();
