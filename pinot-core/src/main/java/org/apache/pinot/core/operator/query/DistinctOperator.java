@@ -79,16 +79,11 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME_INVERTED_INDEX = "DISTINCT_INVERTED_INDEX";
 
   private final IndexSegment _indexSegment;
-  private final QueryContext _queryContext;
-
-  // Scan path fields
-  private BaseProjectOperator<?> _projectOperator;
-
-  // Inverted index path fields (all null when not eligible)
-  @Nullable
   private final SegmentContext _segmentContext;
-  @Nullable
+  private final QueryContext _queryContext;
   private final BaseFilterOperator _filterOperator;
+
+  // Inverted index path fields (null when not eligible)
   @Nullable
   private final DataSource _dataSource;
   @Nullable
@@ -96,41 +91,49 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   @Nullable
   private final InvertedIndexReader<?> _invertedIndexReader;
 
+  // Scan path: created lazily
+  private BaseProjectOperator<?> _projectOperator;
+
   // Execution tracking
   private boolean _usedInvertedIndexPath = false;
   private int _numDocsScanned = 0;
   private int _numValuesProcessed = 0;
 
-  /**
-   * Constructor for scan-only path (no inverted index context).
-   */
-  public DistinctOperator(IndexSegment indexSegment, QueryContext queryContext,
-      BaseProjectOperator<?> projectOperator) {
-    _indexSegment = indexSegment;
-    _queryContext = queryContext;
-    _projectOperator = projectOperator;
-    _segmentContext = null;
-    _filterOperator = null;
-    _dataSource = null;
-    _dictionary = null;
-    _invertedIndexReader = null;
-  }
-
-  /**
-   * Constructor with inverted index context. The operator will evaluate at runtime whether to use
-   * the inverted index path or fall back to the scan path based on cardinality analysis.
-   * The projectOperator is created lazily if the scan path is chosen.
-   */
   public DistinctOperator(IndexSegment indexSegment, SegmentContext segmentContext,
-      QueryContext queryContext, BaseFilterOperator filterOperator, DataSource dataSource) {
+      QueryContext queryContext, BaseFilterOperator filterOperator) {
     _indexSegment = indexSegment;
-    _queryContext = queryContext;
-    _projectOperator = null; // created lazily if scan path chosen
     _segmentContext = segmentContext;
+    _queryContext = queryContext;
     _filterOperator = filterOperator;
+
+    // Check inverted index eligibility: single column with dictionary + inverted index, no nulls
+    List<ExpressionContext> expressions = queryContext.getSelectExpressions();
+    DataSource dataSource = null;
+    Dictionary dictionary = null;
+    InvertedIndexReader<?> invertedIndexReader = null;
+    if (expressions.size() == 1) {
+      String column = expressions.get(0).getIdentifier();
+      if (column != null) {
+        DataSource ds = indexSegment.getDataSource(column, queryContext.getSchema());
+        if (ds.getDictionary() != null && ds.getInvertedIndex() != null) {
+          boolean eligible = true;
+          if (queryContext.isNullHandlingEnabled()) {
+            var nullValueReader = ds.getNullValueVector();
+            if (nullValueReader != null && !nullValueReader.getNullBitmap().isEmpty()) {
+              eligible = false;
+            }
+          }
+          if (eligible) {
+            dataSource = ds;
+            dictionary = ds.getDictionary();
+            invertedIndexReader = ds.getInvertedIndex();
+          }
+        }
+      }
+    }
     _dataSource = dataSource;
-    _dictionary = dataSource.getDictionary();
-    _invertedIndexReader = dataSource.getInvertedIndex();
+    _dictionary = dictionary;
+    _invertedIndexReader = invertedIndexReader;
   }
 
   @Override

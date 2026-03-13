@@ -655,10 +655,6 @@ public class CommonConstants {
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
         public static final String USE_STAR_TREE = "useStarTree";
         /**
-         * When true, use index-based distinct (InvertedIndexDistinctOperator) when applicable.
-         */
-        public static final String USE_INDEX_BASED_DISTINCT_OPERATOR = "useIndexBasedDistinctOperator";
-        /**
          * Cost ratio for the inverted-index-based distinct heuristic. The inverted index path is chosen when
          * dictionaryCardinality * costRatio <= filteredDocCount. Default is 5.
          */
