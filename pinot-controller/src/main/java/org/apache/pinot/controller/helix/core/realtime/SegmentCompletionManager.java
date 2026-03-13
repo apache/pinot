@@ -34,7 +34,6 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -129,22 +128,13 @@ public class SegmentCompletionManager {
     SegmentZKMetadata segmentMetadata = _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName, null);
 
     TableConfig tableConfig = _segmentManager.getTableConfig(realtimeTableName);
-    String factoryName = null;
-    try {
-      Map<String, String> streamConfigMap = IngestionConfigUtils.getFirstStreamConfigMap(tableConfig);
-      factoryName = streamConfigMap.get(StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME);
-    } catch (Exception e) {
-      // If there is an exception, we default to the default factory.
-    }
-
-    if (factoryName == null) {
-      if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
-        factoryName = _segmentCompletionConfig.getDefaultPauselessFsmScheme();
-        _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 1);
-      } else {
-        factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
-        _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 0);
-      }
+    String factoryName;
+    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      factoryName = _segmentCompletionConfig.getDefaultPauselessFsmScheme();
+      _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 1);
+    } else {
+      factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
+      _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 0);
     }
 
     Preconditions.checkState(SegmentCompletionFSMFactory.isFactoryTypeSupported(factoryName),
