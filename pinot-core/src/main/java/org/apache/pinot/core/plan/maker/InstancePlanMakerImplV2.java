@@ -187,14 +187,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
     List<FetchContext> fetchContexts;
     if (queryContext.isEnablePrefetch()) {
-      fetchContexts = new ArrayList<>(numSegments);
-      for (SegmentContext segmentContext : segmentContexts) {
-        FetchContext fetchContext =
-            _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext);
-        fetchContexts.add(fetchContext);
+      fetchContexts = _fetchPlanner.planFetchForProcessing(segmentContexts, queryContext);
+      for (int i = 0; i < numSegments; i++) {
+        SegmentContext segmentContext = segmentContexts.get(i);
         planNodes.add(
             new AcquireReleaseColumnsSegmentPlanNode(makeSegmentPlanNode(segmentContext, queryContext), segmentContext,
-                fetchContext));
+                fetchContexts.get(i)));
       }
     } else {
       fetchContexts = Collections.emptyList();
@@ -335,14 +333,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
     List<FetchContext> fetchContexts;
     if (queryContext.isEnablePrefetch()) {
-      fetchContexts = new ArrayList<>(numSegments);
-      for (SegmentContext segmentContext : segmentContexts) {
-        FetchContext fetchContext =
-            _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext);
-        fetchContexts.add(fetchContext);
+      fetchContexts = _fetchPlanner.planFetchForProcessing(segmentContexts, queryContext);
+      for (int i = 0; i < numSegments; i++) {
+        SegmentContext segmentContext = segmentContexts.get(i);
         planNodes.add(
             new AcquireReleaseColumnsSegmentPlanNode(makeStreamingSegmentPlanNode(segmentContext, queryContext),
-                segmentContext, fetchContext));
+                segmentContext, fetchContexts.get(i)));
       }
     } else {
       fetchContexts = Collections.emptyList();

@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.query.prefetch;
 
+import java.util.List;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 
 
 /**
@@ -42,12 +44,13 @@ public interface FetchPlanner {
   FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext);
 
   /**
-   * Plan what index data to prefetch to process it. For example, one can fetch all types of index for columns tracked
-   * in QueryContext.
+   * Plan what index data to prefetch to process the segments. For example, one can fetch all types of index for
+   * columns tracked in QueryContext. Taking all segments at once allows implementations to precompute query-derived
+   * information once rather than per segment.
    *
-   * @param indexSegment segment to be processed.
-   * @param queryContext context extracted from the query.
-   * @return context to guide data prefetching.
+   * @param segmentContexts segments to be processed.
+   * @param queryContext    context extracted from the query.
+   * @return list of contexts to guide data prefetching, one per segment.
    */
-  FetchContext planFetchForProcessing(IndexSegment indexSegment, QueryContext queryContext);
+  List<FetchContext> planFetchForProcessing(List<SegmentContext> segmentContexts, QueryContext queryContext);
 }

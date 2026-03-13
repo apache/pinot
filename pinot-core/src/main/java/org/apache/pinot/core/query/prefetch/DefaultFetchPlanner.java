@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.prefetch;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,6 +33,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -89,8 +91,14 @@ public class DefaultFetchPlanner implements FetchPlanner {
    * Fetch all kinds of index for columns accessed by the query.
    */
   @Override
-  public FetchContext planFetchForProcessing(IndexSegment indexSegment, QueryContext queryContext) {
-    return new FetchContext(UUID.randomUUID(), indexSegment.getSegmentName(), getColumns(indexSegment, queryContext));
+  public List<FetchContext> planFetchForProcessing(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    List<FetchContext> result = new ArrayList<>(segmentContexts.size());
+    for (SegmentContext segmentContext : segmentContexts) {
+      IndexSegment indexSegment = segmentContext.getIndexSegment();
+      result.add(
+          new FetchContext(UUID.randomUUID(), indexSegment.getSegmentName(), getColumns(indexSegment, queryContext)));
+    }
+    return result;
   }
 
   private Set<String> getColumns(IndexSegment indexSegment, QueryContext queryContext) {
