@@ -49,6 +49,17 @@ public class SegmentReloadMessage extends Message {
   }
 
   /**
+   * This msg asks server to reload all segments in the given table with an explicit reload job id.
+   *
+   * @param tableNameWithType the table where the segments are from.
+   * @param forceDownload     whether to download segments from deep store when reloading.
+   * @param reloadJobId       reload job id to associate with the reload operation
+   */
+  public SegmentReloadMessage(String tableNameWithType, boolean forceDownload, @Nullable String reloadJobId) {
+    this(tableNameWithType, null, forceDownload, reloadJobId);
+  }
+
+  /**
    * This msg asks server to reload a list of specified segments in the given a table.
    *
    * @param tableNameWithType the table where the segments are from.
@@ -72,6 +83,22 @@ public class SegmentReloadMessage extends Message {
       // TODO: use the new List field and deprecate the partition name in next release.
       setPartitionName(segmentNames.get(0));
       znRecord.setListField(SEGMENT_NAMES, segmentNames);
+    }
+  }
+
+  /**
+   * This msg asks server to reload a list of specified segments with an explicit reload job id.
+   *
+   * @param tableNameWithType the table where the segments are from.
+   * @param segmentNames      a list of specified segments to reload, or null for all segments.
+   * @param forceDownload     whether to download segments from deep store when reloading.
+   * @param reloadJobId       reload job id to associate with the reload operation
+   */
+  public SegmentReloadMessage(String tableNameWithType, @Nullable List<String> segmentNames, boolean forceDownload,
+      @Nullable String reloadJobId) {
+    this(tableNameWithType, segmentNames, forceDownload);
+    if (reloadJobId != null) {
+      getRecord().setSimpleField(RELOAD_JOB_ID_KEY, reloadJobId);
     }
   }
 
