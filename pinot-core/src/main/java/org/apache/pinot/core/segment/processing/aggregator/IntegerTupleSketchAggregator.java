@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.Union;
@@ -56,5 +59,46 @@ public class IntegerTupleSketchAggregator implements ValueAggregator {
     Sketch<IntegerSummary> second = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize((byte[]) value2);
     Sketch<IntegerSummary> result = integerUnion.union(first, second);
     return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(result);
+  }
+
+  @Override
+  public boolean supportsBatchAggregation() {
+    return true;
+  }
+
+  @Override
+  public Object aggregateBatch(List<Object> values, Map<String, String> functionParameters) {
+    if (values == null || values.isEmpty()) {
+      return null;
+    }
+    if (values.size() == 1) {
+      return values.get(0);
+    }
+
+    // Build union once for all values
+    String nominalEntriesParam = functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES);
+    int nominalEntries = nominalEntriesParam != null
+        ? Integer.parseInt(nominalEntriesParam)
+        : (int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
+
+    IntegerSummarySetOperations setOperations = new IntegerSummarySetOperations(_mode, _mode);
+    Union<IntegerSummary> union = new Union<>(nominalEntries, setOperations);
+
+    // Deserialize all sketches
+    List<Sketch<IntegerSummary>> sketches = new ArrayList<>(values.size());
+    for (Object value : values) {
+      Sketch<IntegerSummary> sketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize((byte[]) value);
+      sketches.add(sketch);
+    }
+
+    // Sort by theta (ascending) for early-stop optimization
+    sketches.sort(Comparator.comparingDouble(Sketch::getTheta));
+
+    // Union all sketches
+    for (Sketch<IntegerSummary> sketch : sketches) {
+      union.union(sketch);
+    }
+
+    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(union.getResult());
   }
 }

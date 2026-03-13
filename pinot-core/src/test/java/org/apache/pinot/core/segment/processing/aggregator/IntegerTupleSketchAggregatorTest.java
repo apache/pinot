@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.datasketches.tuple.CompactSketch;
 import org.apache.datasketches.tuple.Sketch;
@@ -31,6 +33,8 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class IntegerTupleSketchAggregatorTest {
@@ -74,11 +78,115 @@ public class IntegerTupleSketchAggregatorTest {
     assertEquals(resultSketch.getRetainedEntries(), 32);
   }
 
+  @Test
+  public void testSupportsBatchAggregation() {
+    assertTrue(_tupleSketchAggregator.supportsBatchAggregation());
+  }
+
+  @Test
+  public void testAggregateBatchWithNull() {
+    Map<String, String> functionParameters = new HashMap<>();
+    assertNull(_tupleSketchAggregator.aggregateBatch(null, functionParameters));
+    assertNull(_tupleSketchAggregator.aggregateBatch(new ArrayList<>(), functionParameters));
+  }
+
+  @Test
+  public void testAggregateBatchWithSingleValue() {
+    Sketch<IntegerSummary> sketch = createTupleSketch(64);
+    byte[] value = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(sketch);
+    List<Object> values = new ArrayList<>();
+    values.add(value);
+    Map<String, String> functionParameters = new HashMap<>();
+
+    byte[] result = (byte[]) _tupleSketchAggregator.aggregateBatch(values, functionParameters);
+
+    assertNotNull(result);
+    Sketch<IntegerSummary> resultSketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(result);
+    assertEquals(resultSketch.getRetainedEntries(), 64);
+  }
+
+  @Test
+  public void testAggregateBatchWithMultipleValues() {
+    List<Object> values = new ArrayList<>();
+    int totalDistinct = 0;
+    for (int i = 0; i < 5; i++) {
+      Sketch<IntegerSummary> sketch = createTupleSketchWithOffset(64, i * 100);
+      values.add(ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(sketch));
+      totalDistinct += 64;
+    }
+    Map<String, String> functionParameters = new HashMap<>();
+
+    byte[] result = (byte[]) _tupleSketchAggregator.aggregateBatch(values, functionParameters);
+
+    Sketch<IntegerSummary> resultSketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(result);
+    assertNotNull(resultSketch);
+    assertEquals(resultSketch.getRetainedEntries(), totalDistinct);
+  }
+
+  @Test
+  public void testAggregateBatchMatchesPairwise() {
+    List<Object> values = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      Sketch<IntegerSummary> sketch = createTupleSketchWithOffset(32, i * 50);
+      values.add(ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(sketch));
+    }
+    Map<String, String> functionParameters = new HashMap<>();
+
+    // Batch aggregation
+    byte[] batchResult = (byte[]) _tupleSketchAggregator.aggregateBatch(values, functionParameters);
+
+    // Pairwise aggregation
+    Object pairwiseResult = values.get(0);
+    for (int i = 1; i < values.size(); i++) {
+      pairwiseResult = _tupleSketchAggregator.aggregate(pairwiseResult, values.get(i), functionParameters);
+    }
+
+    Sketch<IntegerSummary> batchSketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(batchResult);
+    Sketch<IntegerSummary> pairwiseSketch =
+        ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize((byte[]) pairwiseResult);
+
+    assertEquals(batchSketch.getRetainedEntries(), pairwiseSketch.getRetainedEntries());
+    assertEquals(batchSketch.getEstimate(), pairwiseSketch.getEstimate(), 0.001);
+  }
+
+  @Test
+  public void testAggregateBatchWithSumMode() {
+    // Test with Sum mode to verify summary values are aggregated correctly
+    IntegerTupleSketchAggregator sumAggregator = new IntegerTupleSketchAggregator(IntegerSummary.Mode.Sum);
+
+    List<Object> values = new ArrayList<>();
+    // Create 3 sketches with same keys but different summary values
+    for (int i = 0; i < 3; i++) {
+      Sketch<IntegerSummary> sketch = createTupleSketchWithSummaryValue(32, i + 1);
+      values.add(ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(sketch));
+    }
+    Map<String, String> functionParameters = new HashMap<>();
+
+    byte[] result = (byte[]) sumAggregator.aggregateBatch(values, functionParameters);
+
+    Sketch<IntegerSummary> resultSketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(result);
+    assertNotNull(resultSketch);
+    assertEquals(resultSketch.getRetainedEntries(), 32);
+  }
+
   private CompactSketch<IntegerSummary> createTupleSketch(int nominalEntries) {
+    return createTupleSketchWithOffset(nominalEntries, 0);
+  }
+
+  private CompactSketch<IntegerSummary> createTupleSketchWithOffset(int nominalEntries, int offset) {
     int lgK = (int) (Math.log(nominalEntries) / Math.log(2));
     IntegerSketch integerSketch = new IntegerSketch(lgK, IntegerSummary.Mode.Max);
     for (int i = 0; i < nominalEntries; i++) {
-      integerSketch.update(i, 1);
+      integerSketch.update(i + offset, 1);
+    }
+    return integerSketch.compact();
+  }
+
+  private CompactSketch<IntegerSummary> createTupleSketchWithSummaryValue(int nominalEntries, int summaryValue) {
+    int lgK = (int) (Math.log(nominalEntries) / Math.log(2));
+    IntegerSketch integerSketch = new IntegerSketch(lgK, IntegerSummary.Mode.Sum);
+    for (int i = 0; i < nominalEntries; i++) {
+      integerSketch.update(i, summaryValue);
     }
     return integerSketch.compact();
   }

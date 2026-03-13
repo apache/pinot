@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
@@ -48,6 +49,7 @@ public class SegmentProcessorConfig {
   private final Map<String, AggregationFunctionType> _aggregationTypes;
   private final Map<String, Map<String, String>> _aggregationFunctionParameters;
   private final SegmentConfig _segmentConfig;
+  private final int _reducerMaxBatchSize;
   private final Consumer<Object> _progressObserver;
   private final SegmentNameGenerator _segmentNameGenerator;
   private final Long _customCreationTime;
@@ -56,8 +58,8 @@ public class SegmentProcessorConfig {
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
       Map<String, AggregationFunctionType> aggregationTypes,
       Map<String, Map<String, String>> aggregationFunctionParameters, SegmentConfig segmentConfig,
-      Consumer<Object> progressObserver, @Nullable SegmentNameGenerator segmentNameGenerator,
-      @Nullable Long customCreationTime) {
+      int reducerMaxBatchSize, Consumer<Object> progressObserver,
+      @Nullable SegmentNameGenerator segmentNameGenerator, @Nullable Long customCreationTime) {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableConfig = tableConfig;
     _schema = schema;
@@ -67,6 +69,7 @@ public class SegmentProcessorConfig {
     _aggregationTypes = aggregationTypes;
     _aggregationFunctionParameters = aggregationFunctionParameters;
     _segmentConfig = segmentConfig;
+    _reducerMaxBatchSize = reducerMaxBatchSize;
     _progressObserver = (progressObserver != null) ? progressObserver : p -> {
       // Do nothing.
     };
@@ -130,6 +133,14 @@ public class SegmentProcessorConfig {
     return _segmentConfig;
   }
 
+  /**
+   * Maximum number of rows to batch before aggregating during rollup reduce phase.
+   * Higher values improve performance for sketch aggregations but use more memory.
+   */
+  public int getReducerMaxBatchSize() {
+    return _reducerMaxBatchSize;
+  }
+
   public Consumer<Object> getProgressObserver() {
     return _progressObserver;
   }
@@ -162,6 +173,7 @@ public class SegmentProcessorConfig {
     private Map<String, AggregationFunctionType> _aggregationTypes;
     private Map<String, Map<String, String>> _aggregationFunctionParameters;
     private SegmentConfig _segmentConfig;
+    private int _reducerMaxBatchSize = -1;  // -1 means use default
     private Consumer<Object> _progressObserver;
     private SegmentNameGenerator _segmentNameGenerator;
     private Long _customCreationTime;
@@ -206,6 +218,11 @@ public class SegmentProcessorConfig {
       return this;
     }
 
+    public Builder setReducerMaxBatchSize(int reducerMaxBatchSize) {
+      _reducerMaxBatchSize = reducerMaxBatchSize;
+      return this;
+    }
+
     public Builder setProgressObserver(Consumer<Object> progressObserver) {
       _progressObserver = progressObserver;
       return this;
@@ -243,9 +260,12 @@ public class SegmentProcessorConfig {
       if (_segmentConfig == null) {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
+      int reducerMaxBatchSize = _reducerMaxBatchSize > 0
+          ? _reducerMaxBatchSize
+          : MinionConstants.MergeTask.DEFAULT_REDUCER_MAX_BATCH_SIZE;
       return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
-          _aggregationTypes, _aggregationFunctionParameters, _segmentConfig, _progressObserver,
-              _segmentNameGenerator, _customCreationTime);
+          _aggregationTypes, _aggregationFunctionParameters, _segmentConfig, reducerMaxBatchSize, _progressObserver,
+          _segmentNameGenerator, _customCreationTime);
     }
   }
 }
