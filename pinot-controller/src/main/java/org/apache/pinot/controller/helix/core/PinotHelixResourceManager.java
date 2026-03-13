@@ -1108,7 +1108,8 @@ public class PinotHelixResourceManager {
     return PinotResourceManagerResponse.SUCCESS;
   }
 
-  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType) {
+  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType)
+  throws Exception {
     Set<String> brokerInstances;
     try {
       TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
@@ -1123,7 +1124,7 @@ public class PinotHelixResourceManager {
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while getting config for table {}", tableNameWithType, e);
-      throw new InvalidTableConfigException(
+      throw new InvalidConfigException(
           "Failed to fetch broker config for table " + tableNameWithType + " due to exception: " + e.getMessage());
     }
     return rebuildBrokerResource(tableNameWithType, brokerInstances);
