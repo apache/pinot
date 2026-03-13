@@ -189,13 +189,18 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
         // Runtime visibility for Platform-FIPS-JDK deployments: log the actual JSSE provider/protocol once.
         TlsUtils.warnIfNonJdkProviderConfigured("grpc.query.server", tlsConfig);
         TlsUtils.logJsseDiagnosticsOnce("grpc.query.server", sslFactory, tlsConfig);
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
-            .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
+        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get());
         sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
         if (tlsConfig.isClientAuthEnabled()) {
           sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
         }
-        return GrpcSslContexts.configure(sslContextBuilder).build();
+        if (tlsConfig.getSslProvider() != null) {
+          sslContextBuilder =
+              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(tlsConfig.getSslProvider()));
+        } else {
+          sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
+        }
+        return sslContextBuilder.build();
       } catch (Exception e) {
         throw new RuntimeException("Failed to build gRPC server SSL context", e);
       }
