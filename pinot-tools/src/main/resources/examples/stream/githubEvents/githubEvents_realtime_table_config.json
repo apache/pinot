@@ -26,7 +26,8 @@
           "realtime.segment.flush.threshold.time": "1h",
           "realtime.segment.flush.threshold.size": "100"
         }
-      ]
+      ],
+      "pauselessConsumptionEnabled": true
     },
     "transformConfigs": [
       {

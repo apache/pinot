@@ -51,6 +51,7 @@ public class PauselessSegmentCompletionFSM extends BlockingSegmentCompletionFSM 
               + "leader has been selected", _segmentName);
       _segmentManager.commitSegmentMetadataToCommitting(
           TableNameBuilder.REALTIME.tableNameWithType(_segmentName.getTableName()), committingSegmentDescriptor);
+      Thread.sleep(20000);
     } catch (Exception e) {
       // this aims to handle the failures during commitSegmentStartMetadata
       // we abort the state machine to allow commit protocol to start from the beginning

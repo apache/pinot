@@ -732,6 +732,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public class PartitionConsumer implements Runnable {
     public void run() {
       long initialConsumptionEnd = 0L;
+      int failCount = 0;
       long lastCatchUpStart = 0L;
       long catchUpTimeMillis = 0L;
       _startTimeMs = now();
@@ -912,6 +913,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
                   _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.PAUSELESS_CONSUMPTION_ENABLED, 1);
                   if (!startSegmentCommit()) {
+                    failCount++;
                     // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                     // Change the state to HOLDING before looping around.
                     _state = State.HOLDING;
@@ -1465,6 +1467,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public void goOnlineFromConsuming(SegmentZKMetadata segmentZKMetadata)
       throws InterruptedException {
     _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+    while(_state != State.COMMITTING) {
+
+    }
     try {
       // Remove the segment file before we do anything else.
       removeSegmentFile();
@@ -1488,6 +1493,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           break;
         case CATCHING_UP:
         case HOLDING:
+        case COMMITTING:
         case INITIAL_CONSUMING:
           if (_segmentCompletionMode == CompletionMode.DOWNLOAD) {
             // Check if download URL has been set by another replica

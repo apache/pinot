@@ -109,6 +109,25 @@ public class KafkaDataProducer implements StreamDataProducer {
   }
 
   @Override
+  public void produceKeyedBatch(String topic, List<RowWithKey> payloadWithKey, boolean includeHeaders) {
+    for (RowWithKey rowWithKey : payloadWithKey) {
+      if (rowWithKey.getKey() == null) {
+        _producer.send(new ProducerRecord<>(topic, rowWithKey.getPayload()));
+      } else if (includeHeaders) {
+        List<Header> headerList = new ArrayList<>();
+        long nowMs = System.currentTimeMillis();
+        headerList.add(new RecordHeader("producerTimestamp",
+            String.valueOf(nowMs).getBytes(StandardCharsets.UTF_8)));
+        _producer.send(new ProducerRecord<>(topic, null, nowMs, rowWithKey.getKey(),
+            rowWithKey.getPayload(), headerList));
+      } else {
+        _producer.send(new ProducerRecord<>(topic, rowWithKey.getKey(), rowWithKey.getPayload()));
+      }
+    }
+    _producer.flush();
+  }
+
+  @Override
   public void close() {
     if (_producer != null) {
       _producer.close();

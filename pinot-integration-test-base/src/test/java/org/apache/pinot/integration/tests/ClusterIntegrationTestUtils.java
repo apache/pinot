@@ -487,15 +487,18 @@ public class ClusterIntegrationTestUtils {
   public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaTopic, int maxNumKafkaMessagesPerBatch,
       @Nullable byte[] header, @Nullable String partitionColumn, boolean injectTombstones, StreamDataProducer producer)
       throws Exception {
+    int batchSize = maxNumKafkaMessagesPerBatch > 0 ? maxNumKafkaMessagesPerBatch : 100000;
     long counter = 0;
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       if (injectTombstones) {
         // publish lots of tombstones to livelock the consumer if it can't handle this properly
+        List<StreamDataProducer.RowWithKey> tombstones = new ArrayList<>(1000);
         for (int i = 0; i < 1000; i++) {
-          // publish a tombstone first
-          producer.produce(kafkaTopic, Longs.toByteArray(counter++), null);
+          tombstones.add(new StreamDataProducer.RowWithKey(Longs.toByteArray(counter++), null));
         }
+        producer.produceKeyedBatch(kafkaTopic, tombstones);
       }
+      List<StreamDataProducer.RowWithKey> batch = new ArrayList<>(batchSize);
       for (File avroFile : avroFiles) {
         try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
           BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
@@ -511,9 +514,17 @@ public class ClusterIntegrationTestUtils {
             byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(counter++)
                 : (genericRecord.get(partitionColumn)).toString().getBytes();
             byte[] bytes = outputStream.toByteArray();
-            producer.produce(kafkaTopic, keyBytes, bytes);
+            batch.add(new StreamDataProducer.RowWithKey(keyBytes, bytes));
+
+            if (batch.size() >= batchSize) {
+              producer.produceKeyedBatch(kafkaTopic, batch);
+              batch = new ArrayList<>(batchSize);
+            }
           }
         }
+      }
+      if (!batch.isEmpty()) {
+        producer.produceKeyedBatch(kafkaTopic, batch);
       }
     }
   }

@@ -763,14 +763,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and replacing CONSUMING segment: {} with committed one", segmentName);
-    File indexDir = downloadSegment(zkMetadata);
-    // Get a new index loading config with latest table config and schema to load the segment
-    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata),
-        zkMetadata);
-    _ingestionDelayTracker.markPartitionForVerification(segmentName);
-    _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
+    throw new TimeoutException("count not download segment " + zkMetadata.getSegmentName());
+//    File indexDir = downloadSegment(zkMetadata);
+//    // Get a new index loading config with latest table config and schema to load the segment
+//    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+//    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+//    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata),
+//        zkMetadata);
+//    _ingestionDelayTracker.markPartitionForVerification(segmentName);
+//    _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
   }
 
   /**

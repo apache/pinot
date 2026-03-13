@@ -55,7 +55,9 @@ public class PauselessRealtimeIngestionIntegrationTest extends BasePauselessReal
 
   @Test(description = "Ensure that all the segments are ingested, built and uploaded when pauseless consumption is "
       + "enabled")
-  public void testSegmentAssignment() {
+  public void testSegmentAssignment()
+      throws InterruptedException {
     testBasicSegmentAssignment();
+    Thread.sleep(1000);
   }
 }
