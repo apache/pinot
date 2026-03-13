@@ -242,8 +242,8 @@ public class RequestUtils {
           literal.setLongValue(longValue);
         }
       } else {
-        // TODO: Support exact decimal value
-        literal.setDoubleValue(bigDecimalValue.doubleValue());
+        // Store exact decimal value to preserve precision
+        literal.setBigDecimalValue(BigDecimalUtils.serialize(bigDecimalValue));
       }
     } else {
       switch (node.getTypeName()) {
