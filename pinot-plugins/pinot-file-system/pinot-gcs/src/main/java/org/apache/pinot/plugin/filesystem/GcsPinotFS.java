@@ -48,6 +48,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -256,6 +257,60 @@ public class GcsPinotFS extends BasePinotFS {
     List<FileMetadata> listedFiles = List.copyOf(listBuilder);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), gcsFileUri, recursive);
     return listedFiles;
+  }
+
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(final URI fileUri, final boolean recursive,
+      final Predicate<String> pathFilter, final int maxResults)
+      throws IOException {
+    if (maxResults <= 0) {
+      LOGGER.warn("listFilesWithMetadata called with maxResults={}, returning empty list", maxResults);
+      return new ArrayList<>();
+    }
+    final List<FileMetadata> result = new ArrayList<>();
+    final GcsUri gcsFileUri = new GcsUri(fileUri);
+    final String prefix = gcsFileUri.getPrefix();
+    final String bucketName = gcsFileUri.getBucketName();
+    try {
+      Page<Blob> page;
+      if (recursive) {
+        page = _storage.list(bucketName, Storage.BlobListOption.prefix(prefix));
+      } else {
+        page = _storage.list(bucketName, Storage.BlobListOption.prefix(prefix),
+            Storage.BlobListOption.currentDirectory());
+      }
+      while (page != null && result.size() < maxResults) {
+        for (final Blob blob : page.getValues()) {
+          if (blob.getName().equals(prefix)) {
+            continue;
+          }
+          final boolean isDirectory = blob.getName().endsWith(GcsUri.DELIMITER);
+          if (isDirectory) {
+            continue;
+          }
+          final String filePath = GcsUri.createGcsUri(bucketName, blob.getName()).toString();
+          if (pathFilter.test(filePath)) {
+            final FileMetadata.Builder fileBuilder = new FileMetadata.Builder()
+                .setFilePath(filePath)
+                .setLength(blob.getSize())
+                .setIsDirectory(false);
+            if (blob.getUpdateTime() != null) {
+              fileBuilder.setLastModifiedTime(blob.getUpdateTime());
+            }
+            result.add(fileBuilder.build());
+            if (result.size() >= maxResults) {
+              break;
+            }
+          }
+        }
+        page = page.hasNextPage() ? page.getNextPage() : null;
+      }
+    } catch (Exception t) {
+      throw new IOException(t);
+    }
+    LOGGER.info("Listed {} files (max: {}) from URI: {}, is recursive: {}",
+        result.size(), maxResults, gcsFileUri, recursive);
+    return result;
   }
 
   @Override

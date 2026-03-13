@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -746,6 +747,70 @@ public class S3PinotFS extends BasePinotFS {
     List<FileMetadata> listedFiles = List.copyOf(listBuilder);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), fileUri, recursive);
     return listedFiles;
+  }
+
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(final URI fileUri, final boolean recursive,
+      final Predicate<String> pathFilter, final int maxResults)
+      throws IOException {
+    if (maxResults <= 0) {
+      LOGGER.warn("listFilesWithMetadata called with maxResults={}, returning empty list", maxResults);
+      return new ArrayList<>();
+    }
+    final List<FileMetadata> result = new ArrayList<>();
+    final String scheme = fileUri.getScheme();
+    Preconditions.checkArgument(scheme.equals(S3_SCHEME) || scheme.equals(S3A_SCHEME));
+    try {
+      String continuationToken = null;
+      boolean isDone = false;
+      final String prefix = normalizeToDirectoryPrefix(fileUri);
+      while (!isDone && result.size() < maxResults) {
+        ListObjectsV2Request.Builder listObjectsV2RequestBuilder =
+            ListObjectsV2Request.builder().bucket(fileUri.getHost());
+        if (!prefix.equals(DELIMITER)) {
+          listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.prefix(prefix);
+        }
+        if (!recursive) {
+          listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.delimiter(DELIMITER);
+        }
+        if (continuationToken != null) {
+          listObjectsV2RequestBuilder.continuationToken(continuationToken);
+        }
+        final ListObjectsV2Request listObjectsV2Request = listObjectsV2RequestBuilder.build();
+        LOGGER.debug("Trying to send ListObjectsV2Request {}", listObjectsV2Request);
+        final ListObjectsV2Response listObjectsV2Response = retryWithS3CredentialRefresh(() ->
+            _s3Client.listObjectsV2(listObjectsV2Request));
+        for (final S3Object s3Object : listObjectsV2Response.contents()) {
+          if (s3Object.key().equals(fileUri.getPath())) {
+            continue;
+          }
+          final boolean isDirectory = s3Object.key().endsWith(DELIMITER);
+          if (isDirectory) {
+            continue;
+          }
+          final String filePath =
+              scheme + SCHEME_SEPARATOR + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object);
+          if (pathFilter.test(filePath)) {
+            result.add(new FileMetadata.Builder()
+                .setFilePath(filePath)
+                .setLastModifiedTime(s3Object.lastModified().toEpochMilli())
+                .setLength(s3Object.size())
+                .setIsDirectory(false)
+                .build());
+            if (result.size() >= maxResults) {
+              break;
+            }
+          }
+        }
+        isDone = !listObjectsV2Response.isTruncated();
+        continuationToken = listObjectsV2Response.nextContinuationToken();
+      }
+    } catch (Throwable t) {
+      throw new IOException(t);
+    }
+    LOGGER.info("Listed {} files (max: {}) from URI: {}, is recursive: {}",
+        result.size(), maxResults, fileUri, recursive);
+    return result;
   }
 
   private static String getNormalizedFileKey(S3Object s3Object) {
