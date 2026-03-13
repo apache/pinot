@@ -146,9 +146,11 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       taskSpec.setInputFilePath(localInputDataFile.getAbsolutePath());
       taskSpec.setOutputDirectoryPath(localOutputTempDir.getAbsolutePath());
       taskSpec.setRecordReaderSpec(_spec.getRecordReaderSpec());
-      taskSpec.setSchema(SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken()));
+      taskSpec.setSchema(SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken(),
+          _spec.getTlsSpec()));
       taskSpec.setTableConfig(
-          SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken()));
+          SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken(),
+              _spec.getTlsSpec()));
       taskSpec.setSequenceId(idx);
       taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
       taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
