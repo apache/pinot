@@ -18,3 +18,40 @@
  */
 
 declare module 'Models';
+
+// Type definitions for dagre and graphlib CommonJS modules
+declare module 'dagre' {
+  import { Graph } from 'graphlib';
+  
+  export namespace graphlib {
+    class Graph {
+      constructor(options?: any);
+      setGraph(label: any): void;
+      graph(): any;
+      setNode(name: string, label?: any): void;
+      node(name: string): any;
+      setEdge(source: string, target: string, label?: any): void;
+      edge(source: string, target: string): any;
+      setDefaultEdgeLabel(callback: () => any): void;
+      nodes(): string[];
+      edges(): Array<{ v: string; w: string }>;
+    }
+  }
+  
+  export function layout(graph: any): void;
+}
+
+declare module 'graphlib' {
+  export class Graph {
+    constructor(options?: any);
+    setGraph(label: any): void;
+    graph(): any;
+    setNode(name: string, label?: any): void;
+    node(name: string): any;
+    setEdge(source: string, target: string, label?: any): void;
+    edge(source: string, target: string): any;
+    setDefaultEdgeLabel(callback: () => any): void;
+    nodes(): string[];
+    edges(): Array<{ v: string; w: string }>;
+  }
+}

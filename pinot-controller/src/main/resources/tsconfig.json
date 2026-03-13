@@ -23,18 +23,8 @@
         "noImplicitAny": false,
         "module": "commonjs",
         "target": "es6",
+        "lib": ["es2017", "dom"],
         "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true,
-        "jsx": "react",
-        "skipLibCheck": true,
-        "moduleResolution": "node",
-        "resolveJsonModule": true
-    },
-    "include": [
-        "app/**/*"
-    ],
-    "exclude": [
-        "node_modules",
-        "dist"
-    ]
+        "jsx": "react"
+    }
 }
