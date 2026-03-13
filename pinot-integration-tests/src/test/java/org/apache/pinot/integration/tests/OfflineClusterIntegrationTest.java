@@ -32,6 +32,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,6 +103,7 @@ import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.SKIP_INDEXES;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR;
 import static org.testng.Assert.*;
 
 
@@ -642,6 +644,78 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void addRangeIndex()
       throws Exception {
     addRangeIndex(true);
+  }
+
+  /**
+   * Verifies that without useIndexBasedDistinctOperator (disabled by default),
+   * SELECT DISTINCT on an inverted-indexed column uses default DistinctOperator and returns correct results.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testInvertedIndexDistinctOperatorDisabledByDefault(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    addInvertedIndex();
+
+    String query = "SELECT DISTINCT Origin FROM mytable ORDER BY Origin";
+    JsonNode response = postQuery(query);
+    assertEquals(response.get("exceptions").size(), 0);
+    Set<String> values = extractDistinctValuesFromResponse(response);
+    assertFalse(values.isEmpty(), "Baseline (operator disabled) should return distinct values");
+  }
+
+  /**
+   * With useIndexBasedDistinctOperator, SELECT DISTINCT on Origin uses the inverted index distinct path
+   * inside DistinctOperator. Verifies same result set as baseline.
+   */
+  @Test(dataProvider = "useBothQueryEngines", dependsOnMethods = "testInvertedIndexDistinctOperatorDisabledByDefault")
+  public void testInvertedIndexDistinctOperator(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT Origin FROM mytable ORDER BY Origin";
+    JsonNode baselineResponse = postQuery(query);
+    assertEquals(baselineResponse.get("exceptions").size(), 0);
+    Set<String> baselineValues = extractDistinctValuesFromResponse(baselineResponse);
+
+    JsonNode optimizedResponse =
+        postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    assertEquals(optimizedResponse.get("exceptions").size(), 0);
+    Set<String> optimizedValues = extractDistinctValuesFromResponse(optimizedResponse);
+    assertEquals(optimizedValues, baselineValues,
+        "Inverted index distinct path should produce same results as baseline. Engine="
+            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
+  }
+
+  /**
+   * Inverted index distinct path with a filter (e.g. WHERE Carrier = 'AA') still returns correct distinct values.
+   * The runtime cost heuristic inside DistinctOperator decides whether to use inverted index or scan path.
+   */
+  @Test(dataProvider = "useBothQueryEngines", dependsOnMethods = "testInvertedIndexDistinctOperatorDisabledByDefault")
+  public void testInvertedIndexDistinctOperatorWithFilter(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT Origin FROM mytable WHERE Carrier = 'AA' ORDER BY Origin";
+    JsonNode baselineResponse = postQuery(query);
+    assertEquals(baselineResponse.get("exceptions").size(), 0);
+    Set<String> baselineValues = extractDistinctValuesFromResponse(baselineResponse);
+
+    JsonNode optimizedResponse =
+        postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    assertEquals(optimizedResponse.get("exceptions").size(), 0);
+    Set<String> optimizedValues = extractDistinctValuesFromResponse(optimizedResponse);
+    assertEquals(optimizedValues, baselineValues,
+        "Inverted index distinct path with filter should match baseline. Engine="
+            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
+  }
+
+  private static Set<String> extractDistinctValuesFromResponse(JsonNode response) {
+    Set<String> values = new HashSet<>();
+    JsonNode rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      values.add(rows.get(i).get(0).asText());
+    }
+    return values;
   }
 
   @Test(dataProvider = "useBothQueryEngines")
