@@ -144,11 +144,18 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-configuration2</artifactId>
     </dependency>
-    <!-- commons-beanutils is required by commons-configuration2 -->
-    <dependency>
-      <groupId>commons-beanutils</groupId>
-      <artifactId>commons-beanutils</artifactId>
-    </dependency>
+      <!-- commons-beanutils is required by commons-configuration2 -->
+      <dependency>
+          <groupId>commons-beanutils</groupId>
+          <artifactId>commons-beanutils</artifactId>
+          <exclusions>
+              <!-- Exclude vulnerable commons-collections 3.2.2 -->
+              <exclusion>
+                  <groupId>commons-collections</groupId>
+                  <artifactId>commons-collections</artifactId>
+              </exclusion>
+          </exclusions>
+      </dependency>
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
