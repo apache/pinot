@@ -197,6 +197,9 @@ public interface PinotFS extends Closeable, Serializable {
   default List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive,
       Predicate<String> pathFilter, int maxResults)
       throws IOException {
+    if (maxResults <= 0) {
+      return new ArrayList<>();
+    }
     final List<FileMetadata> all = listFilesWithMetadata(fileUri, recursive);
     final List<FileMetadata> result = new ArrayList<>();
     for (final FileMetadata fm : all) {

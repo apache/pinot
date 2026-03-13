@@ -480,6 +480,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   public List<FileMetadata> listFilesWithMetadata(final URI fileUri, final boolean recursive,
       final Predicate<String> pathFilter, final int maxResults)
       throws IOException {
+    if (maxResults <= 0) {
+      LOGGER.warn("listFilesWithMetadata called with maxResults={}, returning empty list", maxResults);
+      return new ArrayList<>();
+    }
     LOGGER.debug("listFilesWithMetadata (paginated) is called with fileUri='{}', recursive='{}', maxResults={}",
         fileUri, recursive, maxResults);
     final List<FileMetadata> result = new ArrayList<>();

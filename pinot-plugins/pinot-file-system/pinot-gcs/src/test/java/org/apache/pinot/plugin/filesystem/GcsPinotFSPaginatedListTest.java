@@ -220,6 +220,24 @@ public class GcsPinotFSPaginatedListTest {
     assertEquals(result.size(), 0);
   }
 
+  @Test
+  public void testMaxResultsZeroReturnsEmpty() throws IOException {
+    final List<FileMetadata> result = _gcsPinotFS.listFilesWithMetadata(
+        URI.create("gs://bucket/data/"), true, ACCEPT_ALL, 0);
+
+    assertEquals(result.size(), 0);
+    verify(_mockStorage, never()).list(anyString(), (Storage.BlobListOption[]) any());
+  }
+
+  @Test
+  public void testMaxResultsNegativeReturnsEmpty() throws IOException {
+    final List<FileMetadata> result = _gcsPinotFS.listFilesWithMetadata(
+        URI.create("gs://bucket/data/"), true, ACCEPT_ALL, -1);
+
+    assertEquals(result.size(), 0);
+    verify(_mockStorage, never()).list(anyString(), (Storage.BlobListOption[]) any());
+  }
+
   @SuppressWarnings("unchecked")
   @Test
   public void testFileMetadataAttributes() throws IOException {

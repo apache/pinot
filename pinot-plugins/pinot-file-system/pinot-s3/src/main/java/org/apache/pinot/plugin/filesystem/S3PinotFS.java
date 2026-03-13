@@ -725,6 +725,10 @@ public class S3PinotFS extends BasePinotFS {
   public List<FileMetadata> listFilesWithMetadata(final URI fileUri, final boolean recursive,
       final Predicate<String> pathFilter, final int maxResults)
       throws IOException {
+    if (maxResults <= 0) {
+      LOGGER.warn("listFilesWithMetadata called with maxResults={}, returning empty list", maxResults);
+      return new ArrayList<>();
+    }
     final List<FileMetadata> result = new ArrayList<>();
     final String scheme = fileUri.getScheme();
     Preconditions.checkArgument(scheme.equals(S3_SCHEME) || scheme.equals(S3A_SCHEME));

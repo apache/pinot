@@ -263,6 +263,10 @@ public class GcsPinotFS extends BasePinotFS {
   public List<FileMetadata> listFilesWithMetadata(final URI fileUri, final boolean recursive,
       final Predicate<String> pathFilter, final int maxResults)
       throws IOException {
+    if (maxResults <= 0) {
+      LOGGER.warn("listFilesWithMetadata called with maxResults={}, returning empty list", maxResults);
+      return new ArrayList<>();
+    }
     final List<FileMetadata> result = new ArrayList<>();
     final GcsUri gcsFileUri = new GcsUri(fileUri);
     final String prefix = gcsFileUri.getPrefix();

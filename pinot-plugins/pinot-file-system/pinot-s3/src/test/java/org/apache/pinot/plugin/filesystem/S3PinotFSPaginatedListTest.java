@@ -323,6 +323,24 @@ public class S3PinotFSPaginatedListTest {
   }
 
   @Test
+  public void testMaxResultsZeroReturnsEmpty() throws IOException {
+    final List<FileMetadata> result = _s3PinotFS.listFilesWithMetadata(
+        URI.create("s3://bucket/data/"), true, ACCEPT_ALL, 0);
+
+    assertEquals(result.size(), 0);
+    verify(_mockS3Client, times(0)).listObjectsV2(any(ListObjectsV2Request.class));
+  }
+
+  @Test
+  public void testMaxResultsNegativeReturnsEmpty() throws IOException {
+    final List<FileMetadata> result = _s3PinotFS.listFilesWithMetadata(
+        URI.create("s3://bucket/data/"), true, ACCEPT_ALL, -5);
+
+    assertEquals(result.size(), 0);
+    verify(_mockS3Client, times(0)).listObjectsV2(any(ListObjectsV2Request.class));
+  }
+
+  @Test
   public void testPrefixSentToS3() throws IOException {
     when(_mockS3Client.listObjectsV2(any(ListObjectsV2Request.class)))
         .thenReturn(page(Collections.emptyList(), false, null));

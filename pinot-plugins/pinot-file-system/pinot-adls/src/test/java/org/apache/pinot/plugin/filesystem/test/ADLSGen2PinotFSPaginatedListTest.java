@@ -233,6 +233,24 @@ public class ADLSGen2PinotFSPaginatedListTest {
   }
 
   @Test
+  public void testMaxResultsZeroReturnsEmpty() throws IOException {
+    final List<FileMetadata> result = _adlsPinotFS.listFilesWithMetadata(
+        URI.create("abfss://container@account.dfs.core.windows.net/data/"),
+        true, ACCEPT_ALL, 0);
+
+    assertEquals(result.size(), 0);
+  }
+
+  @Test
+  public void testMaxResultsNegativeReturnsEmpty() throws IOException {
+    final List<FileMetadata> result = _adlsPinotFS.listFilesWithMetadata(
+        URI.create("abfss://container@account.dfs.core.windows.net/data/"),
+        true, ACCEPT_ALL, -3);
+
+    assertEquals(result.size(), 0);
+  }
+
+  @Test
   public void testEarlyTerminationWithFilterAndDirectories() throws IOException {
     // Mix of dirs, matching files, and non-matching files; maxResults=2
     setupIterator(
