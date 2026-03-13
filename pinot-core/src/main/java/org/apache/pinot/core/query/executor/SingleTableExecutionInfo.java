@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.executor;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +38,7 @@ import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
@@ -53,6 +55,8 @@ import org.slf4j.LoggerFactory;
 
 public class SingleTableExecutionInfo implements TableExecutionInfo {
   private static final Logger LOGGER = LoggerFactory.getLogger(SingleTableExecutionInfo.class);
+  private static final Comparator<IndexSegment> LATEST_SEGMENT_FIRST_COMPARATOR =
+      Comparator.comparingLong(SingleTableExecutionInfo::getLatestSegmentTimeMs).reversed();
 
   private final TableDataManager _tableDataManager;
   private final List<SegmentDataManager> _segmentDataManagers;
@@ -268,6 +272,7 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
     SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
     List<IndexSegment> selectedSegments =
         selectSegments(indexSegments, queryContext, timerContext, executorService, segmentPrunerService, prunerStats);
+    prioritizeLatestSegmentsForEarlyTermination(selectedSegments, queryContext);
 
     int numTotalSegments = indexSegments.size();
     int numSelectedSegments = selectedSegments.size();
@@ -296,5 +301,34 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
       segmentPruneTimer.stopAndRecord();
     }
     return selectedSegments;
+  }
+
+  static void prioritizeLatestSegmentsForEarlyTermination(List<IndexSegment> selectedSegments,
+      QueryContext queryContext) {
+    if (selectedSegments.size() <= 1 || !QueryContextUtils.isDistinctEarlyTerminationEnabled(queryContext)) {
+      return;
+    }
+    selectedSegments.sort(LATEST_SEGMENT_FIRST_COMPARATOR);
+  }
+
+  static long getLatestSegmentTimeMs(IndexSegment indexSegment) {
+    SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+    long endTimeMs = segmentMetadata.getEndTime();
+    if (endTimeMs > 0) {
+      return endTimeMs;
+    }
+    long startTimeMs = segmentMetadata.getStartTime();
+    if (startTimeMs > 0) {
+      return startTimeMs;
+    }
+    long lastIndexedTimestampMs = segmentMetadata.getLastIndexedTimestamp();
+    if (lastIndexedTimestampMs > 0) {
+      return lastIndexedTimestampMs;
+    }
+    long indexCreationTimeMs = segmentMetadata.getIndexCreationTime();
+    if (indexCreationTimeMs > 0) {
+      return indexCreationTimeMs;
+    }
+    return Long.MIN_VALUE;
   }
 }
