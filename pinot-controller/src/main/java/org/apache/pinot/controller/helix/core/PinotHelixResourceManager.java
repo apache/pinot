@@ -1108,35 +1108,23 @@ public class PinotHelixResourceManager {
     return PinotResourceManagerResponse.SUCCESS;
   }
 
-  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType)
-      throws Exception {
+  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType) {
     Set<String> brokerInstances;
-    TableConfig tableConfig;
     try {
-      tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      if (tableConfig != null) {
+        brokerInstances = getAllInstancesForBrokerTenant(tableConfig.getTenantConfig().getBroker());
+      } else {
+        LogicalTableConfig logicalTableConfig =
+            ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableNameWithType);
+        Preconditions.checkNotNull(logicalTableConfig, "No table config or logical table config found for %s",
+            tableNameWithType);
+        brokerInstances = getAllInstancesForBrokerTenant(logicalTableConfig.getBrokerTenant());
+      }
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while getting table config for table {}", tableNameWithType, e);
+      LOGGER.warn("Caught exception while getting config for table {}", tableNameWithType, e);
       throw new InvalidTableConfigException(
-          "Failed to fetch broker tag for table " + tableNameWithType + " due to exception: " + e.getMessage());
-    }
-    if (tableConfig != null) {
-      brokerInstances = getAllInstancesForBrokerTenant(tableConfig.getTenantConfig().getBroker());
-    } else {
-      LogicalTableConfig logicalTableConfig;
-      try {
-        logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableNameWithType);
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while getting logical table config for {}", tableNameWithType, e);
-        throw new InvalidTableConfigException(
-            "Failed to fetch broker tenant for logical table " + tableNameWithType + " due to exception: "
-                + e.getMessage());
-      }
-      if (logicalTableConfig == null) {
-        LOGGER.warn("No table config or logical table config found for {}", tableNameWithType);
-        throw new InvalidConfigException(
-            "Invalid table configuration for table " + tableNameWithType + ". Table does not exist");
-      }
-      brokerInstances = getAllInstancesForBrokerTenant(logicalTableConfig.getBrokerTenant());
+          "Failed to fetch broker config for table " + tableNameWithType + " due to exception: " + e.getMessage());
     }
     return rebuildBrokerResource(tableNameWithType, brokerInstances);
   }
@@ -1190,7 +1178,7 @@ public class PinotHelixResourceManager {
    * then logical table config.
    *
    * @param tableName table name in broker ideal state (physical table name with type or logical table name)
-   * @return broker tag for the partition, or null if the partition cannot be resolved (unknown or missing config)
+   * @return broker tag for the table, or throw exception if the table name cannot be resolved
    */
   private String resolveBrokerTagForTable(String tableName) {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableName);
@@ -1201,7 +1189,8 @@ public class PinotHelixResourceManager {
     if (logicalTableConfig != null) {
       return TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant());
     }
-    throw new InvalidTableConfigException("Failed to resolve broker tag for table " + tableName + " because no table config or logical table config found");
+    throw new InvalidTableConfigException("Failed to resolve broker tag for table " + tableName
+        + " because no table config or logical table config found");
   }
 
   private PinotResourceManagerResponse scaleDownBroker(Tenant tenant, String brokerTenantTag,
@@ -1928,7 +1917,7 @@ public class PinotHelixResourceManager {
         // Add ideal state with consuming segments from designated stream metadata
         _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState, streamMetadataList);
         LOGGER.info("Adding table {}: Added consuming segments ideal state given the designated stream metadata",
-                tableNameWithType);
+            tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while setting up table: {}, cleaning it up", tableNameWithType, e);
@@ -5038,7 +5027,8 @@ public class PinotHelixResourceManager {
    * @throws TableNotFoundException if the specified real-time table does not exist.
    * @throws IllegalStateException if the IdealState for the table is not found.
    */
-  public WatermarkInductionResult getConsumerWatermarks(String tableName) throws TableNotFoundException {
+  public WatermarkInductionResult getConsumerWatermarks(String tableName)
+      throws TableNotFoundException {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     if (!hasRealtimeTable(tableName)) {
       throw new TableNotFoundException("Table " + tableNameWithType + " does not exist");

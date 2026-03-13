@@ -153,6 +153,11 @@ public class ValidationManagerStatelessTest extends ControllerTest {
     // Cleanup
     _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
     _helixResourceManager.deleteRealtimeTable(TEST_TABLE_NAME);
+    // Remove the manually added broker instance so that subsequent tests see a clean cluster state
+    helixAdmin.removeInstanceTag(getHelixClusterName(), instanceConfig.getInstanceName(),
+        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
+    instanceConfig.setInstanceEnabled(false);
+    helixAdmin.dropInstance(getHelixClusterName(), instanceConfig);
   }
 
   @AfterClass
