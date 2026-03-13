@@ -165,6 +165,23 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
   }
 
+  /**
+   * Returns true if the inverted-index-based distinct operator should be used.
+   */
+  public static boolean isUseInvertedIndexDistinct(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_INVERTED_INDEX_DISTINCT));
+  }
+
+  /**
+   * Returns the cost ratio for the inverted-index-based distinct heuristic, or null if not set.
+   * The inverted index path is chosen when dictionaryCardinality * costRatio <= filteredDocCount.
+   */
+  @Nullable
+  public static Integer getInvertedIndexDistinctCostRatio(Map<String, String> queryOptions) {
+    return checkedParseIntPositive("invertedIndexDistinctCostRatio",
+        queryOptions.get(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO));
+  }
+
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }

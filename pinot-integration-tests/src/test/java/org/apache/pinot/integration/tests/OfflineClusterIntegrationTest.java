@@ -32,6 +32,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -642,6 +643,46 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void addRangeIndex()
       throws Exception {
     addRangeIndex(true);
+  }
+
+  /**
+   * SELECT DISTINCT on an inverted-indexed column. InvertedIndexDistinctOperator is used when
+   * opted in via query option. Verifies correctness with and without filter.
+   * Origin already has an inverted index by default (see DEFAULT_INVERTED_INDEX_COLUMNS).
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctWithInvertedIndex(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Without filter — uses InvertedIndexDistinctOperator via query option
+    // Use large LIMIT to fetch all distinct values so subset assertion is valid
+    String query =
+        "SELECT DISTINCT Origin FROM mytable ORDER BY Origin LIMIT 10000 "
+            + "OPTION(useInvertedIndexDistinct=true)";
+    JsonNode response = postQuery(query);
+    assertEquals(response.get("exceptions").size(), 0);
+    Set<String> values = extractDistinctValuesFromResponse(response);
+    assertFalse(values.isEmpty(), "DISTINCT on inverted-indexed column should return values");
+
+    // With filter
+    String filteredQuery =
+        "SELECT DISTINCT Origin FROM mytable WHERE Carrier = 'AA' ORDER BY Origin LIMIT 10000 "
+            + "OPTION(useInvertedIndexDistinct=true)";
+    JsonNode filteredResponse = postQuery(filteredQuery);
+    assertEquals(filteredResponse.get("exceptions").size(), 0);
+    Set<String> filteredValues = extractDistinctValuesFromResponse(filteredResponse);
+    assertFalse(filteredValues.isEmpty(), "DISTINCT with filter on inverted-indexed column should return values");
+    assertTrue(values.containsAll(filteredValues), "Filtered values should be a subset of unfiltered values");
+  }
+
+  private static Set<String> extractDistinctValuesFromResponse(JsonNode response) {
+    Set<String> values = new HashSet<>();
+    JsonNode rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      values.add(rows.get(i).get(0).asText());
+    }
+    return values;
   }
 
   @Test(dataProvider = "useBothQueryEngines")
