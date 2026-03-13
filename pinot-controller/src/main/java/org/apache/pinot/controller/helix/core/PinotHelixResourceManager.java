@@ -749,6 +749,14 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Returns all logical table names in the cluster. Used by broker resource validation to repair logical table
+   * broker assignments (and to add missing logical tables to the broker resource when needed).
+   */
+  public List<String> getBrokerResourceLogicalTables() {
+    return getAllLogicalTableNames();
+  }
+
+  /**
    * Get all table names (with type suffix) from provided database.
    *
    * @param databaseName database name
@@ -1101,22 +1109,25 @@ public class PinotHelixResourceManager {
   }
 
   public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType)
-      throws Exception {
-    TableConfig tableConfig;
+  throws Exception {
+    Set<String> brokerInstances;
     try {
-      tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      if (tableConfig != null) {
+        brokerInstances = getAllInstancesForBrokerTenant(tableConfig.getTenantConfig().getBroker());
+      } else {
+        LogicalTableConfig logicalTableConfig =
+            ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableNameWithType);
+        Preconditions.checkNotNull(logicalTableConfig, "No table config or logical table config found for %s",
+            tableNameWithType);
+        brokerInstances = getAllInstancesForBrokerTenant(logicalTableConfig.getBrokerTenant());
+      }
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while getting table config for table {}", tableNameWithType, e);
-      throw new InvalidTableConfigException(
-          "Failed to fetch broker tag for table " + tableNameWithType + " due to exception: " + e.getMessage());
-    }
-    if (tableConfig == null) {
-      LOGGER.warn("Table {} does not exist", tableNameWithType);
+      LOGGER.warn("Caught exception while getting config for table {}", tableNameWithType, e);
       throw new InvalidConfigException(
-          "Invalid table configuration for table " + tableNameWithType + ". Table does not exist");
+          "Failed to fetch broker config for table " + tableNameWithType + " due to exception: " + e.getMessage());
     }
-    return rebuildBrokerResource(tableNameWithType,
-        getAllInstancesForBrokerTenant(tableConfig.getTenantConfig().getBroker()));
+    return rebuildBrokerResource(tableNameWithType, brokerInstances);
   }
 
   public PinotResourceManagerResponse rebuildBrokerResource(String tableNameWithType, Set<String> brokerInstances) {
@@ -1150,16 +1161,37 @@ public class PinotHelixResourceManager {
   }
 
   private void addInstanceToBrokerIdealState(String brokerTenantTag, String instanceName) {
-    IdealState tableIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, Helix.BROKER_RESOURCE_INSTANCE);
-    for (String tableNameWithType : tableIdealState.getPartitionSet()) {
-      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-      Preconditions.checkNotNull(tableConfig);
-      String brokerTag = TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig());
-      if (brokerTag.equals(brokerTenantTag)) {
-        tableIdealState.setPartitionState(tableNameWithType, instanceName, BrokerResourceStateModel.ONLINE);
+    // Use atomic read-modify-write so updates (including for logical tables) are persisted and not lost to races.
+    HelixHelper.updateIdealState(getHelixZkManager(), Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
+      Preconditions.checkNotNull(idealState, "Broker ideal state must not be null");
+      for (String partitionName : idealState.getPartitionSet()) {
+        String brokerTag = resolveBrokerTagForTable(partitionName);
+        if (brokerTag.equals(brokerTenantTag)) {
+          idealState.setPartitionState(partitionName, instanceName, BrokerResourceStateModel.ONLINE);
+        }
       }
+      return idealState;
+    }, DEFAULT_RETRY_POLICY);
+  }
+
+  /**
+   * Resolves the broker tag for a table in the broker resource. Tries physical table config first,
+   * then logical table config.
+   *
+   * @param tableName table name in broker ideal state (physical table name with type or logical table name)
+   * @return broker tag for the table, or throw exception if the table name cannot be resolved
+   */
+  private String resolveBrokerTagForTable(String tableName) {
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableName);
+    if (tableConfig != null) {
+      return TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig());
     }
-    _helixAdmin.setResourceIdealState(_helixClusterName, Helix.BROKER_RESOURCE_INSTANCE, tableIdealState);
+    LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
+    if (logicalTableConfig != null) {
+      return TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant());
+    }
+    throw new InvalidTableConfigException("Failed to resolve broker tag for table " + tableName
+        + " because no table config or logical table config found");
   }
 
   private PinotResourceManagerResponse scaleDownBroker(Tenant tenant, String brokerTenantTag,
@@ -1886,7 +1918,7 @@ public class PinotHelixResourceManager {
         // Add ideal state with consuming segments from designated stream metadata
         _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState, streamMetadataList);
         LOGGER.info("Adding table {}: Added consuming segments ideal state given the designated stream metadata",
-                tableNameWithType);
+            tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while setting up table: {}, cleaning it up", tableNameWithType, e);
@@ -4996,7 +5028,8 @@ public class PinotHelixResourceManager {
    * @throws TableNotFoundException if the specified real-time table does not exist.
    * @throws IllegalStateException if the IdealState for the table is not found.
    */
-  public WatermarkInductionResult getConsumerWatermarks(String tableName) throws TableNotFoundException {
+  public WatermarkInductionResult getConsumerWatermarks(String tableName)
+      throws TableNotFoundException {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     if (!hasRealtimeTable(tableName)) {
       throw new TableNotFoundException("Table " + tableNameWithType + " does not exist");
