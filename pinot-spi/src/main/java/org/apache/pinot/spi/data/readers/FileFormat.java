@@ -19,7 +19,7 @@
 package org.apache.pinot.spi.data.readers;
 
 public enum FileFormat {
-  AVRO, GZIPPED_AVRO, CSV, JSON, PINOT, THRIFT, PARQUET, ORC, PROTO, OTHER;
+  AVRO, GZIPPED_AVRO, CSV, JSON, PINOT, THRIFT, PARQUET, ORC, PROTO, ARROW, OTHER;
 
   /**
    * Converts an input format string to the corresponding FileFormat enum.
