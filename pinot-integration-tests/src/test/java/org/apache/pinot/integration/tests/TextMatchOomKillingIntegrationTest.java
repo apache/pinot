@@ -64,7 +64,7 @@ public class TextMatchOomKillingIntegrationTest extends BaseClusterIntegrationTe
   private static final int NUM_SEGMENTS = 3;
   private static final int NUM_DOCS_PER_SEGMENT = 3_000_000;
 
-  // Query designed to match many documents and consume significant resources (similar to BaseQueryKillingIntegrationTest)
+  // Query designed to match many documents and consume significant resources
   private static final String LARGE_TEXT_MATCH_QUERY =
       "SELECT * FROM " + TABLE_NAME + " WHERE TEXT_MATCH(textContent, '/.*searchable.*/') LIMIT 9000000";
 
