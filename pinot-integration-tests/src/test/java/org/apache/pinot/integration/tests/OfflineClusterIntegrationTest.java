@@ -32,7 +32,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -644,88 +643,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void addRangeIndex()
       throws Exception {
     addRangeIndex(true);
-  }
-
-  /**
-   * Verifies that without useIndexBasedDistinctOperator (disabled by default),
-   * SELECT DISTINCT on an inverted-indexed column uses default DistinctOperator and returns correct results.
-   */
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testInvertedIndexDistinctOperatorDisabledByDefault(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    addInvertedIndex();
-
-    String query = "SELECT DISTINCT Origin FROM mytable ORDER BY Origin";
-    JsonNode response = postQuery(query);
-    assertEquals(response.get("exceptions").size(), 0);
-    Set<String> values = extractDistinctValuesFromResponse(response);
-    assertFalse(values.isEmpty(), "Baseline (operator disabled) should return distinct values");
-  }
-
-  /**
-   * With useIndexBasedDistinctOperator, SELECT DISTINCT on Origin uses InvertedIndexDistinctOperator.
-   * Verifies same result set as baseline and execution stats (numDocsScanned = 0).
-   */
-  @Test(dataProvider = "useBothQueryEngines", dependsOnMethods = "testInvertedIndexDistinctOperatorDisabledByDefault")
-  public void testInvertedIndexDistinctOperator(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-
-    String query = "SELECT DISTINCT Origin FROM mytable ORDER BY Origin";
-    JsonNode baselineResponse = postQuery(query);
-    assertEquals(baselineResponse.get("exceptions").size(), 0);
-    Set<String> baselineValues = extractDistinctValuesFromResponse(baselineResponse);
-
-    JsonNode optimizedResponse =
-        postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
-    assertEquals(optimizedResponse.get("exceptions").size(), 0);
-    Set<String> optimizedValues = extractDistinctValuesFromResponse(optimizedResponse);
-    assertEquals(optimizedValues, baselineValues,
-        "InvertedIndexDistinctOperator should produce same results as baseline. Engine="
-            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
-
-    long numDocsScanned = optimizedResponse.get("numDocsScanned").asLong();
-    assertEquals(numDocsScanned, 0L,
-        "InvertedIndexDistinctOperator should not scan docs (numDocsScanned=0). Engine="
-            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
-  }
-
-  /**
-   * InvertedIndexDistinctOperator with a filter (e.g. WHERE Carrier = 'AA') still returns correct distinct values
-   * and uses index (numDocsScanned = 0).
-   */
-  @Test(dataProvider = "useBothQueryEngines", dependsOnMethods = "testInvertedIndexDistinctOperatorDisabledByDefault")
-  public void testInvertedIndexDistinctOperatorWithFilter(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-
-    String query = "SELECT DISTINCT Origin FROM mytable WHERE Carrier = 'AA' ORDER BY Origin";
-    JsonNode baselineResponse = postQuery(query);
-    assertEquals(baselineResponse.get("exceptions").size(), 0);
-    Set<String> baselineValues = extractDistinctValuesFromResponse(baselineResponse);
-
-    JsonNode optimizedResponse =
-        postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
-    assertEquals(optimizedResponse.get("exceptions").size(), 0);
-    Set<String> optimizedValues = extractDistinctValuesFromResponse(optimizedResponse);
-    assertEquals(optimizedValues, baselineValues,
-        "InvertedIndexDistinctOperator with filter should match baseline. Engine="
-            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
-
-    long numDocsScanned = optimizedResponse.get("numDocsScanned").asLong();
-    assertEquals(numDocsScanned, 0L,
-        "InvertedIndexDistinctOperator with filter should not scan docs (numDocsScanned=0). Engine="
-            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
-  }
-
-  private static Set<String> extractDistinctValuesFromResponse(JsonNode response) {
-    Set<String> values = new HashSet<>();
-    JsonNode rows = response.get("resultTable").get("rows");
-    for (int i = 0; i < rows.size(); i++) {
-      values.add(rows.get(i).get(0).asText());
-    }
-    return values;
   }
 
   @Test(dataProvider = "useBothQueryEngines")

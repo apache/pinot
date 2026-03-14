@@ -27,7 +27,6 @@ import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
-import org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator;
 import org.apache.pinot.core.operator.query.JsonIndexDistinctOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -83,19 +82,6 @@ public class DistinctPlanNode implements PlanNode {
       if (JsonIndexDistinctOperator.canUseJsonIndexDistinct(_indexSegment, expr)) {
         BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
         return new JsonIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator);
-      }
-    }
-
-    // Use inverted index directly for DISTINCT column when query option useIndexBasedDistinctOperator=true
-    // (disabled by default; opt-in via query option)
-    if (QueryOptionsUtils.isUseInvertedIndexDistinct(_queryContext.getQueryOptions()) && expressions.size() == 1) {
-      ExpressionContext expr = expressions.get(0);
-      if (InvertedIndexDistinctOperator.canUseInvertedIndexDistinct(_indexSegment, expr, _queryContext)) {
-        String column = expr.getIdentifier();
-        DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
-        BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
-        return new InvertedIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator,
-            dataSource);
       }
     }
 
