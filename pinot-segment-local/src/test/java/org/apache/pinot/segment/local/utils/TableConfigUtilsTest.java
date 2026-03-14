@@ -3392,16 +3392,10 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
   }
 
-  @SuppressWarnings("deprecation")
   @Test
   public void testConvertFromLegacyTableConfig() {
-    String expectedPushFrequency = "HOURLY";
-    String expectedPushType = "APPEND";
-
     Map<String, String> expectedStreamConfigsMap = getTestStreamConfigs();
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setSegmentPushFrequency(expectedPushFrequency)
-        .setSegmentPushType(expectedPushType)
         .setStreamConfigs(expectedStreamConfigsMap)
         .build();
 
@@ -3414,10 +3408,6 @@ public class TableConfigUtilsTest {
     // After conversion, assert that the configs are transferred ingestionConfig.
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     assertNotNull(ingestionConfig);
-    BatchIngestionConfig batchIngestionConfig = ingestionConfig.getBatchIngestionConfig();
-    assertNotNull(batchIngestionConfig);
-    assertEquals(batchIngestionConfig.getSegmentIngestionFrequency(), expectedPushFrequency);
-    assertEquals(batchIngestionConfig.getSegmentIngestionType(), expectedPushType);
 
     StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
     assertNotNull(streamIngestionConfig);
@@ -3426,10 +3416,6 @@ public class TableConfigUtilsTest {
 
     // Assert that the deprecated fields are cleared.
     assertNull(tableConfig.getIndexingConfig().getStreamConfigs());
-
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    assertNull(validationConfig.getSegmentPushFrequency());
-    assertNull(validationConfig.getSegmentPushType());
   }
 
   private Map<String, String> getTestStreamConfigs() {
