@@ -19,6 +19,7 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,6 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.utils.StatisticalAggregationFunctionUtils;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-
 
 /**
  * Aggregation function which returns the population covariance of 2 expressions.
@@ -57,6 +57,10 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
   protected final boolean _isSample;
 
   public CovarianceAggregationFunction(List<ExpressionContext> arguments, boolean isSample) {
+    int numArguments = arguments.size();
+    Preconditions.checkArgument(numArguments == 2,
+            "Covariance expects 2 arguments, got: %s", numArguments);
+
     _expression1 = arguments.get(0);
     _expression2 = arguments.get(1);
     _isSample = isSample;
