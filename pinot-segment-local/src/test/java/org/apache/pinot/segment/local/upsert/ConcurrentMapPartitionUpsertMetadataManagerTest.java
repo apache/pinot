@@ -82,6 +82,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.when;
@@ -2361,6 +2362,100 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     assertEquals(recordLocationMap.size(), 1);
     checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, HashFunction.NONE);
+    // Prev key map must be cleared after segment replacement irrespective of mode
+    assertTrue(upsertMetadataManager._previousKeyToRecordLocationMap.isEmpty());
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
+
+  /**
+   * Verifies that _previousKeyToRecordLocationMap is cleared after segment commit (replace) and after segment remove,
+   * when not in PROTECTED mode. With PROTECTED mode the same replace assertion is covered by
+   * testProtectedModeRevertsMetadataForConsumingSegmentSeal.
+   */
+  @Test
+  public void testPrevKeyToRecordLocationMapClearedAfterSegmentCommitInNonProtectedMode()
+      throws IOException {
+    UpsertContext upsertContext =
+        _contextBuilder.setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).setDropOutOfOrderRecord(true).build();
+
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, upsertContext);
+    Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
+
+    // Add immutable segment, then consuming segment with records (populates _previousKeyToRecordLocationMap)
+    int numRecords = 3;
+    int[] primaryKeys = new int[]{10, 20, 30};
+    int[] timestamps = new int[]{100, 200, 300};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    List<PrimaryKey> primaryKeysList1 = getPrimaryKeyList(numRecords, primaryKeys);
+    ImmutableSegmentImpl segment1 = mockImmutableSegmentWithTimestamps(1, validDocIds1, null, primaryKeysList1,
+        timestamps);
+    upsertMetadataManager.addSegment(segment1, validDocIds1, null,
+        getRecordInfoListWithIntegerComparison(numRecords, primaryKeys, timestamps, null).iterator());
+    trackedSegments.add(segment1);
+
+    int[] consumingPrimaryKeys = new int[]{10, 20, 30};
+    int[] consumingTimestamps = new int[]{150, 250, 350};
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment mutableSegment = mockMutableSegmentWithDataSource(2, validDocIds2, null, consumingPrimaryKeys);
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(10), 0, 150, false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(20), 1, 250, false));
+    upsertMetadataManager.addRecord(mutableSegment, new RecordInfo(makePrimaryKey(30), 2, 350, false));
+    trackedSegments.add(mutableSegment);
+
+    assertFalse(upsertMetadataManager._previousKeyToRecordLocationMap.isEmpty(),
+        "Prev key map should be populated after consuming segment adds records over immutable");
+
+    // Commit: replace consuming with immutable (no PROTECTED mode)
+    int[] newTimestamps = new int[]{150, 250, 350};
+    ThreadSafeMutableRoaringBitmap newValidDocIds = new ThreadSafeMutableRoaringBitmap();
+    newValidDocIds.add(0);
+    newValidDocIds.add(1);
+    newValidDocIds.add(2);
+    List<PrimaryKey> newPrimaryKeyList = getPrimaryKeyList(3, consumingPrimaryKeys);
+    ImmutableSegmentImpl newSegment = mockImmutableSegmentWithTimestamps(2, newValidDocIds, null, newPrimaryKeyList,
+        newTimestamps);
+    doReturn(mutableSegment.getSegmentName()).when(newSegment).getSegmentName();
+    upsertMetadataManager.replaceSegment(newSegment, newValidDocIds, null,
+        getRecordInfoListWithIntegerComparison(3, consumingPrimaryKeys, newTimestamps, null).iterator(), mutableSegment);
+    trackedSegments.remove(mutableSegment);
+    trackedSegments.add(newSegment);
+
+    assertTrue(upsertMetadataManager._previousKeyToRecordLocationMap.isEmpty(),
+        "Prev key map must be cleared after segment commit irrespective of mode");
+
+    // Also verify prev key map is cleared after removeSegment: set up again and remove consuming segment
+    int[] primaryKeysB = new int[]{40, 50, 60};
+    int[] timestampsB = new int[]{400, 500, 600};
+    ThreadSafeMutableRoaringBitmap validDocIds1B = new ThreadSafeMutableRoaringBitmap();
+    List<PrimaryKey> primaryKeysList1B = getPrimaryKeyList(3, primaryKeysB);
+    ImmutableSegmentImpl segment1B = mockImmutableSegmentWithTimestamps(3, validDocIds1B, null, primaryKeysList1B,
+        timestampsB);
+    upsertMetadataManager.addSegment(segment1B, validDocIds1B, null,
+        getRecordInfoListWithIntegerComparison(3, primaryKeysB, timestampsB, null).iterator());
+    trackedSegments.add(segment1B);
+
+    int[] consumingPrimaryKeysB = new int[]{40, 50, 60};
+    ThreadSafeMutableRoaringBitmap validDocIds2B = new ThreadSafeMutableRoaringBitmap();
+    validDocIds2B.add(0);
+    validDocIds2B.add(1);
+    validDocIds2B.add(2);
+    MutableSegment mutableSegmentB = mockMutableSegmentWithDataSource(4, validDocIds2B, null, consumingPrimaryKeysB);
+    upsertMetadataManager.addRecord(mutableSegmentB, new RecordInfo(makePrimaryKey(40), 0, 450, false));
+    upsertMetadataManager.addRecord(mutableSegmentB, new RecordInfo(makePrimaryKey(50), 1, 550, false));
+    upsertMetadataManager.addRecord(mutableSegmentB, new RecordInfo(makePrimaryKey(60), 2, 650, false));
+    trackedSegments.add(mutableSegmentB);
+
+    assertFalse(upsertMetadataManager._previousKeyToRecordLocationMap.isEmpty(),
+        "Prev key map should be populated after second consuming segment adds records over immutable");
+
+    upsertMetadataManager.removeSegment(mutableSegmentB);
+    trackedSegments.remove(mutableSegmentB);
+
+    assertTrue(upsertMetadataManager._previousKeyToRecordLocationMap.isEmpty(),
+        "Prev key map must be cleared after segment remove irrespective of mode");
 
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
