@@ -116,6 +116,17 @@ public class DimensionTableTest extends CustomDataQueryClusterIntegrationTest {
 
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(getTableName(), _tarDir);
+
+    // Dimension tables are loaded into memory; wait specifically for non-zero docs
+    waitForNonZeroDocsLoaded(60_000L, true, getTableName());
+  }
+
+  @Override
+  protected void waitForAllDocsLoaded(long timeoutMs)
+      throws Exception {
+    // Already waited in setUpTable; just verify
+    long count = getCurrentCountStarResult();
+    Assert.assertEquals(count, getCountStarResult(), "Dimension table doc count mismatch");
   }
 
   @Test

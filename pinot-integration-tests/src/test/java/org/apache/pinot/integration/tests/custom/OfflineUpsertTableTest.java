@@ -171,7 +171,7 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
   public void testSegmentReplacement()
       throws Exception {
     Schema schema = createSchema();
-    TableConfig tableConfig = getOfflineTableConfig();
+    TableConfig tableConfig = getSharedHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
 
     List<GenericRow> rows = new ArrayList<>();
     GenericRow row = new GenericRow();
