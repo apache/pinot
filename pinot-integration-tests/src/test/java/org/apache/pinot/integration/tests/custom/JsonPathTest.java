@@ -27,8 +27,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.common.function.JsonPathCache;
@@ -43,6 +45,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR;
 
 
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -90,6 +94,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setIngestionConfig(ingestionConfig)
+        .setJsonIndexColumns(Collections.singletonList(MY_MAP_STR_FIELD_NAME))
         .build();
   }
 
@@ -592,5 +597,94 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     // Should default to JsonPath format
     Assert.assertTrue(keyList.contains("$['k1']"));
     Assert.assertTrue(keyList.contains("$['k2']"));
+  }
+
+  // --- JsonIndexDistinctOperator tests (useIndexBasedDistinctOperator) ---
+
+  /**
+   * Without useIndexBasedDistinctOperator (disabled by default), SELECT DISTINCT jsonExtractIndex(...) uses
+   * default DistinctOperator and returns correct results.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctOperatorDisabledByDefault(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+    JsonNode response = postQuery(query);
+    Assert.assertEquals(response.get("exceptions").size(), 0);
+    Set<String> values = extractDistinctValuesFromResponse(response);
+    Assert.assertFalse(values.isEmpty(),
+        "Baseline (operator disabled) should return distinct values. Engine="
+            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
+  }
+
+  /**
+   * With useIndexBasedDistinctOperator, JsonIndexDistinctOperator produces same results as baseline.
+   * For SSE, verifies numEntriesScannedPostFilter=0 (index path, no doc scan).
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctOperatorWithPinotJsonIndex(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+    Set<String> baselineValues = extractDistinctValuesFromResponse(baselineResponse);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+    Set<String> optimizedValues = extractDistinctValuesFromResponse(optimizedResponse);
+    Assert.assertEquals(optimizedValues, baselineValues,
+        "JsonIndexDistinctOperator (useIndexBasedDistinctOperator=true) should produce same results as baseline. "
+            + "Engine=" + (useMultiStageQueryEngine ? "MSE" : "SSE"));
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L,
+          "JsonIndexDistinctOperator (SSE) uses index only (numEntriesScannedPostFilter=0).");
+    }
+  }
+
+  /**
+   * JsonIndexDistinctOperator with filter produces same results as baseline.
+   * For SSE, verifies numEntriesScannedPostFilter=0 (index path, no doc scan).
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctOperatorWithFilter(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " WHERE jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k2', 'STRING') = 'value-k2-0'"
+        + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+    Set<String> baselineValues = extractDistinctValuesFromResponse(baselineResponse);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+    Set<String> optimizedValues = extractDistinctValuesFromResponse(optimizedResponse);
+    Assert.assertEquals(optimizedValues, baselineValues,
+        "JsonIndexDistinctOperator with filter should match baseline. Engine="
+            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L,
+          "JsonIndexDistinctOperator with filter (SSE) uses index only (numEntriesScannedPostFilter=0).");
+    }
+  }
+
+  private static Set<String> extractDistinctValuesFromResponse(JsonNode response) {
+    Set<String> values = new HashSet<>();
+    JsonNode rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode cell = rows.get(i).get(0);
+      values.add(cell.isNull() ? null : cell.asText());
+    }
+    return values;
   }
 }

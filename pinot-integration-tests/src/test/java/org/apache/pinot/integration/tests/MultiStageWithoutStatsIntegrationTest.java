@@ -26,7 +26,6 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.query.runtime.SendStatsPredicate;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -97,7 +96,7 @@ public class MultiStageWithoutStatsIntegrationTest extends BaseClusterIntegratio
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_SEND_STATS_MODE,
-        SendStatsPredicate.Mode.NEVER.name());
+        "NEVER");
     super.overrideServerConf(serverConf);
   }
 
