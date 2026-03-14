@@ -108,6 +108,7 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COL_NAME)
+        .setNumReplicas(2)
         .setUpsertConfig(upsertConfig)
         .setRoutingConfig(new RoutingConfig(null, null,
             RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
