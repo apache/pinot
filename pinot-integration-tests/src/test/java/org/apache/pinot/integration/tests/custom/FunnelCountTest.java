@@ -29,6 +29,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -267,129 +268,27 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
-  // ---------- default (bitmap) ----------
+  @DataProvider(name = "allStrategies")
+  public static Object[][] allStrategies() {
+    return new Object[][]{
+        {null}, {"'bitmap'"}, {"'set'"}, {"'theta_sketch'"},
+        {"'partitioned'"}, {"'partitioned', 'theta_sketch'"}, {"'partitioned', 'sorted'"}
+    };
+  }
 
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testDefaultOverall(boolean useMultiStageQueryEngine)
+  @Test(dataProvider = "allStrategies")
+  public void testOverall(String settings)
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(overallQuery(null)));
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(overallQuery(settings)));
     assertOverallResult(rows, EXPECTED_OVERALL);
   }
 
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testDefaultGroupBy(boolean useMultiStageQueryEngine)
+  @Test(dataProvider = "allStrategies")
+  public void testGroupBy(String settings)
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(groupByQuery(null)));
-    assertGroupByResult(rows);
-  }
-
-  // ---------- explicit bitmap ----------
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testBitmapOverall(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(overallQuery("'bitmap'")));
-    assertOverallResult(rows, EXPECTED_OVERALL);
-  }
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testBitmapGroupBy(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(groupByQuery("'bitmap'")));
-    assertGroupByResult(rows);
-  }
-
-  // ---------- set ----------
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testSetOverall(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(overallQuery("'set'")));
-    assertOverallResult(rows, EXPECTED_OVERALL);
-  }
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testSetGroupBy(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(groupByQuery("'set'")));
-    assertGroupByResult(rows);
-  }
-
-  // ---------- theta_sketch ----------
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testThetaSketchOverall(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(overallQuery("'theta_sketch'")));
-    assertOverallResult(rows, EXPECTED_OVERALL);
-  }
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testThetaSketchGroupBy(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(groupByQuery("'theta_sketch'")));
-    assertGroupByResult(rows);
-  }
-
-  // ---------- partitioned ----------
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testPartitionedOverall(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(overallQuery("'partitioned'")));
-    assertOverallResult(rows, EXPECTED_OVERALL);
-  }
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testPartitionedGroupBy(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(groupByQuery("'partitioned'")));
-    assertGroupByResult(rows);
-  }
-
-  // ---------- partitioned + theta_sketch ----------
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testPartitionedThetaSketchOverall(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(overallQuery("'partitioned', 'theta_sketch'")));
-    assertOverallResult(rows, EXPECTED_OVERALL);
-  }
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testPartitionedThetaSketchGroupBy(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(groupByQuery("'partitioned', 'theta_sketch'")));
-    assertGroupByResult(rows);
-  }
-
-  // ---------- partitioned + sorted ----------
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testPartitionedSortedOverall(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(overallQuery("'partitioned', 'sorted'")));
-    assertOverallResult(rows, EXPECTED_OVERALL);
-  }
-
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testPartitionedSortedGroupBy(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode rows = getRows(postQuery(groupByQuery("'partitioned', 'sorted'")));
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(groupByQuery(settings)));
     assertGroupByResult(rows);
   }
 
@@ -432,44 +331,20 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
   // Expected: view=7, cart=6, checkout=4, purchase=3
   private static final long[] EXPECTED_FILTERED = {7, 6, 4, 3};
 
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testWithFilter(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = String.format(
-        "SELECT FUNNEL_COUNT("
-            + "STEPS(%1$s = '%2$s', %1$s = '%3$s', %1$s = '%4$s', %1$s = '%5$s'), "
-            + "CORRELATE_BY(%6$s)) FROM %7$s WHERE %6$s <= 7",
-        ACTION_COL, VIEW, CART, CHECKOUT, PURCHASE, USER_ID_COL, TABLE_NAME);
-    JsonNode rows = getRows(postQuery(query));
-    assertEquals(rows.size(), 1);
-    assertStepCounts(rows.get(0).get(0), EXPECTED_FILTERED);
+  private String filteredQuery(String settings) {
+    return overallQuery(settings) + " WHERE " + USER_ID_COL + " <= 7";
   }
 
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testPartitionedWithFilter(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = String.format(
-        "SELECT FUNNEL_COUNT("
-            + "STEPS(%1$s = '%2$s', %1$s = '%3$s', %1$s = '%4$s', %1$s = '%5$s'), "
-            + "CORRELATE_BY(%6$s), SETTINGS('partitioned')) FROM %7$s WHERE %6$s <= 7",
-        ACTION_COL, VIEW, CART, CHECKOUT, PURCHASE, USER_ID_COL, TABLE_NAME);
-    JsonNode rows = getRows(postQuery(query));
-    assertEquals(rows.size(), 1);
-    assertStepCounts(rows.get(0).get(0), EXPECTED_FILTERED);
+  @DataProvider(name = "filteredStrategies")
+  public static Object[][] filteredStrategies() {
+    return new Object[][]{{null}, {"'partitioned'"}, {"'partitioned', 'sorted'"}};
   }
 
-  @Test(dataProvider = "useV1QueryEngine")
-  public void testPartitionedSortedWithFilter(boolean useMultiStageQueryEngine)
+  @Test(dataProvider = "filteredStrategies")
+  public void testWithFilter(String settings)
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = String.format(
-        "SELECT FUNNEL_COUNT("
-            + "STEPS(%1$s = '%2$s', %1$s = '%3$s', %1$s = '%4$s', %1$s = '%5$s'), "
-            + "CORRELATE_BY(%6$s), SETTINGS('partitioned', 'sorted')) FROM %7$s WHERE %6$s <= 7",
-        ACTION_COL, VIEW, CART, CHECKOUT, PURCHASE, USER_ID_COL, TABLE_NAME);
-    JsonNode rows = getRows(postQuery(query));
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(filteredQuery(settings)));
     assertEquals(rows.size(), 1);
     assertStepCounts(rows.get(0).get(0), EXPECTED_FILTERED);
   }
