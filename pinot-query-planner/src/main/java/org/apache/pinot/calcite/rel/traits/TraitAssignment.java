@@ -32,6 +32,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.core.Window;
@@ -148,13 +149,25 @@ public class TraitAssignment {
         "Always expect left and right keys to be same size. Found: %s and %s",
         joinInfo.leftKeys, joinInfo.rightKeys);
     // Case-3: Default case.
-    RelDistribution rightDistribution = !joinInfo.rightKeys.isEmpty() ? RelDistributions.hash(joinInfo.rightKeys)
-        : RelDistributions.BROADCAST_DISTRIBUTED;
+    JoinRelType joinType = join.getJoinType();
     RelDistribution leftDistribution;
-    if (joinInfo.leftKeys.isEmpty() || rightDistribution == RelDistributions.BROADCAST_DISTRIBUTED) {
-      leftDistribution = RelDistributions.RANDOM_DISTRIBUTED;
-    } else {
+    RelDistribution rightDistribution;
+    if (!joinInfo.leftKeys.isEmpty()) {
       leftDistribution = RelDistributions.hash(joinInfo.leftKeys);
+      rightDistribution = RelDistributions.hash(joinInfo.rightKeys);
+    } else if (joinType == JoinRelType.FULL) {
+      // FULL OUTER JOIN with no equi keys: use SINGLETON to collect all data on one worker. Both sides need
+      // global visibility to correctly determine unmatched rows.
+      leftDistribution = RelDistributions.SINGLETON;
+      rightDistribution = RelDistributions.SINGLETON;
+    } else if (joinType == JoinRelType.RIGHT) {
+      // RIGHT JOIN with no equi keys: broadcast left so each worker has the full left table and can correctly
+      // determine which of its local right rows are unmatched.
+      leftDistribution = RelDistributions.BROADCAST_DISTRIBUTED;
+      rightDistribution = RelDistributions.RANDOM_DISTRIBUTED;
+    } else {
+      leftDistribution = RelDistributions.RANDOM_DISTRIBUTED;
+      rightDistribution = RelDistributions.BROADCAST_DISTRIBUTED;
     }
     // left-input
     RelNode leftInput = join.getInput(0);
