@@ -1461,12 +1461,16 @@ const getPackageVersionsData = () => {
   });
 };
 
-const getLogicalTablesList = async () => {
+const getLogicalTablesData = async (columnHeader: string) => {
   const { data } = await getLogicalTables();
   return {
-    columns: ['Logical Table Name'],
+    columns: [columnHeader],
     records: data.map((name) => [name])
   };
+};
+
+const getLogicalTablesList = async () => {
+  return getLogicalTablesData('Logical Table Name');
 };
 
 const getLogicalTableConfig = async (tableName: string) => {

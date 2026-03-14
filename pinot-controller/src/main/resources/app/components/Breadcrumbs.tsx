@@ -102,7 +102,7 @@ const BreadcrumbsComponent = ({ ...props }) => {
       const {tenantName, tableName, segmentName, instanceName, schemaName, query, taskType, queueTableName, taskID, subTaskID, logicalTableName} = props.match.params;
       if (logicalTableName) {
         breadcrumbs.push(
-          getClickableLabel('Tables', '/tables'),
+          getClickableLabel(breadcrumbNameMap['/logical-tables'], '/tables'),
         );
       }
       if((tenantName || instanceName) && tableName){

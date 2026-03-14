@@ -119,6 +119,7 @@ const LogicalTableDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const fetchData = async () => {
     setFetching(true);
+    setNotFound(false);
     try {
       const result = await PinotMethodUtils.getLogicalTableConfig(logicalTableName);
       if (result.error || !result) {
