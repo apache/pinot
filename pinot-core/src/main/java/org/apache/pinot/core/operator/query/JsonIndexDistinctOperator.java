@@ -58,8 +58,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * POC: Distinct operator that uses JSON index value→docId map directly instead of scanning docs.
- * Avoids projection/transform pipeline for SELECT DISTINCT jsonExtractIndex(...).
+ * Distinct operator that uses the JSON index value→docId map directly instead of scanning documents.
+ * Avoids the projection/transform pipeline for SELECT DISTINCT jsonExtractIndex(...).
  */
 public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT_JSON_INDEX";
