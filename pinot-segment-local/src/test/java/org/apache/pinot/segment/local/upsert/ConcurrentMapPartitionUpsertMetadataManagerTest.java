@@ -2415,11 +2415,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     newValidDocIds.add(1);
     newValidDocIds.add(2);
     List<PrimaryKey> newPrimaryKeyList = getPrimaryKeyList(3, consumingPrimaryKeys);
-    ImmutableSegmentImpl newSegment = mockImmutableSegmentWithTimestamps(2, newValidDocIds, null, newPrimaryKeyList,
-        newTimestamps);
+    ImmutableSegmentImpl newSegment =
+        mockImmutableSegmentWithTimestamps(2, newValidDocIds, null, newPrimaryKeyList, newTimestamps);
     doReturn(mutableSegment.getSegmentName()).when(newSegment).getSegmentName();
     upsertMetadataManager.replaceSegment(newSegment, newValidDocIds, null,
-        getRecordInfoListWithIntegerComparison(3, consumingPrimaryKeys, newTimestamps, null).iterator(), mutableSegment);
+        getRecordInfoListWithIntegerComparison(3, consumingPrimaryKeys, newTimestamps, null).iterator(),
+        mutableSegment);
     trackedSegments.remove(mutableSegment);
     trackedSegments.add(newSegment);
 
