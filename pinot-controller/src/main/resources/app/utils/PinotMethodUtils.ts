@@ -118,7 +118,10 @@ import {
   resumeConsumption,
   getPauseStatus,
   getVersions,
-  getLogicalTables
+  getLogicalTables,
+  getLogicalTable,
+  putLogicalTable,
+  deleteLogicalTable
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -1458,6 +1461,33 @@ const getPackageVersionsData = () => {
   });
 };
 
+const getLogicalTablesData = async (columnHeader: string) => {
+  const { data } = await getLogicalTables();
+  return {
+    columns: [columnHeader],
+    records: data.map((name) => [name])
+  };
+};
+
+const getLogicalTablesList = async () => {
+  return getLogicalTablesData('Logical Table Name');
+};
+
+const getLogicalTableConfig = async (tableName: string) => {
+  const { data } = await getLogicalTable(tableName);
+  return data;
+};
+
+const updateLogicalTableConfig = async (tableName: string, config: string) => {
+  const { data } = await putLogicalTable(tableName, config);
+  return data;
+};
+
+const deleteLogicalTableOp = async (tableName: string) => {
+  const { data } = await deleteLogicalTable(tableName);
+  return data;
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -1558,7 +1588,11 @@ export default {
   getPauseStatusData,
   fetchServerToSegmentsCountData,
   getConsumingSegmentsInfoData,
-  getPackageVersionsData
+  getPackageVersionsData,
+  getLogicalTablesList,
+  getLogicalTableConfig,
+  updateLogicalTableConfig,
+  deleteLogicalTableOp
 };
 
 // Named exports for shared constants and utilities

@@ -58,6 +58,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/minions': 'Minions',
   '/minion-task-manager': 'Minion Task Manager',
   '/tables': 'Tables',
+  '/logical-tables': 'Logical Tables',
   '/query': 'Query Console',
   '/cluster': 'Cluster Manager',
   '/zookeeper': 'Zookeeper Browser',
@@ -98,7 +99,12 @@ const BreadcrumbsComponent = ({ ...props }) => {
     const breadcrumbs = [getClickableLabel(breadcrumbNameMap['/'], '/')];
     const paramsKeys = keys(props.match.params);
     if(paramsKeys.length){
-      const {tenantName, tableName, segmentName, instanceName, schemaName, query, taskType, queueTableName, taskID, subTaskID} = props.match.params;
+      const {tenantName, tableName, segmentName, instanceName, schemaName, query, taskType, queueTableName, taskID, subTaskID, logicalTableName} = props.match.params;
+      if (logicalTableName) {
+        breadcrumbs.push(
+          getClickableLabel(breadcrumbNameMap['/logical-tables'], '/tables'),
+        );
+      }
       if((tenantName || instanceName) && tableName){
         breadcrumbs.push(
           getClickableLabel(
@@ -143,7 +149,7 @@ const BreadcrumbsComponent = ({ ...props }) => {
       if (subTaskID) {
         breadcrumbs.push(getClickableLabel('Sub Tasks', `/task-queue/${taskType}/tables/${queueTableName}/task/${taskID}`));
       }
-      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName || schemaName || subTaskID || taskID || queueTableName || taskType || 'Query Console'));
+      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName || schemaName || logicalTableName || subTaskID || taskID || queueTableName || taskType || 'Query Console'));
     } else {
       breadcrumbs.push(getLabel(breadcrumbNameMap[location.pathname]));
     }
