@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.materializedview;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -32,7 +31,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.minion.MaterializedViewTaskMetadata;
 import org.apache.pinot.common.minion.MaterializedViewTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
@@ -47,7 +45,6 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -430,6 +427,7 @@ public class MaterializedViewTaskGenerator extends BaseTaskGenerator {
     validateMvSchema(taskConfigs);
   }
 
+
   private void validateMvSchema(Map<String, String> taskConfigs) {
     String mvName = taskConfigs.get(MinionConstants.MaterializedViewTask.MATERIALIZED_VIEW_NAME);
 
@@ -463,15 +461,24 @@ public class MaterializedViewTaskGenerator extends BaseTaskGenerator {
     for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
       String key = entry.getKey();
       if (key.endsWith(MinionConstants.MaterializedViewTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
+        // source column is the part before ".aggregationType"
         String sourceColumn =
             StringUtils.removeEnd(key, MinionConstants.MaterializedViewTask.AGGREGATION_TYPE_KEY_SUFFIX);
 
-        // By default, MV output column name is the same as the source column name
-        // TODO: Once Query AS is supported, allow user-defined output column names
-        String outputColumn = sourceColumn;
+        String aggTypeRaw = entry.getValue();
+        Preconditions.checkState(StringUtils.isNotBlank(aggTypeRaw),
+            String.format("Aggregation type for column \"%s\" is empty!", sourceColumn));
+
+        // normalize aggregation type (case-insensitive)
+        String aggType = aggTypeRaw.trim().toLowerCase();
+
+        // By default, MV output column name is constructed as: <sourceColumn>_<aggType>
+        // e.g., Column1 + "_" + "sum" => Column1_sum
+        // TODO: Once "Query AS" is supported, allow users to specify custom output column names
+        String outputColumn = sourceColumn + "_" + aggType;
 
         Preconditions.checkState(mvColumns.contains(outputColumn),
-            String.format("Aggregation output column \"%s\" not found in MV table schema!", outputColumn));
+            String.format("Aggregation output column \"%s\" not found in MV table schema! Expected pattern: <metric>_<aggType>", outputColumn));
       }
     }
   }

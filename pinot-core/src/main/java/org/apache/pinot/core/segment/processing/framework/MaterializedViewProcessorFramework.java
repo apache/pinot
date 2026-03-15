@@ -31,7 +31,6 @@ import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordR
 import org.apache.pinot.core.segment.processing.mapper.SegmentMapper;
 import org.apache.pinot.core.segment.processing.reducer.Reducer;
 import org.apache.pinot.core.segment.processing.reducer.ReducerFactory;
-import org.apache.pinot.segment.local.recordtransformer.BasicFilterTransformer;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -40,7 +39,8 @@ import org.apache.pinot.segment.spi.creator.name.SegmentNameGeneratorFactory;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,13 +62,13 @@ public class MaterializedViewProcessorFramework extends SegmentProcessorFramewor
   /**
    * Initializes the MaterializedViewProcessorFramework with record readers, config and working directory.
    */
-  public MaterializedViewProcessorFramework(List<RecordReader> recordReaders,
-      SegmentProcessorConfig segmentProcessorConfig, File workingDir) throws IOException {
-    super(recordReaders, segmentProcessorConfig, workingDir);
+  public MaterializedViewProcessorFramework(SegmentProcessorConfig segmentProcessorConfig, File workingDir,
+      List<RecordReaderFileConfig> recordReaderFileConfigs, List<RecordTransformer> customRecordTransformers,
+      SegmentNumRowProvider segmentNumRowProvider)
+      throws IOException {
+    super(segmentProcessorConfig, workingDir, recordReaderFileConfigs, customRecordTransformers, null,
+        segmentNumRowProvider);
     _mvProcessorConfig = segmentProcessorConfig.getMaterializedViewProcessorConfig();
-    if (_mvProcessorConfig.getFilterConfig() != null) {
-      _customRecordTransformers = List.of(new BasicFilterTransformer(_mvProcessorConfig.getFilterConfig()));
-    }
   }
 
   /**

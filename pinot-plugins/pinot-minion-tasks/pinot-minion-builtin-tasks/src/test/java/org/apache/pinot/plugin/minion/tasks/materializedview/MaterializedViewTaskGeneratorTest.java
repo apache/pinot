@@ -436,7 +436,7 @@ public class MaterializedViewTaskGeneratorTest {
 
     // Common valid task config
     Map<String, String> validConfig = new HashMap<>();
-    validConfig.put(MinionConstants.MaterializedViewTask.MATERIALIZED_VIEW_NAME, "mvTable"); // raw, validate will append _OFFLINE
+    validConfig.put(MinionConstants.MaterializedViewTask.MATERIALIZED_VIEW_NAME, "mvTable");
     validConfig.put(MinionConstants.MaterializedViewTask.SELECTED_DIMENSION_LIST, "Dim1,Dim2");
     validConfig.put(MinionConstants.MaterializedViewTask.FILTER_FUNCTION, "Groovy({Dim1 != \"X\"}, Dim1)");
     validConfig.put(MinionConstants.MaterializedViewTask.MERGE_TYPE_KEY, "MV_ROLLUP");

@@ -44,11 +44,13 @@ import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
+import org.apache.pinot.segment.local.recordtransformer.BasicFilterTransformer;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,6 +140,7 @@ public class MaterializedViewTaskExecutor extends BaseMultipleSegmentsConversion
     TableConfig tableConfig = getTableConfig(realtimeTableName);
     Schema schema = getSchema(realtimeTableName);
 
+
     TableConfig mvTableConfig = getTableConfig(mvNameWithType);
     Schema mvSchema = getSchema(mvNameWithType);
     String selectedDimensionListStr = configs.get(MaterializedViewTask.SELECTED_DIMENSION_LIST);
@@ -147,12 +150,18 @@ public class MaterializedViewTaskExecutor extends BaseMultipleSegmentsConversion
         Arrays.asList(StringUtils.split(selectedDimensionListStr, COMMA_SEPARATOR))
             .stream().map(s -> s.trim()).filter(s -> StringUtils.isNotBlank(s))
             .collect(Collectors.toSet());
-    FilterConfig filterConfig = new FilterConfig(configs.getOrDefault(MaterializedViewTask.FILTER_FUNCTION, null));
+
+    String filterFunction = configs.getOrDefault(MaterializedViewTask.FILTER_FUNCTION, null);
+    List<RecordTransformer> customRecordTransformers = new ArrayList<>();
+    if (filterFunction != null) {
+      FilterConfig filterConfig = new FilterConfig(filterFunction);
+      customRecordTransformers.add(new BasicFilterTransformer(filterConfig));
+    }
 
     MaterializedViewProcessorConfig.Builder mvProcessorConfigBuilder =
         new MaterializedViewProcessorConfig.Builder()
             .setMvTableConfig(mvTableConfig).setMvSchema(mvSchema)
-            .setSelectedDimensions(selectedDimensionList).setFilterConfig(filterConfig)
+            .setSelectedDimensions(selectedDimensionList)
             .setAggregationFunctionSetMap(MergeTaskUtils.getAggregationTypesMap(configs));
 
     MaterializedViewProcessorConfig mvProcessorConfig = mvProcessorConfigBuilder.build();
@@ -187,8 +196,11 @@ public class MaterializedViewTaskExecutor extends BaseMultipleSegmentsConversion
     }
     List<File> outputSegmentDirs;
     try {
-      outputSegmentDirs =
-          new MaterializedViewProcessorFramework(recordReaders, segmentProcessorConfig, workingDir).process();
+      MaterializedViewProcessorFramework mvProcessorFramework =
+          new MaterializedViewProcessorFramework(segmentProcessorConfig, workingDir,
+              SegmentProcessorFramework.convertRecordReadersToRecordReaderFileConfig(recordReaders),
+              customRecordTransformers, null);
+      outputSegmentDirs = mvProcessorFramework.process();
     } finally {
       for (RecordReader recordReader : recordReaders) {
         recordReader.close();

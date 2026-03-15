@@ -66,7 +66,7 @@ public class SegmentProcessorFramework {
   public static final String GENERATE_STAGE = "GENERATE_SEGMENT";
 
   protected final List<RecordReaderFileConfig> _recordReaderFileConfigs;
-  protected List<RecordTransformer> _customRecordTransformers;
+  protected final List<RecordTransformer> _customRecordTransformers;
   protected final TransformPipeline _transformPipeline;
   protected final SegmentProcessorConfig _segmentProcessorConfig;
   protected final File _mapperOutputDir;

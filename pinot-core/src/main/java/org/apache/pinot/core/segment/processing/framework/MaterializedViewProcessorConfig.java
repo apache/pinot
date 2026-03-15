@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -30,7 +29,6 @@ public class MaterializedViewProcessorConfig {
   private final TableConfig _mvTableConfig;
   private final Schema _mvSchema;
   private final Set<String> _selectedDimensions;
-  private final FilterConfig _filterConfig;
   private final Map<String, Set<AggregationFunctionType>> _aggregationFunctionSetMap;
 
   public TableConfig getMvTableConfig() {
@@ -45,21 +43,16 @@ public class MaterializedViewProcessorConfig {
     return _selectedDimensions;
   }
 
-  public FilterConfig getFilterConfig() {
-    return _filterConfig;
-  }
-
   public Map<String, Set<AggregationFunctionType>> getAggregationFunctionSetMap() {
     return _aggregationFunctionSetMap;
   }
 
   private MaterializedViewProcessorConfig(TableConfig mvTableConfig,
-          Schema mvSchema, Set<String> selectedDimensions, FilterConfig filterConfig, Map<String,
-          Set<AggregationFunctionType>> aggregationFunctionSetMap) {
+          Schema mvSchema, Set<String> selectedDimensions,
+          Map<String, Set<AggregationFunctionType>> aggregationFunctionSetMap) {
     _mvTableConfig = mvTableConfig;
     _mvSchema = mvSchema;
     _selectedDimensions = selectedDimensions;
-    _filterConfig = filterConfig;
     _aggregationFunctionSetMap = aggregationFunctionSetMap;
   }
 
@@ -67,7 +60,6 @@ public class MaterializedViewProcessorConfig {
     private TableConfig _mvTableConfig;
     private Schema _mvSchema;
     private Set<String> _selectedDimensions;
-    private FilterConfig _filterConfig;
     private Map<String, Set<AggregationFunctionType>> _aggregationFunctionSetMap;
 
     public Builder setMvTableConfig(TableConfig tableConfig) {
@@ -85,11 +77,6 @@ public class MaterializedViewProcessorConfig {
       return this;
     }
 
-    public Builder setFilterConfig(FilterConfig filterConfig) {
-      _filterConfig = filterConfig;
-      return this;
-    }
-
     public Builder setAggregationFunctionSetMap(Map<String, Set<AggregationFunctionType>> aggregationFunctionSetMap) {
       _aggregationFunctionSetMap = aggregationFunctionSetMap;
       return this;
@@ -97,7 +84,7 @@ public class MaterializedViewProcessorConfig {
 
     public MaterializedViewProcessorConfig build() {
       return new MaterializedViewProcessorConfig(_mvTableConfig, _mvSchema, _selectedDimensions,
-          _filterConfig, _aggregationFunctionSetMap);
+          _aggregationFunctionSetMap);
     }
   }
 }
