@@ -44,6 +44,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR;
+
 
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
@@ -90,6 +92,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setIngestionConfig(ingestionConfig)
+        .setJsonIndexColumns(Collections.singletonList(MY_MAP_STR_FIELD_NAME))
         .build();
   }
 
@@ -592,5 +595,151 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     // Should default to JsonPath format
     Assert.assertTrue(keyList.contains("$['k1']"));
     Assert.assertTrue(keyList.contains("$['k2']"));
+  }
+
+  // --- JsonIndexDistinctOperator tests (useIndexBasedDistinctOperator) ---
+
+  /**
+   * Without useIndexBasedDistinctOperator (disabled by default), SELECT DISTINCT jsonExtractIndex(...) uses
+   * default DistinctOperator and returns correct results.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctOperatorDisabledByDefault(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+    JsonNode response = postQuery(query);
+    Assert.assertEquals(response.get("exceptions").size(), 0);
+    List<String> values = extractOrderedDistinctValues(response);
+    Assert.assertFalse(values.isEmpty(),
+        "Baseline (operator disabled) should return distinct values. Engine="
+            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
+  }
+
+  /**
+   * With useIndexBasedDistinctOperator, JsonIndexDistinctOperator produces same results as baseline.
+   * Compares ordered rows (not just sets) to verify ORDER BY semantics.
+   * For SSE, verifies numEntriesScannedPostFilter=0 (index path, no doc scan).
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctOperatorWithPinotJsonIndex(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertEquals(optimizedRows, baselineRows,
+        "JsonIndexDistinctOperator should produce same ordered results as baseline. "
+            + "Engine=" + (useMultiStageQueryEngine ? "MSE" : "SSE"));
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L,
+          "JsonIndexDistinctOperator (SSE) uses index only (numEntriesScannedPostFilter=0).");
+    }
+  }
+
+  /**
+   * JsonIndexDistinctOperator with filter produces same ordered results as baseline.
+   * For SSE, verifies numEntriesScannedPostFilter=0 (index path, no doc scan).
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctOperatorWithFilter(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " WHERE jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k2', 'STRING') = 'value-k2-0'"
+        + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertEquals(optimizedRows, baselineRows,
+        "JsonIndexDistinctOperator with filter should match baseline. Engine="
+            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L,
+          "JsonIndexDistinctOperator with filter (SSE) uses index only (numEntriesScannedPostFilter=0).");
+    }
+  }
+
+  /**
+   * Verifies that JsonIndexDistinctOperator correctly materializes the defaultValue for docs where the JSON path
+   * is absent, matching baseline JsonExtractIndexTransformFunction behavior.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctOperatorWithDefaultValue(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Query a non-existent path with a defaultValue — all docs should produce the default
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME
+        + ", '$.nonexistent', 'STRING', 'N/A') FROM " + getTableName()
+        + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.nonexistent', 'STRING', 'N/A') LIMIT 10";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertEquals(optimizedRows, baselineRows,
+        "JsonIndexDistinctOperator with defaultValue should match baseline. Engine="
+            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
+    Assert.assertTrue(optimizedRows.contains("N/A"),
+        "defaultValue 'N/A' should appear in results for non-existent path. Engine="
+            + (useMultiStageQueryEngine ? "MSE" : "SSE"));
+  }
+
+  /**
+   * Verifies that JsonIndexDistinctOperator throws when the JSON path is absent for some docs and no defaultValue
+   * is provided (matching baseline JsonExtractIndexTransformFunction behavior which throws "Illegal Json Path").
+   * Only tested on SSE because MSE may handle errors differently.
+   */
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testJsonIndexDistinctOperatorMissingPathNoDefault(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Query a non-existent path WITHOUT defaultValue — should produce an error
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME
+        + ", '$.nonexistent', 'STRING') FROM " + getTableName() + " LIMIT 10";
+
+    // Baseline also throws for missing path without defaultValue
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertTrue(baselineResponse.get("exceptions").size() > 0,
+        "Baseline should throw for missing JSON path without defaultValue");
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertTrue(optimizedResponse.get("exceptions").size() > 0,
+        "JsonIndexDistinctOperator should throw for missing JSON path without defaultValue");
+  }
+
+  private static List<String> extractOrderedDistinctValues(JsonNode response) {
+    List<String> values = new ArrayList<>();
+    JsonNode rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode cell = rows.get(i).get(0);
+      values.add(cell.isNull() ? null : cell.asText());
+    }
+    return values;
   }
 }
