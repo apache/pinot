@@ -41,6 +41,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
@@ -107,6 +108,10 @@ public class HashJoinOperatorTest {
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2, "BB", 2, "Aa"});
     assertEquals(resultRows.get(1), new Object[]{2, "BB", 2, "BB"});
+    StatMap<HashJoinOperator.StatKey> statMap =
+        OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
+    assertEquals(statMap.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN), 3,
+        "Max rows in join should equal right table size");
   }
 
   @Test
@@ -341,6 +346,10 @@ public class HashJoinOperatorTest {
         .contains("reached number of rows limit"));
     assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED)
         .contains("Cannot build in memory hash table"));
+    StatMap<HashJoinOperator.StatKey> statMap =
+        OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
+    assertEquals(statMap.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN), 3,
+        "Max rows in join should be recorded even on THROW");
   }
 
   @Test
@@ -373,6 +382,8 @@ public class HashJoinOperatorTest {
         OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
     assertTrue(statMap.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED),
         "Max rows in join should be reached");
+    assertEquals(statMap.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN), 1,
+        "Max rows in join should equal the truncated right table size");
   }
 
   @Test
@@ -399,6 +410,10 @@ public class HashJoinOperatorTest {
         .contains("reached number of rows limit"));
     assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED)
         .contains("Cannot process join"));
+    StatMap<HashJoinOperator.StatKey> statMap =
+        OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
+    assertEquals(statMap.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN), 2,
+        "Max rows in join should be recorded even on THROW during output phase");
   }
 
   @Test
@@ -441,6 +456,8 @@ public class HashJoinOperatorTest {
         OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
     assertTrue(statMap.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED),
         "Max rows in join should be reached");
+    assertEquals(statMap.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN), 2,
+        "Max rows in join should equal the truncated right table size");
   }
 
   @Test
@@ -763,6 +780,93 @@ public class HashJoinOperatorTest {
     assertEquals(resultRows.size(), 2);
     assertTrue(containsRow(resultRows, new Object[]{2, null, 2.0}));  // Null key preserved
     assertTrue(containsRow(resultRows, new Object[]{3, "Cc", 3.0}));  // Unmatched preserved
+  }
+
+  @Test
+  public void shouldRecordMaxRowsInJoinWhenRightTableFitsExactlyAtLimit() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Aa")
+        .addRow(3, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
+        Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
+            PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "2")));
+    HashJoinOperator operator =
+        getOperator(resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of(), nodeHint);
+    operator.nextBlock(); // data block
+    operator.nextBlock(); // eos
+
+    StatMap<HashJoinOperator.StatKey> statMap =
+        OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
+    assertFalse(statMap.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED),
+        "Max rows in join should not be reached when right table fits exactly at limit");
+    assertEquals(statMap.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN), 2,
+        "Max rows in join should equal right table size");
+  }
+
+  @Test
+  public void shouldRecordZeroMaxRowsInJoinWhenRightTableIsEmpty() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator =
+        getOperator(resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    operator.nextBlock(); // eos (no matches)
+
+    StatMap<HashJoinOperator.StatKey> statMap =
+        OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
+    assertEquals(statMap.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN), 0,
+        "Max rows in join should be 0 when right table is empty");
+  }
+
+  @Test
+  public void shouldRecordJoinedOutputSizeWhenRightTableFitsButJoinedOutputExceedsLimit() {
+    // Right table has 2 rows (fits under limit of 5), but each left row matches both right rows,
+    // producing 4 x 2 = 8 potential joined rows which exceeds the limit.
+    // MAX_ROWS_IN_JOIN should reflect the joined output size (5), not the right table size (2).
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .spied()
+        .addRow(1, "Aa")
+        .addRow(2, "Aa")
+        .addRow(3, "Aa")
+        .addRow(4, "Aa")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(10, "Aa")
+        .addRow(20, "Aa")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
+        Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
+            PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "5")));
+    HashJoinOperator operator =
+        getOperator(resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(), nodeHint);
+
+    // When
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then
+    Mockito.verify(_leftInput).earlyTerminate();
+    assertEquals(resultRows.size(), 5, "Should have exactly 5 joined rows (truncated from potential 8)");
+    MseBlock block2 = operator.nextBlock();
+    assertTrue(block2.isSuccess());
+    StatMap<HashJoinOperator.StatKey> statMap =
+        OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
+    assertTrue(statMap.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED),
+        "Max rows in join should be reached");
+    assertEquals(statMap.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN), 5,
+        "Max rows in join should reflect the joined output size, not the right table size");
   }
 
   private HashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
