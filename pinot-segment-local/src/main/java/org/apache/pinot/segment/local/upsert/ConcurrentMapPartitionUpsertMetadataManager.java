@@ -267,9 +267,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               _logger.warn(
                   "Consuming segment: {} has added the primary key for docId: {} from the segment: {}, suggesting"
                       + " that consumption is occurring concurrently with segment replacement, which is undesirable "
-                      + "for consistency between replicas. Ensure `isAllowPartialUpsertConsumptionDuringCommit` is "
-                      + "not set to ALLOW_ALWAYS", recordLocation.getSegment().getSegmentName(),
-                  primaryKeyEntry.getKey(), segment.getSegmentName());
+                      + "for consistency between replicas for the table: {}.",
+                  recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(), segment.getSegmentName(),
+                  _tableNameWithType);
             }
             return recordLocation;
           });
