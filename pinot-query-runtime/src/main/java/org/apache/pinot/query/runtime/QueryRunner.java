@@ -548,6 +548,10 @@ public class QueryRunner {
     return opChainMetadata;
   }
 
+  public MailboxService getMailboxService() {
+    return _mailboxService;
+  }
+
   public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
     return _opChainScheduler.cancel(requestId);
   }

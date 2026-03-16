@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
@@ -28,6 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -37,6 +40,8 @@ import org.apache.commons.lang3.tuple.Pair;
  * query/job/stages.
  */
 public class ChannelManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ChannelManager.class);
+
   /**
    * Map from (hostname, port) to the ManagedChannel with all known channels
    */
@@ -96,6 +101,22 @@ public class ChannelManager {
             return decorate(channelBuilder).build();
           });
     }
+  }
+
+  /**
+   * Resets the connection backoff for the channel to the given server if the channel is in
+   * TRANSIENT_FAILURE state. Returns true if a reset was performed, false otherwise.
+   *
+   * @return true if the channel was in TRANSIENT_FAILURE and backoff was reset
+   */
+  public boolean resetConnectBackoff(String hostname, int port) {
+    ManagedChannel channel = _channelMap.get(Pair.of(hostname, port));
+    if (channel != null && channel.getState(false) == ConnectivityState.TRANSIENT_FAILURE) {
+      LOGGER.info("Resetting mailbox channel backoff for server: {}:{}", hostname, port);
+      channel.resetConnectBackoff();
+      return true;
+    }
+    return false;
   }
 
   private NettyChannelBuilder decorate(NettyChannelBuilder builder) {

@@ -19,7 +19,12 @@
 package org.apache.pinot.core.transport;
 
 import nl.jqno.equalsverifier.EqualsVerifier;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class ServerInstanceTest {
@@ -27,5 +32,32 @@ public class ServerInstanceTest {
   public void equalsVerifier() {
     EqualsVerifier.configure().forClass(ServerInstance.class).withOnlyTheseFields("_instanceId")
         .withNonnullFields("_instanceId").verify();
+  }
+
+  @Test
+  public void testExtractHostnameFromConfigWithServerPrefix() {
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost_1234"));
+    config.setHostName("Server_myhost");
+    assertEquals(ServerInstance.extractHostnameFromConfig(config), "myhost");
+  }
+
+  @Test
+  public void testExtractHostnameFromConfigWithoutPrefix() {
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost_1234"));
+    config.setHostName("myhost");
+    assertEquals(ServerInstance.extractHostnameFromConfig(config), "myhost");
+  }
+
+  @Test
+  public void testExtractHostnameFromConfigFallbackToInstanceName() {
+    // When hostname is null, falls back to parsing instance name
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost_1234"));
+    assertEquals(ServerInstance.extractHostnameFromConfig(config), "myhost");
+  }
+
+  @Test
+  public void testExtractHostnameFromConfigEmptyInstanceName() {
+    InstanceConfig config = new InstanceConfig(new ZNRecord(""));
+    assertNull(ServerInstance.extractHostnameFromConfig(config));
   }
 }

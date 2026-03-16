@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.InstanceUtils;
@@ -63,13 +64,9 @@ public final class ServerInstance {
    */
   public ServerInstance(InstanceConfig instanceConfig) {
     _instanceId = instanceConfig.getInstanceName();
-    String hostname = instanceConfig.getHostName();
-    if (hostname != null) {
-      if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        _hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
-      } else {
-        _hostname = hostname;
-      }
+    _hostname = extractHostnameFromConfig(instanceConfig);
+    String rawHostname = instanceConfig.getHostName();
+    if (rawHostname != null) {
       _port = Integer.parseInt(instanceConfig.getPort());
     } else {
       // Hostname might be null in some tests (InstanceConfig created by calling the constructor instead of fetching
@@ -79,7 +76,6 @@ public final class ServerInstance {
         instanceName = instanceName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
       }
       String[] hostnameAndPort = StringUtils.split(instanceName, HOSTNAME_PORT_DELIMITER);
-      _hostname = hostnameAndPort[0];
       _port = Integer.parseInt(hostnameAndPort[1]);
     }
     _grpcPort = instanceConfig.getRecord().getIntField(Helix.Instance.GRPC_PORT_KEY, INVALID_PORT);
@@ -90,6 +86,27 @@ public final class ServerInstance {
         INVALID_PORT);
     _adminEndpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig, _hostname, CommonConstants.HTTP_PROTOCOL);
     _pool = extractPool(instanceConfig);
+  }
+
+  /**
+   * Extracts the raw hostname from an InstanceConfig, stripping the "Server_" prefix if present.
+   * Returns null only if the instance name cannot be parsed (degenerate case).
+   */
+  @Nullable
+  public static String extractHostnameFromConfig(InstanceConfig instanceConfig) {
+    String hostname = instanceConfig.getHostName();
+    if (hostname != null) {
+      if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        return hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+      }
+      return hostname;
+    }
+    String instanceName = instanceConfig.getInstanceName();
+    if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      instanceName = instanceName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    }
+    String[] parts = StringUtils.split(instanceName, HOSTNAME_PORT_DELIMITER);
+    return parts.length > 0 ? parts[0] : null;
   }
 
   @VisibleForTesting
