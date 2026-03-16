@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.executor;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +27,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
@@ -106,16 +104,9 @@ public class LogicalTableExecutionInfo implements TableExecutionInfo {
     int numTotalSegments = allSegments.size();
 
     // Constant false shortcut: skip pruning
-    List<IndexSegment> selectedSegments;
     SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
-    if ((queryContext.getFilter() != null && queryContext.getFilter().isConstantFalse())
-        || (queryContext.getHavingFilter() != null && queryContext.getHavingFilter().isConstantFalse())) {
-      selectedSegments = Collections.emptyList();
-    } else {
-      TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      selectedSegments = segmentPrunerService.prune(allSegments, queryContext, prunerStats, executorService);
-      segmentPruneTimer.stopAndRecord();
-    }
+    List<IndexSegment> selectedSegments =
+        selectSegments(allSegments, queryContext, timerContext, executorService, segmentPrunerService, prunerStats);
 
     // Build segment contexts for selected segments only, preserving prune order
     List<SegmentContext> selectedSegmentContexts = new ArrayList<>(selectedSegments.size());

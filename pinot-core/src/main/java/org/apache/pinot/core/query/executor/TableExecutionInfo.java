@@ -19,10 +19,12 @@
 package org.apache.pinot.core.query.executor;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -119,6 +121,34 @@ public interface TableExecutionInfo {
    * @return A ConsumingSegmentsInfo object containing the metadata about the consuming segments queried
    */
   ConsumingSegmentsInfo getConsumingSegmentsInfo();
+
+  /**
+   * Selects which segments are needed for the query by applying segment pruning. If the query has a constant-false
+   * filter or having clause, returns an empty list; otherwise delegates to the segment pruner and returns the
+   * selected segments.
+   *
+   * @param indexSegments list of segments to prune
+   * @param queryContext query context used by the pruner
+   * @param timerContext timer context for recording segment pruning time
+   * @param executorService executor used by the pruner if needed
+   * @param segmentPrunerService pruner service that performs the selection
+   * @param prunerStats statistics to record pruning results
+   * @return list of segments selected for the query (possibly empty if filter is constant false)
+   */
+  default List<IndexSegment> selectSegments(List<IndexSegment> indexSegments, QueryContext queryContext,
+      TimerContext timerContext, ExecutorService executorService, SegmentPrunerService segmentPrunerService,
+      SegmentPrunerStatistics prunerStats) {
+    List<IndexSegment> selectedSegments;
+    if ((queryContext.getFilter() != null && queryContext.getFilter().isConstantFalse()) || (
+        queryContext.getHavingFilter() != null && queryContext.getHavingFilter().isConstantFalse())) {
+      selectedSegments = Collections.emptyList();
+    } else {
+      TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
+      selectedSegments = segmentPrunerService.prune(indexSegments, queryContext, prunerStats, executorService);
+      segmentPruneTimer.stopAndRecord();
+    }
+    return selectedSegments;
+  }
 
   /**
    * If consuming segments are being queried, this class contains the information about the consuming segments such as

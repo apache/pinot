@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,7 +29,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
@@ -281,20 +279,5 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
     }
     return new SelectedSegmentsInfo(indexSegments, numTotalDocs, prunerStats, numTotalSegments, numSelectedSegments,
         selectedSegmentContexts);
-  }
-
-  private List<IndexSegment> selectSegments(List<IndexSegment> indexSegments, QueryContext queryContext,
-      TimerContext timerContext, ExecutorService executorService, SegmentPrunerService segmentPrunerService,
-      SegmentPrunerStatistics prunerStats) {
-    List<IndexSegment> selectedSegments;
-    if ((queryContext.getFilter() != null && queryContext.getFilter().isConstantFalse()) || (
-        queryContext.getHavingFilter() != null && queryContext.getHavingFilter().isConstantFalse())) {
-      selectedSegments = Collections.emptyList();
-    } else {
-      TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      selectedSegments = segmentPrunerService.prune(indexSegments, queryContext, prunerStats, executorService);
-      segmentPruneTimer.stopAndRecord();
-    }
-    return selectedSegments;
   }
 }

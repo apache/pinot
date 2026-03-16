@@ -34,6 +34,8 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -42,6 +44,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -197,11 +200,78 @@ public class LogicalTableExecutionInfoTest {
     }
   }
 
+  private static final String ORDER_BY_COLUMN = "orderByCol";
+
+  /**
+   * Verifies that for ORDER BY col DESC LIMIT 5, the pruner selects exactly two segments that have
+   * overlapping min/max (order-by column) and prunes the rest. Segments have 10 docs each; two segments
+   * overlap in range so both are kept; all others are out of range.
+   * <p>The pruner keeps an extra segment only when its max &gt; current min (strict). So Seg2 uses max=101.
+   */
+  @Test
+  public void testGetSelectedSegmentsInfoOrderByLimitTwoSegmentsOverlap() {
+    // Seg1: [100, 100] 10 docs - first in DESC order, covers LIMIT 10
+    // Seg2: [90, 101] 10 docs - overlaps (max 101 > 100), kept
+    // Seg3, Seg4, Seg5: [1, 50] 10 docs each - max 50 < 100, pruned
+    IndexSegment seg1 = mockIndexSegmentWithOrderByColumn(ORDER_BY_COLUMN, 100L, 100L, 10);
+    IndexSegment seg2 = mockIndexSegmentWithOrderByColumn(ORDER_BY_COLUMN, 90L, 101L, 10);
+    IndexSegment seg3 = mockIndexSegmentWithOrderByColumn(ORDER_BY_COLUMN, 1L, 50L, 10);
+    IndexSegment seg4 = mockIndexSegmentWithOrderByColumn(ORDER_BY_COLUMN, 1L, 50L, 10);
+    IndexSegment seg5 = mockIndexSegmentWithOrderByColumn(ORDER_BY_COLUMN, 1L, 50L, 10);
+
+    List<IndexSegment> allSegments = new ArrayList<>();
+    allSegments.add(seg1);
+    allSegments.add(seg2);
+    allSegments.add(seg3);
+    allSegments.add(seg4);
+    allSegments.add(seg5);
+
+    SingleTableExecutionInfo tableInfo = mockSingleTableExecutionInfo(allSegments, null);
+    LogicalTableExecutionInfo logicalTableExecutionInfo =
+        new LogicalTableExecutionInfo(Collections.singletonList(tableInfo));
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT * FROM logicalTable ORDER BY " + ORDER_BY_COLUMN + " DESC LIMIT 5");
+    queryContext.setSchema(mock(Schema.class));
+
+    TableExecutionInfo.SelectedSegmentsInfo selectedSegmentsInfo =
+        logicalTableExecutionInfo.getSelectedSegmentsInfo(queryContext, _timerContext, _executorService,
+            _segmentPrunerService);
+
+    assertEquals(selectedSegmentsInfo.getNumTotalSegments(), 5);
+    assertEquals(selectedSegmentsInfo.getNumTotalDocs(), 50);
+    assertEquals(selectedSegmentsInfo.getNumSelectedSegments(), 2,
+        "ORDER BY DESC LIMIT 10 with overlapping ranges should select exactly 2 segments");
+    List<SegmentContext> contexts = selectedSegmentsInfo.getSelectedSegmentContexts();
+    assertEquals(contexts.size(), 2);
+    assertSame(contexts.get(0).getIndexSegment(), seg1, "First selected should be Seg1 (min=100)");
+    assertSame(contexts.get(1).getIndexSegment(), seg2, "Second selected should be Seg2 (min=90, max>100 overlaps)");
+  }
+
   private static IndexSegment mockIndexSegment(int totalDocs) {
     IndexSegment indexSegment = mock(IndexSegment.class);
     SegmentMetadata metadata = mock(SegmentMetadata.class);
     when(metadata.getTotalDocs()).thenReturn(totalDocs);
     when(indexSegment.getSegmentMetadata()).thenReturn(metadata);
+    return indexSegment;
+  }
+
+  /**
+   * Mocks an IndexSegment with min/max for the order-by column so SelectionQuerySegmentPruner can prune by range.
+   * Used for ORDER BY + LIMIT tests.
+   */
+  private static IndexSegment mockIndexSegmentWithOrderByColumn(String orderByColumn, Comparable<?> minValue,
+      Comparable<?> maxValue, int totalDocs) {
+    IndexSegment indexSegment = mock(IndexSegment.class);
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getTotalDocs()).thenReturn(totalDocs);
+    when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq(orderByColumn), any(Schema.class))).thenReturn(dataSource);
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+    when(dataSourceMetadata.getMinValue()).thenReturn(minValue);
+    when(dataSourceMetadata.getMaxValue()).thenReturn(maxValue);
     return indexSegment;
   }
 
