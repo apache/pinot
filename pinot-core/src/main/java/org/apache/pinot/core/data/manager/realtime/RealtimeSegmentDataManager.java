@@ -108,6 +108,7 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -1014,7 +1015,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
-    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
+    // For pauseless ingestion, segmentCommitStart performs heavy ZK work: update segment ZK metadata
+    // to COMMITTING, create new consuming segment metadata, and update IdealState. These are the same
+    // operations that happen during segmentCommitEnd in non-pauseless mode. Use the segment commit
+    // timeout (default 120s) instead of the default request timeout (10s) to avoid premature timeouts
+    // under ZK pressure, while staying within the controller FSM's time budget.
+    int commitStartTimeoutMs = PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)
+        ? (int) SegmentCompletionProtocol.getMaxSegmentCommitTimeMs()
+        : CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_OTHER_REQUESTS_TIMEOUT;
+    SegmentCompletionProtocol.Response segmentCommitStartResponse =
+        _protocolHandler.segmentCommitStart(params, commitStartTimeoutMs);
     if (!segmentCommitStartResponse.getStatus()
         .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
       _segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
@@ -1488,6 +1498,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           break;
         case CATCHING_UP:
         case HOLDING:
+        case COMMITTING:
         case INITIAL_CONSUMING:
           if (_segmentCompletionMode == CompletionMode.DOWNLOAD) {
             // Check if download URL has been set by another replica

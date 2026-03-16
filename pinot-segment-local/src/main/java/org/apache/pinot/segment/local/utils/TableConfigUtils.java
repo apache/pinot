@@ -60,6 +60,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
@@ -453,6 +454,13 @@ public final class TableConfigUtils {
                 "Must have a valid peerSegmentDownloadScheme set in validation config for pauseless consumption");
           } else {
             LOGGER.warn("It's not recommended to create pauseless tables with replication 1 for stability reasons.");
+          }
+          CompletionConfig completionConfig = tableConfig.getValidationConfig().getCompletionConfig();
+          if (completionConfig != null) {
+            Preconditions.checkState(
+                !CommonConstants.Segment.Realtime.CompletionMode.DOWNLOAD.name()
+                    .equalsIgnoreCase(completionConfig.getCompletionMode()),
+                "CompletionMode DOWNLOAD is not supported with pauseless consumption");
           }
         }
       }
