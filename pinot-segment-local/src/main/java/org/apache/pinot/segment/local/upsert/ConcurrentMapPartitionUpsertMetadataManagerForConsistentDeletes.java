@@ -361,11 +361,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
             RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(pk);
-            if (prevLocation == null) {
-              _previousKeyToRecordLocationMap.remove(pk);
-              return null;
-            }
             if (recordLocation.getSegment() == segment) {
+              if (prevLocation == null) {
+                _previousKeyToRecordLocationMap.remove(pk);
+                return null;
+              }
               // Revert to previous segment location
               IndexSegment prevSegment = prevLocation.getSegment();
               ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
@@ -398,10 +398,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               _previousKeyToRecordLocationMap.remove(pk);
             } else {
               _logger.warn(
-                  "Consuming segment {} has already ingested the primary key for docId {} from segment {}, suggesting"
+                  "Consuming segment: {} has added the primary key for docId: {} from the segment: {}, suggesting"
                       + " that consumption is occurring concurrently with segment replacement, which is undesirable "
-                      + "for consistency.", recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(),
-                  segment.getSegmentName());
+                      + "for consistency between replicas for the table: {}.",
+                  recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(), segment.getSegmentName(),
+                  _tableNameWithType);
             }
             if (!uniquePrimaryKeys.add(pk)) {
               return recordLocation;
