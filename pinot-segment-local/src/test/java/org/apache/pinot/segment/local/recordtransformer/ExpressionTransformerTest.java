@@ -199,6 +199,28 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch").toString(), "437222.2222222222");
   }
 
+  @Test
+  public void testImplicitMapTransformDoesNotOverrideExistingValuesWhenSourceMissing() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("mapDim1__KEYS", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mapDim1__VALUES", FieldSpec.DataType.INT)
+        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testImplicitMapTransformExisting").build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("mapDim1__KEYS", new String[]{"k1", "k2"});
+    row.putValue("mapDim1__VALUES", new Integer[]{1, 2});
+
+    expressionTransformer.transform(row);
+
+    Assert.assertEquals((Object[]) row.getValue("mapDim1__KEYS"), new Object[]{"k1", "k2"});
+    Assert.assertEquals((Object[]) row.getValue("mapDim1__VALUES"), new Object[]{1, 2});
+    Assert.assertFalse(row.isNullValue("mapDim1__KEYS"));
+    Assert.assertFalse(row.isNullValue("mapDim1__VALUES"));
+  }
+
   /**
    * If destination field already exists in the row, do not execute transform function
    */
@@ -270,6 +292,45 @@ public class ExpressionTransformerTest {
   }
 
   @Test
+  public void testNullTransformMarksNullField() {
+    Schema schema =
+        new Schema.SchemaBuilder().addSingleValueDimension("fullName", FieldSpec.DataType.STRING).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("fullName", "Groovy({null})")));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testNullTransform").setIngestionConfig(ingestionConfig)
+            .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    expressionTransformer.transform(row);
+
+    Assert.assertNull(row.getValue("fullName"));
+    Assert.assertTrue(row.isNullValue("fullName"));
+    Assert.assertFalse(row.getFieldToValueMap().containsKey("fullName"));
+  }
+
+  @Test
+  public void testNullTransformMarksNullFieldWhenValueAlreadyExists() {
+    Schema schema =
+        new Schema.SchemaBuilder().addMultiValueDimension("tags", FieldSpec.DataType.STRING).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("tags", "Groovy({null})")));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testNullTransformExisting")
+            .setIngestionConfig(ingestionConfig).build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("tags", new String[]{"foo", "bar"});
+    expressionTransformer.transform(row);
+
+    Assert.assertNull(row.getValue("tags"));
+    Assert.assertTrue(row.isNullValue("tags"));
+    Assert.assertFalse(row.getFieldToValueMap().containsKey("tags"));
+  }
+
+  @Test
   public void testTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.STRING)
         .addSingleValueDimension("b", FieldSpec.DataType.STRING).addSingleValueDimension("c", FieldSpec.DataType.STRING)
@@ -300,7 +361,7 @@ public class ExpressionTransformerTest {
 
   /** Check if there is more than one transform function definition for the same column. */
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Cannot set more than one"
-      + " ingestion transform function on column: a.")
+      + " transform function on column: a.")
   public void testMultipleTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)
         .addSingleValueDimension("b", FieldSpec.DataType.INT).addSingleValueDimension("c", FieldSpec.DataType.INT)
@@ -349,7 +410,7 @@ public class ExpressionTransformerTest {
 
   /* Check if we throw exception when Ingestion Transform Functions have a cycle. */
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Expression "
-      + "cycle found for column 'a' in Ingestion Transform Function definitions.")
+      + "cycle found for column 'a' in transform function definitions.")
   public void testCyclicTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)
         .addSingleValueDimension("b", FieldSpec.DataType.INT).addSingleValueDimension("c", FieldSpec.DataType.INT)
