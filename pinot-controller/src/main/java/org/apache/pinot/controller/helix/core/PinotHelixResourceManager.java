@@ -2856,7 +2856,7 @@ public class PinotHelixResourceManager {
       instancePartitionsType = InstancePartitionsType.CONSUMING;
     }
     return Collections.singletonMap(instancePartitionsType,
-        InstancePartitionsUtils.computeDefaultInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
+        InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
   }
 
   public Object getLineageUpdaterLock(String tableNameWithType) {
