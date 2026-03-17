@@ -32,7 +32,7 @@ import org.testng.annotations.Test;
  * {@link org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadataManager}).
  * Validates two-table, self, semi, left, and right joins with joinOptions/tableOptions or
  * inferPartitionHint query options. Broker-config coverage lives in
- * {@link ColocatedJoinInferPartitionHintBrokerConfigIntegrationTest}. For multiple partitions
+ * {@link ColocatedJoinBrokerConfigIntegrationTest}. For multiple partitions
  * check {@link ColocatedJoinMultiPartitionIntegrationTest}.
  */
 public class ColocatedJoinIntegrationTest extends ColocatedJoinIntegrationTestBase {

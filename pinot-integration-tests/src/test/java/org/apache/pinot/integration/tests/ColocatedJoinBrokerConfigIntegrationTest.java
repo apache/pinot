@@ -35,7 +35,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration tests for colocated joins inferred from broker default configuration.
  */
-public class ColocatedJoinInferPartitionHintBrokerConfigIntegrationTest extends ColocatedJoinIntegrationTestBase {
+public class ColocatedJoinBrokerConfigIntegrationTest extends ColocatedJoinIntegrationTestBase {
   private static final int NUM_PARTITIONS = 1;
 
   @Override
