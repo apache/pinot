@@ -422,6 +422,56 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     }, 600_000L, "Timeout when waiting for BrokerResourceValidationManager");
   }
 
+  /**
+   * Verifies that BrokerResourceValidationManager also repairs broker resource for a logical table
+   * when a new broker is added (Issue #15751).
+   */
+  @Test
+  public void testBrokerResourceValidationManagerRepairsLogicalTable()
+      throws IOException {
+    // Add logical table (same broker tenant as physical table)
+    Schema logicalTableSchema = createSchema();
+    logicalTableSchema.setSchemaName(getLogicalTableName());
+    addSchema(logicalTableSchema);
+    createLogicalTable();
+
+    String helixClusterName = getHelixClusterName();
+    String logicalTableName = getLogicalTableName();
+    IdealState idealState = HelixHelper.getBrokerIdealStates(_helixAdmin, helixClusterName);
+    assertNotNull(idealState);
+    assertTrue(idealState.getPartitionSet().contains(logicalTableName), "Broker resource should have logical table");
+
+    // Add a new broker so logical table partition is out of sync
+    String brokerId = "Broker_localhost_5678";
+    InstanceConfig instanceConfig = InstanceConfig.toInstanceConfig(brokerId);
+    instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(TENANT_NAME));
+    _helixAdmin.addInstance(helixClusterName, instanceConfig);
+    Set<String> brokersAfterAdd = _helixResourceManager.getAllInstancesForBrokerTenant(TENANT_NAME);
+    assertTrue(brokersAfterAdd.contains(brokerId));
+
+    // Assert logical table partition does not yet contain the new broker (periodic task will repair it)
+    idealState = HelixHelper.getBrokerIdealStates(_helixAdmin, helixClusterName);
+    assertNotNull(idealState);
+    assertFalse(idealState.getInstanceSet(logicalTableName).contains(brokerId),
+        "Logical table partition should not yet include the new broker before periodic task runs");
+
+    // Wait for BrokerResourceValidationManager to repair both physical and logical table partitions
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    TestUtils.waitForCondition(aVoid -> {
+      IdealState is = HelixHelper.getBrokerIdealStates(_helixAdmin, helixClusterName);
+      if (is == null) {
+        return false;
+      }
+      return is.getInstanceSet(tableNameWithType).equals(brokersAfterAdd)
+          && is.getInstanceSet(logicalTableName).equals(brokersAfterAdd);
+    }, 60_000L, "Timeout when waiting for BrokerResourceValidationManager to repair logical table partition");
+
+    // Cleanup: drop broker, logical table config, and logical table schema
+    _helixAdmin.dropInstance(helixClusterName, instanceConfig);
+    _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
+    deleteSchema(logicalTableName);
+  }
+
   @Test
   public void testOfflineSegmentIntervalChecker() {
     OfflineSegmentValidationManager offlineSegmentValidationManager =
