@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -155,7 +156,8 @@ public class SegmentPrunerService {
     }
     // For upsert tables, treat segments with 0 valid docs as empty only when the query does not skip upsert.
     // When skipUpsert=true, the query returns all docs (including replaced), so the segment contributes rows.
-    if (query != null && query.isSkipUpsert()) {
+    // Use query options map directly: _skipUpsert is only set on the server; the broker has options in the map.
+    if (query != null && query.getQueryOptions() != null && QueryOptionsUtils.isSkipUpsert(query.getQueryOptions())) {
       return false;
     }
     ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
