@@ -19,6 +19,9 @@
 package org.apache.pinot.core.util.trace;
 
 import java.lang.management.ManagementFactory;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -28,8 +31,8 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.assertj.core.api.Assertions;
-import org.testng.annotations.BeforeMethod;
 import org.testng.SkipException;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -41,6 +44,7 @@ public class ContinuousJfrStarterTest {
 
   @BeforeMethod
   public void setUp() {
+    ContinuousJfrStarter.resetGlobalStateForTesting();
     _continuousJfrStarter = new TestContinuousJfrStarter();
   }
 
@@ -63,7 +67,7 @@ public class ContinuousJfrStarterTest {
         .describedAs("Recording should be enabled")
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
             + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
   }
 
@@ -87,7 +91,7 @@ public class ContinuousJfrStarterTest {
         .describedAs("Recording should be disabled")
         .isFalse();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
             + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms",
         "jfrStop name=pinot-continuous");
   }
@@ -111,7 +115,7 @@ public class ContinuousJfrStarterTest {
         .describedAs("Recording should be enabled")
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
             + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
   }
 
@@ -171,10 +175,10 @@ public class ContinuousJfrStarterTest {
     _continuousJfrStarter.onChange(changed, updatedConfig);
 
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
             + " maxage=7200000ms",
         "jfrStop name=pinot-continuous",
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
             + " maxage=3600000ms");
   }
 
@@ -187,8 +191,9 @@ public class ContinuousJfrStarterTest {
     _continuousJfrStarter.onChange(Set.of(), config);
 
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrConfigure repositorypath=/var/log/pinot/jfr-repository dumppath=/var/log/pinot/jfr-dumps",
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+        "jfrConfigure repositorypath=/var/log/pinot/jfr-repository dumppath=/var/log/pinot/jfr-dumps "
+            + "preserve-repository=true",
+        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
             + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
   }
 
@@ -215,7 +220,7 @@ public class ContinuousJfrStarterTest {
         .describedAs("Starter should keep running state when stop fails")
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
             + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms",
         "jfrStop name=pinot-continuous");
   }
@@ -231,7 +236,7 @@ public class ContinuousJfrStarterTest {
         .describedAs("Starter should keep running state when MBean is unavailable for stop")
         .isTrue();
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
             + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
   }
 
@@ -243,8 +248,75 @@ public class ContinuousJfrStarterTest {
     _continuousJfrStarter.onChange(Set.of(), config);
 
     Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=true disk=true maxsize=536870912 maxage="
+        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=536870912 maxage="
             + DEFAULT_MAX_AGE_MILLIS + "ms");
+  }
+
+  @Test
+  public void coordinatesMultipleStartersInSameJvm() {
+    TestContinuousJfrStarter firstStarter = new TestContinuousJfrStarter();
+    TestContinuousJfrStarter secondStarter = new TestContinuousJfrStarter();
+    Map<String, String> enabledConfig = Map.of("pinot.jfr.enabled", "true");
+    Map<String, String> disabledConfig = Map.of("pinot.jfr.enabled", "false");
+
+    firstStarter.onChange(Set.of(), enabledConfig);
+    secondStarter.onChange(Set.of(), enabledConfig);
+
+    Assertions.assertThat(firstStarter.isRunning()).isTrue();
+    Assertions.assertThat(secondStarter.isRunning()).isTrue();
+    Assertions.assertThat(firstStarter.getExecutedCommands()).containsExactly(
+        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
+    Assertions.assertThat(secondStarter.getExecutedCommands()).isEmpty();
+
+    firstStarter.onChange(Set.of("pinot.jfr.enabled"), disabledConfig);
+    Assertions.assertThat(firstStarter.isRunning()).isFalse();
+    Assertions.assertThat(secondStarter.isRunning()).isTrue();
+    Assertions.assertThat(firstStarter.getExecutedCommands()).hasSize(1);
+
+    secondStarter.onChange(Set.of("pinot.jfr.enabled"), disabledConfig);
+    Assertions.assertThat(secondStarter.isRunning()).isFalse();
+    Assertions.assertThat(secondStarter.getExecutedCommands()).containsExactly("jfrStop name=pinot-continuous");
+  }
+
+  @Test
+  public void coordinatesPerRecordingName() {
+    TestContinuousJfrStarter firstStarter = new TestContinuousJfrStarter();
+    TestContinuousJfrStarter secondStarter = new TestContinuousJfrStarter();
+    Map<String, String> enabledFirstConfig = Map.of("pinot.jfr.enabled", "true", "pinot.jfr.name", "pinot-continuous-a");
+    Map<String, String> enabledSecondConfig = Map.of("pinot.jfr.enabled", "true", "pinot.jfr.name",
+        "pinot-continuous-b");
+    Map<String, String> disabledFirstConfig =
+        Map.of("pinot.jfr.enabled", "false", "pinot.jfr.name", "pinot-continuous-a");
+    Map<String, String> disabledSecondConfig =
+        Map.of("pinot.jfr.enabled", "false", "pinot.jfr.name", "pinot-continuous-b");
+
+    firstStarter.onChange(Set.of(), enabledFirstConfig);
+    secondStarter.onChange(Set.of(), enabledSecondConfig);
+
+    Assertions.assertThat(firstStarter.isRunning()).isTrue();
+    Assertions.assertThat(secondStarter.isRunning()).isTrue();
+    Assertions.assertThat(firstStarter.getExecutedCommands()).containsExactly(
+        "jfrStart name=pinot-continuous-a settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
+    Assertions.assertThat(secondStarter.getExecutedCommands()).containsExactly(
+        "jfrStart name=pinot-continuous-b settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
+
+    firstStarter.onChange(Set.of("pinot.jfr.enabled"), disabledFirstConfig);
+    Assertions.assertThat(firstStarter.isRunning()).isFalse();
+    Assertions.assertThat(secondStarter.isRunning()).isTrue();
+    Assertions.assertThat(firstStarter.getExecutedCommands()).containsExactly(
+        "jfrStart name=pinot-continuous-a settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms",
+        "jfrStop name=pinot-continuous-a");
+
+    secondStarter.onChange(Set.of("pinot.jfr.enabled"), disabledSecondConfig);
+    Assertions.assertThat(secondStarter.isRunning()).isFalse();
+    Assertions.assertThat(secondStarter.getExecutedCommands()).containsExactly(
+        "jfrStart name=pinot-continuous-b settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
+            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms",
+        "jfrStop name=pinot-continuous-b");
   }
 
   @Test
@@ -281,6 +353,53 @@ public class ContinuousJfrStarterTest {
         starter.onChange(Set.of("pinot.jfr.enabled"), disabledConfig);
       }
     }
+  }
+
+  @Test
+  public void removesOldRepositoriesWhenTotalSizeExceedsLimit() throws Exception {
+    Path root = Files.createTempDirectory("pinot-jfr-repo-root");
+    try {
+      Path oldest = createRepositoryWithSize(root.resolve("repo-oldest"), 8);
+      Path newer = createRepositoryWithSize(root.resolve("repo-newer"), 8);
+      Path active = createRepositoryWithSize(root.resolve("repo-active"), 8);
+      Files.setLastModifiedTime(oldest, FileTime.fromMillis(1000));
+      Files.setLastModifiedTime(newer, FileTime.fromMillis(2000));
+      Files.setLastModifiedTime(active, FileTime.fromMillis(3000));
+
+      ContinuousJfrStarter.cleanupOldRepositoriesInternal(root, 16, active);
+
+      Assertions.assertThat(Files.exists(oldest)).isFalse();
+      Assertions.assertThat(Files.exists(newer)).isTrue();
+      Assertions.assertThat(Files.exists(active)).isTrue();
+    } finally {
+      ContinuousJfrStarter.cleanupOldRepositoriesInternal(root, 0, null);
+      Files.deleteIfExists(root);
+    }
+  }
+
+  @Test
+  public void keepsActiveRepositoryEvenWhenLargerThanLimit() throws Exception {
+    Path root = Files.createTempDirectory("pinot-jfr-repo-root");
+    try {
+      Path old = createRepositoryWithSize(root.resolve("repo-old"), 8);
+      Path active = createRepositoryWithSize(root.resolve("repo-active"), 24);
+      Files.setLastModifiedTime(old, FileTime.fromMillis(1000));
+      Files.setLastModifiedTime(active, FileTime.fromMillis(2000));
+
+      ContinuousJfrStarter.cleanupOldRepositoriesInternal(root, 20, active);
+
+      Assertions.assertThat(Files.exists(old)).isFalse();
+      Assertions.assertThat(Files.exists(active)).isTrue();
+    } finally {
+      ContinuousJfrStarter.cleanupOldRepositoriesInternal(root, 0, null);
+      Files.deleteIfExists(root);
+    }
+  }
+
+  private static Path createRepositoryWithSize(Path repositoryPath, int bytes) throws Exception {
+    Files.createDirectories(repositoryPath);
+    Files.write(repositoryPath.resolve("chunk.jfr"), new byte[bytes]);
+    return repositoryPath;
   }
 
   private static boolean waitForRecordingPresence(String recordingName, boolean expectedPresent, int maxAttempts,
@@ -330,6 +449,11 @@ public class ContinuousJfrStarterTest {
     @Override
     protected boolean isDiagnosticCommandAvailable() {
       return _mBeanAvailable;
+    }
+
+    @Override
+    protected boolean isRepositoryCleanupEnabled() {
+      return false;
     }
 
     private void setMBeanAvailable(boolean mBeanAvailable) {
