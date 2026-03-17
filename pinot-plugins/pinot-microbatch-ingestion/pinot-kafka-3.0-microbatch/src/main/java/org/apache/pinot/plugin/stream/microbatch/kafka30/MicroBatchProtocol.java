@@ -131,8 +131,22 @@ public class MicroBatchProtocol {
    */
   public static byte[] createUriMessage(String uri, MicroBatchPayloadV1.Format format,
       long numRecords) throws IOException {
+    return createUriMessage(uri, format, numRecords, null);
+  }
+
+  /**
+   * Create a URI message with the current protocol version and optional checksum.
+   *
+   * @param uri the file URI (s3://, hdfs://, file://, etc.)
+   * @param format the data format
+   * @param numRecords number of records in the file (0 if unknown)
+   * @param checksum CRC32 checksum of the file as a hex string, or null to skip validation
+   * @return serialized protocol message bytes
+   */
+  public static byte[] createUriMessage(String uri, MicroBatchPayloadV1.Format format,
+      long numRecords, String checksum) throws IOException {
     MicroBatchPayloadV1 payload =
-        MicroBatchPayloadV1.createUri(uri, format, (int) numRecords);
+        MicroBatchPayloadV1.createUri(uri, format, (int) numRecords, checksum);
     return createMessage(CURRENT_VERSION, payload.toJsonBytes());
   }
 
@@ -244,5 +258,15 @@ public class MicroBatchProtocol {
    */
   public int getNumRecords() {
     return _payloadV1.getNumRecords();
+  }
+
+  /**
+   * Get the CRC32 checksum of the file as a hex string.
+   * Only applicable for URI-type messages.
+   *
+   * @return the checksum hex string, or null if not provided
+   */
+  public String getChecksum() {
+    return _payloadV1.getChecksum();
   }
 }

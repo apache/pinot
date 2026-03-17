@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.stream.microbatch.kafka30;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.zip.CRC32;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -263,6 +264,93 @@ public class MicroBatchQueueManagerTest {
     Thread.interrupted();
   }
 
+  @Test
+  public void testChecksumValidationSuccess() throws Exception {
+    File avroFile = createAvroFile("checksum-valid.avro", 5);
+    String checksum = MicroBatchQueueManager.computeCrc32Hex(avroFile);
+
+    MicroBatch microBatch = createMicroBatchWithChecksum(avroFile.toURI().toString(), 5, checksum);
+    _queueManager.submitBatch(microBatch);
+
+    MessageBatch<GenericRow> batch = null;
+    long startTime = System.currentTimeMillis();
+    while (batch == null && System.currentTimeMillis() - startTime < 10000) {
+      batch = _queueManager.getNextMessageBatch();
+      if (batch == null) {
+        Thread.sleep(100);
+      }
+    }
+
+    assertNotNull(batch, "Should retrieve batch when checksum is valid");
+    assertEquals(batch.getMessageCount(), 5);
+  }
+
+  @Test
+  public void testChecksumValidationFailure() throws Exception {
+    File avroFile = createAvroFile("checksum-invalid.avro", 5);
+    String wrongChecksum = "deadbeef";
+
+    MicroBatch microBatch = createMicroBatchWithChecksum(avroFile.toURI().toString(), 5, wrongChecksum);
+    _queueManager.submitBatch(microBatch);
+    assertTrue(_queueManager.hasData());
+
+    // Wait for error to be processed (checksum mismatch causes error handling path)
+    long startTime = System.currentTimeMillis();
+    while (_queueManager.hasData() && System.currentTimeMillis() - startTime < 5000) {
+      _queueManager.getNextMessageBatch();
+      Thread.sleep(100);
+    }
+
+    assertFalse(_queueManager.hasData(),
+        "Queue should be empty after checksum mismatch is processed");
+  }
+
+  @Test
+  public void testChecksumSkippedWhenNull() throws Exception {
+    File avroFile = createAvroFile("checksum-null.avro", 5);
+
+    // null checksum should skip validation entirely
+    MicroBatch microBatch = createMicroBatchWithChecksum(avroFile.toURI().toString(), 5, null);
+    _queueManager.submitBatch(microBatch);
+
+    MessageBatch<GenericRow> batch = null;
+    long startTime = System.currentTimeMillis();
+    while (batch == null && System.currentTimeMillis() - startTime < 10000) {
+      batch = _queueManager.getNextMessageBatch();
+      if (batch == null) {
+        Thread.sleep(100);
+      }
+    }
+
+    assertNotNull(batch, "Should retrieve batch when checksum is null (skipped)");
+    assertEquals(batch.getMessageCount(), 5);
+  }
+
+  @Test
+  public void testComputeCrc32Hex() throws Exception {
+    File testFile = new File(_tempDir, "crc-test.bin");
+    byte[] content = "hello world".getBytes(StandardCharsets.UTF_8);
+    FileUtils.writeByteArrayToFile(testFile, content);
+
+    // Compute expected CRC32
+    CRC32 crc32 = new CRC32();
+    crc32.update(content);
+    String expected = Long.toHexString(crc32.getValue());
+
+    String actual = MicroBatchQueueManager.computeCrc32Hex(testFile);
+    assertEquals(actual, expected);
+  }
+
+  @Test
+  public void testValidateChecksumCaseInsensitive() throws Exception {
+    File testFile = new File(_tempDir, "crc-case-test.bin");
+    FileUtils.writeByteArrayToFile(testFile, "test data".getBytes(StandardCharsets.UTF_8));
+
+    String checksum = MicroBatchQueueManager.computeCrc32Hex(testFile);
+    // Should not throw with uppercase variant
+    MicroBatchQueueManager.validateChecksum(testFile, checksum.toUpperCase(), "test://uri");
+  }
+
   // Helper methods
 
   private File createAvroFile(String filename, int numRecords) throws IOException {
@@ -286,6 +374,23 @@ public class MicroBatchQueueManagerTest {
   private MicroBatch createMicroBatch(String uri, int numRecords) throws IOException {
     byte[] protocolMessage = MicroBatchProtocol.createUriMessage(
         uri, MicroBatchPayloadV1.Format.AVRO, numRecords);
+    MicroBatchProtocol protocol = MicroBatchProtocol.parse(protocolMessage);
+
+    MicroBatchStreamPartitionMsgOffset offset = new MicroBatchStreamPartitionMsgOffset(0, 0);
+    MicroBatchStreamPartitionMsgOffset nextOffset = new MicroBatchStreamPartitionMsgOffset(1, 0);
+
+    StreamMessageMetadata metadata = new StreamMessageMetadata.Builder()
+        .setRecordIngestionTimeMs(System.currentTimeMillis())
+        .setOffset(offset, nextOffset)
+        .build();
+
+    return new MicroBatch(null, 1, protocol, metadata, false, 0);
+  }
+
+  private MicroBatch createMicroBatchWithChecksum(String uri, int numRecords, String checksum)
+      throws IOException {
+    byte[] protocolMessage = MicroBatchProtocol.createUriMessage(
+        uri, MicroBatchPayloadV1.Format.AVRO, numRecords, checksum);
     MicroBatchProtocol protocol = MicroBatchProtocol.parse(protocolMessage);
 
     MicroBatchStreamPartitionMsgOffset offset = new MicroBatchStreamPartitionMsgOffset(0, 0);

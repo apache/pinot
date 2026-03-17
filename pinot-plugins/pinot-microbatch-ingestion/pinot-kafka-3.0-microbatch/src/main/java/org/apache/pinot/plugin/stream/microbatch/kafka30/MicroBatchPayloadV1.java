@@ -70,6 +70,9 @@ public class MicroBatchPayloadV1 {
   @JsonProperty("numRecords")
   private int _numRecords;
 
+  @JsonProperty("checksum")
+  private String _checksum;
+
   // Cached parsed values
   private transient Type _type;
   private transient Format _format;
@@ -153,6 +156,16 @@ public class MicroBatchPayloadV1 {
    * Create a URI payload.
    */
   public static MicroBatchPayloadV1 createUri(String uri, Format format, int numRecords) {
+    return createUri(uri, format, numRecords, null);
+  }
+
+  /**
+   * Create a URI payload with an optional CRC32 checksum.
+   *
+   * @param checksum CRC32 checksum of the file as a hex string, or null to skip validation
+   */
+  public static MicroBatchPayloadV1 createUri(String uri, Format format, int numRecords,
+      String checksum) {
     MicroBatchPayloadV1 payload = new MicroBatchPayloadV1();
     payload._type = Type.URI;
     payload._typeStr = "uri";
@@ -160,6 +173,7 @@ public class MicroBatchPayloadV1 {
     payload._formatStr = format.name().toLowerCase();
     payload._uri = uri;
     payload._numRecords = numRecords;
+    payload._checksum = checksum;
     return payload;
   }
 
@@ -208,5 +222,15 @@ public class MicroBatchPayloadV1 {
 
   public int getNumRecords() {
     return _numRecords;
+  }
+
+  /**
+   * Get the CRC32 checksum of the file as a hex string.
+   * Only applicable for URI-type messages.
+   *
+   * @return the checksum hex string, or null if not provided
+   */
+  public String getChecksum() {
+    return _checksum;
   }
 }

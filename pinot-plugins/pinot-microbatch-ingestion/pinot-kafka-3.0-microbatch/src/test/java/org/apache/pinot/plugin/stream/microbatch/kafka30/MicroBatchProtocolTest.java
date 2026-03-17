@@ -458,6 +458,52 @@ public class MicroBatchProtocolTest {
     }
   }
 
+  @Test
+  public void testCreateUriMessageWithChecksum() throws IOException {
+    String uri = "s3://bucket/batch.avro";
+    String checksum = "a1b2c3d4";
+    byte[] message = MicroBatchProtocol.createUriMessage(
+        uri, MicroBatchPayloadV1.Format.AVRO, 100, checksum);
+
+    MicroBatchProtocol protocol = MicroBatchProtocol.parse(message);
+    assertEquals(protocol.getUri(), uri);
+    assertEquals(protocol.getNumRecords(), 100);
+    assertEquals(protocol.getChecksum(), checksum);
+  }
+
+  @Test
+  public void testCreateUriMessageWithNullChecksum() throws IOException {
+    byte[] message = MicroBatchProtocol.createUriMessage(
+        "s3://bucket/file.avro", MicroBatchPayloadV1.Format.AVRO, 50, null);
+
+    MicroBatchProtocol protocol = MicroBatchProtocol.parse(message);
+    assertNull(protocol.getChecksum());
+  }
+
+  @Test
+  public void testChecksumNotPresentForDataType() throws IOException {
+    byte[] testData = "test".getBytes(StandardCharsets.UTF_8);
+    byte[] message = MicroBatchProtocol.createDataMessage(
+        testData, MicroBatchPayloadV1.Format.AVRO, 1);
+
+    MicroBatchProtocol protocol = MicroBatchProtocol.parse(message);
+    assertNull(protocol.getChecksum());
+  }
+
+  @Test
+  public void testChecksumPreservedInRoundTrip() throws IOException {
+    String checksum = "deadbeef";
+    byte[] message = MicroBatchProtocol.createUriMessage(
+        "s3://bucket/file.avro", MicroBatchPayloadV1.Format.AVRO, 200, checksum);
+    MicroBatchProtocol protocol = MicroBatchProtocol.parse(message);
+
+    byte[] message2 = MicroBatchProtocol.createUriMessage(
+        protocol.getUri(), protocol.getFormat(), protocol.getNumRecords(), protocol.getChecksum());
+    MicroBatchProtocol protocol2 = MicroBatchProtocol.parse(message2);
+
+    assertEquals(protocol2.getChecksum(), checksum);
+  }
+
   /**
    * Helper to create raw protocol message with version byte + payload.
    */

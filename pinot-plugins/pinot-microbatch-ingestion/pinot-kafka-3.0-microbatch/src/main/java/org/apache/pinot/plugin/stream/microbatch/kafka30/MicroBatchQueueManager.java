@@ -19,7 +19,9 @@
 package org.apache.pinot.plugin.stream.microbatch.kafka30;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.Queue;
 import java.util.UUID;
@@ -31,6 +33,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.CRC32;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.common.utils.CloseableIterator;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -194,6 +197,7 @@ public class MicroBatchQueueManager implements AutoCloseable {
       case URI:
         URI uri = URI.create(protocol.getUri());
         state._dataFile = downloadFromPinotFS(uri);
+        validateChecksum(state._dataFile, protocol.getChecksum(), uri.toString());
         return;
       case DATA:
         File tempFile = null;
@@ -263,6 +267,46 @@ public class MicroBatchQueueManager implements AutoCloseable {
     } catch (Exception e) {
       throw new RuntimeException("Failed to download file from PinotFS: " + uri, e);
     }
+  }
+
+  /**
+   * Validates the CRC32 checksum of a downloaded file against the expected value.
+   * Skips validation if no checksum was provided in the protocol message.
+   *
+   * @param file the downloaded file to validate
+   * @param expectedChecksum the expected CRC32 hex string, or null to skip
+   * @param sourceUri the source URI (for error messages)
+   * @throws IOException if the file cannot be read or checksum doesn't match
+   */
+  static void validateChecksum(File file, String expectedChecksum, String sourceUri)
+      throws IOException {
+    if (expectedChecksum == null || expectedChecksum.isEmpty()) {
+      return;
+    }
+    String actualChecksum = computeCrc32Hex(file);
+    if (!expectedChecksum.equalsIgnoreCase(actualChecksum)) {
+      throw new IOException(
+          "Checksum mismatch for file downloaded from " + sourceUri
+              + ": expected=" + expectedChecksum + ", actual=" + actualChecksum);
+    }
+    LOGGER.debug("Checksum verified for {}: {}", sourceUri, actualChecksum);
+  }
+
+  private static final int CHECKSUM_BUFFER_SIZE = 65536;
+
+  /**
+   * Computes the CRC32 checksum of a file and returns it as a lowercase hex string.
+   */
+  static String computeCrc32Hex(File file) throws IOException {
+    CRC32 crc32 = new CRC32();
+    byte[] buffer = new byte[CHECKSUM_BUFFER_SIZE];
+    try (InputStream is = new FileInputStream(file)) {
+      int bytesRead;
+      while ((bytesRead = is.read(buffer)) != -1) {
+        crc32.update(buffer, 0, bytesRead);
+      }
+    }
+    return Long.toHexString(crc32.getValue());
   }
 
   /**
