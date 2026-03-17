@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -105,7 +106,7 @@ public class SegmentPrunerService {
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query, SegmentPrunerStatistics stats,
       @Nullable ExecutorService executorService) {
     try (InvocationScope scope = Tracing.getTracer().createScope(SegmentPrunerService.class)) {
-      segments = removeEmptySegments(segments);
+      segments = removeEmptySegments(segments, query);
       int invokedPrunersCount = 0;
       for (SegmentPruner segmentPruner : _segmentPruners) {
         if (segmentPruner.isApplicableTo(query)) {
@@ -134,19 +135,30 @@ public class SegmentPrunerService {
    *
    * @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
    *                 undefined way. Therefore, this list should not be used after calling this method.
+   * @param query    query context; when non-null and skipUpsert=true, segments with 0 valid docs are not treated as
+   *                 empty (they contribute replaced rows to the result).
    * @return the new list with filtered elements. This is the list that have to be used.
    */
-  private static List<IndexSegment> removeEmptySegments(List<IndexSegment> segments) {
+  private static List<IndexSegment> removeEmptySegments(List<IndexSegment> segments, @Nullable QueryContext query) {
     int selected = 0;
     for (IndexSegment segment : segments) {
-      if (!isEmptySegment(segment)) {
+      if (!isEmptySegment(segment, query)) {
         segments.set(selected++, segment);
       }
     }
     return segments.subList(0, selected);
   }
 
-  private static boolean isEmptySegment(IndexSegment segment) {
-    return segment.getSegmentMetadata().getTotalDocs() == 0;
+  private static boolean isEmptySegment(IndexSegment segment, @Nullable QueryContext query) {
+    if (segment.getSegmentMetadata().getTotalDocs() == 0) {
+      return true;
+    }
+    // For upsert tables, treat segments with 0 valid docs as empty only when the query does not skip upsert.
+    // When skipUpsert=true, the query returns all docs (including replaced), so the segment contributes rows.
+    if (query != null && query.isSkipUpsert()) {
+      return false;
+    }
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null && validDocIds.getMutableRoaringBitmap().isEmpty();
   }
 }
