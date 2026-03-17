@@ -160,10 +160,12 @@ public interface BrokerResponse {
    */
   boolean isMaxRowsInJoinReached();
 
+
   /**
    * Returns whether the limit for max rows in window has been reached.
    */
   boolean isMaxRowsInWindowReached();
+
 
   /**
    * Returns the total time used for query execution in milliseconds.
