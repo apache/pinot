@@ -525,13 +525,16 @@ public class KafkaPartitionLevelConsumerTest {
         // Mock records
         ConsumerRecord<Bytes, Bytes> record1 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, NULL_CHECKSUM, 4,
-                5, new Bytes("key1".getBytes(StandardCharsets.UTF_8)), new Bytes("value1".getBytes(StandardCharsets.UTF_8)));
+                5, new Bytes("key1".getBytes(StandardCharsets.UTF_8)),
+                new Bytes("value1".getBytes(StandardCharsets.UTF_8)));
         ConsumerRecord<Bytes, Bytes> record2 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, NULL_CHECKSUM, 4,
-                9, new Bytes("key2".getBytes(StandardCharsets.UTF_8)), new Bytes("value2".getBytes(StandardCharsets.UTF_8)));
+                9, new Bytes("key2".getBytes(StandardCharsets.UTF_8)),
+                new Bytes("value2".getBytes(StandardCharsets.UTF_8)));
         ConsumerRecord<Bytes, Bytes> record3 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, NULL_CHECKSUM, 4,
-                -1, new Bytes("key2".getBytes(StandardCharsets.UTF_8)), new Bytes("value2".getBytes(StandardCharsets.UTF_8)));
+                -1, new Bytes("key2".getBytes(StandardCharsets.UTF_8)),
+                new Bytes("value2".getBytes(StandardCharsets.UTF_8)));
         // Mock return of poll()
         ConsumerRecords<Bytes, Bytes> consumerRecords = new ConsumerRecords<>(
             Map.of(topicPartition, List.of(record1, record2, record3))
