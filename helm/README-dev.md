@@ -25,12 +25,12 @@
 
 Update `Chart.yaml` file for fields:
 - `appVersion`: for helm or k8s related changes
-- `version`: for pinot related changes, remove `-SNAPSHOT` suffix to get to the release version, e.g. `0.3.4-SNAPSHOT` -> `0.3.4`.
+- `version`: for pinot related changes, remove `-SNAPSHOT` suffix to get to the release version, e.g. `1.0.1-SNAPSHOT` -> `1.0.1`.
 
 ## 2. Package Helm Charts
 
 Run below command to package Pinot Chart.
-```
+```bash
 helm package pinot
 ```
 This step will generate a `pinot-${version}.tgz` file.
@@ -48,7 +48,7 @@ Update generated `index.yaml` accordingly:
 
 ## 4. Update Helm Version for development:
 
-Update `Chart.yaml` file for making next `version` with `-SNAPSHOT` suffix. E.g. `0.3.4` -> `0.3.5-SNAPSHOT`
+Update `Chart.yaml` file for making next `version` with `-SNAPSHOT` suffix. E.g. `1.0.1` -> `1.0.2-SNAPSHOT`
 
 ## Reference
 
