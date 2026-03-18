@@ -138,7 +138,7 @@
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <shade.phase.prop>none</shade.phase.prop>
 
-    <arrow.version>18.3.0</arrow.version>
+    <arrow.version>19.0.0</arrow.version>
     <avro.version>1.12.1</avro.version>
     <parquet.version>1.17.0</parquet.version>
     <orc.version>1.9.8</orc.version>
