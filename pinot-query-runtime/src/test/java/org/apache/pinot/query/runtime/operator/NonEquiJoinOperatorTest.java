@@ -37,6 +37,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 // TODO: Add more tests.
@@ -189,6 +190,8 @@ public class NonEquiJoinOperatorTest {
     assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "Aa"});
     assertEquals(resultRows.get(1), new Object[]{1, "Aa", 5, "CC"});
     assertEquals(resultRows.get(2), new Object[]{2, "BB", 5, "CC"});
+
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   @Test
@@ -226,6 +229,8 @@ public class NonEquiJoinOperatorTest {
     List<Object[]> unmatchedRightRows = ((MseBlock.Data) secondBlock).asRowHeap().getRows();
     assertEquals(unmatchedRightRows.size(), 1);
     assertEquals(unmatchedRightRows.get(0), new Object[]{null, null, 2, "BB"});
+
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   @Test
@@ -267,6 +272,8 @@ public class NonEquiJoinOperatorTest {
     List<Object[]> unmatchedRightRows = ((MseBlock.Data) secondBlock).asRowHeap().getRows();
     assertEquals(unmatchedRightRows.size(), 1);
     assertEquals(unmatchedRightRows.get(0), new Object[]{null, null, 0, "DD"});
+
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   private NonEquiJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
