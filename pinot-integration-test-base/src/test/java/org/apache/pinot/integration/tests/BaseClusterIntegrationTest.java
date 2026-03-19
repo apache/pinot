@@ -1068,13 +1068,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
-        "Failed to load " + countStarResult + " documents", false, Duration.ofMillis(timeoutMs / 10));
-    if (raiseError) {
-      long currentCount = getCurrentCountStarResult(tableName);
-      Assert.assertEquals(currentCount, countStarResult,
-          "Failed to load " + countStarResult + " documents; current count=" + currentCount + " for table="
-              + tableName);
-    }
+        "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
   }
 
   protected void waitForAllRealtimePartitionsConsuming(String tableNameWithType, long timeoutMs) {
