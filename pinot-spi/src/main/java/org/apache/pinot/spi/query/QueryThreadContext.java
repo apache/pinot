@@ -21,14 +21,12 @@ package org.apache.pinot.spi.query;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.TerminationException;
@@ -57,16 +55,12 @@ public class QueryThreadContext implements AutoCloseable {
   private final QueryExecutionContext _executionContext;
   @Nullable
   private final MseWorkerInfo _mseWorkerInfo;
-  private final Map<String, String> _queryOptions;
-  private final PinotConfiguration _pinotConfiguration;
   private final ThreadAccountant _accountant;
 
   private QueryThreadContext(QueryExecutionContext executionContext, @Nullable MseWorkerInfo mseWorkerInfo,
-      Map<String, String> queryOptions, PinotConfiguration pinotConfiguration, ThreadAccountant accountant) {
+      ThreadAccountant accountant) {
     _executionContext = executionContext;
     _mseWorkerInfo = mseWorkerInfo;
-    _queryOptions = queryOptions;
-    _pinotConfiguration = pinotConfiguration;
     _accountant = accountant;
     LoggerConstants.REQUEST_ID_KEY.registerInMdc(Long.toString(executionContext.getRequestId()));
     LoggerConstants.CORRELATION_ID_KEY.registerInMdc(executionContext.getCid());
@@ -132,7 +126,7 @@ public class QueryThreadContext implements AutoCloseable {
     }
   }
 
-  /// Closes the {@link QueryThreadContext} and removes it from the thread-local storage and MDC context.
+  /// Closes the [QueryThreadContext] and removes it from the thread-local storage and MDC context.
   @Override
   public void close() {
     _accountant.clear();
@@ -146,25 +140,15 @@ public class QueryThreadContext implements AutoCloseable {
     }
   }
 
-  public Map<String, String> getQueryOptions() {
-    return _queryOptions;
-  }
-
-  public PinotConfiguration getPinotConfiguration() {
-    return _pinotConfiguration;
-  }
-
   /// Opens a new [QueryThreadContext] for the current thread and add it to the thread-local storage.
-  public static QueryThreadContext open(QueryExecutionContext executionContext, Map<String, String> queryOptions,
-      PinotConfiguration pinotConfiguration, ThreadAccountant accountant) {
-    return open(executionContext, null, queryOptions, pinotConfiguration, accountant);
+  public static QueryThreadContext open(QueryExecutionContext executionContext, ThreadAccountant accountant) {
+    return open(executionContext, null, accountant);
   }
 
   /// Opens a new [QueryThreadContext] for the current thread and add it to the thread-local storage.
   public static QueryThreadContext open(QueryExecutionContext executionContext, @Nullable MseWorkerInfo mseWorkerInfo,
-      Map<String, String> queryOptions, PinotConfiguration pinotConfiguration, ThreadAccountant accountant) {
-    QueryThreadContext threadContext =
-        new QueryThreadContext(executionContext, mseWorkerInfo, queryOptions, pinotConfiguration, accountant);
+      ThreadAccountant accountant) {
+    QueryThreadContext threadContext = new QueryThreadContext(executionContext, mseWorkerInfo, accountant);
     THREAD_LOCAL.set(threadContext);
     accountant.setupTask(threadContext);
     return threadContext;
@@ -172,15 +156,12 @@ public class QueryThreadContext implements AutoCloseable {
 
   @VisibleForTesting
   public static QueryThreadContext openForSseTest() {
-    return open(QueryExecutionContext.forSseTest(), Map.of(), new PinotConfiguration(Map.of()),
-        ThreadAccountantUtils.getNoOpAccountant());
+    return open(QueryExecutionContext.forSseTest(), ThreadAccountantUtils.getNoOpAccountant());
   }
 
   @VisibleForTesting
   public static QueryThreadContext openForMseTest() {
-    return open(QueryExecutionContext.forMseTest(), new MseWorkerInfo(0, 0), Map.of(),
-        new PinotConfiguration(Map.of()),
-        ThreadAccountantUtils.getNoOpAccountant());
+    return open(QueryExecutionContext.forMseTest(), new MseWorkerInfo(0, 0), ThreadAccountantUtils.getNoOpAccountant());
   }
 
   /// Returns the [QueryThreadContext] for the current thread.
@@ -205,8 +186,7 @@ public class QueryThreadContext implements AutoCloseable {
         QueryThreadContext parentThreadContext = get();
         return () -> {
           try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
-              parentThreadContext._mseWorkerInfo, parentThreadContext._queryOptions,
-              parentThreadContext._pinotConfiguration, parentThreadContext._accountant)) {
+              parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
             return task.call();
           }
         };
@@ -217,8 +197,7 @@ public class QueryThreadContext implements AutoCloseable {
         QueryThreadContext parentThreadContext = get();
         return () -> {
           try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
-              parentThreadContext._mseWorkerInfo, parentThreadContext._queryOptions,
-              parentThreadContext._pinotConfiguration, parentThreadContext._accountant)) {
+              parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
             task.run();
           }
         };

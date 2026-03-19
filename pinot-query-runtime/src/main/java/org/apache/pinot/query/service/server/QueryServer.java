@@ -309,8 +309,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     QueryThreadContext.MseWorkerInfo mseWorkerInfo =
         new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
     try (QueryThreadContext ignore =
-        QueryThreadContext.open(executionContext, mseWorkerInfo, reqMetadata, _serverConf, _threadAccountant)) {
-      return _queryRunner.processQuery(workerMetadata, stagePlan, reqMetadata);
+        QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant)) {
+      return _queryRunner.processQuery(workerMetadata, stagePlan, reqMetadata, _serverConf);
     }
   }
 
@@ -378,8 +378,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
                 workerMetadata.getWorkerId());
         StagePlan explainPlan;
         try (QueryThreadContext ignore =
-            QueryThreadContext.open(executionContext, mseWorkerInfo, reqMetadata, _serverConf, _threadAccountant)) {
-          explainPlan = _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata);
+            QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant)) {
+          explainPlan = _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata, _serverConf);
         }
         ByteString rootAsBytes = PlanNodeSerializer.process(explainPlan.getRootNode()).toByteString();
         StageMetadata metadata = explainPlan.getStageMetadata();
@@ -410,7 +410,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     Map<String, String> metadataMap = request.getMetadataMap();
     QueryExecutionContext executionContext = QueryExecutionContext.forTseServerRequest(metadataMap, _instanceId);
     try (QueryThreadContext ignore =
-        QueryThreadContext.open(executionContext, metadataMap, _serverConf, _threadAccountant)) {
+        QueryThreadContext.open(executionContext, _threadAccountant)) {
       _queryRunner.processTimeSeriesQuery(request.getDispatchPlanList(), metadataMap, responseObserver);
     }
   }

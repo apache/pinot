@@ -132,9 +132,7 @@ public abstract class QueryScheduler {
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
     QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceId);
     _latestQueryTime.accumulate(executionContext.getStartTimeMs());
-    Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
-    try (QueryThreadContext ignore =
-        QueryThreadContext.open(executionContext, queryOptions, _config, _threadAccountant)) {
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       InstanceResponseBlock instanceResponse;
       try {
         instanceResponse =
@@ -167,7 +165,8 @@ public abstract class QueryScheduler {
         int responseSizeBytes = responseBytes.length;
         String tableNameWithType = queryRequest.getTableNameWithType();
         _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_RESPONSE_SIZE, responseSizeBytes);
-        Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
+        Long maxResponseSizeBytes =
+            QueryOptionsUtils.getMaxServerResponseSizeBytes(queryRequest.getQueryContext().getQueryOptions());
         if (maxResponseSizeBytes != null && responseSizeBytes > maxResponseSizeBytes) {
           String errMsg =
               "Serialized query response size " + responseSizeBytes + " exceeds threshold " + maxResponseSizeBytes

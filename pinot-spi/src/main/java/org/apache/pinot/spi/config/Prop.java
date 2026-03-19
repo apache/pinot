@@ -21,7 +21,6 @@ package org.apache.pinot.spi.config;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /// Typed property contract, which can optionally read from runtime map (usually query options)
@@ -36,13 +35,6 @@ public interface Prop<T> {
   /// Resolves the property from explicit runtime map/config.
   @Nullable
   T resolve(@Nullable Map<String, String> runtimeMap, @Nullable PinotConfiguration pinotConfiguration);
-
-  /// Resolves the property from the current [QueryThreadContext].
-  @Nullable
-  default T resolve() {
-    QueryThreadContext queryThreadContext = QueryThreadContext.get();
-    return resolve(queryThreadContext.getQueryOptions(), queryThreadContext.getPinotConfiguration());
-  }
 
   static Prop<Long> fromNullLong() {
     return fromDefault(null);

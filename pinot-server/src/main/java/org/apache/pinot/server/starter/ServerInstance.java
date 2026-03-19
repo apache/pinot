@@ -170,7 +170,7 @@ public class ServerInstance {
           : null;
       _grpcQueryServer =
           new GrpcQueryServer(instanceName, grpcPort, GrpcConfig.buildGrpcQueryConfig(serverConf.getPinotConfig()),
-              actualTslConfig, _queryExecutor, accessControl, threadAccountant, serverConf.getPinotConfig());
+              actualTslConfig, _queryExecutor, accessControl, threadAccountant);
     } else {
       _grpcQueryServer = null;
     }

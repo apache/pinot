@@ -84,7 +84,6 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   });
 
   private final String _instanceName;
-  private final PinotConfiguration _config;
   private final QueryScheduler _queryScheduler;
   private final AccessControl _accessControl;
   private final ThreadAccountant _threadAccountant;
@@ -94,7 +93,6 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   public InstanceRequestHandler(String instanceName, PinotConfiguration config, QueryScheduler queryScheduler,
       AccessControl accessControl, ThreadAccountant threadAccountant) {
     _instanceName = instanceName;
-    _config = config;
     _queryScheduler = queryScheduler;
     _accessControl = accessControl;
     _threadAccountant = threadAccountant;
@@ -158,9 +156,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   @VisibleForTesting
   void submitQuery(ServerQueryRequest queryRequest, ChannelHandlerContext ctx, long queryArrivalTimeMs) {
     QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceName);
-    Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
-    try (QueryThreadContext ignore =
-        QueryThreadContext.open(executionContext, queryOptions, _config, _threadAccountant)) {
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       ListenableFuture<byte[]> future = _queryScheduler.submit(queryRequest);
       if (_executionContexts != null) {
         String queryId = queryRequest.getQueryId();

@@ -285,8 +285,9 @@ public class QueryRunner {
   /// This method will not block the current thread but use [#_executorService] instead.
   /// If any error happened during the asynchronous execution, an error block will be sent to all receiver mailboxes.
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadata) {
-    return CompletableFuture.runAsync(() -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata),
+      Map<String, String> requestMetadata, @Nullable PinotConfiguration pinotConfiguration) {
+    return CompletableFuture.runAsync(
+        () -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata, pinotConfiguration),
         _executorService);
   }
 
@@ -297,45 +298,41 @@ public class QueryRunner {
   ///
   /// If the pipeline breaker success, the rest of the stage is asynchronously executed on the [#_opChainScheduler].
   private void processQueryBlocking(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadata) {
+      Map<String, String> requestMetadata, @Nullable PinotConfiguration pinotConfiguration) {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
-    Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
-    // MSE corner case: stage custom properties can override request-level options.
-    // Re-open a nested context with the effective metadata so no-arg Prop.resolve() observes stage-preferred values
-    // during worker execution and in async tasks decorated by contextAwareExecutorService.
-    try (QueryThreadContext ignore = openWithEffectiveMseOptions(Map.copyOf(opChainMetadata))) {
-      // run pre-stage execution for all pipeline breakers
-      PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
-          _opChainScheduler, _mailboxService, workerMetadata, stagePlan, opChainMetadata,
-          _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+    Map<String, String> opChainMetadata =
+        consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata, pinotConfiguration);
+    // run pre-stage execution for all pipeline breakers
+    PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
+        _opChainScheduler, _mailboxService, workerMetadata, stagePlan, opChainMetadata,
+        _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
 
-      // Send error block to all the receivers if pipeline breaker fails
-      if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
-        ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
-        notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
-        return;
-      }
+    // Send error block to all the receivers if pipeline breaker fails
+    if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
+      ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
+      return;
+    }
 
-      // run OpChain
-      OpChainExecutionContext executionContext =
-          OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-              pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
-      try {
-        OpChain opChain;
-        if (workerMetadata.isLeafStageWorker()) {
-          Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
-          opChain =
-              ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-                  rlsFilters);
-        } else {
-          opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
-        }
-        // This can fail if the executor rejects the task.
-        _opChainScheduler.register(opChain);
-      } catch (RuntimeException e) {
-        ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
-        notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
+    // run OpChain
+    OpChainExecutionContext executionContext =
+        OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
+            pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+    try {
+      OpChain opChain;
+      if (workerMetadata.isLeafStageWorker()) {
+        Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
+        opChain =
+            ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+                rlsFilters);
+      } else {
+        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
       }
+      // This can fail if the executor rejects the task.
+      _opChainScheduler.register(opChain);
+    } catch (RuntimeException e) {
+      ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
+      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
     }
   }
 
@@ -458,7 +455,7 @@ public class QueryRunner {
   }
 
   private Map<String, String> consolidateMetadata(Map<String, String> customProperties,
-      Map<String, String> requestMetadata) {
+      Map<String, String> requestMetadata, @Nullable PinotConfiguration pinotConfiguration) {
     Map<String, String> opChainMetadata = new HashMap<>();
     // 1. put all request level metadata
     opChainMetadata.putAll(requestMetadata);
@@ -469,10 +466,9 @@ public class QueryRunner {
       opChainMetadata.put(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, Integer.toString(_numGroupsWarningLimit));
     }
     // 4. add all overrides from config if anything is still empty.
-    // NOTE: We intentionally materialize effective values into opChainMetadata below (instead of only relying on
-    // no-arg Prop.resolve()) because several runtime operators still consume the map via QueryOptionsUtils.getX(...)
-    // helpers, which do not read PinotConfiguration fallback. Once those consumers migrate to Prop-based resolution,
-    // this normalization block can be simplified/removed.
+    // NOTE: We intentionally materialize effective values into opChainMetadata below because several runtime operators
+    // still consume the map via QueryOptionsUtils.getX(...) helpers, which do not read PinotConfiguration fallback.
+    // Once those consumers migrate to Prop-based resolution, this normalization block can be simplified/removed.
     Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
     if (numGroupsLimit == null) {
       numGroupsLimit = _numGroupsLimit;
@@ -520,7 +516,7 @@ public class QueryRunner {
     // MSE corner case: no-arg resolve() would read the outer request metadata map from QueryThreadContext and miss
     // stage-level overrides already applied into opChainMetadata. Resolve explicitly against opChainMetadata here.
     Integer maxRowsInJoin = QueryOptionsUtils.MAX_ROWS_IN_JOIN_PROP.resolve(opChainMetadata,
-        threadContext.getPinotConfiguration());
+        pinotConfiguration);
     if (maxRowsInJoin != null) {
       opChainMetadata.put(QueryOptionKey.MAX_ROWS_IN_JOIN, Integer.toString(maxRowsInJoin));
     }
@@ -557,48 +553,40 @@ public class QueryRunner {
   }
 
   public StagePlan explainQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadata) {
+      Map<String, String> requestMetadata, @Nullable PinotConfiguration pinotConfiguration) {
     if (!workerMetadata.isLeafStageWorker()) {
       LOGGER.debug("Explain query on intermediate stages is a NOOP");
       return stagePlan;
     }
 
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
-    Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
-
-    try (QueryThreadContext ignore = openWithEffectiveMseOptions(Map.copyOf(opChainMetadata))) {
-      if (PipelineBreakerExecutor.hasPipelineBreakers(stagePlan)) {
-        //TODO: See https://github.com/apache/pinot/pull/13733#discussion_r1752031714
-        LOGGER.error("Pipeline breaker is not supported in explain query");
-        return stagePlan;
-      }
-
-      Map<PlanNode, ExplainedNode> leafNodes = new HashMap<>();
-      BiConsumer<PlanNode, MultiStageOperator> leafNodesConsumer = (node, operator) -> {
-        if (operator instanceof LeafOperator) {
-          leafNodes.put(node, ((LeafOperator) operator).explain());
-        }
-      };
-      // compile OpChain
-      OpChainExecutionContext executionContext =
-          OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-              null, false, false);
-
-      OpChain opChain =
-          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-              leafNodesConsumer, true, Map.of());
-      opChain.close(); // probably unnecessary, but formally needed
-
-      PlanNode rootNode = substituteNode(stagePlan.getRootNode(), leafNodes);
-
-      return new StagePlan(rootNode, stagePlan.getStageMetadata());
+    Map<String, String> opChainMetadata =
+        consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata, pinotConfiguration);
+    if (PipelineBreakerExecutor.hasPipelineBreakers(stagePlan)) {
+      //TODO: See https://github.com/apache/pinot/pull/13733#discussion_r1752031714
+      LOGGER.error("Pipeline breaker is not supported in explain query");
+      return stagePlan;
     }
-  }
 
-  private QueryThreadContext openWithEffectiveMseOptions(Map<String, String> effectiveOptions) {
-    QueryThreadContext currentContext = QueryThreadContext.get();
-    return QueryThreadContext.open(currentContext.getExecutionContext(), currentContext.getMseWorkerInfo(),
-        effectiveOptions, currentContext.getPinotConfiguration(), currentContext.getAccountant());
+    Map<PlanNode, ExplainedNode> leafNodes = new HashMap<>();
+    BiConsumer<PlanNode, MultiStageOperator> leafNodesConsumer = (node, operator) -> {
+      if (operator instanceof LeafOperator) {
+        leafNodes.put(node, ((LeafOperator) operator).explain());
+      }
+    };
+    // compile OpChain
+    OpChainExecutionContext executionContext =
+        OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata, null,
+            false, false);
+
+    OpChain opChain =
+        ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+            leafNodesConsumer, true, Map.of());
+    opChain.close(); // probably unnecessary, but formally needed
+
+    PlanNode rootNode = substituteNode(stagePlan.getRootNode(), leafNodes);
+
+    return new StagePlan(rootNode, stagePlan.getStageMetadata());
   }
 
   private PlanNode substituteNode(PlanNode node, Map<PlanNode, ? extends PlanNode> substitutions) {

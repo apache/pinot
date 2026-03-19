@@ -350,8 +350,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
             activeDeadlineMs, passiveDeadlineMs, _brokerId, _brokerId, queryHash);
     QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
-    try (QueryThreadContext ignore =
-        QueryThreadContext.open(executionContext, mseWorkerInfo, options, _config, _threadAccountant);
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant);
         QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, requestContext,
             httpHeaders, queryTimer)) {
       validatePhysicalTablesWithMultiClusterRouting(compiledQuery.getTableNames(), compiledQuery.getOptions());

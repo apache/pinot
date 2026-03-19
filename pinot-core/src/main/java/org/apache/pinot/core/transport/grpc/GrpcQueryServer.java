@@ -63,7 +63,6 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.GrpcRequesterIdentity;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
@@ -87,7 +86,6 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   private final ExecutorService _executorService;
   private final AccessControl _accessControl;
   private final ThreadAccountant _threadAccountant;
-  private final PinotConfiguration _pinotConfiguration;
   // Memory allocator and throttling configuration
   private final PooledByteBufAllocator _bufAllocator;
   private final long _memoryThresholdBytes;
@@ -116,8 +114,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   }
 
   public GrpcQueryServer(String instanceId, int port, GrpcConfig config, TlsConfig tlsConfig,
-      QueryExecutor queryExecutor, AccessControl accessControl, ThreadAccountant threadAccountant,
-      PinotConfiguration pinotConfiguration) {
+      QueryExecutor queryExecutor, AccessControl accessControl, ThreadAccountant threadAccountant) {
     _instanceId = instanceId;
     _executorService = QueryThreadContext.contextAwareExecutorService(
         Executors.newFixedThreadPool(config.isQueryWorkerThreadsSet()
@@ -174,7 +171,6 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
     _accessControl = accessControl;
     _threadAccountant = threadAccountant;
-    _pinotConfiguration = pinotConfiguration;
     LOGGER.info("Initialized GrpcQueryServer on port: {} with numWorkerThreads: {}", port,
         ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
   }
@@ -271,9 +267,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
     // Process the query
     QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceId);
-    Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
-    try (QueryThreadContext ignore =
-        QueryThreadContext.open(executionContext, queryOptions, _pinotConfiguration, _threadAccountant)) {
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       InstanceResponseBlock instanceResponse;
       try {
         LOGGER.info("Executing gRPC query request {}: {} received from broker: {}", queryRequest.getRequestId(),

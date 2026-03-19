@@ -65,7 +65,6 @@ import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -177,7 +176,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
             activeDeadlineMs, passiveDeadlineMs, "brokerId", "brokerId", "");
     QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
-        Map.of(), new PinotConfiguration(Map.of()), ThreadAccountantUtils.getNoOpAccountant())) {
+        ThreadAccountantUtils.getNoOpAccountant())) {
       // exception will be propagated through for assert purpose on runtime error
       return QueryDispatcher.runReducer(dispatchableSubPlan, Map.of(), _mailboxService);
     }

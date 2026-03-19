@@ -84,8 +84,8 @@ public class QueryServerEnclosure {
     QueryThreadContext.MseWorkerInfo mseWorkerInfo =
         new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
-        requestMetadataMap, new PinotConfiguration(Map.of()), ThreadAccountantUtils.getNoOpAccountant())) {
-      return _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap);
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      return _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap, new PinotConfiguration(Map.of()));
     }
   }
 }
