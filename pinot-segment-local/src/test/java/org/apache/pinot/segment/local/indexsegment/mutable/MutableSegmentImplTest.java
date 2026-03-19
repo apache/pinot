@@ -203,6 +203,30 @@ public class MutableSegmentImplTest {
     }
   }
 
+  @Test
+  public void testUpdateIngestionTimestampWithoutIndexing() {
+    // Create a fresh mutable segment with no indexed rows
+    MutableSegmentImpl freshSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema);
+    try {
+      // Before any updates, minimum ingestion lag should be Long.MAX_VALUE (no events seen)
+      assertEquals(freshSegment.getSegmentMetadata().getMinimumIngestionLagMs(), Long.MAX_VALUE);
+
+      // Simulate consuming a message whose ingestion timestamp is "now" but all rows were filtered
+      long ingestionTimeMs = System.currentTimeMillis();
+      freshSegment.updateIngestionTimestamp(ingestionTimeMs);
+
+      // After the update, the minimum ingestion lag should no longer be Long.MAX_VALUE
+      long lagMs = freshSegment.getSegmentMetadata().getMinimumIngestionLagMs();
+      Assert.assertNotEquals(lagMs, Long.MAX_VALUE,
+          "Expected ingestion lag to be updated from Long.MAX_VALUE after updateIngestionTimestamp()");
+
+      // The latest ingestion timestamp should match what we provided
+      assertEquals(freshSegment.getSegmentMetadata().getLatestIngestionTimestamp(), ingestionTimeMs);
+    } finally {
+      freshSegment.destroy();
+    }
+  }
+
   @AfterClass
   public void tearDown() {
     _mutableSegmentImpl.destroy();
