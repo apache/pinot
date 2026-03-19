@@ -113,7 +113,6 @@ public class QueryRunner {
   private MailboxService _mailboxService;
   private boolean _ownsMailboxService = true;
   private QueryExecutor _leafQueryExecutor;
-  private PinotConfiguration _serverConf;
 
   // Group-by settings
   @Nullable
@@ -154,7 +153,6 @@ public class QueryRunner {
    */
   public void init(PinotConfiguration serverConf, String instanceId, @Nullable InstanceDataManager instanceDataManager,
       @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats) {
-    _serverConf = serverConf;
     String hostname = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);

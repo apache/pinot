@@ -50,188 +50,158 @@ public class QueryOptionsUtils {
   private static final RuntimeException CLASS_LOAD_ERROR;
 
   public static final Prop<Long> TIMEOUT_MS_PROP =
-      Prop.fromNullLong().withRuntimeMap(QueryOptionKey.TIMEOUT_MS, QueryOptionsUtils::parsePositiveLong);
+      Prop.fromRuntimeMap(QueryOptionKey.TIMEOUT_MS, QueryOptionsUtils::parsePositiveLong, null);
   public static final Prop<String> TABLE_SAMPLER_PROP =
-      Prop.fromNullString().withRuntimeMap(QueryOptionKey.TABLE_SAMPLER, QueryOptionsUtils::parseString);
+      Prop.fromRuntimeMap(QueryOptionKey.TABLE_SAMPLER, QueryOptionsUtils::parseString, null);
   public static final Prop<Long> EXTRA_PASSIVE_TIMEOUT_MS_PROP =
-      Prop.fromNullLong()
-          .withRuntimeMap(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, QueryOptionsUtils::parseNonNegativeLong);
+      Prop.fromRuntimeMap(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, QueryOptionsUtils::parseNonNegativeLong, null);
   public static final Prop<Long> MAX_SERVER_RESPONSE_SIZE_BYTES_PROP =
-      Prop.fromNullLong()
-          .withRuntimeMap(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, QueryOptionsUtils::parsePositiveLong);
+      Prop.fromRuntimeMap(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, QueryOptionsUtils::parsePositiveLong, null);
   public static final Prop<Long> MAX_QUERY_RESPONSE_SIZE_BYTES_PROP =
-      Prop.fromNullLong()
-          .withRuntimeMap(QueryOptionKey.MAX_QUERY_RESPONSE_SIZE_BYTES, QueryOptionsUtils::parsePositiveLong);
+      Prop.fromRuntimeMap(QueryOptionKey.MAX_QUERY_RESPONSE_SIZE_BYTES, QueryOptionsUtils::parsePositiveLong, null);
   public static final Prop<Long> UPSERT_VIEW_FRESHNESS_MS_PROP =
-      Prop.fromDefault(-1L).withRuntimeMap(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS, QueryOptionsUtils::parseLong);
+      Prop.fromRuntimeMap(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS, QueryOptionsUtils::parseLong, -1L);
   public static final Prop<String> QUERY_HASH_PROP =
-      Prop.fromDefault(CommonConstants.Broker.DEFAULT_QUERY_HASH).withRuntimeMap(QueryOptionKey.QUERY_HASH,
-          QueryOptionsUtils::parseString);
+      Prop.fromRuntimeMap(QueryOptionKey.QUERY_HASH, QueryOptionsUtils::parseString,
+          CommonConstants.Broker.DEFAULT_QUERY_HASH);
   public static final Prop<Map<String, Set<FieldConfig.IndexType>>> SKIP_INDEXES_PROP =
-      Prop.<Map<String, Set<FieldConfig.IndexType>>>fromNull().withRuntimeMap(QueryOptionKey.SKIP_INDEXES,
-          QueryOptionsUtils::parseSkipIndexes);
+      Prop.fromRuntimeMap(QueryOptionKey.SKIP_INDEXES, QueryOptionsUtils::parseSkipIndexes, null);
   public static final Prop<Set<String>> SKIP_PLANNER_RULES_PROP =
-      Prop.fromDefault(Set.<String>of())
-          .withRuntimeMap(QueryOptionKey.SKIP_PLANNER_RULES, QueryOptionsUtils::parsePlannerRules);
+      Prop.fromRuntimeMap(QueryOptionKey.SKIP_PLANNER_RULES, QueryOptionsUtils::parsePlannerRules, Set.of());
   public static final Prop<Set<String>> USE_PLANNER_RULES_PROP =
-      Prop.fromDefault(Set.<String>of())
-          .withRuntimeMap(QueryOptionKey.USE_PLANNER_RULES, QueryOptionsUtils::parsePlannerRules);
+      Prop.fromRuntimeMap(QueryOptionKey.USE_PLANNER_RULES, QueryOptionsUtils::parsePlannerRules, Set.of());
   public static final Prop<Integer> NUM_REPLICA_GROUPS_TO_QUERY_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<List<Integer>> ORDERED_PREFERRED_POOLS_PROP =
-      Prop.fromDefault(Collections.<Integer>emptyList()).withRuntimeMap(QueryOptionKey.ORDERED_PREFERRED_POOLS,
-          QueryOptionsUtils::parseOrderedPreferredPools);
+      Prop.fromRuntimeMap(QueryOptionKey.ORDERED_PREFERRED_POOLS, QueryOptionsUtils::parseOrderedPreferredPools,
+          Collections.emptyList());
   public static final Prop<Integer> CURSOR_NUM_ROWS_PROP =
-      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.CURSOR_NUM_ROWS, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.CURSOR_NUM_ROWS, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> MAX_EXECUTION_THREADS_PROP =
-      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.MAX_EXECUTION_THREADS, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MAX_EXECUTION_THREADS, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> MIN_SEGMENT_GROUP_TRIM_SIZE_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt, null);
   public static final Prop<Integer> MIN_SERVER_GROUP_TRIM_SIZE_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt, null);
   public static final Prop<Integer> MIN_BROKER_GROUP_TRIM_SIZE_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt, null);
   public static final Prop<Integer> MSE_MIN_GROUP_TRIM_SIZE_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt, null);
   public static final Prop<Integer> GROUP_TRIM_THRESHOLD_PROP =
-      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.GROUP_TRIM_THRESHOLD, QueryOptionsUtils::parseUncheckedInt);
+      Prop.fromRuntimeMap(QueryOptionKey.GROUP_TRIM_THRESHOLD, QueryOptionsUtils::parseUncheckedInt, null);
   public static final Prop<Integer> NUM_THREADS_EXTRACT_FINAL_RESULT_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.NUM_THREADS_EXTRACT_FINAL_RESULT, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.NUM_THREADS_EXTRACT_FINAL_RESULT, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> CHUNK_SIZE_EXTRACT_FINAL_RESULT_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.CHUNK_SIZE_EXTRACT_FINAL_RESULT, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.CHUNK_SIZE_EXTRACT_FINAL_RESULT, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> MULTI_STAGE_LEAF_LIMIT_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, QueryOptionsUtils::parseNonNegativeInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, QueryOptionsUtils::parseNonNegativeInt, null);
   public static final Prop<Boolean> ERROR_ON_NUM_GROUPS_LIMIT_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.ERROR_ON_NUM_GROUPS_LIMIT, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.ERROR_ON_NUM_GROUPS_LIMIT, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Integer> NUM_GROUPS_LIMIT_PROP =
-      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.NUM_GROUPS_LIMIT, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.NUM_GROUPS_LIMIT, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> NUM_GROUPS_WARNING_LIMIT_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> MAX_INITIAL_RESULT_HOLDER_CAPACITY_PROP =
-      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY_PROP =
-      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY, QueryOptionsUtils::parsePositiveInt,
+          null);
   public static final Prop<Integer> MIN_INITIAL_INDEXED_TABLE_CAPACITY_PROP =
-      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY,
-          QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> SORT_AGGREGATE_LIMIT_THRESHOLD_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD_PROP =
-      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD,
-          QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD,
+          QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> MAX_STREAMING_PENDING_BLOCKS_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> MAX_ROWS_IN_JOIN_PROP =
       Prop.fromNullInteger()
           .withConfig(MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN, QueryOptionsUtils::parsePositiveInt)
           .withRuntimeMap(QueryOptionKey.MAX_ROWS_IN_JOIN, QueryOptionsUtils::parsePositiveInt);
   public static final Prop<JoinOverFlowMode> JOIN_OVERFLOW_MODE_PROP =
-      Prop.<JoinOverFlowMode>fromNull().withRuntimeMap(QueryOptionKey.JOIN_OVERFLOW_MODE,
-          QueryOptionsUtils::parseJoinOverflowMode);
+      Prop.fromRuntimeMap(QueryOptionKey.JOIN_OVERFLOW_MODE, QueryOptionsUtils::parseJoinOverflowMode, null);
   public static final Prop<Integer> MAX_ROWS_IN_WINDOW_PROP =
-      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.MAX_ROWS_IN_WINDOW, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.MAX_ROWS_IN_WINDOW, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<WindowOverFlowMode> WINDOW_OVERFLOW_MODE_PROP =
-      Prop.<WindowOverFlowMode>fromNull().withRuntimeMap(QueryOptionKey.WINDOW_OVERFLOW_MODE,
-          QueryOptionsUtils::parseWindowOverflowMode);
+      Prop.fromRuntimeMap(QueryOptionKey.WINDOW_OVERFLOW_MODE, QueryOptionsUtils::parseWindowOverflowMode, null);
   public static final Prop<Integer> LITE_MODE_LEAF_STAGE_LIMIT_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT, QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT_PROP =
-      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT,
-          QueryOptionsUtils::parsePositiveInt);
+      Prop.fromRuntimeMap(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT,
+          QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<String> WORKLOAD_NAME_PROP =
-      Prop.fromDefault(CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME).withRuntimeMap(QueryOptionKey.WORKLOAD_NAME,
-          QueryOptionsUtils::parseString);
+      Prop.fromRuntimeMap(QueryOptionKey.WORKLOAD_NAME,
+          QueryOptionsUtils::parseString,
+          CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
   public static final Prop<Integer> REGEX_DICT_SIZE_THRESHOLD_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, QueryOptionsUtils::parseUncheckedInt);
+      Prop.fromRuntimeMap(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, QueryOptionsUtils::parseUncheckedInt, null);
   public static final Prop<Integer> SORT_EXCHANGE_COPY_THRESHOLD_PROP =
-      Prop.fromNullInteger()
-          .withRuntimeMap(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD, QueryOptionsUtils::parseUncheckedInt);
+      Prop.fromRuntimeMap(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD, QueryOptionsUtils::parseUncheckedInt, null);
   public static final Prop<Boolean> AND_SCAN_REORDERING_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.AND_SCAN_REORDERING, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.AND_SCAN_REORDERING, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> SKIP_UPSERT_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.SKIP_UPSERT, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.SKIP_UPSERT, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> SKIP_UPSERT_VIEW_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.SKIP_UPSERT_VIEW, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.SKIP_UPSERT_VIEW, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> TRACE_RULE_PRODUCTIONS_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.TRACE_RULE_PRODUCTIONS, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.TRACE_RULE_PRODUCTIONS, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> SCAN_STAR_TREE_NODES_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.SCAN_STAR_TREE_NODES, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.SCAN_STAR_TREE_NODES, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> SKIP_STAR_TREE_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.USE_STAR_TREE, QueryOptionsUtils::parseSkipOnFalse);
+      Prop.fromRuntimeMap(QueryOptionKey.USE_STAR_TREE, QueryOptionsUtils::parseSkipOnFalse, false);
   public static final Prop<Boolean> SKIP_SCAN_FILTER_REORDER_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION,
-          QueryOptionsUtils::parseSkipOnFalse);
+      Prop.fromRuntimeMap(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION,
+          QueryOptionsUtils::parseSkipOnFalse, false);
   public static final Prop<Boolean> COLLECT_GC_STATS_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.COLLECT_GC_STATS, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.COLLECT_GC_STATS, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> EXPLAIN_PLAN_VERBOSE_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.EXPLAIN_PLAN_VERBOSE, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.EXPLAIN_PLAN_VERBOSE, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> USE_MULTISTAGE_ENGINE_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.USE_MULTISTAGE_ENGINE, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.USE_MULTISTAGE_ENGINE, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> GET_CURSOR_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.GET_CURSOR, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.GET_CURSOR, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> ENABLE_NULL_HANDLING_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.ENABLE_NULL_HANDLING, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.ENABLE_NULL_HANDLING, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> SERVER_RETURN_FINAL_RESULT_PROP =
-      Prop.fromDefault(false)
-          .withRuntimeMap(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED,
-          QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED, QueryOptionsUtils::parseBoolean,
+          false);
   public static final Prop<Boolean> FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS,
-          QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS, QueryOptionsUtils::parseBoolean,
+          false);
   public static final Prop<Boolean> USE_FIXED_REPLICA_PROP =
-      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_FIXED_REPLICA, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.USE_FIXED_REPLICA, QueryOptionsUtils::parseBoolean, null);
   public static final Prop<Boolean> SKIP_UNAVAILABLE_SERVERS_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.SKIP_UNAVAILABLE_SERVERS, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.SKIP_UNAVAILABLE_SERVERS, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> IGNORE_MISSING_SEGMENTS_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.IGNORE_MISSING_SEGMENTS, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.IGNORE_MISSING_SEGMENTS, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> IS_SECONDARY_WORKLOAD_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.IS_SECONDARY_WORKLOAD, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.IS_SECONDARY_WORKLOAD, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> ACCURATE_GROUP_BY_WITHOUT_ORDER_BY_PROP =
-      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY,
-          QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA_PROP =
-      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA,
-          QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA, QueryOptionsUtils::parseBoolean, null);
   public static final Prop<Boolean> INFER_INVALID_SEGMENT_PARTITION_PROP =
-      Prop.fromDefault(false)
-          .withRuntimeMap(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> INFER_REALTIME_SEGMENT_PARTITION_PROP =
-      Prop.fromDefault(false)
-          .withRuntimeMap(QueryOptionKey.INFER_REALTIME_SEGMENT_PARTITION, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.INFER_REALTIME_SEGMENT_PARTITION, QueryOptionsUtils::parseBoolean, false);
   public static final Prop<Boolean> USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE_PROP =
-      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE,
-          QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE, QueryOptionsUtils::parseBoolean, null);
   public static final Prop<Boolean> USE_PHYSICAL_OPTIMIZER_PROP =
-      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, QueryOptionsUtils::parseBoolean, null);
   public static final Prop<Boolean> ENABLE_MULTI_CLUSTER_ROUTING_PROP =
-      Prop.fromNullBoolean()
-          .withRuntimeMap(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING, QueryOptionsUtils::parseBoolean, null);
   public static final Prop<Boolean> USE_LITE_MODE_PROP =
-      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_LITE_MODE, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.USE_LITE_MODE, QueryOptionsUtils::parseBoolean, null);
   public static final Prop<Boolean> USE_BROKER_PRUNING_PROP =
-      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_BROKER_PRUNING, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.USE_BROKER_PRUNING, QueryOptionsUtils::parseBoolean, null);
   public static final Prop<Boolean> RUN_IN_BROKER_PROP =
-      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.RUN_IN_BROKER, QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.RUN_IN_BROKER, QueryOptionsUtils::parseBoolean, null);
   public static final Prop<Boolean> ALLOW_REVERSE_ORDER_PROP =
-      Prop.fromDefault(QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER).withRuntimeMap(QueryOptionKey.ALLOW_REVERSE_ORDER,
-          QueryOptionsUtils::parseBoolean);
+      Prop.fromRuntimeMap(QueryOptionKey.ALLOW_REVERSE_ORDER,
+          QueryOptionsUtils::parseBoolean, QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER);
 
   static {
     // this is a bit hacky, but lots of the code depends directly on usage of
@@ -784,6 +754,9 @@ public class QueryOptionsUtils {
 
   static Map<String, Set<FieldConfig.IndexType>> parseSkipIndexes(String optionName, String optionValue) {
     String[] perColumnIndexSkip = StringUtils.split(optionValue, '&');
+    if (perColumnIndexSkip == null || perColumnIndexSkip.length == 0) {
+      return Collections.emptyMap();
+    }
     Map<String, Set<FieldConfig.IndexType>> skipIndexes = new HashMap<>();
     for (String columnConf : perColumnIndexSkip) {
       String[] conf = StringUtils.split(columnConf, '=');

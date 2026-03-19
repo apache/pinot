@@ -114,13 +114,12 @@ public class QueryDispatcherTest extends QueryTestSet {
 
     for (QueryServer queryServer : _queryServerMap.values()) {
       Mockito.verify(queryServer, Mockito.atLeastOnce()).submit(Mockito.argThat(queryRequest -> {
-        Map<String, String> requestMetadata = null;
         try {
-          requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
+          Map<String, String> requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
+          return customOptionValue.equals(requestMetadata.get(customOptionKey));
         } catch (InvalidProtocolBufferException e) {
-            throw new RuntimeException(e);
+          return false;
         }
-        return customOptionValue.equals(requestMetadata.get(customOptionKey));
       }), Mockito.any());
     }
   }
