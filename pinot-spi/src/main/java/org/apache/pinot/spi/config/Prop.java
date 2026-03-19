@@ -68,6 +68,11 @@ public interface Prop<T> {
     return (runtimeMap, config) -> defaultValue;
   }
 
+  static <T> Prop<T> fromRuntimeMap(String runtimeKey, OptionValueParser<T> parser, @Nullable T defaultValue) {
+    return fromDefault(defaultValue)
+        .withRuntimeMap(runtimeKey, parser);
+  }
+
   default Prop<T> withRuntimeMap(String runtimeKey, OptionValueParser<T> parser) {
     Prop<T> parent = this;
     return (runtimeMap, config) -> {
