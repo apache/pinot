@@ -99,6 +99,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   REALTIME_INGESTION_DELAY_MS("milliseconds", false,
       "The difference of the current timestamp and the timestamp present in the last consumed message record."),
   END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
+  REALTIME_INGESTION_DELAY_REPORTING_STATUS("boolean", false,
+      "Binary indicator (1 or 0) for whether ingestion delay data is available for a partition."),
   REALTIME_CONSUMER_DIR_USAGE("bytes", true),
   SEGMENT_DOWNLOAD_SPEED("bytes", true),
   PREDOWNLOAD_SPEED("bytes", true),
