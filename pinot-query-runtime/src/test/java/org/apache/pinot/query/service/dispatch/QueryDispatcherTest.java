@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -94,6 +96,32 @@ public class QueryDispatcherTest extends QueryTestSet {
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, new HashSet<>(),
           Map.of());
+    }
+  }
+
+  @Test
+  public void testQueryDispatcherPreservesCustomQueryOptionMetadata()
+      throws Exception {
+    String sql = "SELECT * FROM a";
+    String customOptionKey = "test.custom.option";
+    String customOptionValue = "custom-value";
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
+
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, new HashSet<>(),
+          Map.of(customOptionKey, customOptionValue));
+    }
+
+    for (QueryServer queryServer : _queryServerMap.values()) {
+      Mockito.verify(queryServer, Mockito.atLeastOnce()).submit(Mockito.argThat(queryRequest -> {
+        Map<String, String> requestMetadata = null;
+        try {
+          requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
+        } catch (InvalidProtocolBufferException e) {
+            throw new RuntimeException(e);
+        }
+        return customOptionValue.equals(requestMetadata.get(customOptionKey));
+      }), Mockito.any());
     }
   }
 

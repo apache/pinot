@@ -132,7 +132,9 @@ public abstract class QueryScheduler {
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
     QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceId);
     _latestQueryTime.accumulate(executionContext.getStartTimeMs());
-    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
+    Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
+    try (QueryThreadContext ignore =
+        QueryThreadContext.open(executionContext, queryOptions, _config, _threadAccountant)) {
       InstanceResponseBlock instanceResponse;
       try {
         instanceResponse =
@@ -161,7 +163,6 @@ public abstract class QueryScheduler {
       }
 
       // TODO: Perform this check sooner during the serialization of DataTable.
-      Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
       if (responseBytes != null) {
         int responseSizeBytes = responseBytes.length;
         String tableNameWithType = queryRequest.getTableNameWithType();

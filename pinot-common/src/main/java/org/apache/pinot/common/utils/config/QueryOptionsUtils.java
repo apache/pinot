@@ -30,9 +30,11 @@ import java.util.Optional;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.config.Prop;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 
@@ -46,6 +48,190 @@ public class QueryOptionsUtils {
 
   private static final Map<String, String> CONFIG_RESOLVER;
   private static final RuntimeException CLASS_LOAD_ERROR;
+
+  public static final Prop<Long> TIMEOUT_MS_PROP =
+      Prop.fromNullLong().withRuntimeMap(QueryOptionKey.TIMEOUT_MS, QueryOptionsUtils::parsePositiveLong);
+  public static final Prop<String> TABLE_SAMPLER_PROP =
+      Prop.fromNullString().withRuntimeMap(QueryOptionKey.TABLE_SAMPLER, QueryOptionsUtils::parseString);
+  public static final Prop<Long> EXTRA_PASSIVE_TIMEOUT_MS_PROP =
+      Prop.fromNullLong()
+          .withRuntimeMap(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, QueryOptionsUtils::parseNonNegativeLong);
+  public static final Prop<Long> MAX_SERVER_RESPONSE_SIZE_BYTES_PROP =
+      Prop.fromNullLong()
+          .withRuntimeMap(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, QueryOptionsUtils::parsePositiveLong);
+  public static final Prop<Long> MAX_QUERY_RESPONSE_SIZE_BYTES_PROP =
+      Prop.fromNullLong()
+          .withRuntimeMap(QueryOptionKey.MAX_QUERY_RESPONSE_SIZE_BYTES, QueryOptionsUtils::parsePositiveLong);
+  public static final Prop<Long> UPSERT_VIEW_FRESHNESS_MS_PROP =
+      Prop.fromDefault(-1L).withRuntimeMap(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS, QueryOptionsUtils::parseLong);
+  public static final Prop<String> QUERY_HASH_PROP =
+      Prop.fromDefault(CommonConstants.Broker.DEFAULT_QUERY_HASH).withRuntimeMap(QueryOptionKey.QUERY_HASH,
+          QueryOptionsUtils::parseString);
+  public static final Prop<Map<String, Set<FieldConfig.IndexType>>> SKIP_INDEXES_PROP =
+      Prop.<Map<String, Set<FieldConfig.IndexType>>>fromNull().withRuntimeMap(QueryOptionKey.SKIP_INDEXES,
+          QueryOptionsUtils::parseSkipIndexes);
+  public static final Prop<Set<String>> SKIP_PLANNER_RULES_PROP =
+      Prop.fromDefault(Set.<String>of())
+          .withRuntimeMap(QueryOptionKey.SKIP_PLANNER_RULES, QueryOptionsUtils::parsePlannerRules);
+  public static final Prop<Set<String>> USE_PLANNER_RULES_PROP =
+      Prop.fromDefault(Set.<String>of())
+          .withRuntimeMap(QueryOptionKey.USE_PLANNER_RULES, QueryOptionsUtils::parsePlannerRules);
+  public static final Prop<Integer> NUM_REPLICA_GROUPS_TO_QUERY_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<List<Integer>> ORDERED_PREFERRED_POOLS_PROP =
+      Prop.fromDefault(Collections.<Integer>emptyList()).withRuntimeMap(QueryOptionKey.ORDERED_PREFERRED_POOLS,
+          QueryOptionsUtils::parseOrderedPreferredPools);
+  public static final Prop<Integer> CURSOR_NUM_ROWS_PROP =
+      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.CURSOR_NUM_ROWS, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> MAX_EXECUTION_THREADS_PROP =
+      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.MAX_EXECUTION_THREADS, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> MIN_SEGMENT_GROUP_TRIM_SIZE_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt);
+  public static final Prop<Integer> MIN_SERVER_GROUP_TRIM_SIZE_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt);
+  public static final Prop<Integer> MIN_BROKER_GROUP_TRIM_SIZE_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt);
+  public static final Prop<Integer> MSE_MIN_GROUP_TRIM_SIZE_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, QueryOptionsUtils::parseUncheckedInt);
+  public static final Prop<Integer> GROUP_TRIM_THRESHOLD_PROP =
+      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.GROUP_TRIM_THRESHOLD, QueryOptionsUtils::parseUncheckedInt);
+  public static final Prop<Integer> NUM_THREADS_EXTRACT_FINAL_RESULT_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.NUM_THREADS_EXTRACT_FINAL_RESULT, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> CHUNK_SIZE_EXTRACT_FINAL_RESULT_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.CHUNK_SIZE_EXTRACT_FINAL_RESULT, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> MULTI_STAGE_LEAF_LIMIT_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, QueryOptionsUtils::parseNonNegativeInt);
+  public static final Prop<Boolean> ERROR_ON_NUM_GROUPS_LIMIT_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.ERROR_ON_NUM_GROUPS_LIMIT, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Integer> NUM_GROUPS_LIMIT_PROP =
+      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.NUM_GROUPS_LIMIT, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> NUM_GROUPS_WARNING_LIMIT_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> MAX_INITIAL_RESULT_HOLDER_CAPACITY_PROP =
+      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+          QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY_PROP =
+      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+          QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> MIN_INITIAL_INDEXED_TABLE_CAPACITY_PROP =
+      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY,
+          QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> SORT_AGGREGATE_LIMIT_THRESHOLD_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD_PROP =
+      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD,
+          QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> MAX_STREAMING_PENDING_BLOCKS_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> MAX_ROWS_IN_JOIN_PROP =
+      Prop.fromNullInteger()
+          .withConfig(MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN, QueryOptionsUtils::parsePositiveInt)
+          .withRuntimeMap(QueryOptionKey.MAX_ROWS_IN_JOIN, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<JoinOverFlowMode> JOIN_OVERFLOW_MODE_PROP =
+      Prop.<JoinOverFlowMode>fromNull().withRuntimeMap(QueryOptionKey.JOIN_OVERFLOW_MODE,
+          QueryOptionsUtils::parseJoinOverflowMode);
+  public static final Prop<Integer> MAX_ROWS_IN_WINDOW_PROP =
+      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.MAX_ROWS_IN_WINDOW, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<WindowOverFlowMode> WINDOW_OVERFLOW_MODE_PROP =
+      Prop.<WindowOverFlowMode>fromNull().withRuntimeMap(QueryOptionKey.WINDOW_OVERFLOW_MODE,
+          QueryOptionsUtils::parseWindowOverflowMode);
+  public static final Prop<Integer> LITE_MODE_LEAF_STAGE_LIMIT_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT, QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<Integer> LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT_PROP =
+      Prop.fromNullInteger().withRuntimeMap(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT,
+          QueryOptionsUtils::parsePositiveInt);
+  public static final Prop<String> WORKLOAD_NAME_PROP =
+      Prop.fromDefault(CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME).withRuntimeMap(QueryOptionKey.WORKLOAD_NAME,
+          QueryOptionsUtils::parseString);
+  public static final Prop<Integer> REGEX_DICT_SIZE_THRESHOLD_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, QueryOptionsUtils::parseUncheckedInt);
+  public static final Prop<Integer> SORT_EXCHANGE_COPY_THRESHOLD_PROP =
+      Prop.fromNullInteger()
+          .withRuntimeMap(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD, QueryOptionsUtils::parseUncheckedInt);
+  public static final Prop<Boolean> AND_SCAN_REORDERING_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.AND_SCAN_REORDERING, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> SKIP_UPSERT_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.SKIP_UPSERT, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> SKIP_UPSERT_VIEW_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.SKIP_UPSERT_VIEW, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> TRACE_RULE_PRODUCTIONS_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.TRACE_RULE_PRODUCTIONS, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> SCAN_STAR_TREE_NODES_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.SCAN_STAR_TREE_NODES, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> SKIP_STAR_TREE_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.USE_STAR_TREE, QueryOptionsUtils::parseSkipOnFalse);
+  public static final Prop<Boolean> SKIP_SCAN_FILTER_REORDER_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION,
+          QueryOptionsUtils::parseSkipOnFalse);
+  public static final Prop<Boolean> COLLECT_GC_STATS_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.COLLECT_GC_STATS, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> EXPLAIN_PLAN_VERBOSE_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.EXPLAIN_PLAN_VERBOSE, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> USE_MULTISTAGE_ENGINE_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.USE_MULTISTAGE_ENGINE, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> GET_CURSOR_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.GET_CURSOR, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> ENABLE_NULL_HANDLING_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.ENABLE_NULL_HANDLING, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> SERVER_RETURN_FINAL_RESULT_PROP =
+      Prop.fromDefault(false)
+          .withRuntimeMap(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED,
+          QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS,
+          QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> USE_FIXED_REPLICA_PROP =
+      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_FIXED_REPLICA, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> SKIP_UNAVAILABLE_SERVERS_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.SKIP_UNAVAILABLE_SERVERS, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> IGNORE_MISSING_SEGMENTS_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.IGNORE_MISSING_SEGMENTS, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> IS_SECONDARY_WORKLOAD_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.IS_SECONDARY_WORKLOAD, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> ACCURATE_GROUP_BY_WITHOUT_ORDER_BY_PROP =
+      Prop.fromDefault(false).withRuntimeMap(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY,
+          QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA_PROP =
+      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA,
+          QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> INFER_INVALID_SEGMENT_PARTITION_PROP =
+      Prop.fromDefault(false)
+          .withRuntimeMap(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> INFER_REALTIME_SEGMENT_PARTITION_PROP =
+      Prop.fromDefault(false)
+          .withRuntimeMap(QueryOptionKey.INFER_REALTIME_SEGMENT_PARTITION, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE_PROP =
+      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE,
+          QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> USE_PHYSICAL_OPTIMIZER_PROP =
+      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> ENABLE_MULTI_CLUSTER_ROUTING_PROP =
+      Prop.fromNullBoolean()
+          .withRuntimeMap(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> USE_LITE_MODE_PROP =
+      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_LITE_MODE, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> USE_BROKER_PRUNING_PROP =
+      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.USE_BROKER_PRUNING, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> RUN_IN_BROKER_PROP =
+      Prop.fromNullBoolean().withRuntimeMap(QueryOptionKey.RUN_IN_BROKER, QueryOptionsUtils::parseBoolean);
+  public static final Prop<Boolean> ALLOW_REVERSE_ORDER_PROP =
+      Prop.fromDefault(QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER).withRuntimeMap(QueryOptionKey.ALLOW_REVERSE_ORDER,
+          QueryOptionsUtils::parseBoolean);
 
   static {
     // this is a bit hacky, but lots of the code depends directly on usage of
@@ -96,6 +282,10 @@ public class QueryOptionsUtils {
     return resolved;
   }
 
+  private static Map<String, String> emptyIfNull(@Nullable Map<String, String> queryOptions) {
+    return queryOptions != null ? queryOptions : Map.of();
+  }
+
   @Nullable
   public static String resolveCaseInsensitiveKey(Object property) {
     if (property instanceof String) {
@@ -105,173 +295,124 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  @Deprecated
   public static Long getTimeoutMs(Map<String, String> queryOptions) {
-    String timeoutMsString = queryOptions.get(QueryOptionKey.TIMEOUT_MS);
-    return checkedParseLongPositive(QueryOptionKey.TIMEOUT_MS, timeoutMsString);
+    return TIMEOUT_MS_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static String getTableSampler(@Nullable Map<String, String> queryOptions) {
-    if (queryOptions == null || queryOptions.isEmpty()) {
-      return null;
-    }
-    return queryOptions.get(QueryOptionKey.TABLE_SAMPLER);
+    return TABLE_SAMPLER_PROP.resolve(emptyIfNull(queryOptions), null);
   }
 
   @Nullable
+  @Deprecated
   public static Long getExtraPassiveTimeoutMs(Map<String, String> queryOptions) {
-    String extraPassiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
-    return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, extraPassiveTimeoutMsString, 0);
+    return EXTRA_PASSIVE_TIMEOUT_MS_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Long getMaxServerResponseSizeBytes(Map<String, String> queryOptions) {
-    String responseSize = queryOptions.get(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES);
-    return checkedParseLongPositive(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, responseSize);
+    return MAX_SERVER_RESPONSE_SIZE_BYTES_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Long getMaxQueryResponseSizeBytes(Map<String, String> queryOptions) {
-    String responseSize = queryOptions.get(QueryOptionKey.MAX_QUERY_RESPONSE_SIZE_BYTES);
-    return checkedParseLongPositive(QueryOptionKey.MAX_QUERY_RESPONSE_SIZE_BYTES, responseSize);
+    return MAX_QUERY_RESPONSE_SIZE_BYTES_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isAndScanReorderingEnabled(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
+    return AND_SCAN_REORDERING_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
+    return SKIP_UPSERT_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isSkipUpsertView(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT_VIEW));
+    return SKIP_UPSERT_VIEW_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isTraceRuleProductions(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.TRACE_RULE_PRODUCTIONS));
+    return TRACE_RULE_PRODUCTIONS_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static long getUpsertViewFreshnessMs(Map<String, String> queryOptions) {
-    String freshnessMsString = queryOptions.get(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS);
-    return freshnessMsString != null ? Long.parseLong(freshnessMsString) : -1; //can blow up with NFE
+    return UPSERT_VIEW_FRESHNESS_MS_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isScanStarTreeNodes(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SCAN_STAR_TREE_NODES));
+    return SCAN_STAR_TREE_NODES_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isSkipStarTree(Map<String, String> queryOptions) {
-    return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
+    return SKIP_STAR_TREE_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
-    return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
+    return SKIP_SCAN_FILTER_REORDER_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isCollectGcStats(Map<String, String> queryOptions) {
-    // Disabled by default
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.COLLECT_GC_STATS));
+    return COLLECT_GC_STATS_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static String getQueryHash(Map<String, String> queryOptions) {
-    return queryOptions.getOrDefault(QueryOptionKey.QUERY_HASH, CommonConstants.Broker.DEFAULT_QUERY_HASH);
+    return QUERY_HASH_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Map<String, Set<FieldConfig.IndexType>> getSkipIndexes(Map<String, String> queryOptions) {
-    // Example config:  skipIndexes='col1=inverted,range&col2=inverted'
-    String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_INDEXES);
-    if (skipIndexesStr == null) {
-      return null;
-    }
-
-    String[] perColumnIndexSkip = StringUtils.split(skipIndexesStr, '&');
-    Map<String, Set<FieldConfig.IndexType>> skipIndexes = new HashMap<>();
-    for (String columnConf : perColumnIndexSkip) {
-      String[] conf = StringUtils.split(columnConf, '=');
-      if (conf.length != 2) {
-        throw new RuntimeException("Invalid format for " + QueryOptionKey.SKIP_INDEXES
-            + ". Example of valid format: SET skipIndexes='col1=inverted,range&col2=inverted'");
-      }
-      String columnName = conf[0];
-      String[] indexTypes = StringUtils.split(conf[1], ',');
-
-      for (String indexType : indexTypes) {
-        skipIndexes.computeIfAbsent(columnName, k -> new HashSet<>())
-            .add(FieldConfig.IndexType.valueOf(indexType.toUpperCase()));
-      }
-    }
-
-    return skipIndexes;
+    return SKIP_INDEXES_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
-    // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
-    String skipPlannerRulesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
-    if (skipPlannerRulesStr == null) {
-      return Set.of();
-    }
-
-    String[] skippedRules = StringUtils.split(skipPlannerRulesStr, ',');
-
-    return new HashSet<>(List.of(skippedRules));
+    return SKIP_PLANNER_RULES_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static Set<String> getUsePlannerRules(Map<String, String> queryOptions) {
-    // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
-    String usePlannerRulesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
-    if (usePlannerRulesStr == null) {
-      return Set.of();
-    }
-
-    String[] useRules = StringUtils.split(usePlannerRulesStr, ',');
-
-    return new HashSet<>(List.of(useRules));
+    return USE_PLANNER_RULES_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
   public static Boolean isUseFixedReplica(Map<String, String> queryOptions) {
-    String useFixedReplica = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA);
-    return useFixedReplica != null ? Boolean.parseBoolean(useFixedReplica) : null;
+    return USE_FIXED_REPLICA_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
-    String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
-    return checkedParseIntPositive(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, numReplicaGroupsToQuery);
+    return NUM_REPLICA_GROUPS_TO_QUERY_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static List<Integer> getOrderedPreferredPools(Map<String, String> queryOptions) {
-    String orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_POOLS);
-    if (StringUtils.isEmpty(orderedPreferredPools)) {
-      return Collections.emptyList();
-    }
-    // cannot use comma as the delimiter of pool list
-    // because query option use comma as the delimiter of different options
-    String[] pools = orderedPreferredPools.split("\\|");
-    List<Integer> preferredPools = new ArrayList<>(pools.length);
-    for (String pool : pools) {
-      preferredPools.add(Integer.parseInt(pool.trim()));
-    }
-    return preferredPools;
+    return ORDERED_PREFERRED_POOLS_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isExplainPlanVerbose(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.EXPLAIN_PLAN_VERBOSE));
+    return EXPLAIN_PLAN_VERBOSE_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isUseMultistageEngine(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
+    return USE_MULTISTAGE_ENGINE_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isGetCursor(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.GET_CURSOR));
+    return GET_CURSOR_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static Integer getCursorNumRows(Map<String, String> queryOptions) {
-    String cursorNumRows = queryOptions.get(QueryOptionKey.CURSOR_NUM_ROWS);
-    return checkedParseIntPositive(QueryOptionKey.CURSOR_NUM_ROWS, cursorNumRows);
+    return CURSOR_NUM_ROWS_PROP.resolve(queryOptions, null);
   }
 
   public static Optional<Boolean> isExplainAskingServers(Map<String, String> queryOptions) {
@@ -283,100 +424,95 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMaxExecutionThreads(Map<String, String> queryOptions) {
-    String maxExecutionThreadsString = queryOptions.get(QueryOptionKey.MAX_EXECUTION_THREADS);
-    return checkedParseIntPositive(QueryOptionKey.MAX_EXECUTION_THREADS, maxExecutionThreadsString);
+    return MAX_EXECUTION_THREADS_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMinSegmentGroupTrimSize(Map<String, String> queryOptions) {
-    String minSegmentGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE);
-    // NOTE: Non-positive value means turning off the segment level trim
-    return uncheckedParseInt(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE, minSegmentGroupTrimSizeString);
+    return MIN_SEGMENT_GROUP_TRIM_SIZE_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMinServerGroupTrimSize(Map<String, String> queryOptions) {
-    String minServerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
-    // NOTE: Non-positive value means turning off the segment level trim
-    return uncheckedParseInt(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, minServerGroupTrimSizeString);
+    return MIN_SERVER_GROUP_TRIM_SIZE_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMinBrokerGroupTrimSize(Map<String, String> queryOptions) {
-    String minBrokerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE);
-    // NOTE: Non-positive value means turning off the broker level trim
-    return uncheckedParseInt(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE, minBrokerGroupTrimSizeString);
+    return MIN_BROKER_GROUP_TRIM_SIZE_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMSEMinGroupTrimSize(Map<String, String> queryOptions) {
-    String mseMinGroupTrimSizeString = queryOptions.get(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE);
-    // NOTE: Non-positive value means turning off the intermediate stage trim
-    return uncheckedParseInt(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, mseMinGroupTrimSizeString);
+    return MSE_MIN_GROUP_TRIM_SIZE_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getGroupTrimThreshold(Map<String, String> queryOptions) {
-    String groupByTrimThreshold = queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
-    // NOTE: Non-positive value means turning off the on-the-fly trim before all groups are added
-    return uncheckedParseInt(QueryOptionKey.GROUP_TRIM_THRESHOLD, groupByTrimThreshold);
+    return GROUP_TRIM_THRESHOLD_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getNumThreadsExtractFinalResult(Map<String, String> queryOptions) {
-    String numThreadsExtractFinalResultString = queryOptions.get(QueryOptionKey.NUM_THREADS_EXTRACT_FINAL_RESULT);
-    return checkedParseInt(QueryOptionKey.NUM_THREADS_EXTRACT_FINAL_RESULT, numThreadsExtractFinalResultString, 1);
+    return NUM_THREADS_EXTRACT_FINAL_RESULT_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getChunkSizeExtractFinalResult(Map<String, String> queryOptions) {
-    String chunkSizeExtractFinalResultString =
-        queryOptions.get(QueryOptionKey.CHUNK_SIZE_EXTRACT_FINAL_RESULT);
-    return checkedParseInt(QueryOptionKey.CHUNK_SIZE_EXTRACT_FINAL_RESULT, chunkSizeExtractFinalResultString, 1);
+    return CHUNK_SIZE_EXTRACT_FINAL_RESULT_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_NULL_HANDLING));
+    return ENABLE_NULL_HANDLING_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isServerReturnFinalResult(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT));
+    return SERVER_RETURN_FINAL_RESULT_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isServerReturnFinalResultKeyUnpartitioned(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED));
+    return SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isFilteredAggregationsSkipEmptyGroups(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS));
+    return FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMultiStageLeafLimit(Map<String, String> queryOptions) {
-    String maxLeafLimitStr = queryOptions.get(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT);
-    return checkedParseIntNonNegative(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, maxLeafLimitStr);
+    return MULTI_STAGE_LEAF_LIMIT_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static boolean getErrorOnNumGroupsLimit(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ERROR_ON_NUM_GROUPS_LIMIT));
+    return ERROR_ON_NUM_GROUPS_LIMIT_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getNumGroupsLimit(Map<String, String> queryOptions) {
-    String maxNumGroupLimit = queryOptions.get(QueryOptionKey.NUM_GROUPS_LIMIT);
-    return checkedParseIntPositive(QueryOptionKey.NUM_GROUPS_LIMIT, maxNumGroupLimit);
+    return NUM_GROUPS_LIMIT_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static Integer getNumGroupsWarningLimit(Map<String, String> queryOptions) {
-    String numGroupsWarningLimit = queryOptions.get(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT);
-    return checkedParseIntPositive(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, numGroupsWarningLimit);
+    return NUM_GROUPS_WARNING_LIMIT_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMaxInitialResultHolderCapacity(Map<String, String> queryOptions) {
-    String maxInitialResultHolderCapacity = queryOptions.get(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY);
-    return checkedParseIntPositive(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, maxInitialResultHolderCapacity);
+    return MAX_INITIAL_RESULT_HOLDER_CAPACITY_PROP.resolve(queryOptions, null);
   }
 
   public static boolean optimizeMaxInitialResultHolderCapacityEnabled(Map<String, String> queryOptions) {
@@ -384,15 +520,15 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMSEMaxInitialResultHolderCapacity(Map<String, String> queryOptions) {
-    String maxInitialCapacity = queryOptions.get(QueryOptionKey.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
-    return checkedParseIntPositive(QueryOptionKey.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY, maxInitialCapacity);
+    return MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMinInitialIndexedTableCapacity(Map<String, String> queryOptions) {
-    String minInitialIndexedTableCapacity = queryOptions.get(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY);
-    return checkedParseIntPositive(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY, minInitialIndexedTableCapacity);
+    return MIN_INITIAL_INDEXED_TABLE_CAPACITY_PROP.resolve(queryOptions, null);
   }
 
   public static boolean shouldDropResults(Map<String, String> queryOptions) {
@@ -400,117 +536,126 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  @Deprecated
   public static Integer getSortAggregateLimitThreshold(Map<String, String> queryOptions) {
-    String sortAggregateLimitThreshold = queryOptions.get(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD);
-    return checkedParseIntPositive(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD, sortAggregateLimitThreshold);
+    return SORT_AGGREGATE_LIMIT_THRESHOLD_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getSortAggregateSequentialCombineNumSegmentsThreshold(Map<String, String> queryOptions) {
-    String sortAggregateSingleThreadedNumSegmentsThreshold =
-        queryOptions.get(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD);
-    return checkedParseIntPositive(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD,
-        sortAggregateSingleThreadedNumSegmentsThreshold);
+    return SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMaxStreamingPendingBlocks(Map<String, String> queryOptions) {
-    String maxStreamingPendingBlocks = queryOptions.get(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS);
-    return checkedParseIntPositive(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS, maxStreamingPendingBlocks);
+    return MAX_STREAMING_PENDING_BLOCKS_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMaxRowsInJoin(Map<String, String> queryOptions) {
-    String maxRowsInJoin = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_JOIN);
-    return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_JOIN, maxRowsInJoin);
+    return MAX_ROWS_IN_JOIN_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static JoinOverFlowMode getJoinOverflowMode(Map<String, String> queryOptions) {
-    String joinOverflowModeStr = queryOptions.get(QueryOptionKey.JOIN_OVERFLOW_MODE);
-    return joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
+    return JOIN_OVERFLOW_MODE_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static Integer getMaxRowsInWindow(Map<String, String> queryOptions) {
-    String maxRowsInWindow = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_WINDOW);
-    return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_WINDOW, maxRowsInWindow);
+    return MAX_ROWS_IN_WINDOW_PROP.resolve(queryOptions, null);
   }
 
   @Nullable
+  @Deprecated
   public static WindowOverFlowMode getWindowOverflowMode(Map<String, String> queryOptions) {
-    String windowOverflowModeStr = queryOptions.get(QueryOptionKey.WINDOW_OVERFLOW_MODE);
-    return windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
+    return WINDOW_OVERFLOW_MODE_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isSkipUnavailableServers(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UNAVAILABLE_SERVERS));
+    return SKIP_UNAVAILABLE_SERVERS_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isIgnoreMissingSegments(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IGNORE_MISSING_SEGMENTS));
+    return IGNORE_MISSING_SEGMENTS_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isSecondaryWorkload(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
+    return IS_SECONDARY_WORKLOAD_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isAccurateGroupByWithoutOrderBy(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY));
+    return ACCURATE_GROUP_BY_WITHOUT_ORDER_BY_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
-    String useMSEToFillEmptySchema = queryOptions.get(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
-    return useMSEToFillEmptySchema != null ? Boolean.parseBoolean(useMSEToFillEmptySchema) : defaultValue;
+    Boolean value = USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA_PROP.resolve(queryOptions, null);
+    return value != null ? value : defaultValue;
   }
 
   public static boolean isInferInvalidSegmentPartition(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION));
+    return INFER_INVALID_SEGMENT_PARTITION_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isInferRealtimeSegmentPartition(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_REALTIME_SEGMENT_PARTITION));
+    return INFER_REALTIME_SEGMENT_PARTITION_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isUseLeafServerForIntermediateStage(Map<String, String> queryOptions, boolean defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE);
-    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+    Boolean value = USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE_PROP.resolve(queryOptions, null);
+    return value != null ? value : defaultValue;
   }
 
   public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions, boolean defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.USE_PHYSICAL_OPTIMIZER);
-    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+    Boolean value = USE_PHYSICAL_OPTIMIZER_PROP.resolve(queryOptions, null);
+    return value != null ? value : defaultValue;
   }
 
   public static boolean isMultiClusterRoutingEnabled(Map<String, String> queryOptions, boolean defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING);
-    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+    Boolean value = ENABLE_MULTI_CLUSTER_ROUTING_PROP.resolve(queryOptions, null);
+    return value != null ? value : defaultValue;
   }
 
   public static boolean isUseLiteMode(Map<String, String> queryOptions, boolean defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.USE_LITE_MODE);
-    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+    Boolean value = USE_LITE_MODE_PROP.resolve(queryOptions, null);
+    return value != null ? value : defaultValue;
   }
 
   public static boolean isUseBrokerPruning(Map<String, String> queryOptions, boolean defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.USE_BROKER_PRUNING);
-    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+    Boolean value = USE_BROKER_PRUNING_PROP.resolve(queryOptions, null);
+    return value != null ? value : defaultValue;
   }
 
   public static boolean isRunInBroker(Map<String, String> queryOptions, boolean defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.RUN_IN_BROKER);
-    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+    Boolean value = RUN_IN_BROKER_PROP.resolve(queryOptions, null);
+    return value != null ? value : defaultValue;
   }
 
+  @Deprecated
   public static Integer getLiteModeLeafStageLimit(Map<String, String> queryOptions, int defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT);
-    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT, option) : defaultValue;
+    Integer value = LITE_MODE_LEAF_STAGE_LIMIT_PROP.resolve(queryOptions, null);
+    return value != null ? value : defaultValue;
   }
 
+  @Deprecated
   public static Integer getLiteModeLeafStageFanOutAdjustedLimit(Map<String, String> queryOptions, int defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT);
-    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT, option)
-        : defaultValue;
+    Integer value = LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT_PROP.resolve(queryOptions, null);
+    return value != null ? value : defaultValue;
+  }
+
+  static Set<String> parsePlannerRules(String optionName, String optionValue) {
+    // Example config: skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
+    String[] rules = StringUtils.split(optionValue, ',');
+    return rules == null ? Set.of() : new HashSet<>(List.of(rules));
+  }
+
+  static Integer parsePositiveInt(String optionName, String optionValue) {
+    return checkedParseIntPositive(optionName, optionValue);
   }
 
   @Nullable
@@ -585,16 +730,84 @@ public class QueryOptionsUtils {
         String.format("%s must be a number between %d and 2^63-1, got: %s", optionName, minValue, optionValue));
   }
 
+  static Long parsePositiveLong(String optionName, String optionValue) {
+    return checkedParseLongPositive(optionName, optionValue);
+  }
+
+  static Long parseNonNegativeLong(String optionName, String optionValue) {
+    return checkedParseLong(optionName, optionValue, 0);
+  }
+
+  static Integer parseNonNegativeInt(String optionName, String optionValue) {
+    return checkedParseIntNonNegative(optionName, optionValue);
+  }
+
+  static Integer parseUncheckedInt(String optionName, String optionValue) {
+    return uncheckedParseInt(optionName, optionValue);
+  }
+
+  static Long parseLong(String optionName, String optionValue) {
+    return Long.parseLong(optionValue);
+  }
+
+  static Boolean parseBoolean(String optionName, String optionValue) {
+    return Boolean.parseBoolean(optionValue);
+  }
+
+  static Boolean parseSkipOnFalse(String optionName, String optionValue) {
+    return "false".equalsIgnoreCase(optionValue);
+  }
+
+  static String parseString(String optionName, String optionValue) {
+    return optionValue;
+  }
+
+  static JoinOverFlowMode parseJoinOverflowMode(String optionName, String optionValue) {
+    return JoinOverFlowMode.valueOf(optionValue);
+  }
+
+  static WindowOverFlowMode parseWindowOverflowMode(String optionName, String optionValue) {
+    return WindowOverFlowMode.valueOf(optionValue);
+  }
+
+  static List<Integer> parseOrderedPreferredPools(String optionName, String optionValue) {
+    if (StringUtils.isEmpty(optionValue)) {
+      return Collections.emptyList();
+    }
+    String[] pools = optionValue.split("\\|");
+    List<Integer> preferredPools = new ArrayList<>(pools.length);
+    for (String pool : pools) {
+      preferredPools.add(Integer.parseInt(pool.trim()));
+    }
+    return preferredPools;
+  }
+
+  static Map<String, Set<FieldConfig.IndexType>> parseSkipIndexes(String optionName, String optionValue) {
+    String[] perColumnIndexSkip = StringUtils.split(optionValue, '&');
+    Map<String, Set<FieldConfig.IndexType>> skipIndexes = new HashMap<>();
+    for (String columnConf : perColumnIndexSkip) {
+      String[] conf = StringUtils.split(columnConf, '=');
+      if (conf.length != 2) {
+        throw new RuntimeException("Invalid format for " + optionName
+            + ". Example of valid format: SET skipIndexes='col1=inverted,range&col2=inverted'");
+      }
+      String columnName = conf[0];
+      String[] indexTypes = StringUtils.split(conf[1], ',');
+      for (String indexType : indexTypes) {
+        skipIndexes.computeIfAbsent(columnName, k -> new HashSet<>())
+            .add(FieldConfig.IndexType.valueOf(indexType.toUpperCase()));
+      }
+    }
+    return skipIndexes;
+  }
+
+  @Deprecated
   public static String getWorkloadName(Map<String, String> queryOptions) {
-    return queryOptions.getOrDefault(QueryOptionKey.WORKLOAD_NAME, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
+    return WORKLOAD_NAME_PROP.resolve(queryOptions, null);
   }
 
   public static boolean isReverseOrderAllowed(Map<String, String> queryOptions) {
-    String value = queryOptions.get(QueryOptionKey.ALLOW_REVERSE_ORDER);
-    if (value == null) {
-      return QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;
-    }
-    return Boolean.parseBoolean(value);
+    return ALLOW_REVERSE_ORDER_PROP.resolve(queryOptions, null);
   }
 
   /// When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
@@ -603,21 +816,14 @@ public class QueryOptionsUtils {
   /// - Otherwise, read dictionary while scanning the forward index, cache the matching/unmatching dictionary ids
   ///   during the scan
   @Nullable
+  @Deprecated
   public static Integer getRegexDictSizeThreshold(Map<String, String> queryOptions) {
-    String regexDictSizeThreshold = queryOptions.get(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD);
-    return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
+    return REGEX_DICT_SIZE_THRESHOLD_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
-    String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
-    if (sortExchangeCopyThreshold != null) {
-      try {
-        return Integer.parseInt(sortExchangeCopyThreshold);
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException(String.format("%s must be an integer, got: %s",
-            QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD, sortExchangeCopyThreshold));
-      }
-    }
-    return i;
+    Integer value = SORT_EXCHANGE_COPY_THRESHOLD_PROP.resolve(options, null);
+    return value != null ? value : i;
   }
 }

@@ -82,6 +82,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   private final String _instanceId;
   private final int _port;
+  private final PinotConfiguration _serverConf;
   private final QueryRunner _queryRunner;
   @Nullable
   private final TlsConfig _tlsConfig;
@@ -134,6 +135,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public QueryServer(PinotConfiguration serverConf, String instanceId, int port, QueryRunner queryRunner,
       @Nullable TlsConfig tlsConfig, @Nullable QueryAccessControlFactory accessControlFactory,
       ThreadAccountant threadAccountant) {
+    _serverConf = serverConf;
     _instanceId = instanceId;
     _port = port;
     _queryRunner = queryRunner;
@@ -306,7 +308,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       Map<String, String> reqMetadata, QueryExecutionContext executionContext) {
     QueryThreadContext.MseWorkerInfo mseWorkerInfo =
         new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
-    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant)) {
+    try (QueryThreadContext ignore =
+        QueryThreadContext.open(executionContext, mseWorkerInfo, reqMetadata, _serverConf, _threadAccountant)) {
       return _queryRunner.processQuery(workerMetadata, stagePlan, reqMetadata);
     }
   }
@@ -374,7 +377,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
             new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(),
                 workerMetadata.getWorkerId());
         StagePlan explainPlan;
-        try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant)) {
+        try (QueryThreadContext ignore =
+            QueryThreadContext.open(executionContext, mseWorkerInfo, reqMetadata, _serverConf, _threadAccountant)) {
           explainPlan = _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata);
         }
         ByteString rootAsBytes = PlanNodeSerializer.process(explainPlan.getRootNode()).toByteString();
@@ -405,7 +409,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
     Map<String, String> metadataMap = request.getMetadataMap();
     QueryExecutionContext executionContext = QueryExecutionContext.forTseServerRequest(metadataMap, _instanceId);
-    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
+    try (QueryThreadContext ignore =
+        QueryThreadContext.open(executionContext, metadataMap, _serverConf, _threadAccountant)) {
       _queryRunner.processTimeSeriesQuery(request.getDispatchPlanList(), metadataMap, responseObserver);
     }
   }

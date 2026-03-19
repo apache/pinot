@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -31,6 +33,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -172,6 +175,44 @@ public class QueryRoutingTest {
     _requestCount += 4;
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+  }
+
+  @Test
+  public void testSseQueryRoutingPreservesCustomQueryOption()
+      throws Exception {
+    long requestId = 456;
+    String customOptionKey = "test.custom.option";
+    String customOptionValue = "custom-value";
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
+    brokerRequest.getPinotQuery().putToQueryOptions(customOptionKey, customOptionValue);
+
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    byte[] responseBytes = dataTable.toBytes();
+    CountDownLatch customOptionObservedLatch = new CountDownLatch(1);
+
+    QueryScheduler queryScheduler = mock(QueryScheduler.class);
+    when(queryScheduler.submit(any())).thenAnswer(invocation -> {
+      ServerQueryRequest serverQueryRequest = invocation.getArgument(0);
+      Map<String, String> queryOptions = serverQueryRequest.getQueryContext().getQueryOptions();
+      if (customOptionValue.equals(queryOptions.get(customOptionKey))) {
+        customOptionObservedLatch.countDown();
+      }
+      return Futures.immediateFuture(responseBytes);
+    });
+
+    InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(), queryScheduler,
+        mock(AccessControl.class), ThreadAccountantUtils.getNoOpAccountant());
+    _queryServer = new QueryServer(TEST_PORT, null, handler);
+    _queryServer.start();
+
+    AsyncQueryResponse asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", brokerRequest, ROUTING_TABLE, null, null, 1_000L);
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+    assertEquals(response.size(), 1);
+    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
+    assertTrue(customOptionObservedLatch.await(5, TimeUnit.SECONDS),
+        "Expected custom query option to be preserved in SSE ServerQueryRequest");
   }
 
   @Test

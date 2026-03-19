@@ -48,6 +48,7 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -114,7 +115,7 @@ public class PipelineBreakerExecutorTest {
             "serverId", "");
     QueryThreadContext.MseWorkerInfo workerInfo = new QueryThreadContext.MseWorkerInfo(1, 2);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, workerInfo,
-        ThreadAccountantUtils.getNoOpAccountant())) {
+        opChainMetadata, new PinotConfiguration(Map.of()), ThreadAccountantUtils.getNoOpAccountant())) {
       return PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan,
           opChainMetadata, true, true);
     }

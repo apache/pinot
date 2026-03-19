@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
@@ -193,6 +195,27 @@ public class QueryOptionsUtilsTest {
     String actualHash = QueryOptionsUtils.getQueryHash(queryOptions);
     assertEquals(actualHash, "");
   }
+
+  @Test
+  public void testResolverReadsValueFromPinotConfiguration() {
+    PinotConfiguration pinotConfiguration =
+        new PinotConfiguration(Map.of(MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN, "17"));
+
+    Integer value = QueryOptionsUtils.MAX_ROWS_IN_JOIN_PROP.resolve(Map.of(), pinotConfiguration);
+
+    assertEquals(value, Integer.valueOf(17));
+  }
+
+  @Test
+  public void testResolverQueryOptionOverridesPinotConfiguration() {
+    PinotConfiguration pinotConfiguration =
+        new PinotConfiguration(Map.of(MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN, "17"));
+
+    Integer value = QueryOptionsUtils.MAX_ROWS_IN_JOIN_PROP.resolve(Map.of(MAX_ROWS_IN_JOIN, "19"), pinotConfiguration);
+
+    assertEquals(value, Integer.valueOf(19));
+  }
+
 
   private static Object getValue(Map<String, String> map, String key) {
     switch (key) {

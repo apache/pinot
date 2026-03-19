@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.executor;
 
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.executor.ThrottleOnCriticalHeapUsageExecutor;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -64,7 +66,9 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
     Mockito.when(accountant.throttleQuerySubmission()).thenAnswer(inv -> throttle.get());
 
     // Open a query context for submitting tasks
-    try (QueryThreadContext ignored = QueryThreadContext.open(QueryExecutionContext.forMseTest(), accountant)) {
+    try (QueryThreadContext ignored =
+        QueryThreadContext.open(QueryExecutionContext.forMseTest(), Map.of(), new PinotConfiguration(Map.of()),
+            accountant)) {
       ThrottleOnCriticalHeapUsageExecutor ex = new ThrottleOnCriticalHeapUsageExecutor(
           _base, /*maxQueueSize*/ 100, /*timeout*/ TimeUnit.SECONDS.toMillis(5), /*monitor*/ 50);
 

@@ -355,7 +355,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (cid == null) {
       cid = Long.toString(requestId);
     }
-    String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
+    String workloadName = QueryOptionsUtils.getWorkloadName(options);
 
     // NOTE: Timeout hasn't been resolved at this point, so we don't set deadline in the execution context here.
     //       Timeout is currently handled by processBrokerRequest().
@@ -364,7 +365,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         new QueryExecutionContext(QueryExecutionContext.QueryType.SSE, requestId, cid, workloadName,
             requestContext.getRequestArrivalTimeMillis(), Long.MAX_VALUE, Long.MAX_VALUE, _brokerId, _brokerId,
             queryHash);
-    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, options, _config, _threadAccountant)) {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
           httpHeaders, accessControl, queryWasLogged);
     }
