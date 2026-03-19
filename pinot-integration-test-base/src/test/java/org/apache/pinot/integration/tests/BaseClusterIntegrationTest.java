@@ -97,8 +97,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
 
@@ -106,8 +104,6 @@ import org.testng.Assert;
  * Shared implementation details of the cluster integration tests.
  */
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
-
   // Default settings
   protected static final String DEFAULT_TABLE_NAME = "mytable";
   protected static final String DEFAULT_LOGICAL_TABLE_NAME = "mytable_logical";
@@ -781,7 +777,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableConfig.getTableName()) == expectedNoOfDocs, 100L,
         timeoutMs, "Failed to load " + expectedNoOfDocs + " documents in table " + tableConfig.getTableName(),
-        true, Duration.ofMillis(timeoutMs / 10));
+        Duration.ofMillis(timeoutMs / 10));
   }
 
   protected List<File> getAllAvroFiles()
@@ -1062,9 +1058,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForDocsLoaded(timeoutMs, true, getTableName());
+    waitForAllDocsLoaded(getTableName(), timeoutMs);
   }
 
+  protected void waitForAllDocsLoaded(String tableName, long timeoutMs) {
+    long countStarResult = getCountStarResult();
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
+        "Failed to load " + countStarResult + " documents", Duration.ofMillis(timeoutMs / 10));
+  }
+
+  protected void waitForAnyDocLoaded(String tableName, long timeoutMs) {
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) > 0, 100L, timeoutMs,
+        "Failed to load any document", Duration.ofMillis(timeoutMs / 10));
+  }
+
+  /// @deprecated Always raise error when condition is not met.
+  @Deprecated
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
@@ -1073,16 +1082,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void waitForAllRealtimePartitionsConsuming(String tableNameWithType, long timeoutMs) {
     int expectedPartitions = getNumKafkaPartitions();
-    TestUtils.waitForCondition(() -> hasConsumingSegmentsForAllPartitions(tableNameWithType, expectedPartitions), 200L,
-        timeoutMs, "Failed to get CONSUMING segments for all " + expectedPartitions + " partitions for table "
-            + tableNameWithType, false, Duration.ofMillis(timeoutMs / 10));
-    int consumingPartitions = getNumConsumingPartitions(tableNameWithType);
-    Assert.assertEquals(consumingPartitions, expectedPartitions, "Expected CONSUMING segments for "
-        + expectedPartitions + " partitions, found " + consumingPartitions + " for table " + tableNameWithType);
-  }
-
-  private boolean hasConsumingSegmentsForAllPartitions(String tableNameWithType, int expectedPartitions) {
-    return getNumConsumingPartitions(tableNameWithType) >= expectedPartitions;
+    TestUtils.waitForCondition(() -> getNumConsumingPartitions(tableNameWithType) == expectedPartitions, 200L,
+        timeoutMs,
+        "Failed to get CONSUMING segments for all " + expectedPartitions + " partitions for table " + tableNameWithType,
+        Duration.ofMillis(timeoutMs / 10));
   }
 
   private int getNumConsumingPartitions(String tableNameWithType) {
@@ -1102,11 +1105,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       }
     }
     return consumingPartitions.size();
-  }
-
-  protected void waitForNonZeroDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
-    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) > 0, 100L, timeoutMs,
-        "Failed to load non zero documents", raiseError, Duration.ofMillis(timeoutMs / 10));
   }
 
   /**
