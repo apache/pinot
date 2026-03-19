@@ -136,8 +136,9 @@ public class SegmentPrunerService {
    *
    * @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
    *                 undefined way. Therefore, this list should not be used after calling this method.
-   * @param query    query context; when non-null and skipUpsert=true, segments with 0 valid docs are not treated as
-   *                 empty (they contribute replaced rows to the result).
+   * @param query    query context; when non-null and skipUpsert=true, segments with 0 queryable/valid docs are not
+   *                 treated as empty (they contribute replaced rows to the result). When queryable doc ids exist,
+   *                 emptiness is determined from them; otherwise {@link IndexSegment#getValidDocIds()} is used.
    * @return the new list with filtered elements. This is the list that have to be used.
    */
   private static List<IndexSegment> removeEmptySegments(List<IndexSegment> segments, @Nullable QueryContext query) {
@@ -154,11 +155,17 @@ public class SegmentPrunerService {
     if (segment.getSegmentMetadata().getTotalDocs() == 0) {
       return true;
     }
-    // For upsert tables, treat segments with 0 valid docs as empty only when the query does not skip upsert.
+    // For upsert tables, treat segments with 0 docs to query as empty only when the query does not skip upsert.
     // When skipUpsert=true, the query returns all docs (including replaced), so the segment contributes rows.
     // Use query options map directly: _skipUpsert is only set on the server; the broker has options in the map.
     if (query != null && query.getQueryOptions() != null && QueryOptionsUtils.isSkipUpsert(query.getQueryOptions())) {
       return false;
+    }
+    // Align with query execution: when present, queryable doc ids are what the user sees (valid may still hold
+    // replaced rows). Otherwise fall back to valid doc ids for upsert segments without a separate queryable bitmap.
+    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
+    if (queryableDocIds != null) {
+      return queryableDocIds.getMutableRoaringBitmap().isEmpty();
     }
     ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
     return validDocIds != null && validDocIds.getMutableRoaringBitmap().isEmpty();
