@@ -28,10 +28,12 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -161,13 +163,7 @@ public class SegmentPrunerService {
     if (query != null && query.getQueryOptions() != null && QueryOptionsUtils.isSkipUpsert(query.getQueryOptions())) {
       return false;
     }
-    // Align with query execution: when present, queryable doc ids are what the user sees (valid may still hold
-    // replaced rows). Otherwise fall back to valid doc ids for upsert segments without a separate queryable bitmap.
-    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
-    if (queryableDocIds != null) {
-      return queryableDocIds.getMutableRoaringBitmap().isEmpty();
-    }
-    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
-    return validDocIds != null && validDocIds.getMutableRoaringBitmap().isEmpty();
+    MutableRoaringBitmap queryableDocIds = UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment);
+    return queryableDocIds != null && queryableDocIds.isEmpty();
   }
 }
