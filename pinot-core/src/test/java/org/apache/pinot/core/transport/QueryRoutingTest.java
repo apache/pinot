@@ -181,6 +181,7 @@ public class QueryRoutingTest {
   public void testSseQueryRoutingPreservesCustomQueryOption()
       throws Exception {
     long requestId = 456;
+    String serverId = SERVER_INSTANCE.getInstanceId();
     String customOptionKey = "test.custom.option";
     String customOptionValue = "custom-value";
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
@@ -213,6 +214,10 @@ public class QueryRoutingTest {
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
     assertTrue(customOptionObservedLatch.await(5, TimeUnit.SECONDS),
         "Expected custom query option to be preserved in SSE ServerQueryRequest");
+    // Keep cumulative adaptive selector stats in sync with other tests.
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
   }
 
   @Test

@@ -116,8 +116,7 @@ public class QueryOptionsUtils {
   public static final Prop<Integer> MAX_STREAMING_PENDING_BLOCKS_PROP =
       Prop.fromRuntimeMap(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS, QueryOptionsUtils::parsePositiveInt, null);
   public static final Prop<Integer> MAX_ROWS_IN_JOIN_PROP =
-      Prop.fromNullInteger()
-          .withConfig(MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN, QueryOptionsUtils::parsePositiveInt)
+      Prop.fromRuntimeMap(MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN, QueryOptionsUtils::parsePositiveInt, null)
           .withRuntimeMap(QueryOptionKey.MAX_ROWS_IN_JOIN, QueryOptionsUtils::parsePositiveInt);
   public static final Prop<JoinOverFlowMode> JOIN_OVERFLOW_MODE_PROP =
       Prop.fromRuntimeMap(QueryOptionKey.JOIN_OVERFLOW_MODE, QueryOptionsUtils::parseJoinOverflowMode, null);
@@ -294,18 +293,22 @@ public class QueryOptionsUtils {
     return MAX_QUERY_RESPONSE_SIZE_BYTES_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static boolean isAndScanReorderingEnabled(Map<String, String> queryOptions) {
     return AND_SCAN_REORDERING_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
     return SKIP_UPSERT_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static boolean isSkipUpsertView(Map<String, String> queryOptions) {
     return SKIP_UPSERT_VIEW_PROP.resolve(queryOptions, null);
   }
 
+  @Deprecated
   public static boolean isTraceRuleProductions(Map<String, String> queryOptions) {
     return TRACE_RULE_PRODUCTIONS_PROP.resolve(queryOptions, null);
   }

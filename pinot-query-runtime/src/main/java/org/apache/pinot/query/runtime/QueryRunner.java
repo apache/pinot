@@ -131,8 +131,6 @@ public class QueryRunner {
 
   // Join overflow settings
   @Nullable
-  private Integer _maxRowsInJoin;
-  @Nullable
   private JoinOverFlowMode _joinOverflowMode;
   @Nullable
   private Integer _maxRowsInWindow;
@@ -184,9 +182,6 @@ public class QueryRunner {
         serverConf.getProperty(Server.CONFIG_OF_MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _mseMaxInitialResultHolderCapacity =
         mseMaxInitialGroupHolderCapacity != null ? Integer.parseInt(mseMaxInitialGroupHolderCapacity) : null;
-
-    String maxRowsInJoinStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN);
-    _maxRowsInJoin = maxRowsInJoinStr != null ? Integer.parseInt(maxRowsInJoinStr) : null;
 
     String joinOverflowModeStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
@@ -305,38 +300,42 @@ public class QueryRunner {
       Map<String, String> requestMetadata) {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
+    // MSE corner case: stage custom properties can override request-level options.
+    // Re-open a nested context with the effective metadata so no-arg Prop.resolve() observes stage-preferred values
+    // during worker execution and in async tasks decorated by contextAwareExecutorService.
+    try (QueryThreadContext ignore = openWithEffectiveMseOptions(Map.copyOf(opChainMetadata))) {
+      // run pre-stage execution for all pipeline breakers
+      PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
+          _opChainScheduler, _mailboxService, workerMetadata, stagePlan, opChainMetadata,
+          _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
 
-    // run pre-stage execution for all pipeline breakers
-    PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
-        _opChainScheduler, _mailboxService, workerMetadata, stagePlan, opChainMetadata,
-        _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
-
-    // Send error block to all the receivers if pipeline breaker fails
-    if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
-      ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
-      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
-      return;
-    }
-
-    // run OpChain
-    OpChainExecutionContext executionContext =
-        OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-            pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
-    try {
-      OpChain opChain;
-      if (workerMetadata.isLeafStageWorker()) {
-        Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
-        opChain =
-            ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-                rlsFilters);
-      } else {
-        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+      // Send error block to all the receivers if pipeline breaker fails
+      if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
+        ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+        notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
+        return;
       }
-      // This can fail if the executor rejects the task.
-      _opChainScheduler.register(opChain);
-    } catch (RuntimeException e) {
-      ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
-      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
+
+      // run OpChain
+      OpChainExecutionContext executionContext =
+          OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
+              pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+      try {
+        OpChain opChain;
+        if (workerMetadata.isLeafStageWorker()) {
+          Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
+          opChain =
+              ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+                  rlsFilters);
+        } else {
+          opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+        }
+        // This can fail if the executor rejects the task.
+        _opChainScheduler.register(opChain);
+      } catch (RuntimeException e) {
+        ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
+        notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
+      }
     }
   }
 
@@ -470,6 +469,10 @@ public class QueryRunner {
       opChainMetadata.put(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, Integer.toString(_numGroupsWarningLimit));
     }
     // 4. add all overrides from config if anything is still empty.
+    // NOTE: We intentionally materialize effective values into opChainMetadata below (instead of only relying on
+    // no-arg Prop.resolve()) because several runtime operators still consume the map via QueryOptionsUtils.getX(...)
+    // helpers, which do not read PinotConfiguration fallback. Once those consumers migrate to Prop-based resolution,
+    // this normalization block can be simplified/removed.
     Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
     if (numGroupsLimit == null) {
       numGroupsLimit = _numGroupsLimit;
@@ -513,7 +516,11 @@ public class QueryRunner {
           Integer.toString(mseMaxInitialResultHolderCapacity));
     }
 
-    Integer maxRowsInJoin = QueryOptionsUtils.MAX_ROWS_IN_JOIN_PROP.resolve();
+    QueryThreadContext threadContext = QueryThreadContext.get();
+    // MSE corner case: no-arg resolve() would read the outer request metadata map from QueryThreadContext and miss
+    // stage-level overrides already applied into opChainMetadata. Resolve explicitly against opChainMetadata here.
+    Integer maxRowsInJoin = QueryOptionsUtils.MAX_ROWS_IN_JOIN_PROP.resolve(opChainMetadata,
+        threadContext.getPinotConfiguration());
     if (maxRowsInJoin != null) {
       opChainMetadata.put(QueryOptionKey.MAX_ROWS_IN_JOIN, Integer.toString(maxRowsInJoin));
     }
@@ -559,31 +566,39 @@ public class QueryRunner {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
-    if (PipelineBreakerExecutor.hasPipelineBreakers(stagePlan)) {
-      //TODO: See https://github.com/apache/pinot/pull/13733#discussion_r1752031714
-      LOGGER.error("Pipeline breaker is not supported in explain query");
-      return stagePlan;
-    }
-
-    Map<PlanNode, ExplainedNode> leafNodes = new HashMap<>();
-    BiConsumer<PlanNode, MultiStageOperator> leafNodesConsumer = (node, operator) -> {
-      if (operator instanceof LeafOperator) {
-        leafNodes.put(node, ((LeafOperator) operator).explain());
+    try (QueryThreadContext ignore = openWithEffectiveMseOptions(Map.copyOf(opChainMetadata))) {
+      if (PipelineBreakerExecutor.hasPipelineBreakers(stagePlan)) {
+        //TODO: See https://github.com/apache/pinot/pull/13733#discussion_r1752031714
+        LOGGER.error("Pipeline breaker is not supported in explain query");
+        return stagePlan;
       }
-    };
-    // compile OpChain
-    OpChainExecutionContext executionContext =
-        OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata, null,
-            false, false);
 
-    OpChain opChain =
-        ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-            leafNodesConsumer, true, Map.of());
-    opChain.close(); // probably unnecessary, but formally needed
+      Map<PlanNode, ExplainedNode> leafNodes = new HashMap<>();
+      BiConsumer<PlanNode, MultiStageOperator> leafNodesConsumer = (node, operator) -> {
+        if (operator instanceof LeafOperator) {
+          leafNodes.put(node, ((LeafOperator) operator).explain());
+        }
+      };
+      // compile OpChain
+      OpChainExecutionContext executionContext =
+          OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
+              null, false, false);
 
-    PlanNode rootNode = substituteNode(stagePlan.getRootNode(), leafNodes);
+      OpChain opChain =
+          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+              leafNodesConsumer, true, Map.of());
+      opChain.close(); // probably unnecessary, but formally needed
 
-    return new StagePlan(rootNode, stagePlan.getStageMetadata());
+      PlanNode rootNode = substituteNode(stagePlan.getRootNode(), leafNodes);
+
+      return new StagePlan(rootNode, stagePlan.getStageMetadata());
+    }
+  }
+
+  private QueryThreadContext openWithEffectiveMseOptions(Map<String, String> effectiveOptions) {
+    QueryThreadContext currentContext = QueryThreadContext.get();
+    return QueryThreadContext.open(currentContext.getExecutionContext(), currentContext.getMseWorkerInfo(),
+        effectiveOptions, currentContext.getPinotConfiguration(), currentContext.getAccountant());
   }
 
   private PlanNode substituteNode(PlanNode node, Map<PlanNode, ? extends PlanNode> substitutions) {
