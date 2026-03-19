@@ -139,13 +139,10 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     setupTable(DEFAULT_TABLE_NAME);
     setupTable(DEFAULT_TABLE_NAME_2);
     setupTable(DEFAULT_TABLE_NAME_3);
-
-    waitForAllDocsLoaded(600_000L);
   }
 
   private void setupTable(String tableName)
       throws Exception {
-
     Schema schema = createSchema();
     schema.setSchemaName(tableName);
     addSchema(schema);
@@ -156,7 +153,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
     addTableConfig(tableConfig);
 
-    waitForDocsLoaded(600_000L, true, tableConfig.getTableName());
+    waitForAllDocsLoaded(tableName, 600_000L);
   }
 
   @AfterClass

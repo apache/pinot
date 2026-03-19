@@ -181,7 +181,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   }
 
   private void checkTotalDocsInQuery(long expectedTotalDocs) {
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+    TestUtils.waitForCondition(new Function<>() {
       @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
@@ -192,11 +192,11 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
           return null;
         }
       }
-    }, 100L, 120_000, "Failed to load " + expectedTotalDocs + " documents", true);
+    }, 100L, 120_000L, "Failed to load " + expectedTotalDocs + " documents");
   }
 
   private void checkNumSegments(int expectedNumSegments) {
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+    TestUtils.waitForCondition(new Function<>() {
       @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
@@ -207,7 +207,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
           return null;
         }
       }
-    }, 100L, 120_000, "Failed to load get num segments", true);
+    }, 100L, 120_000L, "Failed to load get num segments");
   }
 
   @AfterClass

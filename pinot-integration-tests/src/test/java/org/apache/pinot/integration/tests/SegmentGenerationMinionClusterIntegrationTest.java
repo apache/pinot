@@ -101,7 +101,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
         LOGGER.error("Failed to get expected totalDocs: {}", rowCnt, e);
         return false;
       }
-    }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents", true);
+    }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents");
     JsonNode result = postQuery("SELECT COUNT(*) FROM " + tableName);
     // One segment per file.
     assertEquals(result.get("numSegmentsQueried").asInt(), 7);
@@ -146,7 +146,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
         LOGGER.error("Failed to get expected totalDocs: {}", rowCnt, e);
         return false;
       }
-    }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents", true);
+    }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents");
     JsonNode result = postQuery("SELECT COUNT(*) FROM " + tableName);
     // One segment per file.
     assertEquals(result.get("numSegmentsQueried").asInt(), 7);

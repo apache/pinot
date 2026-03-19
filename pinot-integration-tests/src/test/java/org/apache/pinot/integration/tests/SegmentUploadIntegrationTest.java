@@ -19,13 +19,11 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -422,18 +420,9 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
         .get(0).get("OFFLINE");
   }
 
-  protected void testCountStar(final long countStarResult) {
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          return getCurrentCountStarResult() == countStarResult;
-        } catch (Exception e) {
-          return null;
-        }
-      }
-    }, 100L, 300_000, "Failed to load " + countStarResult + " documents", true);
+  protected void testCountStar(long countStarResult) {
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult() == countStarResult, 100L, 300_000L,
+        "Failed to load " + countStarResult + " documents", null);
   }
 
   @Override

@@ -32,8 +32,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.apache.pinot.util.TestUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -43,7 +41,6 @@ import org.yaml.snakeyaml.Yaml;
 
 
 public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SSBQueryIntegrationTest.class);
   private static final Map<String, String> SSB_QUICKSTART_TABLE_RESOURCES = Map.of(
       "customer", "examples/batch/ssb/customer",
       "dates", "examples/batch/ssb/dates",
@@ -93,7 +90,7 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
       uploadSegments(tableName, _tarDir);
       // H2
       ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
-      waitForNonZeroDocsLoaded(60_000L, true, tableName);
+      waitForAnyDocLoaded(tableName, 60_000L);
     }
   }
 
