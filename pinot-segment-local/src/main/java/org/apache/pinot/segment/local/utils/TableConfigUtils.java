@@ -789,6 +789,8 @@ public final class TableConfigUtils {
     if (tableConfig.getTableType() == TableType.OFFLINE) {
       Preconditions.checkState(isUpsertEnabled && !isDedupEnabled,
           "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
+      Preconditions.checkState(tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL,
+          "Partial upsert is not supported for OFFLINE table");
       // Offline upsert tables require segment partition config so that segments are assigned to servers
       // based on partition, ensuring all segments of a partition land on the same server for correct dedup.
       IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
