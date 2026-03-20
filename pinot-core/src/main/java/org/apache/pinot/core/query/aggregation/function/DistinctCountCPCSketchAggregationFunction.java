@@ -146,7 +146,9 @@ public class DistinctCountCPCSketchAggregationFunction
         CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(aggregationResultHolder);
         CpcSketch[] sketches = deserializeSketches(bytesValues, length);
         for (CpcSketch sketch : sketches) {
-          cpcSketchAccumulator.apply(sketch);
+          if (sketch != null) {
+            cpcSketchAccumulator.apply(sketch);
+          }
         }
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while merging CPC sketches", e);
@@ -214,9 +216,11 @@ public class DistinctCountCPCSketchAggregationFunction
       try {
         CpcSketch[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
-          CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(groupByResultHolder, groupKeyArray[i]);
           CpcSketch sketch = sketches[i];
-          cpcSketchAccumulator.apply(sketch);
+          if (sketch != null) {
+            CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(groupByResultHolder, groupKeyArray[i]);
+            cpcSketchAccumulator.apply(sketch);
+          }
         }
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while aggregating CPC Sketches", e);
@@ -285,8 +289,10 @@ public class DistinctCountCPCSketchAggregationFunction
       try {
         CpcSketch[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
-          for (int groupKey : groupKeysArray[i]) {
-            getAccumulator(groupByResultHolder, groupKey).apply(sketches[i]);
+          if (sketches[i] != null) {
+            for (int groupKey : groupKeysArray[i]) {
+              getAccumulator(groupByResultHolder, groupKey).apply(sketches[i]);
+            }
           }
         }
       } catch (Exception e) {
@@ -600,13 +606,15 @@ public class DistinctCountCPCSketchAggregationFunction
   }
 
   /**
-   * Deserializes the sketches from the bytes.
+   * Deserializes the sketches from the bytes.  Returns null for empty byte arrays which represent
+   * the default null value for BYTES columns in Pinot.  Callers must handle null entries.
    */
   @SuppressWarnings({"unchecked"})
   private CpcSketch[] deserializeSketches(byte[][] serializedSketches, int length) {
     CpcSketch[] sketches = new CpcSketch[length];
     for (int i = 0; i < length; i++) {
-      sketches[i] = CpcSketch.heapify(Memory.wrap(serializedSketches[i]));
+      byte[] bytes = serializedSketches[i];
+      sketches[i] = bytes.length > 0 ? CpcSketch.heapify(Memory.wrap(bytes)) : null;
     }
     return sketches;
   }
