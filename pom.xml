@@ -255,7 +255,7 @@
     <kerby.version>2.1.1</kerby.version>
     <jline.version>4.0.7</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
-    <jettison.version>1.5.4</jettison.version>
+    <jettison.version>1.5.5</jettison.version>
     <nimbus-jose-jwt.version>10.8</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.4</dnsjava.version>
     <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
