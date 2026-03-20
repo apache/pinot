@@ -162,7 +162,8 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public @Nullable RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+  @Nullable
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     if (!_defaultIsNull) {
       return super.getNullBitmap(valueBlock);
     }
