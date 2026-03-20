@@ -16,16 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -44,8 +41,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -58,74 +53,80 @@ import static org.testng.Assert.assertEquals;
  * keeping the latest record based on the comparison column (time column).
  *
  * Test data layout:
- *   Segment 1 (partition 0): playerId=100 (score=2000, ts=1000), playerId=101 (score=3000, ts=1000)
- *   Segment 2 (partition 0): playerId=100 (score=2500, ts=2000), playerId=102 (score=4000, ts=1000)
- *   Segment 3 (partition 0): playerId=101 (score=3500, ts=2000), playerId=102 (score=4500, ts=2000)
+ *   Segment 1: playerId=100 (score=2000, ts=1671036400000), playerId=101 (score=3000, ts=1671036400000)
+ *   Segment 2: playerId=100 (score=2500, ts=1681036400000), playerId=102 (score=4000, ts=1671036400000)
+ *   Segment 3: playerId=101 (score=3500, ts=1681036400000), playerId=102 (score=4500, ts=1681036400000)
  *
  * After upsert dedup (latest by timestampInEpoch):
- *   playerId=100 -> score=2500 (from segment 2, ts=2000)
- *   playerId=101 -> score=3500 (from segment 3, ts=2000)
- *   playerId=102 -> score=4500 (from segment 3, ts=2000)
+ *   playerId=100 -> score=2500, playerId=101 -> score=3500, playerId=102 -> score=4500
  */
-public class OfflineUpsertTableIntegrationTest extends BaseClusterIntegrationTest {
-  private static final String TABLE_NAME = "offlineUpsertTest";
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTest {
+
+  private static final String TABLE_NAME = "OfflineUpsertTableTest";
   private static final String PRIMARY_KEY_COL = "playerId";
   private static final String TIME_COL_NAME = "timestampInEpoch";
   private static final int NUM_PARTITIONS = 1;
   private static final int TOTAL_RAW_RECORDS = 6;
   private static final int UNIQUE_PRIMARY_KEYS = 3;
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
-
-    // Create and upload schema
-    Schema schema = createUpsertSchema();
-    addSchema(schema);
-
-    // Create OFFLINE table config with upsert enabled
-    TableConfig tableConfig = createOfflineUpsertTableConfig();
-    addTableConfig(tableConfig);
-
-    // Build and upload segments with overlapping primary keys
-    buildAndUploadTestSegments(tableConfig, schema);
-
-    // Wait for all documents to load
-    waitForAllDocsLoaded(600_000L);
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws IOException {
-    dropOfflineTable(TABLE_NAME);
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
-  }
-
   @Override
-  protected String getTableName() {
+  public String getTableName() {
     return TABLE_NAME;
-  }
-
-  @Nullable
-  @Override
-  protected String getTimeColumnName() {
-    return TIME_COL_NAME;
   }
 
   @Override
   protected long getCountStarResult() {
     return UNIQUE_PRIMARY_KEYS;
+  }
+
+  @Override
+  public Schema createSchema() {
+    return new Schema.SchemaBuilder()
+        .setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(PRIMARY_KEY_COL, FieldSpec.DataType.INT)
+        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("game", FieldSpec.DataType.STRING)
+        .addMetric("score", FieldSpec.DataType.FLOAT)
+        .addDateTime(TIME_COL_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(List.of(PRIMARY_KEY_COL))
+        .build();
+  }
+
+  @Override
+  public List<File> createAvroFiles() {
+    return List.of();
+  }
+
+  @Override
+  public TableConfig createOfflineTableConfig() {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put(PRIMARY_KEY_COL, new ColumnPartitionConfig("Murmur", NUM_PARTITIONS));
+
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL_NAME)
+        .setNumReplicas(2)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(new RoutingConfig(null, null,
+            RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PRIMARY_KEY_COL, 1))
+        .build();
+  }
+
+  @Override
+  protected void setUpTable()
+      throws Exception {
+    Schema schema = createSchema();
+    addSchema(schema);
+
+    TableConfig tableConfig = createOfflineTableConfig();
+    addTableConfig(tableConfig);
+
+    buildAndUploadTestSegments(tableConfig, schema);
   }
 
   @Override
@@ -141,50 +142,37 @@ public class OfflineUpsertTableIntegrationTest extends BaseClusterIntegrationTes
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
   }
 
-  /**
-   * Tests that COUNT(*) returns only unique primary keys (deduplication is working).
-   */
   @Test
   public void testUpsertQueryResults()
       throws Exception {
-    // With upsert: should return only 3 unique primary keys
     long upsertCount = getCurrentCountStarResult();
     assertEquals(upsertCount, UNIQUE_PRIMARY_KEYS,
         "Expected " + UNIQUE_PRIMARY_KEYS + " unique records after upsert dedup");
 
-    // Without upsert: should return all 6 raw records
     long rawCount = queryCountStarWithoutUpsert();
     assertEquals(rawCount, TOTAL_RAW_RECORDS,
         "Expected " + TOTAL_RAW_RECORDS + " raw records with skipUpsert=true");
 
-    // Verify the latest records are returned (by checking scores)
     ResultSet rs = getPinotConnection().execute(
         "SELECT playerId, score FROM " + TABLE_NAME + " ORDER BY playerId").getResultSet(0);
     assertEquals(rs.getRowCount(), UNIQUE_PRIMARY_KEYS);
 
-    // playerId=100 -> score=2500 (latest from segment 2)
     assertEquals(rs.getInt(0, 0), 100);
     assertEquals(rs.getFloat(0, 1), 2500.0f, 0.01f);
 
-    // playerId=101 -> score=3500 (latest from segment 3)
     assertEquals(rs.getInt(1, 0), 101);
     assertEquals(rs.getFloat(1, 1), 3500.0f, 0.01f);
 
-    // playerId=102 -> score=4500 (latest from segment 3)
     assertEquals(rs.getInt(2, 0), 102);
     assertEquals(rs.getFloat(2, 1), 4500.0f, 0.01f);
   }
 
-  /**
-   * Tests that uploading a new segment with updated records replaces older values.
-   */
   @Test(dependsOnMethods = "testUpsertQueryResults")
-  public void testSegmentReplacement()
+  public void testUpsertAfterAdditionalSegmentUpload()
       throws Exception {
-    Schema schema = createUpsertSchema();
-    TableConfig tableConfig = getOfflineTableConfig();
+    Schema schema = createSchema();
+    TableConfig tableConfig = getSharedHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
 
-    // Build a new segment with updated values for playerId=100
     List<GenericRow> rows = new ArrayList<>();
     GenericRow row = new GenericRow();
     row.putValue(PRIMARY_KEY_COL, 100);
@@ -200,7 +188,6 @@ public class OfflineUpsertTableIntegrationTest extends BaseClusterIntegrationTes
     buildSegment(tableConfig, schema, "segment_update_0", rows, newSegmentDir, newTarDir);
     uploadSegments(TABLE_NAME, newTarDir);
 
-    // Wait for the new segment to load (7 total raw records now)
     TestUtils.waitForCondition(aVoid -> {
       try {
         return queryCountStarWithoutUpsert() == TOTAL_RAW_RECORDS + 1;
@@ -209,60 +196,26 @@ public class OfflineUpsertTableIntegrationTest extends BaseClusterIntegrationTes
       }
     }, 100L, 600_000L, "Failed to load updated segment");
 
-    // Verify upsert still returns 3 unique primary keys
     assertEquals(getCurrentCountStarResult(), UNIQUE_PRIMARY_KEYS);
 
-    // Verify playerId=100 now has the updated score
     ResultSet rs = getPinotConnection().execute(
         "SELECT score FROM " + TABLE_NAME + " WHERE playerId = 100").getResultSet(0);
     assertEquals(rs.getRowCount(), 1);
     assertEquals(rs.getFloat(0, 0), 9999.0f, 0.01f);
   }
 
-  private Schema createUpsertSchema() {
-    return new Schema.SchemaBuilder()
-        .setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(PRIMARY_KEY_COL, FieldSpec.DataType.INT)
-        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("game", FieldSpec.DataType.STRING)
-        .addMetric("score", FieldSpec.DataType.FLOAT)
-        .addDateTime(TIME_COL_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .setPrimaryKeyColumns(List.of(PRIMARY_KEY_COL))
-        .build();
-  }
-
-  private TableConfig createOfflineUpsertTableConfig() {
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-
-    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
-    columnPartitionConfigMap.put(PRIMARY_KEY_COL, new ColumnPartitionConfig("Murmur", NUM_PARTITIONS));
-
-    return new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(TABLE_NAME)
-        .setTimeColumnName(TIME_COL_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setRoutingConfig(new RoutingConfig(null, null,
-            RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PRIMARY_KEY_COL, 1))
-        .build();
-  }
-
   private void buildAndUploadTestSegments(TableConfig tableConfig, Schema schema)
       throws Exception {
-    // Segment 1: playerId=100 (score=2000, ts=1671036400000), playerId=101 (score=3000, ts=1671036400000)
     List<GenericRow> segment1Rows = new ArrayList<>();
     segment1Rows.add(createRow(100, "Alice", "chess", 2000.0f, 1671036400000L));
     segment1Rows.add(createRow(101, "Bob", "chess", 3000.0f, 1671036400000L));
     buildSegment(tableConfig, schema, "segment_0", segment1Rows, _segmentDir, _tarDir);
 
-    // Segment 2: playerId=100 (score=2500, ts=1681036400000), playerId=102 (score=4000, ts=1671036400000)
     List<GenericRow> segment2Rows = new ArrayList<>();
     segment2Rows.add(createRow(100, "Alice", "chess", 2500.0f, 1681036400000L));
     segment2Rows.add(createRow(102, "Charlie", "chess", 4000.0f, 1671036400000L));
     buildSegment(tableConfig, schema, "segment_1", segment2Rows, _segmentDir, _tarDir);
 
-    // Segment 3: playerId=101 (score=3500, ts=1681036400000), playerId=102 (score=4500, ts=1681036400000)
     List<GenericRow> segment3Rows = new ArrayList<>();
     segment3Rows.add(createRow(101, "Bob", "chess", 3500.0f, 1681036400000L));
     segment3Rows.add(createRow(102, "Charlie", "chess", 4500.0f, 1681036400000L));
