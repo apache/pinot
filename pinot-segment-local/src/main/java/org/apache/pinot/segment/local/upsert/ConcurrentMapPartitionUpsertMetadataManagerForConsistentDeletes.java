@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -360,10 +359,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       int docId = primaryKeyEntry.getKey();
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
-            RecordLocation prevLocation = _previousKeyToRecordLocationMap.get(pk);
             if (recordLocation.getSegment() == segment) {
+              RecordLocation prevLocation = _previousKeyToRecordLocationMap.remove(pk);
               if (prevLocation == null) {
-                _previousKeyToRecordLocationMap.remove(pk);
                 return null;
               }
               // Revert to previous segment location
@@ -376,21 +374,21 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
                   replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
                       prevDocId, recordInfo);
-                  _previousKeyToRecordLocationMap.remove(pk);
                   if (!uniquePrimaryKeys.add(pk)) {
                     return prevLocation;
                   }
                   return new RecordLocation(prevLocation.getSegment(), prevLocation.getDocId(),
                       prevLocation.getComparisonValue(),
                       RecordLocation.decrementSegmentCount(prevLocation.getDistinctSegmentCount()));
-                } catch (IOException e) {
-                  _logger.warn("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
+                } catch (Exception e) {
+                  _logger.error("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
                       e);
-                  _previousKeyToRecordLocationMap.remove(pk);
                   return null;
                 }
               } else {
-                _previousKeyToRecordLocationMap.remove(pk);
+                // Should not happen
+                _logger.error("Failed to find valid doc ids in previous segment: {}, removing key",
+                    prevSegment.getSegmentName());
                 return null;
               }
             } else if (recordLocation.getSegment() instanceof ImmutableSegmentImpl) {
