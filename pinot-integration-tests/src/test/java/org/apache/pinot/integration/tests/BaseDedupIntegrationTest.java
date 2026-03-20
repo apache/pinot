@@ -59,9 +59,9 @@ import static org.testng.Assert.assertEquals;
 
 
 public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final String DEDUP_TABLE_WITH_REPLICAS = "DedupTableWithReplicas";
+  protected static final String DEDUP_TABLE_WITH_REPLICAS = "DedupTableWithReplicas";
 
-  private List<File> _avroFiles;
+  protected List<File> _avroFiles;
 
   @BeforeClass
   public void setUp()
@@ -84,7 +84,7 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     createDedupTableWithReplicas();
   }
 
-  private void createDedupTable()
+  protected void createDedupTable()
       throws Exception {
     Schema schema = createSchema();
     addSchema(schema);
@@ -93,7 +93,7 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     waitForAllDocsLoaded(600_000L);
   }
 
-  private void createDedupTableWithReplicas()
+  protected void createDedupTableWithReplicas()
       throws IOException {
     Schema schemaWithReplicas = createSchema();
     schemaWithReplicas.setSchemaName(DEDUP_TABLE_WITH_REPLICAS);
@@ -159,7 +159,7 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     DedupConfig dedupConfig = new DedupConfig();
     dedupConfig.setMetadataTTL(30);
     dedupConfig.setPreload(Enablement.ENABLE);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("DedupTableWithReplicas_REALTIME")
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(DEDUP_TABLE_WITH_REPLICAS)
         .setTimeColumnName(getTimeColumnName())
         .setFieldConfigList(getFieldConfigs())
         .setNumReplicas(2)
