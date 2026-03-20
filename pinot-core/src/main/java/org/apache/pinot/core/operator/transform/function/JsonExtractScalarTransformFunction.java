@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.function.IntFunction;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -38,7 +39,6 @@ import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.jspecify.annotations.Nullable;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -127,8 +127,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           _defaultValue = literalTransformFun.getFloatLiteral();
           break;
         case DOUBLE:
-        case TIMESTAMP:
           _defaultValue = literalTransformFun.getDoubleLiteral();
+          break;
+        case TIMESTAMP:
+          // Use long literal so numeric millis stay exact and string timestamps use LiteralContext parsing.
+          _defaultValue = literalTransformFun.getLongLiteral();
           break;
         case BOOLEAN:
           _defaultValue = literalTransformFun.getBooleanLiteral();
@@ -185,6 +188,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     }
     if (!nullBitmap.isEmpty()) {
       bitmap.or(nullBitmap);
+    }
+    if (bitmap.isEmpty()) {
+      return null;
     }
     return bitmap;
   }

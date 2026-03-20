@@ -173,7 +173,7 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
   }
 
   @Test
-  public void testNullAsDefaultValue_enableNullHandlingFalse() {
+  public void testNullAsDefaultValueWithNullHandlingDisabled() {
     checkResult(
         "SET enableNullHandling=false;"
             + "SELECT intColumn, jsonextractscalar(" + JSON_COLUMN + ", '$.longVal', 'long', null) "
@@ -192,7 +192,7 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
   }
 
   @Test
-  public void testNullAsDefaultValue_enableNullHandlingTrue() {
+  public void testNullAsDefaultValueWithNullHandlingEnabled() {
     checkResult(
         "SET enableNullHandling=true;"
             + "SELECT intColumn, jsonextractscalar(" + JSON_COLUMN + ", '$.longVal', 'long', null) "
