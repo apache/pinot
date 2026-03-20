@@ -33,10 +33,16 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.pinot.controller.BaseControllerStarter;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
@@ -57,7 +63,6 @@ import org.testng.annotations.BeforeSuite;
 
 public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected static final Logger LOGGER = LoggerFactory.getLogger(CustomDataQueryClusterIntegrationTest.class);
-  private static final Object SUITE_MUTATION_LOCK = new Object();
   private static final int REALTIME_TABLE_CONFIG_RETRY_COUNT = 5;
   private static final long REALTIME_TABLE_CONFIG_RETRY_WAIT_MS = 1_000L;
   private static final long KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS = 30_000L;
@@ -78,6 +83,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     startController();
     startBroker();
     startServer();
+    startMinion();
     LOGGER.warn("Finished setting up integration test suite");
   }
 
@@ -86,6 +92,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
       throws Exception {
     LOGGER.warn("Tearing down integration test suite");
     // Shutdown the Pinot cluster
+    stopMinion();
     stopServer();
     stopBroker();
     stopController();
@@ -100,62 +107,77 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   @BeforeClass
   public void setUp()
       throws Exception {
-    synchronized (SUITE_MUTATION_LOCK) {
-      LOGGER.warn("Setting up integration test class: {}", getClass().getSimpleName());
-      if (_controllerRequestURLBuilder == null) {
-        _controllerRequestURLBuilder =
-            ControllerRequestURLBuilder.baseUrl("http://localhost:" + _sharedClusterTestSuite.getControllerPort());
+    LOGGER.warn("Setting up integration test class: {}", getClass().getSimpleName());
+    initControllerRequestURLBuilder();
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+
+    setUpTable();
+
+    waitForAllDocsLoaded(60_000);
+    LOGGER.warn("Finished setting up integration test class: {}", getClass().getSimpleName());
+  }
+
+  /**
+   * Initializes the controller request URL builder for the shared suite.
+   * Called at the start of setUp; safe to call from overridden setUp methods.
+   */
+  protected void initControllerRequestURLBuilder() {
+    if (_controllerRequestURLBuilder == null) {
+      _controllerRequestURLBuilder =
+          ControllerRequestURLBuilder.baseUrl("http://localhost:" + _sharedClusterTestSuite.getControllerPort());
+    }
+  }
+
+  /**
+   * Creates schema, table config, builds segments, and uploads them.
+   * Subclasses can override this to customize the table creation flow
+   * (e.g., for dimension tables, upsert tables, or tables built from GenericRow).
+   */
+  protected void setUpTable()
+      throws Exception {
+    // create & upload schema AND table config
+    Schema schema = createSchema();
+    addSchema(schema);
+
+    List<File> avroFiles = createAvroFiles();
+    if (isRealtimeTable()) {
+      // In suite mode multiple realtime tests use different topics, so make sure
+      // this class-specific topic exists before the controller validates stream metadata.
+      _sharedClusterTestSuite.createKafkaTopic(getKafkaTopic());
+      waitForKafkaTopicMetadataReadyForConsumer(getKafkaTopic(), getNumKafkaPartitions());
+
+      // create realtime table
+      TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+      addRealtimeTableConfigWithRetry(tableConfig);
+
+      // Push data into Kafka
+      pushAvroIntoKafka(avroFiles);
+    } else {
+      // create offline table
+      TableConfig tableConfig = createOfflineTableConfig();
+      addTableConfig(tableConfig);
+
+      // create & upload segments
+      int segmentIndex = 0;
+      for (File avroFile : avroFiles) {
+        ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex++, _segmentDir,
+            _tarDir);
+        uploadSegments(getTableName(), _tarDir);
       }
-      TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-      // create & upload schema AND table config
-      Schema schema = createSchema();
-      addSchema(schema);
-
-      List<File> avroFiles = createAvroFiles();
-      if (isRealtimeTable()) {
-        // In suite mode multiple realtime tests use different topics, so make sure
-        // this class-specific topic exists before the controller validates stream metadata.
-        _sharedClusterTestSuite.createKafkaTopic(getKafkaTopic());
-        waitForKafkaTopicMetadataReadyForConsumer(getKafkaTopic(), getNumKafkaPartitions());
-
-        // create realtime table
-        TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
-        addRealtimeTableConfigWithRetry(tableConfig);
-
-        // Push data into Kafka
-        pushAvroIntoKafka(avroFiles);
-      } else {
-        // create offline table
-        TableConfig tableConfig = createOfflineTableConfig();
-        addTableConfig(tableConfig);
-
-        // create & upload segments
-        int segmentIndex = 0;
-        for (File avroFile : avroFiles) {
-          ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex++, _segmentDir,
-              _tarDir);
-          uploadSegments(getTableName(), _tarDir);
-        }
-      }
-
-      waitForAllDocsLoaded(60_000);
-      LOGGER.warn("Finished setting up integration test class: {}", getClass().getSimpleName());
     }
   }
 
   @AfterClass
   public void tearDown()
       throws IOException {
-    synchronized (SUITE_MUTATION_LOCK) {
-      LOGGER.warn("Tearing down integration test class: {}", getClass().getSimpleName());
-      if (isRealtimeTable()) {
-        dropRealtimeTable(getTableName());
-      } else {
-        dropOfflineTable(getTableName());
-      }
-      FileUtils.deleteDirectory(_tempDir);
-      LOGGER.warn("Finished tearing down integration test class: {}", getClass().getSimpleName());
+    LOGGER.warn("Tearing down integration test class: {}", getClass().getSimpleName());
+    if (isRealtimeTable()) {
+      dropRealtimeTable(getTableName());
+    } else {
+      dropOfflineTable(getTableName());
     }
+    FileUtils.deleteDirectory(_tempDir);
+    LOGGER.warn("Finished tearing down integration test class: {}", getClass().getSimpleName());
   }
 
   private void addRealtimeTableConfigWithRetry(TableConfig tableConfig)
@@ -264,6 +286,41 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
       return _sharedClusterTestSuite.getRandomBrokerPort();
     }
     return super.getRandomBrokerPort();
+  }
+
+  /**
+   * Returns the controller starter from the shared suite instance.
+   */
+  protected BaseControllerStarter getSharedControllerStarter() {
+    return _sharedClusterTestSuite._controllerStarter;
+  }
+
+  /**
+   * Returns the property store from the shared suite instance.
+   */
+  protected ZkHelixPropertyStore<ZNRecord> getSharedPropertyStore() {
+    return _sharedClusterTestSuite._propertyStore;
+  }
+
+  /**
+   * Returns the task manager from the shared suite's controller.
+   */
+  protected PinotTaskManager getTaskManager() {
+    return getSharedControllerStarter().getTaskManager();
+  }
+
+  /**
+   * Returns the Helix task resource manager from the shared suite's controller.
+   */
+  protected PinotHelixTaskResourceManager getHelixTaskResourceManager() {
+    return getSharedControllerStarter().getHelixTaskResourceManager();
+  }
+
+  /**
+   * Returns the Helix resource manager from the shared suite's controller.
+   */
+  protected PinotHelixResourceManager getSharedHelixResourceManager() {
+    return getSharedControllerStarter().getHelixResourceManager();
   }
 
   @Override
