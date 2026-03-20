@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.ingestion.batch.hadoop;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
@@ -95,7 +96,7 @@ public class HadoopSegmentUriPushJobRunner implements IngestionJobRunner, Serial
     // Push from driver
     try {
       SegmentPushUtils.sendSegmentUris(_spec, segmentUris);
-    } catch (RetriableOperationException | AttemptsExceededException e) {
+    } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
       throw new RuntimeException(e);
     }
   }
