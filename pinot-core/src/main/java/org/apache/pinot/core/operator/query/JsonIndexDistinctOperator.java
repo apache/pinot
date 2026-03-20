@@ -27,7 +27,11 @@ import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
@@ -54,12 +58,17 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * Distinct operator that uses the JSON index value→docId map directly instead of scanning documents.
- * Avoids the projection/transform pipeline for SELECT DISTINCT jsonExtractIndex(...).
+ * Distinct operator for the scalar {@code jsonExtractIndex(column, path, type[, defaultValue])} form.
+ *
+ * <p>Execution flow:
+ * 1. Push a same-path {@code JSON_MATCH} predicate into the JSON-index lookup when it cannot match missing paths.
+ * 2. Convert matching flattened doc ids back to segment doc ids.
+ * 3. Apply any remaining row-level filter and materialize DISTINCT results, including missing-path handling.
  */
 public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT_JSON_INDEX";
@@ -91,11 +100,23 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
     ExpressionContext expr = expressions.get(0);
     ParsedJsonExtractIndex parsed = parseJsonExtractIndex(expr);
     if (parsed == null) {
-      throw new IllegalStateException("Expected jsonExtractIndex expression");
+      throw new IllegalStateException("Expected 3/4-arg scalar jsonExtractIndex expression");
     }
 
-    // Evaluate the filter first so we can skip the (potentially expensive) index map when no docs match
-    RoaringBitmap filteredDocIds = buildFilteredDocIds();
+    DataSource dataSource = _indexSegment.getDataSource(parsed._columnName, _queryContext.getSchema());
+    JsonIndexReader jsonIndexReader = getJsonIndexReader(dataSource);
+    if (jsonIndexReader == null) {
+      throw new IllegalStateException("Column " + parsed._columnName + " has no JSON index");
+    }
+
+    String pushedDownFilterJson = extractSamePathJsonMatchFilter(parsed, _queryContext.getFilter());
+    boolean filterFullyPushedDown = pushedDownFilterJson != null
+        && isOnlySamePathJsonMatchFilter(parsed, _queryContext.getFilter())
+        && !jsonMatchFilterCanMatchMissingPath(pushedDownFilterJson);
+
+    // Evaluate the filter first so we can skip the (potentially expensive) index map when no docs match.
+    // For the scalar same-path JSON_MATCH case, the lookup itself is already exact and no row-level filter remains.
+    RoaringBitmap filteredDocIds = filterFullyPushedDown ? null : buildFilteredDocIds();
     if (filteredDocIds != null && filteredDocIds.isEmpty()) {
       ColumnDataType earlyColumnDataType = ColumnDataType.fromDataTypeSV(parsed._dataType);
       DataSchema earlyDataSchema = new DataSchema(
@@ -107,18 +128,22 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
           createDistinctTable(earlyDataSchema, parsed._dataType, earlyOrderBy), _queryContext);
     }
 
-    DataSource dataSource = _indexSegment.getDataSource(parsed._columnName, _queryContext.getSchema());
-    JsonIndexReader jsonIndexReader = getJsonIndexReader(dataSource);
-    if (jsonIndexReader == null) {
-      throw new IllegalStateException("Column " + parsed._columnName + " has no JSON index");
-    }
-
-    // Same logic as JsonExtractIndexTransformFunction.getValueToMatchingDocsMap()
+    // Same-path JSON_MATCH can be pushed down for the scalar 3/4-arg form because each qualifying row contributes
+    // at most one value for the selected path. Exclusive predicates such as IS NULL are excluded from the fully
+    // pushed-down case because they can also match docs where the selected path is missing.
+    // All other WHERE filters remain row-level and are applied after converting flattened doc IDs to real doc IDs.
     Map<String, RoaringBitmap> valueToMatchingDocs =
-        jsonIndexReader.getMatchingFlattenedDocsMap(parsed._jsonPathString, parsed._filterExpression);
+        jsonIndexReader.getMatchingFlattenedDocsMap(parsed._jsonPathString, pushedDownFilterJson);
+
     // Always single-value (MV _ARRAY is rejected in parseJsonExtractIndex)
     jsonIndexReader.convertFlattenedDocIdsToDocIds(valueToMatchingDocs);
+    return buildDistinctResultsBlock(expr, parsed, valueToMatchingDocs, filteredDocIds,
+        filteredDocIds == null && !filterFullyPushedDown);
+  }
 
+  private DistinctResultsBlock buildDistinctResultsBlock(ExpressionContext expr, ParsedJsonExtractIndex parsed,
+      Map<String, RoaringBitmap> valueToMatchingDocs, @Nullable RoaringBitmap filteredDocIds,
+      boolean allDocsSelected) {
     ColumnDataType columnDataType = ColumnDataType.fromDataTypeSV(parsed._dataType);
     DataSchema dataSchema = new DataSchema(
         new String[]{expr.toString()},
@@ -129,32 +154,30 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
 
     int limit = _queryContext.getLimit();
     int totalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    // Track uncovered docs: for the no-filter case, build a union and compare against totalDocs.
-    // For the filtered case, use a "remaining" bitmap that shrinks in-place (no per-value allocation).
-    RoaringBitmap allMatchedDocs = filteredDocIds == null ? new RoaringBitmap() : null;
+    RoaringBitmap coveredDocs = allDocsSelected ? new RoaringBitmap() : null;
     RoaringBitmap remainingDocs = filteredDocIds != null ? filteredDocIds.clone() : null;
-    boolean allDocsCovered = filteredDocIds == null ? (totalDocs == 0) : filteredDocIds.isEmpty();
+    boolean allDocsCovered = filteredDocIds == null ? !allDocsSelected || totalDocs == 0 : filteredDocIds.isEmpty();
     boolean earlyBreak = false;
 
     for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
       _numEntriesExamined++;
       QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numEntriesExamined, EXPLAIN_NAME);
+
       String value = entry.getKey();
       RoaringBitmap docIds = entry.getValue();
 
       boolean includeValue;
       if (filteredDocIds == null) {
         includeValue = true;
-        // Build union for uncovered-docs detection; short-circuit once all segment docs are covered
-        if (!allDocsCovered) {
-          allMatchedDocs.or(docIds);
-          if (allMatchedDocs.getLongCardinality() >= totalDocs) {
+        if (!allDocsCovered && allDocsSelected) {
+          coveredDocs.or(docIds);
+          if (coveredDocs.getLongCardinality() >= totalDocs) {
             allDocsCovered = true;
           }
         }
       } else {
         includeValue = RoaringBitmap.intersects(docIds, filteredDocIds);
-        // Remove matched docs from remaining set in-place (no allocation per value)
+        // Remove matched docs from remaining set in-place (no allocation per value).
         if (!allDocsCovered && includeValue) {
           remainingDocs.andNot(docIds);
           if (remainingDocs.isEmpty()) {
@@ -177,23 +200,90 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
       }
     }
 
-    // Handle docs not covered by any value in the index.
-    // Baseline JsonExtractIndexTransformFunction throws when a doc is missing the path and no
-    // defaultValue is provided. Match that behavior here unless nullHandling is enabled.
-    // allDocsCovered tracks coverage precisely (against totalDocs or filteredDocIds cardinality).
     if (!earlyBreak && !allDocsCovered) {
-      if (parsed._defaultValue != null) {
-        addValueToDistinctTable(distinctTable, parsed._defaultValue, parsed._dataType, orderByExpression);
-      } else if (_queryContext.isNullHandlingEnabled()) {
-        distinctTable.addNull();
-      } else {
-        throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], for some docIds in segment [%s]",
-                parsed._jsonPathString, _indexSegment.getSegmentName()));
-      }
+      handleMissingDocs(distinctTable, parsed, orderByExpression);
     }
 
     return new DistinctResultsBlock(distinctTable, _queryContext);
+  }
+
+  private void handleMissingDocs(DistinctTable distinctTable, ParsedJsonExtractIndex parsed,
+      @Nullable OrderByExpressionContext orderByExpression) {
+    if (parsed._defaultValueLiteral != null) {
+      addValueToDistinctTable(distinctTable, parsed._defaultValueLiteral, parsed._dataType, orderByExpression);
+    } else if (_queryContext.isNullHandlingEnabled()) {
+      distinctTable.addNull();
+    } else {
+      throw new RuntimeException(
+          String.format("Illegal Json Path: [%s], for some docIds in segment [%s]",
+              parsed._jsonPathString, _indexSegment.getSegmentName()));
+    }
+  }
+
+  @Nullable
+  private static String extractSamePathJsonMatchFilter(ParsedJsonExtractIndex parsed, @Nullable FilterContext filter) {
+    if (filter == null) {
+      return null;
+    }
+    switch (filter.getType()) {
+      case PREDICATE:
+        return extractSamePathJsonMatchFilter(parsed, filter.getPredicate());
+      case AND:
+        String matchingFilter = null;
+        for (FilterContext child : filter.getChildren()) {
+          String childFilter = extractSamePathJsonMatchFilter(parsed, child);
+          if (childFilter == null) {
+            continue;
+          }
+          if (matchingFilter != null) {
+            return null;
+          }
+          matchingFilter = childFilter;
+        }
+        return matchingFilter;
+      default:
+        return null;
+    }
+  }
+
+  private static boolean isOnlySamePathJsonMatchFilter(ParsedJsonExtractIndex parsed, @Nullable FilterContext filter) {
+    if (filter == null || filter.getType() != FilterContext.Type.PREDICATE) {
+      return false;
+    }
+    return extractSamePathJsonMatchFilter(parsed, filter.getPredicate()) != null;
+  }
+
+  private static boolean jsonMatchFilterCanMatchMissingPath(String filterJsonString) {
+    try {
+      FilterContext filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterJsonString));
+      return filter.getType() == FilterContext.Type.PREDICATE
+          && filter.getPredicate().getType() == Predicate.Type.IS_NULL;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  @Nullable
+  private static String extractSamePathJsonMatchFilter(ParsedJsonExtractIndex parsed, Predicate predicate) {
+    if (!(predicate instanceof JsonMatchPredicate)) {
+      return null;
+    }
+    ExpressionContext lhs = predicate.getLhs();
+    if (lhs.getType() != ExpressionContext.Type.IDENTIFIER
+        || !parsed._columnName.equals(lhs.getIdentifier())) {
+      return null;
+    }
+    String filterJsonString = ((JsonMatchPredicate) predicate).getValue();
+    int start = filterJsonString.indexOf('"');
+    if (start < 0) {
+      return null;
+    }
+    int end = filterJsonString.indexOf('"', start + 1);
+    if (end < 0) {
+      return null;
+    }
+    String filterPath = filterJsonString.substring(start + 1, end);
+    return parsed._jsonPathString.equals(filterPath) ? filterJsonString : null;
   }
 
   private DistinctTable createDistinctTable(DataSchema dataSchema, FieldSpec.DataType dataType,
@@ -380,14 +470,15 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
       return null;
     }
     List<ExpressionContext> args = expr.getFunction().getArguments();
-    if (args.size() < 3 || args.size() > 5) {
+    if (args.size() != 3 && args.size() != 4) {
       return null;
     }
     if (args.get(0).getType() != ExpressionContext.Type.IDENTIFIER) {
       return null;
     }
     if (args.get(1).getType() != ExpressionContext.Type.LITERAL
-        || args.get(2).getType() != ExpressionContext.Type.LITERAL) {
+        || args.get(2).getType() != ExpressionContext.Type.LITERAL
+        || (args.size() == 4 && args.get(3).getType() != ExpressionContext.Type.LITERAL)) {
       return null;
     }
 
@@ -428,23 +519,17 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
       return null;
     }
 
-    String defaultValue = null;
-    if (args.size() >= 4) {
-      if (args.get(3).getType() != ExpressionContext.Type.LITERAL) {
+    String defaultValueLiteral = null;
+    if (args.size() == 4) {
+      defaultValueLiteral = args.get(3).getLiteral().getStringValue();
+      try {
+        dataType.convert(defaultValueLiteral);
+      } catch (Exception e) {
         return null;
       }
-      defaultValue = args.get(3).getLiteral().getStringValue();
     }
 
-    String filterExpression = null;
-    if (args.size() == 5) {
-      if (args.get(4).getType() != ExpressionContext.Type.LITERAL) {
-        return null;
-      }
-      filterExpression = args.get(4).getLiteral().getStringValue();
-    }
-
-    return new ParsedJsonExtractIndex(columnName, jsonPathString, dataType, defaultValue, filterExpression);
+    return new ParsedJsonExtractIndex(columnName, jsonPathString, dataType, defaultValueLiteral);
   }
 
   private static final class ParsedJsonExtractIndex {
@@ -452,17 +537,14 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
     final String _jsonPathString;
     final FieldSpec.DataType _dataType;
     @Nullable
-    final String _defaultValue;
-    @Nullable
-    final String _filterExpression;
+    final String _defaultValueLiteral;
 
-    ParsedJsonExtractIndex(String columnName, String jsonPathString,
-        FieldSpec.DataType dataType, @Nullable String defaultValue, @Nullable String filterExpression) {
+    ParsedJsonExtractIndex(String columnName, String jsonPathString, FieldSpec.DataType dataType,
+        @Nullable String defaultValueLiteral) {
       _columnName = columnName;
       _jsonPathString = jsonPathString;
       _dataType = dataType;
-      _defaultValue = defaultValue;
-      _filterExpression = filterExpression;
+      _defaultValueLiteral = defaultValueLiteral;
     }
   }
 
@@ -506,9 +588,9 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
   }
 
   /**
-   * Returns true if the expression is jsonExtractIndex on a column with JSON index and the path is indexed.
-   * For OSS JSON index all paths are indexed. For composite JSON index, only paths in invertedIndexConfigs
-   * are indexed per key.
+   * Returns true if the expression is the 3/4-arg scalar jsonExtractIndex form on a column with JSON index and the
+   * path is indexed. For OSS JSON index all paths are indexed. For composite JSON index, only paths in
+   * invertedIndexConfigs are indexed per key.
    */
   public static boolean canUseJsonIndexDistinct(IndexSegment indexSegment, ExpressionContext expr) {
     ParsedJsonExtractIndex parsed = parseJsonExtractIndex(expr);
@@ -526,9 +608,6 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
     if (!reader.isPathIndexed(parsed._jsonPathString)) {
       return false;
     }
-    // The 5th arg (_filterExpression) is a JSON filter expression, not a plain JSON path,
-    // so isPathIndexed() is not appropriate for it. The reader's getMatchingFlattenedDocsMap()
-    // handles filter expressions internally.
     return true;
   }
 }
