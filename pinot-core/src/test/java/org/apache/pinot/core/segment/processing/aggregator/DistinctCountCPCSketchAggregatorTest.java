@@ -69,4 +69,47 @@ public class DistinctCountCPCSketchAggregatorTest {
     assertNotNull(resultSketch);
     assertEquals(resultSketch.getLgK(), 15);
   }
+
+  @Test
+  public void testAggregateWithEmptyByteArrayFirst() {
+    byte[] emptyBytes = new byte[0];
+    CpcSketch sketch = new CpcSketch(12);
+    for (int i = 0; i < 100; i++) {
+      sketch.update(i);
+    }
+    byte[] sketchBytes = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(sketch);
+
+    byte[] result = (byte[]) _cpcSketchAggregator.aggregate(emptyBytes, sketchBytes, new HashMap<>());
+
+    // Empty byte array should be skipped; result should be the non-empty sketch
+    assertSame(result, sketchBytes);
+  }
+
+  @Test
+  public void testAggregateWithEmptyByteArraySecond() {
+    byte[] emptyBytes = new byte[0];
+    CpcSketch sketch = new CpcSketch(12);
+    for (int i = 0; i < 100; i++) {
+      sketch.update(i);
+    }
+    byte[] sketchBytes = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(sketch);
+
+    byte[] result = (byte[]) _cpcSketchAggregator.aggregate(sketchBytes, emptyBytes, new HashMap<>());
+
+    assertSame(result, sketchBytes);
+  }
+
+  @Test
+  public void testAggregateWithBothEmptyByteArrays() {
+    byte[] emptyBytes1 = new byte[0];
+    byte[] emptyBytes2 = new byte[0];
+
+    byte[] result = (byte[]) _cpcSketchAggregator.aggregate(emptyBytes1, emptyBytes2, new HashMap<>());
+
+    // Both empty: should produce a valid serialized empty sketch, not byte[0],
+    // so that merged segments always contain deserializable sketch bytes.
+    CpcSketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(result);
+    assertNotNull(resultSketch);
+    assertEquals(resultSketch.getEstimate(), 0.0);
+  }
 }
