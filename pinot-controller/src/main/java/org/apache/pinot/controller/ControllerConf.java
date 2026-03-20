@@ -386,8 +386,8 @@ public class ControllerConf extends PinotConfiguration {
       "controller.resource.utilization.checker.initial.delay";
   public static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
       "controller.resource.utilization.checker.frequency";
-  // Wait for the resource utilization checker to run once during controller startup, before marking the controller
-  // as ready. When enabled, controller.resource.utilization.checker.initial.delay is set to 0.
+  // Wait for the resource utilization checker to collect resource usage during controller startup, before marking
+  // the controller as ready. When enabled, controller.resource.utilization.checker.initial.delay is set to 0.
   public static final String RESOURCE_UTILIZATION_CHECKER_COLLECT_USAGE_AT_STARTUP =
       "controller.resource.utilization.checker.collect.usage.at.startup";
   public static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
