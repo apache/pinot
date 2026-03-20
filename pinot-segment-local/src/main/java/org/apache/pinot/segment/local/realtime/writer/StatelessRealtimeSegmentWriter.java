@@ -221,7 +221,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     retryPolicy.attempt(() -> {
       try {
         StreamMessageDecoder streamMessageDecoder = createMessageDecoder(fieldsToRead);
-        localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder));
+        boolean isKeyBytesType = StreamDataDecoderImpl.isKeyBytesType(_schema);
+        localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder, isKeyBytesType));
         return true;
       } catch (Exception e) {
         _logger.warn("Failed to create StreamMessageDecoder. Retrying...", e);

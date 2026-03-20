@@ -1808,7 +1808,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       retryPolicy.attempt(() -> {
         try {
           StreamMessageDecoder streamMessageDecoder = createMessageDecoder(fieldsToRead);
-          localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder));
+          boolean isKeyBytesType = StreamDataDecoderImpl.isKeyBytesType(_schema);
+          localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder, isKeyBytesType));
           return true;
         } catch (Exception e) {
           _segmentLogger.warn("Failed to initialize the StreamMessageDecoder: ", e);

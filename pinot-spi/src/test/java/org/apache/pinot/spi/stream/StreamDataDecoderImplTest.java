@@ -83,6 +83,28 @@ public class StreamDataDecoderImplTest {
   }
 
   @Test
+  public void testDecodeBytesKey() {
+    TestDecoder messageDecoder = new TestDecoder();
+    messageDecoder.init(Map.of(), Set.of(NAME_FIELD), "");
+    String value = "Alice";
+    // Simulate binary key (e.g. Avro with leading magic byte 0x00)
+    byte[] binaryKey = new byte[]{0x00, 0x01, 0x02, 0x03};
+    StreamMessageMetadata metadata = new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(1234L)
+        .setOffset(new LongMsgOffset(0), new LongMsgOffset(1))
+        .build();
+    BytesStreamMessage message =
+        new BytesStreamMessage(binaryKey, value.getBytes(StandardCharsets.UTF_8), metadata);
+
+    StreamDataDecoderResult result = new StreamDataDecoderImpl(messageDecoder, true).decode(message);
+    Assert.assertNotNull(result);
+    Assert.assertNull(result.getException());
+    Assert.assertNotNull(result.getResult());
+
+    GenericRow row = result.getResult();
+    Assert.assertEquals(row.getValue(StreamDataDecoderImpl.KEY), binaryKey);
+  }
+
+  @Test
   public void testNoExceptionIsThrown() {
     ThrowingDecoder messageDecoder = new ThrowingDecoder();
     messageDecoder.init(Map.of(), Set.of(NAME_FIELD), "");
