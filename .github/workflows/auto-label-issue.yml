@@ -1,0 +1,121 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+name: Auto Label Issues
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  label-issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label issues by keywords
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const title = (issue.title || '').toLowerCase();
+            const body = (issue.body || '').toLowerCase();
+            const text = `${title} ${body}`;
+            const labels = new Set();
+
+            // --- Type labels ---
+            const typeRules = [
+              { keywords: ['bug', 'error', 'fail', 'crash', 'exception', 'npe', 'nullpointer',
+                           'broken', 'incorrect', 'wrong result', 'not working', 'regression'],
+                label: 'bugfix' },
+              { keywords: ['feature request', 'enhancement', 'new feature', 'support for',
+                           'add support', 'would be nice', 'proposal'],
+                label: 'feature' },
+              { keywords: ['performance', 'slow', 'latency', 'throughput', 'memory usage',
+                           'oom', 'out of memory', 'gc pressure', 'optimize'],
+                label: 'performance' },
+              { keywords: ['security', 'vulnerability', 'cve', 'auth', 'authentication',
+                           'authorization', 'injection', 'xss'],
+                label: 'security' },
+              { keywords: ['documentation', 'docs', 'readme', 'javadoc', 'typo in doc'],
+                label: 'documentation' },
+              { keywords: ['ui', 'query console', 'dashboard', 'web ui', 'frontend', 'pinot ui'],
+                label: 'ui' },
+            ];
+
+            for (const rule of typeRules) {
+              if (rule.keywords.some(kw => text.includes(kw))) {
+                labels.add(rule.label);
+              }
+            }
+
+            // --- Component labels ---
+            const componentRules = [
+              { keywords: ['broker', 'query routing', 'scatter gather', 'scatter-gather'],
+                label: 'broker' },
+              { keywords: ['controller', 'cluster management', 'table creation',
+                           'segment management'],
+                label: 'controller' },
+              { keywords: ['server', 'segment loading', 'query execution'],
+                label: 'server' },
+              { keywords: ['minion', 'minion task', 'segment merge', 'segment purge'],
+                label: 'minion' },
+              { keywords: ['multi-stage', 'multistage', 'msqe', 'v2 engine',
+                           'query planner', 'query runtime'],
+                label: 'query-engine' },
+              { keywords: ['segment', 'index', 'indexing', 'forward index', 'inverted index',
+                           'range index', 'star-tree', 'startree', 'json index', 'text index',
+                           'bloom filter'],
+                label: 'segment' },
+              { keywords: ['kafka', 'kinesis', 'pulsar', 'stream ingestion', 'realtime',
+                           'real-time'],
+                label: 'plugins/stream-ingestion' },
+              { keywords: ['batch ingestion', 'spark ingestion', 'hadoop ingestion',
+                           'offline ingestion'],
+                label: 'plugins/batch-ingestion' },
+              { keywords: ['avro', 'parquet', 'orc', 'csv', 'json format', 'protobuf',
+                           'thrift', 'input format'],
+                label: 'plugins/input-format' },
+              { keywords: ['s3', 'gcs', 'hdfs', 'adls', 'filesystem', 'file system'],
+                label: 'plugins/file-system' },
+              { keywords: ['docker', 'container', 'kubernetes', 'k8s', 'helm'],
+                label: 'docker' },
+              { keywords: ['timeseries', 'time series', 'm3ql'],
+                label: 'timeseries' },
+            ];
+
+            for (const rule of componentRules) {
+              if (rule.keywords.some(kw => text.includes(kw))) {
+                labels.add(rule.label);
+              }
+            }
+
+            if (labels.size > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: [...labels],
+              });
+              console.log(`Added labels: ${[...labels].join(', ')}`);
+            } else {
+              console.log('No matching keywords found, no labels added.');
+            }

@@ -1,0 +1,143 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+# Path-based labeler configuration for PRs
+# Used by .github/workflows/auto-label-pr.yml
+
+# --- Core modules ---
+broker:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-broker/**'
+
+controller:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-controller/**'
+
+server:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-server/**'
+
+minion:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-minion/**'
+
+# --- Query engine ---
+query-engine:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pinot-query-planner/**'
+          - 'pinot-query-runtime/**'
+
+# --- Segment & indexing ---
+segment:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pinot-segment-local/**'
+          - 'pinot-segment-spi/**'
+
+# --- Common / SPI ---
+common:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pinot-common/**'
+          - 'pinot-spi/**'
+          - 'pinot-core/**'
+
+# --- Plugins ---
+plugins:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-plugins/**'
+
+plugins/input-format:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-plugins/pinot-input-format/**'
+
+plugins/file-system:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-plugins/pinot-file-system/**'
+
+plugins/stream-ingestion:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-plugins/pinot-stream-ingestion/**'
+
+plugins/batch-ingestion:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-plugins/pinot-batch-ingestion/**'
+
+plugins/metrics:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-plugins/pinot-metrics/**'
+
+plugins/minion-tasks:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-plugins/pinot-minion-tasks/**'
+
+# --- Connectors ---
+connectors:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-connectors/**'
+
+# --- Integration tests ---
+testing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pinot-integration-tests/**'
+          - 'pinot-integration-test-base/**'
+          - 'pinot-compatibility-verifier/**'
+          - 'pinot-udf-test/**'
+          - 'pinot-perf/**'
+
+# --- Tooling & build ---
+tooling:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pinot-tools/**'
+          - 'pinot-distribution/**'
+
+build:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/pom.xml'
+          - '.mvn/**'
+          - 'mvnw*'
+
+# --- CI/CD ---
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+
+# --- Docker ---
+docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/Dockerfile'
+          - 'docker/**'
+
+# --- Documentation ---
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'LICENSE'
+          - 'NOTICE'
+
+# --- Timeseries ---
+timeseries:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-timeseries/**'
