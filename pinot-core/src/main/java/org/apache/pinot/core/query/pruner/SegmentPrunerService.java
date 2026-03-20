@@ -32,7 +32,6 @@ import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
