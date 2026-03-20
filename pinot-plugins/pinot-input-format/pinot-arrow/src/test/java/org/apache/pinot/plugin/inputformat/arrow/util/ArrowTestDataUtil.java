@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BitVector;
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float8Vector;
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.TimeStampMilliVector;
@@ -602,8 +603,7 @@ public class ArrowTestDataUtil {
         new DictionaryEncoding(1L, false, new ArrowType.Int(32, true));
 
     try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE);
-        VarCharVector dictionaryVector = new VarCharVector("tags_dict", allocator);
-        IntVector idVector = new IntVector("id", allocator)) {
+        VarCharVector dictionaryVector = new VarCharVector("tags_dict", allocator)) {
 
       // Create dictionary
       dictionaryVector.allocateNew();
@@ -627,7 +627,7 @@ public class ArrowTestDataUtil {
       Schema schema = new Schema(Arrays.asList(idField, tagsField));
 
       try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
-        idVector = (IntVector) root.getVector("id");
+        IntVector idVector = (IntVector) root.getVector("id");
         ListVector tagsVector = (ListVector) root.getVector("tags");
         VarCharVector tagsChild = (VarCharVector) tagsVector.getDataVector();
 
@@ -653,8 +653,10 @@ public class ArrowTestDataUtil {
         root.setRowCount(numRows);
 
         // Encode the list elements
-        try (VarCharVector encodedTagsChild = (VarCharVector) DictionaryEncoder.encode(tagsChild, dictionary)) {
-          tagsVector.replaceDataVector(encodedTagsChild);
+        try (FieldVector encodedTagsChild = (FieldVector) DictionaryEncoder.encode(tagsChild, dictionary)) {
+          java.lang.reflect.Method replaceDataVectorMethod = org.apache.arrow.vector.complex.BaseRepeatedValueVector.class.getDeclaredMethod("replaceDataVector", FieldVector.class);
+          replaceDataVectorMethod.setAccessible(true);
+          replaceDataVectorMethod.invoke(tagsVector, encodedTagsChild);
           return writeArrowDataToBytes(root, dictionaryProvider);
         }
       }
@@ -671,8 +673,7 @@ public class ArrowTestDataUtil {
         new DictionaryEncoding(1L, false, new ArrowType.Int(32, true));
 
     try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE);
-        VarCharVector nameDictionaryVector = new VarCharVector("name_dict", allocator);
-        IntVector idVector = new IntVector("id", allocator)) {
+        VarCharVector nameDictionaryVector = new VarCharVector("name_dict", allocator)) {
 
       // Create dictionary
       nameDictionaryVector.allocateNew();
@@ -696,7 +697,7 @@ public class ArrowTestDataUtil {
       Schema schema = new Schema(Arrays.asList(idField, personField));
 
       try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
-        idVector = (IntVector) root.getVector("id");
+        IntVector idVector = (IntVector) root.getVector("id");
         StructVector personVector = (StructVector) root.getVector("person");
         VarCharVector nameVector = (VarCharVector) personVector.getChild("name");
         IntVector ageVector = (IntVector) personVector.getChild("age");
@@ -719,8 +720,10 @@ public class ArrowTestDataUtil {
         root.setRowCount(numRows);
 
         // Encode the name field
-        try (VarCharVector encodedNameVector = (VarCharVector) DictionaryEncoder.encode(nameVector, dictionary)) {
-          personVector.putChild("name", encodedNameVector);
+        try (FieldVector encodedNameVector = (FieldVector) DictionaryEncoder.encode(nameVector, dictionary)) {
+          java.lang.reflect.Method putChildMethod = org.apache.arrow.vector.complex.AbstractStructVector.class.getDeclaredMethod("putChild", String.class, FieldVector.class);
+          putChildMethod.setAccessible(true);
+          putChildMethod.invoke(personVector, "name", encodedNameVector);
           return writeArrowDataToBytes(root, dictionaryProvider);
         }
       }
@@ -737,8 +740,7 @@ public class ArrowTestDataUtil {
         new DictionaryEncoding(1L, false, new ArrowType.Int(32, true));
 
     try (RootAllocator allocator = new RootAllocator(Long.MAX_VALUE);
-        VarCharVector keyDictionaryVector = new VarCharVector("key_dict", allocator);
-        IntVector idVector = new IntVector("id", allocator)) {
+        VarCharVector keyDictionaryVector = new VarCharVector("key_dict", allocator)) {
 
       // Create dictionary
       keyDictionaryVector.allocateNew();
@@ -767,7 +769,7 @@ public class ArrowTestDataUtil {
       Schema schema = new Schema(Arrays.asList(idField, mapField));
 
       try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
-        idVector = (IntVector) root.getVector("id");
+        IntVector idVector = (IntVector) root.getVector("id");
         MapVector mapVector = (MapVector) root.getVector("metadata");
         StructVector entriesVector = (StructVector) mapVector.getDataVector();
         VarCharVector keyVector = (VarCharVector) entriesVector.getChild(MapVector.KEY_NAME);
@@ -800,8 +802,10 @@ public class ArrowTestDataUtil {
         root.setRowCount(numRows);
 
         // Encode the key vector
-        try (VarCharVector encodedKeyVector = (VarCharVector) DictionaryEncoder.encode(keyVector, dictionary)) {
-          entriesVector.putChild(MapVector.KEY_NAME, encodedKeyVector);
+        try (FieldVector encodedKeyVector = (FieldVector) DictionaryEncoder.encode(keyVector, dictionary)) {
+          java.lang.reflect.Method putChildMethod = org.apache.arrow.vector.complex.AbstractStructVector.class.getDeclaredMethod("putChild", String.class, FieldVector.class);
+          putChildMethod.setAccessible(true);
+          putChildMethod.invoke(entriesVector, MapVector.KEY_NAME, encodedKeyVector);
           return writeArrowDataToBytes(root, dictionaryProvider);
         }
       }

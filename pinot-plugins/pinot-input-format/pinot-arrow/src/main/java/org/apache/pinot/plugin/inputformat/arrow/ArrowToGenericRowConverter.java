@@ -32,6 +32,7 @@ import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.complex.StructVector;
+import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryEncoder;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -120,22 +121,7 @@ public class ArrowToGenericRowConverter {
       String fieldName = fieldVector.getField().getName();
 
       try {
-        Object value;
-
-        // Handle complex types with potential nested dictionary encoding
-        if (fieldVector instanceof ListVector) {
-          value = extractListValue((ListVector) fieldVector, rowIndex, reader);
-        } else if (fieldVector instanceof MapVector) {
-          value = extractMapValue((MapVector) fieldVector, rowIndex, reader);
-        } else if (fieldVector instanceof StructVector) {
-          value = extractStructValue((StructVector) fieldVector, rowIndex, reader);
-        } else {
-          // Handle simple types and top-level dictionary encoding
-          value = extractValueFromVector(fieldVector, rowIndex, reader);
-          // Convert Arrow-specific types to Pinot-compatible types
-          value = convertArrowTypeToPinotCompatible(value);
-        }
-
+        Object value = extractValueFromVector(fieldVector, rowIndex, reader);
         if (value != null) {
           row.putValue(fieldName, value);
           convertedFields++;
@@ -165,22 +151,36 @@ public class ArrowToGenericRowConverter {
       return null;
     }
 
+    // 1. Handle complex types for TRUE recursion.
+    // CRITICAL: MapVector must be checked BEFORE ListVector!
+    if (vector instanceof MapVector) {
+      return extractMapValue((MapVector) vector, index, reader);
+    } else if (vector instanceof ListVector) {
+      return extractListValue((ListVector) vector, index, reader);
+    } else if (vector instanceof StructVector) {
+      return extractStructValue((StructVector) vector, index, reader);
+    }
+
+    // 2. Handle primitive types and dictionary decoding
     try {
-      // Decode dictionary if present at this level
+      Object value;
       if (vector.getField().getDictionary() != null) {
         long dictionaryId = vector.getField().getDictionary().getId();
-        ValueVector dictionaryVector = reader.getDictionaryVectors().get(dictionaryId);
-        if (dictionaryVector == null) {
+        Dictionary dictionary = reader.getDictionaryVectors().get(dictionaryId);
+        if (dictionary == null) {
           logger.error("Dictionary ID {} not found for field {}", dictionaryId, vector.getField().getName());
           return null;
         }
-        try (ValueVector decodedVector = DictionaryEncoder.decode(vector, dictionaryVector)) {
-          return decodedVector.getObject(index);
+        try (ValueVector decodedVector = DictionaryEncoder.decode(vector, dictionary)) {
+          value = decodedVector.getObject(index);
         }
+      } else {
+        // No dictionary encoding at this level
+        value = vector.getObject(index);
       }
 
-      // No dictionary encoding at this level
-      return vector.getObject(index);
+      // 3. Convert leaf values to Pinot compatible types (e.g., Text -> String)
+      return convertArrowTypeToPinotCompatible(value);
     } catch (Exception e) {
       logger.error("Error decoding value for field {} at index {}", vector.getField().getName(), index, e);
       return null;
@@ -210,7 +210,7 @@ public class ArrowToGenericRowConverter {
     for (int i = 0; i < elementCount; i++) {
       int elementIndex = startOffset + i;
       Object elementValue = extractValueFromVector(dataVector, elementIndex, reader);
-      result.add(convertArrowTypeToPinotCompatible(elementValue));
+      result.add(elementValue);
     }
 
     return result;
@@ -234,7 +234,7 @@ public class ArrowToGenericRowConverter {
       FieldVector childVector = structVector.getChild(fieldName);
       if (childVector != null) {
         Object childValue = extractValueFromVector(childVector, index, reader);
-        result.put(fieldName, convertArrowTypeToPinotCompatible(childValue));
+        result.put(fieldName, childValue);
       }
     }
 
@@ -269,9 +269,7 @@ public class ArrowToGenericRowConverter {
       Object key = extractValueFromVector(keyVector, entryIndex, reader);
       Object value = extractValueFromVector(valueVector, entryIndex, reader);
 
-      Object convertedKey = convertArrowTypeToPinotCompatible(key);
-      Object convertedValue = convertArrowTypeToPinotCompatible(value);
-      result.put(String.valueOf(convertedKey), convertedValue);
+      result.put(String.valueOf(key), value);
     }
 
     return result;
