@@ -57,6 +57,14 @@ public class ThreadSafeMutableRoaringBitmap {
     _mutableRoaringBitmap.add(newDocId);
   }
 
+  /**
+   * Returns whether the bitmap has no set bits. Prefer this over {@link #getMutableRoaringBitmap()} when only
+   * emptiness is needed, since {@code getMutableRoaringBitmap} clones the underlying bitmap.
+   */
+  public synchronized boolean isEmpty() {
+    return _mutableRoaringBitmap.isEmpty();
+  }
+
   public synchronized MutableRoaringBitmap getMutableRoaringBitmap() {
     return _mutableRoaringBitmap.clone();
   }

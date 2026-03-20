@@ -57,6 +57,26 @@ public class UpsertUtils {
         : (useEmptyForNull ? new MutableRoaringBitmap() : null);
   }
 
+  /**
+   * Returns whether the segment has no queryable documents for purposes such as empty-segment pruning.
+   * When {@code skipUpsert} is true, always returns {@code false} (the segment is not treated as empty).
+   * Otherwise uses the same bitmap precedence as {@link #getQueryableDocIdsSnapshotFromSegment(IndexSegment)}:
+   * {@link IndexSegment#getQueryableDocIds()} if non-null, else {@link IndexSegment#getValidDocIds()}; if both are
+   * null, returns {@code false}, the table will be non-upsert. Emptiness is checked via
+   * {@link ThreadSafeMutableRoaringBitmap#isEmpty()} to avoid
+   * cloning the bitmap.
+   */
+  public static boolean areQueryableDocIdsEmpty(IndexSegment segment, boolean skipUpsert) {
+    if (skipUpsert) {
+      return false;
+    }
+    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
+    if (queryableDocIds != null) {
+      return queryableDocIds.isEmpty();
+    }
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null && validDocIds.isEmpty();
+  }
 
   public static void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {

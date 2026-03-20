@@ -32,7 +32,6 @@ import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,17 +151,13 @@ public class SegmentPrunerService {
     return segments.subList(0, selected);
   }
 
-  private static boolean isEmptySegment(IndexSegment segment, @Nullable QueryContext query) {
+  private static boolean isEmptySegment(IndexSegment segment, QueryContext query) {
     if (segment.getSegmentMetadata().getTotalDocs() == 0) {
       return true;
     }
     // For upsert tables, treat segments with 0 docs to query as empty only when the query does not skip upsert.
     // When skipUpsert=true, the query returns all docs (including replaced), so the segment contributes rows.
     // Use query options map directly: _skipUpsert is only set on the server; the broker has options in the map.
-    if (query != null && query.getQueryOptions() != null && QueryOptionsUtils.isSkipUpsert(query.getQueryOptions())) {
-      return false;
-    }
-    MutableRoaringBitmap queryableDocIds = UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment);
-    return queryableDocIds != null && queryableDocIds.isEmpty();
+    return UpsertUtils.areQueryableDocIdsEmpty(segment, QueryOptionsUtils.isSkipUpsert(query.getQueryOptions()));
   }
 }
