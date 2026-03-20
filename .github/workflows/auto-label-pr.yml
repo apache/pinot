@@ -37,25 +37,3 @@ jobs:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           configuration-path: .github/labeler.yml
           sync-labels: false
-
-  # Label PRs by size (lines changed)
-  size-labeler:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: codelytv/pr-size-labeler@v1
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          xs_label: 'size/XS'
-          xs_max_size: 9
-          s_label: 'size/S'
-          s_max_size: 49
-          m_label: 'size/M'
-          m_max_size: 199
-          l_label: 'size/L'
-          l_max_size: 499
-          xl_label: 'size/XL'
-          fail_if_xl: false
-          files_to_ignore: |
-            "**/pom.xml"
-            "**/*.lock"
-            "**/*.json"

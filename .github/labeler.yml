@@ -18,17 +18,18 @@
 #
 # Path-based labeler configuration for PRs
 # Used by .github/workflows/auto-label-pr.yml
+# Only labels that exist in the repository are used.
 
 # --- Core modules ---
-broker:
+"component: broker":
   - changed-files:
       - any-glob-to-any-file: 'pinot-broker/**'
 
-controller:
+"component: controller":
   - changed-files:
       - any-glob-to-any-file: 'pinot-controller/**'
 
-server:
+"component: server":
   - changed-files:
       - any-glob-to-any-file: 'pinot-server/**'
 
@@ -37,58 +38,57 @@ minion:
       - any-glob-to-any-file: 'pinot-minion/**'
 
 # --- Query engine ---
-query-engine:
+"component: query-planner":
   - changed-files:
-      - any-glob-to-any-file:
-          - 'pinot-query-planner/**'
-          - 'pinot-query-runtime/**'
+      - any-glob-to-any-file: 'pinot-query-planner/**'
+
+"component: query-runtime":
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-query-runtime/**'
 
 # --- Segment & indexing ---
-segment:
+"component: segment":
   - changed-files:
       - any-glob-to-any-file:
           - 'pinot-segment-local/**'
           - 'pinot-segment-spi/**'
-
-# --- Common / SPI ---
-common:
-  - changed-files:
-      - any-glob-to-any-file:
-          - 'pinot-common/**'
-          - 'pinot-spi/**'
-          - 'pinot-core/**'
 
 # --- Plugins ---
 plugins:
   - changed-files:
       - any-glob-to-any-file: 'pinot-plugins/**'
 
-plugins/input-format:
-  - changed-files:
-      - any-glob-to-any-file: 'pinot-plugins/pinot-input-format/**'
-
-plugins/file-system:
+pinot-filesystem:
   - changed-files:
       - any-glob-to-any-file: 'pinot-plugins/pinot-file-system/**'
 
-plugins/stream-ingestion:
+ingestion:
   - changed-files:
-      - any-glob-to-any-file: 'pinot-plugins/pinot-stream-ingestion/**'
+      - any-glob-to-any-file:
+          - 'pinot-plugins/pinot-stream-ingestion/**'
+          - 'pinot-plugins/pinot-batch-ingestion/**'
 
-plugins/batch-ingestion:
+kafka:
   - changed-files:
-      - any-glob-to-any-file: 'pinot-plugins/pinot-batch-ingestion/**'
+      - any-glob-to-any-file:
+          - 'pinot-plugins/pinot-stream-ingestion/pinot-kafka-base/**'
+          - 'pinot-plugins/pinot-stream-ingestion/pinot-kafka-3.0/**'
+          - 'pinot-plugins/pinot-stream-ingestion/pinot-kafka-4.0/**'
 
-plugins/metrics:
+kinesis:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-plugins/pinot-stream-ingestion/pinot-kinesis/**'
+
+pulsar:
+  - changed-files:
+      - any-glob-to-any-file: 'pinot-plugins/pinot-stream-ingestion/pinot-pulsar/**'
+
+metrics:
   - changed-files:
       - any-glob-to-any-file: 'pinot-plugins/pinot-metrics/**'
 
-plugins/minion-tasks:
-  - changed-files:
-      - any-glob-to-any-file: 'pinot-plugins/pinot-minion-tasks/**'
-
 # --- Connectors ---
-connectors:
+"component: connector":
   - changed-files:
       - any-glob-to-any-file: 'pinot-connectors/**'
 
@@ -103,24 +103,22 @@ testing:
           - 'pinot-perf/**'
 
 # --- Tooling & build ---
-tooling:
+tools:
   - changed-files:
-      - any-glob-to-any-file:
-          - 'pinot-tools/**'
-          - 'pinot-distribution/**'
+      - any-glob-to-any-file: 'pinot-tools/**'
 
-build:
+buildAndPackage:
   - changed-files:
       - any-glob-to-any-file:
+          - 'pinot-distribution/**'
           - '**/pom.xml'
           - '.mvn/**'
           - 'mvnw*'
 
 # --- CI/CD ---
-ci:
+"ci/cd":
   - changed-files:
-      - any-glob-to-any-file:
-          - '.github/**'
+      - any-glob-to-any-file: '.github/**'
 
 # --- Docker ---
 docker:
@@ -138,6 +136,6 @@ documentation:
           - 'NOTICE'
 
 # --- Timeseries ---
-timeseries:
+timeseries-engine:
   - changed-files:
       - any-glob-to-any-file: 'pinot-timeseries/**'
