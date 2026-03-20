@@ -232,7 +232,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
   protected final List<UtilizationChecker> _utilizationCheckers = new ArrayList<>();
-  protected DiskUtilizationChecker _diskUtilizationChecker;
   protected ResourceUtilizationChecker _resourceUtilizationChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
@@ -768,7 +767,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
-    if (_config.isResourceUtilizationCheckerWaitDuringStartupEnabled()) {
+    if (_config.isResourceUtilizationCheckerCollectUsageAtStartupEnabled()) {
       _serviceStatusCallbackList.add(generateResourceUtilizationCheckerStatusCallback());
     }
 
