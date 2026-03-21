@@ -308,11 +308,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     });
 
     // Timeout exception should occur with this option:
-    // - If the query times out during submission, we get: "Error occurred during stage submission: Timeout"
-    // - If the query times out during execution, we get: "Timed out on stage 0 waiting for data sent by a child stage"
+    // - During submission: "Error occurred during stage submission: Timeout"
+    // - During execution on receiver side: "Timed out on stage 0 waiting for data from child stage 1"
+    // - During execution on sender side: "Received 1 error from stage 1 on serverId: Timing out on: HASH_JOIN"
     testCases.add(new Object[]{
         "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
-        "Time"
+        "Tim"
     });
 
     // Function with incorrect argument signature should throw runtime exception when casting string to numeric

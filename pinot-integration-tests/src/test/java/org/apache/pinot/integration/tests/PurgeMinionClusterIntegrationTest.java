@@ -129,7 +129,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // Push data into Kafka to create LLC segments
     pushAvroIntoKafka(avroFiles);
     // Wait for all documents loaded
-    waitForDocsLoaded(600_000L, true, PURGE_REALTIME_LAST_SEGMENT_TABLE);
+    waitForAllDocsLoaded(PURGE_REALTIME_LAST_SEGMENT_TABLE, 600_000L);
 
     setRecordPurger();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();

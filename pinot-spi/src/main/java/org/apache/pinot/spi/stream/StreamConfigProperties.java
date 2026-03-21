@@ -131,10 +131,6 @@ public class StreamConfigProperties {
    */
   public static final String SERVER_UPLOAD_TO_DEEPSTORE = "realtime.segment.serverUploadToDeepStore";
 
-  /**
-   * Config used to indicate which segment commit protocol implementation controller should use for this table
-   */
-  public static final String SEGMENT_COMPLETION_FSM_SCHEME = "segment.completion.fsm.scheme";
 
   /**
    * For pauseless consumption, the time in seconds that the server will wait for a segment to be ready for download.

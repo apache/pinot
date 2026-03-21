@@ -311,8 +311,7 @@ public class StreamOp extends BaseOp {
           long existingTotalDocs = fetchExistingTotalDocs(tableName);
           loadedDocs.set(existingTotalDocs);
           return existingTotalDocs == targetDocs;
-        }, 100L, timeoutMs,
-        "Failed to load " + targetDocs + " documents. Found " + loadedDocs.get() + " instead", true,
+        }, 100L, timeoutMs, "Failed to load " + targetDocs + " documents. Found " + loadedDocs.get() + " instead",
         Duration.ofSeconds(1));
   }
 }

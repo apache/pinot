@@ -524,20 +524,23 @@ public class KafkaPartitionLevelConsumerTest {
       }
 
       @Override
-      protected Consumer<String, Bytes> createConsumer(Properties consumerProp) {
-        Consumer<String, Bytes> mockConsumer = mock(Consumer.class);
+      protected Consumer<Bytes, Bytes> createConsumer(Properties consumerProp) {
+        Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
         // Mock records using Kafka 4.x compatible constructor (headers cannot be null in Kafka 4.x)
-        ConsumerRecord<String, Bytes> record1 =
+        ConsumerRecord<Bytes, Bytes> record1 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, 4,
-                5, "key1", new Bytes("value1".getBytes(StandardCharsets.UTF_8)), new RecordHeaders(), null);
-        ConsumerRecord<String, Bytes> record2 =
+                5, new Bytes("key1".getBytes(StandardCharsets.UTF_8)),
+                new Bytes("value1".getBytes(StandardCharsets.UTF_8)), new RecordHeaders(), null);
+        ConsumerRecord<Bytes, Bytes> record2 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, 4,
-                9, "key2", new Bytes("value2".getBytes(StandardCharsets.UTF_8)), new RecordHeaders(), null);
-        ConsumerRecord<String, Bytes> record3 =
+                9, new Bytes("key2".getBytes(StandardCharsets.UTF_8)),
+                new Bytes("value2".getBytes(StandardCharsets.UTF_8)), new RecordHeaders(), null);
+        ConsumerRecord<Bytes, Bytes> record3 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, 4,
-                -1, "key2", new Bytes("value2".getBytes(StandardCharsets.UTF_8)), new RecordHeaders(), null);
+                -1, new Bytes("key2".getBytes(StandardCharsets.UTF_8)),
+                new Bytes("value2".getBytes(StandardCharsets.UTF_8)), new RecordHeaders(), null);
         // Mock return of poll()
-        ConsumerRecords<String, Bytes> consumerRecords = new ConsumerRecords<>(
+        ConsumerRecords<Bytes, Bytes> consumerRecords = new ConsumerRecords<>(
             Map.of(topicPartition, List.of(record1, record2, record3))
         );
         when(mockConsumer.poll(any(Duration.class))).thenReturn(consumerRecords);

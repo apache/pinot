@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.sql.ResultSet;
@@ -28,22 +29,26 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.apache.pinot.util.TestUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
 
 
-public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SSBQueryIntegrationTest.class);
+/**
+ * SSB (Star Schema Benchmark) query integration test.
+ * Loads multiple SSB tables (lineorder, customer, supplier, part, dates) and validates
+ * JOIN queries using the multi-stage query engine against H2.
+ */
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class SSBQueryTest extends CustomDataQueryClusterIntegrationTest {
+
   private static final Map<String, String> SSB_QUICKSTART_TABLE_RESOURCES = Map.of(
       "customer", "examples/batch/ssb/customer",
       "dates", "examples/batch/ssb/dates",
@@ -52,17 +57,41 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
       "supplier", "examples/batch/ssb/supplier");
   private static final String SSB_QUERY_SET_RESOURCE_NAME = "ssb/ssb_query_set.yaml";
 
-  @BeforeClass
-  public void setUp()
+  @Override
+  public String getTableName() {
+    return "lineorder";
+  }
+
+  @Override
+  public Schema createSchema() {
+    // Not used — schemas are loaded per-table from classpath
+    return null;
+  }
+
+  @Override
+  public List<File> createAvroFiles() {
+    // Not used — data is loaded per-table from classpath
+    return List.of();
+  }
+
+  @Override
+  protected long getCountStarResult() {
+    return 9999L;
+  }
+
+  @Override
+  protected long getCurrentCountStarResult() {
+    return getPinotConnection().execute("SELECT COUNT(*) FROM lineorder").getResultSet(0).getLong(0);
+  }
+
+  @Override
+  protected boolean useMultiStageQueryEngine() {
+    return true;
+  }
+
+  @Override
+  protected void setUpTable()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
-
     setUpH2Connection();
     for (Map.Entry<String, String> tableResource : SSB_QUICKSTART_TABLE_RESOURCES.entrySet()) {
       String tableName = tableResource.getKey();
@@ -92,9 +121,29 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
           _segmentDir, _tarDir);
       uploadSegments(tableName, _tarDir);
       // H2
-      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
-      waitForNonZeroDocsLoaded(60_000L, true, tableName);
+      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName,
+          _h2Connection);
+      waitForAnyDocLoaded(tableName, 60_000L);
     }
+  }
+
+  @Override
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    LOGGER.warn("Tearing down integration test class: {}", getClass().getSimpleName());
+    for (String table : SSB_QUICKSTART_TABLE_RESOURCES.keySet()) {
+      dropOfflineTable(table);
+    }
+    try {
+      if (_h2Connection != null) {
+        _h2Connection.close();
+      }
+    } catch (Exception e) {
+      // ignore
+    }
+    FileUtils.deleteDirectory(_tempDir);
+    LOGGER.warn("Finished tearing down integration test class: {}", getClass().getSimpleName());
   }
 
   @Test(dataProvider = "QueryDataProvider")
@@ -103,82 +152,57 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
     testQueriesValidateAgainstH2(query);
   }
 
-  protected void testQueriesValidateAgainstH2(String query)
+  private void testQueriesValidateAgainstH2(String query)
       throws Exception {
-    // connection response
+    // Pinot response
     ResultSetGroup pinotResultSetGroup = getPinotConnection().execute(query);
     org.apache.pinot.client.ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
     int numRows = resultTableResultSet.getRowCount();
     int numColumns = resultTableResultSet.getColumnCount();
 
-    // h2 response
+    // H2 response
     Assert.assertNotNull(_h2Connection);
-    Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    h2statement.execute(query);
-    ResultSet h2ResultSet = h2statement.getResultSet();
-
-    // compare results.
-    Assert.assertEquals(numColumns, h2ResultSet.getMetaData().getColumnCount());
-    if (h2ResultSet.first()) {
-      for (int i = 0; i < numRows; i++) {
-        for (int c = 0; c < numColumns; c++) {
-          String h2Value = h2ResultSet.getString(c + 1);
-          String pinotValue = resultTableResultSet.getString(i, c);
-          boolean error = ClusterIntegrationTestUtils.fuzzyCompare(h2Value, pinotValue, pinotValue);
-          if (error) {
-            throw new RuntimeException("Value: " + c + " does not match at (" + i + ", " + c + "), "
-                + "expected h2 value: " + h2Value + ", actual Pinot value: " + pinotValue);
+    try (Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY,
+        ResultSet.CONCUR_READ_ONLY)) {
+      h2statement.execute(query);
+      try (ResultSet h2ResultSet = h2statement.getResultSet()) {
+        // Compare results
+        Assert.assertEquals(numColumns, h2ResultSet.getMetaData().getColumnCount());
+        if (h2ResultSet.first()) {
+          for (int i = 0; i < numRows; i++) {
+            for (int c = 0; c < numColumns; c++) {
+              String h2Value = h2ResultSet.getString(c + 1);
+              String pinotValue = resultTableResultSet.getString(i, c);
+              boolean error = ClusterIntegrationTestUtils.fuzzyCompare(h2Value, pinotValue, pinotValue);
+              if (error) {
+                throw new RuntimeException("Value does not match at (" + i + ", " + c + "), "
+                    + "expected h2 value: " + h2Value + ", actual Pinot value: " + pinotValue);
+              }
+            }
+            if (!h2ResultSet.next() && i != numRows - 1) {
+              throw new RuntimeException("H2 result set is smaller than Pinot result set after: " + i + " rows!");
+            }
           }
         }
-        if (!h2ResultSet.next() && i != numRows - 1) {
-          throw new RuntimeException("H2 result set is smaller than Pinot result set after: " + i + " rows!");
-        }
+
+        Assert.assertFalse(h2ResultSet.next(), "Pinot result set is smaller than H2 result set after: "
+            + numRows + " rows!");
       }
     }
-
-    Assert.assertFalse(h2ResultSet.next(), "Pinot result set is smaller than H2 result set after: "
-        + numRows + " rows!");
-  }
-
-  @Override
-  protected long getCurrentCountStarResult() {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM lineorder").getResultSet(0).getLong(0);
-  }
-
-  @Override
-  protected long getCountStarResult() {
-    return 9999L;
-  }
-
-  @Override
-  protected boolean useMultiStageQueryEngine() {
-    return true;
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    // unload all SSB tables.
-    for (String table : SSB_QUICKSTART_TABLE_RESOURCES.keySet()) {
-      dropOfflineTable(table);
-    }
-
-    // stop components and clean up
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
   }
 
   @DataProvider(name = "QueryDataProvider")
   public static Object[][] queryDataProvider() {
     Yaml yaml = new Yaml();
-    InputStream inputStream = SSBQueryIntegrationTest.class.getClassLoader()
+    InputStream inputStream = SSBQueryTest.class.getClassLoader()
         .getResourceAsStream(SSB_QUERY_SET_RESOURCE_NAME);
-    Map<String, List<String>> ssbQuerySet = yaml.load(inputStream);
-    List<String> ssbQueryList = ssbQuerySet.get("sqls");
-    return ssbQueryList.stream().map(s -> new Object[]{s}).toArray(Object[][]::new);
+    Assert.assertNotNull(inputStream, "Unable to load SSB query set from: " + SSB_QUERY_SET_RESOURCE_NAME);
+    try (inputStream) {
+      Map<String, List<String>> ssbQuerySet = yaml.load(inputStream);
+      List<String> ssbQueryList = ssbQuerySet.get("sqls");
+      return ssbQueryList.stream().map(s -> new Object[]{s}).toArray(Object[][]::new);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to read SSB query set", e);
+    }
   }
 }

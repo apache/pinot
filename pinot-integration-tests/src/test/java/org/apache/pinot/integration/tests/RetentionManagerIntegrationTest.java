@@ -94,7 +94,7 @@ public class RetentionManagerIntegrationTest extends BaseClusterIntegrationTest 
     tableConfig.getValidationConfig().setRetentionTimeValue("2");
     addTableConfig(tableConfig);
 
-    waitForDocsLoaded(600_000L, true, tableConfig.getTableName());
+    waitForAllDocsLoaded(600_000L);
   }
 
   @AfterClass

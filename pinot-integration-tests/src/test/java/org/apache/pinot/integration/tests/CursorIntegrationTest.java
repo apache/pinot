@@ -420,6 +420,6 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
         LOGGER.error(e.getMessage());
         return false;
       }
-    }, 500L, 100_000L, "Failed to load delete query results", true);
+    }, 500L, 100_000L, "Failed to load delete query results");
   }
 }

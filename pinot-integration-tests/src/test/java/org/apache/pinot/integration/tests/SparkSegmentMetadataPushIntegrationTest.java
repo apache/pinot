@@ -369,14 +369,9 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
         .get("OFFLINE");
   }
 
-  protected void testCountStar(final long countStarResult) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return getCurrentCountStarResult() == countStarResult;
-      } catch (Exception e) {
-        return null;
-      }
-    }, 100L, 300_000, "Failed to load " + countStarResult + " documents", true);
+  protected void testCountStar(long countStarResult) {
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult() == countStarResult, 100L, 300_000L,
+        "Failed to load " + countStarResult + " documents", null);
   }
 
   @AfterMethod

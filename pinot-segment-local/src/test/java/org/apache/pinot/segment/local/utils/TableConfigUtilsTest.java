@@ -2159,6 +2159,19 @@ public class TableConfigUtilsTest {
               + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
     }
 
+    // OFFLINE table with partial upsert should fail
+    UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(partialUpsertConfig)
+        .setTimeColumnName(TIME_COLUMN)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Partial upsert is not supported for OFFLINE table");
+    }
+
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setUpsertConfig(upsertConfig).build();
     try {

@@ -431,7 +431,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   @Override
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForDocsLoaded(timeoutMs, true, getLogicalTableName());
+    waitForAllDocsLoaded(getLogicalTableName(), timeoutMs);
   }
 
   @Override
