@@ -568,7 +568,9 @@ public class S3PinotFS extends BasePinotFS {
         .build();
 
     DeleteObjectsResponse deleteResponse = retryWithS3CredentialRefresh(() -> _s3Client.deleteObjects(deleteRequest));
-    LOGGER.info("Failed to delete {} objects", deleteResponse.hasErrors() ? deleteResponse.errors().size() : 0);
+    if (deleteResponse.hasErrors()) {
+      LOGGER.info("Failed to delete {} objects", deleteResponse.errors().size());
+    }
     return deleteResponse.deleted().size() == objectsToDelete.size();
   }
 
