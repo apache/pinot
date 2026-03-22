@@ -476,10 +476,14 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get status for a submitted table replication job",
       notes = "Get status for a submitted table replication job")
-  public JsonNode getForceCommitJobStatus(
+  public JsonNode getTableCopyStatus(
       @ApiParam(value = "job id", required = true) @PathParam("jobId") String id) {
-    return JsonUtils.objectToJsonNode(
-        _pinotHelixResourceManager.getControllerJobZKMetadata(id, ControllerJobTypes.TABLE_REPLICATION));
+    Map<String, String> metadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(id, ControllerJobTypes.TABLE_REPLICATION);
+    if (metadata == null) {
+      throw new ControllerApplicationException(LOGGER, "Controller job not found: " + id, Response.Status.NOT_FOUND);
+    }
+    return JsonUtils.objectToJsonNode(metadata);
   }
 
   @PUT

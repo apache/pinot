@@ -39,6 +39,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -120,5 +121,55 @@ public class ZkBasedTableReplicationObserverTest {
 
     verify(_pinotHelixResourceManager).addControllerJobToZK(eq(jobId), anyMap(),
         eq(ControllerJobTypes.TABLE_REPLICATION));
+  }
+
+  @Test
+  public void testObserverCompletedWithErrors() throws Exception {
+    String jobId = "job1";
+    String tableName = "table1";
+    List<String> segments = Arrays.asList("seg1", "seg2");
+    WatermarkInductionResult res = new WatermarkInductionResult(Collections.emptyList(), segments);
+
+    Map<String, String> baseMetadata = new HashMap<>();
+    baseMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    baseMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableName);
+    when(_pinotHelixResourceManager.commonTableReplicationJobMetadata(eq(tableName), eq(jobId), anyLong(),
+        eq(res))).thenReturn(baseMetadata);
+
+    ZkBasedTableReplicationObserver observer =
+        new ZkBasedTableReplicationObserver(jobId, tableName, res, _pinotHelixResourceManager);
+
+    // seg1 succeeds, seg2 fails -> remaining == 0 but with errors
+    observer.onTrigger(TableReplicationObserver.Trigger.SEGMENT_REPLICATE_COMPLETED_TRIGGER, "seg1");
+    observer.onTrigger(TableReplicationObserver.Trigger.SEGMENT_REPLICATE_ERRORED_TRIGGER, "seg2");
+
+    ArgumentCaptor<Map<String, String>> metadataCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(_pinotHelixResourceManager).addControllerJobToZK(eq(jobId), metadataCaptor.capture(),
+        eq(ControllerJobTypes.TABLE_REPLICATION));
+
+    Map<String, String> metadata = metadataCaptor.getValue();
+    Assert.assertEquals(metadata.get(CommonConstants.ControllerJob.REPLICATION_JOB_STATUS), "COMPLETED_WITH_ERRORS");
+  }
+
+  @Test
+  public void testObserverZkWriteFailureDoesNotPropagate() throws Exception {
+    String jobId = "job1";
+    String tableName = "table1";
+    List<String> segments = Arrays.asList("seg1");
+    WatermarkInductionResult res = new WatermarkInductionResult(Collections.emptyList(), segments);
+
+    Map<String, String> baseMetadata = new HashMap<>();
+    baseMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    baseMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableName);
+    when(_pinotHelixResourceManager.commonTableReplicationJobMetadata(eq(tableName), eq(jobId), anyLong(),
+        eq(res))).thenReturn(baseMetadata);
+    doThrow(new RuntimeException("ZK unavailable")).when(_pinotHelixResourceManager)
+        .addControllerJobToZK(anyString(), anyMap(), any());
+
+    ZkBasedTableReplicationObserver observer =
+        new ZkBasedTableReplicationObserver(jobId, tableName, res, _pinotHelixResourceManager);
+
+    // Should not throw even when ZK write fails
+    observer.onTrigger(TableReplicationObserver.Trigger.SEGMENT_REPLICATE_ERRORED_TRIGGER, "seg1");
   }
 }

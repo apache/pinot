@@ -33,6 +33,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.CopyTablePayload;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +43,6 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeSegmentCopier implements SegmentCopier {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentCopier.class);
-  private static final String SEGMENT_UPLOAD_ENDPOINT_TEMPLATE = "/segments?tableName=%s";
 
   private final String _destinationDeepStoreUri;
   private final HttpClient _httpClient;
@@ -79,7 +79,7 @@ public class RealtimeSegmentCopier implements SegmentCopier {
     String tableName = tableNameWithType.substring(0, tableNameWithType.lastIndexOf("_REALTIME"));
     try {
       // 1. Get the the source segment uri
-      String downloadUrl = segmentZKMetadata.get("segment.download.url");
+      String downloadUrl = segmentZKMetadata.get(CommonConstants.Segment.DOWNLOAD_URL);
       if (downloadUrl == null) {
         throw new RuntimeException("Download URL not found in segment ZK metadata for segment: " + segmentName);
       }

@@ -28,6 +28,7 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.CopyTablePayload;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -75,7 +76,7 @@ public class RealtimeSegmentCopierTest {
         "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null, null);
 
     Map<String, String> metadata = new HashMap<>();
-    metadata.put("segment.download.url", "hdfs://src/data/seg1");
+    metadata.put(CommonConstants.Segment.DOWNLOAD_URL, "hdfs://src/data/seg1");
 
     doReturn(_pinotFS).when(_copier).getPinotFS(any(URI.class));
     when(_pinotFS.exists(any(URI.class))).thenReturn(false);
@@ -100,7 +101,7 @@ public class RealtimeSegmentCopierTest {
         "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null, null);
 
     Map<String, String> metadata = new HashMap<>();
-    metadata.put("segment.download.url", "hdfs://src/data/seg1");
+    metadata.put(CommonConstants.Segment.DOWNLOAD_URL, "hdfs://src/data/seg1");
 
     doReturn(_pinotFS).when(_copier).getPinotFS(any(URI.class));
     when(_pinotFS.exists(any(URI.class))).thenReturn(true);
@@ -114,5 +115,18 @@ public class RealtimeSegmentCopierTest {
 
     verify(_pinotFS, never()).copy(any(URI.class), any(URI.class));
     verify(_httpClient).sendRequest(any(ClassicHttpRequest.class), anyLong());
+  }
+
+  @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Download URL not found.*")
+  public void testCopyMissingDownloadUrl() {
+    String tableNameWithType = "table1_REALTIME";
+    String segmentName = "seg1";
+    CopyTablePayload payload = new CopyTablePayload("http://src", Collections.emptyMap(),
+        "http://dest", Collections.emptyMap(), "broker", "server", Collections.emptyMap(), null, null);
+
+    Map<String, String> metadata = new HashMap<>();
+    // No download URL in metadata
+
+    _copier.copy(tableNameWithType, segmentName, payload, metadata);
   }
 }

@@ -61,7 +61,7 @@ public class CopyTablePayload {
    * MUST NOT contain the tenant type suffix, i.e. _REALTIME or _OFFLINE.
    */
   private String _serverTenant;
-  private Integer _backfillParallism;
+  private Integer _backfillParallelism;
 
   /**
    * Job type for the copy operation.
@@ -85,7 +85,7 @@ public class CopyTablePayload {
       @JsonProperty(value = "brokerTenant", required = true) String brokerTenant,
       @JsonProperty(value = "serverTenant", required = true) String serverTenant,
       @JsonProperty("tagPoolReplacementMap") @Nullable Map<String, String> tagPoolReplacementMap,
-      @JsonProperty("backfillParallism") @Nullable Integer backfillParallism,
+      @JsonProperty("backfillParallelism") @Nullable Integer backfillParallism,
       @JsonProperty("jobType") @Nullable JobType jobType) {
     _sourceClusterUri = sourceClusterUri;
     _headers = headers;
@@ -94,7 +94,7 @@ public class CopyTablePayload {
     _brokerTenant = brokerTenant;
     _serverTenant = serverTenant;
     _tagPoolReplacementMap = tagPoolReplacementMap;
-    _backfillParallism = backfillParallism;
+    _backfillParallelism = backfillParallism;
     _jobType = jobType != null ? jobType : JobType.CONTROLLER;
   }
 
@@ -128,9 +128,9 @@ public class CopyTablePayload {
     return _serverTenant;
   }
 
-  @JsonGetter("backfillParallism")
-  public Integer getBackfillParallism() {
-    return _backfillParallism;
+  @JsonGetter("backfillParallelism")
+  public Integer getBackfillParallelism() {
+    return _backfillParallelism;
   }
 
   @JsonGetter("tagPoolReplacementMap")

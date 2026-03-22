@@ -101,8 +101,8 @@ public class TableReplicator {
         _pinotHelixResourceManager);
     observer.onTrigger(TableReplicationObserver.Trigger.START_TRIGGER, null);
     ConcurrentLinkedQueue<String> q = new ConcurrentLinkedQueue<>(segments);
-    int parallelism = copyTablePayload.getBackfillParallism() != null
-        ? copyTablePayload.getBackfillParallism()
+    int parallelism = copyTablePayload.getBackfillParallelism() != null
+        ? copyTablePayload.getBackfillParallelism()
         : res.getWatermarks().size();
     for (int i = 0; i < parallelism; i++) {
       _executorService.submit(() -> {
@@ -120,7 +120,7 @@ public class TableReplicator {
             _segmentCopier.copy(tableNameWithType, segment, copyTablePayload, segmentZKMetadata);
             observer.onTrigger(TableReplicationObserver.Trigger.SEGMENT_REPLICATE_COMPLETED_TRIGGER, segment);
           } catch (Exception e) {
-            LOGGER.error("Caught exception while replicating table segment", e);
+            LOGGER.error("Caught exception while replicating segment {} for table {}", segment, tableNameWithType, e);
             observer.onTrigger(TableReplicationObserver.Trigger.SEGMENT_REPLICATE_ERRORED_TRIGGER, segment);
           }
         }

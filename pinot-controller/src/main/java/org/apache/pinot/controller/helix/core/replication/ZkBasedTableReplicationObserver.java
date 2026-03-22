@@ -85,11 +85,16 @@ public class ZkBasedTableReplicationObserver implements TableReplicationObserver
       jobMetadata.put(CommonConstants.ControllerJob.REPLICATION_PROGRESS, progress);
       int remaining = JsonUtils.stringToObject(progress, JsonNode.class).get("remainingSegments").asInt();
       if (remaining == 0) {
-        jobMetadata.put(CommonConstants.ControllerJob.REPLICATION_JOB_STATUS, "COMPLETED");
+        String status = _progressStats.getSegmentsFailToCopy().isEmpty() ? "COMPLETED" : "COMPLETED_WITH_ERRORS";
+        jobMetadata.put(CommonConstants.ControllerJob.REPLICATION_JOB_STATUS, status);
       } else {
         jobMetadata.put(CommonConstants.ControllerJob.REPLICATION_JOB_STATUS, "IN_PROGRESS");
       }
-      _pinotHelixResourceManager.addControllerJobToZK(_jobId, jobMetadata, ControllerJobTypes.TABLE_REPLICATION);
+      try {
+        _pinotHelixResourceManager.addControllerJobToZK(_jobId, jobMetadata, ControllerJobTypes.TABLE_REPLICATION);
+      } catch (Exception e) {
+        LOGGER.error("Failed to persist replication stats to ZK for job: {}", _jobId, e);
+      }
     } catch (JsonProcessingException e) {
       LOGGER.error("Error serialising replication stats to JSON for persisting to ZK {}", _jobId, e);
     }
