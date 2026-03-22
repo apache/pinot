@@ -771,6 +771,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         ConsumingSegmentConsistencyModeListener.getInstance());
     LOGGER.info("Registered ConsumingSegmentConsistencyModeListener as cluster config change listener");
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_pinotLLCRealtimeSegmentManager);
+    LOGGER.info("Registered PinotLLCRealtimeSegmentManager as cluster config change listener");
   }
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
