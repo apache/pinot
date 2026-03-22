@@ -59,7 +59,7 @@ jobs:
     strategy:
       matrix:
         arch: [ "amd64", "arm64" ]
-        base-image-tag: [ "11-amazoncorretto", "11-ms-openjdk" ]
+        base-image-tag: [ "21-amazoncorretto", "21-ms-openjdk" ]
     name: Build Pinot Docker Image on ${{ matrix.arch }} with base image ${{ matrix.base-image-tag }}
     needs: [ generate-build-info ]
     steps:
@@ -104,5 +104,5 @@ jobs:
         env:
           TAGS: "${{needs.generate-build-info.outputs.tags}}"
           BUILD_PLATFORM: "linux/arm64,linux/amd64"
-          BASE_IMAGE_TAGS: "11-amazoncorretto,11-ms-openjdk"
+          BASE_IMAGE_TAGS: "21-amazoncorretto,21-ms-openjdk"
         run: .github/workflows/scripts/docker/.pinot_multi_arch_docker_image_manifest_package.sh
