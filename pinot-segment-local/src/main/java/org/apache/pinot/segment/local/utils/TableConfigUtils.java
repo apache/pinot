@@ -455,13 +455,6 @@ public final class TableConfigUtils {
           } else {
             LOGGER.warn("It's not recommended to create pauseless tables with replication 1 for stability reasons.");
           }
-          CompletionConfig completionConfig = tableConfig.getValidationConfig().getCompletionConfig();
-          if (completionConfig != null) {
-            Preconditions.checkState(
-                !CommonConstants.Segment.Realtime.CompletionMode.DOWNLOAD.name()
-                    .equalsIgnoreCase(completionConfig.getCompletionMode()),
-                "CompletionMode DOWNLOAD is not supported with pauseless consumption");
-          }
         }
       }
 

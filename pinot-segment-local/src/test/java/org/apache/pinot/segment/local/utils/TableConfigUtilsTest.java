@@ -883,39 +883,6 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       fail("Should not fail when pauseless consumption is disabled with multiple stream configs with unique topics");
     }
-
-    // Test for pauseless consumption with CompletionMode.DOWNLOAD - should fail
-    Map<String, String> singleStreamConfig = getKafkaStreamConfigs();
-    StreamIngestionConfig pauselessStreamConfig = new StreamIngestionConfig(List.of(singleStreamConfig));
-    pauselessStreamConfig.setPauselessConsumptionEnabled(true);
-    IngestionConfig pauselessIngestionConfig = new IngestionConfig();
-    pauselessIngestionConfig.setStreamIngestionConfig(pauselessStreamConfig);
-
-    TableConfig pauselessWithDownloadMode = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setTimeColumnName("timeColumn")
-        .setIngestionConfig(pauselessIngestionConfig)
-        .setCompletionConfig(new CompletionConfig("DOWNLOAD"))
-        .build();
-
-    try {
-      TableConfigUtils.validate(pauselessWithDownloadMode, schema);
-      fail("Should fail when pauseless consumption is enabled with CompletionMode DOWNLOAD");
-    } catch (IllegalStateException e) {
-      assertTrue(e.getMessage().contains("CompletionMode DOWNLOAD is not supported with pauseless consumption"));
-    }
-
-    // Test for pauseless consumption with CompletionMode.DEFAULT - should pass
-    TableConfig pauselessWithDefaultMode = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setTimeColumnName("timeColumn")
-        .setIngestionConfig(pauselessIngestionConfig)
-        .setCompletionConfig(new CompletionConfig("DEFAULT"))
-        .build();
-
-    try {
-      TableConfigUtils.validate(pauselessWithDefaultMode, schema);
-    } catch (IllegalStateException e) {
-      fail("Should not fail when pauseless consumption is enabled with CompletionMode DEFAULT");
-    }
   }
 
   @Test
