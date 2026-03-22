@@ -503,6 +503,38 @@ public class PartitionFunctionTest {
   }
 
   @Test
+  public void testUseRawBytesThroughFactory() {
+    int numPartitions = 5;
+    byte[] rawBytes = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05};
+    String hexValue = BytesUtils.toHexString(rawBytes);
+    int expectedPartition =
+        (MurmurHashFunctions.murmurHash2(rawBytes) & Integer.MAX_VALUE) % numPartitions;
+
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("useRawBytes", "true");
+
+    // Test Murmur alias through factory
+    PartitionFunction murmurFn =
+        PartitionFunctionFactory.getPartitionFunction("Murmur", numPartitions, functionConfig);
+    assertEquals(murmurFn.getPartition(hexValue), expectedPartition);
+    assertEquals(murmurFn.getFunctionConfig().get("useRawBytes"), "true");
+
+    // Test Murmur2 alias through factory
+    PartitionFunction murmur2Fn =
+        PartitionFunctionFactory.getPartitionFunction("Murmur2", numPartitions, functionConfig);
+    assertEquals(murmur2Fn.getPartition(hexValue), expectedPartition);
+    assertEquals(murmur2Fn.getFunctionConfig().get("useRawBytes"), "true");
+
+    // Test Murmur3 through factory
+    int expectedPartitionMurmur3 =
+        (MurmurHashFunctions.murmurHash3X86Bit32(rawBytes, 0) & Integer.MAX_VALUE) % numPartitions;
+    PartitionFunction murmur3Fn =
+        PartitionFunctionFactory.getPartitionFunction("Murmur3", numPartitions, functionConfig);
+    assertEquals(murmur3Fn.getPartition(hexValue), expectedPartitionMurmur3);
+    assertEquals(murmur3Fn.getFunctionConfig().get("useRawBytes"), "true");
+  }
+
+  @Test
   public void testMurmur3PartitionFunctionEquivalence() {
 
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
