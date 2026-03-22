@@ -19,6 +19,9 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -29,20 +32,25 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 public class MurmurPartitionFunction implements PartitionFunction {
   private static final String NAME = "Murmur";
+  private static final String USE_RAW_BYTES_KEY = "useRawBytes";
   private final int _numPartitions;
+  private final boolean _useRawBytes;
 
   /**
    * Constructor for the class.
    * @param numPartitions Number of partitions.
+   * @param functionConfig to extract configurations for the partition function.
    */
-  public MurmurPartitionFunction(int numPartitions) {
+  public MurmurPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
+    _useRawBytes = functionConfig != null && Boolean.parseBoolean(functionConfig.get(USE_RAW_BYTES_KEY));
   }
 
   @Override
   public int getPartition(String value) {
-    return (MurmurHashFunctions.murmurHash2(value.getBytes(UTF_8)) & Integer.MAX_VALUE) % _numPartitions;
+    byte[] bytes = _useRawBytes ? BytesUtils.toBytes(value) : value.getBytes(UTF_8);
+    return (MurmurHashFunctions.murmurHash2(bytes) & Integer.MAX_VALUE) % _numPartitions;
   }
 
   @Override
