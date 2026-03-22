@@ -34,7 +34,16 @@ public class MurmurPartitionFunction implements PartitionFunction {
   private static final String NAME = "Murmur";
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
   private final int _numPartitions;
+  private final Map<String, String> _functionConfig;
   private final boolean _useRawBytes;
+
+  /**
+   * Constructor for backward compatibility.
+   * @param numPartitions Number of partitions.
+   */
+  public MurmurPartitionFunction(int numPartitions) {
+    this(numPartitions, null);
+  }
 
   /**
    * Constructor for the class.
@@ -44,6 +53,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
   public MurmurPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
+    _functionConfig = functionConfig;
     _useRawBytes = functionConfig != null && Boolean.parseBoolean(functionConfig.get(USE_RAW_BYTES_KEY));
   }
 
@@ -61,6 +71,11 @@ public class MurmurPartitionFunction implements PartitionFunction {
   @Override
   public int getNumPartitions() {
     return _numPartitions;
+  }
+
+  @Override
+  public Map<String, String> getFunctionConfig() {
+    return _functionConfig;
   }
 
   // Keep it for backward-compatibility, use getName() instead

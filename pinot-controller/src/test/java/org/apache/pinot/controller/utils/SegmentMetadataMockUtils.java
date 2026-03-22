@@ -89,7 +89,7 @@ public class SegmentMetadataMockUtils {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     Set<Integer> partitions = Collections.singleton(partitionNumber);
     when(columnMetadata.getPartitions()).thenReturn(partitions);
-    when(columnMetadata.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(5, null));
+    when(columnMetadata.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(5));
 
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     if (columnName != null) {

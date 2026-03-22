@@ -36,6 +36,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   private static final String VARIANT_KEY = "variant";
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
   private final int _numPartitions;
+  private final Map<String, String> _functionConfig;
   private final int _seed;
   private final boolean _useX64;
   private final boolean _useRawBytes;
@@ -48,6 +49,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   public Murmur3PartitionFunction(int numPartitions, Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
+    _functionConfig = functionConfig;
 
     int seed = 0;
     boolean useX64 = false;
@@ -94,6 +96,11 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   @Override
   public int getNumPartitions() {
     return _numPartitions;
+  }
+
+  @Override
+  public Map<String, String> getFunctionConfig() {
+    return _functionConfig;
   }
 
   // Keep it for backward-compatibility, use getName() instead

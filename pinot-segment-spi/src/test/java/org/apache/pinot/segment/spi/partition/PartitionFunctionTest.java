@@ -433,7 +433,7 @@ public class PartitionFunctionTest {
 
     // initialized {@link MurmurPartitionFunction} with 5 partitions
     int numPartitions = 5;
-    MurmurPartitionFunction murmurPartitionFunction = new MurmurPartitionFunction(numPartitions, null);
+    MurmurPartitionFunction murmurPartitionFunction = new MurmurPartitionFunction(numPartitions);
 
     // generate the same 10 String values
     // Apply the partition function and compare with stored results
