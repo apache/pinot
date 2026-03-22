@@ -75,7 +75,7 @@ public class PinotTableRestletResourceTest {
         new WatermarkInductionResult(List.of(
             new WatermarkInductionResult.Watermark(1, 3, 101L),
             new WatermarkInductionResult.Watermark(0, 2, 100L),
-            new WatermarkInductionResult.Watermark(10000, 5, 200L))));
+            new WatermarkInductionResult.Watermark(10000, 5, 200L)), List.of()));
 
     assertEquals(streamMetadataList.size(), 2);
 
