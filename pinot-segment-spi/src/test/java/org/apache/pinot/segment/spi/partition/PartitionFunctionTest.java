@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 import org.testng.annotations.Test;
@@ -437,6 +438,100 @@ public class PartitionFunctionTest {
     // generate the same 10 String values
     // Apply the partition function and compare with stored results
     testPartitionFunction(murmurPartitionFunction, expectedPartitions);
+  }
+
+  @Test
+  public void testMurmurPartitionFunctionUseRawBytes() {
+    int numPartitions = 5;
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("useRawBytes", "true");
+    MurmurPartitionFunction partitionFunction = new MurmurPartitionFunction(numPartitions, functionConfig);
+
+    // When useRawBytes is true, the hex-encoded value should be decoded back to raw bytes before hashing.
+    // This means getPartition(hexString) should produce the same result as hashing the original raw bytes.
+    byte[] rawBytes = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05};
+    String hexValue = BytesUtils.toHexString(rawBytes);
+
+    int expectedPartition =
+        (MurmurHashFunctions.murmurHash2(rawBytes) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(partitionFunction.getPartition(hexValue), expectedPartition);
+
+    // Without useRawBytes, the same hex string should be treated as UTF-8 text (different result).
+    MurmurPartitionFunction defaultPartitionFunction = new MurmurPartitionFunction(numPartitions, null);
+    int defaultPartition =
+        (MurmurHashFunctions.murmurHash2(hexValue.getBytes(UTF_8)) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(defaultPartitionFunction.getPartition(hexValue), defaultPartition);
+  }
+
+  @Test
+  public void testMurmur3PartitionFunctionUseRawBytes() {
+    int numPartitions = 5;
+    byte[] rawBytes = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05};
+    String hexValue = BytesUtils.toHexString(rawBytes);
+
+    // Test x86_32 variant with useRawBytes
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("useRawBytes", "true");
+    Murmur3PartitionFunction partitionFunction = new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+    int expectedPartition =
+        (MurmurHashFunctions.murmurHash3X86Bit32(rawBytes, 0) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(partitionFunction.getPartition(hexValue), expectedPartition);
+
+    // Test x64_32 variant with useRawBytes
+    functionConfig.put("variant", "x64_32");
+    Murmur3PartitionFunction partitionFunctionX64 = new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+    int expectedPartitionX64 =
+        (MurmurHashFunctions.murmurHash3X64Bit32(rawBytes, 0) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(partitionFunctionX64.getPartition(hexValue), expectedPartitionX64);
+
+    // Test x86_32 variant with useRawBytes and non-zero seed
+    functionConfig.remove("variant");
+    functionConfig.put("seed", "9001");
+    Murmur3PartitionFunction partitionFunctionWithSeed = new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+    int expectedPartitionWithSeed =
+        (MurmurHashFunctions.murmurHash3X86Bit32(rawBytes, 9001) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(partitionFunctionWithSeed.getPartition(hexValue), expectedPartitionWithSeed);
+
+    // Without useRawBytes, the same hex string should be treated as UTF-8 text.
+    Murmur3PartitionFunction defaultPartitionFunction = new Murmur3PartitionFunction(numPartitions, null);
+    int defaultPartition =
+        (MurmurHashFunctions.murmurHash3X86Bit32(hexValue.getBytes(UTF_8), 0) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(defaultPartitionFunction.getPartition(hexValue), defaultPartition);
+  }
+
+  @Test
+  public void testUseRawBytesThroughFactory() {
+    int numPartitions = 5;
+    byte[] rawBytes = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05};
+    String hexValue = BytesUtils.toHexString(rawBytes);
+    int expectedPartition =
+        (MurmurHashFunctions.murmurHash2(rawBytes) & Integer.MAX_VALUE) % numPartitions;
+
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("useRawBytes", "true");
+
+    // Test Murmur alias through factory
+    PartitionFunction murmurFn =
+        PartitionFunctionFactory.getPartitionFunction("Murmur", numPartitions, functionConfig);
+    assertEquals(murmurFn.getPartition(hexValue), expectedPartition);
+    assertEquals(murmurFn.getFunctionConfig().get("useRawBytes"), "true");
+
+    // Test Murmur2 alias through factory
+    PartitionFunction murmur2Fn =
+        PartitionFunctionFactory.getPartitionFunction("Murmur2", numPartitions, functionConfig);
+    assertEquals(murmur2Fn.getPartition(hexValue), expectedPartition);
+    assertEquals(murmur2Fn.getFunctionConfig().get("useRawBytes"), "true");
+
+    // Test Murmur3 through factory
+    int expectedPartitionMurmur3 =
+        (MurmurHashFunctions.murmurHash3X86Bit32(rawBytes, 0) & Integer.MAX_VALUE) % numPartitions;
+    PartitionFunction murmur3Fn =
+        PartitionFunctionFactory.getPartitionFunction("Murmur3", numPartitions, functionConfig);
+    assertEquals(murmur3Fn.getPartition(hexValue), expectedPartitionMurmur3);
+    assertEquals(murmur3Fn.getFunctionConfig().get("useRawBytes"), "true");
   }
 
   @Test

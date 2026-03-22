@@ -77,7 +77,7 @@ public class PartitionFunctionFactory {
 
       case Murmur:
       case Murmur2:
-        return new MurmurPartitionFunction(numPartitions);
+        return new MurmurPartitionFunction(numPartitions, functionConfig);
 
       case Murmur3:
         return new Murmur3PartitionFunction(numPartitions, functionConfig);
