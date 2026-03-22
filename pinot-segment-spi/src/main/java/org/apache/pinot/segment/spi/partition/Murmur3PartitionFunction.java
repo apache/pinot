@@ -19,7 +19,9 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
@@ -36,6 +38,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   private static final String VARIANT_KEY = "variant";
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
   private final int _numPartitions;
+  @Nullable
   private final Map<String, String> _functionConfig;
   private final int _seed;
   private final boolean _useX64;
@@ -46,10 +49,10 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    * @param numPartitions Number of partitions.
    * @param functionConfig to extract configurations for the partition function.
    */
-  public Murmur3PartitionFunction(int numPartitions, Map<String, String> functionConfig) {
+  public Murmur3PartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
-    _functionConfig = functionConfig;
+    _functionConfig = functionConfig != null ? Collections.unmodifiableMap(functionConfig) : null;
 
     int seed = 0;
     boolean useX64 = false;
@@ -98,6 +101,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
     return _numPartitions;
   }
 
+  @Nullable
   @Override
   public Map<String, String> getFunctionConfig() {
     return _functionConfig;

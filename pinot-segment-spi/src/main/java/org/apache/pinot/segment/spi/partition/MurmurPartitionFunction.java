@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -34,6 +35,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
   private static final String NAME = "Murmur";
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
   private final int _numPartitions;
+  @Nullable
   private final Map<String, String> _functionConfig;
   private final boolean _useRawBytes;
 
@@ -53,7 +55,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
   public MurmurPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
-    _functionConfig = functionConfig;
+    _functionConfig = functionConfig != null ? Collections.unmodifiableMap(functionConfig) : null;
     _useRawBytes = functionConfig != null && Boolean.parseBoolean(functionConfig.get(USE_RAW_BYTES_KEY));
   }
 
@@ -73,6 +75,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
     return _numPartitions;
   }
 
+  @Nullable
   @Override
   public Map<String, String> getFunctionConfig() {
     return _functionConfig;
