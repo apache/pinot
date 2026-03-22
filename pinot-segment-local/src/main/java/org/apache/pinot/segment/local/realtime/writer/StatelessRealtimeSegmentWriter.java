@@ -434,7 +434,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
         realtimeSegmentConfigBuilder.setPartitionFunction(
-            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions, null));
+            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
+                columnPartitionConfig.getFunctionConfig()));
         realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
       } else {
         _logger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());
