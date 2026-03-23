@@ -30,6 +30,7 @@ permissions:
 
 jobs:
   close-stale-issues:
+    if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/stale@v9
