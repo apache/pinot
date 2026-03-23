@@ -263,7 +263,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
   @VisibleForTesting
   protected InstancePartitions getInstancePartitions() {
-    // TODO: Evaluate whether we need to provide support for COMPLETE partitions.
+    // TODO: Evaluate whether we need to provide support for COMPLETED partitions.
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(_tableNameWithType);
     Preconditions.checkNotNull(tableType);
     InstancePartitionsType instancePartitionsType =
