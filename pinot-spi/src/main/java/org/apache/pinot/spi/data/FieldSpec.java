@@ -26,6 +26,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -148,6 +149,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     TRIM_LENGTH, ERROR, SUBSTITUTE_DEFAULT_VALUE, NO_ACTION
   }
 
+  @JsonProperty("description")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  protected String _description;
+
+  @JsonProperty("tags")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  protected List<String> _tags;
+
   protected String _name;
   protected DataType _dataType;
   protected boolean _singleValueField = true;
@@ -208,6 +219,24 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setName(String name) {
     _name = name;
+  }
+
+  @Nullable
+  public String getDescription() {
+    return _description;
+  }
+
+  public void setDescription(@Nullable String description) {
+    _description = description;
+  }
+
+  @Nullable
+  public List<String> getTags() {
+    return _tags;
+  }
+
+  public void setTags(@Nullable List<String> tags) {
+    _tags = tags;
   }
 
   public DataType getDataType() {
@@ -518,6 +547,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     appendTransformFunction(jsonObject);
     if (_virtualColumnProvider != null) {
       jsonObject.put("virtualColumnProvider", _virtualColumnProvider);
+    }
+    if (_description != null) {
+      jsonObject.put("description", _description);
+    }
+    if (_tags != null && !_tags.isEmpty()) {
+      ArrayNode tagsArray = JsonUtils.newArrayNode();
+      for (String tag : _tags) {
+        tagsArray.add(tag);
+      }
+      jsonObject.set("tags", tagsArray);
     }
     return jsonObject;
   }

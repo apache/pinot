@@ -3272,7 +3272,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null, null);
+            null, null, null, null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -3288,7 +3288,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null, null);
+            null, null, null, null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -3298,8 +3298,9 @@ public class TableConfigUtilsTest {
   public void testValidateInstancePoolsAndReplicaGroupsForNoIACOfflineTable() {
     TableConfig tableConfig =
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
-            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null, null);
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(),
+            new TableCustomConfig(null), null, null, null, null, null, null, null, null, null, null, null, false,
+            null, null, null, null, null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3309,8 +3310,9 @@ public class TableConfigUtilsTest {
   public void testValidateInstancePoolsAndReplicaGroupsForNoIACRealtimeTable() {
     TableConfig tableConfig =
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
-            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null, null);
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(),
+            new TableCustomConfig(null), null, null, null, null, null, null, null, null, null, null, null, false,
+            null, null, null, null, null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3326,7 +3328,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null, null);
+            null, null, null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3342,7 +3344,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null, null);
+            null, null, null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3358,7 +3360,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null, null);
+            null, null, null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3374,7 +3376,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null, null);
+            null, null, null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3385,7 +3387,7 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, true, null, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, true, null, null, null, null, null, null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -3399,7 +3401,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, null, null, null, null, null, null, null, true, null, instancePartitionsMap, null,
-            null);
+            null, null, null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,6 +35,7 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -137,5 +139,107 @@ public class TableConfigTest {
     IllegalArgumentException e =
         Assert.expectThrows(IllegalArgumentException.class, () -> config.setTableSamplers(samplers));
     assertTrue(e.getMessage().contains("Table sampler name cannot be blank"));
+  }
+
+  @Test
+  public void testDescriptionSerdeRoundtrip()
+      throws IOException {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setDescription("Tracks all user events in real-time.")
+        .build();
+
+    assertThat(config.getDescription()).isEqualTo("Tracks all user events in real-time.");
+
+    // Serialize to JSON and verify description is present
+    String json = config.toJsonString();
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
+    assertThat(jsonNode.has("description")).isTrue();
+    assertThat(jsonNode.get("description").asText()).isEqualTo("Tracks all user events in real-time.");
+
+    // Deserialize and verify roundtrip
+    TableConfig deserialized = JsonUtils.stringToObject(json, TableConfig.class);
+    assertThat(deserialized.getDescription()).isEqualTo("Tracks all user events in real-time.");
+    assertThat(deserialized).isEqualTo(config);
+  }
+
+  @Test
+  public void testDescriptionOmittedWhenNotSet()
+      throws IOException {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .build();
+
+    assertThat(config.getDescription()).isNull();
+
+    String json = config.toJsonString();
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
+    assertThat(jsonNode.has("description")).as("description should be absent when null").isFalse();
+  }
+
+  @Test
+  public void testOldJsonWithoutDescriptionDeserializesCleanly()
+      throws IOException {
+    // Minimal old-format JSON without description field
+    String oldJson = "{\"tableName\":\"testTable_OFFLINE\",\"tableType\":\"OFFLINE\","
+        + "\"segmentsConfig\":{},\"tenants\":{},\"tableIndexConfig\":{}}";
+    TableConfig config = JsonUtils.stringToObject(oldJson, TableConfig.class);
+    assertThat(config.getDescription()).isNull();
+  }
+
+  @Test
+  public void testCopyConstructorCopiesDescription() {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setDescription("Original description")
+        .build();
+
+    TableConfig copy = new TableConfig(config);
+    assertThat(copy.getDescription()).isEqualTo("Original description");
+    assertThat(config).isEqualTo(copy);
+  }
+
+  @Test
+  public void testTagsSerdeRoundtrip()
+      throws IOException {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setTags(List.of("real-time", "production"))
+        .build();
+
+    assertThat(config.getTags()).containsExactly("real-time", "production");
+
+    String json = config.toJsonString();
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
+    assertThat(jsonNode.has("tags")).isTrue();
+    assertThat(jsonNode.get("tags").size()).isEqualTo(2);
+
+    TableConfig deserialized = JsonUtils.stringToObject(json, TableConfig.class);
+    assertThat(deserialized.getTags()).containsExactly("real-time", "production");
+  }
+
+  @Test
+  public void testTagsOmittedWhenNotSet()
+      throws IOException {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .build();
+
+    assertThat(config.getTags()).isNull();
+
+    String json = config.toJsonString();
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
+    assertThat(jsonNode.has("tags")).as("tags should be absent when null").isFalse();
+  }
+
+  @Test
+  public void testCopyConstructorCopiesTags() {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setTags(List.of("production", "critical"))
+        .build();
+
+    TableConfig copy = new TableConfig(config);
+    assertThat(copy.getTags()).containsExactly("production", "critical");
   }
 }

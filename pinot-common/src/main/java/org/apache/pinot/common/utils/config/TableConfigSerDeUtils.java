@@ -184,10 +184,19 @@ public class TableConfigSerDeUtils {
       });
     }
 
+    String description = simpleFields.get(TableConfig.DESCRIPTION_KEY);
+
+    List<String> tags = null;
+    String tagsString = simpleFields.get(TableConfig.TAGS_KEY);
+    if (tagsString != null) {
+      tags = JsonUtils.stringToObject(tagsString, new TypeReference<>() {
+      });
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
         dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList,
-        instancePartitionsMap, segmentAssignmentConfigMap, tableSamplerConfigs);
+        instancePartitionsMap, segmentAssignmentConfigMap, tableSamplerConfigs, description, tags);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -265,6 +274,14 @@ public class TableConfigSerDeUtils {
     List<TableSamplerConfig> tableSamplerConfigs = tableConfig.getTableSamplers();
     if (tableSamplerConfigs != null) {
       simpleFields.put(TableConfig.TABLE_SAMPLERS_KEY, JsonUtils.objectToString(tableSamplerConfigs));
+    }
+    String description = tableConfig.getDescription();
+    if (description != null) {
+      simpleFields.put(TableConfig.DESCRIPTION_KEY, description);
+    }
+    List<String> tags = tableConfig.getTags();
+    if (tags != null && !tags.isEmpty()) {
+      simpleFields.put(TableConfig.TAGS_KEY, JsonUtils.objectToString(tags));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
