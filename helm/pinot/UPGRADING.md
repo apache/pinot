@@ -58,8 +58,8 @@ RELEASE=pinot
 # 1. Delete the old ZooKeeper StatefulSet (pods will be terminated)
 kubectl delete statefulset ${RELEASE}-zookeeper -n ${NAMESPACE}
 
-# 2. Delete old ZooKeeper PVCs
-kubectl delete pvc -l app.kubernetes.io/name=zookeeper -n ${NAMESPACE}
+# 2. Delete old ZooKeeper PVCs for this Helm release only
+kubectl delete pvc -l app.kubernetes.io/name=zookeeper,app.kubernetes.io/instance=${RELEASE} -n ${NAMESPACE}
 
 # 3. Upgrade the Helm release
 helm upgrade ${RELEASE} -n ${NAMESPACE} ./helm/pinot
@@ -85,8 +85,8 @@ kubectl cp ${NAMESPACE}/${RELEASE}-zookeeper-0:/bitnami/zookeeper/data ./zk-data
 # 2. Delete the old ZooKeeper StatefulSet and pods.
 kubectl delete statefulset ${RELEASE}-zookeeper -n ${NAMESPACE}
 
-# 3. Delete old PVCs (mount paths are incompatible between images).
-kubectl delete pvc -l app.kubernetes.io/name=zookeeper -n ${NAMESPACE}
+# 3. Delete old PVCs for this release (mount paths are incompatible between images).
+kubectl delete pvc -l app.kubernetes.io/name=zookeeper,app.kubernetes.io/instance=${RELEASE} -n ${NAMESPACE}
 
 # 4. Upgrade the Helm release (creates new StatefulSet + PVCs).
 helm upgrade ${RELEASE} -n ${NAMESPACE} ./helm/pinot
@@ -97,7 +97,7 @@ kubectl rollout status statefulset/${RELEASE}-zookeeper -n ${NAMESPACE}
 # 6. Stop ZooKeeper, restore data, then restart.
 kubectl exec -n ${NAMESPACE} ${RELEASE}-zookeeper-0 -- \
   bash -c 'zkServer.sh stop' 2>/dev/null || true
-kubectl cp ./zk-data-backup ${NAMESPACE}/${RELEASE}-zookeeper-0:/data
+kubectl cp ./zk-data-backup/. ${NAMESPACE}/${RELEASE}-zookeeper-0:/data
 kubectl delete pod -n ${NAMESPACE} ${RELEASE}-zookeeper-0
 
 # 7. Wait for ZooKeeper to restart with restored data.

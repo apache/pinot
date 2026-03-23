@@ -799,9 +799,10 @@ zookeeper:
   ## Whitelist of 4-letter-word commands
   fourLetterWordsWhitelist: "srvr,mntr,ruok,conf"
 
-  ## ZooKeeper AdminServer configuration (listens on port 8080)
+  ## ZooKeeper AdminServer configuration
   adminServer:
     enabled: false
+    port: 8080
 
   ## Probes configuration
   probes:

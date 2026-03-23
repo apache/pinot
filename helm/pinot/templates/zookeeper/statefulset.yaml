@@ -43,6 +43,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "pinot.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -92,6 +94,10 @@ spec:
             value: {{ .Values.zookeeper.fourLetterWordsWhitelist | default "srvr,mntr,ruok,conf" | quote }}
           - name: ZOO_ADMINSERVER_ENABLED
             value: {{ .Values.zookeeper.adminServer.enabled | default false | quote }}
+          {{- if .Values.zookeeper.adminServer.enabled }}
+          - name: ZOO_ADMINSERVER_PORT
+            value: {{ .Values.zookeeper.adminServer.port | default 8080 | quote }}
+          {{- end }}
           {{- with .Values.zookeeper.extraEnv }}
           {{- toYaml . | nindent 10 }}
           {{- end }}
@@ -117,7 +123,7 @@ spec:
             containerPort: 3888
           {{- if .Values.zookeeper.adminServer.enabled }}
           - name: admin
-            containerPort: 8080
+            containerPort: {{ .Values.zookeeper.adminServer.port | default 8080 }}
           {{- end }}
         {{- if .Values.zookeeper.probes.livenessEnabled }}
         livenessProbe:
