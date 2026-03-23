@@ -150,7 +150,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   @JsonProperty("description")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @Nullable
   protected String _description;
 

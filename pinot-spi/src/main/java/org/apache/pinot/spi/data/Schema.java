@@ -43,6 +43,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -534,7 +535,7 @@ public final class Schema implements Serializable {
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("schemaName", _schemaName);
-    if (_description != null) {
+    if (StringUtils.isNotBlank(_description)) {
       jsonObject.put("description", _description);
     }
     if (_tags != null && !_tags.isEmpty()) {

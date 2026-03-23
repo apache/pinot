@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
@@ -276,7 +277,7 @@ public class TableConfigSerDeUtils {
       simpleFields.put(TableConfig.TABLE_SAMPLERS_KEY, JsonUtils.objectToString(tableSamplerConfigs));
     }
     String description = tableConfig.getDescription();
-    if (description != null) {
+    if (StringUtils.isNotBlank(description)) {
       simpleFields.put(TableConfig.DESCRIPTION_KEY, description);
     }
     List<String> tags = tableConfig.getTags();

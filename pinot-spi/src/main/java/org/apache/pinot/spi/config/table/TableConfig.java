@@ -89,7 +89,7 @@ public class TableConfig extends BaseJsonConfig {
   /* OPTIONAL FIELDS */
 
   @JsonPropertyDescription("Human-readable description of the table, supports markdown")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private String _description;
 
   @JsonPropertyDescription("Tags for categorizing and filtering the table")
