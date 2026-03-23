@@ -2860,34 +2860,34 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /// Fetches or computes the default instance partitions for non-consuming segments.
   private Map<InstancePartitionsType, InstancePartitions> fetchOrComputeInstancePartitions(String tableNameWithType,
       TableConfig tableConfig) {
+    InstancePartitionsType instancePartitionsType;
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-      return Collections.singletonMap(InstancePartitionsType.OFFLINE,
-          InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixZkManager, tableConfig,
-              InstancePartitionsType.OFFLINE));
+      instancePartitionsType = InstancePartitionsType.OFFLINE;
+    } else {
+      if (tableConfig.isUpsertEnabled()) {
+        // For upsert table, always use CONSUMING type to ensure all segments of the same partition are assigned to the
+        // same servers
+        instancePartitionsType = InstancePartitionsType.CONSUMING;
+      } else {
+        // For non-upsert table, use COMPLETED instance partitions if exists
+        InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
+            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, InstancePartitionsType.COMPLETED));
+        if (instancePartitions != null) {
+          return Map.of(InstancePartitionsType.COMPLETED, instancePartitions);
+        }
+        // Use COMPLETED type when completed tag override is configured
+        TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
+        if (tagOverrideConfig != null && tagOverrideConfig.getRealtimeCompleted() != null) {
+          instancePartitionsType = InstancePartitionsType.COMPLETED;
+        } else {
+          instancePartitionsType = InstancePartitionsType.CONSUMING;
+        }
+      }
     }
-    if (tableConfig.isUpsertEnabled()) {
-      // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
-      // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
-      return Collections.singletonMap(InstancePartitionsType.CONSUMING,
-          InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixZkManager, tableConfig,
-              InstancePartitionsType.CONSUMING));
-    }
-    // for non-upsert realtime tables, if COMPLETED instance partitions is available or tag override for
-    // completed segments is provided in the tenant config, COMPLETED instance partitions type is used
-    // otherwise CONSUMING instance partitions type is used.
-    InstancePartitionsType instancePartitionsType = InstancePartitionsType.COMPLETED;
-    InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
-        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
-    if (instancePartitions != null) {
-      return Collections.singletonMap(instancePartitionsType, instancePartitions);
-    }
-    TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
-    if (tagOverrideConfig == null || tagOverrideConfig.getRealtimeCompleted() == null) {
-      instancePartitionsType = InstancePartitionsType.CONSUMING;
-    }
-    return Collections.singletonMap(instancePartitionsType,
+    return Map.of(instancePartitionsType,
         InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
   }
 

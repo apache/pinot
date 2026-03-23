@@ -259,7 +259,7 @@ public class PinotInstanceAssignmentRestletResource {
     if (!InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
       InstancePartitions existingInstancePartitions =
           InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getHelixZkManager().getHelixPropertyStore(),
-              InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+              InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType));
       instancePartitionsMap.put(instancePartitionsType.toString(),
           new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
               existingInstancePartitions));
@@ -269,7 +269,7 @@ public class PinotInstanceAssignmentRestletResource {
         // generation for minimum difference
         InstancePartitions existingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
             _resourceManager.getHelixZkManager().getHelixPropertyStore(),
-            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType));
         String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
         // fetch the pre-configured instance partitions, the renaming part is irrelevant as we are not really
         // preserving this preConfigured, but only using it as a reference to generate the new instance partitions
