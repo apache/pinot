@@ -182,13 +182,16 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   private void waitForAllDocsLoaded(String tableName, long timeoutMs, long expectedCountStarWithoutUpsertResult) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return queryCountStarWithoutUpsert(tableName) == expectedCountStarWithoutUpsertResult;
-      } catch (Exception e) {
-        return null;
+    TestUtils.waitForCondition(() -> {
+      // Query 10 times to get result from both servers (query should be distributed to both servers in a round-robin
+      // fashion, but query more times to be more robust)
+      for (int i = 0; i < 10; i++) {
+        if (queryCountStarWithoutUpsert(tableName) != expectedCountStarWithoutUpsertResult) {
+          return false;
+        }
       }
-    }, timeoutMs, "Failed to load all documents");
+      return true;
+    }, 100L, timeoutMs, "Failed to load all documents", null);
   }
 
   private void waitForNumQueriedSegmentsToConverge(String tableName, long timeoutMs, int expectedNumSegmentsQueried) {
@@ -199,11 +202,20 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
       int expectedNumConsumingSegmentsQueried) {
     // Do not tolerate exception here because it is always followed by the docs check
     TestUtils.waitForCondition(aVoid -> {
-      ExecutionStats executionStats =
-          getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getExecutionStats();
-      return executionStats.getNumSegmentsQueried() == expectedNumSegmentsQueried && (
-          expectedNumConsumingSegmentsQueried < 0
-              || executionStats.getNumConsumingSegmentsQueried() == expectedNumConsumingSegmentsQueried);
+      // Query 10 times to get result from both servers (query should be distributed to both servers in a round-robin
+      // fashion, but query more times to be more robust)
+      for (int i = 0; i < 10; i++) {
+        ExecutionStats executionStats =
+            getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getExecutionStats();
+        if (executionStats.getNumSegmentsQueried() != expectedNumSegmentsQueried) {
+          return false;
+        }
+        if (expectedNumConsumingSegmentsQueried >= 0
+            && executionStats.getNumConsumingSegmentsQueried() != expectedNumConsumingSegmentsQueried) {
+          return false;
+        }
+      }
+      return true;
     }, timeoutMs, "Failed to load all segments");
   }
 
