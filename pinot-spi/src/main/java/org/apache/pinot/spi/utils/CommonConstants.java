@@ -2183,6 +2183,17 @@ public class CommonConstants {
   }
 
   /**
+   * Constants for graph query configuration.
+   */
+  public static class Graph {
+    public static final String CONFIG_OF_GRAPH_QUERY_ENABLED = "pinot.graph.enabled";
+    public static final boolean DEFAULT_GRAPH_QUERY_ENABLED = false;
+
+    private Graph() {
+    }
+  }
+
+  /**
    * Constants for cluster config change listeners.
    */
   public static class ConfigChangeListenerConstants {
