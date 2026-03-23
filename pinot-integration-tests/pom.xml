@@ -184,6 +184,14 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-planner</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-graph-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-graph-planner</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.pinot</groupId>
