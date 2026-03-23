@@ -671,6 +671,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         LOGGER.info("Registered {} as config change listener", controllerPeriodicTask.getTaskName());
       }
     }
+    // Register PinotLLCRealtimeSegmentManager before _adminApp.start() so that
+    // max.segment.completion.time.millis is seeded from cluster config before serving requests.
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_pinotLLCRealtimeSegmentManager);
+    LOGGER.info("Registered PinotLLCRealtimeSegmentManager as cluster config change listener");
+
     LOGGER.info("Init controller periodic tasks scheduler");
     _periodicTaskScheduler = new PeriodicTaskScheduler();
     _periodicTaskScheduler.init(controllerPeriodicTasks);
@@ -771,8 +776,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         ConsumingSegmentConsistencyModeListener.getInstance());
     LOGGER.info("Registered ConsumingSegmentConsistencyModeListener as cluster config change listener");
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_pinotLLCRealtimeSegmentManager);
-    LOGGER.info("Registered PinotLLCRealtimeSegmentManager as cluster config change listener");
   }
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
