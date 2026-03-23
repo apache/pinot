@@ -2309,6 +2309,56 @@ public class PinotLLCRealtimeSegmentManagerTest {
         pinotLLCRealtimeSegmentManager.shouldRepairErrorSegmentsForPartialUpsertOrDedup(DisasterRecoveryMode.ALWAYS));
   }
 
+  @Test
+  public void testOnChangeUpdatesMaxSegmentCompletionTime() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+
+    // Verify default value
+    assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(),
+        PinotLLCRealtimeSegmentManager.DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+
+    // Update via cluster config
+    String configKey = PinotLLCRealtimeSegmentManager.MAX_SEGMENT_COMPLETION_TIME_MILLIS_KEY;
+    Map<String, String> clusterConfigs = new HashMap<>();
+    clusterConfigs.put(configKey, "600000");
+    segmentManager.onChange(Set.of(configKey), clusterConfigs);
+    assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(), 600_000L);
+
+    // Update with a different value
+    clusterConfigs.put(configKey, "900000");
+    segmentManager.onChange(Set.of(configKey), clusterConfigs);
+    assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(), 900_000L);
+
+    // Remove config — should revert to default
+    clusterConfigs.remove(configKey);
+    segmentManager.onChange(Set.of(configKey), clusterConfigs);
+    assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(),
+        PinotLLCRealtimeSegmentManager.DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+
+    // Invalid value — should keep current value
+    clusterConfigs.put(configKey, "600000");
+    segmentManager.onChange(Set.of(configKey), clusterConfigs);
+    assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(), 600_000L);
+    clusterConfigs.put(configKey, "not_a_number");
+    segmentManager.onChange(Set.of(configKey), clusterConfigs);
+    assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(), 600_000L);
+
+    // Non-positive value — should keep current value
+    clusterConfigs.put(configKey, "0");
+    segmentManager.onChange(Set.of(configKey), clusterConfigs);
+    assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(), 600_000L);
+    clusterConfigs.put(configKey, "-100");
+    segmentManager.onChange(Set.of(configKey), clusterConfigs);
+    assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(), 600_000L);
+
+    // Unrelated config change — should not affect value
+    clusterConfigs.put(configKey, "600000");
+    segmentManager.onChange(Set.of(configKey), clusterConfigs);
+    assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(), 600_000L);
+    segmentManager.onChange(Set.of("some.other.config"), clusterConfigs);
+    assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(), 600_000L);
+  }
+
   //////////////////////////////////////////////////////////////////////////////////
   // Fake classes
 
