@@ -3,6 +3,29 @@ entries:
   pinot:
   - apiVersion: v1
     appVersion: 1.0.0
+    created: "2026-03-23T13:15:00.162224-07:00"
+    description: Apache Pinot is a realtime distributed OLAP datastore, which is used
+      to deliver scalable real time analytics with low latency. It can ingest data
+      from offline data sources (such as Hadoop and flat files) as well as online
+      sources (such as Kafka). Pinot is designed to scale horizontally.
+    digest: 4cf4d07c10b52026e0af87c91c39d297b60b245729423a69e94fa0ddee5144a6
+    home: https://pinot.apache.org/
+    keywords:
+      - olap
+      - analytics
+      - database
+      - pinot
+    maintainers:
+      - email: dev@pinot.apache.org
+        name: pinot-dev
+    name: pinot
+    sources:
+      - https://github.com/apache/pinot/tree/master/helm
+    urls:
+      - pinot-1.0.0.tgz
+    version: 1.0.0
+  - apiVersion: v1
+    appVersion: 1.0.0
     created: "2025-10-08T22:20:54.54165-07:00"
     dependencies:
       - condition: pinot.zookeeper.enabled,zookeeper.enabled
