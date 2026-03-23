@@ -762,8 +762,10 @@ zookeeper:
   ## If ZooKeeper is disabled a URL override is required to connect
   urlOverride: "my-zookeeper:2181/my-pinot"
 
-  ## ZooKeeper client port
+  ## ZooKeeper ports
   port: 2181
+  followerPort: 2888
+  electionPort: 3888
 
   ## Configure ZooKeeper resource requests and limits
   ## ref: http://kubernetes.io/docs/user-guide/compute-resources/

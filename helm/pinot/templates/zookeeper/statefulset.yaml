@@ -77,26 +77,26 @@ spec:
           - name: ZOO_SERVERS
             value: {{ include "pinot.zookeeper.servers" . | quote }}
           - name: ZOO_TICK_TIME
-            value: {{ .Values.zookeeper.tickTime | default 2000 | quote }}
+            value: {{ .Values.zookeeper.tickTime | quote }}
           - name: ZOO_INIT_LIMIT
-            value: {{ .Values.zookeeper.initLimit | default 10 | quote }}
+            value: {{ .Values.zookeeper.initLimit | quote }}
           - name: ZOO_SYNC_LIMIT
-            value: {{ .Values.zookeeper.syncLimit | default 5 | quote }}
+            value: {{ .Values.zookeeper.syncLimit | quote }}
           - name: ZOO_MAX_CLIENT_CNXNS
-            value: {{ .Values.zookeeper.maxClientCnxns | default 60 | quote }}
+            value: {{ .Values.zookeeper.maxClientCnxns | quote }}
           - name: ZOO_AUTOPURGE_PURGE_INTERVAL
-            value: {{ .Values.zookeeper.autopurge.purgeInterval | default 1 | quote }}
+            value: {{ .Values.zookeeper.autopurge.purgeInterval | quote }}
           - name: ZOO_AUTOPURGE_SNAP_RETAIN_COUNT
-            value: {{ .Values.zookeeper.autopurge.snapRetainCount | default 5 | quote }}
+            value: {{ .Values.zookeeper.autopurge.snapRetainCount | quote }}
           - name: JVMFLAGS
             value: "-Xmx{{ .Values.zookeeper.heapSize }}m -Xms{{ .Values.zookeeper.heapSize }}m {{ .Values.zookeeper.jvmFlags }}"
           - name: ZOO_4LW_COMMANDS_WHITELIST
-            value: {{ .Values.zookeeper.fourLetterWordsWhitelist | default "srvr,mntr,ruok,conf" | quote }}
+            value: {{ .Values.zookeeper.fourLetterWordsWhitelist | quote }}
           - name: ZOO_ADMINSERVER_ENABLED
-            value: {{ .Values.zookeeper.adminServer.enabled | default false | quote }}
+            value: {{ .Values.zookeeper.adminServer.enabled | quote }}
           {{- if .Values.zookeeper.adminServer.enabled }}
           - name: ZOO_ADMINSERVER_PORT
-            value: {{ .Values.zookeeper.adminServer.port | default 8080 | quote }}
+            value: {{ .Values.zookeeper.adminServer.port | quote }}
           {{- end }}
           {{- with .Values.zookeeper.extraEnv }}
           {{- toYaml . | nindent 10 }}
@@ -118,12 +118,12 @@ spec:
           - name: client
             containerPort: {{ .Values.zookeeper.port }}
           - name: follower
-            containerPort: 2888
+            containerPort: {{ .Values.zookeeper.followerPort }}
           - name: election
-            containerPort: 3888
+            containerPort: {{ .Values.zookeeper.electionPort }}
           {{- if .Values.zookeeper.adminServer.enabled }}
           - name: admin
-            containerPort: {{ .Values.zookeeper.adminServer.port | default 8080 }}
+            containerPort: {{ .Values.zookeeper.adminServer.port }}
           {{- end }}
         {{- if .Values.zookeeper.probes.livenessEnabled }}
         livenessProbe:
@@ -131,11 +131,11 @@ spec:
             command:
               - bash
               - -c
-              - echo ruok | nc localhost {{ .Values.zookeeper.port }} | grep imok
-          initialDelaySeconds: {{ .Values.zookeeper.probes.liveness.initialDelaySeconds | default 30 }}
-          periodSeconds: {{ .Values.zookeeper.probes.liveness.periodSeconds | default 10 }}
-          timeoutSeconds: {{ .Values.zookeeper.probes.liveness.timeoutSeconds | default 5 }}
-          failureThreshold: {{ .Values.zookeeper.probes.liveness.failureThreshold | default 6 }}
+              - echo ruok | nc -w {{ .Values.zookeeper.probes.liveness.timeoutSeconds }} localhost {{ .Values.zookeeper.port }} | grep imok
+          initialDelaySeconds: {{ .Values.zookeeper.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.zookeeper.probes.liveness.periodSeconds }}
+          timeoutSeconds: {{ .Values.zookeeper.probes.liveness.timeoutSeconds }}
+          failureThreshold: {{ .Values.zookeeper.probes.liveness.failureThreshold }}
         {{- end }}
         {{- if .Values.zookeeper.probes.readinessEnabled }}
         readinessProbe:
@@ -143,11 +143,11 @@ spec:
             command:
               - bash
               - -c
-              - echo ruok | nc localhost {{ .Values.zookeeper.port }} | grep imok
-          initialDelaySeconds: {{ .Values.zookeeper.probes.readiness.initialDelaySeconds | default 10 }}
-          periodSeconds: {{ .Values.zookeeper.probes.readiness.periodSeconds | default 10 }}
-          timeoutSeconds: {{ .Values.zookeeper.probes.readiness.timeoutSeconds | default 5 }}
-          failureThreshold: {{ .Values.zookeeper.probes.readiness.failureThreshold | default 6 }}
+              - echo ruok | nc -w {{ .Values.zookeeper.probes.readiness.timeoutSeconds }} localhost {{ .Values.zookeeper.port }} | grep imok
+          initialDelaySeconds: {{ .Values.zookeeper.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.zookeeper.probes.readiness.periodSeconds }}
+          timeoutSeconds: {{ .Values.zookeeper.probes.readiness.timeoutSeconds }}
+          failureThreshold: {{ .Values.zookeeper.probes.readiness.failureThreshold }}
         {{- end }}
         volumeMounts:
           - name: data
@@ -171,7 +171,7 @@ spec:
         name: data
       spec:
         accessModes:
-          - {{ .Values.zookeeper.persistence.accessMode | default "ReadWriteOnce" | quote }}
+          - {{ .Values.zookeeper.persistence.accessMode | quote }}
         {{- if .Values.zookeeper.persistence.storageClass }}
         {{- if (eq "-" .Values.zookeeper.persistence.storageClass) }}
         storageClassName: ""
@@ -186,7 +186,7 @@ spec:
         name: datalog
       spec:
         accessModes:
-          - {{ .Values.zookeeper.persistence.accessMode | default "ReadWriteOnce" | quote }}
+          - {{ .Values.zookeeper.persistence.accessMode | quote }}
         {{- if .Values.zookeeper.persistence.storageClass }}
         {{- if (eq "-" .Values.zookeeper.persistence.storageClass) }}
         storageClassName: ""

@@ -4,11 +4,11 @@ entries:
   - apiVersion: v1
     appVersion: 1.0.0
     created: "2026-03-23T13:15:00.162224-07:00"
-    description: Apache Pinot is a realtime distributed OLAP datastore, which is used
-      to deliver scalable real time analytics with low latency. It can ingest data
-      from offline data sources (such as Hadoop and flat files) as well as online
-      sources (such as Kafka). Pinot is designed to scale horizontally.
-    digest: 4feb83c0f64a28e98b5746c99083f0d2c2485393a0cc01e0aaf581ad7a4f188c
+    description: Apache Pinot is an open-source distributed OLAP database for user-facing
+      and agent-facing real-time analytics. From interactive dashboards to LLM-powered
+      decision engines, Pinot delivers sub-second queries on fresh data at petabyte
+      scale.
+    digest: 2d262e0d298cdc3969f2cb3aa82de1d932740b47f62e539922af98b76c717656
     home: https://pinot.apache.org/
     keywords:
       - olap

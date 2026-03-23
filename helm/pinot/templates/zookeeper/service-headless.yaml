@@ -33,11 +33,16 @@ spec:
       port: {{ .Values.zookeeper.port }}
       targetPort: client
     - name: follower
-      port: 2888
+      port: {{ .Values.zookeeper.followerPort }}
       targetPort: follower
     - name: election
-      port: 3888
+      port: {{ .Values.zookeeper.electionPort }}
       targetPort: election
+    {{- if .Values.zookeeper.adminServer.enabled }}
+    - name: admin
+      port: {{ .Values.zookeeper.adminServer.port }}
+      targetPort: admin
+    {{- end }}
   selector:
     {{- include "pinot.zookeeperMatchLabels" . | nindent 4 }}
 {{- end }}
