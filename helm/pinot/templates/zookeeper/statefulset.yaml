@@ -59,7 +59,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.zookeeper.securityContext }}
+      {{- with .Values.zookeeper.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -67,11 +67,11 @@ spec:
       - name: zookeeper
         image: "{{ .Values.zookeeper.image.repository }}:{{ .Values.zookeeper.image.tag }}"
         imagePullPolicy: {{ .Values.zookeeper.image.pullPolicy }}
+        {{- with .Values.zookeeper.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         env:
-          - name: ZOO_MY_ID
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
           - name: ZOO_SERVERS
             value: {{ include "pinot.zookeeper.servers" . | quote }}
           - name: ZOO_TICK_TIME
@@ -117,7 +117,7 @@ spec:
             containerPort: 3888
           {{- if .Values.zookeeper.adminServer.enabled }}
           - name: admin
-            containerPort: {{ .Values.zookeeper.adminServer.port | default 8080 }}
+            containerPort: 8080
           {{- end }}
         {{- if .Values.zookeeper.probes.livenessEnabled }}
         livenessProbe:

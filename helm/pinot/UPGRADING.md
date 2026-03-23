@@ -67,21 +67,20 @@ helm upgrade ${RELEASE} -n ${NAMESPACE} ./helm/pinot
 # 4. Recreate your Pinot tables and schemas
 ```
 
-#### Option B: Migrate ZooKeeper data (best-effort metadata preservation)
+#### Option B: Migrate ZooKeeper data (preserves Pinot metadata)
 
-> **Note**: This option copies the ZooKeeper data directory from the old
-> Bitnami mount path to the new official image mount path. This preserves
-> Pinot cluster metadata (table configs, schemas, segment assignments) on a
-> best-effort basis. Verify your cluster state after migration.
+> **Note**: This option copies ZooKeeper data from the old Bitnami mount
+> path (`/bitnami/zookeeper`) to a local backup, then restores it into
+> the new official image's data directory (`/data`) after upgrade. This
+> preserves Pinot cluster metadata (table configs, schemas, segment
+> assignments). Verify your cluster state after migration.
 
 ```bash
 NAMESPACE=pinot-quickstart
 RELEASE=pinot
 
-# 1. Copy data from the Bitnami path to the official image path within
-#    the existing PVC, while the old ZooKeeper is still running.
-kubectl exec -n ${NAMESPACE} ${RELEASE}-zookeeper-0 -- \
-  bash -c 'cp -a /bitnami/zookeeper/data/* /tmp/ 2>/dev/null; echo "Data backed up to /tmp"'
+# 1. Back up ZooKeeper data to your local machine while old cluster is running.
+kubectl cp ${NAMESPACE}/${RELEASE}-zookeeper-0:/bitnami/zookeeper/data ./zk-data-backup
 
 # 2. Delete the old ZooKeeper StatefulSet and pods.
 kubectl delete statefulset ${RELEASE}-zookeeper -n ${NAMESPACE}
@@ -95,18 +94,24 @@ helm upgrade ${RELEASE} -n ${NAMESPACE} ./helm/pinot
 # 5. Wait for the new ZooKeeper to be ready.
 kubectl rollout status statefulset/${RELEASE}-zookeeper -n ${NAMESPACE}
 
-# 6. Pinot components will automatically reconnect and re-register
-#    with the new ZooKeeper. However, since ZooKeeper started fresh,
-#    you will need to re-apply your Pinot table configs and schemas:
-#
-#    curl -X POST http://<controller>:9000/schemas -d @mySchema.json
-#    curl -X POST http://<controller>:9000/tables -d @myTable.json
+# 6. Stop ZooKeeper, restore data, then restart.
+kubectl exec -n ${NAMESPACE} ${RELEASE}-zookeeper-0 -- \
+  bash -c 'zkServer.sh stop' 2>/dev/null || true
+kubectl cp ./zk-data-backup ${NAMESPACE}/${RELEASE}-zookeeper-0:/data
+kubectl delete pod -n ${NAMESPACE} ${RELEASE}-zookeeper-0
+
+# 7. Wait for ZooKeeper to restart with restored data.
+kubectl rollout status statefulset/${RELEASE}-zookeeper -n ${NAMESPACE}
+
+# 8. Pinot components will automatically reconnect. Verify cluster state:
+kubectl exec -n ${NAMESPACE} ${RELEASE}-controller-0 -- \
+  curl -s http://localhost:9000/instances
 ```
 
-> If you have many tables/schemas, consider scripting the re-application
-> from your source of truth (e.g., version-controlled config files or a
-> CI/CD pipeline). Segment data on Pinot servers is not affected — only
-> the ZooKeeper metadata needs to be recreated.
+> If restoration fails or the cluster state looks incorrect, fall back to
+> Option A and re-apply your table configs and schemas from your source of
+> truth. Segment data on Pinot servers is not affected — only the
+> ZooKeeper metadata needs to be recreated.
 
 #### Option C: Use an external ZooKeeper (recommended for production)
 
