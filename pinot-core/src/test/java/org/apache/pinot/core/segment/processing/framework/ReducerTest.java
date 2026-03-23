@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -31,6 +32,10 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.theta.UpdateSketch;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordReader;
@@ -569,5 +574,210 @@ public class ReducerTest {
       assertEquals(fieldToValueMap.get("d1"), dValues[expectedDIndex][0]);
       assertEquals(fieldToValueMap.get("d2"), dValues[expectedDIndex][1]);
     }
+  }
+
+  /**
+   * Test rollup with theta sketch metric to verify batch aggregation path.
+   * This test creates multiple rows per dimension key, each with a theta sketch,
+   * and verifies they are properly aggregated using batch aggregation.
+   */
+  @Test
+  public void testRollupWithThetaSketch()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("d", DataType.INT)
+        .addMetric("sketch", DataType.BYTES)
+        .build();
+    Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, null);
+    GenericRowFileManager fileManager =
+        new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
+
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    int numRecords = 100;
+    int numDimValues = 5;
+    // Track expected distinct values per dimension
+    Map<Integer, Set<Integer>> expectedDistincts = new TreeMap<>();
+    for (int i = 0; i < numDimValues; i++) {
+      expectedDistincts.put(i, new HashSet<>());
+    }
+
+    GenericRow row = new GenericRow();
+    for (int i = 0; i < numRecords; i++) {
+      row.clear();
+      int d = RANDOM.nextInt(numDimValues);
+      // Create a sketch with some random values
+      UpdateSketch updateSketch = UpdateSketch.builder().setNominalEntries(128).build();
+      int numValues = RANDOM.nextInt(10) + 1;
+      for (int j = 0; j < numValues; j++) {
+        int value = RANDOM.nextInt(1000);
+        updateSketch.update(value);
+        expectedDistincts.get(d).add(value);
+      }
+      byte[] sketchBytes = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(updateSketch.compact());
+
+      row.putValue("d", d);
+      row.putValue("sketch", sketchBytes);
+      fileWriter.write(row);
+    }
+    fileManager.closeFileWriter();
+
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
+    aggregationTypes.put("sketch", AggregationFunctionType.DISTINCTCOUNTTHETASKETCH);
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder()
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setMergeType(MergeType.ROLLUP)
+        .setAggregationTypes(aggregationTypes)
+        .build();
+
+    Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
+    GenericRowFileManager reducedFileManager = reducer.reduce();
+    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    assertEquals(fileReader.getNumRows(), numDimValues);
+
+    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    for (int i = 0; i < numDimValues; i++) {
+      row.clear();
+      recordReader.read(i, row);
+      Map<String, Object> fieldToValueMap = row.getFieldToValueMap();
+      assertEquals(fieldToValueMap.size(), 2);
+      int d = (int) fieldToValueMap.get("d");
+      byte[] sketchBytes = (byte[]) fieldToValueMap.get("sketch");
+      Sketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(sketchBytes);
+
+      // Verify the sketch estimate matches expected distinct count
+      int expectedDistinct = expectedDistincts.get(d).size();
+      // Allow 10% error for theta sketch estimation
+      assertEquals(resultSketch.getEstimate(), expectedDistinct, expectedDistinct * 0.1,
+          "Sketch estimate for dimension " + d + " should match expected distinct count");
+    }
+    reducedFileManager.cleanUp();
+  }
+
+  /**
+   * Test rollup with theta sketch using custom batch size configuration.
+   */
+  @Test
+  public void testRollupWithThetaSketchAndCustomBatchSize()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("d", DataType.INT)
+        .addMetric("sketch", DataType.BYTES)
+        .build();
+    Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, null);
+    GenericRowFileManager fileManager =
+        new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
+
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    // Create many rows with the same dimension to test batch size limit
+    int numRecords = 50;
+    Set<Integer> expectedDistincts = new HashSet<>();
+
+    GenericRow row = new GenericRow();
+    for (int i = 0; i < numRecords; i++) {
+      row.clear();
+      UpdateSketch updateSketch = UpdateSketch.builder().setNominalEntries(128).build();
+      int value = i;  // Each row has a unique value
+      updateSketch.update(value);
+      expectedDistincts.add(value);
+      byte[] sketchBytes = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(updateSketch.compact());
+
+      row.putValue("d", 0);  // All same dimension
+      row.putValue("sketch", sketchBytes);
+      fileWriter.write(row);
+    }
+    fileManager.closeFileWriter();
+
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
+    aggregationTypes.put("sketch", AggregationFunctionType.DISTINCTCOUNTTHETASKETCH);
+    // Use a small batch size to force multiple batch flushes
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder()
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setMergeType(MergeType.ROLLUP)
+        .setAggregationTypes(aggregationTypes)
+        .setReducerMaxBatchSize(10)  // Small batch size
+        .build();
+
+    Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
+    GenericRowFileManager reducedFileManager = reducer.reduce();
+    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    assertEquals(fileReader.getNumRows(), 1);  // All rows have same dimension
+
+    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    row.clear();
+    recordReader.read(0, row);
+    byte[] sketchBytes = (byte[]) row.getValue("sketch");
+    Sketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(sketchBytes);
+
+    // Even with small batch size, final result should have all distinct values
+    assertEquals(resultSketch.getEstimate(), expectedDistincts.size(), expectedDistincts.size() * 0.1);
+    reducedFileManager.cleanUp();
+  }
+
+  /**
+   * Test that SegmentProcessorConfig uses default reducerMaxBatchSize when not set.
+   */
+  @Test
+  public void testSegmentProcessorConfigDefaultBatchSize() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("d", DataType.INT).build();
+
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder()
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .build();
+
+    assertEquals(config.getReducerMaxBatchSize(), MinionConstants.MergeTask.DEFAULT_REDUCER_MAX_BATCH_SIZE);
+  }
+
+  /**
+   * Test that SegmentProcessorConfig respects custom reducerMaxBatchSize.
+   */
+  @Test
+  public void testSegmentProcessorConfigCustomBatchSize() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("d", DataType.INT).build();
+
+    int customBatchSize = 500;
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder()
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setReducerMaxBatchSize(customBatchSize)
+        .build();
+
+    assertEquals(config.getReducerMaxBatchSize(), customBatchSize);
+  }
+
+  /**
+   * Test that invalid batch size (<=0) falls back to default.
+   */
+  @Test
+  public void testSegmentProcessorConfigInvalidBatchSize() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("d", DataType.INT).build();
+
+    // Zero should fall back to default
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder()
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setReducerMaxBatchSize(0)
+        .build();
+
+    assertEquals(config.getReducerMaxBatchSize(), MinionConstants.MergeTask.DEFAULT_REDUCER_MAX_BATCH_SIZE);
+
+    // Negative should fall back to default
+    config = new SegmentProcessorConfig.Builder()
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setReducerMaxBatchSize(-1)
+        .build();
+
+    assertEquals(config.getReducerMaxBatchSize(), MinionConstants.MergeTask.DEFAULT_REDUCER_MAX_BATCH_SIZE);
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.util.List;
 import java.util.Map;
 
 
@@ -31,4 +32,39 @@ public interface ValueAggregator {
    * @return aggregated value given two column values
    */
   Object aggregate(Object value1, Object value2, Map<String, String> functionParameters);
+
+  /**
+   * Aggregate multiple values at once. Default implementation falls back to pairwise aggregation.
+   * Sketch implementations can override for optimized batch merging with reduced serialization
+   * overhead and early-stop optimization.
+   *
+   * @param values List of values to aggregate (all same column, same key)
+   * @param functionParameters Aggregation parameters
+   * @return Aggregated result
+   */
+  default Object aggregateBatch(List<Object> values, Map<String, String> functionParameters) {
+    if (values == null || values.isEmpty()) {
+      return null;
+    }
+    if (values.size() == 1) {
+      return values.get(0);
+    }
+    // Default: pairwise aggregation for backwards compatibility
+    Object result = values.get(0);
+    for (int i = 1; i < values.size(); i++) {
+      result = aggregate(result, values.get(i), functionParameters);
+    }
+    return result;
+  }
+
+  /**
+   * Whether this aggregator supports optimized batch aggregation.
+   * When true, the aggregator has an optimized implementation of {@link #aggregateBatch}
+   * that is more efficient than pairwise aggregation.
+   *
+   * @return true if optimized batch aggregation is supported
+   */
+  default boolean supportsBatchAggregation() {
+    return false;
+  }
 }

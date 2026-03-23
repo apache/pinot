@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
@@ -47,6 +48,36 @@ public class DistinctCountCPCSketchAggregator implements ValueAggregator {
     }
     union.update(first);
     union.update(second);
+    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(union.getResult());
+  }
+
+  @Override
+  public boolean supportsBatchAggregation() {
+    return true;
+  }
+
+  @Override
+  public Object aggregateBatch(List<Object> values, Map<String, String> functionParameters) {
+    if (values == null || values.isEmpty()) {
+      return null;
+    }
+    if (values.size() == 1) {
+      return values.get(0);
+    }
+
+    // Build union once for all values
+    String lgKParam = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
+    int lgK = lgKParam != null
+        ? Integer.parseInt(lgKParam)
+        : CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
+    CpcUnion union = new CpcUnion(lgK);
+
+    // Deserialize and union all sketches
+    for (Object value : values) {
+      CpcSketch sketch = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize((byte[]) value);
+      union.update(sketch);
+    }
+
     return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(union.getResult());
   }
 }
