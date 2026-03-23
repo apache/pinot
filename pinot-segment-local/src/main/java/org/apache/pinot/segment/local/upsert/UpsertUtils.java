@@ -66,7 +66,7 @@ public class UpsertUtils {
    * {@link ThreadSafeMutableRoaringBitmap#isEmpty()} to avoid
    * cloning the bitmap.
    */
-  public static boolean areQueryableDocIdsEmpty(IndexSegment segment, boolean skipUpsert) {
+  public static boolean hasNoQueryableDocs(IndexSegment segment, boolean skipUpsert) {
     if (skipUpsert) {
       return false;
     }

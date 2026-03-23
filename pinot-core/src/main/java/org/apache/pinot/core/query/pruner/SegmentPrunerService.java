@@ -141,23 +141,24 @@ public class SegmentPrunerService {
    *                 emptiness is determined from them; otherwise {@link IndexSegment#getValidDocIds()} is used.
    * @return the new list with filtered elements. This is the list that have to be used.
    */
-  private static List<IndexSegment> removeEmptySegments(List<IndexSegment> segments, @Nullable QueryContext query) {
+  private static List<IndexSegment> removeEmptySegments(List<IndexSegment> segments, QueryContext query) {
     int selected = 0;
+    boolean skipUpsert = QueryOptionsUtils.isSkipUpsert(query.getQueryOptions());
     for (IndexSegment segment : segments) {
-      if (!isEmptySegment(segment, query)) {
+      if (!isEmptySegment(segment, skipUpsert)) {
         segments.set(selected++, segment);
       }
     }
     return segments.subList(0, selected);
   }
 
-  private static boolean isEmptySegment(IndexSegment segment, QueryContext query) {
+  private static boolean isEmptySegment(IndexSegment segment, boolean skipUpsert) {
     if (segment.getSegmentMetadata().getTotalDocs() == 0) {
       return true;
     }
     // For upsert tables, treat segments with 0 docs to query as empty only when the query does not skip upsert.
     // When skipUpsert=true, the query returns all docs (including replaced), so the segment contributes rows.
     // Use query options map directly: _skipUpsert is only set on the server; the broker has options in the map.
-    return UpsertUtils.areQueryableDocIdsEmpty(segment, QueryOptionsUtils.isSkipUpsert(query.getQueryOptions()));
+    return UpsertUtils.hasNoQueryableDocs(segment, skipUpsert);
   }
 }
