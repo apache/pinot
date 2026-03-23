@@ -156,9 +156,7 @@ public class SegmentPrunerService {
     if (segment.getSegmentMetadata().getTotalDocs() == 0) {
       return true;
     }
-    // For upsert tables, treat segments with 0 docs to query as empty only when the query does not skip upsert.
-    // When skipUpsert=true, the query returns all docs (including replaced), so the segment contributes rows.
-    // Use query options map directly: _skipUpsert is only set on the server; the broker has options in the map.
-    return UpsertUtils.hasNoQueryableDocs(segment, skipUpsert);
+    // Check if the segment has 0 queryable docIds while skipUpsert=false
+    return !skipUpsert && UpsertUtils.hasNoQueryableDocs(segment);
   }
 }

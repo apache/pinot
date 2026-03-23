@@ -66,10 +66,7 @@ public class UpsertUtils {
    * {@link ThreadSafeMutableRoaringBitmap#isEmpty()} to avoid
    * cloning the bitmap.
    */
-  public static boolean hasNoQueryableDocs(IndexSegment segment, boolean skipUpsert) {
-    if (skipUpsert) {
-      return false;
-    }
+  public static boolean hasNoQueryableDocs(IndexSegment segment) {
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     if (queryableDocIds != null) {
       return queryableDocIds.isEmpty();
