@@ -1234,8 +1234,8 @@ public class TableRebalancer {
         tableRebalanceLogger.info("COMPLETED segments should not be relocated, skipping fetching/computing COMPLETED "
             + "instance partitions for table: {}", tableNameWithType);
         if (!dryRun) {
-          String instancePartitionsName = InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
-              InstancePartitionsType.COMPLETED.toString());
+          String instancePartitionsName =
+              InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, InstancePartitionsType.COMPLETED);
           tableRebalanceLogger.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
           InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(),
               instancePartitionsName);
@@ -1253,7 +1253,7 @@ public class TableRebalancer {
       Enablement minimizeDataMovement, Logger tableRebalanceLogger) {
     String tableNameWithType = tableConfig.getTableName();
     String instancePartitionsName =
-        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString());
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType);
     InstancePartitions existingInstancePartitions =
         InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
 
