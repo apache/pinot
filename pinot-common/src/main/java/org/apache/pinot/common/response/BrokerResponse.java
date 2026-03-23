@@ -40,7 +40,8 @@ import org.slf4j.LoggerFactory;
  * Interface for broker response.
  */
 public interface BrokerResponse {
-  static final Logger LOGGER = LoggerFactory.getLogger(BrokerResponse.class);
+  Logger LOGGER = LoggerFactory.getLogger(BrokerResponse.class);
+
   /**
    * Convert the broker response to JSON String.
    */
@@ -160,12 +161,10 @@ public interface BrokerResponse {
    */
   boolean isMaxRowsInJoinReached();
 
-
   /**
    * Returns whether the limit for max rows in window has been reached.
    */
   boolean isMaxRowsInWindowReached();
-
 
   /**
    * Returns the total time used for query execution in milliseconds.
@@ -387,7 +386,6 @@ public interface BrokerResponse {
   default long getRealtimeTotalMemAllocatedBytes() {
     return getRealtimeThreadMemAllocatedBytes() + getRealtimeResponseSerMemAllocatedBytes();
   }
-
 
   /**
    * Returns the total number of segments with an EmptyFilterOperator when Explain Plan is called.
