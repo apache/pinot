@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
@@ -37,8 +36,6 @@ import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
-import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -68,7 +65,6 @@ public class SegmentGeneratorConfig implements Serializable {
     EPOCH, SIMPLE_DATE
   }
 
-  public static final String GENERATE_INV_BEFORE_PUSH_DEPREC_PROP = "generate.inverted.index.before.push";
   private final TableConfig _tableConfig;
   private final Schema _schema;
   // NOTE: Use TreeMap to guarantee the order. The custom properties will be written into the segment metadata.
@@ -130,17 +126,8 @@ public class SegmentGeneratorConfig implements Serializable {
   /**
    * Constructs the SegmentGeneratorConfig with table config and schema.
    * NOTE: The passed in table config and schema might be changed.
-   *
-   * @param tableConfig table config of the segment. Used for getting time column information and indexing information
-   * @param schema schema of the segment to be generated. The time column information should be taken from table config.
-   *               However, for maintaining backward compatibility, taking it from schema if table config is null.
-   *               This will not work once we start supporting multiple time columns (DateTimeFieldSpec)
    */
   public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
-    this(tableConfig, schema, false);
-  }
-
-  public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema, boolean createInvertedIndex) {
     Preconditions.checkNotNull(tableConfig);
     Preconditions.checkNotNull(schema);
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
@@ -197,28 +184,6 @@ public class SegmentGeneratorConfig implements Serializable {
     }
 
     _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
-
-    // NOTE: By default inverted indexes are not created during segment creation
-    // There are 2 ways to configure creating inverted index during segment generation:
-    //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
-    //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
-    // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
-    // TODO 2: Decide what to do with this. Index-spi is based on the idea that TableConfig is the source of truth
-    List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-    if (!createInvertedIndex && CollectionUtils.isNotEmpty(invertedIndexColumns)) {
-      Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-      boolean customConfigEnabled =
-          customConfigs != null && Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP));
-      boolean indexingConfigEnable = indexingConfig.isCreateInvertedIndexDuringSegmentGeneration();
-      if (!customConfigEnabled && !indexingConfigEnable) {
-        //noinspection rawtypes
-        IndexType inverted = StandardIndexes.inverted();
-        for (String column : invertedIndexColumns) {
-          _indexConfigsByColName.computeIfPresent(column,
-              (k, v) -> new FieldIndexConfigs.Builder(v).undeclare(inverted).build());
-        }
-      }
-    }
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {

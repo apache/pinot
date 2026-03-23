@@ -184,13 +184,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     return NUM_SERVERS;
   }
 
-  /// Create inverted index when generating the segment to ensure the index ordering won't change when re-assembling
-  /// them, so that the table size is consistent.
-  @Override
-  protected boolean isCreateInvertedIndexDuringSegmentGeneration() {
-    return true;
-  }
-
   @Override
   protected List<FieldConfig> getFieldConfigs() {
     List<FieldConfig> fieldConfigs = new ArrayList<>();

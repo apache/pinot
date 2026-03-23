@@ -1985,17 +1985,31 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE),
             RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, true);
 
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName("staticTableTest").setTimeColumnName("mtime")
-            .setTimeType("MILLISECONDS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5000")
-            .setDeletedSegmentsRetentionPeriod("7d").setSegmentAssignmentStrategy("BalanceNumSegmentAssignmentStrategy")
-            .setNumReplicas(1).setSegmentPushType("APPEND").setBrokerTenant("DefaultTenant")
-            .setServerTenant("DefaultTenant").setLoadMode("MMAP").setAggregateMetrics(false)
-            .setOptimizeDictionary(false).setOptimizeDictionaryForMetrics(false).setNoDictionarySizeRatioThreshold(0.85)
-            .setNullHandlingEnabled(false).setSkipSegmentPreprocess(false).setOptimizeDictionaryType(false)
-            .setCreateInvertedIndexDuringSegmentGeneration(false).setColumnMajorSegmentBuilderEnabled(false)
-            .setStreamConfigs(streamConfigs).setRoutingConfig(routingConfig).setUpsertConfig(upsertConfig)
-            .setIsDimTable(false).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("staticTableTest")
+        .setTimeColumnName("mtime")
+        .setTimeType("MILLISECONDS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5000")
+        .setDeletedSegmentsRetentionPeriod("7d")
+        .setSegmentAssignmentStrategy("BalanceNumSegmentAssignmentStrategy")
+        .setNumReplicas(1)
+        .setSegmentPushType("APPEND")
+        .setBrokerTenant("DefaultTenant")
+        .setServerTenant("DefaultTenant")
+        .setLoadMode("MMAP")
+        .setAggregateMetrics(false)
+        .setOptimizeDictionary(false)
+        .setOptimizeDictionaryForMetrics(false)
+        .setNoDictionarySizeRatioThreshold(0.85)
+        .setNullHandlingEnabled(false)
+        .setSkipSegmentPreprocess(false)
+        .setOptimizeDictionaryType(false)
+        .setColumnMajorSegmentBuilderEnabled(false)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(routingConfig)
+        .setUpsertConfig(upsertConfig)
+        .setIsDimTable(false)
+        .build();
 
     List<TableConfig> tableConfigs = Collections.singletonList(tableConfig);
     List<Schema> schemas = Collections.singletonList(schema);
