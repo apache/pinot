@@ -234,7 +234,7 @@ Format: server.1=<pod-0>.<headless>:2888:3888;2181 server.2=...
 {{- $replicas := .Values.zookeeper.replicaCount | int -}}
 {{- $servers := list -}}
 {{- range $i := until $replicas -}}
-{{- $servers = append $servers (printf "server.%d=%s-%d.%s.%s.svc.cluster.local:2888:3888;%d" (add $i 1) $fullname $i $headless $namespace $port) -}}
+{{- $servers = append $servers (printf "server.%d=%s-%d.%s.%s:2888:3888;%d" (add $i 1) $fullname $i $headless $namespace $port) -}}
 {{- end -}}
 {{- join " " $servers -}}
 {{- end -}}

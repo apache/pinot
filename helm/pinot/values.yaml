@@ -759,7 +759,7 @@ zookeeper:
   ## ref: https://hub.docker.com/_/zookeeper
   enabled: true
 
-  ## If the ZooKeeper chart is disabled a URL override is required to connect
+  ## If ZooKeeper is disabled a URL override is required to connect
   urlOverride: "my-zookeeper:2181/my-pinot"
 
   ## ZooKeeper client port

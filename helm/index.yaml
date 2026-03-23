@@ -8,7 +8,7 @@ entries:
       to deliver scalable real time analytics with low latency. It can ingest data
       from offline data sources (such as Hadoop and flat files) as well as online
       sources (such as Kafka). Pinot is designed to scale horizontally.
-    digest: 4cf4d07c10b52026e0af87c91c39d297b60b245729423a69e94fa0ddee5144a6
+    digest: 3be4913977dc4a10089efe9f80fb8af3b9d318301576c46c1579007e92549c4b
     home: https://pinot.apache.org/
     keywords:
       - olap

@@ -67,34 +67,46 @@ helm upgrade ${RELEASE} -n ${NAMESPACE} ./helm/pinot
 # 4. Recreate your Pinot tables and schemas
 ```
 
-#### Option B: Migrate ZooKeeper data (preserves Pinot metadata)
+#### Option B: Migrate ZooKeeper data (best-effort metadata preservation)
+
+> **Note**: This option copies the ZooKeeper data directory from the old
+> Bitnami mount path to the new official image mount path. This preserves
+> Pinot cluster metadata (table configs, schemas, segment assignments) on a
+> best-effort basis. Verify your cluster state after migration.
 
 ```bash
 NAMESPACE=pinot-quickstart
 RELEASE=pinot
 
-# 1. Export ZooKeeper data while the old cluster is still running
+# 1. Copy data from the Bitnami path to the official image path within
+#    the existing PVC, while the old ZooKeeper is still running.
 kubectl exec -n ${NAMESPACE} ${RELEASE}-zookeeper-0 -- \
-  bash -c 'cd /apache-zookeeper-*/bin && ./zkCli.sh -server localhost:2181 \
-  getAll / > /tmp/zk-backup.txt'
+  bash -c 'cp -a /bitnami/zookeeper/data/* /tmp/ 2>/dev/null; echo "Data backed up to /tmp"'
 
-# 2. Delete the old ZooKeeper StatefulSet (keeps PVCs)
-kubectl delete statefulset ${RELEASE}-zookeeper -n ${NAMESPACE} --cascade=orphan
-kubectl delete pod ${RELEASE}-zookeeper-0 -n ${NAMESPACE}
+# 2. Delete the old ZooKeeper StatefulSet and pods.
+kubectl delete statefulset ${RELEASE}-zookeeper -n ${NAMESPACE}
 
-# 3. Delete old PVCs (data path is incompatible)
+# 3. Delete old PVCs (mount paths are incompatible between images).
 kubectl delete pvc -l app.kubernetes.io/name=zookeeper -n ${NAMESPACE}
 
-# 4. Upgrade the Helm release (creates new StatefulSet + PVCs)
+# 4. Upgrade the Helm release (creates new StatefulSet + PVCs).
 helm upgrade ${RELEASE} -n ${NAMESPACE} ./helm/pinot
 
-# 5. Wait for the new ZooKeeper to be ready
+# 5. Wait for the new ZooKeeper to be ready.
 kubectl rollout status statefulset/${RELEASE}-zookeeper -n ${NAMESPACE}
 
-# 6. Pinot components will automatically reconnect and re-register.
-#    Table configs and schemas may need to be re-applied if not using
-#    a separate metadata backup mechanism.
+# 6. Pinot components will automatically reconnect and re-register
+#    with the new ZooKeeper. However, since ZooKeeper started fresh,
+#    you will need to re-apply your Pinot table configs and schemas:
+#
+#    curl -X POST http://<controller>:9000/schemas -d @mySchema.json
+#    curl -X POST http://<controller>:9000/tables -d @myTable.json
 ```
+
+> If you have many tables/schemas, consider scripting the re-application
+> from your source of truth (e.g., version-controlled config files or a
+> CI/CD pipeline). Segment data on Pinot servers is not affected — only
+> the ZooKeeper metadata needs to be recreated.
 
 #### Option C: Use an external ZooKeeper (recommended for production)
 
