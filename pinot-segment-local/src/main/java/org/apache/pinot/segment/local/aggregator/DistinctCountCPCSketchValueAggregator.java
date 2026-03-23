@@ -62,11 +62,15 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
     }
     if (rawValue instanceof byte[]) { // Serialized Sketch
       byte[] bytes = (byte[]) rawValue;
-      cpcUnion.update(deserializeAggregatedValue(bytes));
+      if (bytes.length > 0) {
+        cpcUnion.update(deserializeAggregatedValue(bytes));
+      }
     } else if (rawValue instanceof byte[][]) { // Multiple Serialized Sketches
       byte[][] serializedSketches = (byte[][]) rawValue;
       for (byte[] bytes : serializedSketches) {
-        cpcUnion.update(deserializeAggregatedValue(bytes));
+        if (bytes.length > 0) {
+          cpcUnion.update(deserializeAggregatedValue(bytes));
+        }
       }
     } else {
       CpcSketch pristineSketch = empty();
@@ -81,8 +85,10 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
     CpcUnion cpcUnion = extractUnion(aggregatedValue);
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
-      CpcSketch sketch = deserializeAggregatedValue(bytes);
-      cpcUnion.update(sketch);
+      if (bytes.length > 0) {
+        CpcSketch sketch = deserializeAggregatedValue(bytes);
+        cpcUnion.update(sketch);
+      }
     } else {
       CpcSketch pristineSketch = empty();
       addObjectToSketch(rawValue, pristineSketch);
