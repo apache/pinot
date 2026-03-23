@@ -56,6 +56,7 @@ public interface DataManipulationStatement {
    */
   enum ExecutionType {
     HTTP,
-    MINION
+    MINION,
+    PUSH
   }
 }

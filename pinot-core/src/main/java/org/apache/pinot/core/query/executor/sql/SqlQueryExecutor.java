@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.executor.sql;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -32,12 +34,22 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.ingest.InsertExecutor;
+import org.apache.pinot.spi.ingest.InsertRequest;
+import org.apache.pinot.spi.ingest.InsertResult;
+import org.apache.pinot.spi.ingest.InsertType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
+import org.apache.pinot.sql.parsers.dml.InsertIntoValues;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -45,8 +57,11 @@ import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
  *
  */
 public class SqlQueryExecutor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SqlQueryExecutor.class);
+
   private final String _controllerUrl;
   private final HelixManager _helixManager;
+  private volatile InsertExecutor _insertExecutor;
 
   /**
    * Fetch the lead controller from helix, HA is not guaranteed.
@@ -64,6 +79,15 @@ public class SqlQueryExecutor {
   public SqlQueryExecutor(String controllerUrl) {
     _controllerUrl = controllerUrl;
     _helixManager = null;
+  }
+
+  /**
+   * Sets the local InsertExecutor for push-based INSERT. When set, the executor is called
+   * directly instead of via HTTP to the controller. This is used when the SqlQueryExecutor
+   * runs inside the controller process.
+   */
+  public void setInsertExecutor(InsertExecutor insertExecutor) {
+    _insertExecutor = insertExecutor;
   }
 
   private static String getControllerBaseUrl(HelixManager helixManager) {
@@ -113,12 +137,110 @@ public class SqlQueryExecutor {
           result.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
         }
         break;
+      case PUSH:
+        try {
+          InsertResult insertResult = executePushInsert(statement, headers);
+          List<Object[]> pushRows = new ArrayList<>();
+          pushRows.add(new Object[]{
+              insertResult.getStatementId(),
+              String.valueOf(insertResult.getState()),
+              insertResult.getMessage()
+          });
+          result.setResultTable(new ResultTable(statement.getResultSchema(), pushRows));
+        } catch (Exception e) {
+          result.addException(
+              new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
+        }
+        break;
       default:
         result.addException(
             new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, "Unsupported statement: " + statement));
         break;
     }
     return result;
+  }
+
+  private InsertResult executePushInsert(DataManipulationStatement statement,
+      @Nullable Map<String, String> headers)
+      throws Exception {
+    if (!(statement instanceof InsertIntoValues)) {
+      throw new IllegalStateException("PUSH execution type requires InsertIntoValues statement");
+    }
+    InsertIntoValues insertStmt = (InsertIntoValues) statement;
+
+    InsertRequest request = buildInsertRequest(insertStmt);
+
+    // If a local executor is available (controller-side), call it directly
+    InsertExecutor localExecutor = _insertExecutor;
+    if (localExecutor != null) {
+      LOGGER.info("Executing push-based INSERT locally via InsertExecutor");
+      return localExecutor.execute(request);
+    }
+
+    // Otherwise, POST to controller /insert/execute (broker-side)
+    String controllerBaseUrl = getControllerUrl();
+    String url = controllerBaseUrl + "/insert/execute";
+    String payload = JsonUtils.objectToString(request);
+
+    LOGGER.info("Submitting push-based INSERT to controller: {}", url);
+
+    Map<String, String> requestHeaders = new HashMap<>();
+    requestHeaders.put("Content-Type", "application/json");
+    requestHeaders.put("accept", "application/json");
+    if (headers != null) {
+      requestHeaders.putAll(headers);
+    }
+
+    String responseStr =
+        org.apache.pinot.common.utils.http.HttpClient.wrapAndThrowHttpException(
+            org.apache.pinot.common.utils.http.HttpClient.getInstance()
+                .sendJsonPostRequest(new java.net.URL(url).toURI(), payload, requestHeaders))
+            .getResponse();
+    JsonNode responseJson = JsonUtils.stringToJsonNode(responseStr);
+    return JsonUtils.jsonNodeToObject(responseJson, InsertResult.class);
+  }
+
+  private static InsertRequest buildInsertRequest(InsertIntoValues insertStmt) {
+    List<GenericRow> genericRows = new ArrayList<>();
+    List<String> columns = insertStmt.getColumns();
+    for (List<Object> rowValues : insertStmt.getRows()) {
+      GenericRow genericRow = new GenericRow();
+      if (!columns.isEmpty()) {
+        for (int i = 0; i < columns.size(); i++) {
+          genericRow.putValue(columns.get(i), rowValues.get(i));
+        }
+      } else {
+        for (int i = 0; i < rowValues.size(); i++) {
+          genericRow.putValue("col" + i, rowValues.get(i));
+        }
+      }
+      genericRows.add(genericRow);
+    }
+
+    TableType tableType = null;
+    String tableTypeStr = insertStmt.getTableType();
+    if (tableTypeStr != null) {
+      tableType = TableType.valueOf(tableTypeStr.toUpperCase());
+    }
+
+    return new InsertRequest.Builder()
+        .setTableName(insertStmt.getTableName())
+        .setTableType(tableType)
+        .setInsertType(InsertType.ROW)
+        .setRows(genericRows)
+        .setRequestId(insertStmt.getRequestId())
+        .setOptions(insertStmt.getOptions())
+        .build();
+  }
+
+  private String getControllerUrl() {
+    if (_controllerUrl != null) {
+      return _controllerUrl;
+    }
+    if (_helixManager != null) {
+      return getControllerBaseUrl(_helixManager);
+    }
+    throw new RuntimeException("No controller URL configured");
   }
 
   private MinionClient getMinionClient() {
