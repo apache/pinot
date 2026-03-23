@@ -1508,6 +1508,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         case HOLDING:
         case COMMITTING:
         case INITIAL_CONSUMING:
+          // WARNING: DOWNLOAD mode is not recommended with pauseless ingestion due to a known bug
+          // (https://github.com/apache/pinot/pull/17885).
+          // With pauseless ingestion, the committing (lead) server may also attempt to download the segment instead
+          // of building it locally, causing the segment to go missing.
+          // Recovery requires RealtimeSegmentValidationManager to detect and re-create the missing segment.
           if (_segmentCompletionMode == CompletionMode.DOWNLOAD) {
             // Check if download URL has been set by another replica
             String downloadUrl = segmentZKMetadata.getDownloadUrl();
