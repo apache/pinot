@@ -66,7 +66,6 @@ repo. It is intentionally short and focused on day-to-day work.
 - pinot-batch-ingestion: batch ingestion plugin family.
   - pinot-batch-ingestion-common: shared batch ingestion APIs and utilities.
   - pinot-batch-ingestion-spark-base: shared Spark ingestion base classes.
-  - pinot-batch-ingestion-spark-2.4: Spark 2.4 ingestion implementation.
   - pinot-batch-ingestion-spark-3: Spark 3 ingestion implementation.
   - pinot-batch-ingestion-hadoop: Hadoop MapReduce ingestion implementation.
   - pinot-batch-ingestion-standalone: standalone batch ingestion implementation.

@@ -84,14 +84,6 @@
     </file>
     <file>
       <source>
-        ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-2.4/target/pinot-batch-ingestion-spark-2.4-${project.version}-shaded.jar
-      </source>
-      <destName>
-        plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-2.4/pinot-batch-ingestion-spark-2.4-${project.version}-shaded.jar
-      </destName>
-    </file>
-    <file>
-      <source>
         ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-3/target/pinot-batch-ingestion-spark-3-${project.version}-shaded.jar
       </source>
       <destName>
