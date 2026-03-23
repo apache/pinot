@@ -200,6 +200,46 @@ else use user-provided URL
 {{- end -}}
 
 {{/*
+Zookeeper labels
+*/}}
+{{- define "pinot.zookeeperLabels" -}}
+{{- include "pinot.labels" . }}
+component: zookeeper
+{{- end }}
+
+{{/*
+Zookeeper Match Selector labels
+*/}}
+{{- define "pinot.zookeeperMatchLabels" -}}
+{{- include "pinot.matchLabels" . }}
+component: zookeeper
+{{- end }}
+
+{{/*
+The name of the zookeeper headless service.
+*/}}
+{{- define "pinot.zookeeper.headless" -}}
+{{- printf "%s-headless" (include "pinot.zookeeper.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Generate the ZOO_SERVERS string for the official ZooKeeper Docker image.
+Format: server.1=<pod-0>.<headless>:2888:3888;2181 server.2=...
+*/}}
+{{- define "pinot.zookeeper.servers" -}}
+{{- $fullname := (include "pinot.zookeeper.fullname" .) -}}
+{{- $headless := (include "pinot.zookeeper.headless" .) -}}
+{{- $namespace := (include "pinot.namespace" .) -}}
+{{- $port := .Values.zookeeper.port | int -}}
+{{- $replicas := .Values.zookeeper.replicaCount | int -}}
+{{- $servers := list -}}
+{{- range $i := until $replicas -}}
+{{- $servers = append $servers (printf "server.%d=%s-%d.%s.%s.svc.cluster.local:2888:3888;%d" (add $i 1) $fullname $i $headless $namespace $port) -}}
+{{- end -}}
+{{- join " " $servers -}}
+{{- end -}}
+
+{{/*
 Create a default fully qualified pinot controller name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 */}}

@@ -1,0 +1,193 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+{{- if .Values.zookeeper.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "pinot.zookeeper.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
+  labels:
+    {{- include "pinot.zookeeperLabels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "pinot.zookeeperMatchLabels" . | nindent 6 }}
+  serviceName: {{ include "pinot.zookeeper.headless" . }}
+  replicas: {{ .Values.zookeeper.replicaCount }}
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        {{- include "pinot.zookeeperLabels" . | nindent 8 }}
+      {{- with .Values.zookeeper.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.zookeeper.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.zookeeper.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.zookeeper.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.zookeeper.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: zookeeper
+        image: "{{ .Values.zookeeper.image.repository }}:{{ .Values.zookeeper.image.tag }}"
+        imagePullPolicy: {{ .Values.zookeeper.image.pullPolicy }}
+        env:
+          - name: ZOO_MY_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+          - name: ZOO_SERVERS
+            value: {{ include "pinot.zookeeper.servers" . | quote }}
+          - name: ZOO_TICK_TIME
+            value: {{ .Values.zookeeper.tickTime | default 2000 | quote }}
+          - name: ZOO_INIT_LIMIT
+            value: {{ .Values.zookeeper.initLimit | default 10 | quote }}
+          - name: ZOO_SYNC_LIMIT
+            value: {{ .Values.zookeeper.syncLimit | default 5 | quote }}
+          - name: ZOO_MAX_CLIENT_CNXNS
+            value: {{ .Values.zookeeper.maxClientCnxns | default 60 | quote }}
+          - name: ZOO_AUTOPURGE_PURGE_INTERVAL
+            value: {{ .Values.zookeeper.autopurge.purgeInterval | default 1 | quote }}
+          - name: ZOO_AUTOPURGE_SNAP_RETAIN_COUNT
+            value: {{ .Values.zookeeper.autopurge.snapRetainCount | default 5 | quote }}
+          - name: JVMFLAGS
+            value: "-Xmx{{ .Values.zookeeper.heapSize }}m -Xms{{ .Values.zookeeper.heapSize }}m {{ .Values.zookeeper.jvmFlags }}"
+          - name: ZOO_4LW_COMMANDS_WHITELIST
+            value: {{ .Values.zookeeper.fourLetterWordsWhitelist | default "srvr,mntr,ruok,conf" | quote }}
+          {{- with .Values.zookeeper.extraEnv }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        command:
+          - bash
+          - -c
+          - |
+            # The official ZooKeeper image uses 1-based IDs, but pod-index is 0-based
+            HOST=$(hostname -s)
+            if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
+              export ZOO_MY_ID=$(( ${BASH_REMATCH[2]} + 1 ))
+            else
+              echo "Failed to extract ordinal from hostname $HOST"
+              exit 1
+            fi
+            exec /docker-entrypoint.sh zkServer.sh start-foreground
+        ports:
+          - name: client
+            containerPort: {{ .Values.zookeeper.port }}
+          - name: follower
+            containerPort: 2888
+          - name: election
+            containerPort: 3888
+          {{- if .Values.zookeeper.adminServer.enabled }}
+          - name: admin
+            containerPort: {{ .Values.zookeeper.adminServer.port | default 8080 }}
+          {{- end }}
+        {{- if .Values.zookeeper.probes.livenessEnabled }}
+        livenessProbe:
+          exec:
+            command:
+              - bash
+              - -c
+              - echo ruok | nc localhost {{ .Values.zookeeper.port }} | grep imok
+          initialDelaySeconds: {{ .Values.zookeeper.probes.liveness.initialDelaySeconds | default 30 }}
+          periodSeconds: {{ .Values.zookeeper.probes.liveness.periodSeconds | default 10 }}
+          timeoutSeconds: {{ .Values.zookeeper.probes.liveness.timeoutSeconds | default 5 }}
+          failureThreshold: {{ .Values.zookeeper.probes.liveness.failureThreshold | default 6 }}
+        {{- end }}
+        {{- if .Values.zookeeper.probes.readinessEnabled }}
+        readinessProbe:
+          exec:
+            command:
+              - bash
+              - -c
+              - echo ruok | nc localhost {{ .Values.zookeeper.port }} | grep imok
+          initialDelaySeconds: {{ .Values.zookeeper.probes.readiness.initialDelaySeconds | default 10 }}
+          periodSeconds: {{ .Values.zookeeper.probes.readiness.periodSeconds | default 10 }}
+          timeoutSeconds: {{ .Values.zookeeper.probes.readiness.timeoutSeconds | default 5 }}
+          failureThreshold: {{ .Values.zookeeper.probes.readiness.failureThreshold | default 6 }}
+        {{- end }}
+        volumeMounts:
+          - name: data
+            mountPath: /data
+          - name: datalog
+            mountPath: /datalog
+        {{- with .Values.zookeeper.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+{{- if not .Values.zookeeper.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: datalog
+          emptyDir: {}
+{{- end }}
+{{- if .Values.zookeeper.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - {{ .Values.zookeeper.persistence.accessMode | default "ReadWriteOnce" | quote }}
+        {{- if .Values.zookeeper.persistence.storageClass }}
+        {{- if (eq "-" .Values.zookeeper.persistence.storageClass) }}
+        storageClassName: ""
+        {{- else }}
+        storageClassName: {{ .Values.zookeeper.persistence.storageClass }}
+        {{- end }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.zookeeper.persistence.data.size | default .Values.zookeeper.persistence.size | quote }}
+    - metadata:
+        name: datalog
+      spec:
+        accessModes:
+          - {{ .Values.zookeeper.persistence.accessMode | default "ReadWriteOnce" | quote }}
+        {{- if .Values.zookeeper.persistence.storageClass }}
+        {{- if (eq "-" .Values.zookeeper.persistence.storageClass) }}
+        storageClassName: ""
+        {{- else }}
+        storageClassName: {{ .Values.zookeeper.persistence.storageClass }}
+        {{- end }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.zookeeper.persistence.datalog.size | default "8Gi" | quote }}
+{{- end }}
+{{- end }}

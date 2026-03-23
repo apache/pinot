@@ -17,4 +17,20 @@
 # under the License.
 #
 
-dependencies: []
+{{- if .Values.zookeeper.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pinot.zookeeper.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
+  labels:
+    {{- include "pinot.zookeeperLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: client
+      port: {{ .Values.zookeeper.port }}
+      targetPort: client
+  selector:
+    {{- include "pinot.zookeeperMatchLabels" . | nindent 4 }}
+{{- end }}

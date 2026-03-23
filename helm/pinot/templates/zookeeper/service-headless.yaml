@@ -17,9 +17,27 @@
 # under the License.
 #
 
-dependencies:
-- name: zookeeper
-  repository: https://charts.bitnami.com/bitnami
-  version: 13.8.7
-digest: sha256:ef0a8f3a7dc73696cceb417e968c4d88565c9845ddda6ba17e205c56230cefd8
-generated: "2025-10-08T16:48:00.594827-07:00"
+{{- if .Values.zookeeper.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pinot.zookeeper.headless" . }}
+  namespace: {{ include "pinot.namespace" . }}
+  labels:
+    {{- include "pinot.zookeeperLabels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: client
+      port: {{ .Values.zookeeper.port }}
+      targetPort: client
+    - name: follower
+      port: 2888
+      targetPort: follower
+    - name: election
+      port: 3888
+      targetPort: election
+  selector:
+    {{- include "pinot.zookeeperMatchLabels" . | nindent 4 }}
+{{- end }}
