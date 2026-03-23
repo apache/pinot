@@ -58,13 +58,8 @@ public class UpsertUtils {
   }
 
   /**
-   * Returns whether the segment has no queryable documents for purposes such as empty-segment pruning.
-   * When {@code skipUpsert} is true, always returns {@code false} (the segment is not treated as empty).
-   * Otherwise uses the same bitmap precedence as {@link #getQueryableDocIdsSnapshotFromSegment(IndexSegment)}:
-   * {@link IndexSegment#getQueryableDocIds()} if non-null, else {@link IndexSegment#getValidDocIds()}; if both are
-   * null, returns {@code false}, the table will be non-upsert. Emptiness is checked via
-   * {@link ThreadSafeMutableRoaringBitmap#isEmpty()} to avoid
-   * cloning the bitmap.
+   * Returns whether the segment has no queryable documents, when no delete record column we look into validDocIds
+   * for an upsert table
    */
   public static boolean hasNoQueryableDocs(IndexSegment segment) {
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
