@@ -655,9 +655,17 @@ public class CommonConstants {
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
         public static final String USE_STAR_TREE = "useStarTree";
         /**
-         * When true, use index-based distinct (JsonIndexDistinctOperator) when applicable.
+         * When true, use index-based distinct operators when applicable. This enables both
+         * JsonIndexDistinctOperator (for JSON columns) and InvertedIndexDistinctOperator
+         * (for dictionary + inverted index columns with cost heuristic).
          */
         public static final String USE_INDEX_BASED_DISTINCT_OPERATOR = "useIndexBasedDistinctOperator";
+        /**
+         * Cost ratio for the inverted-index-based distinct heuristic. The inverted index path is chosen when
+         * dictionaryCardinality * costRatio <= filteredDocCount. Default is cardinality-dependent:
+         * 30 for dictCard <= 1K, 10 for dictCard <= 10K, 6 for dictCard > 10K.
+         */
+        public static final String INVERTED_INDEX_DISTINCT_COST_RATIO = "invertedIndexDistinctCostRatio";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String TABLE_SAMPLER = "sampler";
