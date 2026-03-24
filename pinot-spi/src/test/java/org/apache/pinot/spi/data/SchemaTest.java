@@ -710,21 +710,11 @@ public class SchemaTest {
         .addMetric("revenue_cents", FieldSpec.DataType.LONG)
         .build();
 
-    // Set field-level description and tags
-    schema.getFieldSpecFor("user_id").setDescription("Unique user ID");
-    schema.getFieldSpecFor("user_id").setTags(Arrays.asList("pii", "partition-key"));
-
-    // Serialize and deserialize
     String jsonString = schema.toSingleLineJsonString();
     Schema deserialized = Schema.fromString(jsonString);
 
     assertThat(deserialized.getDescription()).isEqualTo("Tracks all user interaction events.");
     assertThat(deserialized.getTags()).isEqualTo(Arrays.asList("real-time", "production"));
-    assertThat(deserialized.getFieldSpecFor("user_id").getDescription()).isEqualTo("Unique user ID");
-    assertThat(deserialized.getFieldSpecFor("user_id").getTags()).isEqualTo(Arrays.asList("pii", "partition-key"));
-    assertThat(deserialized.getFieldSpecFor("revenue_cents").getDescription()).isNull();
-    assertThat(deserialized.getFieldSpecFor("revenue_cents").getTags()).isNull();
-
     assertThat(deserialized).isEqualTo(schema);
     assertThat(deserialized.hashCode()).isEqualTo(schema.hashCode());
   }

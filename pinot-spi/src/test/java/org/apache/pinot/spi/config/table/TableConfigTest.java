@@ -142,39 +142,42 @@ public class TableConfigTest {
   }
 
   @Test
-  public void testDescriptionSerdeRoundtrip()
+  public void testDescriptionAndTagsSerdeRoundtrip()
       throws IOException {
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .setDescription("Tracks all user events in real-time.")
+        .setTags(List.of("real-time", "production"))
         .build();
 
     assertThat(config.getDescription()).isEqualTo("Tracks all user events in real-time.");
+    assertThat(config.getTags()).containsExactly("real-time", "production");
 
-    // Serialize to JSON and verify description is present
     String json = config.toJsonString();
     JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
-    assertThat(jsonNode.has("description")).isTrue();
     assertThat(jsonNode.get("description").asText()).isEqualTo("Tracks all user events in real-time.");
+    assertThat(jsonNode.get("tags").size()).isEqualTo(2);
 
-    // Deserialize and verify roundtrip
     TableConfig deserialized = JsonUtils.stringToObject(json, TableConfig.class);
     assertThat(deserialized.getDescription()).isEqualTo("Tracks all user events in real-time.");
+    assertThat(deserialized.getTags()).containsExactly("real-time", "production");
     assertThat(deserialized).isEqualTo(config);
   }
 
   @Test
-  public void testDescriptionOmittedWhenNotSet()
+  public void testDescriptionAndTagsOmittedWhenNotSet()
       throws IOException {
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .build();
 
     assertThat(config.getDescription()).isNull();
+    assertThat(config.getTags()).isNull();
 
     String json = config.toJsonString();
     JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
     assertThat(jsonNode.has("description")).as("description should be absent when null").isFalse();
+    assertThat(jsonNode.has("tags")).as("tags should be absent when null").isFalse();
   }
 
   @Test
@@ -188,58 +191,16 @@ public class TableConfigTest {
   }
 
   @Test
-  public void testCopyConstructorCopiesDescription() {
+  public void testCopyConstructorCopiesDescriptionAndTags() {
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .setDescription("Original description")
-        .build();
-
-    TableConfig copy = new TableConfig(config);
-    assertThat(copy.getDescription()).isEqualTo("Original description");
-    assertThat(config).isEqualTo(copy);
-  }
-
-  @Test
-  public void testTagsSerdeRoundtrip()
-      throws IOException {
-    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .setTags(List.of("real-time", "production"))
-        .build();
-
-    assertThat(config.getTags()).containsExactly("real-time", "production");
-
-    String json = config.toJsonString();
-    JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
-    assertThat(jsonNode.has("tags")).isTrue();
-    assertThat(jsonNode.get("tags").size()).isEqualTo(2);
-
-    TableConfig deserialized = JsonUtils.stringToObject(json, TableConfig.class);
-    assertThat(deserialized.getTags()).containsExactly("real-time", "production");
-  }
-
-  @Test
-  public void testTagsOmittedWhenNotSet()
-      throws IOException {
-    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .build();
-
-    assertThat(config.getTags()).isNull();
-
-    String json = config.toJsonString();
-    JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
-    assertThat(jsonNode.has("tags")).as("tags should be absent when null").isFalse();
-  }
-
-  @Test
-  public void testCopyConstructorCopiesTags() {
-    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
         .setTags(List.of("production", "critical"))
         .build();
 
     TableConfig copy = new TableConfig(config);
+    assertThat(copy.getDescription()).isEqualTo("Original description");
     assertThat(copy.getTags()).containsExactly("production", "critical");
+    assertThat(config).isEqualTo(copy);
   }
 }
