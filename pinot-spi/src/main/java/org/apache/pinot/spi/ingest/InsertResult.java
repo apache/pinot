@@ -21,6 +21,7 @@ package org.apache.pinot.spi.ingest;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -51,7 +52,8 @@ public class InsertResult {
     _statementId = statementId;
     _state = state;
     _message = message;
-    _segmentNames = segmentNames != null ? Collections.unmodifiableList(segmentNames) : Collections.emptyList();
+    _segmentNames = segmentNames != null
+        ? Collections.unmodifiableList(new ArrayList<>(segmentNames)) : Collections.emptyList();
     _errorCode = errorCode;
   }
 
@@ -60,7 +62,7 @@ public class InsertResult {
     _state = builder._state;
     _message = builder._message;
     _segmentNames = builder._segmentNames != null
-        ? Collections.unmodifiableList(builder._segmentNames) : Collections.emptyList();
+        ? Collections.unmodifiableList(new ArrayList<>(builder._segmentNames)) : Collections.emptyList();
     _errorCode = builder._errorCode;
   }
 

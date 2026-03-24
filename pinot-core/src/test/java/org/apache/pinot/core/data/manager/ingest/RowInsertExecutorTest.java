@@ -102,7 +102,7 @@ public class RowInsertExecutorTest {
 
     assertNotNull(result);
     assertEquals(result.getStatementId(), "stmt-1");
-    assertEquals(result.getState(), InsertStatementState.ACCEPTED);
+    assertEquals(result.getState(), InsertStatementState.PREPARED);
     assertNotNull(result.getMessage());
   }
 

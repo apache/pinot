@@ -133,8 +133,8 @@ public class RowInsertExecutor implements InsertExecutor {
 
       return new InsertResult.Builder()
           .setStatementId(statementId)
-          .setState(InsertStatementState.ACCEPTED)
-          .setMessage("Insert accepted and prepared with " + rows.size() + " rows across "
+          .setState(InsertStatementState.PREPARED)
+          .setMessage("Insert prepared with " + rows.size() + " rows across "
               + partitionedRows.size() + " partition(s)")
           .build();
     } catch (IOException e) {

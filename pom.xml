@@ -2817,7 +2817,9 @@
 
             <!-- Exclude build targets -->
             <exclude>**/target/**</exclude>
-            <exclude>**/*.md</exclude>
+            <exclude>.github/**/*.md</exclude>
+            <exclude>.claude/**/*.md</exclude>
+            <exclude>docs/**/*.md</exclude>
 
             <!-- Exclude Maven plugin generated files -->
             <exclude>**/dependency-reduced-pom.xml</exclude>

@@ -21,7 +21,9 @@ package org.apache.pinot.spi.ingest;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -69,9 +71,9 @@ public class InsertRequest {
     _tableName = tableName;
     _tableType = tableType;
     _insertType = insertType;
-    _rows = rows != null ? Collections.unmodifiableList(rows) : Collections.emptyList();
+    _rows = rows != null ? Collections.unmodifiableList(new ArrayList<>(rows)) : Collections.emptyList();
     _fileUri = fileUri;
-    _options = options != null ? Collections.unmodifiableMap(options) : Collections.emptyMap();
+    _options = options != null ? Collections.unmodifiableMap(new HashMap<>(options)) : Collections.emptyMap();
     _consistencyMode = consistencyMode != null ? consistencyMode : InsertConsistencyMode.WAIT_FOR_ACCEPT;
   }
 
@@ -82,9 +84,11 @@ public class InsertRequest {
     _tableName = builder._tableName;
     _tableType = builder._tableType;
     _insertType = builder._insertType;
-    _rows = builder._rows != null ? Collections.unmodifiableList(builder._rows) : Collections.emptyList();
+    _rows = builder._rows != null
+        ? Collections.unmodifiableList(new ArrayList<>(builder._rows)) : Collections.emptyList();
     _fileUri = builder._fileUri;
-    _options = builder._options != null ? Collections.unmodifiableMap(builder._options) : Collections.emptyMap();
+    _options = builder._options != null
+        ? Collections.unmodifiableMap(new HashMap<>(builder._options)) : Collections.emptyMap();
     _consistencyMode = builder._consistencyMode != null ? builder._consistencyMode
         : InsertConsistencyMode.WAIT_FOR_ACCEPT;
   }

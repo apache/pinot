@@ -164,11 +164,13 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
 
   @Override
   public InsertResult getStatus(String statementId) {
-    // Row inserts are synchronous; once execute() returns VISIBLE, the segment is queryable.
-    // For unknown statement IDs we return VISIBLE as a safe default since we do not track state.
+    // This executor does not track statement state, so getStatus() cannot reliably report visibility.
+    // To avoid misrepresenting the status for unknown or unsupported statement IDs, we report ABORTED.
     return new InsertResult.Builder()
         .setStatementId(statementId)
-        .setState(InsertStatementState.VISIBLE)
+        .setState(InsertStatementState.ABORTED)
+        .setMessage("ControllerRowInsertExecutor does not track statement status; getStatus is unsupported for "
+            + "statementId=" + statementId)
         .build();
   }
 

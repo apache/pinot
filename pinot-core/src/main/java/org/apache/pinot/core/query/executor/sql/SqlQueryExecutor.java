@@ -205,14 +205,13 @@ public class SqlQueryExecutor {
     List<String> columns = insertStmt.getColumns();
     for (List<Object> rowValues : insertStmt.getRows()) {
       GenericRow genericRow = new GenericRow();
-      if (!columns.isEmpty()) {
-        for (int i = 0; i < columns.size(); i++) {
-          genericRow.putValue(columns.get(i), rowValues.get(i));
-        }
-      } else {
-        for (int i = 0; i < rowValues.size(); i++) {
-          genericRow.putValue("col" + i, rowValues.get(i));
-        }
+      if (columns.isEmpty()) {
+        throw new IllegalStateException(
+            "INSERT INTO ... VALUES requires an explicit column list, "
+                + "e.g. INSERT INTO myTable (col1, col2) VALUES (1, 'a')");
+      }
+      for (int i = 0; i < columns.size(); i++) {
+        genericRow.putValue(columns.get(i), rowValues.get(i));
       }
       genericRows.add(genericRow);
     }

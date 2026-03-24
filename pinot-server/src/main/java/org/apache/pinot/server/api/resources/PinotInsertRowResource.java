@@ -241,10 +241,31 @@ public class PinotInsertRowResource {
     }
     for (JsonNode rowNode : rowsNode) {
       GenericRow row = new GenericRow();
-      Iterator<Map.Entry<String, JsonNode>> fields = rowNode.fields();
-      while (fields.hasNext()) {
-        Map.Entry<String, JsonNode> field = fields.next();
-        row.putValue(field.getKey(), parseFieldValue(field.getValue()));
+
+      // Support GenericRow JSON format with fieldToValueMap/nullValueFields
+      if (rowNode.has("fieldToValueMap")) {
+        JsonNode fieldMap = rowNode.get("fieldToValueMap");
+        Iterator<Map.Entry<String, JsonNode>> fields = fieldMap.fields();
+        while (fields.hasNext()) {
+          Map.Entry<String, JsonNode> field = fields.next();
+          row.putValue(field.getKey(), parseFieldValue(field.getValue()));
+        }
+        if (rowNode.has("nullValueFields")) {
+          JsonNode nullFields = rowNode.get("nullValueFields");
+          if (nullFields.isArray()) {
+            for (JsonNode nullField : nullFields) {
+              row.putValue(nullField.asText(), null);
+              row.addNullValueField(nullField.asText());
+            }
+          }
+        }
+      } else {
+        // Flat column->value format
+        Iterator<Map.Entry<String, JsonNode>> fields = rowNode.fields();
+        while (fields.hasNext()) {
+          Map.Entry<String, JsonNode> field = fields.next();
+          row.putValue(field.getKey(), parseFieldValue(field.getValue()));
+        }
       }
       rows.add(row);
     }
