@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -57,6 +58,14 @@ public class Quickstart extends QuickStartBase {
     return null;
   }
 
+  protected Map<String, Object> getIndividualBrokerConfigOverridesFunction(int brokerId) {
+    return Map.of();
+  }
+
+  protected Map<String, Object> getIndividualServerConfigOverridesFunction(int serverId) {
+    return Map.of();
+  }
+
   public void execute()
       throws Exception {
     File quickstartTmpDir =
@@ -67,7 +76,9 @@ public class Quickstart extends QuickStartBase {
 
     QuickstartRunner runner =
         new QuickstartRunner(quickstartTableRequests, 1, 1, getNumQuickstartRunnerServers(), 1, quickstartRunnerDir,
-            true, getAuthProvider(), getConfigOverrides(), _zkExternalAddress, true, getClusterConfigOverrides());
+            true, getAuthProvider(),
+            getConfigOverrides(), _zkExternalAddress, true, getClusterConfigOverrides(),
+            this::getIndividualBrokerConfigOverridesFunction, this::getIndividualServerConfigOverridesFunction);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker, server and minion *****");
     runner.startAll();
