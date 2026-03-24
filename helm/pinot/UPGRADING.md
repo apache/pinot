@@ -134,7 +134,7 @@ spec:
       claimName: datalog-${RELEASE}-zookeeper-0
   restartPolicy: Never
 EOF
-kubectl wait --for=condition=ready pod/zk-data-restore -n ${NAMESPACE} --timeout=60s
+kubectl wait --for=condition=ready pod/zk-data-restore -n ${NAMESPACE} --timeout=10m
 
 # 8. Copy backup into the data PVC, then separate snapshots from transaction logs.
 kubectl cp ./zk-data-backup/. ${NAMESPACE}/zk-data-restore:/data
