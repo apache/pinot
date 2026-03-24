@@ -16,49 +16,69 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM debian:buster-slim
-
-ARG version=11.0.18.10-1
-# In addition to installing the Amazon corretto, we also install
-# fontconfig. The folks who manage the docker hub's
-# official image library have found that font management
-# is a common usecase, and painpoint, and have
-# recommended that Java images include font support.
-#
-# See:
-#  https://github.com/docker-library/official-images/blob/master/test/tests/java-uimanager-font/container.java
+ARG JAVA_VERSION=11
+FROM debian:bookworm-slim
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
+# Print platform info for debugging
+RUN echo "Building for platform: $(uname -m)" && \
+    echo "Architecture: $(dpkg --print-architecture)" && \
+    cat /etc/os-release
+
+# Install basic dependencies first
 RUN set -eux \
   && apt-get update \
   && apt-get install -y --no-install-recommends \
-  curl ca-certificates gnupg software-properties-common fontconfig java-common vim wget git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config\
-  && curl -fL https://apt.corretto.aws/corretto.key | apt-key add - \
-  && add-apt-repository 'deb https://apt.corretto.aws stable main' \
-  && mkdir -p /usr/share/man/man1 || true \
+  curl ca-certificates gpg fontconfig java-common \
+  wget git && \
+  rm -rf /var/lib/apt/lists/*
+
+# Install Amazon Corretto
+ARG JAVA_VERSION
+RUN set -eux \
+  && mkdir -p /etc/apt/keyrings \
+  && curl -fL https://apt.corretto.aws/corretto.key | gpg --dearmor -o /etc/apt/keyrings/corretto.gpg \
+  && echo "deb [signed-by=/etc/apt/keyrings/corretto.gpg] https://apt.corretto.aws stable main" > /etc/apt/sources.list.d/corretto.list \
   && apt-get update \
-  && apt-get install -y java-11-amazon-corretto-jdk=1:$version \
+  && apt-get install -y java-${JAVA_VERSION}-amazon-corretto-jdk \
   && rm -rf /var/lib/apt/lists/*
 
-ENV LANG C.UTF-8
-ENV JAVA_HOME=/usr/lib/jvm/java-11-amazon-corretto
+# Install build dependencies separately
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+    automake bison flex g++ libtool make pkg-config && \
+  rm -rf /var/lib/apt/lists/*
+
+# Install libraries for Thrift build (headers-only boost, no Python bindings)
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends libboost-dev libevent-dev libssl-dev && \
+  rm -rf /var/lib/apt/lists/*
+
+ENV LANG=C.UTF-8
+ENV JAVA_HOME=/usr/lib/jvm/java-${JAVA_VERSION}-amazon-corretto
 
 # install maven
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
-  && wget https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz -P /tmp \
+  && echo "Downloading Maven for $(uname -m) architecture..." \
+  && wget https://dlcdn.apache.org/maven/maven-3/3.9.14/binaries/apache-maven-3.9.14-bin.tar.gz -P /tmp \
   && tar -xzf /tmp/apache-maven-*.tar.gz -C /usr/share/maven --strip-components=1 \
   && rm -f /tmp/apache-maven-*.tar.gz \
-  && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn
-ENV MAVEN_HOME /usr/share/maven
-ENV MAVEN_CONFIG /opt/.m2
+  && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn \
+  && mvn --version
+ENV MAVEN_HOME=/usr/share/maven
+ENV MAVEN_CONFIG=/opt/.m2
 
-# install thrift
-RUN  wget https://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
+# install thrift with better error handling
+RUN echo "Building Thrift for $(uname -m) architecture..." && \
+  wget https://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
   tar xfz /tmp/thrift-0.12.0.tar.gz --directory /tmp && \
-  base_dir=`pwd` && \
   cd /tmp/thrift-0.12.0 && \
+  echo "Configuring Thrift..." && \
   ./configure --with-cpp=no --with-c_glib=no --with-java=yes --with-python=no --with-ruby=no --with-erlang=no --with-go=no --with-nodejs=no --with-php=no && \
-  make install
+  echo "Building Thrift..." && \
+  make -j$(nproc) install && \
+  echo "Thrift installation completed" && \
+  rm -rf /tmp/thrift-0.12.0*
 
 CMD ["bash"]

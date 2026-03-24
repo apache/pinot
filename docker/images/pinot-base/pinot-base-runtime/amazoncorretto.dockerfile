@@ -19,14 +19,15 @@
 ARG JAVA_VERSION=11
 ARG JDK_IMAGE=amazoncorretto
 
-FROM ${JDK_IMAGE}:${JAVA_VERSION}-al2-jdk
+FROM ${JDK_IMAGE}:${JAVA_VERSION}-al2023-jdk
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
 RUN yum update -y && \
-  yum groupinstall 'Development Tools' -y && \
-  yum install -y procps vim less wget curl git python sysstat perf libtasn1 zstd && \
-  yum clean all
+  yum swap -y curl-minimal curl && \
+  yum install -y procps less wget git-core sysstat libtasn1 zstd tar gzip && \
+  yum clean all && \
+  rm -rf /var/cache/yum
 
 RUN case `uname -m` in \
   x86_64) arch=x64; ;; \

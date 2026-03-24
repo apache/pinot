@@ -1,3 +1,4 @@
+#!/bin/bash -x
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -16,24 +17,11 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG JAVA_VERSION=21
-ARG JDK_IMAGE=mcr.microsoft.com/openjdk/jdk
 
-FROM ${JDK_IMAGE}:${JAVA_VERSION}-jdk-slim
+set -e
 
-LABEL MAINTAINER=dev@pinot.apache.org
+docker manifest create apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG} \
+    --amend apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-amd64 \
+    --amend apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-arm64
 
-RUN apt-get update && \
-  apt-get install -y --no-install-recommends less wget curl git sysstat procps libtasn1-6 zstd && \
-  rm -rf /var/lib/apt/lists/*
-
-RUN case `uname -m` in \
-  x86_64) arch=x64; ;; \
-  aarch64) arch=arm64; ;; \
-  *) echo "platform=$(uname -m) un-supported, exit ..."; exit 1; ;; \
-  esac \
-  && mkdir -p /usr/local/lib/async-profiler \
-  && curl -L https://github.com/async-profiler/async-profiler/releases/download/v4.3/async-profiler-4.3-linux-${arch}.tar.gz | tar -xz --strip-components 1 -C /usr/local/lib/async-profiler \
-  && ln -s /usr/local/lib/async-profiler/bin/asprof /usr/local/bin/async-profiler
-
-CMD ["bash"]
+docker manifest push apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}
