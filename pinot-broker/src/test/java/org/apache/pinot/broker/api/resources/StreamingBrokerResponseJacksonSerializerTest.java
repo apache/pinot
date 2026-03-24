@@ -388,6 +388,30 @@ public class StreamingBrokerResponseJacksonSerializerTest {
   }
 
   @Test
+  public void testObjectTypeColumnSerialization() throws Exception {
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"dynamicCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.OBJECT}
+    );
+
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{true});
+    rows.add(new Object[]{"pinot"});
+    rows.add(new Object[]{42L});
+
+    StreamingBrokerResponse.Metainfo metainfo = new TestMetainfo(Collections.emptyList());
+    StreamingBrokerResponse response = new StreamingBrokerResponse.ListStreamingBrokerResponse(
+        dataSchema, metainfo, rows);
+
+    JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
+    JsonNode rowsNode = json.get("resultTable").get("rows");
+    assertEquals(rowsNode.size(), 3);
+    assertTrue(rowsNode.get(0).get(0).asBoolean());
+    assertEquals(rowsNode.get(1).get(0).asText(), "pinot");
+    assertEquals(rowsNode.get(2).get(0).asLong(), 42L);
+  }
+
+  @Test
   public void testModuleRegistration() throws Exception {
     ObjectMapper mapper = new ObjectMapper();
     StreamingBrokerResponseJacksonSerializer.registerModule(mapper, Comparator.naturalOrder());

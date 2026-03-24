@@ -619,7 +619,7 @@ public class PinotClientRequest {
           } else {
             BrokerResponse eagerResponse = _requestHandler.handleRequest(
                 sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext, httpHeaders);
-            return new EagerToLazyBrokerResponseAdaptor(eagerResponse);;
+            return new EagerToLazyBrokerResponseAdaptor(eagerResponse);
           }
           return streamingBrokerResponse;
         } catch (Exception e) {
