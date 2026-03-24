@@ -78,6 +78,8 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -595,22 +597,11 @@ public class QueryDispatcher {
       MultiStageOperator rootOperator = opChain.getRoot();
       block = rootOperator.nextBlock();
       while (block.isData()) {
-        DataBlock dataBlock = ((MseBlock.Data) block).asSerialized().getDataBlock();
-        int numRows = dataBlock.getNumberOfRows();
-        if (numRows > 0) {
-          resultRows.ensureCapacity(resultRows.size() + numRows);
-          List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
-          for (Object[] rawRow : rawRows) {
-            Object[] row = new Object[numColumns];
-            for (int i = 0; i < numColumns; i++) {
-              Object rawValue = rawRow[resultFields.get(i).getKey()];
-              if (rawValue != null) {
-                ColumnDataType dataType = columnTypes[i];
-                row[i] = dataType.format(dataType.toExternal(rawValue));
-              }
-            }
-            resultRows.add(row);
-          }
+        MseBlock.Data dataBlock = (MseBlock.Data) block;
+        if (dataBlock.isSerialized()) {
+          reduceSerialized(dataBlock.asSerialized(), resultRows, numColumns, resultFields, columnTypes);
+        } else {
+          reduceRowHeap(dataBlock.asRowHeap(), resultRows, numColumns, resultFields, columnTypes);
         }
         block = rootOperator.nextBlock();
       }
@@ -647,6 +638,49 @@ public class QueryDispatcher {
     assert block.isSuccess();
     return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
+  }
+
+  private static void reduceSerialized(SerializedDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
+    DataBlock dataBlock = block.getDataBlock();
+    int numRows = dataBlock.getNumberOfRows();
+    if (numRows > 0) {
+      resultRows.ensureCapacity(resultRows.size() + numRows);
+      List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
+      for (Object[] rawRow : rawRows) {
+        Object[] row = new Object[numColumns];
+        for (int i = 0; i < numColumns; i++) {
+          Object rawValue = rawRow[resultFields.get(i).getKey()];
+          if (rawValue != null) {
+            ColumnDataType dataType = columnTypes[i];
+            row[i] = dataType.format(dataType.toExternal(rawValue));
+          }
+        }
+        resultRows.add(row);
+      }
+    }
+  }
+
+  /// Reduces a RowHeapDataBlock by extracting the rows and converting the values to the expected result types.
+  ///
+  /// This method destructs the received block, as their cells will be converted into the external type.
+  private static void reduceRowHeap(RowHeapDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
+    List<Object[]> rows = block.getRows();
+    int numRows = rows.size();
+    if (numRows > 0) {
+      resultRows.ensureCapacity(resultRows.size() + numRows);
+      for (int i = 0; i < numRows; i++) {
+        Object[] row = rows.get(i);
+        for (int j = 0; j < numColumns; j++) {
+          if (row[j] != null) {
+            ColumnDataType dataType = columnTypes[j];
+            row[j] = dataType.format(dataType.toExternal(row[j]));
+          }
+        }
+        resultRows.add(row);
+      }
+    }
   }
 
   // TODO: Improve the way the errors are compared
