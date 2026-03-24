@@ -148,9 +148,9 @@ public class InsertIntoValuesTest {
     InsertIntoValues stmt = InsertIntoValues.parse(sqlNodeAndOptions);
     Assert.assertNotNull(stmt.getResultSchema());
     Assert.assertEquals(stmt.getResultSchema().getColumnNames().length, 3);
-    Assert.assertEquals(stmt.getResultSchema().getColumnNames()[0], "tableName");
-    Assert.assertEquals(stmt.getResultSchema().getColumnNames()[1], "requestId");
-    Assert.assertEquals(stmt.getResultSchema().getColumnNames()[2], "rowsInserted");
+    Assert.assertEquals(stmt.getResultSchema().getColumnNames()[0], "statementId");
+    Assert.assertEquals(stmt.getResultSchema().getColumnNames()[1], "status");
+    Assert.assertEquals(stmt.getResultSchema().getColumnNames()[2], "message");
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)
