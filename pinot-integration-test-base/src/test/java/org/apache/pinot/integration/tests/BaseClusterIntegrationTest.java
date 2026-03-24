@@ -32,24 +32,42 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartitionInfo;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.plugin.stream.kafka30.server.EmbeddedKafkaCluster;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -63,12 +81,17 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
@@ -81,9 +104,9 @@ import org.testng.Assert;
  * Shared implementation details of the cluster integration tests.
  */
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
-
   // Default settings
   protected static final String DEFAULT_TABLE_NAME = "mytable";
+  protected static final String DEFAULT_LOGICAL_TABLE_NAME = "mytable_logical";
   protected static final String DEFAULT_SCHEMA_NAME = "mytable";
   protected static final String DEFAULT_SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
@@ -96,6 +119,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
   protected static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
   protected static final int DEFAULT_MAX_NUM_KAFKA_MESSAGES_PER_BATCH = 10000;
+  private static final long KAFKA_CLUSTER_READY_TIMEOUT_MS = 120_000L;
+  private static final long KAFKA_TOPIC_READY_TIMEOUT_MS = 120_000L;
   protected static final List<String> DEFAULT_NO_DICTIONARY_COLUMNS =
       Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
   protected static final String DEFAULT_SORTED_COLUMN = "Carrier";
@@ -121,6 +146,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected String getTableName() {
     return DEFAULT_TABLE_NAME;
+  }
+
+  protected String getLogicalTableName() {
+    return DEFAULT_LOGICAL_TABLE_NAME;
   }
 
   protected String getSchemaFileName() {
@@ -156,13 +185,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return useKafkaTransaction() ? DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS : DEFAULT_LLC_NUM_KAFKA_BROKERS;
   }
 
+  /**
+   * Override to pass extra Kafka broker config properties when starting the embedded Kafka cluster.
+   */
+  protected Properties getKafkaExtraProperties() {
+    return new Properties();
+  }
+
   protected int getKafkaPort() {
     int idx = RANDOM.nextInt(_kafkaStarters.size());
     return _kafkaStarters.get(idx).getPort();
-  }
-
-  protected String getKafkaZKAddress() {
-    return getZkUrl() + "/kafka";
   }
 
   protected int getNumKafkaPartitions() {
@@ -368,11 +400,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
             KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
-        "localhost:" + _kafkaStarters.get(0).getPort());
+        getKafkaBrokerList());
     if (useKafkaTransaction()) {
       streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
               KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),
           KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED);
+      // Ensure the consumer can fetch complete transactional batches plus commit markers.
+      streamConfigMap.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG,
+          Integer.toString(10 * 1024 * 1024));
     }
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
         StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), getStreamConsumerFactoryClassName());
@@ -389,12 +424,61 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return streamConfigMap;
   }
 
+  protected String getKafkaBrokerList() {
+    StreamDataServerStartable firstStarter = _kafkaStarters.get(0);
+    if (firstStarter instanceof EmbeddedKafkaCluster) {
+      return ((EmbeddedKafkaCluster) firstStarter).bootstrapServers();
+    }
+    StringBuilder builder = new StringBuilder();
+    for (int i = 0; i < _kafkaStarters.size(); i++) {
+      if (i > 0) {
+        builder.append(',');
+      }
+      builder.append("localhost:").append(_kafkaStarters.get(i).getPort());
+    }
+    return builder.toString();
+  }
+
   /**
    * Creates a new REALTIME table config.
    */
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     return getTableConfigBuilder(TableType.REALTIME).build();
+  }
+
+  /**
+   * Creates a LogicalTableConfig backed by the OFFLINE and REALTIME physical tables.
+   */
+  protected LogicalTableConfig createLogicalTableConfig() {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    physicalTableConfigMap.put(offlineTableName, new PhysicalTableConfig());
+    physicalTableConfigMap.put(realtimeTableName, new PhysicalTableConfig());
+
+    return new LogicalTableConfigBuilder()
+        .setTableName(getLogicalTableName())
+        .setBrokerTenant(getBrokerTenant())
+        .setRefOfflineTableName(offlineTableName)
+        .setRefRealtimeTableName(realtimeTableName)
+        .setPhysicalTableConfigMap(physicalTableConfigMap)
+        .setTimeBoundaryConfig(
+            new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableConfigMap.keySet())))
+        .build();
+  }
+
+  /**
+   * Registers a logical table backed by the OFFLINE and REALTIME physical tables.
+   * The schema for the logical table should be created separately before calling this method.
+   */
+  protected void createLogicalTable()
+      throws IOException {
+    LogicalTableConfig logicalTableConfig = createLogicalTableConfig();
+    sendPostRequest(
+        _controllerRequestURLBuilder.forLogicalTableCreate(),
+        logicalTableConfig.toSingleLineJsonString());
   }
 
   // TODO - Use this method to create table config for all table types to avoid redundant code
@@ -693,7 +777,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableConfig.getTableName()) == expectedNoOfDocs, 100L,
         timeoutMs, "Failed to load " + expectedNoOfDocs + " documents in table " + tableConfig.getTableName(),
-        true, Duration.ofMillis(timeoutMs / 10));
+        Duration.ofMillis(timeoutMs / 10));
   }
 
   protected List<File> getAllAvroFiles()
@@ -733,21 +817,189 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void startKafkaWithoutTopic() {
-    startKafkaWithoutTopic(KafkaStarterUtils.DEFAULT_KAFKA_PORT);
+    int requestedBrokers = getNumKafkaBrokers();
+    Properties props = new Properties();
+    props.setProperty(EmbeddedKafkaCluster.BROKER_COUNT_PROP, Integer.toString(requestedBrokers));
+    props.putAll(getKafkaExtraProperties());
+    EmbeddedKafkaCluster cluster = new EmbeddedKafkaCluster();
+    cluster.init(props);
+    cluster.start();
+    _kafkaStarters = Collections.singletonList(cluster);
+    try {
+      waitForKafkaClusterReady(getKafkaBrokerList(), requestedBrokers, useKafkaTransaction());
+    } catch (RuntimeException e) {
+      try {
+        cluster.stop();
+      } catch (Exception suppressed) {
+        e.addSuppressed(suppressed);
+      }
+      _kafkaStarters = null;
+      throw e;
+    }
   }
 
-  protected void startKafkaWithoutTopic(int port) {
-    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(),
-        KafkaStarterUtils.getDefaultKafkaConfiguration());
+  private void waitForKafkaClusterReady(String brokerList, int brokerCount, boolean requireTransactions) {
+    TestUtils.waitForCondition(aVoid -> isKafkaClusterReady(brokerList, brokerCount), 200L,
+        KAFKA_CLUSTER_READY_TIMEOUT_MS,
+        "Kafka brokers are not ready");
+    if (requireTransactions) {
+      TestUtils.waitForCondition(aVoid -> canInitTransactions(brokerList), 500L, KAFKA_CLUSTER_READY_TIMEOUT_MS,
+          "Kafka transaction coordinator is not ready");
+    }
+  }
+
+  private boolean isKafkaClusterReady(String brokerList, int brokerCount) {
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.describeCluster().nodes().get(5, TimeUnit.SECONDS).size() == brokerCount;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private boolean canInitTransactions(String brokerList) {
+    Properties producerProps = new Properties();
+    producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);
+    producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+    producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+    producerProps.put(ProducerConfig.ACKS_CONFIG, "all");
+    producerProps.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+    producerProps.put(ProducerConfig.TRANSACTIONAL_ID_CONFIG, "pinot-txn-ready-" + UUID.randomUUID());
+    producerProps.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, "10000");
+    producerProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(producerProps)) {
+      producer.initTransactions();
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   protected void createKafkaTopic(String topic) {
-    _kafkaStarters.get(0).createTopic(topic, KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
+    createKafkaTopic(topic, getNumKafkaPartitions(), getNumKafkaBrokers());
+  }
+
+  protected void createKafkaTopic(String topic, int numPartitions) {
+    createKafkaTopic(topic, numPartitions, getNumKafkaBrokers());
+  }
+
+  protected void createKafkaTopic(String topic, int numPartitions, int replicationFactor) {
+    int effectiveReplicationFactor = Math.max(1, Math.min(replicationFactor, getNumKafkaBrokers()));
+    _kafkaStarters.get(0).createTopic(
+        topic,
+        KafkaStarterUtils.getTopicCreationProps(numPartitions, effectiveReplicationFactor));
+    waitForKafkaTopicReady(topic, numPartitions, effectiveReplicationFactor);
+    waitForKafkaTopicMetadataReadyForConsumer(topic, numPartitions);
+  }
+
+  protected void deleteKafkaTopic(String topic) {
+    _kafkaStarters.get(0).deleteTopic(topic);
+    waitForKafkaTopicDeleted(topic);
+  }
+
+  protected void waitForKafkaTopicDeleted(String topic) {
+    TestUtils.waitForCondition(aVoid -> isKafkaTopicDeleted(topic), 200L, KAFKA_TOPIC_READY_TIMEOUT_MS,
+        "Kafka topic '" + topic + "' is not deleted");
+  }
+
+  private boolean isKafkaTopicDeleted(String topic) {
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return !adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(topic);
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void waitForKafkaTopicReady(String topic, int expectedPartitions, int expectedReplicationFactor) {
+    TestUtils.waitForCondition(
+        aVoid -> isKafkaTopicReady(topic, expectedPartitions, expectedReplicationFactor),
+        200L, KAFKA_TOPIC_READY_TIMEOUT_MS, "Kafka topic '" + topic + "' is not fully ready");
+  }
+
+  private void waitForKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions) {
+    TestUtils.waitForCondition(aVoid -> isKafkaTopicMetadataReadyForConsumer(topic, expectedPartitions), 200L,
+        KAFKA_TOPIC_READY_TIMEOUT_MS,
+        "Kafka topic '" + topic + "' metadata is not visible to consumers");
+  }
+
+  private boolean isKafkaTopicReady(String topic, int expectedPartitions, int expectedReplicationFactor) {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    return isKafkaTopicReadyOnBroker(getKafkaBrokerList(), topic, expectedPartitions, expectedReplicationFactor);
+  }
+
+  private boolean isKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions) {
+    Properties consumerProps = new Properties();
+    consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "pinot-kafka-topic-ready-" + UUID.randomUUID());
+    consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+    consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+    consumerProps.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    consumerProps.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(consumerProps)) {
+      List<PartitionInfo> partitionInfos = consumer.partitionsFor(topic, Duration.ofSeconds(5));
+      return partitionInfos != null && partitionInfos.size() >= expectedPartitions;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private boolean isKafkaTopicReadyOnBroker(String brokerList, String topic, int expectedPartitions,
+      int expectedReplicationFactor) {
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      TopicDescription topicDescription =
+          adminClient.describeTopics(Collections.singletonList(topic)).allTopicNames().get(5, TimeUnit.SECONDS)
+              .get(topic);
+      if (topicDescription.partitions().size() < expectedPartitions) {
+        return false;
+      }
+      for (TopicPartitionInfo partitionInfo : topicDescription.partitions()) {
+        if (partitionInfo.leader() == null) {
+          return false;
+        }
+        if (partitionInfo.isr() == null || partitionInfo.isr().size() < expectedReplicationFactor) {
+          return false;
+        }
+      }
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   protected void stopKafka() {
-    for (StreamDataServerStartable kafkaStarter : _kafkaStarters) {
-      kafkaStarter.stop();
+    if (_kafkaStarters != null) {
+      Exception firstException = null;
+      try {
+        for (StreamDataServerStartable starter : _kafkaStarters) {
+          try {
+            starter.stop();
+          } catch (Exception e) {
+            if (firstException == null) {
+              firstException = e;
+            } else {
+              firstException.addSuppressed(e);
+            }
+          }
+        }
+      } finally {
+        _kafkaStarters = null;
+      }
+      if (firstException != null) {
+        throw new RuntimeException("Failed to stop Kafka starters cleanly", firstException);
+      }
     }
   }
 
@@ -806,18 +1058,53 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForDocsLoaded(timeoutMs, true, getTableName());
+    waitForAllDocsLoaded(getTableName(), timeoutMs);
   }
 
+  protected void waitForAllDocsLoaded(String tableName, long timeoutMs) {
+    long countStarResult = getCountStarResult();
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
+        "Failed to load " + countStarResult + " documents", Duration.ofMillis(timeoutMs / 10));
+  }
+
+  protected void waitForAnyDocLoaded(String tableName, long timeoutMs) {
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) > 0, 100L, timeoutMs,
+        "Failed to load any document", Duration.ofMillis(timeoutMs / 10));
+  }
+
+  /// @deprecated Always raise error when condition is not met.
+  @Deprecated
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
         "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
   }
 
-  protected void waitForNonZeroDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
-    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) > 0, 100L, timeoutMs,
-        "Failed to load non zero documents", raiseError, Duration.ofMillis(timeoutMs / 10));
+  protected void waitForAllRealtimePartitionsConsuming(String tableNameWithType, long timeoutMs) {
+    int expectedPartitions = getNumKafkaPartitions();
+    TestUtils.waitForCondition(() -> getNumConsumingPartitions(tableNameWithType) == expectedPartitions, 200L,
+        timeoutMs,
+        "Failed to get CONSUMING segments for all " + expectedPartitions + " partitions for table " + tableNameWithType,
+        Duration.ofMillis(timeoutMs / 10));
+  }
+
+  private int getNumConsumingPartitions(String tableNameWithType) {
+    IdealState idealState = _controllerStarter.getHelixResourceManager().getTableIdealState(tableNameWithType);
+    if (idealState == null) {
+      return 0;
+    }
+    Set<Integer> consumingPartitions = new HashSet<>();
+    for (String segmentName : idealState.getPartitionSet()) {
+      if (!LLCSegmentName.isLLCSegment(segmentName)) {
+        continue;
+      }
+      Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
+      if (stateMap != null
+          && stateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
+        consumingPartitions.add(new LLCSegmentName(segmentName).getPartitionGroupId());
+      }
+    }
+    return consumingPartitions.size();
   }
 
   /**

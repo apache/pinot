@@ -26,10 +26,12 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -39,11 +41,16 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.plugin.stream.kafka.KafkaConsumerPartitionLag;
+import org.apache.pinot.plugin.stream.kafka.KafkaPartitionSubsetUtils;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -57,6 +64,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     implements StreamMetadataProvider {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamMetadataProvider.class);
+  /**
+   * Immutable partition ID subset from table config. Read once at construction; does not change during the
+   * provider's lifetime. Empty when no subset is configured (consume all partitions).
+   */
+  private final List<Integer> _partitionIdSubset;
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     this(clientId, streamConfig, Integer.MIN_VALUE);
@@ -64,16 +76,25 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
+    List<Integer> subset =
+        KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(_config.getStreamConfigMap());
+    if (subset != null) {
+      _partitionIdSubset = Collections.unmodifiableList(subset);
+      validatePartitionIds(_partitionIdSubset);
+    } else {
+      _partitionIdSubset = List.of();
+    }
   }
 
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
     try {
-      List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis));
+      List<PartitionInfo> partitionInfos = fetchPartitionInfos(timeoutMillis);
       if (CollectionUtils.isNotEmpty(partitionInfos)) {
         return partitionInfos.size();
       }
-      throw new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic));
+      throw new TransientConsumerException(new RuntimeException(
+          "Failed to fetch partition information for topic: " + _topic));
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
@@ -82,9 +103,10 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public Set<Integer> fetchPartitionIds(long timeoutMillis) {
     try {
-      List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis));
+      List<PartitionInfo> partitionInfos = fetchPartitionInfos(timeoutMillis);
       if (CollectionUtils.isEmpty(partitionInfos)) {
-        throw new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic));
+        throw new TransientConsumerException(new RuntimeException(
+            "Failed to fetch partition information for topic: " + _topic));
       }
       Set<Integer> partitionIds = Sets.newHashSetWithExpectedSize(partitionInfos.size());
       for (PartitionInfo partitionInfo : partitionInfos) {
@@ -94,6 +116,39 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
+  }
+
+  @Override
+  public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
+      throws IOException, java.util.concurrent.TimeoutException {
+    if (_partitionIdSubset.isEmpty()) {
+      return StreamMetadataProvider.super.computePartitionGroupMetadata(clientId, streamConfig,
+          partitionGroupConsumptionStatuses, timeoutMillis);
+    }
+    Map<Integer, StreamPartitionMsgOffset> partitionIdToEndOffset =
+        new HashMap<>(partitionGroupConsumptionStatuses.size());
+    for (PartitionGroupConsumptionStatus s : partitionGroupConsumptionStatuses) {
+      partitionIdToEndOffset.put(s.getStreamPartitionGroupId(), s.getEndOffset());
+    }
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    List<PartitionGroupMetadata> result = new ArrayList<>(_partitionIdSubset.size());
+    for (Integer partitionId : _partitionIdSubset) {
+      StreamPartitionMsgOffset endOffset = partitionIdToEndOffset.get(partitionId);
+      StreamPartitionMsgOffset startOffset;
+      if (endOffset == null) {
+        try (StreamMetadataProvider partitionMetadataProvider =
+            streamConsumerFactory.createPartitionMetadataProvider(
+                StreamConsumerFactory.getUniqueClientId(clientId), partitionId)) {
+          startOffset = partitionMetadataProvider.fetchStreamPartitionOffset(
+              streamConfig.getOffsetCriteria(), timeoutMillis);
+        }
+      } else {
+        startOffset = endOffset;
+      }
+      result.add(new PartitionGroupMetadata(partitionId, startOffset));
+    }
+    return result;
   }
 
   @Override
@@ -283,5 +338,101 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   public void close()
       throws IOException {
     super.close();
+  }
+
+  private List<PartitionInfo> fetchPartitionInfos(long timeoutMillis) {
+    long deadlineMs = System.currentTimeMillis() + timeoutMillis;
+    List<PartitionInfo> partitionInfos = null;
+    Exception lastError = null;
+    boolean topicMissing = false;
+    while (System.currentTimeMillis() < deadlineMs) {
+      long remainingMs = deadlineMs - System.currentTimeMillis();
+      long requestTimeoutMs = Math.min(500L, Math.max(1L, remainingMs));
+      try {
+        partitionInfos = _consumer.partitionsFor(_topic, Duration.ofMillis(requestTimeoutMs));
+      } catch (TimeoutException e) {
+        lastError = e;
+      }
+
+      if (CollectionUtils.isNotEmpty(partitionInfos)) {
+        return partitionInfos;
+      }
+
+      try {
+        if (!topicExists(requestTimeoutMs)) {
+          topicMissing = true;
+          lastError = new RuntimeException("Topic does not exist: " + _topic);
+        } else {
+          topicMissing = false;
+        }
+      } catch (TransientConsumerException e) {
+        lastError = e;
+      } catch (RuntimeException e) {
+        lastError = e;
+      }
+
+      if (System.currentTimeMillis() >= deadlineMs) {
+        break;
+      }
+      try {
+        Thread.sleep(100L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
+      }
+    }
+
+    if (lastError != null) {
+      if (topicMissing) {
+        throw new RuntimeException("Topic does not exist: " + _topic);
+      }
+      if (lastError instanceof TransientConsumerException) {
+        throw (TransientConsumerException) lastError;
+      }
+      if (lastError instanceof TimeoutException) {
+        throw new TransientConsumerException(lastError);
+      }
+    }
+
+    throw new TransientConsumerException(
+        new RuntimeException("Failed to fetch partition information for topic: " + _topic));
+  }
+
+  private void validatePartitionIds(List<Integer> subset) {
+    Set<Integer> topicPartitionIds = new HashSet<>();
+    List<PartitionInfo> partitionInfos = fetchPartitionInfos(10_000L);
+    if (partitionInfos == null || partitionInfos.isEmpty()) {
+      throw new IllegalStateException(
+          "Cannot validate partition IDs: topic " + _topic + " metadata not available. "
+              + "Ensure the topic exists and is accessible.");
+    }
+    for (PartitionInfo partitionInfo : partitionInfos) {
+      topicPartitionIds.add(partitionInfo.partition());
+    }
+    List<Integer> missingPartitionIds = new ArrayList<>();
+    for (Integer partitionId : subset) {
+      if (!topicPartitionIds.contains(partitionId)) {
+        missingPartitionIds.add(partitionId);
+      }
+    }
+    Preconditions.checkArgument(
+        missingPartitionIds.isEmpty(),
+        "Invalid partition ids %s for table stream config. Available partitions on topic %s are: %s",
+        missingPartitionIds, _topic, topicPartitionIds);
+  }
+
+  private boolean topicExists(long timeoutMillis) {
+    try {
+      AdminClient adminClient = getOrCreateSharedAdminClient();
+      ListTopicsResult result = adminClient.listTopics();
+      return result.names().get(timeoutMillis, TimeUnit.MILLISECONDS).contains(_topic);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new TransientConsumerException(e);
+    } catch (ExecutionException e) {
+      throw new TransientConsumerException(e);
+    } catch (java.util.concurrent.TimeoutException e) {
+      throw new TransientConsumerException(e);
+    }
   }
 }

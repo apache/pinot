@@ -77,4 +77,14 @@ public interface JsonIndexReader extends IndexReader {
    * Converts the flattened docIds to real docIds using the map returned by getMatchingFlattenedDocsMap
    */
   void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> flattenedDocIdsMap);
+
+  /**
+   * Returns true if the given JSON path is indexed and can be used for index-based operations
+   * (e.g. getMatchingFlattenedDocsMap, JsonIndexDistinctOperator).
+   * OSS JSON index indexes all paths, so always returns true. Composite JSON index with
+   * selective indexing returns true only for paths in invertedIndexConfigs.
+   */
+  default boolean isPathIndexed(String jsonPath) {
+    return true;
+  }
 }

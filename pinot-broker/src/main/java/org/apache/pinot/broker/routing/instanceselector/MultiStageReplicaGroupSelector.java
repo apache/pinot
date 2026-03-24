@@ -261,21 +261,15 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     return Pair.of(segmentsToInstanceMap, optionalSegmentToInstanceMap);
   }
 
-
   @VisibleForTesting
   protected InstancePartitions getInstancePartitions() {
-    // TODO: Evaluate whether we need to provide support for COMPLETE partitions.
+    // TODO: Evaluate whether we need to provide support for COMPLETED partitions.
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(_tableNameWithType);
     Preconditions.checkNotNull(tableType);
-    InstancePartitions instancePartitions;
-    if (tableType.equals(TableType.OFFLINE)) {
-      instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
-          InstancePartitionsUtils.getInstancePartitionsName(_tableNameWithType, tableType.name()));
-    } else {
-      instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
-          InstancePartitionsUtils.getInstancePartitionsName(_tableNameWithType,
-              InstancePartitionsType.CONSUMING.name()));
-    }
+    InstancePartitionsType instancePartitionsType =
+        tableType == TableType.OFFLINE ? InstancePartitionsType.OFFLINE : InstancePartitionsType.CONSUMING;
+    InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
+        InstancePartitionsUtils.getInstancePartitionsName(_tableNameWithType, instancePartitionsType));
     Preconditions.checkNotNull(instancePartitions);
     return instancePartitions;
   }

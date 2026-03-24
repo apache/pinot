@@ -117,7 +117,7 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
       } catch (Exception e) {
         return false;
       }
-    }, 5000L, 600_000L, "Failed to load " + DEFAULT_COUNT_STAR_RESULT + " documents", true);
+    }, 5000L, 600_000L, "Failed to load " + DEFAULT_COUNT_STAR_RESULT + " documents");
     JsonNode result = postQuery("SELECT COUNT(*) FROM " + REALTIME_TABLE_NAME);
     assertEquals(result.get("numSegmentsQueried").asInt(), 14);
   }
@@ -152,7 +152,7 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
       } catch (Exception e) {
         return false;
       }
-    }, 5000L, 600_000L, "Failed to load " + DEFAULT_COUNT_STAR_RESULT + " documents", true);
+    }, 5000L, 600_000L, "Failed to load " + DEFAULT_COUNT_STAR_RESULT + " documents");
     JsonNode result = postQuery("SELECT COUNT(*) FROM " + REALTIME_TABLE_NAME);
     assertEquals(result.get("numSegmentsQueried").asInt(), 14);
   }

@@ -17,8 +17,4 @@
 # under the License.
 #
 
-dependencies:
-  - name: zookeeper
-    version: 13.x.x
-    repository: https://charts.bitnami.com/bitnami
-    condition: pinot.zookeeper.enabled,zookeeper.enabled
+dependencies: []

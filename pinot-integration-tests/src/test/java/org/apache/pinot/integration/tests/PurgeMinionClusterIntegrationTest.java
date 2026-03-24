@@ -129,7 +129,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // Push data into Kafka to create LLC segments
     pushAvroIntoKafka(avroFiles);
     // Wait for all documents loaded
-    waitForDocsLoaded(600_000L, true, PURGE_REALTIME_LAST_SEGMENT_TABLE);
+    waitForAllDocsLoaded(PURGE_REALTIME_LAST_SEGMENT_TABLE, 600_000L);
 
     setRecordPurger();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
@@ -190,7 +190,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     _tableName = tableName;
   }
 
-  private TableTaskConfig getPurgeTaskConfig() {
+  protected TableTaskConfig getPurgeTaskConfig() {
     Map<String, String> tableTaskConfigs = new HashMap<>();
     tableTaskConfigs.put(MinionConstants.PurgeTask.LAST_PURGE_TIME_THREESOLD_PERIOD, "1d");
     return new TableTaskConfig(Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));

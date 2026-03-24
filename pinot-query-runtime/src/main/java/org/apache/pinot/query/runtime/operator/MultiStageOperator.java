@@ -252,6 +252,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
         response.mergeNumGroupsWarningLimitReached(
             stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED));
+        response.mergeNumGroups(stats.getLong(AggregateOperator.StatKey.NUM_GROUPS));
         response.mergeMaxRowsInOperator(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
       }
 
@@ -275,6 +276,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(HashJoinOperator.StatKey.EMITTED_ROWS));
         response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
+        response.mergeMaxRowsInJoin(stats.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN));
       }
 
       @Override
@@ -411,6 +413,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeMaxRowsInOperator(stats.getLong(WindowAggregateOperator.StatKey.EMITTED_ROWS));
         response.mergeMaxRowsInWindowReached(
             stats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED));
+        response.mergeMaxRowsInWindow(stats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW));
       }
 
       @Override

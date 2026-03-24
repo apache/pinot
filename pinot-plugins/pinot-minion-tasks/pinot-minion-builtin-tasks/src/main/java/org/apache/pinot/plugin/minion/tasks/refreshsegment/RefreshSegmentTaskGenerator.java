@@ -127,6 +127,7 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
       }
 
       Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, List.of(segmentName)));
+      configs.putAll(MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs, _clusterInfoAccessor));
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
       configs.put(MinionConstants.UPLOAD_URL_KEY,
           _clusterInfoAccessor.getVipUrlForLeadController(tableNameWithType) + "/segments");

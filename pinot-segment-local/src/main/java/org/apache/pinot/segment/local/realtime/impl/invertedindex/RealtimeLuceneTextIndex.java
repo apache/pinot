@@ -342,4 +342,8 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   public SearcherManager getSearcherManager() {
     return _searcherManager;
   }
+  @Override
+  public int getSearchableDocCount() {
+    return _refreshListener.getLastRefreshNumDocs();
+  }
 }

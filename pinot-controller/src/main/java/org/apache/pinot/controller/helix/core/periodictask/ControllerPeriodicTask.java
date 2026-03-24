@@ -64,18 +64,32 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask impleme
     _controllerMetrics = controllerMetrics;
   }
 
+  /**
+   * Returns the list of table names (with type) to consider for this task. Subclasses may override to add
+   * more names (e.g. logical table partitions). Default: single table from property or all physical tables.
+   */
+  protected List<String> getTablesToProcess(Properties periodicTaskProperties) {
+    String propTableNameWithType = (String) periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
+    return propTableNameWithType != null ? List.of(propTableNameWithType)
+        : _pinotHelixResourceManager.getAllTables();
+  }
+
+  /**
+   * Returns whether the given table should be processed by this controller run. Default: only if this
+   * controller is leader for the table. Subclasses may override (e.g. to always include logical tables).
+   */
+  protected boolean shouldProcessTable(String tableNameWithType) {
+    return _leadControllerManager.isLeaderForTable(tableNameWithType);
+  }
+
   @Override
   protected final void runTask(Properties periodicTaskProperties) {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
     try {
-      // Check if we have a specific table against which this task needs to be run.
-      String propTableNameWithType = (String) periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
-      // Process the tables that are managed by this controller
-      List<String> allTables =
-          propTableNameWithType != null ? List.of(propTableNameWithType) : _pinotHelixResourceManager.getAllTables();
+      List<String> allTables = getTablesToProcess(periodicTaskProperties);
 
       Set<String> currentLeaderOfTables = allTables.stream()
-          .filter(_leadControllerManager::isLeaderForTable)
+          .filter(this::shouldProcessTable)
           .collect(Collectors.toSet());
 
       if (!currentLeaderOfTables.isEmpty()) {

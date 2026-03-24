@@ -95,6 +95,15 @@ public interface SegmentMetadata {
    */
   long getLatestIngestionTimestamp();
 
+  /**
+   * Return the minimum ingestion lag recorded for this segment. Ingestion lag is
+   * the difference between the record ingestion timestamp and current system time.
+   * Applicable for MutableSegments.
+   *
+   * @return minimum ingestion lag recorded for this segment
+   */
+  long getMinimumIngestionLagMs();
+
   @Nullable
   List<StarTreeV2Metadata> getStarTreeV2MetadataList();
 

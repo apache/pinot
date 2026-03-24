@@ -94,13 +94,13 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   public void tearDownSuite()
       throws Exception {
     LOGGER.info("Tearing down integration test suite");
-    // Stop Kafka
-    LOGGER.info("Stop Kafka in the integration test suite");
-    stopKafka();
     // Shutdown the Pinot cluster
     stopServer();
     stopBroker();
     stopController();
+    // Stop Kafka
+    LOGGER.info("Stop Kafka in the integration test suite");
+    stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
     LOGGER.info("Finished tearing down integration test suite");
@@ -431,7 +431,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   @Override
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForDocsLoaded(timeoutMs, true, getLogicalTableName());
+    waitForAllDocsLoaded(getLogicalTableName(), timeoutMs);
   }
 
   @Override

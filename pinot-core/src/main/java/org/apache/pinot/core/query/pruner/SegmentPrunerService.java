@@ -25,8 +25,10 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -105,7 +107,7 @@ public class SegmentPrunerService {
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query, SegmentPrunerStatistics stats,
       @Nullable ExecutorService executorService) {
     try (InvocationScope scope = Tracing.getTracer().createScope(SegmentPrunerService.class)) {
-      segments = removeEmptySegments(segments);
+      segments = removeEmptySegments(segments, query);
       int invokedPrunersCount = 0;
       for (SegmentPruner segmentPruner : _segmentPruners) {
         if (segmentPruner.isApplicableTo(query)) {
@@ -134,19 +136,27 @@ public class SegmentPrunerService {
    *
    * @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
    *                 undefined way. Therefore, this list should not be used after calling this method.
+   * @param query    query context; when non-null and skipUpsert=true, segments with 0 queryable/valid docs are not
+   *                 treated as empty (they contribute replaced rows to the result). When queryable doc ids exist,
+   *                 emptiness is determined from them; otherwise {@link IndexSegment#getValidDocIds()} is used.
    * @return the new list with filtered elements. This is the list that have to be used.
    */
-  private static List<IndexSegment> removeEmptySegments(List<IndexSegment> segments) {
+  private static List<IndexSegment> removeEmptySegments(List<IndexSegment> segments, QueryContext query) {
     int selected = 0;
+    boolean skipUpsert = QueryOptionsUtils.isSkipUpsert(query.getQueryOptions());
     for (IndexSegment segment : segments) {
-      if (!isEmptySegment(segment)) {
+      if (!isEmptySegment(segment, skipUpsert)) {
         segments.set(selected++, segment);
       }
     }
     return segments.subList(0, selected);
   }
 
-  private static boolean isEmptySegment(IndexSegment segment) {
-    return segment.getSegmentMetadata().getTotalDocs() == 0;
+  private static boolean isEmptySegment(IndexSegment segment, boolean skipUpsert) {
+    if (segment.getSegmentMetadata().getTotalDocs() == 0) {
+      return true;
+    }
+    // Check if the segment has 0 queryable docIds while skipUpsert=false
+    return !skipUpsert && UpsertUtils.hasNoQueryableDocs(segment);
   }
 }

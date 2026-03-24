@@ -51,6 +51,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
 
 public class TableConfigBuilder {
@@ -125,6 +126,7 @@ public class TableConfigBuilder {
   private TableTaskConfig _taskConfig;
   private RoutingConfig _routingConfig;
   private QueryConfig _queryConfig;
+  private List<TableSamplerConfig> _tableSamplers;
   private Map<String, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private Map<InstancePartitionsType, String> _instancePartitionsMap;
   private Map<String, SegmentAssignmentConfig> _segmentAssignmentConfigMap;
@@ -412,6 +414,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setTableSamplers(List<TableSamplerConfig> tableSamplers) {
+    _tableSamplers = tableSamplers;
+    return this;
+  }
+
   public TableConfigBuilder setInstanceAssignmentConfigMap(
       Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
@@ -538,6 +545,6 @@ public class TableConfigBuilder {
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
         _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
-        _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap);
+        _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap, _tableSamplers);
   }
 }

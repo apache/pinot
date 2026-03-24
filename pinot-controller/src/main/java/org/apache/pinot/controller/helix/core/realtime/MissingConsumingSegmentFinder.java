@@ -41,6 +41,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -84,10 +85,12 @@ public class MissingConsumingSegmentFinder {
     });
     try {
       PauseState pauseState = PinotLLCRealtimeSegmentManager.extractTablePauseState(idealState);
-      PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs, Collections.emptyList(),
+      PinotTableIdealStateBuilder.getStreamMetadataList(streamConfigs, Collections.emptyList(),
               pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), false)
-          .forEach(metadata -> {
-            _partitionGroupIdToLargestStreamOffsetMap.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
+          .forEach(streamMetadata -> {
+            for (PartitionGroupMetadata metadata : streamMetadata.getPartitionGroupMetadataList()) {
+              _partitionGroupIdToLargestStreamOffsetMap.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
+            }
           });
     } catch (Exception e) {
       LOGGER.warn("Problem encountered in fetching stream metadata for topics: {} of table: {}. "

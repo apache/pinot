@@ -46,8 +46,8 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
-import org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory;
-import org.apache.pinot.plugin.stream.kafka20.KafkaPartitionLevelConsumer;
+import org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory;
+import org.apache.pinot.plugin.stream.kafka30.KafkaPartitionLevelConsumer;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -140,8 +140,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
         continue;
       }
       TestUtils.waitForCondition(() -> isOffline(partition, seqNum), 5000L, timeoutMs,
-          "Failed to find offline segment in partition " + partition + " seqNum ", true,
-          Duration.ofMillis(timeoutMs / 10));
+          "Failed to find offline segment in partition " + partition + " seqNum ", Duration.ofMillis(timeoutMs / 10));
       getControllerRequestClient().runPeriodicTask("RealtimeSegmentValidationManager");
     }
   }

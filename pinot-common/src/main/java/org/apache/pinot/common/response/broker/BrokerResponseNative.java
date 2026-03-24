@@ -568,12 +568,15 @@ public class BrokerResponseNative implements BrokerResponse {
   public void setOfflineThreadMemAllocatedBytes(long offlineThreadMemAllocatedBytes) {
     _offlineThreadMemAllocatedBytes = offlineThreadMemAllocatedBytes;
   }
+
   public void setRealtimeThreadMemAllocatedBytes(long realtimeThreadMemAllocatedBytes) {
     _realtimeThreadMemAllocatedBytes = realtimeThreadMemAllocatedBytes;
   }
+
   public void setOfflineResponseSerMemAllocatedBytes(long offlineResponseSerMemAllocatedBytes) {
     _offlineResponseSerMemAllocatedBytes = offlineResponseSerMemAllocatedBytes;
   }
+
   public void setRealtimeResponseSerMemAllocatedBytes(long realtimeResponseSerMemAllocatedBytes) {
     _realtimeResponseSerMemAllocatedBytes = realtimeResponseSerMemAllocatedBytes;
   }

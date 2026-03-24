@@ -24,15 +24,21 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.OptionalInt;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -182,6 +188,130 @@ public class FilterOperatorUtilsTest {
     List<Operator> actualChildOperators = ((AndFilterOperator) filterOperator).getChildOperators();
     assertEquals(actualChildOperators, Lists.newArrayList(first, second), "Filter " + first + " should have "
         + "more priority than filter " + second);
+  }
+
+  // --- TextMatchFilterOperator searchable doc fence tests ---
+
+  private static final int TOTAL_DOCS = 1000;
+  private static final int SEARCHABLE_DOCS = 950;
+  private static final int[] LUCENE_MATCH_DOC_IDS = {10, 42, 300};
+
+  @Test
+  public void testTextMatchNotFenceGetFalsesExcludesUnindexedDocs() {
+    NotFilterOperator notOp = new NotFilterOperator(textMatchOp(TOTAL_DOCS, SEARCHABLE_DOCS), TOTAL_DOCS, false);
+    List<Integer> result = TestUtils.getDocIds(notOp.getTrues());
+
+    assertEquals(result.size(), SEARCHABLE_DOCS - LUCENE_MATCH_DOC_IDS.length);
+    for (int docId = SEARCHABLE_DOCS; docId < TOTAL_DOCS; docId++) {
+      assertFalse(result.contains(docId), "Unindexed doc " + docId + " should not appear in NOT result");
+    }
+    for (int matchDocId : LUCENE_MATCH_DOC_IDS) {
+      assertFalse(result.contains(matchDocId), "Matched doc " + matchDocId + " should not appear in NOT result");
+    }
+  }
+
+  @Test
+  public void testTextMatchNotFenceGetBitmapsExcludesUnindexedDocs() {
+    NotFilterOperator notOp = new NotFilterOperator(textMatchOp(TOTAL_DOCS, SEARCHABLE_DOCS), TOTAL_DOCS, false);
+    ImmutableRoaringBitmap bitmap = notOp.getBitmaps().reduce();
+
+    assertEquals(bitmap.getCardinality(), SEARCHABLE_DOCS - LUCENE_MATCH_DOC_IDS.length);
+    for (int docId = SEARCHABLE_DOCS; docId < TOTAL_DOCS; docId++) {
+      assertFalse(bitmap.contains(docId), "Unindexed doc " + docId + " should not be set in inverted bitmap");
+    }
+  }
+
+  @Test
+  public void testTextMatchNotFenceGetTruesUnaffected() {
+    // SEARCHABLE_DOCS is less than TOTAL_DOCS, so the result should be the same as the LUCENE_MATCH_DOC_IDS
+    List<Integer> result = TestUtils.getDocIds(textMatchOp(TOTAL_DOCS, SEARCHABLE_DOCS).getTrues());
+    assertEquals(result.size(), LUCENE_MATCH_DOC_IDS.length);
+    for (int docId : LUCENE_MATCH_DOC_IDS) {
+      assertTrue(result.contains(docId));
+    }
+  }
+
+  @Test
+  public void testTextMatchNotFenceOfflineSegmentAllDocsSearchable() {
+    // searchableDocCount = -1 means all docs are searchable (offline segment)
+    NotFilterOperator notOp = new NotFilterOperator(textMatchOp(TOTAL_DOCS, -1), TOTAL_DOCS, false);
+    List<Integer> result = TestUtils.getDocIds(notOp.getTrues());
+    assertEquals(result.size(), TOTAL_DOCS - LUCENE_MATCH_DOC_IDS.length);
+  }
+
+  @Test
+  public void testTextMatchNotFenceFullyCaughtUpNoFence() {
+    // searchableDocCount = numDocs means Lucene is fully caught up
+    NotFilterOperator notOp = new NotFilterOperator(textMatchOp(TOTAL_DOCS, TOTAL_DOCS), TOTAL_DOCS, false);
+    List<Integer> result = TestUtils.getDocIds(notOp.getTrues());
+    assertEquals(result.size(), TOTAL_DOCS - LUCENE_MATCH_DOC_IDS.length);
+  }
+
+  @Test
+  public void testTextMatchNotFenceNoMatchesReturnsAllSearchable() {
+    TextMatchPredicate predicate =
+        new TextMatchPredicate(ExpressionContext.forIdentifier("__mergedTextIndex"), "nothing");
+    TextIndexReader emptyReader = new TextIndexReader() {
+      @Override
+      public ImmutableRoaringBitmap getDictIds(String searchQuery) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public MutableRoaringBitmap getDocIds(String searchQuery) {
+        return new MutableRoaringBitmap();
+      }
+
+      @Override
+      public int getSearchableDocCount() {
+        return SEARCHABLE_DOCS;
+      }
+
+      @Override
+      public void close() {
+      }
+    };
+    NotFilterOperator notOp =
+        new NotFilterOperator(new TextMatchFilterOperator(emptyReader, predicate, TOTAL_DOCS), TOTAL_DOCS, false);
+    List<Integer> result = TestUtils.getDocIds(notOp.getTrues());
+
+    assertEquals(result.size(), SEARCHABLE_DOCS);
+    for (int docId = SEARCHABLE_DOCS; docId < TOTAL_DOCS; docId++) {
+      assertFalse(result.contains(docId), "Unindexed doc " + docId + " should not appear with zero matches");
+    }
+  }
+
+  private static TextIndexReader mockTextIndexReader(int searchableDocCount) {
+    return new TextIndexReader() {
+      @Override
+      public ImmutableRoaringBitmap getDictIds(String searchQuery) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public MutableRoaringBitmap getDocIds(String searchQuery) {
+        MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+        for (int docId : LUCENE_MATCH_DOC_IDS) {
+          bitmap.add(docId);
+        }
+        return bitmap;
+      }
+
+      @Override
+      public int getSearchableDocCount() {
+        return searchableDocCount;
+      }
+
+      @Override
+      public void close() {
+      }
+    };
+  }
+
+  private static TextMatchFilterOperator textMatchOp(int numDocs, int searchableDocCount) {
+    TextMatchPredicate predicate =
+        new TextMatchPredicate(ExpressionContext.forIdentifier("__mergedTextIndex"), "error");
+    return new TextMatchFilterOperator(mockTextIndexReader(searchableDocCount), predicate, numDocs);
   }
 
   private static abstract class MockedPrioritizedFilterOperator extends BaseFilterOperator

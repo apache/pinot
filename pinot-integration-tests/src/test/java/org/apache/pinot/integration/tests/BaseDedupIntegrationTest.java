@@ -23,9 +23,15 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.SegmentsToQuery;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -41,6 +47,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -51,10 +59,9 @@ import static org.testng.Assert.assertEquals;
 
 
 public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
+  protected static final String DEDUP_TABLE_WITH_REPLICAS = "DedupTableWithReplicas";
 
-  private List<File> _avroFiles;
-  private static final String DEDUP_TABLE_WITH_REPLICAS = "DedupTableWithReplicas_REALTIME";
-  private static final String DEDUP_WITH_REPLICAS_SCHEMA = "DedupTableWithReplicas";
+  protected List<File> _avroFiles;
 
   @BeforeClass
   public void setUp()
@@ -73,23 +80,60 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     startKafka();
     pushAvroIntoKafka(_avroFiles);
 
+    createDedupTable();
+    createDedupTableWithReplicas();
+  }
+
+  protected void createDedupTable()
+      throws Exception {
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig tableConfig = createDedupTableConfig(_avroFiles.get(0), "id", getNumKafkaPartitions());
     addTableConfig(tableConfig);
     waitForAllDocsLoaded(600_000L);
-    createDedupConfigsWithReplicas();
   }
 
-  public void createDedupConfigsWithReplicas()
+  protected void createDedupTableWithReplicas()
       throws IOException {
-    Schema schemaWithReplicas = createSchema(getSchemaFileName());
-    schemaWithReplicas.setSchemaName(DEDUP_WITH_REPLICAS_SCHEMA);
+    Schema schemaWithReplicas = createSchema();
+    schemaWithReplicas.setSchemaName(DEDUP_TABLE_WITH_REPLICAS);
     addSchema(schemaWithReplicas);
-    TableConfig tableConfigWithReplication =
+    TableConfig tableConfigWithReplicas =
         createDedupTableWithReplicas(_avroFiles.get(0), "id", getNumKafkaPartitions());
-    addTableConfig(tableConfigWithReplication);
-    waitForDocsLoaded(600_000L, true, DEDUP_TABLE_WITH_REPLICAS);
+    addTableConfig(tableConfigWithReplicas);
+    BrokerRequest countStarBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+        "SELECT COUNT(*) FROM " + TableNameBuilder.REALTIME.tableNameWithType(DEDUP_TABLE_WITH_REPLICAS));
+    long countStarResult = getCountStarResult();
+    TestUtils.waitForCondition(aVoid -> {
+      // Ensure both servers are ready to be queried
+      Integer serverPort0 = getServingServerPort(countStarBrokerRequest, 0L);
+      Integer serverPort1 = getServingServerPort(countStarBrokerRequest, 1L);
+      if (serverPort0 == null || serverPort1 == null || serverPort0.equals(serverPort1)) {
+        return false;
+      }
+      // Query 10 times to get result from both servers (query should be distributed to both servers in a round-robin
+      // fashion, but query more times to be more robust)
+      for (int i = 0; i < 10; i++) {
+        if (getCurrentCountStarResult(DEDUP_TABLE_WITH_REPLICAS) != countStarResult) {
+          return false;
+        }
+      }
+      return true;
+    }, 600_000L, "Failed to load " + countStarResult + " documents to both servers");
+  }
+
+  @Nullable
+  private Integer getServingServerPort(BrokerRequest brokerRequest, long requestId) {
+    BrokerRoutingManager routingManager = _brokerStarters.get(0).getRoutingManager();
+    RoutingTable routingTable = routingManager.getRoutingTable(brokerRequest, requestId);
+    if (routingTable == null) {
+      return null;
+    }
+    Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+    if (serverInstanceToSegmentsMap.size() != 1) {
+      return null;
+    }
+    return serverInstanceToSegmentsMap.keySet().iterator().next().getPort();
   }
 
   @Override
@@ -115,7 +159,7 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     DedupConfig dedupConfig = new DedupConfig();
     dedupConfig.setMetadataTTL(30);
     dedupConfig.setPreload(Enablement.ENABLE);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("DedupTableWithReplicas_REALTIME")
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(DEDUP_TABLE_WITH_REPLICAS)
         .setTimeColumnName(getTimeColumnName())
         .setFieldConfigList(getFieldConfigs())
         .setNumReplicas(2)
@@ -173,14 +217,13 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Override
   protected long getCountStarResult() {
-    // Three distinct records are expected with pk values of 100000, 100001, 100002
+    // 5 distinct records are expected with pk values of 0, 1, 2, 3, 4
     return 5;
   }
 
   //Tests the query results for table with RF=1
   @Test
-  public void testValues()
-      throws Exception {
+  public void testValues() {
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
 
     // Validate the older value persist

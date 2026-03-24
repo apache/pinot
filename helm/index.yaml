@@ -3,6 +3,29 @@ entries:
   pinot:
   - apiVersion: v1
     appVersion: 1.0.0
+    created: "2026-03-23T13:15:00.162224-07:00"
+    description: Apache Pinot is an open-source distributed OLAP database for user-facing
+      and agent-facing real-time analytics. From interactive dashboards to LLM-powered
+      decision engines, Pinot delivers sub-second queries on fresh data at petabyte
+      scale.
+    digest: 2d262e0d298cdc3969f2cb3aa82de1d932740b47f62e539922af98b76c717656
+    home: https://pinot.apache.org/
+    keywords:
+      - olap
+      - analytics
+      - database
+      - pinot
+    maintainers:
+      - email: dev@pinot.apache.org
+        name: pinot-dev
+    name: pinot
+    sources:
+      - https://github.com/apache/pinot/tree/master/helm
+    urls:
+      - pinot-1.0.0.tgz
+    version: 1.0.0
+  - apiVersion: v1
+    appVersion: 1.0.0
     created: "2025-10-08T22:20:54.54165-07:00"
     dependencies:
       - condition: pinot.zookeeper.enabled,zookeeper.enabled
@@ -448,48 +471,5 @@ entries:
     - https://github.com/apache/pinot/tree/master/helm
     urls:
     - pinot-0.2.0.tgz
-    version: 0.2.0
-  presto:
-  - apiVersion: v1
-    appVersion: 0.2.1
-    created: "2021-04-22T16:13:57.616017-07:00"
-    description: Presto is an open source distributed SQL query engine for running
-      interactive analytic queries against data sources of all sizes ranging from
-      gigabytes to petabytes.
-    digest: 370757c5a5c4fdb2e9e2e0e219400719b572e76c1c800e9c3abb29b6e2e5743a
-    home: https://github.com/prestodb/presto
-    keywords:
-    - analytics
-    - database
-    - presto
-    maintainers:
-    - email: dev@pinot.apache.org
-      name: pinot-dev
-    name: presto
-    sources:
-    - https://github.com/apache/pinot/tree/master/helm
-    urls:
-    - presto-0.2.1.tgz
-    version: 0.2.1
-  - apiVersion: v1
-    appVersion: 0.2.0
-    created: "2021-04-22T16:13:57.612839-07:00"
-    description: Presto is an open source distributed SQL query engine for running
-      interactive analytic queries against data sources of all sizes ranging from
-      gigabytes to petabytes.
-    digest: d17eb6e0b1b3ba26e013325d7fb8da1c7a25fad35f37f955f4fbe402b5363b15
-    home: https://github.com/prestodb/presto
-    keywords:
-    - analytics
-    - database
-    - presto
-    maintainers:
-    - email: dev@pinot.apache.org
-      name: pinot-dev
-    name: presto
-    sources:
-    - https://github.com/apache/pinot/tree/master/helm
-    urls:
-    - presto-0.2.0.tgz
     version: 0.2.0
 generated: "2021-04-22T16:13:57.586041-07:00"

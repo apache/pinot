@@ -302,23 +302,30 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     long sendResponseStartTimeMs = System.currentTimeMillis();
     int queryProcessingTimeMs = (int) (sendResponseStartTimeMs - queryArrivalTimeMs);
     ctx.writeAndFlush(Unpooled.wrappedBuffer(serializedDataTable)).addListener(f -> {
-      long sendResponseEndTimeMs = System.currentTimeMillis();
-      int sendResponseLatencyMs = (int) (sendResponseEndTimeMs - sendResponseStartTimeMs);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_RESPONSES_SENT, 1);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_SENT, serializedDataTable.length);
-      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.NETTY_CONNECTION_SEND_RESPONSE_LATENCY,
-          sendResponseLatencyMs, TimeUnit.MILLISECONDS);
+      if (f.isSuccess()) {
+        long sendResponseEndTimeMs = System.currentTimeMillis();
+        int sendResponseLatencyMs = (int) (sendResponseEndTimeMs - sendResponseStartTimeMs);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_RESPONSES_SENT, 1);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_SENT, serializedDataTable.length);
+        _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.NETTY_CONNECTION_SEND_RESPONSE_LATENCY,
+            sendResponseLatencyMs, TimeUnit.MILLISECONDS);
 
-      int totalQueryTimeMs = (int) (sendResponseEndTimeMs - queryArrivalTimeMs);
-      if (totalQueryTimeMs > SLOW_QUERY_LATENCY_THRESHOLD_MS) {
-        LOGGER.info(
-            "Slow query ({}): request handler processing time: {}, send response latency: {}, total time to handle "
-                + "request: {}", requestId, queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
-      }
-      if (serializedDataTable.length > LARGE_RESPONSE_SIZE_THRESHOLD_BYTES) {
-        LOGGER.warn("Large query ({}): response size in bytes: {}, table name {}", requestId,
-            serializedDataTable.length, tableNameWithType);
-        ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.LARGE_QUERY_RESPONSES_SENT, 1);
+        int totalQueryTimeMs = (int) (sendResponseEndTimeMs - queryArrivalTimeMs);
+        if (totalQueryTimeMs > SLOW_QUERY_LATENCY_THRESHOLD_MS) {
+          LOGGER.info(
+              "Slow query ({}): request handler processing time: {}, send response latency: {}, total time to handle "
+                  + "request: {}", requestId, queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
+        }
+        if (serializedDataTable.length > LARGE_RESPONSE_SIZE_THRESHOLD_BYTES) {
+          LOGGER.warn("Large query ({}): response size in bytes: {}, table name {}", requestId,
+              serializedDataTable.length, tableNameWithType);
+          _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.LARGE_QUERY_RESPONSES_SENT, 1);
+        }
+      } else {
+        Throwable cause = f.cause();
+        LOGGER.error("Failed to send response for request: {} table: {}", requestId, tableNameWithType, cause);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_SEND_RESPONSE_FAILURES, 1);
+        ctx.close();
       }
     });
   }

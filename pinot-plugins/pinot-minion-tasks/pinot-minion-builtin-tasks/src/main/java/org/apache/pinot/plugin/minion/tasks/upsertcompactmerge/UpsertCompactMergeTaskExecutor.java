@@ -109,15 +109,23 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
         List.of(configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY).split(","));
     validateCRCForInputSegments(segmentMetadataList, originalSegmentCrcFromTaskGenerator);
 
-    // Fetch validDocID snapshot from server and get record-reader for compacted reader.
+    // Executor-only: read comparison mode string from task config (no auth resolution or URL hits).
+    Map<String, String> taskConfigs =
+        tableConfig.getTaskConfig() != null ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
+    String consensusMode = taskConfigs != null ? taskConfigs.getOrDefault(
+        MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+        MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
+        : MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
+
     List<RecordReader> recordReaders = segmentMetadataList.stream().map(x -> {
       RoaringBitmap validDocIds = MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
-          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc());
+          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc(), consensusMode);
       if (validDocIds == null) {
         // no valid crc match found or no validDocIds obtained from all servers
         // error out the task instead of silently failing so that we can track it via task-error metrics
-        String message = String.format("No validDocIds found from all servers. They either failed to download "
-            + "or did not match crc from segment copy obtained from deepstore / servers. " + "Expected crc: %s", "");
+        String message = "No validDocIds found from all servers for segment: " + x.getName()
+            + ". They either failed to download or did not match crc from segment copy obtained from "
+            + "deepstore/servers. Expected crc: " + x.getCrc();
         LOGGER.error(message);
         throw new IllegalStateException(message);
       }

@@ -94,6 +94,59 @@ public class StringFunctionsTest {
     };
   }
 
+  @DataProvider(name = "initcapTestCases")
+  public static Object[][] initcapTestCases() {
+    return new Object[][]{
+        // Basic test cases
+        {"hello world", "Hello World"},
+        {"HELLO WORLD", "Hello World"},
+        {"hello WORLD", "Hello World"},
+        {"HeLLo WoRLd", "Hello World"},
+
+        // Single word
+        {"hello", "Hello"},
+        {"HELLO", "Hello"},
+        {"hELLO", "Hello"},
+
+        // Multiple spaces
+        {"hello  world", "Hello  World"},
+        {"hello   world   test", "Hello   World   Test"},
+
+        // Leading and trailing spaces
+        {" hello world", " Hello World"},
+        {"hello world ", "Hello World "},
+        {" hello world ", " Hello World "},
+
+        // Special characters and numbers
+        {"hello-world", "Hello-world"},
+        {"hello_world", "Hello_world"},
+        {"hello123world", "Hello123world"},
+        {"123hello world", "123hello World"},
+
+        // Mixed whitespace characters
+        {"hello\tworld", "Hello\tWorld"},
+        {"hello\nworld", "Hello\nWorld"},
+        {"hello\rworld", "Hello\rWorld"},
+
+        // Edge cases
+        {"", ""},
+        {" ", " "},
+        {"a", "A"},
+        {"A", "A"},
+
+        // Real-world examples
+        {"apache pinot", "Apache Pinot"},
+        {"the quick brown fox", "The Quick Brown Fox"},
+        {"SQL is AWESOME", "Sql Is Awesome"},
+        {"new york city", "New York City"},
+
+        // Unicode and special characters
+        {"café résumé", "Café Résumé"},
+        {"hello@world.com", "Hello@world.com"},
+        {"one,two,three", "One,two,three"}
+    };
+  }
+
   @DataProvider(name = "levenshteinDistanceTestCases")
   public static Object[][] levenshteinDistanceTestCases() {
     return new Object[][]{
@@ -158,6 +211,11 @@ public class StringFunctionsTest {
     assertEquals(StringFunctions.suffixes(input, length), expectedSuffix);
     assertEquals(StringFunctions.prefixesWithPrefix(input, length, "^"), expectedPrefixWithRegexChar);
     assertEquals(StringFunctions.suffixesWithSuffix(input, length, "$"), expectedSuffixWithRegexChar);
+  }
+
+  @Test(dataProvider = "initcapTestCases")
+  public void testInitcap(String input, String expected) {
+    assertEquals(StringFunctions.initcap(input), expected);
   }
 
   @Test(dataProvider = "levenshteinDistanceTestCases")

@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.Enablement;
 
 
@@ -57,6 +58,13 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Partial update strategies.")
   @Nullable
   private Map<String, Strategy> _partialUpsertStrategies;
+
+  @JsonPropertyDescription("Transform configs evaluated after partial upsert merge to populate derived columns. Lives "
+      + "under UpsertConfig because these transforms are applied on the merged upsert view, not during ingestion. "
+      + "These transforms run during upsert merge (not query time) and derived columns must be part of the table "
+      + "schema to be queryable.")
+  @Nullable
+  private List<TransformConfig> _postPartialUpsertTransformConfigs;
 
   @JsonPropertyDescription("default upsert strategy for partial mode")
   private Strategy _defaultPartialUpsertStrategy = Strategy.OVERWRITE;
@@ -170,6 +178,20 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setPartialUpsertStrategies(@Nullable Map<String, Strategy> partialUpsertStrategies) {
     _partialUpsertStrategies = partialUpsertStrategies;
+  }
+
+  @Nullable
+  public List<TransformConfig> getPostPartialUpsertTransformConfigs() {
+    return _postPartialUpsertTransformConfigs;
+  }
+
+  public void setPostPartialUpsertTransformConfigs(
+      @Nullable List<TransformConfig> postPartialUpsertTransformConfigs) {
+    if (CollectionUtils.isNotEmpty(postPartialUpsertTransformConfigs)) {
+      _postPartialUpsertTransformConfigs = postPartialUpsertTransformConfigs;
+    } else {
+      _postPartialUpsertTransformConfigs = null;
+    }
   }
 
   public Strategy getDefaultPartialUpsertStrategy() {

@@ -23,7 +23,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -53,39 +52,18 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[][] valuesArray = blockValSetMap.get(_expression).getLongValuesMV();
-    QuantileDigest quantileDigest = getDefaultQuantileDigest(aggregationResultHolder);
-    for (int i = 0; i < length; i++) {
-      for (long value : valuesArray[i]) {
-        quantileDigest.add(value);
-      }
-    }
+    aggregateMV(length, aggregationResultHolder, blockValSetMap.get(_expression));
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[][] valuesArray = blockValSetMap.get(_expression).getLongValuesMV();
-    for (int i = 0; i < length; i++) {
-      QuantileDigest quantileDigest = getDefaultQuantileDigest(groupByResultHolder, groupKeyArray[i]);
-      for (long value : valuesArray[i]) {
-        quantileDigest.add(value);
-      }
-    }
+    aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap.get(_expression));
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[][] valuesArray = blockValSetMap.get(_expression).getLongValuesMV();
-    for (int i = 0; i < length; i++) {
-      long[] values = valuesArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        QuantileDigest quantileDigest = getDefaultQuantileDigest(groupByResultHolder, groupKey);
-        for (long value : values) {
-          quantileDigest.add(value);
-        }
-      }
-    }
+    aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap.get(_expression));
   }
 }

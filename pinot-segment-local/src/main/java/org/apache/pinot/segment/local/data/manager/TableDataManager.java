@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.data.manager;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import java.io.File;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -32,8 +33,9 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -62,7 +64,7 @@ public interface TableDataManager {
       ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
       boolean enableAsyncSegmentRefresh,
       ServerReloadJobStatusCache reloadJobStatusCache);
 
@@ -358,4 +360,26 @@ public interface TableDataManager {
    * @return List of {@link StaleSegment} with segment names and reason why it is stale
    */
   List<StaleSegment> getStaleSegments();
+
+  /**
+   * Returns whether upsert is enabled for this table.
+   */
+  default boolean isUpsertEnabled() {
+    return false;
+  }
+
+  /**
+   * Returns the table upsert metadata manager if upsert is enabled, null otherwise.
+   */
+  @Nullable
+  default TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return null;
+  }
+
+  /**
+   * Returns a mapping of partition id to primary key count. Supports both upsert and dedup enabled tables.
+   */
+  default Map<Integer, Long> getPartitionToPrimaryKeyCount() {
+    return Collections.emptyMap();
+  }
 }

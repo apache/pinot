@@ -52,13 +52,16 @@ public class DataFetcher implements AutoCloseable {
   private final Map<String, ColumnValueReader> _columnValueReaderMap;
   private final int[] _reusableMVDictIds;
   private final int _maxNumValuesPerMVEntry;
+  private final Map<String, String> _queryOptions;
 
   /**
    * Constructor for DataFetcher.
    *
-   * @param dataSourceMap Map from column to data source
+   * @param dataSourceMap  Map from column to data source
+   * @param queryOptions   Query-level options propagated to reader contexts
    */
-  public DataFetcher(Map<String, DataSource> dataSourceMap) {
+  public DataFetcher(Map<String, DataSource> dataSourceMap, Map<String, String> queryOptions) {
+    _queryOptions = queryOptions;
     _columnValueReaderMap = new HashMap<>();
     int maxNumValuesPerMVEntry = 0;
     for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
@@ -321,9 +324,8 @@ public class DataFetcher implements AutoCloseable {
     }
 
     private ForwardIndexReaderContext getReaderContext() {
-      // Create reader context lazily to reduce the duration of existence
       if (!_readerContextCreated) {
-        _readerContext = _reader.createContext();
+        _readerContext = _reader.createContext(_queryOptions);
         _readerContextCreated = true;
       }
       return _readerContext;

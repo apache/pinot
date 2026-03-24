@@ -38,6 +38,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -79,6 +80,7 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.annotations.DataProvider;
@@ -872,9 +874,9 @@ public class TableConfigUtilsTest {
         streamIngestionConfigWithoutPauselessUniqueTopics);
     TableConfig tableConfigWithoutPauselessUniqueTopics = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)
-        .setTimeColumnName("timeColumn")
-        .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
-        .build();
+            .setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
+            .build();
     try {
       TableConfigUtils.validate(tableConfigWithoutPauselessUniqueTopics, schema);
     } catch (IllegalStateException e) {
@@ -1897,58 +1899,12 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void testValidateUpsertWithTierConfig() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
-    Map<String, String> streamConfigs = getStreamConfigs();
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setRoutingConfig(
-            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
-        .setTimeColumnName(TIME_COLUMN)
-        .setStreamConfigs(streamConfigs)
-        .setTierConfigList(Lists.newArrayList(
-            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
-        .build();
-
-    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
-        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
-  }
-
-  @Test
-  public void testValidateDedupWithTierConfig() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
-    Map<String, String> streamConfigs = getStreamConfigs();
-    DedupConfig dedupConfig = new DedupConfig();
-    dedupConfig.setMetadataTTL(10);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(dedupConfig)
-        .setRoutingConfig(
-            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
-        .setTimeColumnName(TIME_COLUMN)
-        .setStreamConfigs(streamConfigs)
-        .setTierConfigList(Lists.newArrayList(
-            new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null)))
-        .build();
-
-    assertThrows("Tiered storage is not supported for Upsert/Dedup tables", IllegalStateException.class,
-        () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema));
-  }
-
-  @Test
   public void testValidateDedupConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
+    // OFFLINE table should fail because dedup is not yet supported for offline tables
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)
         .setDedupConfig(new DedupConfig())
@@ -1957,7 +1913,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       fail();
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Upsert/Dedup table is for realtime table only.");
+      assertEquals(e.getMessage(), "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE"
+          + " table");
     }
 
     tableConfig =
@@ -2073,11 +2030,87 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateUpsertConfigWithMd5Disabled() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setHashFunction(HashFunction.MD5);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      IllegalStateException exception =
+          expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig,
+              schema));
+      assertTrue(exception.getMessage().contains(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
+  }
+
+  @Test
+  public void testValidateDedupConfigWithMd5Disabled() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setHashFunction(HashFunction.MD5);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      IllegalStateException exception =
+          expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateUpsertAndDedupConfig(tableConfig,
+              schema));
+      assertTrue(exception.getMessage().contains(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
+  }
+
+  @Test
+  public void testValidateDedupConfigWithMd5DisabledAllowsUpsertModeNoneMd5() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setHashFunction(HashFunction.NONE);
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.NONE);
+    upsertConfig.setHashFunction(HashFunction.MD5);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
+  }
+
+  @Test
   public void testValidateUpsertConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
+    // OFFLINE table without segment partition config should fail with partition config error
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setUpsertConfig(upsertConfig)
@@ -2087,7 +2120,22 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       fail();
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Upsert/Dedup table is for realtime table only.");
+      assertEquals(e.getMessage(),
+          "Offline upsert table must have segment partition config to ensure correct partition-based "
+              + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
+    }
+
+    // OFFLINE table with partial upsert should fail
+    UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(partialUpsertConfig)
+        .setTimeColumnName(TIME_COLUMN)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Partial upsert is not supported for OFFLINE table");
     }
 
     tableConfig =
@@ -3224,7 +3272,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -3240,7 +3288,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -3251,7 +3299,7 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3262,7 +3310,7 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3278,7 +3326,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3294,7 +3342,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3310,7 +3358,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3326,7 +3374,7 @@ public class TableConfigUtilsTest {
         new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
             null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
-            null);
+            null, null);
 
     assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig));
@@ -3337,7 +3385,7 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, true, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, true, null, null, null, null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -3350,7 +3398,8 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
             new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
-            null, null, null, null, null, null, null, null, null, null, null, true, null, instancePartitionsMap, null);
+            null, null, null, null, null, null, null, null, null, null, null, true, null, instancePartitionsMap, null,
+            null);
 
     // Should not throw
     TableConfigUtils.validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -3733,5 +3782,188 @@ public class TableConfigUtilsTest {
 
     // Should not throw
     TableConfigUtils.validateTaskConfig(tableConfigOnlyCompactMerge);
+  }
+
+  @Test
+  public void testValidatePostPartialUpsertTransformConfigs() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addMetric("score", FieldSpec.DataType.DOUBLE)
+        .addMetric("bonus", FieldSpec.DataType.DOUBLE)
+        .addMetric("total", FieldSpec.DataType.DOUBLE)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(Lists.newArrayList("pk"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+
+    // Valid config should pass
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", "plus(score,bonus)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(upsertConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
+    // postPartialUpsertTransformConfigs on FULL upsert should fail
+    UpsertConfig fullUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    fullUpsertConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", "plus(score,bonus)")));
+    TableConfig fullTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(fullUpsertConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(fullTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("PARTIAL"));
+    }
+
+    // Duplicate transform column should fail
+    UpsertConfig dupConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    dupConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", "plus(score,bonus)"),
+            new TransformConfig("total", "minus(score,bonus)")));
+    TableConfig dupTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(dupConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(dupTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Duplicate"));
+    }
+
+    // Destination column not in schema should fail
+    UpsertConfig missingColConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    missingColConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("nonExistent", "plus(score,bonus)")));
+    TableConfig missingColTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(missingColConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(missingColTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("must be present in the schema"));
+    }
+
+    // Self-referencing transform function should fail
+    UpsertConfig selfRefConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    selfRefConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", "plus(total,bonus)")));
+    TableConfig selfRefTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(selfRefConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(selfRefTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("cannot contain the destination column"));
+    }
+
+    // Transform targeting primary key column should fail
+    UpsertConfig pkConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    pkConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("pk", "concat(score,bonus)")));
+    TableConfig pkTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(pkConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(pkTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("primary key column"));
+    }
+
+    // Transform targeting comparison column should fail
+    UpsertConfig compConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    compConfig.setComparisonColumns(List.of(TIME_COLUMN));
+    compConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig(TIME_COLUMN, "plus(score,bonus)")));
+    TableConfig compTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(compConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(compTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("comparison column"));
+    }
+
+    // Transform targeting delete record column should fail
+    UpsertConfig deleteColConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    deleteColConfig.setDeleteRecordColumn("score");
+    deleteColConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("score", "plus(bonus,total)")));
+    TableConfig deleteColTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(deleteColConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(deleteColTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("delete record column"));
+    }
+
+    // Transform targeting out-of-order record column should fail
+    Schema schemaWithBool = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addMetric("score", FieldSpec.DataType.DOUBLE)
+        .addMetric("bonus", FieldSpec.DataType.DOUBLE)
+        .addMetric("total", FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension("isOoo", FieldSpec.DataType.BOOLEAN)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(Lists.newArrayList("pk"))
+        .build();
+    UpsertConfig oooColConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    oooColConfig.setOutOfOrderRecordColumn("isOoo");
+    oooColConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("isOoo", "plus(bonus,total)")));
+    TableConfig oooColTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(oooColConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(oooColTableConfig, schemaWithBool);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("out-of-order record column"));
+    }
   }
 }

@@ -191,6 +191,7 @@ public class MutableSegmentImpl implements MutableSegment {
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
+  private volatile long _minimumIngestionLagMs = Long.MAX_VALUE;
 
   // multi-column text index fields
   private final MultiColumnRealtimeLuceneTextIndex _multiColumnTextIndex;
@@ -222,6 +223,11 @@ public class MutableSegmentImpl implements MutableSegment {
       @Override
       public long getLatestIngestionTimestamp() {
         return _latestIngestionTimeMs;
+      }
+
+      @Override
+      public long getMinimumIngestionLagMs() {
+        return _minimumIngestionLagMs;
       }
 
       @Override
@@ -584,7 +590,8 @@ public class MutableSegmentImpl implements MutableSegment {
   public SegmentPartitionConfig getSegmentPartitionConfig() {
     if (_partitionColumn != null) {
       return new SegmentPartitionConfig(Collections.singletonMap(_partitionColumn,
-          new ColumnPartitionConfig(_partitionFunction.getName(), _partitionFunction.getNumPartitions())));
+          new ColumnPartitionConfig(_partitionFunction.getName(), _partitionFunction.getNumPartitions(),
+              _partitionFunction.getFunctionConfig())));
     } else {
       return null;
     }
@@ -700,10 +707,21 @@ public class MutableSegmentImpl implements MutableSegment {
     // Update last indexed time and latest ingestion time
     _lastIndexedTimeMs = System.currentTimeMillis();
     if (metadata != null) {
-      _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, metadata.getRecordIngestionTimeMs());
+      updateIngestionTimestamp(metadata.getRecordIngestionTimeMs());
     }
 
     return canTakeMore;
+  }
+
+  /**
+   * Updates ingestion timestamp metadata. This is a public function to allow
+   * external components to update the ingestion timestamp metadata without indexing a row.
+   */
+  public void updateIngestionTimestamp(long recordIngestionTimeMs) {
+    long now = System.currentTimeMillis();
+    _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, recordIngestionTimeMs);
+    long ingestionLagMs = Math.max(0, now - _latestIngestionTimeMs);
+    _minimumIngestionLagMs = Math.min(_minimumIngestionLagMs, ingestionLagMs);
   }
 
   private boolean isUpsertEnabled() {

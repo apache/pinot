@@ -119,13 +119,18 @@ public class ServerSegmentCompletionProtocolHandler {
   }
 
   public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params params) {
+    return segmentCommitStart(params, DEFAULT_OTHER_REQUESTS_TIMEOUT);
+  }
+
+  public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params params,
+      int timeoutMs) {
     SegmentCompletionProtocol.SegmentCommitStartRequest request =
         new SegmentCompletionProtocol.SegmentCommitStartRequest(params);
     String url = createSegmentCompletionUrl(request);
     if (url == null) {
       return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
-    return sendRequest(url);
+    return sendRequest(url, timeoutMs);
   }
 
   // TODO We need to make this work with trusted certificates if the VIP is using https.
@@ -231,11 +236,15 @@ public class ServerSegmentCompletionProtocolHandler {
   }
 
   private SegmentCompletionProtocol.Response sendRequest(String url) {
+    return sendRequest(url, DEFAULT_OTHER_REQUESTS_TIMEOUT);
+  }
+
+  private SegmentCompletionProtocol.Response sendRequest(String url, int timeoutMs) {
     SegmentCompletionProtocol.Response response;
     try {
       String responseStr = _fileUploadDownloadClient
           .sendSegmentCompletionProtocolRequest(new URI(url), AuthProviderUtils.toRequestHeaders(_authProvider), null,
-              DEFAULT_OTHER_REQUESTS_TIMEOUT).getResponse();
+              timeoutMs).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {

@@ -63,6 +63,7 @@ public class CommonConstants {
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
+  public static final String CONFIG_OF_PINOT_MD5_DISABLED = "pinot.md5.disabled";
   @Deprecated
   public static final String DEFAULT_PINOT_INSECURE_MODE = "false";
 
@@ -336,6 +337,9 @@ public class CommonConstants {
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
     public static final String EVENT_LISTENER_CONFIG_PREFIX = "pinot.broker.event.listener";
+    // Prefix for table sampler configs:
+    // - pinot.broker.table.sampler.annotation.packages=<comma-separated packages>
+    public static final String TABLE_SAMPLER_CONFIG_PREFIX = "pinot.broker.table.sampler";
     public static final String CONFIG_OF_METRICS_NAME_PREFIX = "pinot.broker.metrics.prefix";
     public static final String DEFAULT_METRICS_NAME_PREFIX = "pinot.broker.";
 
@@ -382,6 +386,11 @@ public class CommonConstants {
     public static final long DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS = 100L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_INSTANCE_TAGS = "pinot.broker.instance.tags";
+    // When enabled, brokers must have pinot.broker.instance.tags configured to start.
+    // Prevents misconfigured brokers from joining multi-tenant clusters without tenant tags.
+    public static final String CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS =
+        "pinot.broker.enforce.instance.tags";
+    public static final boolean DEFAULT_BROKER_ENFORCE_INSTANCE_TAGS = false;
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Comma separated list of packages that contains javax service resources.
@@ -645,8 +654,13 @@ public class CommonConstants {
         public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
         public static final String USE_STAR_TREE = "useStarTree";
+        /**
+         * When true, use index-based distinct (JsonIndexDistinctOperator) when applicable.
+         */
+        public static final String USE_INDEX_BASED_DISTINCT_OPERATOR = "useIndexBasedDistinctOperator";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
         public static final String ROUTING_OPTIONS = "routingOptions";
+        public static final String TABLE_SAMPLER = "sampler";
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String COLLECT_GC_STATS = "collectGCStats";
@@ -1724,21 +1738,18 @@ public class CommonConstants {
      *  - Instance Config: enableThreadAllocatedBytesMeasurement = true
      */
 
-    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION =
-        "accounting.workload.enable.cost.collection";
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION = "accounting.workload.enable.cost.collection";
     public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION = false;
 
     public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT =
         "accounting.workload.enable.cost.enforcement";
     public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT = false;
 
-    public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS =
-        "accounting.workload.enforcement.window.ms";
+    public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS = "accounting.workload.enforcement.window.ms";
     public static final long DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS = 60_000L;
 
-    public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS =
-        "accounting.workload.sleep.time.ms";
-    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
+    public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS = "accounting.workload.sleep.time.ms";
+    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 100;
 
     public static final String DEFAULT_WORKLOAD_NAME = "default";
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";
@@ -2031,6 +2042,14 @@ public class CommonConstants {
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
 
+    /// Used to indicate whether MSE pipeline breaker stats should be included in the queryStats field.
+    /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. Starting from 1.5.0,
+    /// they are not included by default but can be included by setting this flag to false (upper or lower case).
+    ///
+    /// It is expected that in 1.6.0 and later, MSE pipeline breaker stats will be included by default.
+    public static final String KEY_OF_SKIP_PIPELINE_BREAKER_STATS = "pinot.query.mse.skip.pipeline.breaker.stats";
+    public static final boolean DEFAULT_SKIP_PIPELINE_BREAKER_STATS = true;
+
     /// Used to indicate that MSE stats should be logged at INFO level for successful queries.
     ///
     /// When an MSE query is executed, the stats are collected and logged.
@@ -2168,15 +2187,14 @@ public class CommonConstants {
    */
   public static class ConfigChangeListenerConstants {
     /**
-     * Cluster config key to control whether force commit/reload is allowed for upsert tables
-     * with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true
-     * with consistency mode NONE and replication > 1).
+     * Cluster config key to control how to handle inconsistency during consuming segment commit
+     * for upsert/dedup tables (partial upsert or dropOutOfOrderRecord=true with consistency mode).
+     *
+     * Supported values:
+     * - RESTRICTED: Force commit is disabled for tables with inconsistent state table configurations
+     * - PROTECTED: Force commit is enabled with metadata reversion on inconsistencies
+     * - UNSAFE: Force commit is enabled without metadata reversion (Can lead to inconsistencies)
      */
-    public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.force.commit.reload";
-
-    /**
-     * Default value: true (force commit/reload is allowed by default).
-     */
-    public static final boolean DEFAULT_FORCE_COMMIT_RELOAD = true;
+    public static final String CONSUMING_SEGMENT_CONSISTENCY_MODE = "pinot.server.consuming.segment.consistency.mode";
   }
 }

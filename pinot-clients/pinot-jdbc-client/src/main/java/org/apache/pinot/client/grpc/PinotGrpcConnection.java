@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.pinot.client.SimpleBrokerSelector;
 import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
@@ -72,7 +73,6 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
     } else {
       brokers = getBrokerGrpcList(controllerURL, tenant);
     }
-    _session = new GrpcConnection(properties, brokers);
 
     for (String possibleQueryOption : POSSIBLE_QUERY_OPTIONS) {
       Object property = properties.getProperty(possibleQueryOption);
@@ -90,6 +90,7 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
       }
     }
     DriverUtils.handleAuth(properties, _metadataMap);
+    _session = new GrpcConnection(properties, new SimpleBrokerSelector(brokers), _metadataMap);
   }
 
   public GrpcConnection getSession() {

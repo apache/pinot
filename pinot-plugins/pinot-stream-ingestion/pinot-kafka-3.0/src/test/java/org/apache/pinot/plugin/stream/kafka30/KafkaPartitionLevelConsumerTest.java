@@ -43,7 +43,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.plugin.stream.kafka30.utils.MiniKafkaCluster;
+import org.apache.pinot.plugin.stream.kafka30.server.EmbeddedKafkaCluster;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -79,22 +79,29 @@ public class KafkaPartitionLevelConsumerTest {
   private static final String TEST_TOPIC_1 = "foo";
   private static final String TEST_TOPIC_2 = "bar";
   private static final String TEST_TOPIC_3 = "expired";
+  private static final String TEST_TOPIC_SUBSET_PARTITION = "subsetPartition";
   private static final int NUM_MSG_PRODUCED_PER_PARTITION = 1000;
+  private static final int NUM_MSG_PRODUCED_PER_SUBSET_PARTITION = 100;
   private static final long TIMESTAMP = Instant.now().toEpochMilli();
   private static final Random RANDOM = new Random();
 
-  private MiniKafkaCluster _kafkaCluster;
+  private EmbeddedKafkaCluster _kafkaCluster;
   private String _kafkaBrokerAddress;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    _kafkaCluster = new MiniKafkaCluster("0");
+    Properties props = new Properties();
+    props.setProperty(EmbeddedKafkaCluster.BROKER_COUNT_PROP, "1");
+
+    _kafkaCluster = new EmbeddedKafkaCluster();
+    _kafkaCluster.init(props);
     _kafkaCluster.start();
-    _kafkaBrokerAddress = _kafkaCluster.getKafkaServerAddress();
-    _kafkaCluster.createTopic(TEST_TOPIC_1, 1, 1);
-    _kafkaCluster.createTopic(TEST_TOPIC_2, 2, 1);
-    _kafkaCluster.createTopic(TEST_TOPIC_3, 1, 1);
+    _kafkaBrokerAddress = _kafkaCluster.bootstrapServers();
+    _kafkaCluster.createTopic(TEST_TOPIC_1, 1);
+    _kafkaCluster.createTopic(TEST_TOPIC_2, 2);
+    _kafkaCluster.createTopic(TEST_TOPIC_3, 1);
+    _kafkaCluster.createTopic(TEST_TOPIC_SUBSET_PARTITION, 8);
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
     produceMsgToKafka();
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
@@ -115,6 +122,13 @@ public class KafkaPartitionLevelConsumerTest {
         producer.send(new ProducerRecord<>(TEST_TOPIC_2, 1, TIMESTAMP + i, null, "sample_msg_" + i));
         producer.send(new ProducerRecord<>(TEST_TOPIC_3, "sample_msg_" + i));
       }
+      for (int partitionId = 0; partitionId < 8; partitionId++) {
+        for (int msgIdx = 0; msgIdx < NUM_MSG_PRODUCED_PER_SUBSET_PARTITION; msgIdx++) {
+          String payload = "mod_" + partitionId + "_msg_" + msgIdx;
+          producer.send(new ProducerRecord<>(TEST_TOPIC_SUBSET_PARTITION, partitionId,
+              TIMESTAMP + (partitionId * 1000L) + msgIdx, Integer.toString(partitionId), payload));
+        }
+      }
       producer.flush();
     }
   }
@@ -126,8 +140,9 @@ public class KafkaPartitionLevelConsumerTest {
       _kafkaCluster.deleteTopic(TEST_TOPIC_1);
       _kafkaCluster.deleteTopic(TEST_TOPIC_2);
       _kafkaCluster.deleteTopic(TEST_TOPIC_3);
+      _kafkaCluster.deleteTopic(TEST_TOPIC_SUBSET_PARTITION);
     } finally {
-      _kafkaCluster.close();
+      _kafkaCluster.stop();
     }
   }
 
@@ -200,6 +215,71 @@ public class KafkaPartitionLevelConsumerTest {
 
     streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
     assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testSubsetPartitionInvalidPartition() {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
+    String clientId = "invalid-subset-client";
+    String tableNameWithType = "tableName_REALTIME";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_1);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.PARTITION_IDS), "99");
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+    new KafkaStreamMetadataProvider(clientId, streamConfig);
+  }
+
+  @Test
+  public void testSubsetPartitionConsumption()
+      throws TimeoutException {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
+    String tableNameWithType = "tableName_REALTIME";
+
+    for (int partitionId = 0; partitionId < 8; partitionId++) {
+      String clientId = "subset-client-" + partitionId;
+      Map<String, String> streamConfigMap = new HashMap<>();
+      streamConfigMap.put("streamType", streamType);
+      streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_SUBSET_PARTITION);
+      streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+      streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+      streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+          KafkaStreamConfigProperties.PARTITION_IDS), Integer.toString(partitionId));
+      StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+      KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
+      // With subset partition config, fetchPartitionCount/fetchPartitionIds still return the total Kafka
+      // partition count and all partition IDs; subset filtering only applies to segment creation.
+      assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 8);
+      assertEquals(streamMetadataProvider.fetchPartitionIds(10000L),
+          new HashSet<>(List.of(0, 1, 2, 3, 4, 5, 6, 7)));
+
+      StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+      PartitionGroupConsumer consumer = streamConsumerFactory.createPartitionGroupConsumer(
+          clientId,
+          new PartitionGroupConsumptionStatus(partitionId, 0, new LongMsgOffset(0),
+              new LongMsgOffset(NUM_MSG_PRODUCED_PER_SUBSET_PARTITION), "CONSUMING"));
+
+      MessageBatch messageBatch = consumer.fetchMessages(new LongMsgOffset(0), 10000);
+      assertEquals(messageBatch.getMessageCount(), NUM_MSG_PRODUCED_PER_SUBSET_PARTITION);
+      assertEquals(messageBatch.getUnfilteredMessageCount(), NUM_MSG_PRODUCED_PER_SUBSET_PARTITION);
+      for (int i = 0; i < NUM_MSG_PRODUCED_PER_SUBSET_PARTITION; i++) {
+        StreamMessage streamMessage = messageBatch.getStreamMessage(i);
+        assertEquals(new String((byte[]) streamMessage.getValue()), "mod_" + partitionId + "_msg_" + i);
+        StreamMessageMetadata metadata = streamMessage.getMetadata();
+        assertEquals(((LongMsgOffset) metadata.getOffset()).getOffset(), i);
+        assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + (partitionId * 1000L) + i);
+      }
+    }
   }
 
   @Test
@@ -440,20 +520,23 @@ public class KafkaPartitionLevelConsumerTest {
       }
 
       @Override
-      protected Consumer<String, Bytes> createConsumer(Properties consumerProp) {
-        Consumer<String, Bytes> mockConsumer = mock(Consumer.class);
+      protected Consumer<Bytes, Bytes> createConsumer(Properties consumerProp) {
+        Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
         // Mock records
-        ConsumerRecord<String, Bytes> record1 =
+        ConsumerRecord<Bytes, Bytes> record1 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, NULL_CHECKSUM, 4,
-                5, "key1", new Bytes("value1".getBytes(StandardCharsets.UTF_8)));
-        ConsumerRecord<String, Bytes> record2 =
+                5, new Bytes("key1".getBytes(StandardCharsets.UTF_8)),
+                new Bytes("value1".getBytes(StandardCharsets.UTF_8)));
+        ConsumerRecord<Bytes, Bytes> record2 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, NULL_CHECKSUM, 4,
-                9, "key2", new Bytes("value2".getBytes(StandardCharsets.UTF_8)));
-        ConsumerRecord<String, Bytes> record3 =
+                9, new Bytes("key2".getBytes(StandardCharsets.UTF_8)),
+                new Bytes("value2".getBytes(StandardCharsets.UTF_8)));
+        ConsumerRecord<Bytes, Bytes> record3 =
             new ConsumerRecord<>("test-topic", 0, 0L, NO_TIMESTAMP, TimestampType.NO_TIMESTAMP_TYPE, NULL_CHECKSUM, 4,
-                -1, "key2", new Bytes("value2".getBytes(StandardCharsets.UTF_8)));
+                -1, new Bytes("key2".getBytes(StandardCharsets.UTF_8)),
+                new Bytes("value2".getBytes(StandardCharsets.UTF_8)));
         // Mock return of poll()
-        ConsumerRecords<String, Bytes> consumerRecords = new ConsumerRecords<>(
+        ConsumerRecords<Bytes, Bytes> consumerRecords = new ConsumerRecords<>(
             Map.of(topicPartition, List.of(record1, record2, record3))
         );
         when(mockConsumer.poll(any(Duration.class))).thenReturn(consumerRecords);

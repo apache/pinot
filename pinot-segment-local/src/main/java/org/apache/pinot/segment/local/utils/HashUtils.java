@@ -28,6 +28,8 @@ import net.jpountz.xxhash.XXHashFactory;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 
 
 public class HashUtils {
@@ -94,6 +96,10 @@ public class HashUtils {
       case NONE:
         return primaryKey;
       case MD5:
+        if (PinotMd5Mode.isPinotMd5Disabled()) {
+          throw new IllegalStateException(String.format("Hash function MD5 is disabled via '%s=true'",
+              CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+        }
         return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
       case MURMUR3:
         return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));

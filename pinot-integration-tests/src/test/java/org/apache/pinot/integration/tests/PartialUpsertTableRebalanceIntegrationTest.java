@@ -37,18 +37,19 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
-import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -83,12 +84,11 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     startZk();
+    // Start Kafka
+    startKafka();
     startController();
     startBroker();
     startServers(NUM_SERVERS);
-
-    // Start Kafka and push data into Kafka
-    startKafka();
 
     _resourceManager = _controllerStarter.getHelixResourceManager();
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager());
@@ -154,6 +154,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     serverStarter1.stop();
     serverStarter2.stop();
+    // Re-init the static executor because stopping servers shuts it down; required for subsequent operations.
+    SegmentBuildTimeLeaseExtender.initExecutor();
     TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful()
             && _resourceManager.dropInstance(serverStarter2.getInstanceId()).isSuccessful(), 60_000L,
         "Failed to drop servers");
@@ -218,6 +220,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     serverStarter1.stop();
     serverStarter2.stop();
+    // Re-init the static executor because stopping servers shuts it down; required for subsequent operations.
+    SegmentBuildTimeLeaseExtender.initExecutor();
     TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful()
             && _resourceManager.dropInstance(serverStarter2.getInstanceId()).isSuccessful(), 60_000L,
         "Failed to drop servers");
@@ -229,55 +233,51 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     pushAvroIntoKafka(_avroFiles);
     waitForAllDocsLoaded(600_000L, 300);
 
-    String statusResponse = reloadRealtimeTable(getTableName());
-    Map<String, String> statusResponseJson =
-        JsonUtils.stringToObject(statusResponse, new TypeReference<Map<String, String>>() {
-        });
-    String reloadResponse = statusResponseJson.get("status");
-    int jsonStartIndex = reloadResponse.indexOf("{");
-    String trimmedResponse = reloadResponse.substring(jsonStartIndex);
-    Map<String, Map<String, String>> reloadStatus =
-        JsonUtils.stringToObject(trimmedResponse, new TypeReference<Map<String, Map<String, String>>>() {
-        });
-    String reloadJobId = reloadStatus.get(REALTIME_TABLE_NAME).get("reloadJobId");
-    waitForReloadToComplete(reloadJobId, 600_000L);
-    waitForAllDocsLoaded(600_000L, 300);
-    verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
+    // Partial-upsert tables need PROTECTED consuming segment consistency mode for reload to force-commit
+    // consuming segments; RESTRICTED (default) skips force-commit and reload never completes.
+    try {
+      updateClusterConfig(
+          Map.of(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE,
+              ConsumingSegmentConsistencyModeListener.Mode.PROTECTED.name()));
+      Thread.sleep(5000); // Allow server to pick up cluster config from ZK
+
+      String statusResponse = reloadRealtimeTable(getTableName());
+      Map<String, String> statusResponseJson =
+          JsonUtils.stringToObject(statusResponse, new TypeReference<Map<String, String>>() {
+          });
+      String reloadResponse = statusResponseJson.get("status");
+      int jsonStartIndex = reloadResponse.indexOf("{");
+      String trimmedResponse = reloadResponse.substring(jsonStartIndex);
+      Map<String, Map<String, String>> reloadStatus =
+          JsonUtils.stringToObject(trimmedResponse, new TypeReference<Map<String, Map<String, String>>>() {
+          });
+      String reloadJobId = reloadStatus.get(REALTIME_TABLE_NAME).get("reloadJobId");
+      waitForReloadToComplete(reloadJobId, 600_000L);
+      waitForAllDocsLoaded(600_000L, 300);
+      verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
+    } finally {
+      deleteClusterConfig(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE);
+    }
   }
 
   @AfterMethod
   public void afterMethod()
       throws Exception {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    getControllerRequestClient().pauseConsumption(realtimeTableName);
-    TestUtils.waitForCondition((aVoid) -> {
-      try {
-        PauseStatusDetails pauseStatusDetails = getControllerRequestClient().getPauseStatusDetails(realtimeTableName);
-        return pauseStatusDetails.getConsumingSegments().isEmpty();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to drop the segments");
 
-    // Test dropping all segments one by one
-    List<String> segments = listSegments(realtimeTableName);
-    for (String segment : segments) {
-      dropSegment(realtimeTableName, segment);
-    }
+    // Drop the table entirely to clean up all segments and server-side upsert state.
+    // This is more reliable than the pause/drop-segments/restart cycle because it uses
+    // the standard table lifecycle and avoids issues with stale controller/server state.
+    dropRealtimeTable(getTableName());
+    waitForTableDataManagerRemoved(realtimeTableName);
+    waitForEVToDisappear(realtimeTableName);
 
-    // NOTE: There is a delay to remove the segment from property store
-    TestUtils.waitForCondition((aVoid) -> {
-      try {
-        return listSegments(realtimeTableName).isEmpty();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to drop the segments");
+    // Delete and recreate the Kafka topic for a clean stream
+    deleteKafkaTopic(getKafkaTopic());
+    createKafkaTopic(getKafkaTopic());
 
-    stopKafka(); // to clean up the topic
-    restartServers();
-    startKafka();
-    getControllerRequestClient().resumeConsumption(realtimeTableName);
+    // Recreate the table — this triggers fresh consuming segment creation
+    addTableConfig(_tableConfig);
   }
 
   protected void verifySegmentAssignment(Map<String, Map<String, String>> segmentAssignment, int numSegmentsExpected,
@@ -363,6 +363,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   @AfterClass
   public void tearDown()
       throws IOException {
+    dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();
     stopController();

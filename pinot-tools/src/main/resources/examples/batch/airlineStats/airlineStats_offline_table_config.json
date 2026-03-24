@@ -108,6 +108,15 @@
   "metadata": {
     "customConfigs": {}
   },
+  "tableSamplers": [
+    {
+      "name": "small",
+      "type": "firstN",
+      "properties": {
+        "numSegments": "1"
+      }
+    }
+  ],
   "ingestionConfig": {
     "transformConfigs": [
       {

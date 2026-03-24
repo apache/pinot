@@ -41,7 +41,6 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOv
  * Utils to parse query options.
  */
 public class QueryOptionsUtils {
-
   private QueryOptionsUtils() {
   }
 
@@ -112,6 +111,14 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static String getTableSampler(@Nullable Map<String, String> queryOptions) {
+    if (queryOptions == null || queryOptions.isEmpty()) {
+      return null;
+    }
+    return queryOptions.get(QueryOptionKey.TABLE_SAMPLER);
+  }
+
+  @Nullable
   public static Long getExtraPassiveTimeoutMs(Map<String, String> queryOptions) {
     String extraPassiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
     return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, extraPassiveTimeoutMsString, 0);
@@ -156,6 +163,14 @@ public class QueryOptionsUtils {
 
   public static boolean isSkipStarTree(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
+  }
+
+  /**
+   * When true, use JsonIndexDistinctOperator for SELECT DISTINCT jsonExtractIndex(...) when applicable.
+   * Set via query option useIndexBasedDistinctOperator=true.
+   */
+  public static boolean isUseIndexBasedDistinctOperator(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR));
   }
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {

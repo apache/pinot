@@ -53,6 +53,8 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.core.data.manager.SegmentOperationsTaskContext;
+import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.DedupContext;
@@ -81,7 +83,6 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.data.Schema;
@@ -107,6 +108,7 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -705,8 +707,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     updateCurrentDocumentCountMetrics();
     if (messageBatch.getUnfilteredMessageCount() > 0) {
-      updateIngestionMetrics(messageBatch.getLastMessageMetadata());
+      StreamMessageMetadata lastMetadata = messageBatch.getLastMessageMetadata();
+      updateIngestionMetrics(lastMetadata);
       _hasMessagesFetched = true;
+      // When messages were consumed from the stream but all were filtered out, we update
+      // the segment's ingestion timestamp so freshness tracking reflects fresh data was consumed.
+      if (indexedMessageCount == 0 && streamMessageCount > 0) {
+        if (lastMetadata != null) {
+          _realtimeSegment.updateIngestionTimestamp(lastMetadata.getRecordIngestionTimeMs());
+        }
+      }
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
             indexedMessageCount, streamMessageCount, _currentOffset);
@@ -1013,7 +1023,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
-    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
+    // For pauseless ingestion, segmentCommitStart performs heavy ZK work: update segment ZK metadata
+    // to COMMITTING, create new consuming segment metadata, and update IdealState. These are the same
+    // operations that happen during segmentCommitEnd in non-pauseless mode. Use the segment commit
+    // timeout (default 120s) instead of the default request timeout (10s) to avoid premature timeouts
+    // under ZK pressure, while staying within the controller FSM's time budget.
+    int commitStartTimeoutMs = PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)
+        ? (int) SegmentCompletionProtocol.getMaxSegmentCommitTimeMs()
+        : CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_OTHER_REQUESTS_TIMEOUT;
+    SegmentCompletionProtocol.Response segmentCommitStartResponse =
+        _protocolHandler.segmentCommitStart(params, commitStartTimeoutMs);
     if (!segmentCommitStartResponse.getStatus()
         .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
       _segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
@@ -1403,6 +1422,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     final Logger _logger;
     final ServerSegmentCompletionProtocolHandler _protocolHandler;
     final String _reason;
+
     private ConsumptionStopIndicator(StreamPartitionMsgOffset offset, String segmentName, String instanceId,
         ServerSegmentCompletionProtocolHandler protocolHandler, String reason, Logger logger) {
       _offset = offset;
@@ -1487,7 +1507,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           break;
         case CATCHING_UP:
         case HOLDING:
+        case COMMITTING:
         case INITIAL_CONSUMING:
+          // WARNING: DOWNLOAD mode with pauseless ingestion can trigger a race condition where the
+          // committing (lead) server downloads the segment instead of building it locally, causing it
+          // to go missing. See https://github.com/apache/pinot/pull/17885 for details.
+          // Recovery: RealtimeSegmentValidationManager detects and re-creates the missing segment.
+          // Not restricted at table config level since this is a rare race condition and DOWNLOAD mode
+          // is valuable for high-ingestion-rate scenarios (only the lead server builds the segment,
+          // reducing CPU/memory load on other replicas).
           if (_segmentCompletionMode == CompletionMode.DOWNLOAD) {
             // Check if download URL has been set by another replica
             String downloadUrl = segmentZKMetadata.getDownloadUrl();
@@ -1633,7 +1661,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   public void startConsumption() {
-    _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
+    Runnable consumer =
+        SegmentOperationsTaskContext.wrap(new PartitionConsumer(), SegmentOperationsTaskType.CONSUMER,
+            _tableNameWithType);
+    _consumerThread = new Thread(consumer, _segmentNameStr);
     _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this);
     _consumerThread.start();
   }
@@ -1796,7 +1827,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       retryPolicy.attempt(() -> {
         try {
           StreamMessageDecoder streamMessageDecoder = createMessageDecoder(fieldsToRead);
-          localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder));
+          boolean isKeyBytesType = StreamDataDecoderImpl.isKeyBytesType(_schema);
+          localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder, isKeyBytesType));
           return true;
         } catch (Exception e) {
           _segmentLogger.warn("Failed to initialize the StreamMessageDecoder: ", e);
@@ -1878,7 +1910,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (_partitionUpsertMetadataManager != null) {
       UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
       if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit()
-          || upsertContext.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
+          || !upsertContext.isTableTypeInconsistentDuringConsumption()) {
         return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
       }
       return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY
@@ -1983,7 +2015,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
         realtimeSegmentConfigBuilder.setPartitionFunction(
-            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions, null));
+            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
+                columnPartitionConfig.getFunctionConfig()));
         realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
       } else {
         _segmentLogger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());

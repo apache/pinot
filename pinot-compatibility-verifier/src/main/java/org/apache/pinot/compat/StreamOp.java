@@ -168,7 +168,7 @@ public class StreamOp extends BaseOp {
 
       final Map<String, Object> config = new HashMap<>();
       config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterDescriptor.getInstance().getKafkaServerUrl());
-      config.put(AdminClientConfig.CLIENT_ID_CONFIG, "Kafka2AdminClient-" + UUID.randomUUID());
+      config.put(AdminClientConfig.CLIENT_ID_CONFIG, "KafkaAdminClient-" + UUID.randomUUID());
       config.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
       AdminClient adminClient = KafkaAdminClient.create(config);
       NewTopic topic = new NewTopic(topicName, partitions, KAFKA_REPLICATION_FACTOR);
@@ -311,8 +311,7 @@ public class StreamOp extends BaseOp {
           long existingTotalDocs = fetchExistingTotalDocs(tableName);
           loadedDocs.set(existingTotalDocs);
           return existingTotalDocs == targetDocs;
-        }, 100L, timeoutMs,
-        "Failed to load " + targetDocs + " documents. Found " + loadedDocs.get() + " instead", true,
+        }, 100L, timeoutMs, "Failed to load " + targetDocs + " documents. Found " + loadedDocs.get() + " instead",
         Duration.ofSeconds(1));
   }
 }

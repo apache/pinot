@@ -20,11 +20,14 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
+import org.apache.pinot.core.operator.query.JsonIndexDistinctOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -69,6 +72,16 @@ public class DistinctPlanNode implements PlanNode {
             return new DictionaryBasedDistinctOperator(dataSource, _queryContext);
           }
         }
+      }
+    }
+
+    // Use JSON index directly for DISTINCT jsonExtractIndex when query option useIndexBasedDistinctOperator=true
+    // (disabled by default; opt-in via query option)
+    if (QueryOptionsUtils.isUseIndexBasedDistinctOperator(_queryContext.getQueryOptions()) && expressions.size() == 1) {
+      ExpressionContext expr = expressions.get(0);
+      if (JsonIndexDistinctOperator.canUseJsonIndexDistinct(_indexSegment, expr)) {
+        BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
+        return new JsonIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator);
       }
     }
 

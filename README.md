@@ -170,7 +170,7 @@ To verify which profile is active, run:
 If you encounter issues, check that the `protoc-gen-grpc-java` binary is present in one of the expected locations and is executable.
 
 ## Deploying Pinot to Kubernetes
-Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](helm/superset.yaml).
+Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino), and the data visualization tool, [Apache Superset](helm/superset.yaml).
 
 ## Join the Community
  - Ask questions on [Apache Pinot Slack](https://join.slack.com/t/apache-pinot/shared_invite/zt-5z7pav2f-yYtjZdVA~EDmrGkho87Vzw)

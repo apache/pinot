@@ -21,17 +21,23 @@ package org.apache.pinot.controller.helix.core;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -158,6 +164,56 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
     String coldServerName = currentAssignment.get(segmentName).keySet().iterator().next();
     InstanceConfig coldServerConfig = HelixHelper.getInstanceConfig(_helixManager, coldServerName);
     assertTrue(coldServerConfig.containsTag(coldOfflineServerTag));
+  }
+
+  @Test
+  public void testUploadedRealtimeSegmentRespectsStoredConsumingInstancePartitions()
+      throws Exception {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
+
+    // Create a realtime table backed by the fake stream
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).setNumReplicas(1)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    // Collect the realtime-tagged servers for this tenant
+    List<String> realtimeServers = _helixResourceManager.getInstancesWithTag(SERVER_TENANT_NAME + "_REALTIME");
+    assertTrue(realtimeServers.size() >= 2);
+
+    // Reuse the same segment name across all iterations: pin to each server in turn, call addNewSegment,
+    // verify the IdealState reflects the pinned server, then remove the segment before the next iteration.
+    // Cycling through every server guarantees the test catches the bug regardless of which server the
+    // default hash-based computation would have chosen for this segment name.
+    String segmentName = "uploadedSegment_0";
+    String consumingPartitionsName =
+        InstancePartitionsUtils.getInstancePartitionsName(realtimeTableName, InstancePartitionsType.CONSUMING);
+
+    for (String pinnedServer : realtimeServers) {
+      // Overwrite the stored CONSUMING instance partition to pin exclusively to this server
+      InstancePartitions consumingInstancePartitions = new InstancePartitions(consumingPartitionsName);
+      consumingInstancePartitions.setInstances(0, 0, Collections.singletonList(pinnedServer));
+      InstancePartitionsUtils.persistInstancePartitions(_helixResourceManager.getPropertyStore(),
+          consumingInstancePartitions);
+
+      // Upload the segment -- triggers addNewSegment -> assignSegment -> fetchOrComputeInstancePartitions
+      _helixResourceManager.addNewSegment(realtimeTableName,
+          SegmentMetadataMockUtils.mockSegmentMetadata(realtimeTableName, segmentName), "downloadUrl");
+
+      // Verify the segment is assigned only to the pinned server
+      IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
+      assertNotNull(idealState);
+      Set<String> assignedServers = idealState.getRecord().getMapFields().get(segmentName).keySet();
+      assertEquals(assignedServers, Collections.singleton(pinnedServer));
+
+      // Remove from both IdealState and property store so the next iteration can re-upload the same segment name
+      HelixHelper.removeSegmentsFromIdealState(_helixResourceManager.getHelixZkManager(), realtimeTableName,
+          Collections.singletonList(segmentName));
+      ZKMetadataProvider.removeSegmentZKMetadata(_helixResourceManager.getPropertyStore(), realtimeTableName,
+          segmentName);
+    }
   }
 
   @AfterClass

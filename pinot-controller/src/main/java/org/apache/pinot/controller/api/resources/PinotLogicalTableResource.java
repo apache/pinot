@@ -30,7 +30,6 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -47,6 +46,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -58,7 +58,6 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
-import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
@@ -143,29 +142,9 @@ public class PinotLogicalTableResource {
     ResourceUtils.checkPermissionAndAccess(tableName, request, httpHeaders, AccessType.CREATE,
         Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
-    translatePhysicalTableNamesWithDB(logicalTableConfig, httpHeaders);
+    LogicalTableConfigUtils.translatePhysicalTableNamesWithDB(logicalTableConfig, httpHeaders);
     SuccessResponse successResponse = addLogicalTable(logicalTableConfig);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
-  }
-
-  private void translatePhysicalTableNamesWithDB(LogicalTableConfig logicalTableConfig, HttpHeaders headers) {
-    // Translate physical table names to include the database name
-    Map<String, PhysicalTableConfig> physicalTableConfigMap = logicalTableConfig.getPhysicalTableConfigMap().entrySet()
-        .stream()
-        .map(entry -> Map.entry(DatabaseUtils.translateTableName(entry.getKey(), headers), entry.getValue()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-    logicalTableConfig.setPhysicalTableConfigMap(physicalTableConfigMap);
-
-    // Translate refOfflineTableName and refRealtimeTableName to include the database name
-    String refOfflineTableName = logicalTableConfig.getRefOfflineTableName();
-    if (refOfflineTableName != null) {
-      logicalTableConfig.setRefOfflineTableName(DatabaseUtils.translateTableName(refOfflineTableName, headers));
-    }
-    String refRealtimeTableName = logicalTableConfig.getRefRealtimeTableName();
-    if (refRealtimeTableName != null) {
-      logicalTableConfig.setRefRealtimeTableName(DatabaseUtils.translateTableName(refRealtimeTableName, headers));
-    }
   }
 
   @PUT
@@ -193,7 +172,7 @@ public class PinotLogicalTableResource {
 
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     logicalTableConfig.setTableName(tableName);
-    translatePhysicalTableNamesWithDB(logicalTableConfig, headers);
+    LogicalTableConfigUtils.translatePhysicalTableNamesWithDB(logicalTableConfig, headers);
     SuccessResponse successResponse = updateLogicalTable(logicalTableConfig);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
   }

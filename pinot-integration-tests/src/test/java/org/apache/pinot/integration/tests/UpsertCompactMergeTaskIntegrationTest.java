@@ -110,7 +110,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     setUpTable(getTableName(), kafkaTopicName, null);
 
     // Wait for all documents loaded
-    waitForTotalDocsLoaded(600_000L, 10);
+    TestUtils.waitForCondition(() -> getCurrentCountStarResultSkipUpsert() == 10, 100L, 600_000L,
+        "Failed to load 10 documents", Duration.ofMillis(600_000L / 10));
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
 
     // Create partial upsert table schema
@@ -710,20 +711,9 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     return null;
   }
 
-  protected void waitForTotalDocsLoaded(long timeoutMs, int totalDoc)
-      throws Exception {
-    waitForDocsLoaded(timeoutMs, true, getTableName(), totalDoc);
-  }
-
-  protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName, int totalDoc) {
-    long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(() -> getCurrentCountStarResultAll(tableName) == totalDoc, 100L, timeoutMs,
-        "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
-  }
-
-  protected long getCurrentCountStarResultAll(String tableName) {
+  private long getCurrentCountStarResultSkipUpsert() {
     ResultSetGroup resultSetGroup =
-        getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)");
+        getPinotConnection().execute("SET skipUpsert = true; SELECT COUNT(*) FROM " + getTableName());
     if (resultSetGroup.getResultSetCount() > 0) {
       return resultSetGroup.getResultSet(0).getLong(0);
     }

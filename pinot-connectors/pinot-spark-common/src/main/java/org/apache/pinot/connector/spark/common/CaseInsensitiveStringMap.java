@@ -29,9 +29,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Copied from Apache Spark repository org.apache.spark.sql.util package in order to re-use
- * for Spark2 connectors besides Spark3.
- * This class is compatible with DataSourceOptions class used in Spark2.
+ * Copied from Apache Spark repository org.apache.spark.sql.util package.
+ * This class is compatible with DataSourceOptions class used in Spark 3.
  *
  * Case-insensitive map of string keys to string values.
  * <p>

@@ -187,14 +187,19 @@ public class MultiClusterRoutingManager implements RoutingManager {
 
   @Override
   public List<String> getSegments(BrokerRequest brokerRequest) {
+    return getSegments(brokerRequest, BaseBrokerRoutingManager.extractSamplerName(brokerRequest));
+  }
+
+  @Override
+  public List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
     List<String> combined = new ArrayList<>();
-    List<String> localSegments = _localClusterRoutingManager.getSegments(brokerRequest);
+    List<String> localSegments = _localClusterRoutingManager.getSegments(brokerRequest, samplerName);
     if (localSegments != null) {
       combined.addAll(localSegments);
     }
     for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
       try {
-        List<String> remoteSegments = remoteCluster.getSegments(brokerRequest);
+        List<String> remoteSegments = remoteCluster.getSegments(brokerRequest, samplerName);
         if (remoteSegments != null) {
           combined.addAll(remoteSegments);
         }

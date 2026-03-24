@@ -75,9 +75,17 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       LOGGER.error(message);
       throw new IllegalStateException(message);
     }
+
+    // Executor-only: read comparison mode string from task config (no auth resolution or URL hits).
+    Map<String, String> taskConfigs =
+        tableConfig.getTaskConfig() != null ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
+    String consensusMode =
+        taskConfigs != null ? taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+            UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
+            : UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
     RoaringBitmap validDocIds =
         MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
-            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator);
+            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator, consensusMode);
     if (validDocIds == null) {
       // no valid crc match found or no validDocIds obtained from all servers
       // error out the task instead of silently failing so that we can track it via task-error metrics

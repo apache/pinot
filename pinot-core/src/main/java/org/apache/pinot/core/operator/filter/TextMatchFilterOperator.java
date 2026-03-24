@@ -44,16 +44,19 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   // name of text column to query, used with multi-column text indexes.
   private final String _column;
   private final TextIndexReader _textIndexReader;
-  private final int _numDocs;
   private final TextMatchPredicate _predicate;
 
   public TextMatchFilterOperator(String column, TextIndexReader textIndexReader, TextMatchPredicate predicate,
       int numDocs) {
-    super(numDocs, false);
+    super(getSearchableDocCount(textIndexReader, numDocs), false);
     _column = column;
     _textIndexReader = textIndexReader;
     _predicate = predicate;
-    _numDocs = numDocs;
+  }
+
+  private static int getSearchableDocCount(TextIndexReader reader, int numDocs) {
+    int searchableDocCount = reader.getSearchableDocCount();
+    return searchableDocCount > 0 && searchableDocCount < numDocs ? searchableDocCount : numDocs;
   }
 
   public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {

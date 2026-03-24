@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.client.SimpleBrokerSelector;
+import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.utils.DataSchema;
@@ -51,10 +53,12 @@ import org.slf4j.LoggerFactory;
  */
 public class GrpcConnection implements AutoCloseable {
   public static final String FAIL_ON_EXCEPTIONS = "failOnExceptions";
+  static final String CONNECTION_VALIDATION_QUERY = "select 1;";
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcConnection.class);
 
   private final BrokerSelector _brokerSelector;
   private final boolean _failOnExceptions;
+  private final Map<String, String> _defaultMetadata;
   private final BrokerStreamingQueryClient _grpcQueryClient;
 
   public GrpcConnection(Properties properties, List<String> brokerList) {
@@ -63,13 +67,73 @@ public class GrpcConnection implements AutoCloseable {
   }
 
   public GrpcConnection(Properties properties, BrokerSelector brokerSelector) {
+    this(properties, brokerSelector, ConnectionUtils.getHeadersFromProperties(properties));
+  }
+
+  GrpcConnection(Properties properties, BrokerSelector brokerSelector, Map<String, String> defaultMetadata) {
+    this(properties, brokerSelector, createGrpcQueryClient(properties), defaultMetadata);
+  }
+
+  GrpcConnection(Properties properties, BrokerSelector brokerSelector, BrokerStreamingQueryClient grpcQueryClient) {
+    this(properties, brokerSelector, grpcQueryClient, ConnectionUtils.getHeadersFromProperties(properties));
+  }
+
+  GrpcConnection(Properties properties, BrokerSelector brokerSelector, BrokerStreamingQueryClient grpcQueryClient,
+      Map<String, String> defaultMetadata) {
     _brokerSelector = brokerSelector;
-    // Convert Properties properties to a Map
-    Map<String, Object> propertiesMap = new HashMap<>();
-    properties.forEach((key, value) -> propertiesMap.put(key.toString(), value));
-    _grpcQueryClient = new BrokerStreamingQueryClient(new GrpcConfig(new PinotConfiguration(propertiesMap)));
+    _grpcQueryClient = grpcQueryClient;
+    _defaultMetadata = Map.copyOf(defaultMetadata);
     // Default fail Pinot query if response contains any exception.
     _failOnExceptions = Boolean.parseBoolean(properties.getProperty(FAIL_ON_EXCEPTIONS, "TRUE"));
+    validateConnection();
+  }
+
+  private static BrokerStreamingQueryClient createGrpcQueryClient(Properties properties) {
+    Map<String, Object> propertiesMap = new HashMap<>();
+    properties.forEach((key, value) -> propertiesMap.put(key.toString(), value));
+    return new BrokerStreamingQueryClient(new GrpcConfig(new PinotConfiguration(propertiesMap)));
+  }
+
+  private void validateConnection() {
+    try {
+      BrokerResponse brokerResponse =
+          BrokerResponse.fromJson(getJsonResponse(CONNECTION_VALIDATION_QUERY, Collections.emptyMap()));
+      if (brokerResponse.hasExceptions()) {
+        throw new PinotClientException(
+            "Failed to establish gRPC broker connection: " + brokerResponse.getExceptions());
+      }
+    } catch (PinotClientException e) {
+      closeQuietly();
+      throw e;
+    } catch (Exception e) {
+      closeQuietly();
+      throw new PinotClientException("Failed to establish gRPC broker connection", e);
+    }
+  }
+
+  private void closeQuietly() {
+    try {
+      _grpcQueryClient.shutdown();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to shut down gRPC query client after connection initialization failure", e);
+    }
+    try {
+      _brokerSelector.close();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to close broker selector after connection initialization failure", e);
+    }
+  }
+
+  private Map<String, String> getRequestMetadata(Map<String, String> metadataMap) {
+    if (_defaultMetadata.isEmpty()) {
+      return metadataMap;
+    }
+    if (metadataMap.isEmpty()) {
+      return _defaultMetadata;
+    }
+    Map<String, String> requestMetadata = new HashMap<>(_defaultMetadata);
+    requestMetadata.putAll(metadataMap);
+    return requestMetadata;
   }
 
   /**
@@ -239,10 +303,11 @@ public class GrpcConnection implements AutoCloseable {
       throw new PinotClientException("Could not find broker to query " + ((tableNames == null) ? "with no tables"
           : "for table(s): " + Arrays.asList(tableNames)));
     }
+    Map<String, String> requestMetadata = getRequestMetadata(metadata);
     String brokerHost = brokerHostPort.split(":")[0];
     int brokerPort = Integer.parseInt(brokerHostPort.split(":")[1]);
     Broker.BrokerRequest brokerRequest =
-        Broker.BrokerRequest.newBuilder().setSql(query).putAllMetadata(metadata).build();
+        Broker.BrokerRequest.newBuilder().setSql(query).putAllMetadata(requestMetadata).build();
     return _grpcQueryClient.submit(brokerHost, brokerPort, brokerRequest);
   }
 

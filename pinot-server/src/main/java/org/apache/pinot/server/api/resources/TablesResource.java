@@ -84,6 +84,9 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -293,23 +296,19 @@ public class TablesResource {
       }
     }
 
-    // fetch partition to primary key count for realtime tables that have upsert enabled
-    Map<Integer, Long> upsertPartitionToPrimaryKeyCountMap = new HashMap<>();
-    if (tableDataManager instanceof RealtimeTableDataManager) {
-      RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
-      upsertPartitionToPrimaryKeyCountMap = realtimeTableDataManager.getUpsertPartitionToPrimaryKeyCount();
-    }
+    // fetch partition to primary key count for tables that have upsert or dedup enabled
+    Map<Integer, Long> partitionToPrimaryKeyCountMap = tableDataManager.getPartitionToPrimaryKeyCount();
 
-    // construct upsertPartitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
-    Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap = new HashMap<>();
-    upsertPartitionToPrimaryKeyCountMap.forEach(
-        (partition, primaryKeyCount) -> upsertPartitionToServerPrimaryKeyCountMap.put(partition,
+    // construct partitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
+    Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
+    partitionToPrimaryKeyCountMap.forEach(
+        (partition, primaryKeyCount) -> partitionToServerPrimaryKeyCountMap.put(partition,
             Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
 
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
             totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
-            upsertPartitionToServerPrimaryKeyCountMap);
+            partitionToServerPrimaryKeyCountMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
@@ -472,10 +471,10 @@ public class TablesResource {
     }
   }
 
-  // TODO Add access control similar to PinotSegmentUploadDownloadRestletResource for segment download.
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DOWNLOAD_SEGMENT)
   @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
   public Response downloadSegment(
       @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE")

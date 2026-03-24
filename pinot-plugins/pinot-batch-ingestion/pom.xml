@@ -38,7 +38,6 @@
   <modules>
     <module>pinot-batch-ingestion-common</module>
     <module>pinot-batch-ingestion-spark-base</module>
-    <module>pinot-batch-ingestion-spark-2.4</module>
     <module>pinot-batch-ingestion-spark-3</module>
 
     <module>pinot-batch-ingestion-hadoop</module>

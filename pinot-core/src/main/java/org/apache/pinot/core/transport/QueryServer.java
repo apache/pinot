@@ -143,6 +143,7 @@ public class QueryServer {
             @Override
             protected void initChannel(SocketChannel ch) {
               _allChannels.put(ch, true);
+              ch.closeFuture().addListener(f -> _allChannels.remove(ch));
 
               ch.pipeline()
                   .addLast(ChannelHandlerFactory.getDirectOOMHandler(null, null, null, _allChannels, _channel));
@@ -179,5 +180,10 @@ public class QueryServer {
   @VisibleForTesting
   ServerSocketChannel getChannel() {
     return _channel;
+  }
+
+  @VisibleForTesting
+  int getConnectedChannelCount() {
+    return _allChannels.size();
   }
 }

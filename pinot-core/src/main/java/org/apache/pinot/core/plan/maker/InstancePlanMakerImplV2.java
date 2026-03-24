@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -179,8 +178,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _groupByTrimThreshold = groupByTrimThreshold;
   }
 
+  @Override
   public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
-      ExecutorService executorService, ServerMetrics serverMetrics) {
+      ExecutorService executorService) {
     applyQueryOptions(queryContext);
 
     int numSegments = segmentContexts.size();
@@ -326,8 +326,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
   }
 
+  @Override
   public Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
-      ExecutorService executorService, ResultsBlockStreamer streamer, ServerMetrics serverMetrics) {
+      ExecutorService executorService, ResultsBlockStreamer streamer) {
     applyQueryOptions(queryContext);
 
     int numSegments = segmentContexts.size();

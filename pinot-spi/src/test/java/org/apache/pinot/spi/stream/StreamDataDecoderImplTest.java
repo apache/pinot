@@ -82,6 +82,47 @@ public class StreamDataDecoderImplTest {
     Assert.assertEquals(row.getValue(StreamDataDecoderImpl.RECORD_SERIALIZED_VALUE_SIZE_KEY), value.length());
   }
 
+  /**
+   * Demonstrates that binary keys (e.g. Confluent Avro wire format with 0x00 magic byte)
+   * were previously corrupted when decoded as UTF-8 string, and now work correctly when
+   * the __key column is defined as BYTES type.
+   */
+  @Test
+  public void testBinaryKeyCorruptedAsString() {
+    TestDecoder messageDecoder = new TestDecoder();
+    messageDecoder.init(Map.of(), Set.of(NAME_FIELD), "");
+    String value = "Alice";
+    // Simulate binary key with bytes that are invalid UTF-8 sequences.
+    // 0xFE and 0xFF are never valid in UTF-8; 0x80 is an invalid start byte.
+    // A UTF-8 round-trip will replace these with the replacement character U+FFFD,
+    // corrupting the original bytes.
+    byte[] avroKey = new byte[]{(byte) 0xFE, (byte) 0xFF, (byte) 0x80, 0x01, 0x02};
+    StreamMessageMetadata metadata = new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(1234L)
+        .setOffset(new LongMsgOffset(0), new LongMsgOffset(1))
+        .build();
+    BytesStreamMessage message =
+        new BytesStreamMessage(avroKey, value.getBytes(StandardCharsets.UTF_8), metadata);
+
+    // Old behavior (isKeyBytesType=false): binary key is decoded as UTF-8 string.
+    // The leading 0x00 byte and other non-printable bytes produce a corrupted string
+    // that does NOT round-trip back to the original bytes.
+    StreamDataDecoderResult stringResult = new StreamDataDecoderImpl(messageDecoder).decode(message);
+    Assert.assertNotNull(stringResult.getResult());
+    Object stringKey = stringResult.getResult().getValue(StreamDataDecoderImpl.KEY);
+    Assert.assertTrue(stringKey instanceof String);
+    // The UTF-8 round-trip corrupts the binary data
+    Assert.assertNotEquals(((String) stringKey).getBytes(StandardCharsets.UTF_8), avroKey,
+        "Binary key should be corrupted when decoded as UTF-8 string");
+
+    // New behavior (isKeyBytesType=true): binary key bytes are preserved as-is
+    StreamDataDecoderResult bytesResult = new StreamDataDecoderImpl(messageDecoder, true).decode(message);
+    Assert.assertNotNull(bytesResult.getResult());
+    Object bytesKey = bytesResult.getResult().getValue(StreamDataDecoderImpl.KEY);
+    Assert.assertTrue(bytesKey instanceof byte[]);
+    Assert.assertEquals((byte[]) bytesKey, avroKey,
+        "Binary key should be preserved losslessly when __key is BYTES type");
+  }
+
   @Test
   public void testNoExceptionIsThrown() {
     ThrowingDecoder messageDecoder = new ThrowingDecoder();

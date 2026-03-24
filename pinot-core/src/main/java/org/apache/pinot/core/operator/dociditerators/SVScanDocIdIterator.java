@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.util.Map;
 import java.util.OptionalInt;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -49,11 +50,12 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize) {
+  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize,
+      Map<String, String> queryOptions) {
     _batch = new int[batchSize];
     _predicateEvaluator = predicateEvaluator;
     _reader = dataSource.getForwardIndex();
-    _readerContext = _reader.createContext();
+    _readerContext = _reader.createContext(queryOptions);
     _numDocs = numDocs;
     _valueMatcher = getValueMatcher();
     _cardinality = dataSource.getDataSourceMetadata().getCardinality();

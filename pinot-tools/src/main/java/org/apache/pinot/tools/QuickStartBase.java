@@ -25,6 +25,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -35,12 +37,23 @@ import java.util.Properties;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.hc.client5.http.entity.mime.FileBody;
+import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.AirlineDataStream;
 import org.apache.pinot.tools.streams.MeetupRsvpStream;
@@ -81,17 +94,19 @@ public abstract class QuickStartBase {
       "examples/batch/testUnnest",
   };
 
-  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = Map.of(
-      "airlineStats", "examples/stream/airlineStats",
-      "dailySales", "examples/stream/dailySales",
-      "githubEvents", "examples/stream/githubEvents",
-      "meetupRsvp", "examples/stream/meetupRsvp",
-      "meetupRsvpJson", "examples/stream/meetupRsvpJson",
-      "meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType",
-      "upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp",
-      "upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp",
-      "upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp",
-      "fineFoodReviews", "examples/stream/fineFoodReviews");
+  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = Map.ofEntries(
+      Map.entry("airlineStats", "examples/stream/airlineStats"),
+      Map.entry("dailySales", "examples/stream/dailySales"),
+      Map.entry("githubEvents", "examples/stream/githubEvents"),
+      Map.entry("meetupRsvp", "examples/stream/meetupRsvp"),
+      Map.entry("meetupRsvpJson", "examples/stream/meetupRsvpJson"),
+      Map.entry("meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType"),
+      Map.entry("upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp"),
+      Map.entry("upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp"),
+      Map.entry("upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp"),
+      Map.entry("fineFoodReviews", "examples/stream/fineFoodReviews"),
+      Map.entry("fineFoodReviews_part_0", "examples/stream/fineFoodReviews_part_0"),
+      Map.entry("fineFoodReviews_part_1", "examples/stream/fineFoodReviews_part_1"));
 
   protected File _dataDir = FileUtils.getTempDirectory();
   protected boolean _setCustomDataDir;
@@ -99,7 +114,9 @@ public abstract class QuickStartBase {
   protected String _zkExternalAddress;
   protected String _configFilePath;
   protected StreamDataServerStartable _kafkaStarter;
-  protected ZkStarter.ZookeeperInstance _zookeeperInstance;
+  protected String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
+  private boolean _kafkaBrokerListOverridden;
+  private String _resolvedKafkaBrokerList;
 
   public QuickStartBase setDataDir(String dataDir) {
     _dataDir = new File(dataDir);
@@ -139,6 +156,13 @@ public abstract class QuickStartBase {
 
   public QuickStartBase setConfigFilePath(String configFilePath) {
     _configFilePath = configFilePath;
+    return this;
+  }
+
+  public QuickStartBase setKafkaBrokerList(String kafkaBrokerList) {
+    _kafkaBrokerList = kafkaBrokerList;
+    _kafkaBrokerListOverridden = true;
+    _resolvedKafkaBrokerList = null;
     return this;
   }
 
@@ -341,8 +365,9 @@ public abstract class QuickStartBase {
     return DEFAULT_STREAM_TABLE_DIRECTORIES;
   }
 
-  protected static void publishStreamDataToKafka(String tableName, File dataDir)
+  protected void publishStreamDataToKafka(String tableName, File dataDir)
       throws Exception {
+    resolveKafkaBrokerList();
     switch (tableName) {
       case "githubEvents":
         publishLineSplitFileToKafka("githubEvents", new File(dataDir, "/rawdata/2021-07-21-few-hours.json"));
@@ -359,10 +384,10 @@ public abstract class QuickStartBase {
     }
   }
 
-  protected static void publishLineSplitFileToKafka(String topicName, File dataFile)
+  protected void publishLineSplitFileToKafka(String topicName, File dataFile)
       throws Exception {
     Properties properties = new Properties();
-    properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+    properties.put("metadata.broker.list", resolveKafkaBrokerList());
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
     StreamDataProducer producer =
@@ -399,22 +424,33 @@ public abstract class QuickStartBase {
     }
   }
 
-  protected void startKafka() {
+  public final void startKafka() {
+    if (_kafkaStarter != null) {
+      return;
+    }
     printStatus(Quickstart.Color.CYAN, "***** Starting Kafka *****");
-    _zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
+      String configuredBrokerList = getConfiguredKafkaBrokerList();
+      Properties props = new Properties();
+      props.put(KafkaStarterUtils.KAFKA_SERVER_OWNER_NAME, getClass().getSimpleName());
+      props.put(KafkaStarterUtils.KAFKA_SERVER_BOOTSTRAP_SERVERS, configuredBrokerList);
+      props.put(KafkaStarterUtils.KAFKA_SERVER_PORT,
+          String.valueOf(KafkaStarterUtils.parsePort(configuredBrokerList, KafkaStarterUtils.DEFAULT_KAFKA_PORT)));
+      props.put(KafkaStarterUtils.KAFKA_SERVER_BROKER_ID, String.valueOf(KafkaStarterUtils.DEFAULT_BROKER_ID));
+      props.put(KafkaStarterUtils.KAFKA_SERVER_ALLOW_MANAGED_FOR_CONFIGURED_BROKER, "false");
       _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
+          props);
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
     _kafkaStarter.start();
+    _resolvedKafkaBrokerList = resolveKafkaBrokerList();
+    printStatus(Quickstart.Color.CYAN, "***** Using Kafka at " + _resolvedKafkaBrokerList + " *****");
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
-        printStatus(Quickstart.Color.GREEN, "***** Shutting down kafka and zookeeper *****");
+        printStatus(Quickstart.Color.GREEN, "***** Shutting down kafka *****");
         _kafkaStarter.stop();
-        ZkStarter.stopLocalZkServer(_zookeeperInstance);
       } catch (Exception e) {
         e.printStackTrace();
       }
@@ -425,6 +461,9 @@ public abstract class QuickStartBase {
 
   public void startAllDataStreams(StreamDataServerStartable kafkaStarter, File quickstartTmpDir)
       throws Exception {
+    if (kafkaStarter == null) {
+      throw new IllegalArgumentException("Kafka starter must not be null");
+    }
     for (String streamName : getDefaultStreamTableDirectories().keySet()) {
       switch (streamName) {
         case "airlineStats":
@@ -541,6 +580,10 @@ public abstract class QuickStartBase {
           printStatus(Quickstart.Color.CYAN,
               "***** Starting fineFoodReviews data stream and publishing to Kafka *****");
           publishStreamDataToKafka("fineFoodReviews", new File(quickstartTmpDir, "fineFoodReviews"));
+          break;
+        case "fineFoodReviews_part_0":
+        case "fineFoodReviews_part_1":
+          // Consume from existing fineFoodReviews topic (partition subset); no separate stream to start
           break;
         default:
           throw new UnsupportedOperationException("Unknown stream name: " + streamName);
@@ -967,5 +1010,99 @@ public abstract class QuickStartBase {
     printStatus(Quickstart.Color.CYAN, "Query : " + q7);
     printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q7)));
     printStatus(Quickstart.Color.GREEN, "***************************************************");
+  }
+
+  protected AdminClient createKafkaAdminClient() {
+    Properties props = new Properties();
+    props.put("bootstrap.servers", resolveKafkaBrokerList());
+    return AdminClient.create(props);
+  }
+
+  private String resolveKafkaBrokerList() {
+    if (_resolvedKafkaBrokerList != null) {
+      return _resolvedKafkaBrokerList;
+    }
+    _resolvedKafkaBrokerList =
+        KafkaStarterUtils.resolveKafkaBrokerList(getConfiguredKafkaBrokerList(), _kafkaBrokerListOverridden);
+    return _resolvedKafkaBrokerList;
+  }
+
+  private String getConfiguredKafkaBrokerList() {
+    String envKafka = firstNonEmpty(System.getProperty("pinot.kafka.broker.list"),
+        System.getenv("PINOT_KAFKA_BROKER_LIST"),
+        System.getenv("KAFKA_BROKER_LIST"));
+    return _kafkaBrokerListOverridden ? _kafkaBrokerList : (envKafka != null ? envKafka : _kafkaBrokerList);
+  }
+
+  private static String firstNonEmpty(String... values) {
+    for (String value : values) {
+      if (value != null && !value.isBlank()) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  protected void createFineFoodReviewsFederatedTable() {
+    if (!useDefaultBootstrapTableDir()) {
+      return;
+    }
+    Map<String, String> streamTableDirectories = getDefaultStreamTableDirectories();
+    if (!streamTableDirectories.containsKey("fineFoodReviews_part_0")
+        || !streamTableDirectories.containsKey("fineFoodReviews_part_1")) {
+      return;
+    }
+    String logicalTableName = "fineFoodReviews-federated";
+    try {
+      Schema schema = loadSchemaFromResource("/examples/stream/fineFoodReviews/fineFoodReviews_schema.json");
+      schema.setSchemaName(logicalTableName);
+      createSchemaOnController(schema, logicalTableName);
+
+      LogicalTableConfig logicalTableConfig = new LogicalTableConfig();
+      logicalTableConfig.setTableName(logicalTableName);
+      logicalTableConfig.setBrokerTenant("DefaultTenant");
+      logicalTableConfig.setRefRealtimeTableName("fineFoodReviews_part_0_REALTIME");
+      logicalTableConfig.setPhysicalTableConfigMap(Map.of(
+          "fineFoodReviews_part_0_REALTIME", new PhysicalTableConfig(),
+          "fineFoodReviews_part_1_REALTIME", new PhysicalTableConfig()
+      ));
+
+      String logicalTableUrl = "http://localhost:" + QuickstartRunner.DEFAULT_CONTROLLER_PORT + "/logicalTables";
+      AbstractBaseAdminCommand.sendPostRequest(logicalTableUrl, logicalTableConfig.toSingleLineJsonString());
+      printStatus(Quickstart.Color.GREEN,
+          "***** Logical table fineFoodReviews-federated created successfully *****");
+    } catch (Exception e) {
+      printStatus(Quickstart.Color.YELLOW,
+          "***** Logical table fineFoodReviews-federated creation failed: " + e.getMessage() + " *****");
+    }
+  }
+
+  private Schema loadSchemaFromResource(String resourcePath)
+      throws IOException {
+    try (InputStream inputStream = getClass().getResourceAsStream(resourcePath)) {
+      if (inputStream == null) {
+        throw new IOException("Schema file not found: " + resourcePath);
+      }
+      String schemaJsonString = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+      return Schema.fromString(schemaJsonString);
+    }
+  }
+
+  private void createSchemaOnController(Schema schema, String logicalTableName)
+      throws Exception {
+    File tempSchemaFile = File.createTempFile(logicalTableName + "_schema", ".json");
+    tempSchemaFile.deleteOnExit();
+    FileUtils.writeStringToFile(tempSchemaFile, schema.toSingleLineJsonString(), StandardCharsets.UTF_8);
+    HttpEntity multipartEntity = MultipartEntityBuilder.create()
+        .addPart("schema", new FileBody(tempSchemaFile, ContentType.APPLICATION_JSON, logicalTableName + ".json"))
+        .build();
+    try (HttpClient httpClient = new HttpClient()) {
+      String schemaUrl = "http://localhost:" + QuickstartRunner.DEFAULT_CONTROLLER_PORT + "/schemas?override=true"
+          + "&force=true";
+      SimpleHttpResponse response = httpClient.sendPostRequest(URI.create(schemaUrl), multipartEntity, null, null);
+      if (response.getStatusCode() != 200) {
+        throw new RuntimeException("Schema creation response: " + response.getResponse());
+      }
+    }
   }
 }

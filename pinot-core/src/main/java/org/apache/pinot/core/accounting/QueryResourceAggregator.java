@@ -202,19 +202,34 @@ public class QueryResourceAggregator implements ResourceAggregator {
 
     // Compute the new triggering level based on the current heap usage
     QueryMonitorConfig config = _queryMonitorConfig.get();
-    _triggeringLevel =
-        config.isCpuTimeBasedKillingEnabled() ? TriggeringLevel.CPUTimeBasedKilling : TriggeringLevel.Normal;
     if (_usedBytes > config.getPanicLevel()) {
+      // PANIC
+      _sleepTime = config.getAlarmingSleepTime();
       _triggeringLevel = TriggeringLevel.HeapMemoryPanic;
       _metrics.addMeteredGlobalValue(_heapMemoryPanicExceededMeter, 1);
     } else if (_usedBytes > config.getCriticalLevel()) {
+      // CRITICAL
+      _sleepTime = config.getAlarmingSleepTime();
       _triggeringLevel = TriggeringLevel.HeapMemoryCritical;
       _metrics.addMeteredGlobalValue(_heapMemoryCriticalExceededMeter, 1);
     } else if (_usedBytes > config.getAlarmingLevel()) {
+      // ALARMING
       _sleepTime = config.getAlarmingSleepTime();
-      // For debugging
-      if (LOGGER.isDebugEnabled() && _triggeringLevel == TriggeringLevel.Normal) {
-        _triggeringLevel = TriggeringLevel.HeapMemoryAlarmingVerbose;
+      if (config.isCpuTimeBasedKillingEnabled()) {
+        _triggeringLevel = TriggeringLevel.CPUTimeBasedKilling;
+      } else {
+        if (LOGGER.isDebugEnabled()) {
+          _triggeringLevel = TriggeringLevel.HeapMemoryAlarmingVerbose;
+        } else {
+          _triggeringLevel = TriggeringLevel.Normal;
+        }
+      }
+    } else {
+      // NORMAL
+      if (config.isCpuTimeBasedKillingEnabled()) {
+        _triggeringLevel = TriggeringLevel.CPUTimeBasedKilling;
+      } else {
+        _triggeringLevel = TriggeringLevel.Normal;
       }
     }
 

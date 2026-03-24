@@ -60,4 +60,8 @@ public class ThreadSafeMutableRoaringBitmap {
   public synchronized MutableRoaringBitmap getMutableRoaringBitmap() {
     return _mutableRoaringBitmap.clone();
   }
+
+  public synchronized boolean isEmpty() {
+    return _mutableRoaringBitmap.isEmpty();
+  }
 }

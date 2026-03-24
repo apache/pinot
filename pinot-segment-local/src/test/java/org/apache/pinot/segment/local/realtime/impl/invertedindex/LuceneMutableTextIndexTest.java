@@ -217,6 +217,29 @@ public class LuceneMutableTextIndexTest {
   }
 
   @Test
+  public void testGetSearchableDocCount()
+      throws IOException {
+    TextIndexConfig config = new TextIndexConfigBuilder().withUseANDForMultiTermQueries(false).build();
+    RealtimeLuceneTextIndex index = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR,
+        "table__0__" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement() + "__20240601T1818Z", config);
+    try {
+      // Before any refresh, no docs are visible to the searcher
+      assertEquals(index.getSearchableDocCount(), 0);
+
+      index.add(new String[]{"hello world"});
+      index.add(new String[]{"foo bar"});
+      index.add(new String[]{"baz qux"});
+
+      // Force a searcher refresh — triggers the refresh listener which records the current doc count
+      index.getSearcherManager().maybeRefresh();
+
+      assertEquals(index.getSearchableDocCount(), 3);
+    } finally {
+      index.close();
+    }
+  }
+
+  @Test
   public void testQueries() {
     TestUtils.waitForCondition(aVoid -> {
           try {

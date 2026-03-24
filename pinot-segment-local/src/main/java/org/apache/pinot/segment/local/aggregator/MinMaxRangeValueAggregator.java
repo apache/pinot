@@ -90,9 +90,7 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
       Object[] values = (Object[]) rawValue;
       MinMaxRangePair minMaxRangePair = new MinMaxRangePair();
       for (Object value : values) {
-        if (value != null) {
-          minMaxRangePair.apply(ValueAggregatorUtils.toDouble(value));
-        }
+        minMaxRangePair.apply(ValueAggregatorUtils.toDouble(value));
       }
       return minMaxRangePair;
     } else {
