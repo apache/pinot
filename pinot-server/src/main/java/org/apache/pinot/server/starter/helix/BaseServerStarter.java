@@ -814,20 +814,18 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     // Register handler to reset GRPC mailbox channel backoff when servers come online
-    {
-      WorkerQueryServer workerQueryServer = _serverInstance.getWorkerQueryServer();
-      if (workerQueryServer != null) {
-        MailboxService mailboxService = workerQueryServer.getQueryRunner().getMailboxService();
-        LOGGER.info("Registering ServerGrpcChannelBackoffResetHandler");
-        try {
-          _helixManager.addInstanceConfigChangeListener(
-              new ServerGrpcChannelBackoffResetHandler(_helixManager, _instanceId, mailboxService));
-        } catch (Exception e) {
-          LOGGER.error("Failed to register ServerGrpcChannelBackoffResetHandler", e);
-        }
-      } else {
-        LOGGER.info("Multi-stage query engine not enabled, skipping ServerGrpcChannelBackoffResetHandler registration");
+    WorkerQueryServer workerQueryServer = _serverInstance.getWorkerQueryServer();
+    if (workerQueryServer != null) {
+      MailboxService mailboxService = workerQueryServer.getQueryRunner().getMailboxService();
+      LOGGER.info("Registering ServerGrpcChannelBackoffResetHandler");
+      try {
+        _helixManager.addInstanceConfigChangeListener(
+            new ServerGrpcChannelBackoffResetHandler(_helixAdmin, _helixClusterName, _instanceId, mailboxService));
+      } catch (Exception e) {
+        LOGGER.error("Failed to register ServerGrpcChannelBackoffResetHandler", e);
       }
+    } else {
+      LOGGER.info("Multi-stage query engine not enabled, skipping ServerGrpcChannelBackoffResetHandler registration");
     }
 
     // Start restlet server for admin API endpoint

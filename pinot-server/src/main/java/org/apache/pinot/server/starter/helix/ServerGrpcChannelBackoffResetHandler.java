@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.listeners.BatchMode;
 import org.apache.helix.api.listeners.InstanceConfigChangeListener;
@@ -58,7 +57,7 @@ import org.slf4j.LoggerFactory;
 public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerGrpcChannelBackoffResetHandler.class);
 
-  private final HelixManager _helixManager;
+  private final HelixAdmin _helixAdmin;
   private final String _clusterName;
   private final String _selfInstanceId;
   private final MailboxService _mailboxService;
@@ -67,13 +66,10 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
   // from being in this set to having IS_SHUTDOWN_IN_PROGRESS=false, we reset its channel backoff.
   private final Set<String> _shuttingDownServers = new HashSet<>();
 
-  @Nullable
-  private HelixAdmin _helixAdmin;
-
-  public ServerGrpcChannelBackoffResetHandler(HelixManager helixManager, String selfInstanceId,
+  public ServerGrpcChannelBackoffResetHandler(HelixAdmin helixAdmin, String clusterName, String selfInstanceId,
       MailboxService mailboxService) {
-    _helixManager = helixManager;
-    _clusterName = helixManager.getClusterName();
+    _helixAdmin = helixAdmin;
+    _clusterName = clusterName;
     _selfInstanceId = selfInstanceId;
     _mailboxService = mailboxService;
   }
@@ -81,19 +77,10 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
   @Override
   public synchronized void onInstanceConfigChange(List<InstanceConfig> instanceConfigs,
       NotificationContext context) {
-    if (_helixAdmin == null) {
-      _helixAdmin = _helixManager.getClusterManagmentTool();
-    }
-    // Only process INIT (listener registration) and CALLBACK (ZK data/child change).
-    // Ignore FINALIZE (listener unregistration) and other types.
-    NotificationContext.Type type = context.getType();
-    if (type != NotificationContext.Type.INIT && type != NotificationContext.Type.CALLBACK) {
-      return;
-    }
-
     // INIT: first callback when the listener is registered (full cluster snapshot).
     // isChildChange: an instance ZK node was added or removed under /CONFIGS/PARTICIPANT.
     // Both require a full scan to rebuild _shuttingDownServers from the current cluster state.
+    NotificationContext.Type type = context.getType();
     if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {
       handleFullScan();
     } else {
@@ -170,9 +157,11 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
       LOGGER.debug("Server {} has no mailbox port configured, skipping backoff reset", instanceId);
       return;
     }
-    String hostname = ServerInstance.extractHostnameFromConfig(config);
-    if (hostname == null) {
-      LOGGER.warn("Could not extract hostname for server: {}, skipping backoff reset", instanceId);
+    String hostname;
+    try {
+      hostname = ServerInstance.extractHostnameFromConfig(config);
+    } catch (Exception e) {
+      LOGGER.warn("Could not extract hostname for server: {}, skipping backoff reset", instanceId, e);
       return;
     }
     if (_mailboxService.resetConnectBackoff(hostname, mailboxPort)) {

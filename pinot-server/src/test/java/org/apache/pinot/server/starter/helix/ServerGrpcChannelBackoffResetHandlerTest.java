@@ -63,9 +63,7 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    when(_helixManager.getClusterName()).thenReturn(CLUSTER_NAME);
-    when(_helixManager.getClusterManagmentTool()).thenReturn(_helixAdmin);
-    _handler = new ServerGrpcChannelBackoffResetHandler(_helixManager, SELF_INSTANCE_ID, _mailboxService);
+    _handler = new ServerGrpcChannelBackoffResetHandler(_helixAdmin, CLUSTER_NAME, SELF_INSTANCE_ID, _mailboxService);
   }
 
   @AfterMethod
@@ -143,18 +141,6 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, -1, false));
     _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
 
-    verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
-  }
-
-  @Test
-  public void testIgnoresNonCallbackNotifications() {
-    NotificationContext context = new NotificationContext(_helixManager);
-    context.setType(NotificationContext.Type.FINALIZE);
-
-    _handler.onInstanceConfigChange(Collections.emptyList(), context);
-
-    verify(_helixAdmin, never()).getInstancesInCluster(any());
-    verify(_helixAdmin, never()).getInstanceConfig(any(), any());
     verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
   }
 

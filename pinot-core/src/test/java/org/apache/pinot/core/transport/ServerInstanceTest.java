@@ -24,7 +24,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 
 
 public class ServerInstanceTest {
@@ -56,8 +56,29 @@ public class ServerInstanceTest {
   }
 
   @Test
-  public void testExtractHostnameFromConfigEmptyInstanceName() {
+  public void testExtractHostnameFromConfigEmptyInstanceNameThrows() {
     InstanceConfig config = new InstanceConfig(new ZNRecord(""));
-    assertNull(ServerInstance.extractHostnameFromConfig(config));
+    assertThrows(ArrayIndexOutOfBoundsException.class, () -> ServerInstance.extractHostnameFromConfig(config));
+  }
+
+  @Test
+  public void testExtractPortFromConfigWithPort() {
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost_1234"));
+    config.setHostName("myhost");
+    config.setPort("1234");
+    assertEquals(ServerInstance.extractPortFromConfig(config), 1234);
+  }
+
+  @Test
+  public void testExtractPortFromConfigFallbackToInstanceName() {
+    // When port is null, falls back to parsing instance name
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost_1234"));
+    assertEquals(ServerInstance.extractPortFromConfig(config), 1234);
+  }
+
+  @Test
+  public void testExtractPortFromConfigNoPortThrows() {
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost"));
+    assertThrows(ArrayIndexOutOfBoundsException.class, () -> ServerInstance.extractPortFromConfig(config));
   }
 }
