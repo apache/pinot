@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.core.function.scalar;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.PinotScalarFunction;
-import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.transform.function.FilterMvPredicateEvaluator;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -36,14 +32,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /**
  * Scalar wrapper for filterMv so FunctionRegistry can expose type signatures for query planning and execution paths
  * that resolve scalar functions.
+ *
+ * <p>Each FunctionInvoker creates a new instance of this class, so instance fields are safe to use without
+ * synchronization. The evaluator is cached per instance to avoid repeated creation for the same predicate.</p>
  */
-@ScalarFunction(names = {"filterMv"})
+@ScalarFunction
 public class FilterMvScalarFunction implements PinotScalarFunction {
-  private static final int MAX_CACHED_EVALUATORS = 10_000;
   private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP =
       new EnumMap<>(ColumnDataType.class);
-  private static final Cache<CacheKey, FilterMvPredicateEvaluator> EVALUATOR_CACHE =
-      CacheBuilder.newBuilder().maximumSize(MAX_CACHED_EVALUATORS).build();
 
   static {
     try {
@@ -70,21 +66,13 @@ public class FilterMvScalarFunction implements PinotScalarFunction {
     }
   }
 
+  private String _predicate;
+  private DataType _dataType;
+  private FilterMvPredicateEvaluator _evaluator;
+
   @Override
   public String getName() {
     return "filterMv";
-  }
-
-  @Override
-  public Set<String> getNames() {
-    return Set.of("filterMv");
-  }
-
-  @Nullable
-  @Override
-  public PinotSqlFunction toPinotSqlFunction() {
-    // Should already be registered in PinotOperatorTable by the transform function implementation
-    return null;
   }
 
   @Nullable
@@ -109,7 +97,7 @@ public class FilterMvScalarFunction implements PinotScalarFunction {
     return getFunctionInfo(new ColumnDataType[]{ColumnDataType.STRING_ARRAY, ColumnDataType.STRING});
   }
 
-  public static int[] filterMv(int[] values, String predicate) {
+  public int[] filterMv(int[] values, String predicate) {
     FilterMvPredicateEvaluator evaluator = evaluatorFor(predicate, DataType.INT);
     int numValues = values.length;
     int count = 0;
@@ -131,7 +119,7 @@ public class FilterMvScalarFunction implements PinotScalarFunction {
     return filtered;
   }
 
-  public static long[] filterMv(long[] values, String predicate) {
+  public long[] filterMv(long[] values, String predicate) {
     FilterMvPredicateEvaluator evaluator = evaluatorFor(predicate, DataType.LONG);
     int numValues = values.length;
     int count = 0;
@@ -153,7 +141,7 @@ public class FilterMvScalarFunction implements PinotScalarFunction {
     return filtered;
   }
 
-  public static float[] filterMv(float[] values, String predicate) {
+  public float[] filterMv(float[] values, String predicate) {
     FilterMvPredicateEvaluator evaluator = evaluatorFor(predicate, DataType.FLOAT);
     int numValues = values.length;
     int count = 0;
@@ -175,7 +163,7 @@ public class FilterMvScalarFunction implements PinotScalarFunction {
     return filtered;
   }
 
-  public static double[] filterMv(double[] values, String predicate) {
+  public double[] filterMv(double[] values, String predicate) {
     FilterMvPredicateEvaluator evaluator = evaluatorFor(predicate, DataType.DOUBLE);
     int numValues = values.length;
     int count = 0;
@@ -197,7 +185,7 @@ public class FilterMvScalarFunction implements PinotScalarFunction {
     return filtered;
   }
 
-  public static String[] filterMv(String[] values, String predicate) {
+  public String[] filterMv(String[] values, String predicate) {
     FilterMvPredicateEvaluator evaluator = evaluatorFor(predicate, DataType.STRING);
     int numValues = values.length;
     int count = 0;
@@ -219,7 +207,7 @@ public class FilterMvScalarFunction implements PinotScalarFunction {
     return filtered;
   }
 
-  public static byte[][] filterMv(byte[][] values, String predicate) {
+  public byte[][] filterMv(byte[][] values, String predicate) {
     FilterMvPredicateEvaluator evaluator = evaluatorFor(predicate, DataType.BYTES);
     int numValues = values.length;
     int count = 0;
@@ -241,46 +229,14 @@ public class FilterMvScalarFunction implements PinotScalarFunction {
     return filtered;
   }
 
-  private static FilterMvPredicateEvaluator evaluatorFor(String predicate, DataType dataType) {
-    CacheKey key = new CacheKey(predicate, dataType);
-    try {
-      return EVALUATOR_CACHE.get(key,
-          () -> FilterMvPredicateEvaluator.forPredicate(predicate, dataType, null));
-    } catch (Exception e) {
-      Throwable cause = e.getCause() != null ? e.getCause() : e;
-      if (cause instanceof RuntimeException) {
-        throw (RuntimeException) cause;
-      }
-      throw new IllegalArgumentException("Failed to create predicate evaluator for: " + predicate, cause);
-    }
-  }
-
-  private static final class CacheKey {
-    private final String _predicate;
-    private final DataType _dataType;
-
-    private CacheKey(String predicate, DataType dataType) {
+  private FilterMvPredicateEvaluator evaluatorFor(String predicate, DataType dataType) {
+    if (_evaluator == null || _dataType != dataType || !_predicate.equals(predicate)) {
+      // Build the new evaluator first so cached state is only updated after successful creation
+      FilterMvPredicateEvaluator newEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, dataType, null);
       _predicate = predicate;
       _dataType = dataType;
+      _evaluator = newEvaluator;
     }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (this == obj) {
-        return true;
-      }
-      if (!(obj instanceof CacheKey)) {
-        return false;
-      }
-      CacheKey other = (CacheKey) obj;
-      return _dataType == other._dataType && _predicate.equals(other._predicate);
-    }
-
-    @Override
-    public int hashCode() {
-      int result = _predicate.hashCode();
-      result = 31 * result + _dataType.hashCode();
-      return result;
-    }
+    return _evaluator;
   }
 }
