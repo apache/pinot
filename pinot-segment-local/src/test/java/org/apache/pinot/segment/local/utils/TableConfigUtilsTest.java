@@ -3783,4 +3783,187 @@ public class TableConfigUtilsTest {
     // Should not throw
     TableConfigUtils.validateTaskConfig(tableConfigOnlyCompactMerge);
   }
+
+  @Test
+  public void testValidatePostPartialUpsertTransformConfigs() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addMetric("score", FieldSpec.DataType.DOUBLE)
+        .addMetric("bonus", FieldSpec.DataType.DOUBLE)
+        .addMetric("total", FieldSpec.DataType.DOUBLE)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(Lists.newArrayList("pk"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+
+    // Valid config should pass
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", "plus(score,bonus)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(upsertConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
+    // postPartialUpsertTransformConfigs on FULL upsert should fail
+    UpsertConfig fullUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    fullUpsertConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", "plus(score,bonus)")));
+    TableConfig fullTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(fullUpsertConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(fullTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("PARTIAL"));
+    }
+
+    // Duplicate transform column should fail
+    UpsertConfig dupConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    dupConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", "plus(score,bonus)"),
+            new TransformConfig("total", "minus(score,bonus)")));
+    TableConfig dupTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(dupConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(dupTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Duplicate"));
+    }
+
+    // Destination column not in schema should fail
+    UpsertConfig missingColConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    missingColConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("nonExistent", "plus(score,bonus)")));
+    TableConfig missingColTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(missingColConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(missingColTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("must be present in the schema"));
+    }
+
+    // Self-referencing transform function should fail
+    UpsertConfig selfRefConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    selfRefConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", "plus(total,bonus)")));
+    TableConfig selfRefTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(selfRefConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(selfRefTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("cannot contain the destination column"));
+    }
+
+    // Transform targeting primary key column should fail
+    UpsertConfig pkConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    pkConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("pk", "concat(score,bonus)")));
+    TableConfig pkTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(pkConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(pkTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("primary key column"));
+    }
+
+    // Transform targeting comparison column should fail
+    UpsertConfig compConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    compConfig.setComparisonColumns(List.of(TIME_COLUMN));
+    compConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig(TIME_COLUMN, "plus(score,bonus)")));
+    TableConfig compTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(compConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(compTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("comparison column"));
+    }
+
+    // Transform targeting delete record column should fail
+    UpsertConfig deleteColConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    deleteColConfig.setDeleteRecordColumn("score");
+    deleteColConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("score", "plus(bonus,total)")));
+    TableConfig deleteColTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(deleteColConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(deleteColTableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("delete record column"));
+    }
+
+    // Transform targeting out-of-order record column should fail
+    Schema schemaWithBool = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addMetric("score", FieldSpec.DataType.DOUBLE)
+        .addMetric("bonus", FieldSpec.DataType.DOUBLE)
+        .addMetric("total", FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension("isOoo", FieldSpec.DataType.BOOLEAN)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(Lists.newArrayList("pk"))
+        .build();
+    UpsertConfig oooColConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    oooColConfig.setOutOfOrderRecordColumn("isOoo");
+    oooColConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("isOoo", "plus(bonus,total)")));
+    TableConfig oooColTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(oooColConfig)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(oooColTableConfig, schemaWithBool);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("out-of-order record column"));
+    }
+  }
 }

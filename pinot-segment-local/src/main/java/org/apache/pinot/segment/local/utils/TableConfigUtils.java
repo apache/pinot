@@ -902,6 +902,61 @@ public final class TableConfigUtils {
                 + " / UpsertCompactMergeTask for upsert table");
       }
 
+      // Validate post-partial-upsert transform configs
+      List<TransformConfig> postPartialUpsertTransformConfigs =
+          upsertConfig.getPostPartialUpsertTransformConfigs();
+      if (postPartialUpsertTransformConfigs != null) {
+        Preconditions.checkState(upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
+            "postPartialUpsertTransformConfigs can only be configured for PARTIAL upsert tables");
+        Set<String> primaryKeyColumns = new HashSet<>(schema.getPrimaryKeyColumns());
+        Set<String> transformColumns = new HashSet<>();
+        for (TransformConfig transformConfig : postPartialUpsertTransformConfigs) {
+          String columnName = transformConfig.getColumnName();
+          String transformFunction = transformConfig.getTransformFunction();
+          if (columnName == null || transformFunction == null) {
+            throw new IllegalStateException(
+                "columnName/transformFunction cannot be null in postPartialUpsertTransformConfigs "
+                    + transformConfig);
+          }
+          Preconditions.checkState(!primaryKeyColumns.contains(columnName),
+              "Post-partial-upsert transform cannot target primary key column '%s'", columnName);
+          Preconditions.checkState(comparisonColumns == null || !comparisonColumns.contains(columnName),
+              "Post-partial-upsert transform cannot target comparison column '%s'", columnName);
+          Preconditions.checkState(!columnName.equals(deleteRecordColumn),
+              "Post-partial-upsert transform cannot target delete record column '%s'", columnName);
+          Preconditions.checkState(!columnName.equals(outOfOrderRecordColumn),
+              "Post-partial-upsert transform cannot target out-of-order record column '%s'", columnName);
+          if (!transformColumns.add(columnName)) {
+            throw new IllegalStateException(
+                "Duplicate post-partial-upsert transform config found for column '" + columnName + "'");
+          }
+          Preconditions.checkState(schema.hasColumn(columnName),
+              "The destination column '%s' of the post-partial-upsert transform function must be present in the "
+                  + "schema", columnName);
+          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+            throw new IllegalStateException(
+                "Groovy transform functions are disabled. Found '" + transformFunction + "' for column '"
+                    + columnName + "' in postPartialUpsertTransformConfigs");
+          }
+          try {
+            FunctionEvaluator expressionEvaluator =
+                FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+            List<String> arguments = expressionEvaluator.getArguments();
+            if (arguments.contains(columnName)) {
+              throw new IllegalStateException(
+                  "Arguments of a post-partial-upsert transform function '" + arguments
+                      + "' cannot contain the destination column '" + columnName + "'");
+            }
+          } catch (IllegalStateException e) {
+            throw e;
+          } catch (Exception e) {
+            throw new IllegalStateException(
+                "Invalid post-partial-upsert transform function '" + transformFunction + "' for column '"
+                    + columnName + "'", e);
+          }
+        }
+      }
+
       if (upsertConfig.getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE) {
         Preconditions.checkState(upsertConfig.getNewSegmentTrackingTimeMs() > 0,
             "Positive newSegmentTrackingTimeMs is required to enable consistency mode: "
