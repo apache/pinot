@@ -70,16 +70,27 @@ helm upgrade ${RELEASE} -n ${NAMESPACE} ./helm/pinot
 #### Option B: Migrate ZooKeeper data (preserves Pinot metadata)
 
 > **Note**: This option copies ZooKeeper data from the old Bitnami mount
-> path (`/bitnami/zookeeper`) to a local backup, then restores it into
-> the new official image's data directory (`/data`) after upgrade. This
-> preserves Pinot cluster metadata (table configs, schemas, segment
-> assignments). Verify your cluster state after migration.
+> path (`/bitnami/zookeeper/data`) to a local backup, then restores it into
+> the new official image's data directories (`/data` and `/datalog`) after
+> upgrade. This preserves Pinot cluster metadata (table configs, schemas,
+> segment assignments). Verify your cluster state after migration.
+>
+> **Important**: The Bitnami image stores both snapshots and transaction
+> logs together in `/bitnami/zookeeper/data/version-2/`. The new chart
+> uses separate directories (`/data` for snapshots, `/datalog` for
+> transaction logs). The restore step below handles this separation
+> automatically. If not separated, ZooKeeper will refuse to start with:
+> `Snapshot directory has log files`.
+>
+> If your old deployment used `replicaCount > 1`, repeat the backup
+> (step 1) for each pod (e.g. `zookeeper-1`, `zookeeper-2`) and restore
+> from the pod that was the ZooKeeper leader.
 
 ```bash
 NAMESPACE=pinot-quickstart
 RELEASE=pinot
 
-# 1. Back up ZooKeeper data to your local machine while old cluster is running.
+# 1. Back up ZooKeeper data while old cluster is running.
 kubectl cp ${NAMESPACE}/${RELEASE}-zookeeper-0:/bitnami/zookeeper/data ./zk-data-backup
 
 # 2. Delete the old ZooKeeper StatefulSet and pods.
@@ -94,16 +105,54 @@ helm upgrade ${RELEASE} -n ${NAMESPACE} ./helm/pinot
 # 5. Wait for the new ZooKeeper to be ready.
 kubectl rollout status statefulset/${RELEASE}-zookeeper -n ${NAMESPACE}
 
-# 6. Stop ZooKeeper, restore data, then restart.
-kubectl exec -n ${NAMESPACE} ${RELEASE}-zookeeper-0 -- \
-  bash -c 'zkServer.sh stop' 2>/dev/null || true
-kubectl cp ./zk-data-backup/. ${NAMESPACE}/${RELEASE}-zookeeper-0:/data
-kubectl delete pod -n ${NAMESPACE} ${RELEASE}-zookeeper-0
+# 6. Scale down ZooKeeper so we can safely restore data to the PVCs.
+kubectl scale statefulset/${RELEASE}-zookeeper --replicas=0 -n ${NAMESPACE}
 
-# 7. Wait for ZooKeeper to restart with restored data.
+# 7. Launch a temporary pod to mount both PVCs and restore data.
+#    Snapshots go to /data/version-2/, transaction logs to /datalog/version-2/.
+cat <<EOF | kubectl apply -n ${NAMESPACE} -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: zk-data-restore
+spec:
+  containers:
+  - name: restore
+    image: busybox
+    command: ["sleep", "3600"]
+    volumeMounts:
+    - name: data
+      mountPath: /data
+    - name: datalog
+      mountPath: /datalog
+  volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: data-${RELEASE}-zookeeper-0
+  - name: datalog
+    persistentVolumeClaim:
+      claimName: datalog-${RELEASE}-zookeeper-0
+  restartPolicy: Never
+EOF
+kubectl wait --for=condition=ready pod/zk-data-restore -n ${NAMESPACE} --timeout=60s
+
+# 8. Copy backup into the data PVC, then separate snapshots from transaction logs.
+kubectl cp ./zk-data-backup/. ${NAMESPACE}/zk-data-restore:/data
+kubectl exec -n ${NAMESPACE} zk-data-restore -- \
+  sh -c 'mkdir -p /datalog/version-2 && mv /data/version-2/log.* /datalog/version-2/'
+
+# 9. Clean up the restore pod and scale ZooKeeper back up.
+kubectl delete pod zk-data-restore -n ${NAMESPACE}
+kubectl scale statefulset/${RELEASE}-zookeeper --replicas=1 -n ${NAMESPACE}
+
+# 10. Wait for ZooKeeper to start with restored data.
 kubectl rollout status statefulset/${RELEASE}-zookeeper -n ${NAMESPACE}
 
-# 8. Pinot components will automatically reconnect. Verify cluster state:
+# 11. Verify ZooKeeper is healthy.
+kubectl exec -n ${NAMESPACE} ${RELEASE}-zookeeper-0 -- \
+  bash -c 'echo ruok | nc localhost 2181'
+
+# 12. Pinot components will automatically reconnect. Verify cluster state:
 kubectl exec -n ${NAMESPACE} ${RELEASE}-controller-0 -- \
   curl -s http://localhost:9000/instances
 ```
