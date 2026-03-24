@@ -59,7 +59,8 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   private static final String JFR_STOP_COMMAND = "jfrStop";
   private static final String JFR_DIAGNOSTIC_MBEAN = "com.sun.management:type=DiagnosticCommand";
   private static final Duration REPOSITORY_CLEANUP_INTERVAL = Duration.ofDays(1);
-  private static final ScheduledExecutorService REPOSITORY_CLEANUP_EXECUTOR = Executors.newSingleThreadScheduledExecutor(
+  private static final ScheduledExecutorService REPOSITORY_CLEANUP_EXECUTOR =
+      Executors.newSingleThreadScheduledExecutor(
       runnable -> {
         Thread thread = new Thread(runnable, "pinot-jfr-repository-cleaner");
         thread.setDaemon(true);
@@ -408,7 +409,8 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   }
 
   @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private void updateRepositoryCleanupTask(PinotConfiguration subset, String recordingName, RecordingState recordingState) {
+  private void updateRepositoryCleanupTask(
+      PinotConfiguration subset, String recordingName, RecordingState recordingState) {
     if (!isRepositoryCleanupEnabled()) {
       return;
     }
@@ -457,8 +459,8 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
       Path activeRepositoryPath = resolveCurrentRepositoryPath();
       cleanupOldRepositoriesInternal(repositoryRootPath, maxTotalSizeBytes, activeRepositoryPath);
     } catch (Exception e) {
-      LOGGER.warn("Failed to clean up old JFR repositories for recording '{}' under '{}'", recordingName, repositoryRoot,
-          e);
+      LOGGER.warn("Failed to clean up old JFR repositories for recording '{}' under '{}'", recordingName,
+          repositoryRoot, e);
     }
   }
 
@@ -468,7 +470,10 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
       return null;
     }
     try {
-      Object result = _mBeanServer.invoke(_diagnosticCommandObjectName, JFR_CONFIGURE_COMMAND, new Object[]{new String[0]},
+      Object result = _mBeanServer.invoke(
+          _diagnosticCommandObjectName,
+          JFR_CONFIGURE_COMMAND,
+          new Object[]{new String[0]},
           new String[]{String[].class.getName()});
       if (result == null) {
         return null;
@@ -503,7 +508,8 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
       List<PathWithMetadata> repositories = new ArrayList<>();
       try (java.util.stream.Stream<Path> children = Files.list(repositoryRootPath)) {
         children.filter(path -> activeRepositoryPath == null || !activeRepositoryPath.startsWith(path))
-            .forEach(path -> repositories.add(new PathWithMetadata(path, computePathSize(path), readLastModifiedMillis(path))));
+            .forEach(path -> repositories.add(
+                new PathWithMetadata(path, computePathSize(path), readLastModifiedMillis(path))));
       }
       long totalSizeBytes = repositories.stream().mapToLong(pathWithMetadata -> pathWithMetadata._sizeBytes).sum();
       if (activeRepositoryPath != null) {

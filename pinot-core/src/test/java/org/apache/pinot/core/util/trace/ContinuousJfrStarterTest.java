@@ -283,7 +283,8 @@ public class ContinuousJfrStarterTest {
   public void coordinatesPerRecordingName() {
     TestContinuousJfrStarter firstStarter = new TestContinuousJfrStarter();
     TestContinuousJfrStarter secondStarter = new TestContinuousJfrStarter();
-    Map<String, String> enabledFirstConfig = Map.of("pinot.jfr.enabled", "true", "pinot.jfr.name", "pinot-continuous-a");
+    Map<String, String> enabledFirstConfig = Map.of("pinot.jfr.enabled", "true", "pinot.jfr.name",
+        "pinot-continuous-a");
     Map<String, String> enabledSecondConfig = Map.of("pinot.jfr.enabled", "true", "pinot.jfr.name",
         "pinot-continuous-b");
     Map<String, String> disabledFirstConfig =
