@@ -349,7 +349,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
             activeDeadlineMs, passiveDeadlineMs, _brokerId, _brokerId, queryHash);
-    QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
+    // Stage 0 (broker reduce) always has stage 1 as its sole upstream — this is hard-coded
+    // in PinotLogicalQueryPlanner.planNodeToPlanFragment. It has no downstream (terminal stage).
+    QueryThreadContext.MseWorkerInfo mseWorkerInfo =
+        new QueryThreadContext.MseWorkerInfo(0, 0, Set.of(1), Set.of());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant);
         QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, requestContext,
             httpHeaders, queryTimer)) {

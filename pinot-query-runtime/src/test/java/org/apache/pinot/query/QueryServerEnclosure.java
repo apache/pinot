@@ -20,6 +20,7 @@ package org.apache.pinot.query;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.routing.StagePlan;
@@ -82,7 +83,8 @@ public class QueryServerEnclosure {
       Map<String, String> requestMetadataMap) {
     QueryExecutionContext executionContext = QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId");
     QueryThreadContext.MseWorkerInfo mseWorkerInfo =
-        new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
+        new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId(),
+            Set.of(), Set.of());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
         ThreadAccountantUtils.getNoOpAccountant())) {
       return _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap);
