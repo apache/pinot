@@ -137,6 +137,10 @@
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <shade.phase.prop>none</shade.phase.prop>
+    <!-- Keep these enabled by default; fastdev can disable them for incremental builds. -->
+    <pinot.skip.buildnumber>false</pinot.skip.buildnumber>
+    <package.info.phase>generate-sources</package.info.phase>
+    <pinot.skip.remote.resources>false</pinot.skip.remote.resources>
 
     <arrow.version>19.0.0</arrow.version>
     <avro.version>1.12.1</avro.version>
@@ -368,6 +372,10 @@
         <shade.phase.prop>none</shade.phase.prop>
         <archiver.compress>false</archiver.compress>
         <archiver.recompressZippedFiles>false</archiver.recompressZippedFiles>
+        <!-- Avoid rewriting metadata/generated sources on every local build. -->
+        <pinot.skip.buildnumber>true</pinot.skip.buildnumber>
+        <package.info.phase>none</package.info.phase>
+        <pinot.skip.remote.resources>true</pinot.skip.remote.resources>
       </properties>
     </profile>
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
@@ -2883,6 +2891,9 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>buildnumber-maven-plugin</artifactId>
+        <configuration>
+          <skip>${pinot.skip.buildnumber}</skip>
+        </configuration>
         <executions>
           <execution>
             <phase>validate</phase>
@@ -2970,6 +2981,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-remote-resources-plugin</artifactId>
         <configuration>
+          <skip>${pinot.skip.remote.resources}</skip>
           <properties>
             <projectName>Apache Pinot</projectName>
           </properties>
@@ -2981,7 +2993,7 @@
         <version>2.0.0</version>
         <executions>
           <execution>
-            <phase>generate-sources</phase>
+            <phase>${package.info.phase}</phase>
             <goals>
               <goal>package-info</goal>
             </goals>

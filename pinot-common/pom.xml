@@ -398,7 +398,7 @@
       <id>sqlparser</id>
       <activation>
         <file>
-          <missing>${project.build.directory}/generated-sources/javacc/Parser.jj</missing>
+          <missing>${basedir}/target/generated-sources/javacc/Parser.jj</missing>
         </file>
       </activation>
       <build>
