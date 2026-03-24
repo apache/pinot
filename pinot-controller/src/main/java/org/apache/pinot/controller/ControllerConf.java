@@ -1148,7 +1148,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public long getResourceUtilizationCheckerInitialDelay() {
-    return isResourceUtilizationCheckerCollectUsageAtStartupEnabled() ? 0L
+    return isResourceUtilizationCheckerCollectUsageAtStartup() ? 0L
         : getProperty(RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY, DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY);
   }
 
@@ -1156,7 +1156,7 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(RESOURCE_UTILIZATION_CHECKER_FREQUENCY, DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY);
   }
 
-  public boolean isResourceUtilizationCheckerCollectUsageAtStartupEnabled() {
+  public boolean isResourceUtilizationCheckerCollectUsageAtStartup() {
     return getProperty(RESOURCE_UTILIZATION_CHECKER_COLLECT_USAGE_AT_STARTUP,
         DEFAULT_RESOURCE_UTILIZATION_CHECKER_COLLECT_USAGE_AT_STARTUP);
   }

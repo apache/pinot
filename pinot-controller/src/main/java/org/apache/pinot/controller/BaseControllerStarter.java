@@ -767,7 +767,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
-    if (_config.isResourceUtilizationCheckerCollectUsageAtStartupEnabled()) {
+    if (_config.isResourceUtilizationCheckerCollectUsageAtStartup()) {
       _serviceStatusCallbackList.add(generateResourceUtilizationCheckerStatusCallback());
     }
 
