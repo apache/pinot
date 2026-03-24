@@ -1756,7 +1756,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String streamTopic = _streamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _partitionGroupConsumptionStatus =
-        new PartitionGroupConsumptionStatus(_partitionGroupId, llcSegmentName.getSequenceNumber(),
+        new PartitionGroupConsumptionStatus(_partitionGroupId, _streamPartitionId, llcSegmentName.getSequenceNumber(),
             _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
             _segmentZKMetadata.getEndOffset() == null ? null
                 : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
