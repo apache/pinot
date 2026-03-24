@@ -31,7 +31,9 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.common.utils.DataSchema;
 import org.slf4j.Logger;
@@ -100,27 +102,38 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
 
     try {
       int width = dataSchema.size();
-      // prepare serializers for each column to avoid looking up each time
+      // Fast path: cache one serializer per type-stable column (INT, LONG, STRING, arrays, etc.).
       @SuppressWarnings("unchecked")
       JsonSerializer<Object>[] serializers = new JsonSerializer[width];
+      // OBJECT columns are type-unstable (runtime type can vary per row), so cache serializers by runtime class.
+      @SuppressWarnings("unchecked")
+      Map<Class<?>, JsonSerializer<Object>>[] objectTypeColumnSerializers = new Map[width];
       DataSchema.ColumnDataType[] columnTypes = dataSchema.getColumnDataTypes();
       for (int colIdx = 0; colIdx < columnTypes.length; colIdx++) {
-        serializers[colIdx] = provider.findTypedValueSerializer(columnTypes[colIdx].getExternalClass(), false, null);
+        DataSchema.ColumnDataType columnType = columnTypes[colIdx];
+        if (columnType == DataSchema.ColumnDataType.OBJECT) {
+          // Lazily populated during row serialization as new runtime classes are encountered.
+          objectTypeColumnSerializers[colIdx] = new HashMap<>();
+        } else {
+          serializers[colIdx] = provider.findTypedValueSerializer(columnType.getExternalClass(), false, null);
+        }
       }
-
-      value.consumeData(data -> writeDataBlockContent(data, gen, columnTypes, serializers, width, provider));
+      value.consumeData(data -> writeDataBlockContent(
+          data, gen, columnTypes, serializers, objectTypeColumnSerializers, width, provider));
     } finally {
       gen.writeEndArray();
     }
   }
 
   private static void writeDataBlockContent(StreamingBrokerResponse.Data dataBlock, JsonGenerator gen,
-      DataSchema.ColumnDataType[] columnTypes, JsonSerializer<Object>[] serializers, int width,
-      SerializerProvider provider) {
-    try {
-      while (dataBlock.next()) {
-        // write the row as an array
+      DataSchema.ColumnDataType[] columnTypes, JsonSerializer<Object>[] serializers,
+      Map<Class<?>, JsonSerializer<Object>>[] objectTypeColumnSerializers, int width, SerializerProvider provider) {
+    while (dataBlock.next()) {
+      // Make sure every row array is closed even if one value fails to serialize.
+      boolean rowStarted = false;
+      try {
         gen.writeStartArray();
+        rowStarted = true;
         for (int i = 0; i < width; i++) {
           Object rawValue = dataBlock.get(i);
           if (rawValue == null) {
@@ -128,13 +141,31 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
           } else {
             DataSchema.ColumnDataType dataType = columnTypes[i];
             Object external = dataType.toExternal(rawValue);
-            serializers[i].serialize(external, gen, provider);
+            JsonSerializer<Object> serializer = serializers[i];
+            if (serializer == null) {
+              // OBJECT fallback path: resolve serializer for this runtime class once, then reuse from cache.
+              Map<Class<?>, JsonSerializer<Object>> runtimeSerializers = objectTypeColumnSerializers[i];
+              Class<?> runtimeClass = external.getClass();
+              serializer = runtimeSerializers.get(runtimeClass);
+              if (serializer == null) {
+                serializer = provider.findTypedValueSerializer(runtimeClass, false, null);
+                runtimeSerializers.put(runtimeClass, serializer);
+              }
+            }
+            serializer.serialize(external, gen, provider);
           }
         }
-        gen.writeEndArray();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      } finally {
+        if (rowStarted) {
+          try {
+            gen.writeEndArray();
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+        }
       }
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
     }
   }
 
