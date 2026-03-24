@@ -194,10 +194,14 @@ public class TableConfigSerDeUtils {
       });
     }
 
-    return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList,
-        instancePartitionsMap, segmentAssignmentConfigMap, tableSamplerConfigs, description, tags);
+    TableConfig tableConfig =
+        new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
+            quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
+            upsertConfig, dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable,
+            tunerConfigList, instancePartitionsMap, segmentAssignmentConfigMap, tableSamplerConfigs);
+    tableConfig.setDescription(description);
+    tableConfig.setTags(tags);
+    return tableConfig;
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)

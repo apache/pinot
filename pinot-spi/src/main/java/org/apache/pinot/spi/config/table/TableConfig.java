@@ -160,9 +160,7 @@ public class TableConfig extends BaseJsonConfig {
       Map<InstancePartitionsType, String> instancePartitionsMap,
       @JsonProperty(SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable
       Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap,
-      @JsonProperty(TABLE_SAMPLERS_KEY) @Nullable List<TableSamplerConfig> tableSamplers,
-      @JsonProperty(DESCRIPTION_KEY) @Nullable String description,
-      @JsonProperty(TAGS_KEY) @Nullable List<String> tags) {
+      @JsonProperty(TABLE_SAMPLERS_KEY) @Nullable List<TableSamplerConfig> tableSamplers) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -194,8 +192,6 @@ public class TableConfig extends BaseJsonConfig {
     _instancePartitionsMap = instancePartitionsMap;
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
     _tableSamplers = sanitizeAndValidateTableSamplers(tableSamplers);
-    _description = description;
-    _tags = tags;
   }
 
   public TableConfig(TableConfig tableConfig) {

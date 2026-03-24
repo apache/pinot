@@ -554,10 +554,13 @@ public class TableConfigBuilder {
       _customConfig = new TableCustomConfig(null);
     }
 
-    return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
-        _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
-        _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap, _tableSamplers,
-        _description, _tags);
+    TableConfig tableConfig =
+        new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
+            _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
+            _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
+            _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap, _tableSamplers);
+    tableConfig.setDescription(_description);
+    tableConfig.setTags(_tags);
+    return tableConfig;
   }
 }

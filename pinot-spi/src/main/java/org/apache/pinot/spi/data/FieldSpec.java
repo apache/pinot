@@ -628,13 +628,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && _allowTrailingZeros == that._allowTrailingZeros
         && _dataType.equals(_defaultNullValue, that._defaultNullValue)
         && Objects.equals(_transformFunction, that._transformFunction)
-        && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider);
+        && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider)
+        && Objects.equals(_description, that._description)
+        && Objects.equals(_tags, that._tags);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
-        _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider);
+        _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider,
+        _description, _tags);
   }
 
   /**

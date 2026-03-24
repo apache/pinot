@@ -567,13 +567,18 @@ public class FieldSpecTest {
   }
 
   @Test
-  public void testDescriptionNotInEqualsOrHashCode() {
+  public void testDescriptionAndTagsInEqualsAndHashCode() {
     DimensionFieldSpec spec1 = new DimensionFieldSpec("col1", STRING, true);
     DimensionFieldSpec spec2 = new DimensionFieldSpec("col1", STRING, true);
     spec2.setDescription("some description");
     spec2.setTags(Arrays.asList("tag1"));
 
-    // description and tags are NOT part of equals/hashCode per spec
+    assertThat(spec1).isNotEqualTo(spec2);
+    assertThat(spec1.hashCode()).isNotEqualTo(spec2.hashCode());
+
+    // Equal when both have the same description and tags
+    spec1.setDescription("some description");
+    spec1.setTags(Arrays.asList("tag1"));
     assertThat(spec1).isEqualTo(spec2);
     assertThat(spec1.hashCode()).isEqualTo(spec2.hashCode());
   }
