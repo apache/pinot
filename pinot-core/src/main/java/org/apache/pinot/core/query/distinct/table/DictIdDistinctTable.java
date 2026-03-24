@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.distinct.table;
 
 import it.unimi.dsi.fastutil.ints.IntComparator;
+import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.IOException;
 import java.util.List;
@@ -27,6 +28,8 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 public class DictIdDistinctTable extends IntDistinctTable {
@@ -74,5 +77,91 @@ public class DictIdDistinctTable extends IntDistinctTable {
   @Override
   public ResultTable toResultTable() {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Converts this dictId-based table to a typed distinct table by resolving dictionary values.
+   */
+  public DistinctTable toTypedDistinctTable(Dictionary dictionary, boolean hasNull) {
+    DataSchema dataSchema = getDataSchema();
+    int limit = getLimit();
+    boolean nullHandlingEnabled = isNullHandlingEnabled();
+    OrderByExpressionContext orderByExpression = getOrderByExpression();
+    IntIterator dictIdIterator = _valueSet.iterator();
+    switch (dictionary.getValueType()) {
+      case INT: {
+        IntDistinctTable table = new IntDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+        if (hasNull) {
+          table.addNull();
+        }
+        while (dictIdIterator.hasNext()) {
+          table.addUnbounded(dictionary.getIntValue(dictIdIterator.nextInt()));
+        }
+        return table;
+      }
+      case LONG: {
+        LongDistinctTable table = new LongDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+        if (hasNull) {
+          table.addNull();
+        }
+        while (dictIdIterator.hasNext()) {
+          table.addUnbounded(dictionary.getLongValue(dictIdIterator.nextInt()));
+        }
+        return table;
+      }
+      case FLOAT: {
+        FloatDistinctTable table = new FloatDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+        if (hasNull) {
+          table.addNull();
+        }
+        while (dictIdIterator.hasNext()) {
+          table.addUnbounded(dictionary.getFloatValue(dictIdIterator.nextInt()));
+        }
+        return table;
+      }
+      case DOUBLE: {
+        DoubleDistinctTable table = new DoubleDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+        if (hasNull) {
+          table.addNull();
+        }
+        while (dictIdIterator.hasNext()) {
+          table.addUnbounded(dictionary.getDoubleValue(dictIdIterator.nextInt()));
+        }
+        return table;
+      }
+      case BIG_DECIMAL: {
+        BigDecimalDistinctTable table =
+            new BigDecimalDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+        if (hasNull) {
+          table.addNull();
+        }
+        while (dictIdIterator.hasNext()) {
+          table.addUnbounded(dictionary.getBigDecimalValue(dictIdIterator.nextInt()));
+        }
+        return table;
+      }
+      case STRING: {
+        StringDistinctTable table = new StringDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+        if (hasNull) {
+          table.addNull();
+        }
+        while (dictIdIterator.hasNext()) {
+          table.addUnbounded(dictionary.getStringValue(dictIdIterator.nextInt()));
+        }
+        return table;
+      }
+      case BYTES: {
+        BytesDistinctTable table = new BytesDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+        if (hasNull) {
+          table.addNull();
+        }
+        while (dictIdIterator.hasNext()) {
+          table.addUnbounded(new ByteArray(dictionary.getBytesValue(dictIdIterator.nextInt())));
+        }
+        return table;
+      }
+      default:
+        throw new IllegalStateException("Unsupported data type: " + dictionary.getValueType());
+    }
   }
 }

@@ -27,12 +27,14 @@ import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
+import org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator;
 import org.apache.pinot.core.operator.query.JsonIndexDistinctOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.config.table.FieldConfig;
 
 
 /**
@@ -75,13 +77,29 @@ public class DistinctPlanNode implements PlanNode {
       }
     }
 
-    // Use JSON index directly for DISTINCT jsonExtractIndex when query option useIndexBasedDistinctOperator=true
-    // (disabled by default; opt-in via query option)
-    if (QueryOptionsUtils.isUseIndexBasedDistinctOperator(_queryContext.getQueryOptions()) && expressions.size() == 1) {
+    // Use index-based distinct operators when opted in via query option
+    if (expressions.size() == 1 && QueryOptionsUtils.isUseIndexBasedDistinctOperator(_queryContext.getQueryOptions())) {
       ExpressionContext expr = expressions.get(0);
+
+      // JSON index path
       if (JsonIndexDistinctOperator.canUseJsonIndexDistinct(_indexSegment, expr)) {
         BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
         return new JsonIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator);
+      }
+
+      // Inverted/sorted index path — requires a sorted dictionary so that dictId order matches value order,
+      // which is needed for correct ORDER BY pruning via DictIdDistinctTable. Mutable (consuming) segments
+      // have unsorted dictionaries and are excluded.
+      String column = expr.getIdentifier();
+      if (column != null) {
+        DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
+        if (dataSource.getDictionary() != null && dataSource.getDictionary().isSorted()
+            && dataSource.getInvertedIndex() != null
+            && _queryContext.isIndexUseAllowed(column, FieldConfig.IndexType.INVERTED)) {
+          BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
+          return new InvertedIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator,
+              dataSource);
+        }
       }
     }
 
