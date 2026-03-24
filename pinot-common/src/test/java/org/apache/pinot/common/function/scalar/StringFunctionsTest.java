@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.util.Random;
+import org.apache.commons.lang3.StringUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -140,12 +142,12 @@ public class StringFunctionsTest {
         {"::org::apache::", "::", -4, 100, "null", "null"},
 
         // Empty input with non-empty delimiter
-        {"", ".", 0, 100, "", "null"},
-        {"", ".", -1, 100, "", "null"},
+        {"", ".", 0, 100, "null", "null"},
+        {"", ".", -1, 100, "null", "null"},
         {"", ".", -2, 100, "null", "null"},
 
         // Empty input with multi-char delimiter and negative index
-        {"", "::", -1, 100, "", "null"},
+        {"", "::", -1, 100, "null", "null"},
 
         // Integer.MIN_VALUE: negating it overflows (remains negative), guard must return "null"
         {"org.apache.pinot", ".", Integer.MIN_VALUE, 100, "null", "null"},
@@ -287,6 +289,31 @@ public class StringFunctionsTest {
       String expectedTokenWithLimitCounts) {
     assertEquals(StringFunctions.splitPart(input, delimiter, index), expectedToken);
     assertEquals(StringFunctions.splitPart(input, delimiter, limit, index), expectedTokenWithLimitCounts);
+  }
+
+  @Test
+  public void testSplitPartRandomized() {
+    String chars = "abcdefg.,:;+-_/";
+    String[] delimiters = {".", ",", ":", "::", "++", "ab", "///"};
+    Random random = new Random();
+    int numIterations = 10_000;
+
+    for (int iter = 0; iter < numIterations; iter++) {
+      int len = random.nextInt(50);
+      StringBuilder sb = new StringBuilder(len);
+      for (int i = 0; i < len; i++) {
+        sb.append(chars.charAt(random.nextInt(chars.length())));
+      }
+      String input = sb.toString();
+      String delimiter = delimiters[random.nextInt(delimiters.length)];
+      int index = random.nextInt(21) - 10; // range [-10, 10]
+
+      String expected = StringFunctions.splitPartArrayBased(
+          StringUtils.splitByWholeSeparator(input, delimiter), index);
+      String actual = StringFunctions.splitPart(input, delimiter, index);
+      assertEquals(actual, expected,
+          String.format("Mismatch for input='%s', delimiter='%s', index=%d", input, delimiter, index));
+    }
   }
 
   @Test(dataProvider = "prefixAndSuffixTestCases")

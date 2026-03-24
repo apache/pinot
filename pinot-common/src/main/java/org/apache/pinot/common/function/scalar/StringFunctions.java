@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -585,15 +586,20 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int index) {
-    // compare with {@link BenchmarkSplitPart} for future changes
+    // compare with BenchmarkSplitPart (perf module) for future changes
     int delimLen = delimiter.length();
     if (delimLen == 0) {
-      return index == 0 || index == -1 ? input : "null";
+      // Empty delimiter splits on whitespace (preserving existing behavior via Apache Commons)
+      return splitPartArrayBased(StringUtils.splitByWholeSeparator(input, delimiter), index);
+    }
+
+    int len = input.length();
+    if (len == 0) {
+      return "null";
     }
 
     // skip leading delimiters
     int start = 0;
-    int len = input.length();
     while (start < len && input.startsWith(delimiter, start)) {
       start += delimLen;
     }
@@ -691,6 +697,16 @@ public class StringFunctions {
       }
     }
 
+    return "null";
+  }
+
+  @VisibleForTesting
+  static String splitPartArrayBased(String[] parts, int index) {
+    if (index >= 0 && index < parts.length) {
+      return parts[index];
+    } else if (index < 0 && index >= -parts.length) {
+      return parts[parts.length + index];
+    }
     return "null";
   }
 
