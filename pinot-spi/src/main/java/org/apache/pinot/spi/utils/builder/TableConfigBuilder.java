@@ -98,7 +98,6 @@ public class TableConfigBuilder {
   private String _segmentVersion;
   private String _sortedColumn;
   private List<String> _invertedIndexColumns;
-  private boolean _createInvertedIndexDuringSegmentGeneration;
   private List<String> _noDictionaryColumns;
   private List<String> _onHeapDictionaryColumns;
   private List<String> _bloomFilterColumns;
@@ -120,6 +119,10 @@ public class TableConfigBuilder {
   private boolean _optimizeDictionaryType;
   private double _noDictionarySizeRatioThreshold;
   private double _noDictionaryCardinalityRatioThreshold;
+
+  /// @deprecated This flag is ignored. Keep it for backward compatibility during upgrade (especially for JSON ser/de).
+  @Deprecated
+  private boolean _createInvertedIndexDuringSegmentGeneration;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -308,6 +311,7 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @Deprecated
   public TableConfigBuilder setCreateInvertedIndexDuringSegmentGeneration(
       boolean createInvertedIndexDuringSegmentGeneration) {
     _createInvertedIndexDuringSegmentGeneration = createInvertedIndexDuringSegmentGeneration;

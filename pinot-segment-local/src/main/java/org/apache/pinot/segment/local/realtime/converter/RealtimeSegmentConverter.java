@@ -81,7 +81,7 @@ public class RealtimeSegmentConverter {
 
   public void build(@Nullable SegmentVersion segmentVersion, @Nullable ServerMetrics serverMetrics)
       throws Exception {
-    SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema, true);
+    SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
 
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable

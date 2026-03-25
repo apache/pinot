@@ -287,7 +287,6 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         .setTimeColumnName("daysSinceEpoch")
         .setNoDictionaryColumns(new ArrayList<>(_noDictionaryColumns))
         .setInvertedIndexColumns(new ArrayList<>(_invertedIndexColumns))
-        .setCreateInvertedIndexDuringSegmentGeneration(true)
         .setRangeIndexColumns(new ArrayList<>(_rangeIndexColumns))
         .setFieldConfigList(new ArrayList<>(_fieldConfigMap.values()))
         .setNullHandlingEnabled(true)
