@@ -67,18 +67,12 @@ public class PredownloadPredownloadStatusRecorderTest {
     testFolder.mkdir();
     PredownloadStatusRecorder.setStatusRecordFolder(testFolder.getAbsolutePath());
 
-    SecurityManager originalSecurityManager = System.getSecurityManager();
-    try {
-      ExitHelper.setExitAction(status -> {
-        throw new ExitException(status);
-      });
-      trySucceed(testFolder);
-      tryRetriableFailure(testFolder);
-      tryNonRetriableFailure(testFolder);
-    } finally {
-      // Restore the original SecurityManager
-      System.setSecurityManager(originalSecurityManager);
-    }
+    ExitHelper.setExitAction(status -> {
+      throw new ExitException(status);
+    });
+    trySucceed(testFolder);
+    tryRetriableFailure(testFolder);
+    tryNonRetriableFailure(testFolder);
   }
 
   private void trySucceed(File testFolder) {
