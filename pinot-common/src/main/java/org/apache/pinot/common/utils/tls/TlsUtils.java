@@ -344,9 +344,8 @@ public final class TlsUtils {
     sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
     sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
     // Netty 4.2 defaults endpointIdentificationAlgorithm to HTTPS (hostname verification enabled).
-    // Pinot does not require hostname verification for internal cluster communication, so disable it
-    // explicitly to maintain backwards compatibility.
-    sslContextBuilder.endpointIdentificationAlgorithm("");
+    // Apply the value from TlsConfig, which defaults to empty (disabled) for backwards compatibility.
+    sslContextBuilder.endpointIdentificationAlgorithm(tlsConfig.getEndpointIdentificationAlgorithm());
 
     // Apply protocol restrictions if configured
     String[] allowedProtocols = tlsConfig.getAllowedProtocols();

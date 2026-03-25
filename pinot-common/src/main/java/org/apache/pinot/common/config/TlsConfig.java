@@ -40,6 +40,9 @@ public class TlsConfig {
   private String _sslProvider = SslProvider.JDK.toString();
   // If true, the client will not verify the server's certificate
   private boolean _insecure = false;
+  // Endpoint identification algorithm for hostname verification (e.g. "HTTPS").
+  // Defaults to empty string (disabled) for backwards compatibility with Netty 4.1.
+  private String _endpointIdentificationAlgorithm = "";
   // Allowed TLS protocols (optional, if not set uses default)
   @Nullable
   private String[] _allowedProtocols = null;
@@ -58,6 +61,7 @@ public class TlsConfig {
     _trustStorePassword = tlsConfig._trustStorePassword;
     _sslProvider = tlsConfig._sslProvider;
     _insecure = tlsConfig._insecure;
+    _endpointIdentificationAlgorithm = tlsConfig._endpointIdentificationAlgorithm;
     _allowedProtocols = tlsConfig._allowedProtocols != null
         ? Arrays.copyOf(tlsConfig._allowedProtocols, tlsConfig._allowedProtocols.length)
         : null;
@@ -139,6 +143,14 @@ public class TlsConfig {
     _insecure = insecure;
   }
 
+  public String getEndpointIdentificationAlgorithm() {
+    return _endpointIdentificationAlgorithm;
+  }
+
+  public void setEndpointIdentificationAlgorithm(String endpointIdentificationAlgorithm) {
+    _endpointIdentificationAlgorithm = endpointIdentificationAlgorithm;
+  }
+
   @Nullable
   public String[] getAllowedProtocols() {
     return _allowedProtocols != null ? Arrays.copyOf(_allowedProtocols, _allowedProtocols.length) : null;
@@ -168,13 +180,14 @@ public class TlsConfig {
         && Objects.equals(_trustStorePath, tlsConfig._trustStorePath)
         && Objects.equals(_trustStorePassword, tlsConfig._trustStorePassword)
         && Objects.equals(_sslProvider, tlsConfig._sslProvider)
+        && Objects.equals(_endpointIdentificationAlgorithm, tlsConfig._endpointIdentificationAlgorithm)
         && Arrays.equals(_allowedProtocols, tlsConfig._allowedProtocols);
   }
 
   @Override
   public int hashCode() {
     int result = Objects.hash(_clientAuthEnabled, _keyStoreType, _keyStorePath, _keyStorePassword, _trustStoreType,
-        _trustStorePath, _trustStorePassword, _sslProvider, _insecure);
+        _trustStorePath, _trustStorePassword, _sslProvider, _insecure, _endpointIdentificationAlgorithm);
     result = 31 * result + Arrays.hashCode(_allowedProtocols);
     return result;
   }
