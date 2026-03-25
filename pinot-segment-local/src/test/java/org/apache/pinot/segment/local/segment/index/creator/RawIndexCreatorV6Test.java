@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -377,7 +378,8 @@ public class RawIndexCreatorV6Test implements PinotBuffersAfterClassCheckRule {
             RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)), Integer.MAX_VALUE);
       case BYTES:
         return StringUtil.sanitizeStringValue(
-            RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)), Integer.MAX_VALUE).getBytes();
+            RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)), Integer.MAX_VALUE)
+            .getBytes(StandardCharsets.UTF_8);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }

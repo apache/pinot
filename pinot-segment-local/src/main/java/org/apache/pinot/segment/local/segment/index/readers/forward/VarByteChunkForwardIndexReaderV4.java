@@ -57,8 +57,8 @@ public class VarByteChunkForwardIndexReaderV4
 
   private final FieldSpec.DataType _storedType;
   protected final int _targetDecompressedChunkSize;
-  private final ChunkDecompressor _chunkDecompressor;
-  private final ChunkCompressionType _chunkCompressionType;
+  protected final ChunkDecompressor _chunkDecompressor;
+  protected final ChunkCompressionType _chunkCompressionType;
 
   protected final PinotDataBuffer _metadata;
   protected final PinotDataBuffer _chunks;

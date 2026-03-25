@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -46,16 +45,9 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexReaderV4 {
 
-  private final int _targetDecompressedChunkSize;
-  private final ChunkDecompressor _chunkDecompressor;
-  private final ChunkCompressionType _chunkCompressionType;
-
   public VarByteChunkForwardIndexReaderV6(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
       boolean isSingleValue) {
     super(dataBuffer, storedType, isSingleValue);
-    _targetDecompressedChunkSize = dataBuffer.getInt(4);
-    _chunkCompressionType = ChunkCompressionType.valueOf(dataBuffer.getInt(8));
-    _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_chunkCompressionType);
   }
 
   @Override
@@ -120,12 +112,6 @@ public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexRe
     } else {
       return ByteBuffer.wrap(bytes).getInt();
     }
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    _chunkDecompressor.close();
   }
 
   /**

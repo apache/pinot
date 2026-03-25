@@ -131,15 +131,14 @@ public class VarByteChunkV6Test extends VarByteChunkV4Test implements PinotBuffe
       throws IOException {
     // Generate input data containing short MV docs with somewhat repetitive data
     int numDocs = 1000000;
-    int numElements = 0;
     int maxMVRowSize = 0;
+    int valueCounter = 0;
     List<long[]> inputData = new ArrayList<>(numDocs);
     for (int i = 0; i < numDocs; i++) {
       long[] mvRow = new long[Math.abs((int) Math.floor(RANDOM.nextGaussian()))];
       maxMVRowSize = Math.max(maxMVRowSize, mvRow.length);
-      numElements += mvRow.length;
-      for (int j = 0; j < mvRow.length; j++, numElements++) {
-        mvRow[j] = numElements % 10;
+      for (int j = 0; j < mvRow.length; j++) {
+        mvRow[j] = valueCounter++ % 10;
       }
       inputData.add(mvRow);
     }
@@ -149,7 +148,7 @@ public class VarByteChunkV6Test extends VarByteChunkV4Test implements PinotBuffe
     File v4FwdIndexFile = new File(FileUtils.getTempDirectory(), "v6test_v4");
     FileUtils.deleteQuietly(v4FwdIndexFile);
     try (MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(v4FwdIndexFile,
-        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, numElements, true, rawIndexVersionV4)) {
+        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, maxMVRowSize, true, rawIndexVersionV4)) {
       for (long[] mvRow : inputData) {
         creator.putLongMV(mvRow);
       }
@@ -160,7 +159,7 @@ public class VarByteChunkV6Test extends VarByteChunkV4Test implements PinotBuffe
     File v6FwdIndexFile = new File(FileUtils.getTempDirectory(), "v6test_v6");
     FileUtils.deleteQuietly(v6FwdIndexFile);
     try (MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(v6FwdIndexFile,
-        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, numElements, true, rawIndexVersionV6)) {
+        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, maxMVRowSize, true, rawIndexVersionV6)) {
       for (long[] mvRow : inputData) {
         creator.putLongMV(mvRow);
       }

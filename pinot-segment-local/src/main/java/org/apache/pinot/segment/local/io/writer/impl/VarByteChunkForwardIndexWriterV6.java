@@ -87,6 +87,8 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
   private final ByteArrayOutputStream _chunkSizeStream;
   // Compression output buffer for the data stream
   private final ByteBuffer _dataCompressionBuffer;
+  // Compression output buffer for the size stream (reused across chunks, grown when needed)
+  private ByteBuffer _sizeCompressionBuffer;
 
   private int _docIdOffset = 0;
   private int _nextDocId = 0;
@@ -237,7 +239,6 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
     sizeBytes[3] = (byte) (numDocs >> 24);
 
     _chunkDataBuffer.flip();
-    ByteBuffer sizeCompressionBuffer = null;
     try {
       // Wrap size bytes for compression (needs direct buffer for some compressors)
       ByteBuffer sizeBuffer;
@@ -250,12 +251,17 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
         sizeBuffer = ByteBuffer.wrap(sizeBytes).order(ByteOrder.LITTLE_ENDIAN);
       }
 
-      // Allocate compression output for sizes
+      // Reuse or grow the size compression buffer
       int maxSizeCompressed = _chunkCompressor.maxCompressedSize(sizeBytes.length);
-      sizeCompressionBuffer = ByteBuffer.allocateDirect(maxSizeCompressed).order(ByteOrder.LITTLE_ENDIAN);
+      if (_sizeCompressionBuffer == null || _sizeCompressionBuffer.capacity() < maxSizeCompressed) {
+        CleanerUtil.cleanQuietly(_sizeCompressionBuffer);
+        _sizeCompressionBuffer = ByteBuffer.allocateDirect(maxSizeCompressed).order(ByteOrder.LITTLE_ENDIAN);
+      } else {
+        _sizeCompressionBuffer.clear();
+      }
 
       // Compress size stream
-      int sizeCompressedLen = _chunkCompressor.compress(sizeBuffer, sizeCompressionBuffer);
+      int sizeCompressedLen = _chunkCompressor.compress(sizeBuffer, _sizeCompressionBuffer);
       CleanerUtil.cleanQuietly(sizeBuffer);
 
       // Compress data stream
@@ -272,7 +278,7 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
 
       int written = 0;
       while (written < sizeCompressedLen) {
-        written += _dataChannel.write(sizeCompressionBuffer);
+        written += _dataChannel.write(_sizeCompressionBuffer);
       }
 
       if (dataCompressedLen > 0) {
@@ -293,7 +299,6 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
       throw new RuntimeException(e);
     } finally {
       _dataCompressionBuffer.clear();
-      CleanerUtil.cleanQuietly(sizeCompressionBuffer);
     }
     clearChunkBuffers();
   }
@@ -325,6 +330,7 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
     _dataChannel.close();
     _output.close();
     CleanerUtil.cleanQuietly(_dataCompressionBuffer);
+    CleanerUtil.cleanQuietly(_sizeCompressionBuffer);
     CleanerUtil.cleanQuietly(_chunkDataBuffer);
     FileUtils.deleteQuietly(_dataBuffer);
     _chunkCompressor.close();
