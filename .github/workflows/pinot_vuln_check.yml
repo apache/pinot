@@ -37,9 +37,9 @@ jobs:
     name: Verify Docker Image
     runs-on: ubuntu-latest
     steps:
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
         name: Set up QEMU
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build the Docker image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
@@ -60,6 +60,6 @@ jobs:
           severity: 'CRITICAL,HIGH'
           timeout: '10m'
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
