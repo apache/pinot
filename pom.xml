@@ -988,18 +988,6 @@
         <version>${prometheus.metrics.version}</version>
         <scope>test</scope>
       </dependency>
-      <dependency>
-        <groupId>io.prometheus</groupId>
-        <artifactId>prometheus-metrics-config</artifactId>
-        <version>${prometheus.metrics.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>io.prometheus</groupId>
-        <artifactId>prometheus-metrics-model</artifactId>
-        <version>${prometheus.metrics.version}</version>
-        <scope>test</scope>
-      </dependency>
 
       <!-- netty BOM -->
       <dependency>
