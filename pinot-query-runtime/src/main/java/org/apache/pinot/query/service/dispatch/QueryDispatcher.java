@@ -663,7 +663,7 @@ public class QueryDispatcher {
 
   /// Reduces a RowHeapDataBlock by extracting the rows and converting the values to the expected result types.
   ///
-  /// This method destructs the received block, as their cells will be converted into the external type.
+  /// This method mutates the received block; its cells are converted to external/formatted values.
   private static void reduceRowHeap(RowHeapDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
       PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
     List<Object[]> rows = block.getRows();
