@@ -1490,13 +1490,34 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // TODO: Support it
     resetForwardIndex(dictionarySize, forwardIndexSize);
 
-    // Convert 'DestCityName' to v2 raw index
+    // Convert 'DestCityName' to v6 raw index (two-stream format)
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigs);
-    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(2).build();
+    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(6).build();
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     FieldConfig fieldConfig =
+        new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+    fieldConfigs.add(fieldConfig);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
+    columnIndexSize = getColumnIndexSize(column);
+    assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
+    double v6RawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
+    // V6 two-stream format should produce a smaller index than V4 due to better compression
+    assertTrue(v6RawIndexSize <= v4rawIndexSize,
+        "V6 (" + v6RawIndexSize + ") should be <= V4 (" + v4rawIndexSize + ")");
+
+    resetForwardIndex(dictionarySize, forwardIndexSize);
+
+    // Convert 'DestCityName' to v2 raw index
+    fieldConfigs = tableConfig.getFieldConfigList();
+    assertNotNull(fieldConfigs);
+    forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(2).build();
+    indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forwardIndexConfig.toJsonNode());
+    fieldConfig =
         new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
     fieldConfigs.add(fieldConfig);
     updateTableConfig(tableConfig);
