@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.io.compression;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 
 
 /**
@@ -51,6 +52,21 @@ public class ChunkCompressorFactory {
    * @return Compressor for the specified type.
    */
   public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, boolean upgradeToLengthPrefixed) {
+    return getCompressor(compressionType, upgradeToLengthPrefixed, ForwardIndexConfig.DEFAULT_COMPRESSION_LEVEL);
+  }
+
+  /**
+   * Returns the chunk compressor for the specified name with a configurable compression level.
+   *
+   * @param compressionType Type of compressor.
+   * @param upgradeToLengthPrefixed if true, guarantee the compressed chunk contains metadata about the decompressed
+   *                                size.
+   * @param compressionLevel Compression level. Use {@link ForwardIndexConfig#DEFAULT_COMPRESSION_LEVEL} for codec
+   *                         default.
+   * @return Compressor for the specified type.
+   */
+  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, boolean upgradeToLengthPrefixed,
+      int compressionLevel) {
     switch (compressionType) {
 
       case PASS_THROUGH:
@@ -60,6 +76,9 @@ public class ChunkCompressorFactory {
         return SnappyCompressor.INSTANCE;
 
       case ZSTANDARD:
+        if (compressionLevel != ForwardIndexConfig.DEFAULT_COMPRESSION_LEVEL) {
+          return new ZstandardCompressor(compressionLevel);
+        }
         return ZstandardCompressor.INSTANCE;
 
       case LZ4:

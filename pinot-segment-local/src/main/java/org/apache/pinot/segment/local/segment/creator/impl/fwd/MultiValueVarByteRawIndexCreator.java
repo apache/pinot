@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -75,6 +76,15 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes, int maxNumberOfElements,
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, writerVersion, maxRowLengthInBytes,
+        maxNumberOfElements, targetMaxChunkSizeBytes, targetDocsPerChunk,
+        ForwardIndexConfig.DEFAULT_COMPRESSION_LEVEL);
+  }
+
+  public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
+      int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes, int maxNumberOfElements,
+      int targetMaxChunkSizeBytes, int targetDocsPerChunk, int compressionLevel)
+      throws IOException {
     File file = new File(baseIndexDir, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     // We will prepend the actual content with numElements and length array containing length of each element
     int totalMaxLength = getTotalRowStorageBytes(maxNumberOfElements, maxRowLengthInBytes);
@@ -84,10 +94,14 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       _indexWriter =
           new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
               writerVersion);
+    } else if (writerVersion == VarByteChunkForwardIndexWriterV6.VERSION) {
+      int chunkSize =
+          ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
+      _indexWriter = new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize, compressionLevel);
     } else {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-      _indexWriter = new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
+      _indexWriter = new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize, compressionLevel);
     }
     _valueType = valueType;
   }

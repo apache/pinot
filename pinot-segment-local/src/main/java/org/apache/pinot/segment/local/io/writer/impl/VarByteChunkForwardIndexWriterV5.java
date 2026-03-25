@@ -89,6 +89,12 @@ public class VarByteChunkForwardIndexWriterV5 extends VarByteChunkForwardIndexWr
     super(file, compressionType, chunkSize);
   }
 
+  public VarByteChunkForwardIndexWriterV5(File file, ChunkCompressionType compressionType, int chunkSize,
+      int compressionLevel)
+      throws IOException {
+    super(file, compressionType, chunkSize, compressionLevel);
+  }
+
   // Override the parent class getVersion();
   @Override
   public int getVersion() {

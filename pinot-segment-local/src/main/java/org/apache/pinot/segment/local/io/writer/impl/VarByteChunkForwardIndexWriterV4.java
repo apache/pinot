@@ -33,6 +33,7 @@ import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.slf4j.Logger;
@@ -95,10 +96,16 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
 
   public VarByteChunkForwardIndexWriterV4(File file, ChunkCompressionType compressionType, int chunkSize)
       throws IOException {
+    this(file, compressionType, chunkSize, ForwardIndexConfig.DEFAULT_COMPRESSION_LEVEL);
+  }
+
+  public VarByteChunkForwardIndexWriterV4(File file, ChunkCompressionType compressionType, int chunkSize,
+      int compressionLevel)
+      throws IOException {
     _dataBuffer = new File(file.getParentFile(), file.getName() + DATA_BUFFER_SUFFIX);
     _output = new RandomAccessFile(file, "rw");
     _dataChannel = new RandomAccessFile(_dataBuffer, "rw").getChannel();
-    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType, true);
+    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType, true, compressionLevel);
     _chunkBuffer = ByteBuffer.allocateDirect(chunkSize).order(ByteOrder.LITTLE_ENDIAN);
     _compressionBuffer =
         ByteBuffer.allocateDirect(_chunkCompressor.maxCompressedSize(chunkSize)).order(ByteOrder.LITTLE_ENDIAN);

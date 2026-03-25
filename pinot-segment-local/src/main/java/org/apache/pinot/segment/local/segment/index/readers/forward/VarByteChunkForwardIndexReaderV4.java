@@ -56,14 +56,14 @@ public class VarByteChunkForwardIndexReaderV4
   private static final int METADATA_ENTRY_SIZE = 8;
 
   private final FieldSpec.DataType _storedType;
-  private final int _targetDecompressedChunkSize;
+  protected final int _targetDecompressedChunkSize;
   private final ChunkDecompressor _chunkDecompressor;
   private final ChunkCompressionType _chunkCompressionType;
 
-  private final PinotDataBuffer _metadata;
-  private final PinotDataBuffer _chunks;
+  protected final PinotDataBuffer _metadata;
+  protected final PinotDataBuffer _chunks;
   private final boolean _isSingleValue;
-  private final long _chunksStartOffset;
+  protected final long _chunksStartOffset;
 
   public VarByteChunkForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
       boolean isSingleValue) {
