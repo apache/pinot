@@ -19,10 +19,14 @@
 package org.apache.pinot.core.query.executor.sql;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -222,14 +226,65 @@ public class SqlQueryExecutor {
       tableType = TableType.valueOf(tableTypeStr.toUpperCase());
     }
 
+    // Compute a stable payload hash for idempotency when requestId is set
+    String payloadHash = computePayloadHash(insertStmt.getTableName(), columns, insertStmt.getRows(),
+        insertStmt.getOptions());
+
     return new InsertRequest.Builder()
         .setTableName(insertStmt.getTableName())
         .setTableType(tableType)
         .setInsertType(InsertType.ROW)
         .setRows(genericRows)
         .setRequestId(insertStmt.getRequestId())
+        .setPayloadHash(payloadHash)
         .setOptions(insertStmt.getOptions())
         .build();
+  }
+
+  /**
+   * Computes a stable SHA-256 hash from the table name, column list, row values, and options.
+   * This ensures that identical INSERT statements produce the same hash for idempotency.
+   */
+  private static String computePayloadHash(String tableName, List<String> columns,
+      List<List<Object>> rows, Map<String, String> options) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      digest.update(tableName.getBytes(StandardCharsets.UTF_8));
+      digest.update((byte) 0);
+
+      for (String col : columns) {
+        digest.update(col.getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+      }
+      digest.update((byte) 1);
+
+      for (List<Object> row : rows) {
+        for (Object val : row) {
+          digest.update(String.valueOf(val).getBytes(StandardCharsets.UTF_8));
+          digest.update((byte) 0);
+        }
+        digest.update((byte) 2);
+      }
+
+      if (options != null && !options.isEmpty()) {
+        // Sort keys for deterministic ordering
+        for (Map.Entry<String, String> entry : new TreeMap<>(options).entrySet()) {
+          digest.update(entry.getKey().getBytes(StandardCharsets.UTF_8));
+          digest.update((byte) 0);
+          digest.update(entry.getValue().getBytes(StandardCharsets.UTF_8));
+          digest.update((byte) 0);
+        }
+      }
+
+      byte[] hashBytes = digest.digest();
+      StringBuilder sb = new StringBuilder(hashBytes.length * 2);
+      for (byte b : hashBytes) {
+        sb.append(String.format("%02x", b));
+      }
+      return sb.toString();
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException("SHA-256 not available", e);
+    }
   }
 
   private String getControllerUrl() {

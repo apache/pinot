@@ -192,12 +192,27 @@ public class InsertStatementCoordinator {
     // 5. Delegate to executor
     try {
       InsertResult executorResult = executor.execute(request);
-      // Update manifest based on executor result
-      if (executorResult.getState() == InsertStatementState.ABORTED) {
-        manifest.setState(InsertStatementState.ABORTED);
-        manifest.setErrorMessage(executorResult.getMessage());
+      // Persist the executor's result state into the manifest so that ZK reflects actual progress.
+      InsertStatementState resultState = executorResult.getState();
+      if (resultState != null && resultState != InsertStatementState.ACCEPTED) {
+        manifest.setState(resultState);
+        if (executorResult.getMessage() != null) {
+          manifest.setErrorMessage(executorResult.getMessage());
+        }
+        if (executorResult.getSegmentNames() != null && !executorResult.getSegmentNames().isEmpty()) {
+          manifest.setSegmentNames(executorResult.getSegmentNames());
+        }
         _statementStore.updateStatement(manifest);
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_ABORTED, 1);
+
+        if (resultState == InsertStatementState.ABORTED) {
+          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_ABORTED, 1);
+        } else if (resultState == InsertStatementState.VISIBLE) {
+          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_VISIBLE, 1);
+          _controllerMetrics.setValueOfGlobalGauge(
+              ControllerGauge.INSERT_STATEMENTS_ACTIVE, getActiveStatementCount());
+        } else if (resultState == InsertStatementState.COMMITTED) {
+          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_COMMITTED, 1);
+        }
       }
       return executorResult;
     } catch (Exception e) {
@@ -300,10 +315,15 @@ public class InsertStatementCoordinator {
    * @return the result reflecting the aborted state
    */
   public InsertResult abortStatement(String statementId, @Nullable String tableNameWithType) {
-    // If tableNameWithType is not provided, we need to search for it
+    // If tableNameWithType is not provided, search across all tables
     InsertStatementManifest manifest = null;
     if (tableNameWithType != null) {
       manifest = _statementStore.getStatement(tableNameWithType, statementId);
+    } else {
+      manifest = _statementStore.findStatementAcrossTables(statementId);
+      if (manifest != null) {
+        tableNameWithType = manifest.getTableNameWithType();
+      }
     }
 
     if (manifest == null) {
@@ -457,17 +477,27 @@ public class InsertStatementCoordinator {
   }
 
   /**
-   * Background task: sweeps all known tables for stuck or completed statements.
-   * This method is also effective after controller failover because it reads all state from ZK.
+   * Background task: sweeps all tables for stuck or completed statements.
+   *
+   * <p>Failover-safe: enumerates tables directly from ZK (the property store) rather than relying
+   * solely on the in-memory {@code _tablesWithStatements} set. After a controller restart, the
+   * first sweep picks up all tables that still have manifests in ZK.
    */
   @VisibleForTesting
   void cleanupAllTables() {
     try {
       LOGGER.debug("Insert statement cleanup sweep started");
-      // Sweep all tables that are known to have statements.
-      // Copy the set to avoid ConcurrentModificationException.
+
+      // Enumerate tables from ZK to pick up tables persisted before this controller started.
+      // This makes cleanup resilient to controller failover.
+      List<String> zkTables = _statementStore.listTablesWithStatements();
       Set<String> tables = ConcurrentHashMap.newKeySet();
       tables.addAll(_tablesWithStatements);
+      tables.addAll(zkTables);
+
+      // Update the in-memory set so subsequent sweeps don't need to re-enumerate
+      _tablesWithStatements.addAll(zkTables);
+
       for (String table : tables) {
         try {
           cleanupStatementsForTable(table);

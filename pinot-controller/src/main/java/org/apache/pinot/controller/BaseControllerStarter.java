@@ -641,11 +641,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new InsertStatementStore(_helixResourceManager.getPropertyStore());
     _insertStatementCoordinator =
         new InsertStatementCoordinator(_helixResourceManager, insertStatementStore, _controllerMetrics);
+
+    // Register executors with the coordinator so broker-issued INSERTs are routed correctly
+    ControllerRowInsertExecutor rowInsertExecutor = new ControllerRowInsertExecutor(_helixResourceManager);
+    _insertStatementCoordinator.registerExecutor("ROW", rowInsertExecutor);
+
     _insertStatementCoordinator.start();
 
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
-    // Wire the controller-side row insert executor so INSERT INTO VALUES works directly
-    _sqlQueryExecutor.setInsertExecutor(new ControllerRowInsertExecutor(_helixResourceManager));
+    // Wire the same row insert executor for direct controller-side INSERT INTO VALUES
+    _sqlQueryExecutor.setInsertExecutor(rowInsertExecutor);
 
     _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
     _connectionManager.setDefaultSocketConfig(

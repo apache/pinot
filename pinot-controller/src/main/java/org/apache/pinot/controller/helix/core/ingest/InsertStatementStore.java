@@ -176,6 +176,41 @@ public class InsertStatementStore {
     return null;
   }
 
+  /**
+   * Lists all table names that have at least one insert statement manifest in ZK.
+   *
+   * @return list of table names with type suffix (never null; may be empty)
+   */
+  public List<String> listTablesWithStatements() {
+    try {
+      List<String> children = _propertyStore.getChildNames(INSERT_STATEMENTS_PREFIX, AccessOption.PERSISTENT);
+      if (children == null || children.isEmpty()) {
+        return Collections.emptyList();
+      }
+      return children;
+    } catch (Exception e) {
+      LOGGER.error("Failed to list tables with insert statements", e);
+      return Collections.emptyList();
+    }
+  }
+
+  /**
+   * Searches all tables for a statement with the given statementId.
+   *
+   * @return the manifest if found, or null
+   */
+  @Nullable
+  public InsertStatementManifest findStatementAcrossTables(String statementId) {
+    List<String> tables = listTablesWithStatements();
+    for (String table : tables) {
+      InsertStatementManifest manifest = getStatement(table, statementId);
+      if (manifest != null) {
+        return manifest;
+      }
+    }
+    return null;
+  }
+
   private static String buildTablePath(String tableNameWithType) {
     return INSERT_STATEMENTS_PREFIX + "/" + tableNameWithType;
   }
