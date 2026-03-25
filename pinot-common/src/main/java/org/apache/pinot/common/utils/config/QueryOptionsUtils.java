@@ -609,12 +609,12 @@ public class QueryOptionsUtils {
     }
     double value;
     try {
-      value = Double.parseDouble(optionValue);
+      value = Double.parseDouble(optionValue.trim());
     } catch (NumberFormatException nfe) {
       throw new IllegalArgumentException(
           String.format("%s must be a positive number, got: %s", optionName, optionValue));
     }
-    if (value <= 0) {
+    if (!Double.isFinite(value) || value <= 0) {
       throw new IllegalArgumentException(
           String.format("%s must be a positive number, got: %s", optionName, optionValue));
     }

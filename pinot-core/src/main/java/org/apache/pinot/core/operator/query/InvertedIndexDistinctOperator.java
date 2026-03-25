@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableMap;
@@ -35,7 +36,6 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
-import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -44,7 +44,15 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorFactory;
+import org.apache.pinot.core.query.distinct.table.BigDecimalDistinctTable;
+import org.apache.pinot.core.query.distinct.table.BytesDistinctTable;
 import org.apache.pinot.core.query.distinct.table.DictIdDistinctTable;
+import org.apache.pinot.core.query.distinct.table.DistinctTable;
+import org.apache.pinot.core.query.distinct.table.DoubleDistinctTable;
+import org.apache.pinot.core.query.distinct.table.FloatDistinctTable;
+import org.apache.pinot.core.query.distinct.table.IntDistinctTable;
+import org.apache.pinot.core.query.distinct.table.LongDistinctTable;
+import org.apache.pinot.core.query.distinct.table.StringDistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -55,6 +63,7 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.Pairs;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -117,19 +126,32 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
 
   @Override
   protected DistinctResultsBlock getNextBlock() {
-    ImmutableRoaringBitmap filteredDocIds = buildFilteredDocIds();
-
     // Sorted index: always use the sorted path — O(cardinality + filteredDocs) merge iteration
     if (_invertedIndexReader instanceof SortedIndexReader) {
+      ImmutableRoaringBitmap filteredDocIds = buildFilteredDocIds();
       _usedInvertedIndexPath = true;
       return executeSortedIndexPath((SortedIndexReader<?>) _invertedIndexReader, filteredDocIds);
     }
-    // Bitmap inverted index: use cost heuristic to decide
-    if (shouldUseBitmapInvertedIndex(filteredDocIds)) {
-      _usedInvertedIndexPath = true;
-      return executeInvertedIndexPath(filteredDocIds);
+
+    // Prefer cheap count-only inputs for the heuristic so scan fallback can keep the original filter pipeline.
+    FilterPreparation filterPreparation = prepareBitmapPathInput();
+    Integer filteredDocCount = filterPreparation.getFilteredDocCount();
+
+    if (filteredDocCount != null) {
+      if (filteredDocCount == 0) {
+        return createEmptyResultsBlock();
+      }
+      // Bitmap inverted index: use cost heuristic to decide
+      if (shouldUseBitmapInvertedIndex(filteredDocCount)) {
+        ImmutableRoaringBitmap filteredDocIds = filterPreparation.getFilteredDocIds();
+        if (filteredDocIds == null) {
+          filteredDocIds = buildFilteredDocIds();
+        }
+        _usedInvertedIndexPath = true;
+        return executeInvertedIndexPath(filteredDocIds);
+      }
     }
-    return executeScanPath(filteredDocIds);
+    return executeScanPath(filterPreparation.getFilteredDocIds());
   }
 
   // ==================== Cost Heuristic ====================
@@ -167,11 +189,8 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
     return DEFAULT_COST_RATIO_BY_CARDINALITY.floorEntry(dictionaryCardinality).getValue();
   }
 
-  private boolean shouldUseBitmapInvertedIndex(@Nullable ImmutableRoaringBitmap filteredDocIds) {
+  private boolean shouldUseBitmapInvertedIndex(int filteredDocCount) {
     int dictionaryCardinality = _dictionary.length();
-    int filteredDocCount = filteredDocIds == null
-        ? _indexSegment.getSegmentMetadata().getTotalDocs()
-        : filteredDocIds.getCardinality();
     if (filteredDocCount == 0) {
       return false;
     }
@@ -180,12 +199,53 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
     return (double) dictionaryCardinality * costRatio <= filteredDocCount;
   }
 
+  static final class FilterPreparation {
+    @Nullable
+    private final ImmutableRoaringBitmap _filteredDocIds;
+    @Nullable
+    private final Integer _filteredDocCount;
+
+    private FilterPreparation(@Nullable ImmutableRoaringBitmap filteredDocIds, @Nullable Integer filteredDocCount) {
+      _filteredDocIds = filteredDocIds;
+      _filteredDocCount = filteredDocCount;
+    }
+
+    @Nullable
+    ImmutableRoaringBitmap getFilteredDocIds() {
+      return _filteredDocIds;
+    }
+
+    @Nullable
+    Integer getFilteredDocCount() {
+      return _filteredDocCount;
+    }
+  }
+
+  FilterPreparation prepareBitmapPathInput() {
+    int totalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    if (_filterOperator.isResultMatchingAll()) {
+      return new FilterPreparation(null, totalDocs);
+    }
+    if (_filterOperator.isResultEmpty()) {
+      return new FilterPreparation(new MutableRoaringBitmap(), 0);
+    }
+    // Prefer the cheaper exact count when available so scan fallback does not pay eager bitmap materialization.
+    if (_filterOperator.canOptimizeCount()) {
+      return new FilterPreparation(null, _filterOperator.getNumMatchingDocs());
+    }
+    if (_filterOperator.canProduceBitmaps()) {
+      ImmutableRoaringBitmap filteredDocIds = _filterOperator.getBitmaps().reduce();
+      return new FilterPreparation(filteredDocIds, filteredDocIds.getCardinality());
+    }
+    return new FilterPreparation(null, null);
+  }
+
   // ==================== Scan Path (Fallback) ====================
 
   /**
-   * Scan fallback: uses ProjectOperator + DistinctExecutor. When the filter bitmap was already materialized
-   * by {@link #buildFilteredDocIds()}, wraps it in a {@link BitmapBasedFilterOperator} to avoid re-evaluating
-   * the filter through the projection pipeline.
+   * Scan fallback: uses ProjectOperator + DistinctExecutor. When an exact filter bitmap is already cheaply available,
+   * wraps it in a {@link BitmapBasedFilterOperator} to avoid re-evaluating the filter through the projection pipeline.
+   * Otherwise preserves the original filter operator so scan fallback does not pay eager bitmap materialization.
    */
   private DistinctResultsBlock executeScanPath(@Nullable ImmutableRoaringBitmap filteredDocIds) {
     BaseFilterOperator filterOp;
@@ -216,57 +276,88 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
    */
   private DistinctResultsBlock executeSortedIndexPath(SortedIndexReader<?> sortedReader,
       @Nullable ImmutableRoaringBitmap filteredDocIds) {
-    DictIdDistinctTable dictIdTable = createDictIdTable();
     OrderByExpressionContext orderByExpression =
         _queryContext.getOrderByExpressions() != null ? _queryContext.getOrderByExpressions().get(0) : null;
+    boolean useDictIdTable = canUseDictIdDistinctTable(orderByExpression);
+    DistinctTable distinctTable =
+        useDictIdTable ? createDictIdDistinctTable(orderByExpression) : createTypedDistinctTable(orderByExpression);
     int dictLength = _dictionary.length();
     // Process null handling: exclude null docs from filter and determine if nulls are present
     NullFilterResult nullResult = processNullDocs(filteredDocIds);
     ImmutableRoaringBitmap nonNullFilteredDocIds = nullResult._nonNullFilteredDocIds;
+    if (nullResult._hasNull) {
+      distinctTable.addNull();
+    }
+
+    // When dictIds are in value order, ORDER BY + LIMIT can terminate early by iterating in the ORDER BY direction.
+    boolean orderedEarlyTermination = useDictIdTable && orderByExpression != null && distinctTable.hasLimit();
+    boolean iterateReverse = orderedEarlyTermination && !orderByExpression.isAsc();
 
     if (nonNullFilteredDocIds == null) {
       // No filter, no null exclusion — every dictionary value is present
-      int dictId;
-      for (dictId = 0; dictId < dictLength; dictId++) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME_SORTED_INDEX);
-        boolean done = addDictId(dictIdTable, dictId, orderByExpression);
+      int entriesExamined = 0;
+      int start = iterateReverse ? dictLength - 1 : 0;
+      int end = iterateReverse ? -1 : dictLength;
+      int step = iterateReverse ? -1 : 1;
+      for (int dictId = start; dictId != end; dictId += step) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(entriesExamined, EXPLAIN_NAME_SORTED_INDEX);
+        entriesExamined++;
+        if (dictId == nullResult._nullPlaceholderDictId) {
+          continue;
+        }
+        boolean done = addDistinctValue(distinctTable, dictId, orderByExpression, orderedEarlyTermination);
         if (done) {
-          dictId++;
           break;
         }
       }
-      _numEntriesExamined = dictId;
+      _numEntriesExamined = entriesExamined;
     } else if (!nonNullFilteredDocIds.isEmpty()) {
-      // Merge-iterate: walk non-null filter bitmap and sorted ranges together.
-      // Both are in sorted order, so this is O(cardinality + filteredDocs).
-      PeekableIntIterator filterIter = nonNullFilteredDocIds.getIntIterator();
-      int dictId;
-      for (dictId = 0; dictId < dictLength && filterIter.hasNext(); dictId++) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME_SORTED_INDEX);
-        Pairs.IntPair range = sortedReader.getDocIds(dictId);
-        int startDocId = range.getLeft();
-        int endDocId = range.getRight(); // inclusive
-
-        // Skip filter docs before this range
-        filterIter.advanceIfNeeded(startDocId);
-
-        // Check if any non-null filter doc falls within this range
-        if (filterIter.hasNext() && filterIter.peekNext() <= endDocId) {
-          boolean done = addDictId(dictIdTable, dictId, orderByExpression);
-          if (done) {
-            _numEntriesExamined = dictId + 1;
-            return new DistinctResultsBlock(
-                dictIdTable.toTypedDistinctTable(_dictionary, nullResult._hasNull), _queryContext);
+      if (iterateReverse) {
+        // DESC + LIMIT: iterate dictIds backward, use rangeCardinality for presence check.
+        // Each dictId maps to a contiguous doc range, so rangeCardinality is O(1) per check.
+        int entriesExamined = 0;
+        for (int dictId = dictLength - 1; dictId >= 0; dictId--) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(entriesExamined, EXPLAIN_NAME_SORTED_INDEX);
+          entriesExamined++;
+          Pairs.IntPair range = sortedReader.getDocIds(dictId);
+          int startDocId = range.getLeft();
+          int endDocId = range.getRight(); // inclusive
+          if (nonNullFilteredDocIds.rangeCardinality(startDocId, endDocId + 1L) > 0) {
+            if (addDistinctValue(distinctTable, dictId, orderByExpression, true)) {
+              break;
+            }
           }
-          // Advance past the current range for next dictId
-          filterIter.advanceIfNeeded(endDocId + 1);
         }
+        _numEntriesExamined = entriesExamined;
+      } else {
+        // ASC or no ORDER BY: merge-iterate forward (O(cardinality + filteredDocs))
+        PeekableIntIterator filterIter = nonNullFilteredDocIds.getIntIterator();
+        int dictId;
+        for (dictId = 0; dictId < dictLength && filterIter.hasNext(); dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME_SORTED_INDEX);
+          Pairs.IntPair range = sortedReader.getDocIds(dictId);
+          int startDocId = range.getLeft();
+          int endDocId = range.getRight(); // inclusive
+
+          // Skip filter docs before this range
+          filterIter.advanceIfNeeded(startDocId);
+
+          // Check if any non-null filter doc falls within this range
+          if (filterIter.hasNext() && filterIter.peekNext() <= endDocId) {
+            boolean done = addDistinctValue(distinctTable, dictId, orderByExpression, orderedEarlyTermination);
+            if (done) {
+              _numEntriesExamined = dictId + 1;
+              return new DistinctResultsBlock(convertDistinctTable(distinctTable, nullResult._hasNull), _queryContext);
+            }
+            // Advance past the current range for next dictId
+            filterIter.advanceIfNeeded(endDocId + 1);
+          }
+        }
+        _numEntriesExamined = dictId;
       }
-      _numEntriesExamined = dictId;
     }
 
-    return new DistinctResultsBlock(
-        dictIdTable.toTypedDistinctTable(_dictionary, nullResult._hasNull), _queryContext);
+    return new DistinctResultsBlock(convertDistinctTable(distinctTable, nullResult._hasNull), _queryContext);
   }
 
   // ==================== Bitmap Inverted Index Path ====================
@@ -275,14 +366,31 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
     // Process null handling: exclude null docs from filter and determine if nulls are present
     NullFilterResult nullResult = processNullDocs(filteredDocIds);
     ImmutableRoaringBitmap nonNullFilteredDocIds = nullResult._nonNullFilteredDocIds;
-    DictIdDistinctTable dictIdTable = createDictIdTable();
     OrderByExpressionContext orderByExpression =
         _queryContext.getOrderByExpressions() != null ? _queryContext.getOrderByExpressions().get(0) : null;
+    boolean useDictIdTable = canUseDictIdDistinctTable(orderByExpression);
+    DistinctTable distinctTable =
+        useDictIdTable ? createDictIdDistinctTable(orderByExpression) : createTypedDistinctTable(orderByExpression);
     int dictLength = _dictionary.length();
+    if (nullResult._hasNull) {
+      distinctTable.addNull();
+    }
 
-    int dictId;
-    for (dictId = 0; dictId < dictLength; dictId++) {
-      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
+    // When dictIds are in value order, ORDER BY + LIMIT can terminate early by iterating in the ORDER BY direction.
+    boolean orderedEarlyTermination = useDictIdTable && orderByExpression != null && distinctTable.hasLimit();
+    boolean iterateReverse = orderedEarlyTermination && !orderByExpression.isAsc();
+
+    int entriesExamined = 0;
+    int start = iterateReverse ? dictLength - 1 : 0;
+    int end = iterateReverse ? -1 : dictLength;
+      int step = iterateReverse ? -1 : 1;
+
+    for (int dictId = start; dictId != end; dictId += step) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(entriesExamined, EXPLAIN_NAME);
+      entriesExamined++;
+      if (dictId == nullResult._nullPlaceholderDictId) {
+        continue;
+      }
 
       // SortedIndexReader is handled separately in getNextBlock(), so this path only sees bitmap inverted indexes
       // whose getDocIds() returns ImmutableRoaringBitmap.
@@ -300,81 +408,193 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
       }
 
       if (includeValue) {
-        boolean done = addDictId(dictIdTable, dictId, orderByExpression);
+        boolean done = addDistinctValue(distinctTable, dictId, orderByExpression, orderedEarlyTermination);
         if (done) {
-          dictId++;
           break;
         }
       }
     }
-    _numEntriesExamined = dictId;
+    _numEntriesExamined = entriesExamined;
 
-    return new DistinctResultsBlock(
-        dictIdTable.toTypedDistinctTable(_dictionary, nullResult._hasNull), _queryContext);
+    return new DistinctResultsBlock(convertDistinctTable(distinctTable, nullResult._hasNull), _queryContext);
   }
 
   @Nullable
   private ImmutableRoaringBitmap buildFilteredDocIds() {
-    if (_filterOperator.isResultMatchingAll()) {
-      return null;
-    }
-    if (_filterOperator.isResultEmpty()) {
-      return new MutableRoaringBitmap();
-    }
-    if (_filterOperator.canProduceBitmaps()) {
-      return _filterOperator.getBitmaps().reduce();
-    }
-    return materializeFilterBitmap();
+    BaseFilterOperator.FilteredDocIds filteredDocIds = _filterOperator.getFilteredDocIds();
+    _numEntriesScannedInFilter = filteredDocIds.getNumEntriesScannedInFilter();
+    return filteredDocIds.getDocIds();
   }
 
-  /**
-   * Materializes the filter bitmap by iterating through the DocIdSetOperator.
-   * Used when the filter cannot produce bitmaps directly (e.g., expression-based filters).
-   */
-  private MutableRoaringBitmap materializeFilterBitmap() {
-    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
-    DocIdSetPlanNode docIdSetPlanNode =
-        new DocIdSetPlanNode(_segmentContext, _queryContext, DocIdSetPlanNode.MAX_DOC_PER_CALL, _filterOperator);
-    var docIdSetOperator = docIdSetPlanNode.run();
-    DocIdSetBlock block;
-    while ((block = docIdSetOperator.nextBlock()) != null) {
-      int[] docIds = block.getDocIds();
-      int length = block.getLength();
-      for (int i = 0; i < length; i++) {
-        bitmap.add(docIds[i]);
-      }
-    }
-    _numEntriesScannedInFilter = docIdSetOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    return bitmap;
+  private boolean canUseDictIdDistinctTable(@Nullable OrderByExpressionContext orderByExpression) {
+    return orderByExpression == null || _dictionary.isSorted();
   }
 
-  private DictIdDistinctTable createDictIdTable() {
+  private DistinctResultsBlock createEmptyResultsBlock() {
+    OrderByExpressionContext orderByExpression =
+        _queryContext.getOrderByExpressions() != null ? _queryContext.getOrderByExpressions().get(0) : null;
+    DistinctTable distinctTable =
+        canUseDictIdDistinctTable(orderByExpression) ? createDictIdDistinctTable(orderByExpression)
+            : createTypedDistinctTable(orderByExpression);
+    return new DistinctResultsBlock(convertDistinctTable(distinctTable, false), _queryContext);
+  }
+
+  private DataSchema createDataSchema() {
     ExpressionContext expr = _queryContext.getSelectExpressions().get(0);
     String column = expr.getIdentifier();
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
-    DataSchema dataSchema = new DataSchema(new String[]{column},
+    return new DataSchema(new String[]{column},
         new ColumnDataType[]{ColumnDataType.fromDataTypeSV(dataSourceMetadata.getDataType())});
-    OrderByExpressionContext orderByExpression =
-        _queryContext.getOrderByExpressions() != null ? _queryContext.getOrderByExpressions().get(0) : null;
-    return new DictIdDistinctTable(dataSchema, _queryContext.getLimit(), _queryContext.isNullHandlingEnabled(),
+  }
+
+  private DictIdDistinctTable createDictIdDistinctTable(@Nullable OrderByExpressionContext orderByExpression) {
+    return new DictIdDistinctTable(createDataSchema(), _queryContext.getLimit(), _queryContext.isNullHandlingEnabled(),
         orderByExpression);
   }
 
-  /**
-   * Adds a dictId to the table. Returns true if the table is full (no ORDER BY, limit reached).
-   */
-  private static boolean addDictId(DictIdDistinctTable table, int dictId,
-      @Nullable OrderByExpressionContext orderByExpression) {
-    if (table.hasLimit()) {
-      if (orderByExpression != null) {
-        table.addWithOrderBy(dictId);
-        return false;
-      } else {
-        return table.addWithoutOrderBy(dictId);
+  private DistinctTable createTypedDistinctTable(@Nullable OrderByExpressionContext orderByExpression) {
+    DataSchema dataSchema = createDataSchema();
+    int limit = _queryContext.getLimit();
+    boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+    switch (_dictionary.getValueType()) {
+      case INT:
+        return new IntDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case LONG:
+        return new LongDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case FLOAT:
+        return new FloatDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case DOUBLE:
+        return new DoubleDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case BIG_DECIMAL:
+        return new BigDecimalDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case STRING:
+        return new StringDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      case BYTES:
+        return new BytesDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
+      default:
+        throw new IllegalStateException("Unsupported data type: " + _dictionary.getValueType());
+    }
+  }
+
+  private DistinctTable convertDistinctTable(DistinctTable distinctTable, boolean hasNull) {
+    if (distinctTable instanceof DictIdDistinctTable) {
+      return ((DictIdDistinctTable) distinctTable).toTypedDistinctTable(_dictionary, hasNull);
+    }
+    return distinctTable;
+  }
+
+  private boolean addDistinctValue(DistinctTable distinctTable, int dictId,
+      @Nullable OrderByExpressionContext orderByExpression, boolean orderedEarlyTermination) {
+    if (distinctTable instanceof DictIdDistinctTable) {
+      DictIdDistinctTable dictIdDistinctTable = (DictIdDistinctTable) distinctTable;
+      if (orderedEarlyTermination) {
+        return dictIdDistinctTable.addForOrderedEarlyTermination(dictId);
       }
-    } else {
-      table.addUnbounded(dictId);
+      if (dictIdDistinctTable.hasLimit()) {
+        if (orderByExpression != null) {
+          dictIdDistinctTable.addWithOrderBy(dictId);
+          return false;
+        }
+        return dictIdDistinctTable.addWithoutOrderBy(dictId);
+      }
+      dictIdDistinctTable.addUnbounded(dictId);
       return false;
+    }
+
+    switch (_dictionary.getValueType()) {
+      case INT: {
+        IntDistinctTable table = (IntDistinctTable) distinctTable;
+        int value = _dictionary.getIntValue(dictId);
+        if (table.hasLimit()) {
+          if (orderByExpression != null) {
+            table.addWithOrderBy(value);
+            return false;
+          }
+          return table.addWithoutOrderBy(value);
+        }
+        table.addUnbounded(value);
+        return false;
+      }
+      case LONG: {
+        LongDistinctTable table = (LongDistinctTable) distinctTable;
+        long value = _dictionary.getLongValue(dictId);
+        if (table.hasLimit()) {
+          if (orderByExpression != null) {
+            table.addWithOrderBy(value);
+            return false;
+          }
+          return table.addWithoutOrderBy(value);
+        }
+        table.addUnbounded(value);
+        return false;
+      }
+      case FLOAT: {
+        FloatDistinctTable table = (FloatDistinctTable) distinctTable;
+        float value = _dictionary.getFloatValue(dictId);
+        if (table.hasLimit()) {
+          if (orderByExpression != null) {
+            table.addWithOrderBy(value);
+            return false;
+          }
+          return table.addWithoutOrderBy(value);
+        }
+        table.addUnbounded(value);
+        return false;
+      }
+      case DOUBLE: {
+        DoubleDistinctTable table = (DoubleDistinctTable) distinctTable;
+        double value = _dictionary.getDoubleValue(dictId);
+        if (table.hasLimit()) {
+          if (orderByExpression != null) {
+            table.addWithOrderBy(value);
+            return false;
+          }
+          return table.addWithoutOrderBy(value);
+        }
+        table.addUnbounded(value);
+        return false;
+      }
+      case BIG_DECIMAL: {
+        BigDecimalDistinctTable table = (BigDecimalDistinctTable) distinctTable;
+        java.math.BigDecimal value = _dictionary.getBigDecimalValue(dictId);
+        if (table.hasLimit()) {
+          if (orderByExpression != null) {
+            table.addWithOrderBy(value);
+            return false;
+          }
+          return table.addWithoutOrderBy(value);
+        }
+        table.addUnbounded(value);
+        return false;
+      }
+      case STRING: {
+        StringDistinctTable table = (StringDistinctTable) distinctTable;
+        String value = _dictionary.getStringValue(dictId);
+        if (table.hasLimit()) {
+          if (orderByExpression != null) {
+            table.addWithOrderBy(value);
+            return false;
+          }
+          return table.addWithoutOrderBy(value);
+        }
+        table.addUnbounded(value);
+        return false;
+      }
+      case BYTES: {
+        BytesDistinctTable table = (BytesDistinctTable) distinctTable;
+        ByteArray value = new ByteArray(_dictionary.getBytesValue(dictId));
+        if (table.hasLimit()) {
+          if (orderByExpression != null) {
+            table.addWithOrderBy(value);
+            return false;
+          }
+          return table.addWithoutOrderBy(value);
+        }
+        table.addUnbounded(value);
+        return false;
+      }
+      default:
+        throw new IllegalStateException("Unsupported data type: " + _dictionary.getValueType());
     }
   }
 
@@ -390,37 +610,64 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
    */
   private NullFilterResult processNullDocs(@Nullable ImmutableRoaringBitmap filteredDocIds) {
     if (!_queryContext.isNullHandlingEnabled()) {
-      return new NullFilterResult(filteredDocIds, false);
+      return new NullFilterResult(filteredDocIds, false, Dictionary.NULL_VALUE_INDEX);
     }
     NullValueVectorReader nullReader = _dataSource.getNullValueVector();
     if (nullReader == null) {
-      return new NullFilterResult(filteredDocIds, false);
+      return new NullFilterResult(filteredDocIds, false, Dictionary.NULL_VALUE_INDEX);
     }
     ImmutableRoaringBitmap nullBitmap = nullReader.getNullBitmap();
     if (nullBitmap == null || nullBitmap.isEmpty()) {
-      return new NullFilterResult(filteredDocIds, false);
+      return new NullFilterResult(filteredDocIds, false, Dictionary.NULL_VALUE_INDEX);
     }
     // Determine if any filtered doc has null
     boolean hasNull = filteredDocIds == null || ImmutableRoaringBitmap.intersects(nullBitmap, filteredDocIds);
     // Exclude null docs from filter bitmap
     ImmutableRoaringBitmap nonNullFilteredDocIds;
+    int nullPlaceholderDictId = Dictionary.NULL_VALUE_INDEX;
     if (filteredDocIds == null) {
-      // Match-all: flip null bitmap to get all non-null docs
-      nonNullFilteredDocIds = ImmutableRoaringBitmap.flip(nullBitmap, 0L,
-          _indexSegment.getSegmentMetadata().getTotalDocs());
+      // Preserve match-all to avoid materializing a dense complement bitmap. Instead skip the null placeholder dictId
+      // while iterating dictionary values.
+      nonNullFilteredDocIds = null;
+      nullPlaceholderDictId = getNullPlaceholderDictId();
     } else {
       nonNullFilteredDocIds = ImmutableRoaringBitmap.andNot(filteredDocIds, nullBitmap);
     }
-    return new NullFilterResult(nonNullFilteredDocIds, hasNull);
+    return new NullFilterResult(nonNullFilteredDocIds, hasNull, nullPlaceholderDictId);
+  }
+
+  private int getNullPlaceholderDictId() {
+    Object defaultNullValue = _dataSource.getDataSourceMetadata().getFieldSpec().getDefaultNullValue();
+    switch (_dictionary.getValueType()) {
+      case INT:
+        return _dictionary.indexOf((int) defaultNullValue);
+      case LONG:
+        return _dictionary.indexOf((long) defaultNullValue);
+      case FLOAT:
+        return _dictionary.indexOf((float) defaultNullValue);
+      case DOUBLE:
+        return _dictionary.indexOf((double) defaultNullValue);
+      case BIG_DECIMAL:
+        return _dictionary.indexOf((BigDecimal) defaultNullValue);
+      case STRING:
+        return _dictionary.indexOf((String) defaultNullValue);
+      case BYTES:
+        return _dictionary.indexOf(new ByteArray((byte[]) defaultNullValue));
+      default:
+        return Dictionary.NULL_VALUE_INDEX;
+    }
   }
 
   private static class NullFilterResult {
     final ImmutableRoaringBitmap _nonNullFilteredDocIds;
     final boolean _hasNull;
+    final int _nullPlaceholderDictId;
 
-    NullFilterResult(@Nullable ImmutableRoaringBitmap nonNullFilteredDocIds, boolean hasNull) {
+    NullFilterResult(@Nullable ImmutableRoaringBitmap nonNullFilteredDocIds, boolean hasNull,
+        int nullPlaceholderDictId) {
       _nonNullFilteredDocIds = nonNullFilteredDocIds;
       _hasNull = hasNull;
+      _nullPlaceholderDictId = nullPlaceholderDictId;
     }
   }
 
@@ -447,12 +694,12 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     if (_usedInvertedIndexPath || _projectOperator == null) {
       // For inverted/sorted index paths: numDocsScanned=0 (no forward index lookups),
-      // numEntriesScannedInFilter tracks work done by materializeFilterBitmap() when the filter
-      // cannot produce bitmaps directly, numEntriesScannedPostFilter=numEntriesExamined
-      // (dictionary entries examined via bitmap intersection or sorted range checks).
+      // numEntriesScannedInFilter tracks work done while materializing the exact filter bitmap,
+      // numEntriesScannedPostFilter=numEntriesExamined (dictionary entries examined via bitmap
+      // intersection or sorted range checks).
       return new ExecutionStatistics(0, _numEntriesScannedInFilter, _numEntriesExamined, numTotalDocs);
     }
-    // _numEntriesScannedInFilter captures filter work from materializeFilterBitmap() (non-zero only when
+    // _numEntriesScannedInFilter captures filter work from exact bitmap materialization (non-zero only when
     // the filter could not produce bitmaps directly). The project operator's stats capture any additional
     // filter work (zero when using a pre-built BitmapBasedFilterOperator).
     long numEntriesScannedInFilter = _numEntriesScannedInFilter

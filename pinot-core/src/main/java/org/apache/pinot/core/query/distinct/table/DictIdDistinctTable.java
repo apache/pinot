@@ -50,7 +50,22 @@ public class DictIdDistinctTable extends IntDistinctTable {
 
   @Override
   protected IntComparator getComparator(OrderByExpressionContext orderByExpression) {
-    return orderByExpression.isAsc() ? (v1, v2) -> v2 - v1 : (v1, v2) -> v1 - v2;
+    return orderByExpression.isAsc() ? (v1, v2) -> Integer.compare(v2, v1)
+        : (v1, v2) -> Integer.compare(v1, v2);
+  }
+
+  /**
+   * Adds a dictId while iterating in final ORDER BY order.
+   *
+   * <p>When nulls sort first, the null placeholder consumes one top-N slot. For nulls last, the top-N rows are
+   * determined entirely by non-null values, so early termination should not reserve space for null.
+   */
+  public boolean addForOrderedEarlyTermination(int dictId) {
+    assert _orderByExpression != null;
+    assert hasLimit();
+    _valueSet.add(dictId);
+    int targetSize = _hasNull && !_orderByExpression.isNullsLast() ? _limitWithoutNull : _limit;
+    return _valueSet.size() >= targetSize;
   }
 
   @Override
