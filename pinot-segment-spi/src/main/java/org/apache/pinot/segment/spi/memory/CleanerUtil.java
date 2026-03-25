@@ -24,8 +24,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,7 +71,7 @@ public final class CleanerUtil {
   }
 
   static {
-    final Object hack = AccessController.doPrivileged((PrivilegedAction<Object>) CleanerUtil::unmapHackImpl);
+    final Object hack = unmapHackImpl();
     if (hack instanceof BufferCleaner) {
       CLEANER = (BufferCleaner) hack;
       UNMAP_SUPPORTED = true;
@@ -161,14 +159,12 @@ public final class CleanerUtil {
       if (!unmappableBufferClass.isInstance(buffer)) {
         throw new IllegalArgumentException("buffer is not an instance of " + unmappableBufferClass.getName());
       }
-      final Throwable error = AccessController.doPrivileged((PrivilegedAction<Throwable>) () -> {
-        try {
-          unmapper.invokeExact(buffer);
-          return null;
-        } catch (Throwable t) {
-          return t;
-        }
-      });
+      Throwable error = null;
+      try {
+        unmapper.invokeExact(buffer);
+      } catch (Throwable t) {
+        error = t;
+      }
       if (error != null) {
         throw new IOException("Unable to unmap the mapped buffer", error);
       }

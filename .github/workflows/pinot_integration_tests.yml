@@ -56,8 +56,10 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 21 ]
+        java: [ 21, 25 ]
         distribution: [ "temurin" ]
+    # JDK 25 is experimental due to datasketches-memory 3.0.2 incompatibility
+    continue-on-error: ${{ matrix.java == 25 }}
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v7
