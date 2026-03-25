@@ -120,7 +120,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
     }
 
     if (version == VarByteChunkForwardIndexWriterV6.VERSION) {
-      // V6 uses two-stream chunk format (sizes and data compressed separately) for better compression
+      // V6 delta-encodes chunk header (sizes instead of offsets) for better compression
       return new VarByteChunkForwardIndexReaderV6(dataBuffer, storedType, isSingleValue);
     } else if (version == VarByteChunkForwardIndexWriterV5.VERSION) {
       // V5 is the same as V4 except the multi-value docs have implicit value count rather than explicit

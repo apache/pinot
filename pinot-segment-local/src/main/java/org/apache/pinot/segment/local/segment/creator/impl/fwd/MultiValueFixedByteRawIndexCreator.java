@@ -85,7 +85,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
               writerVersion);
     } else {
       if (writerVersion == VarByteChunkForwardIndexWriterV6.VERSION) {
-        // V6: two-stream format, store only the values (implicit length)
+        // V6: delta-encoded chunk header, store only the values (implicit length)
         int totalMaxLength = maxNumberOfMultiValueElements * valueType.getStoredType().size();
         int chunkSize =
             ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
