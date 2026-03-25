@@ -39,10 +39,8 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
-import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.distinct.table.BigDecimalDistinctTable;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
 import org.apache.pinot.core.query.distinct.table.DoubleDistinctTable;
@@ -61,6 +59,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -465,32 +464,10 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
 
   @Nullable
   private RoaringBitmap buildFilteredDocIds() {
-    if (_filterOperator.isResultMatchingAll()) {
-      return null;
-    }
-
-    if (_filterOperator.canProduceBitmaps()) {
-      // Bitmap-capable filters (inverted index, JSON index, etc.) produce bitmaps without scanning
-      // docs, so _numEntriesScannedInFilter correctly stays 0 for this path.
-      return _filterOperator.getBitmaps().reduce().toRoaringBitmap();
-    }
-
-    if (_filterOperator.isResultEmpty()) {
-      return new RoaringBitmap();
-    }
-
-    RoaringBitmap bitmap = new RoaringBitmap();
-    DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(
-        _segmentContext, _queryContext, DocIdSetPlanNode.MAX_DOC_PER_CALL, _filterOperator);
-    var docIdSetOperator = docIdSetPlanNode.run();
-    DocIdSetBlock block;
-    while ((block = docIdSetOperator.nextBlock()) != null) {
-      int[] docIds = block.getDocIds();
-      int length = block.getLength();
-      bitmap.addN(docIds, 0, length);
-    }
-    _numEntriesScannedInFilter = docIdSetOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    return bitmap;
+    BaseFilterOperator.FilteredDocIds filteredDocIds = _filterOperator.getFilteredDocIds();
+    _numEntriesScannedInFilter = filteredDocIds.getNumEntriesScannedInFilter();
+    ImmutableRoaringBitmap docIds = filteredDocIds.getDocIds();
+    return docIds != null ? docIds.toRoaringBitmap() : null;
   }
 
   @Nullable

@@ -235,6 +235,79 @@ public class BenchmarkInvertedIndexDistinct {
     return docsScanned;
   }
 
+  /**
+   * Inverted index path with ORDER BY ASC LIMIT: iterate dictIds forward, stop after finding
+   * {@code limit} matching values. Exploits dictId order = value order for early termination.
+   * Cost ~ O(limit / hitRate * bitmapIntersectionCost) where hitRate = distinctInFilter / cardinality.
+   */
+  @Benchmark
+  public int invertedIndexPathLimitAsc(Blackhole bh) {
+    int limit = 10;
+    int found = 0;
+
+    for (int dictId = 0; dictId < _dictionaryCardinality; dictId++) {
+      ImmutableRoaringBitmap docIds = _invertedIndex[dictId];
+      if (ImmutableRoaringBitmap.intersects(docIds, _filterBitmap)) {
+        found++;
+        if (found >= limit) {
+          break;
+        }
+      }
+    }
+
+    bh.consume(found);
+    return found;
+  }
+
+  /**
+   * Inverted index path with ORDER BY DESC LIMIT: iterate dictIds backward, stop after finding
+   * {@code limit} matching values. Exploits reverse dictId order for early termination.
+   * Cost ~ O(limit / hitRate * bitmapIntersectionCost).
+   */
+  @Benchmark
+  public int invertedIndexPathLimitDesc(Blackhole bh) {
+    int limit = 10;
+    int found = 0;
+
+    for (int dictId = _dictionaryCardinality - 1; dictId >= 0; dictId--) {
+      ImmutableRoaringBitmap docIds = _invertedIndex[dictId];
+      if (ImmutableRoaringBitmap.intersects(docIds, _filterBitmap)) {
+        found++;
+        if (found >= limit) {
+          break;
+        }
+      }
+    }
+
+    bh.consume(found);
+    return found;
+  }
+
+  /**
+   * Sorted index path with ORDER BY DESC LIMIT: iterate dictIds backward, check filter presence
+   * using rangeCardinality. Exploits reverse iteration for early termination.
+   * Cost ~ O(limit / hitRate) since rangeCardinality on contiguous ranges is O(1).
+   */
+  @Benchmark
+  public int sortedIndexPathLimitDesc(Blackhole bh) {
+    int limit = 10;
+    int found = 0;
+
+    for (int dictId = _dictionaryCardinality - 1; dictId >= 0; dictId--) {
+      int startDocId = _sortedRangeStarts[dictId];
+      int endDocId = _sortedRangeEnds[dictId];
+      if (_filterBitmap.rangeCardinality(startDocId, endDocId + 1L) > 0) {
+        found++;
+        if (found >= limit) {
+          break;
+        }
+      }
+    }
+
+    bh.consume(found);
+    return found;
+  }
+
   public static void main(String[] args)
       throws Exception {
     new Runner(new OptionsBuilder()

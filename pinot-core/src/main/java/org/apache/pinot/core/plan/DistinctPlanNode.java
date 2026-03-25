@@ -33,7 +33,9 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 
 
@@ -87,18 +89,21 @@ public class DistinctPlanNode implements PlanNode {
         return new JsonIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator);
       }
 
-      // Inverted/sorted index path — requires a sorted dictionary so that dictId order matches value order,
-      // which is needed for correct ORDER BY pruning via DictIdDistinctTable. Mutable (consuming) segments
-      // have unsorted dictionaries and are excluded.
+      // Inverted/sorted index path. For unsorted dictionaries the operator still avoids the scan/projection path,
+      // but ORDER BY pruning is disabled and ordering is maintained with the typed distinct table instead.
       String column = expr.getIdentifier();
       if (column != null) {
         DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
-        if (dataSource.getDictionary() != null && dataSource.getDictionary().isSorted()
-            && dataSource.getInvertedIndex() != null
-            && _queryContext.isIndexUseAllowed(column, FieldConfig.IndexType.INVERTED)) {
-          BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
-          return new InvertedIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator,
-              dataSource);
+        InvertedIndexReader<?> invertedIndexReader = dataSource.getInvertedIndex();
+        if (dataSource.getDictionary() != null && invertedIndexReader != null) {
+          FieldConfig.IndexType indexType =
+              invertedIndexReader instanceof SortedIndexReader ? FieldConfig.IndexType.SORTED
+                  : FieldConfig.IndexType.INVERTED;
+          if (_queryContext.isIndexUseAllowed(column, indexType)) {
+            BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
+            return new InvertedIndexDistinctOperator(_indexSegment, _segmentContext, _queryContext, filterOperator,
+                dataSource);
+          }
         }
       }
     }

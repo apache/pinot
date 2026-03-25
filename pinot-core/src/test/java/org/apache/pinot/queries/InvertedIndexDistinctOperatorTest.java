@@ -25,15 +25,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -54,7 +57,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Tests for {@link org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator}.
  *
- * <p>Five segments exercise distinct operator features:
+ * <p>Six segments exercise distinct operator features:
  * <ul>
  *   <li><b>INT segment</b>: 10K records, 100 unique INT values (interleaved), inverted index.
  *       Tests cost heuristic path selection and inverted-vs-scan correctness.</li>
@@ -62,6 +65,8 @@ import static org.testng.Assert.assertTrue;
  *       Tests multi-value column support.</li>
  *   <li><b>Sorted segment</b>: 10K records, sorted INT column (100 unique), sorted forward index.
  *       Tests sorted index path.</li>
+ *   <li><b>Mutable segment</b>: consuming segment with unsorted dictionary + inverted index.
+ *       Tests ORDER BY correctness without relying on sorted dictIds.</li>
  *   <li><b>STRING segment</b>: 5K records, STRING column (50 unique), inverted index.
  *       Tests STRING data type handling.</li>
  *   <li><b>Null segment</b>: 1K records, INT column with nulls, inverted index.
@@ -100,6 +105,11 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
   private static final int SORTED_RECORDS_PER_VALUE = 100;
   private IndexSegment _sortedSegment;
 
+  // --- Mutable segment with unsorted dictionary ---
+  private static final int MUTABLE_NUM_UNIQUE = 10;
+  private static final int MUTABLE_RECORDS_PER_VALUE = 100;
+  private IndexSegment _mutableSegment;
+
   // --- STRING segment ---
   private static final String STRING_COLUMN = "stringColumn";
   private static final int STRING_NUM_UNIQUE = 50;
@@ -134,6 +144,7 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
     _intSegment = buildIntSegment();
     _mvSegment = buildMvSegment();
     _sortedSegment = buildSortedSegment();
+    _mutableSegment = buildMutableSegment();
     _stringSegment = buildStringSegment();
     _nullSegment = buildNullSegment();
   }
@@ -216,6 +227,28 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
       }
     }
     return buildSegment("sortedSegment", schema, tableConfig, records);
+  }
+
+  private IndexSegment buildMutableSegment()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(INT_COLUMN, DataType.INT)
+        .addSingleValueDimension(FILTER_COLUMN, DataType.INT).build();
+    MutableSegment mutableSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(), Set.of(),
+        Set.of(INT_COLUMN, FILTER_COLUMN), false);
+    int[] insertionOrder = new int[]{5, 1, 9, 0, 8, 2, 7, 3, 6, 4};
+    int docId = 0;
+    for (int i = 0; i < MUTABLE_RECORDS_PER_VALUE; i++) {
+      for (int value : insertionOrder) {
+        GenericRow record = new GenericRow();
+        record.putValue(INT_COLUMN, value);
+        record.putValue(FILTER_COLUMN, docId++);
+        mutableSegment.index(record, null);
+      }
+    }
+    assertFalse(mutableSegment.getDataSource(INT_COLUMN).getDictionary().isSorted());
+    _allSegments.add(mutableSegment);
+    return mutableSegment;
   }
 
   private IndexSegment buildStringSegment()
@@ -319,9 +352,17 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
     return values;
   }
 
-  private Set<String> extractStringValues(DistinctTable table) {
-    Set<String> values = new HashSet<>();
-    for (Object[] row : table.getRows()) {
+  private List<Integer> extractOrderedIntValues(ResultTable resultTable) {
+    List<Integer> values = new ArrayList<>();
+    for (Object[] row : resultTable.getRows()) {
+      values.add((Integer) row[0]);
+    }
+    return values;
+  }
+
+  private List<String> extractOrderedStringValues(ResultTable resultTable) {
+    List<String> values = new ArrayList<>();
+    for (Object[] row : resultTable.getRows()) {
       values.add((String) row[0]);
     }
     return values;
@@ -329,6 +370,15 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
 
   private boolean containsNull(DistinctTable table) {
     for (Object[] row : table.getRows()) {
+      if (row[0] == null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean containsNull(ResultTable resultTable) {
+    for (Object[] row : resultTable.getRows()) {
       if (row[0] == null) {
         return true;
       }
@@ -452,38 +502,53 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testMvColumnVariants() {
+  public void testMvColumnMatchAll() {
     _activeSegment = _mvSegment;
 
-    // Match all — should return all unique values
     BaseOperator<DistinctResultsBlock> matchAllOp = getOperator(
         "SELECT DISTINCT mvIntColumn FROM testTable WHERE svFilterColumn >= 0 LIMIT 1000 " + OPT_INV);
     DistinctTable matchAllTable = matchAllOp.nextBlock().getDistinctTable();
     assertEquals(extractIntValues(matchAllTable), _allMvValues);
+  }
 
-    // LIMIT
+  @Test
+  public void testMvColumnLimit() {
+    _activeSegment = _mvSegment;
+
     BaseOperator<DistinctResultsBlock> limitOp = getOperator(
         "SELECT DISTINCT mvIntColumn FROM testTable WHERE svFilterColumn >= 0 LIMIT 10 " + OPT_INV);
     assertEquals(limitOp.nextBlock().getDistinctTable().size(), 10);
+  }
 
-    // ORDER BY DESC
+  @Test
+  public void testMvColumnOrderByDesc() {
+    _activeSegment = _mvSegment;
+
     BaseOperator<DistinctResultsBlock> descOp = getOperator(
         "SELECT DISTINCT mvIntColumn FROM testTable WHERE svFilterColumn < 500 "
             + "ORDER BY mvIntColumn DESC LIMIT 1000 " + OPT_INV);
     BaseOperator<DistinctResultsBlock> descScanOp = getOperator(
         "SELECT DISTINCT mvIntColumn FROM testTable WHERE svFilterColumn < 500 "
             + "ORDER BY mvIntColumn DESC LIMIT 1000 " + OPT_SCAN);
-    assertEquals(extractIntValues(descOp.nextBlock().getDistinctTable()),
-        extractIntValues(descScanOp.nextBlock().getDistinctTable()));
+    assertEquals(extractOrderedIntValues(descOp.nextBlock().getDistinctTable().toResultTable()),
+        extractOrderedIntValues(descScanOp.nextBlock().getDistinctTable().toResultTable()));
+  }
 
-    // Selective filter: docs 0,1,2 → values {0,1,2,3}
+  @Test
+  public void testMvColumnSelectiveFilter() {
+    _activeSegment = _mvSegment;
+
     BaseOperator<DistinctResultsBlock> selectiveOp = getOperator(
         "SELECT DISTINCT mvIntColumn FROM testTable WHERE svFilterColumn < 3 "
             + "ORDER BY mvIntColumn LIMIT 100 " + OPT_INV);
     assertEquals(extractIntValues(selectiveOp.nextBlock().getDistinctTable()),
         new HashSet<>(Arrays.asList(0, 1, 2, 3)));
+  }
 
-    // Empty filter
+  @Test
+  public void testMvColumnEmptyFilter() {
+    _activeSegment = _mvSegment;
+
     BaseOperator<DistinctResultsBlock> emptyOp = getOperator(
         "SELECT DISTINCT mvIntColumn FROM testTable WHERE svFilterColumn > 99999 LIMIT 1000 " + OPT_INV);
     assertEquals(emptyOp.nextBlock().getDistinctTable().size(), 0);
@@ -531,33 +596,44 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testSortedColumnOrderByAndLimit() {
+  public void testSortedColumnLimit() {
     _activeSegment = _sortedSegment;
 
-    // LIMIT
     BaseOperator<DistinctResultsBlock> limitOp = getOperator(
         "SELECT DISTINCT sortedColumn FROM testTable WHERE filterColumn >= 0 LIMIT 10 " + OPT + ")");
     assertEquals(limitOp.nextBlock().getDistinctTable().size(), 10);
+  }
 
-    // Matches scan path results
+  @Test
+  public void testSortedColumnMatchesScan() {
+    _activeSegment = _sortedSegment;
+
     BaseOperator<DistinctResultsBlock> sortedOp = getOperator(
         "SELECT DISTINCT sortedColumn FROM testTable WHERE filterColumn < 500 LIMIT 1000 " + OPT + ")");
     BaseOperator<DistinctResultsBlock> scanOp = getOperator(
         "SELECT DISTINCT sortedColumn FROM testTable WHERE filterColumn < 500 LIMIT 1000");
     assertEquals(extractIntValues(sortedOp.nextBlock().getDistinctTable()),
         extractIntValues(scanOp.nextBlock().getDistinctTable()));
+  }
 
-    // ORDER BY DESC
+  @Test
+  public void testSortedColumnOrderByDesc() {
+    _activeSegment = _sortedSegment;
+
     BaseOperator<DistinctResultsBlock> descOp = getOperator(
         "SELECT DISTINCT sortedColumn FROM testTable WHERE filterColumn < 500 "
             + "ORDER BY sortedColumn DESC LIMIT 1000 " + OPT + ")");
     BaseOperator<DistinctResultsBlock> descScanOp = getOperator(
         "SELECT DISTINCT sortedColumn FROM testTable WHERE filterColumn < 500 "
             + "ORDER BY sortedColumn DESC LIMIT 1000");
-    assertEquals(extractIntValues(descOp.nextBlock().getDistinctTable()),
-        extractIntValues(descScanOp.nextBlock().getDistinctTable()));
+    assertEquals(extractOrderedIntValues(descOp.nextBlock().getDistinctTable().toResultTable()),
+        extractOrderedIntValues(descScanOp.nextBlock().getDistinctTable().toResultTable()));
+  }
 
-    // ORDER BY DESC with LIMIT
+  @Test
+  public void testSortedColumnOrderByDescWithLimit() {
+    _activeSegment = _sortedSegment;
+
     int limit = 5;
     BaseOperator<DistinctResultsBlock> descLimitOp = getOperator(
         "SELECT DISTINCT sortedColumn FROM testTable WHERE filterColumn >= 0 "
@@ -566,9 +642,33 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
         "SELECT DISTINCT sortedColumn FROM testTable WHERE filterColumn >= 0 "
             + "ORDER BY sortedColumn DESC LIMIT " + limit);
     DistinctTable descLimitTable = descLimitOp.nextBlock().getDistinctTable();
-    assertEquals(extractIntValues(descLimitTable),
-        extractIntValues(descLimitScanOp.nextBlock().getDistinctTable()));
-    assertEquals(descLimitTable.size(), limit);
+    ResultTable descLimitResultTable = descLimitTable.toResultTable();
+    assertEquals(extractOrderedIntValues(descLimitResultTable),
+        extractOrderedIntValues(descLimitScanOp.nextBlock().getDistinctTable().toResultTable()));
+    assertEquals(descLimitResultTable.getRows().size(), limit);
+  }
+
+  @Test
+  public void testMutableSegmentOrderByUsesInvertedIndex() {
+    _activeSegment = _mutableSegment;
+    String bitmapCapableAllDocsFilter = "intColumn IN (0,1,2,3,4,5,6,7,8,9)";
+
+    BaseOperator<DistinctResultsBlock> invertedOp = getOperator(
+        "SELECT DISTINCT intColumn FROM testTable WHERE " + bitmapCapableAllDocsFilter + ' '
+            + "ORDER BY intColumn DESC LIMIT 5 " + OPT_INV);
+    DistinctTable invertedTable = invertedOp.nextBlock().getDistinctTable();
+    assertTrue(usedInvertedIndex(invertedOp));
+
+    BaseOperator<DistinctResultsBlock> scanOp = getOperator(
+        "SELECT DISTINCT intColumn FROM testTable WHERE " + bitmapCapableAllDocsFilter + ' '
+            + "ORDER BY intColumn DESC LIMIT 5 " + OPT_SCAN);
+    DistinctTable scanTable = scanOp.nextBlock().getDistinctTable();
+    assertFalse(usedInvertedIndex(scanOp));
+
+    ResultTable invertedResultTable = invertedTable.toResultTable();
+    ResultTable scanResultTable = scanTable.toResultTable();
+    assertEquals(extractOrderedIntValues(invertedResultTable), extractOrderedIntValues(scanResultTable));
+    assertEquals(extractOrderedIntValues(invertedResultTable), List.of(9, 8, 7, 6, 5));
   }
 
   // ==================== STRING Tests ====================
@@ -597,24 +697,28 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
     BaseOperator<DistinctResultsBlock> scanOp = getOperator(
         "SELECT DISTINCT stringColumn FROM testTable WHERE filterColumn < 200 "
             + "ORDER BY stringColumn LIMIT 1000 " + OPT_SCAN);
-    assertEquals(extractStringValues(invertedTable), extractStringValues(scanOp.nextBlock().getDistinctTable()));
+    assertEquals(extractOrderedStringValues(invertedTable.toResultTable()),
+        extractOrderedStringValues(scanOp.nextBlock().getDistinctTable().toResultTable()));
   }
 
   @Test
-  public void testStringColumnVariants() {
+  public void testStringColumnOrderByDesc() {
     _activeSegment = _stringSegment;
 
-    // ORDER BY DESC
     BaseOperator<DistinctResultsBlock> descOp = getOperator(
         "SELECT DISTINCT stringColumn FROM testTable WHERE filterColumn >= 0 "
             + "ORDER BY stringColumn DESC LIMIT 1000 " + OPT_INV);
     BaseOperator<DistinctResultsBlock> descScanOp = getOperator(
         "SELECT DISTINCT stringColumn FROM testTable WHERE filterColumn >= 0 "
             + "ORDER BY stringColumn DESC LIMIT 1000 " + OPT_SCAN);
-    assertEquals(extractStringValues(descOp.nextBlock().getDistinctTable()),
-        extractStringValues(descScanOp.nextBlock().getDistinctTable()));
+    assertEquals(extractOrderedStringValues(descOp.nextBlock().getDistinctTable().toResultTable()),
+        extractOrderedStringValues(descScanOp.nextBlock().getDistinctTable().toResultTable()));
+  }
 
-    // ORDER BY DESC with LIMIT
+  @Test
+  public void testStringColumnOrderByDescWithLimit() {
+    _activeSegment = _stringSegment;
+
     BaseOperator<DistinctResultsBlock> descLimitOp = getOperator(
         "SELECT DISTINCT stringColumn FROM testTable WHERE filterColumn >= 0 "
             + "ORDER BY stringColumn DESC LIMIT 5 " + OPT_INV);
@@ -622,24 +726,33 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
         "SELECT DISTINCT stringColumn FROM testTable WHERE filterColumn >= 0 "
             + "ORDER BY stringColumn DESC LIMIT 5");
     DistinctTable descLimitStrTable = descLimitOp.nextBlock().getDistinctTable();
-    assertEquals(extractStringValues(descLimitStrTable),
-        extractStringValues(descLimitScanOp.nextBlock().getDistinctTable()));
-    assertEquals(descLimitStrTable.size(), 5);
+    ResultTable descLimitResultTable = descLimitStrTable.toResultTable();
+    assertEquals(extractOrderedStringValues(descLimitResultTable),
+        extractOrderedStringValues(descLimitScanOp.nextBlock().getDistinctTable().toResultTable()));
+    assertEquals(descLimitResultTable.getRows().size(), 5);
+  }
 
-    // Empty filter
+  @Test
+  public void testStringColumnEmptyFilter() {
+    _activeSegment = _stringSegment;
+
     BaseOperator<DistinctResultsBlock> emptyOp = getOperator(
         "SELECT DISTINCT stringColumn FROM testTable WHERE filterColumn > 99999 LIMIT 1000 " + OPT_INV);
     assertEquals(emptyOp.nextBlock().getDistinctTable().size(), 0);
+  }
 
-    // Selective filter
-    Set<String> allExpected = new HashSet<>();
-    for (int i = 0; i < STRING_NUM_UNIQUE; i++) {
-      allExpected.add(String.format("val_%02d", i));
-    }
+  @Test
+  public void testStringColumnSelectiveFilter() {
+    _activeSegment = _stringSegment;
+
     BaseOperator<DistinctResultsBlock> selectiveOp = getOperator(
         "SELECT DISTINCT stringColumn FROM testTable WHERE filterColumn < 100 "
             + "ORDER BY stringColumn LIMIT 100 " + OPT_INV);
-    assertEquals(extractStringValues(selectiveOp.nextBlock().getDistinctTable()), allExpected);
+    BaseOperator<DistinctResultsBlock> selectiveScanOp = getOperator(
+        "SELECT DISTINCT stringColumn FROM testTable WHERE filterColumn < 100 "
+            + "ORDER BY stringColumn LIMIT 100 " + OPT_SCAN);
+    assertEquals(extractOrderedStringValues(selectiveOp.nextBlock().getDistinctTable().toResultTable()),
+        extractOrderedStringValues(selectiveScanOp.nextBlock().getDistinctTable().toResultTable()));
   }
 
   // ==================== Null Handling Tests ====================
@@ -686,27 +799,61 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testNullHandlingOrderByAndLimit() {
+  public void testNullHandlingOrderBy() {
     _activeSegment = _nullSegment;
 
-    // ORDER BY with nulls
     BaseOperator<DistinctResultsBlock> orderOp = getOperator(
         "SELECT DISTINCT intColumn FROM testTable WHERE filterColumn >= 0 "
             + "ORDER BY intColumn LIMIT 1000 "
             + OPT + ", invertedIndexDistinctCostRatio=1, enableNullHandling=true)");
-    DistinctTable orderTable = orderOp.nextBlock().getDistinctTable();
-    List<Object[]> rows = orderTable.getRows();
-    assertEquals(rows.size(), NULL_NUM_UNIQUE + 1);
-    assertNull(rows.get(0)[0]);
+    ResultTable resultTable = orderOp.nextBlock().getDistinctTable().toResultTable();
+    assertEquals(resultTable.getRows().size(), NULL_NUM_UNIQUE + 1);
+    assertEquals(resultTable.getRows().get(0)[0], 0);
+    assertNull(resultTable.getRows().get(resultTable.getRows().size() - 1)[0]);
+  }
 
-    // LIMIT with nulls
+  @Test
+  public void testNullHandlingOrderByNullsFirstLimit() {
+    _activeSegment = _nullSegment;
+
+    BaseOperator<DistinctResultsBlock> limitOp = getOperator(
+        "SELECT DISTINCT intColumn FROM testTable WHERE filterColumn >= 0 "
+            + "ORDER BY intColumn NULLS FIRST LIMIT 10 "
+            + OPT + ", invertedIndexDistinctCostRatio=1, enableNullHandling=true)");
+    ResultTable resultTable = limitOp.nextBlock().getDistinctTable().toResultTable();
+    assertEquals(resultTable.getRows().size(), 10);
+    assertNull(resultTable.getRows().get(0)[0]);
+    assertTrue(containsNull(resultTable));
+  }
+
+  @Test
+  public void testNullHandlingOrderByNullsLastLimit() {
+    _activeSegment = _nullSegment;
+
     BaseOperator<DistinctResultsBlock> limitOp = getOperator(
         "SELECT DISTINCT intColumn FROM testTable WHERE filterColumn >= 0 "
             + "ORDER BY intColumn LIMIT 10 "
             + OPT + ", invertedIndexDistinctCostRatio=1, enableNullHandling=true)");
-    DistinctTable limitTable = limitOp.nextBlock().getDistinctTable();
-    assertTrue(limitTable.size() >= 10);
-    assertTrue(containsNull(limitTable));
+    ResultTable resultTable = limitOp.nextBlock().getDistinctTable().toResultTable();
+    assertEquals(resultTable.getRows().size(), 10);
+    assertFalse(containsNull(resultTable));
+    assertEquals(resultTable.getRows().get(0)[0], 0);
+    assertEquals(resultTable.getRows().get(resultTable.getRows().size() - 1)[0], 9);
+  }
+
+  @Test
+  public void testNullHandlingOrderByDescNullsLastLimit() {
+    _activeSegment = _nullSegment;
+
+    BaseOperator<DistinctResultsBlock> limitOp = getOperator(
+        "SELECT DISTINCT intColumn FROM testTable WHERE filterColumn >= 0 "
+            + "ORDER BY intColumn DESC NULLS LAST LIMIT 10 "
+            + OPT + ", invertedIndexDistinctCostRatio=1, enableNullHandling=true)");
+    ResultTable resultTable = limitOp.nextBlock().getDistinctTable().toResultTable();
+    assertEquals(resultTable.getRows().size(), 10);
+    assertFalse(containsNull(resultTable));
+    assertEquals(resultTable.getRows().get(0)[0], 49);
+    assertEquals(resultTable.getRows().get(resultTable.getRows().size() - 1)[0], 40);
   }
 
   @Test
@@ -717,19 +864,41 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
         "SELECT DISTINCT intColumn FROM testTable WHERE filterColumn >= 940 "
             + "ORDER BY intColumn LIMIT 1000 "
             + OPT + ", invertedIndexDistinctCostRatio=1, enableNullHandling=true)");
-    DistinctTable invertedTable = invertedOp.nextBlock().getDistinctTable();
+    ResultTable invertedResultTable = invertedOp.nextBlock().getDistinctTable().toResultTable();
     assertTrue(usedInvertedIndex(invertedOp));
 
     BaseOperator<DistinctResultsBlock> scanOp = getOperator(
         "SELECT DISTINCT intColumn FROM testTable WHERE filterColumn >= 940 "
             + "ORDER BY intColumn LIMIT 1000 "
             + OPT + ", invertedIndexDistinctCostRatio=100000, enableNullHandling=true)");
-    DistinctTable scanTable = scanOp.nextBlock().getDistinctTable();
+    ResultTable scanResultTable = scanOp.nextBlock().getDistinctTable().toResultTable();
     assertFalse(usedInvertedIndex(scanOp));
 
-    assertEquals(invertedTable.size(), scanTable.size());
-    assertTrue(containsNull(invertedTable));
-    assertTrue(containsNull(scanTable));
+    assertEquals(extractOrderedIntValues(invertedResultTable), extractOrderedIntValues(scanResultTable));
+    assertTrue(containsNull(invertedResultTable));
+  }
+
+  @Test
+  public void testNullPreservedInBrokerResultWithoutOrderByLimit() {
+    _activeSegment = _nullSegment;
+
+    BaseOperator<DistinctResultsBlock> op = getOperator(
+        "SELECT DISTINCT intColumn FROM testTable WHERE filterColumn >= 940 LIMIT 10 "
+            + OPT + ", invertedIndexDistinctCostRatio=1, enableNullHandling=true)");
+    DistinctTable table = op.nextBlock().getDistinctTable();
+    assertTrue(usedInvertedIndex(op));
+
+    ResultTable resultTable = table.toResultTable();
+    assertEquals(resultTable.getRows().size(), 10);
+    assertTrue(containsNull(resultTable));
+
+    int nonNullValues = 0;
+    for (Object[] row : resultTable.getRows()) {
+      if (row[0] != null) {
+        nonNullValues++;
+      }
+    }
+    assertEquals(nonNullValues, 9);
   }
 
   @Test
