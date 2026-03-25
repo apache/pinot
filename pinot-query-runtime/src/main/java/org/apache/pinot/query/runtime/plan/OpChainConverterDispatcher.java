@@ -40,11 +40,11 @@ import org.slf4j.LoggerFactory;
 public final class OpChainConverterDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainConverterDispatcher.class);
 
-  private static volatile OpChainConverter ACTIVE;
+  private static volatile OpChainConverter _active;
 
   static {
-    ACTIVE = resolveActiveConverter(null);
-    LOGGER.info("Active OpChainConverter: {}", ACTIVE.converterId());
+    _active = resolveActiveConverter(null);
+    LOGGER.info("Active OpChainConverter: {}", _active.converterId());
   }
 
   private OpChainConverterDispatcher() {
@@ -62,17 +62,17 @@ public final class OpChainConverterDispatcher {
    * implementation when {@code null}.
    */
   public static void setActiveConverterIdOverride(@Nullable String converterId) {
-    ACTIVE = resolveActiveConverter(converterId);
+    _active = resolveActiveConverter(converterId);
     if (converterId != null) {
-      LOGGER.info("Active OpChainConverter: {} (pinned by override)", ACTIVE.converterId());
+      LOGGER.info("Active OpChainConverter: {} (pinned by override)", _active.converterId());
     } else if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Active OpChainConverter: {} (priority selection)", ACTIVE.converterId());
+      LOGGER.debug("Active OpChainConverter: {} (priority selection)", _active.converterId());
     }
   }
 
   public static OpChain convert(PlanNode node, OpChainExecutionContext context,
       BiConsumer<PlanNode, MultiStageOperator> tracker) {
-    return ACTIVE.convert(node, context, tracker);
+    return _active.convert(node, context, tracker);
   }
 
   private static OpChainConverter resolveActiveConverter(@Nullable String overrideConverterId) {

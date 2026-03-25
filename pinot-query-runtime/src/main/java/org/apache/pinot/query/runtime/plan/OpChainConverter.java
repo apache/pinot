@@ -40,7 +40,7 @@ public interface OpChainConverter {
    * Relative preference when more than one converter is registered. The converter with the largest value is used
    * unless {@link OpChainConverterDispatcher#setActiveConverterIdOverride} is set. Ties break lexicographically by
    * {@link #converterId()} (ascending).
-   * 
+   *
    * It is recommended to use multiples of 1000 for the priority, as that gives more flexibility to other
    * converters to be registered with different priorities.
    */
