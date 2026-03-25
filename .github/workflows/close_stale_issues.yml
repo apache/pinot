@@ -33,7 +33,7 @@ jobs:
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@v10
         with:
           days-before-issue-stale: 150
           days-before-issue-close: 30
