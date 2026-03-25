@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 public class PartitionFunctionFactory {
   // Enum for various partition functions to be added.
   public enum PartitionFunctionType {
-    Modulo, Murmur, Murmur2, Murmur3, ByteArray, HashCode, BoundedColumnValue;
+    Modulo, Murmur, Murmur2, Murmur3, Fnv, ByteArray, HashCode, BoundedColumnValue;
     // Add more functions here.
 
     private static final Map<String, PartitionFunctionType> VALUE_MAP = new HashMap<>();
@@ -81,6 +81,9 @@ public class PartitionFunctionFactory {
 
       case Murmur3:
         return new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+      case Fnv:
+        return new FnvPartitionFunction(numPartitions, functionConfig);
 
       case ByteArray:
         return new ByteArrayPartitionFunction(numPartitions);
