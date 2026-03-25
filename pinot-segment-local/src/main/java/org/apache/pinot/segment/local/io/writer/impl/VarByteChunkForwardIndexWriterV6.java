@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.io.writer.impl;
 
 import com.google.common.base.Preconditions;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -33,7 +34,6 @@ import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
-import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.slf4j.Logger;
@@ -83,11 +83,10 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
 
   // Data buffer: holds raw entry bytes (no sizes interleaved)
   private final ByteBuffer _chunkDataBuffer;
-  // Size buffer: holds [numDocs (reserved)][size0][size1]...
-  private final ByteBuffer _chunkSizeBuffer;
-  // Compression output buffers
+  // Size stream: uses ByteArrayOutputStream to grow dynamically
+  private final ByteArrayOutputStream _chunkSizeStream;
+  // Compression output buffer for the data stream
   private final ByteBuffer _dataCompressionBuffer;
-  private final ByteBuffer _sizeCompressionBuffer;
 
   private int _docIdOffset = 0;
   private int _nextDocId = 0;
@@ -96,29 +95,19 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
 
   public VarByteChunkForwardIndexWriterV6(File file, ChunkCompressionType compressionType, int chunkSize)
       throws IOException {
-    this(file, compressionType, chunkSize, ForwardIndexConfig.DEFAULT_COMPRESSION_LEVEL);
-  }
-
-  public VarByteChunkForwardIndexWriterV6(File file, ChunkCompressionType compressionType, int chunkSize,
-      int compressionLevel)
-      throws IOException {
     _dataBuffer = new File(file.getParentFile(), file.getName() + DATA_BUFFER_SUFFIX);
     _output = new RandomAccessFile(file, "rw");
     _dataChannel = new RandomAccessFile(_dataBuffer, "rw").getChannel();
-    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType, true, compressionLevel);
+    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType, true);
 
     _chunkDataBuffer = ByteBuffer.allocateDirect(chunkSize).order(ByteOrder.LITTLE_ENDIAN);
-
-    // Size buffer: numDocs (4 bytes) + up to one int per byte in the data buffer (generous upper bound)
-    int sizeBufferCapacity = Integer.BYTES + chunkSize;
-    _chunkSizeBuffer = ByteBuffer.allocateDirect(sizeBufferCapacity).order(ByteOrder.LITTLE_ENDIAN);
+    // Initial capacity: numDocs (4 bytes) + some entries; grows as needed
+    _chunkSizeStream = new ByteArrayOutputStream(Integer.BYTES + 256 * Integer.BYTES);
     // Reserve space for numDocs at position 0
-    _chunkSizeBuffer.position(Integer.BYTES);
+    writeLittleEndianInt(_chunkSizeStream, 0);
 
     _dataCompressionBuffer =
         ByteBuffer.allocateDirect(_chunkCompressor.maxCompressedSize(chunkSize)).order(ByteOrder.LITTLE_ENDIAN);
-    int maxSizeCompressed = _chunkCompressor.maxCompressedSize(sizeBufferCapacity);
-    _sizeCompressionBuffer = ByteBuffer.allocateDirect(maxSizeCompressed).order(ByteOrder.LITTLE_ENDIAN);
 
     writeHeader(_chunkCompressor.compressionType(), chunkSize);
   }
@@ -155,7 +144,7 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
         return;
       }
     }
-    _chunkSizeBuffer.putInt(bytes.length);
+    writeLittleEndianInt(_chunkSizeStream, bytes.length);
     _chunkDataBuffer.put(bytes);
     _nextDocId++;
   }
@@ -240,12 +229,34 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
 
   private void writeChunk() {
     int numDocs = _nextDocId - _docIdOffset;
-    _chunkSizeBuffer.putInt(0, numDocs);
-    _chunkSizeBuffer.flip();
+    // Write numDocs at position 0 in the size stream (overwrite the reserved slot)
+    byte[] sizeBytes = _chunkSizeStream.toByteArray();
+    sizeBytes[0] = (byte) numDocs;
+    sizeBytes[1] = (byte) (numDocs >> 8);
+    sizeBytes[2] = (byte) (numDocs >> 16);
+    sizeBytes[3] = (byte) (numDocs >> 24);
+
     _chunkDataBuffer.flip();
+    ByteBuffer sizeCompressionBuffer = null;
     try {
+      // Wrap size bytes for compression (needs direct buffer for some compressors)
+      ByteBuffer sizeBuffer;
+      if (_chunkCompressor.compressionType() == ChunkCompressionType.SNAPPY
+          || _chunkCompressor.compressionType() == ChunkCompressionType.ZSTANDARD) {
+        sizeBuffer = ByteBuffer.allocateDirect(sizeBytes.length).order(ByteOrder.LITTLE_ENDIAN);
+        sizeBuffer.put(sizeBytes);
+        sizeBuffer.flip();
+      } else {
+        sizeBuffer = ByteBuffer.wrap(sizeBytes).order(ByteOrder.LITTLE_ENDIAN);
+      }
+
+      // Allocate compression output for sizes
+      int maxSizeCompressed = _chunkCompressor.maxCompressedSize(sizeBytes.length);
+      sizeCompressionBuffer = ByteBuffer.allocateDirect(maxSizeCompressed).order(ByteOrder.LITTLE_ENDIAN);
+
       // Compress size stream
-      int sizeCompressedLen = _chunkCompressor.compress(_chunkSizeBuffer, _sizeCompressionBuffer);
+      int sizeCompressedLen = _chunkCompressor.compress(sizeBuffer, sizeCompressionBuffer);
+      CleanerUtil.cleanQuietly(sizeBuffer);
 
       // Compress data stream
       int dataCompressedLen = _chunkDataBuffer.remaining() > 0
@@ -261,7 +272,7 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
 
       int written = 0;
       while (written < sizeCompressedLen) {
-        written += _dataChannel.write(_sizeCompressionBuffer);
+        written += _dataChannel.write(sizeCompressionBuffer);
       }
 
       if (dataCompressedLen > 0) {
@@ -282,15 +293,16 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
       throw new RuntimeException(e);
     } finally {
       _dataCompressionBuffer.clear();
-      _sizeCompressionBuffer.clear();
+      CleanerUtil.cleanQuietly(sizeCompressionBuffer);
     }
     clearChunkBuffers();
   }
 
   private void clearChunkBuffers() {
     _chunkDataBuffer.clear();
-    _chunkSizeBuffer.clear();
-    _chunkSizeBuffer.position(Integer.BYTES);
+    _chunkSizeStream.reset();
+    // Reserve space for numDocs at position 0
+    writeLittleEndianInt(_chunkSizeStream, 0);
   }
 
   @Override
@@ -313,10 +325,15 @@ public class VarByteChunkForwardIndexWriterV6 implements VarByteChunkWriter {
     _dataChannel.close();
     _output.close();
     CleanerUtil.cleanQuietly(_dataCompressionBuffer);
-    CleanerUtil.cleanQuietly(_sizeCompressionBuffer);
     CleanerUtil.cleanQuietly(_chunkDataBuffer);
-    CleanerUtil.cleanQuietly(_chunkSizeBuffer);
     FileUtils.deleteQuietly(_dataBuffer);
     _chunkCompressor.close();
+  }
+
+  private static void writeLittleEndianInt(ByteArrayOutputStream out, int value) {
+    out.write(value & 0xFF);
+    out.write((value >> 8) & 0xFF);
+    out.write((value >> 16) & 0xFF);
+    out.write((value >> 24) & 0xFF);
   }
 }

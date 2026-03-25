@@ -69,14 +69,12 @@ public class ForwardIndexConfig extends IndexConfig {
     _defaultTargetDocsPerChunk = defaultTargetDocsPerChunk;
   }
 
-  public static final int DEFAULT_COMPRESSION_LEVEL = -1;
-
   public static ForwardIndexConfig getDefault() {
     return new Builder().build();
   }
 
   public static ForwardIndexConfig getDisabled() {
-    return new ForwardIndexConfig(true, null, null, null, null, null, null, null, null, null);
+    return new ForwardIndexConfig(true, null, null, null, null, null, null, null, null);
   }
 
   @Nullable
@@ -86,7 +84,6 @@ public class ForwardIndexConfig extends IndexConfig {
   private final String _targetMaxChunkSize;
   private final int _targetMaxChunkSizeBytes;
   private final int _targetDocsPerChunk;
-  private final int _compressionLevel;
 
   @Nullable
   private final ChunkCompressionType _chunkCompressionType;
@@ -98,7 +95,7 @@ public class ForwardIndexConfig extends IndexConfig {
   public ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
       @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
       @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk,
-      @Nullable Integer compressionLevel, @Nullable Map<String, Object> configs) {
+      @Nullable Map<String, Object> configs) {
     super(disabled);
     _compressionCodec = compressionCodec;
     _deriveNumDocsPerChunk = Boolean.TRUE.equals(deriveNumDocsPerChunk);
@@ -108,7 +105,6 @@ public class ForwardIndexConfig extends IndexConfig {
     _targetMaxChunkSizeBytes =
         targetMaxChunkSize == null ? _defaultTargetMaxChunkSizeBytes : (int) DataSizeUtils.toBytes(targetMaxChunkSize);
     _targetDocsPerChunk = targetDocsPerChunk == null ? _defaultTargetDocsPerChunk : targetDocsPerChunk;
-    _compressionLevel = compressionLevel == null ? DEFAULT_COMPRESSION_LEVEL : compressionLevel;
     _configs = configs != null ? configs : new HashMap<>();
     if (compressionCodec != null) {
       switch (compressionCodec) {
@@ -166,11 +162,9 @@ public class ForwardIndexConfig extends IndexConfig {
       @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion,
       @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
       @JsonProperty("targetDocsPerChunk") @Nullable Integer targetDocsPerChunk,
-      @JsonProperty("compressionLevel") @Nullable Integer compressionLevel,
       @JsonProperty("configs") @Nullable Map<String, Object> configs) {
     this(disabled, getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType),
-        deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk, compressionLevel,
-        configs);
+        deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk, configs);
   }
 
   public static CompressionCodec getActualCompressionCodec(@Nullable CompressionCodec compressionCodec,
@@ -231,10 +225,6 @@ public class ForwardIndexConfig extends IndexConfig {
     return _targetDocsPerChunk;
   }
 
-  public int getCompressionLevel() {
-    return _compressionLevel;
-  }
-
   @JsonIgnore
   public int getTargetMaxChunkSizeBytes() {
     return _targetMaxChunkSizeBytes;
@@ -272,14 +262,13 @@ public class ForwardIndexConfig extends IndexConfig {
     ForwardIndexConfig that = (ForwardIndexConfig) o;
     return _compressionCodec == that._compressionCodec && _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
         && _rawIndexWriterVersion == that._rawIndexWriterVersion && Objects.equals(_targetMaxChunkSize,
-        that._targetMaxChunkSize) && _targetDocsPerChunk == that._targetDocsPerChunk
-        && _compressionLevel == that._compressionLevel;
+        that._targetMaxChunkSize) && _targetDocsPerChunk == that._targetDocsPerChunk;
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _compressionCodec, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
-        _targetMaxChunkSize, _targetDocsPerChunk, _compressionLevel);
+        _targetMaxChunkSize, _targetDocsPerChunk);
   }
 
   public static class Builder {
@@ -289,7 +278,6 @@ public class ForwardIndexConfig extends IndexConfig {
     private int _rawIndexWriterVersion = _defaultRawIndexWriterVersion;
     private String _targetMaxChunkSize = _defaultTargetMaxChunkSize;
     private int _targetDocsPerChunk = _defaultTargetDocsPerChunk;
-    private int _compressionLevel = DEFAULT_COMPRESSION_LEVEL;
     private Map<String, Object> _configs = new HashMap<>();
 
     public Builder() {
@@ -301,7 +289,6 @@ public class ForwardIndexConfig extends IndexConfig {
       _rawIndexWriterVersion = other._rawIndexWriterVersion;
       _targetMaxChunkSize = other._targetMaxChunkSize;
       _targetDocsPerChunk = other._targetDocsPerChunk;
-      _compressionLevel = other._compressionLevel;
       _configs = other._configs;
     }
 
@@ -327,11 +314,6 @@ public class ForwardIndexConfig extends IndexConfig {
 
     public Builder withTargetDocsPerChunk(int targetDocsPerChunk) {
       _targetDocsPerChunk = targetDocsPerChunk;
-      return this;
-    }
-
-    public Builder withCompressionLevel(int compressionLevel) {
-      _compressionLevel = compressionLevel;
       return this;
     }
 
@@ -390,16 +372,12 @@ public class ForwardIndexConfig extends IndexConfig {
       if (newRawIndexVersion != null) {
         withRawIndexWriterVersion(Integer.parseInt(newRawIndexVersion));
       }
-      String newCompressionLevel = properties.get(FieldConfig.FORWARD_INDEX_COMPRESSION_LEVEL);
-      if (newCompressionLevel != null) {
-        withCompressionLevel(Integer.parseInt(newCompressionLevel));
-      }
       return this;
     }
 
     public ForwardIndexConfig build() {
       return new ForwardIndexConfig(false, _compressionCodec, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
-          _targetMaxChunkSize, _targetDocsPerChunk, _compressionLevel, _configs);
+          _targetMaxChunkSize, _targetDocsPerChunk, _configs);
     }
   }
 }

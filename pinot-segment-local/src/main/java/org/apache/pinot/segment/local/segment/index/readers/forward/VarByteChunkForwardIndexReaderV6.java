@@ -218,9 +218,12 @@ public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexRe
 
   /**
    * Compressed reader context for V6 format. Decompresses both size and data streams.
+   * The size decompression buffer is allocated dynamically per chunk based on the actual
+   * decompressed length from the compressed stream, since the size stream can be much larger
+   * than the data stream (e.g., many small values each need a 4-byte size entry).
    */
   private static final class V6CompressedReaderContext extends V6ReaderContextBase {
-    private final ByteBuffer _sizeDecompressedBuffer;
+    private ByteBuffer _sizeDecompressedBuffer;
     private final ByteBuffer _dataDecompressedBuffer;
     private final ChunkDecompressor _chunkDecompressor;
     private final ChunkCompressionType _chunkCompressionType;
@@ -232,9 +235,6 @@ public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexRe
       super(metadata, chunks, chunkStartOffset);
       _chunkDecompressor = chunkDecompressor;
       _chunkCompressionType = chunkCompressionType;
-      // Size buffer: generous allocation for sizes (numDocs * 4 + 4 fits within targetChunkSize)
-      _sizeDecompressedBuffer = ByteBuffer.allocateDirect(targetChunkSize + Integer.BYTES)
-          .order(ByteOrder.LITTLE_ENDIAN);
       _dataDecompressedBuffer = ByteBuffer.allocateDirect(targetChunkSize).order(ByteOrder.LITTLE_ENDIAN);
     }
 
@@ -251,11 +251,21 @@ public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexRe
       // Read sizeStreamCompressedLen
       int sizeStreamCompressedLen = compressed.getInt(0);
 
-      // Decompress size stream
-      _sizeDecompressedBuffer.clear();
+      // Slice out the compressed size stream
       ByteBuffer sizeCompressed = compressed.duplicate().order(ByteOrder.LITTLE_ENDIAN);
       sizeCompressed.position(Integer.BYTES);
       sizeCompressed.limit(Integer.BYTES + sizeStreamCompressedLen);
+
+      // Determine actual decompressed size and (re)allocate buffer if needed
+      int sizeDecompressedLen = _chunkDecompressor.decompressedLength(sizeCompressed);
+      if (_sizeDecompressedBuffer == null || _sizeDecompressedBuffer.capacity() < sizeDecompressedLen) {
+        CleanerUtil.cleanQuietly(_sizeDecompressedBuffer);
+        _sizeDecompressedBuffer = ByteBuffer.allocateDirect(sizeDecompressedLen).order(ByteOrder.LITTLE_ENDIAN);
+      } else {
+        _sizeDecompressedBuffer.clear();
+      }
+
+      // Decompress size stream
       _chunkDecompressor.decompress(sizeCompressed, _sizeDecompressedBuffer);
 
       // Decompress data stream

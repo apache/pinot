@@ -63,15 +63,6 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
         targetDocsPerChunk);
   }
 
-  public MultiValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
-      int totalDocs, DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk,
-      int writerVersion, int targetMaxChunkSizeBytes, int targetDocsPerChunk, int compressionLevel)
-      throws IOException {
-    this(new File(baseIndexDir, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION), compressionType, totalDocs,
-        valueType, maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSizeBytes,
-        targetDocsPerChunk, compressionLevel);
-  }
-
   public MultiValueFixedByteRawIndexCreator(File indexFile, ChunkCompressionType compressionType, int totalDocs,
       DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
@@ -83,14 +74,6 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public MultiValueFixedByteRawIndexCreator(File indexFile, ChunkCompressionType compressionType, int totalDocs,
       DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion,
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
-      throws IOException {
-    this(indexFile, compressionType, totalDocs, valueType, maxNumberOfMultiValueElements, deriveNumDocsPerChunk,
-        writerVersion, targetMaxChunkSizeBytes, targetDocsPerChunk, ForwardIndexConfig.DEFAULT_COMPRESSION_LEVEL);
-  }
-
-  public MultiValueFixedByteRawIndexCreator(File indexFile, ChunkCompressionType compressionType, int totalDocs,
-      DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion,
-      int targetMaxChunkSizeBytes, int targetDocsPerChunk, int compressionLevel)
       throws IOException {
     if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
       // Store the length followed by the values
@@ -106,19 +89,19 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
         int totalMaxLength = maxNumberOfMultiValueElements * valueType.getStoredType().size();
         int chunkSize =
             ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-        _indexWriter = new VarByteChunkForwardIndexWriterV6(indexFile, compressionType, chunkSize, compressionLevel);
+        _indexWriter = new VarByteChunkForwardIndexWriterV6(indexFile, compressionType, chunkSize);
       } else if (writerVersion == VarByteChunkForwardIndexWriterV5.VERSION) {
         // Store only the values
         int totalMaxLength = maxNumberOfMultiValueElements * valueType.getStoredType().size();
         int chunkSize =
             ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-        _indexWriter = new VarByteChunkForwardIndexWriterV5(indexFile, compressionType, chunkSize, compressionLevel);
+        _indexWriter = new VarByteChunkForwardIndexWriterV5(indexFile, compressionType, chunkSize);
       } else {
         // Store the length followed by the values
         int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
         int chunkSize =
             ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-        _indexWriter = new VarByteChunkForwardIndexWriterV4(indexFile, compressionType, chunkSize, compressionLevel);
+        _indexWriter = new VarByteChunkForwardIndexWriterV4(indexFile, compressionType, chunkSize);
       }
     }
     _valueType = valueType;

@@ -27,26 +27,19 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 /**
  * Implementation of {@link ChunkCompressor} using Zstandard(Zstd) compression algorithm.
- * Supports configurable compression level via {@link #ZstandardCompressor(int)}.
+ * Zstd.compress(destinationBuffer, sourceBuffer)
  */
 class ZstandardCompressor implements ChunkCompressor {
 
   static final ZstandardCompressor INSTANCE = new ZstandardCompressor();
 
-  private final int _compressionLevel;
-
   private ZstandardCompressor() {
-    _compressionLevel = Zstd.defaultCompressionLevel();
-  }
-
-  ZstandardCompressor(int compressionLevel) {
-    _compressionLevel = compressionLevel;
   }
 
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
-    int compressedSize = Zstd.compress(outCompressed, inUncompressed, _compressionLevel);
+    int compressedSize = Zstd.compress(outCompressed, inUncompressed);
     // When the compress method returns successfully,
     // dstBuf's position() will be set to its current position() plus the compressed size of the data.
     // and srcBuf's position() will be set to its limit()

@@ -1251,7 +1251,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
     }
     if (forwardIndexConfig == null) {
-      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null, null, null);
+      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null, null);
     }
     return StandardIndexes.forward().createIndexCreator(indexCreationContext, forwardIndexConfig);
   }

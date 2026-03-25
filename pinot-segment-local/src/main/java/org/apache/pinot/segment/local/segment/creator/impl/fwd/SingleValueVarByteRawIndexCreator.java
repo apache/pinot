@@ -78,14 +78,6 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
       int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion,
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, deriveNumDocsPerChunk, writerVersion,
-        targetMaxChunkSizeBytes, targetDocsPerChunk, ForwardIndexConfig.DEFAULT_COMPRESSION_LEVEL);
-  }
-
-  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
-      int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion,
-      int targetMaxChunkSizeBytes, int targetDocsPerChunk, int compressionLevel)
-      throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
       int numDocsPerChunk =
@@ -95,11 +87,11 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
     } else if (writerVersion == VarByteChunkForwardIndexWriterV6.VERSION) {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(maxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-      _indexWriter = new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize, compressionLevel);
+      _indexWriter = new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize);
     } else {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(maxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-      _indexWriter = new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize, compressionLevel);
+      _indexWriter = new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
     }
     _valueType = valueType;
   }
