@@ -36,28 +36,33 @@ public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreation
   private final MutableSegment _mutableSegment;
   private final RecordReader _recordReader;
   private final int[] _sortedDocIds;
+  @Nullable
+  private final String _sortedColumn;
   private final ThreadSafeMutableRoaringBitmap _validDocIdsSnapshot;
 
   public RealtimeSegmentSegmentCreationDataSource(MutableSegment mutableSegment,
-      PinotSegmentRecordReader recordReader) {
+      PinotSegmentRecordReader recordReader, @Nullable String sortedColumn) {
     _mutableSegment = mutableSegment;
     _recordReader = recordReader;
     _sortedDocIds = recordReader.getSortedDocIds();
+    _sortedColumn = sortedColumn;
     _validDocIdsSnapshot = null;
   }
 
   public RealtimeSegmentSegmentCreationDataSource(MutableSegment mutableSegment, RecordReader recordReader,
-      @Nullable int[] sortedDocIds, @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot) {
+      @Nullable int[] sortedDocIds, @Nullable String sortedColumn,
+      @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot) {
     _mutableSegment = mutableSegment;
     _recordReader = recordReader;
     _sortedDocIds = sortedDocIds;
+    _sortedColumn = sortedColumn;
     _validDocIdsSnapshot = validDocIdsSnapshot;
   }
 
   @Override
   public SegmentPreIndexStatsContainer gatherStats(StatsCollectorConfig statsCollectorConfig) {
-    return new RealtimeSegmentStatsContainer(_mutableSegment, _sortedDocIds, statsCollectorConfig, _recordReader,
-        _validDocIdsSnapshot);
+    return new RealtimeSegmentStatsContainer(_mutableSegment, _sortedDocIds, _sortedColumn, statsCollectorConfig,
+        _recordReader, _validDocIdsSnapshot);
   }
 
   @Override

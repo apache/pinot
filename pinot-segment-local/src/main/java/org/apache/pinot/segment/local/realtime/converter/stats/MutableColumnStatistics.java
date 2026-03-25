@@ -41,6 +41,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 public class MutableColumnStatistics implements ColumnStatistics {
   private final DataSource _dataSource;
   private final int[] _sortedDocIdIterationOrder;
+  private final boolean _isSortedColumn;
 
   // NOTE: For new added columns during the ingestion, this will be constant value dictionary instead of mutable
   //       dictionary.
@@ -49,9 +50,11 @@ public class MutableColumnStatistics implements ColumnStatistics {
   private int _minElementLength = -1;
   private int _maxElementLength = -1;
 
-  public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIdIterationOrder) {
+  public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIdIterationOrder,
+      boolean isSortedColumn) {
     _dataSource = dataSource;
     _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
+    _isSortedColumn = isSortedColumn;
     _dictionary = dataSource.getDictionary();
   }
 
@@ -132,6 +135,11 @@ public class MutableColumnStatistics implements ColumnStatistics {
 
   @Override
   public boolean isSorted() {
+    // Sorted column is guaranteed to be sorted by construction — no scan needed
+    if (_isSortedColumn) {
+      return true;
+    }
+
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
 
     // Multi-valued column cannot be sorted

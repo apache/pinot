@@ -60,7 +60,7 @@ public class CompactedRawIndexDictColumnStatisticsTest {
     ThreadSafeMutableRoaringBitmap validDocIds = createValidDocIds(0, 1, 2);
 
     CompactedRawIndexDictColumnStatistics stats =
-        new CompactedRawIndexDictColumnStatistics(dataSource, null, validDocIds);
+        new CompactedRawIndexDictColumnStatistics(dataSource, null, false, validDocIds);
 
     // Should find 2 unique values from the raw reads
     Assert.assertEquals(stats.getCardinality(), 2);
@@ -98,7 +98,7 @@ public class CompactedRawIndexDictColumnStatisticsTest {
     ThreadSafeMutableRoaringBitmap validDocIds = createValidDocIds(0, 2);
 
     CompactedRawIndexDictColumnStatistics stats =
-        new CompactedRawIndexDictColumnStatistics(dataSource, null, validDocIds);
+        new CompactedRawIndexDictColumnStatistics(dataSource, null, false, validDocIds);
 
     // Should only find values from valid docs
     Assert.assertEquals(stats.getCardinality(), 2);

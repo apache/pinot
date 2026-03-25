@@ -1343,17 +1343,30 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /**
-   * Returns the docIds to use for iteration when the data is sorted by the given column.
-   * <p>Called only by realtime record reader.
-   *
-   * @param column The column to use for sorting
-   * @return The docIds to use for iteration
-   */
+  /// Returns the docIds to use for iteration when the data is sorted by the given column.
+  /// Called only by realtime record reader.
+  ///
+  /// When the column has a dictionary and an inverted index (the common case for sorted columns), delegates to
+  /// [#getSortedDocIdsWithInvertedIndex]. When the column is configured as no-dictionary (raw forward index),
+  /// delegates to [#getSortedDocIdsWithRawForwardIndex].
+  ///
+  /// @param column The column to use for sorting
+  /// @return The docIds to use for iteration
   public int[] getSortedDocIdIterationOrderWithSortedColumn(String column) {
     IndexContainer indexContainer = _indexContainerMap.get(column);
+    if (indexContainer._dictionary != null) {
+      return getSortedDocIdsWithInvertedIndex(indexContainer);
+    } else {
+      return getSortedDocIdsWithRawForwardIndex(column, indexContainer);
+    }
+  }
+
+  /// Returns sorted docIds for a dictionary-encoded sorted column by sorting dictionary ids and re-ordering documents
+  /// via the inverted index bitmaps.
+  private int[] getSortedDocIdsWithInvertedIndex(IndexContainer indexContainer) {
     MutableDictionary dictionary = indexContainer._dictionary;
     int numDocsIndexed = _numDocsIndexed;
+
     // Sort all values in the dictionary
     int numValues = dictionary.length();
     int[] dictIds = new int[numValues];
@@ -1382,6 +1395,50 @@ public class MutableSegmentImpl implements MutableSegment {
     Preconditions.checkState(numDocsIndexed == docIdIndex,
         "The number of documents indexed: %s is not equal to the number of sorted documents: %s", numDocsIndexed,
         docIdIndex);
+
+    return docIds;
+  }
+
+  /// Returns sorted docIds for a no-dictionary (raw) sorted column by reading raw values directly from the forward
+  /// index and sorting by them.
+  private int[] getSortedDocIdsWithRawForwardIndex(String column, IndexContainer indexContainer) {
+    MutableForwardIndex forwardIndex =
+        (MutableForwardIndex) indexContainer._mutableIndexes.get(StandardIndexes.forward());
+    int numDocsIndexed = _numDocsIndexed;
+    int[] docIds = new int[numDocsIndexed];
+    for (int i = 0; i < numDocsIndexed; i++) {
+      docIds[i] = i;
+    }
+
+    DataType storedType = indexContainer._fieldSpec.getDataType().getStoredType();
+    switch (storedType) {
+      case INT:
+        IntArrays.quickSort(docIds, (d1, d2) -> Integer.compare(forwardIndex.getInt(d1), forwardIndex.getInt(d2)));
+        break;
+      case LONG:
+        IntArrays.quickSort(docIds, (d1, d2) -> Long.compare(forwardIndex.getLong(d1), forwardIndex.getLong(d2)));
+        break;
+      case FLOAT:
+        IntArrays.quickSort(docIds, (d1, d2) -> Float.compare(forwardIndex.getFloat(d1), forwardIndex.getFloat(d2)));
+        break;
+      case DOUBLE:
+        IntArrays.quickSort(docIds, (d1, d2) -> Double.compare(forwardIndex.getDouble(d1), forwardIndex.getDouble(d2)));
+        break;
+      case BIG_DECIMAL:
+        IntArrays.quickSort(docIds,
+            (d1, d2) -> forwardIndex.getBigDecimal(d1).compareTo(forwardIndex.getBigDecimal(d2)));
+        break;
+      case STRING:
+        IntArrays.quickSort(docIds, (d1, d2) -> forwardIndex.getString(d1).compareTo(forwardIndex.getString(d2)));
+        break;
+      case BYTES:
+        IntArrays.quickSort(docIds,
+            (d1, d2) -> ByteArray.compare(forwardIndex.getBytes(d1), forwardIndex.getBytes(d2)));
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Unsupported stored type: " + storedType + " for no-dictionary sorted column: " + column);
+    }
 
     return docIds;
   }
