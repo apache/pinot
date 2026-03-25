@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.hash.CityHashFunctions;
+import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
@@ -215,6 +216,94 @@ public class HashFunctions {
   @ScalarFunction
   public static byte[] murmurHash3X64Bit128(byte[] input, int seed) {
     return MurmurHashFunctions.murmurHash3X64Bit128(input, seed);
+  }
+
+  /**
+   * Computes 32-bit FNV-1 hash of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return 32-bit hash
+   */
+  @ScalarFunction
+  public static int fnv1Hash32(byte[] input) {
+    return FnvHashFunctions.fnv1Hash32(input);
+  }
+
+  /**
+   * Computes 32-bit FNV-1 hash of the given string using UTF-8 bytes.
+   *
+   * @param input the string to hash
+   * @return 32-bit hash
+   */
+  @ScalarFunction
+  public static int fnv1Hash32UTF8(String input) {
+    return FnvHashFunctions.fnv1Hash32(input.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /**
+   * Computes 32-bit FNV-1a hash of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return 32-bit hash
+   */
+  @ScalarFunction
+  public static int fnv1aHash32(byte[] input) {
+    return FnvHashFunctions.fnv1aHash32(input);
+  }
+
+  /**
+   * Computes 32-bit FNV-1a hash of the given string using UTF-8 bytes.
+   *
+   * @param input the string to hash
+   * @return 32-bit hash
+   */
+  @ScalarFunction
+  public static int fnv1aHash32UTF8(String input) {
+    return FnvHashFunctions.fnv1aHash32(input.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /**
+   * Computes 64-bit FNV-1 hash of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return 64-bit hash
+   */
+  @ScalarFunction
+  public static long fnv1Hash64(byte[] input) {
+    return FnvHashFunctions.fnv1Hash64(input);
+  }
+
+  /**
+   * Computes 64-bit FNV-1 hash of the given string using UTF-8 bytes.
+   *
+   * @param input the string to hash
+   * @return 64-bit hash
+   */
+  @ScalarFunction
+  public static long fnv1Hash64UTF8(String input) {
+    return FnvHashFunctions.fnv1Hash64(input.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /**
+   * Computes 64-bit FNV-1a hash of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return 64-bit hash
+   */
+  @ScalarFunction
+  public static long fnv1aHash64(byte[] input) {
+    return FnvHashFunctions.fnv1aHash64(input);
+  }
+
+  /**
+   * Computes 64-bit FNV-1a hash of the given string using UTF-8 bytes.
+   *
+   * @param input the string to hash
+   * @return 64-bit hash
+   */
+  @ScalarFunction
+  public static long fnv1aHash64UTF8(String input) {
+    return FnvHashFunctions.fnv1aHash64(input.getBytes(StandardCharsets.UTF_8));
   }
 
   /**

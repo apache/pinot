@@ -897,6 +897,86 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
     }
   }
 
+  @Test
+  public void testFnvPartitionFunctionConfigPreservedInConvertedSegment()
+      throws Exception {
+    File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
+
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("variant", "fnv1_64");
+    functionConfig.put("negativePartitionHandling", "abs");
+
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(
+        Collections.singletonMap(STRING_COLUMN1,
+            new ColumnPartitionConfig("FNV", 5, functionConfig)));
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
+            .setTimeColumnName(DATE_TIME_COLUMN)
+            .setSegmentPartitionConfig(segmentPartitionConfig)
+            .setColumnMajorSegmentBuilderEnabled(false)
+            .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN3, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN4, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(LONG_COLUMN1, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_COLUMN2, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_COLUMN3, FieldSpec.DataType.LONG)
+        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
+        .addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
+        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    String tableNameWithType = tableConfig.getTableName();
+    String segmentName = "testTable__0__0__123456";
+
+    PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(
+        "FNV", 5, functionConfig);
+
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
+        new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
+            .setStreamName(tableNameWithType).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
+            .setAvgNumMultiValues(3)
+            .setPartitionColumn(STRING_COLUMN1)
+            .setPartitionFunction(partitionFunction)
+            .setPartitionId(0)
+            .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
+            .setMemoryManager(new DirectMemoryManager(segmentName))
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
+            .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
+
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
+    try {
+      List<GenericRow> rows = generateTestData();
+      for (GenericRow row : rows) {
+        mutableSegmentImpl.index(row, null);
+      }
+
+      File outputDir = new File(tmpDir, "outputDir");
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3, null);
+
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+
+      ColumnMetadata col1Meta = segmentMetadata.getColumnMetadataFor(STRING_COLUMN1);
+      assertNotNull(col1Meta.getPartitionFunction(), "Partition function should be present in converted segment");
+      assertEquals(col1Meta.getPartitionFunction().getName(), "FNV");
+      assertEquals(col1Meta.getPartitionFunction().getNumPartitions(), 5);
+      assertEquals(col1Meta.getPartitionFunction().getFunctionConfig(), functionConfig,
+          "FNV function config should be preserved in converted segment metadata");
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
+  }
+
   private List<GenericRow> generateTestData() {
     LinkedList<GenericRow> rows = new LinkedList<>();
 
