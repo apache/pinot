@@ -118,8 +118,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   @Override
   public void add(@Nullable Geometry geometry)
       throws IOException {
-    Coordinate coordinate = geometry instanceof Point ? geometry.getCoordinate() : null;
-    if (_continueOnError && coordinate == null) {
+    if (_continueOnError && !(geometry instanceof Point)) {
       MetricUtils.updateIndexingErrorMetric(_tableNameWithType, H3IndexType.INDEX_DISPLAY_NAME);
       _nextDocId++;
       return;
@@ -127,6 +126,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
     Preconditions.checkState(geometry != null, "Null geometry record found and continueOnError is disabled");
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
         geometry.getGeometryType());
+    Coordinate coordinate = geometry.getCoordinate();
     Preconditions.checkState(coordinate != null, "Point has null coordinate and continueOnError is disabled");
     // TODO: support multiple resolutions
     long h3Id = H3Utils.H3_CORE.latLngToCell(coordinate.y, coordinate.x, _lowestResolution);
