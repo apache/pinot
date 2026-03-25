@@ -287,7 +287,7 @@
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.6.13</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.5.0</prometheus.jmx-exporter.version>
-    <prometheus.metrics.version>1.4.1</prometheus.metrics.version>
+    <prometheus.metrics.version>1.5.1</prometheus.metrics.version>
     <fastutil.version>8.5.18</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
     <snakeyaml.version>2.6</snakeyaml.version>
@@ -979,6 +979,24 @@
       <dependency>
         <groupId>io.prometheus</groupId>
         <artifactId>prometheus-metrics-exporter-httpserver</artifactId>
+        <version>${prometheus.metrics.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.prometheus</groupId>
+        <artifactId>prometheus-metrics-core</artifactId>
+        <version>${prometheus.metrics.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.prometheus</groupId>
+        <artifactId>prometheus-metrics-config</artifactId>
+        <version>${prometheus.metrics.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.prometheus</groupId>
+        <artifactId>prometheus-metrics-model</artifactId>
         <version>${prometheus.metrics.version}</version>
         <scope>test</scope>
       </dependency>
