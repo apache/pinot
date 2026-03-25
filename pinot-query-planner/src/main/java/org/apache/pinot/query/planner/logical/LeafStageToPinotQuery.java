@@ -28,9 +28,12 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.sql.FilterKind;
 
 
 /**
@@ -98,8 +101,77 @@ public class LeafStageToPinotQuery {
   private static void handleFilter(Filter filter, PinotQuery pinotQuery) {
     if (filter != null) {
       RexExpression rexExpression = RexExpressionUtils.fromRexNode(filter.getCondition());
-      pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(rexExpression,
-          pinotQuery.getSelectList()));
+      Expression filterExpression = CalciteRexExpressionParser.toExpression(rexExpression,
+          pinotQuery.getSelectList());
+      pinotQuery.setFilterExpression(ensureFilterIsFunctionExpression(filterExpression));
     }
+  }
+
+  /**
+   * Ensures the filter expression is a FUNCTION type that segment pruners can process.
+   * <p>
+   * When the V2 physical optimizer passes filters through Calcite's RelNode tree, certain expression types
+   * (REINTERPRET on bare boolean columns, constant-folded SEARCH) produce IDENTIFIER or LITERAL Expression
+   * objects with null functionCall. Segment pruners assume all filter expressions are FUNCTION type and NPE
+   * on these. This method wraps bare IDENTIFIERs as EQUALS(col, true) and drops LITERAL expressions.
+   * For AND/OR/NOT nodes, operands are recursively fixed.
+   * <p>
+   * Note: This method mutates the input expression's operand lists in-place for AND/OR/NOT nodes.
+   * It assumes the expression tree is freshly constructed and not shared across concurrent callers.
+   */
+  static Expression ensureFilterIsFunctionExpression(Expression expression) {
+    if (expression == null) {
+      return null;
+    }
+    if (expression.getFunctionCall() != null) {
+      Function function = expression.getFunctionCall();
+      String operator = function.getOperator();
+      if (FilterKind.AND.name().equals(operator) || FilterKind.OR.name().equals(operator)) {
+        // Recursively fix operands of AND/OR, dropping null (LITERAL) results
+        List<Expression> operands = function.getOperands();
+        List<Expression> fixedOperands = new ArrayList<>();
+        for (Expression operand : operands) {
+          Expression fixed = ensureFilterIsFunctionExpression(operand);
+          if (fixed != null) {
+            fixedOperands.add(fixed);
+          }
+        }
+        if (fixedOperands.isEmpty()) {
+          return null;  // All operands were constant — drop entire filter
+        }
+        if (fixedOperands.size() == 1) {
+          return fixedOperands.get(0);  // Single operand — unwrap AND/OR
+        }
+        function.setOperands(fixedOperands);
+      } else if (FilterKind.NOT.name().equals(operator)) {
+        // Recursively fix the single operand of NOT
+        List<Expression> operands = function.getOperands();
+        // NOT is always unary — Calcite validates this at parse time and RexExpressionUtils
+        // preserves the operand list unchanged. Guard defensively; drop filter if malformed.
+        if (operands.size() != 1) {
+          return null;
+        }
+        Expression fixed = ensureFilterIsFunctionExpression(operands.get(0));
+        if (fixed == null) {
+          return null;  // NOT(constant) — drop entire filter
+        }
+        operands.set(0, fixed);
+      }
+      return expression;
+    }
+    if (expression.getIdentifier() != null) {
+      // Bare boolean column reference (e.g., "is_active" after REINTERPRET stripped).
+      // Wrap as EQUALS(col, true) so pruners see a standard predicate.
+      Function equalsFunction = new Function(FilterKind.EQUALS.name());
+      equalsFunction.setOperands(new ArrayList<>(List.of(expression, RequestUtils.getLiteralExpression(true))));
+      Expression wrapped = new Expression(ExpressionType.FUNCTION);
+      wrapped.setFunctionCall(equalsFunction);
+      return wrapped;
+    }
+    // LITERAL expression (constant-folded predicate, e.g., TRUE/FALSE).
+    // In practice, Calcite's optimizer already strips unreachable branches (e.g., `WHERE col = 1 AND false`
+    // becomes `WHERE false`, and `WHERE col = 1 AND true` becomes `WHERE col = 1`), so LITERAL expressions
+    // reaching here are rare edge cases. They don't constrain routing — return null to skip pruning.
+    return null;
   }
 }
