@@ -114,7 +114,7 @@ public abstract class PinotPrometheusMetricsTest {
    * <a href="https://github.com/prometheus/jmx_exporter/blob/main/jmx_prometheus_javaagent/src/main/java/io/
    * prometheus/jmx/JavaAgent.java">...</a>
    *
-   * Updated for JMX Exporter 1.0.1 which uses new prometheus-metrics library instead of the legacy client.
+   * Updated for JMX Exporter 1.5.0 which uses new prometheus-metrics library instead of the legacy client.
    *
    * @return the corresponding HTTP server on a random unoccupied port
    */
