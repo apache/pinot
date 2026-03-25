@@ -115,9 +115,8 @@ public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexRe
   @Override
   public int getNumValuesMV(int docId, ReaderContext context) {
     byte[] bytes = context.getValue(docId);
-    int valueSize = getStoredType().size();
-    if (valueSize > 0) {
-      return bytes.length / valueSize;
+    if (getStoredType().isFixedWidth()) {
+      return bytes.length / getStoredType().size();
     } else {
       return ByteBuffer.wrap(bytes).getInt();
     }

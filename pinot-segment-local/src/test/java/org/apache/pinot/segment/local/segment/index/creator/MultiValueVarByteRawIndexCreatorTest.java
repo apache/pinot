@@ -62,7 +62,7 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
   public Object[][] params() {
     return Arrays.stream(ChunkCompressionType.values())
         .filter(t -> t != ChunkCompressionType.DELTA && t != ChunkCompressionType.DELTADELTA)
-        .flatMap(chunkCompressionType -> IntStream.rangeClosed(2, 5)
+        .flatMap(chunkCompressionType -> IntStream.rangeClosed(2, 6)
             .boxed()
             .flatMap(writerVersion -> IntStream.of(10, 100)
                 .boxed()
