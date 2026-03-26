@@ -47,10 +47,8 @@ import static org.testng.Assert.*;
  * <p>Tests the controller coordinator REST API for statement lifecycle management,
  * idempotency, hybrid table validation, abort, and list operations.
  *
- * <p>Note: In this test environment, no ROW executor is registered with the coordinator,
- * so submitted inserts will be ABORTED with NO_EXECUTOR error. The tests verify the
- * coordinator's behavior (table resolution, idempotency, abort, status) rather than
- * end-to-end data visibility.
+ * <p>The ROW executor is registered with the coordinator at controller startup,
+ * so submitted inserts are expected to succeed (state = VISIBLE).
  */
 public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER =
@@ -178,16 +176,11 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
     String statementId = result.get("statementId").asText();
     assertFalse(statementId.isEmpty(), "statementId should not be empty");
 
-    // Without a ROW executor registered, the coordinator returns NO_EXECUTOR error
+    // With ROW executor registered, the insert should succeed
     String state = result.get("state").asText();
     assertTrue(
-        "ACCEPTED".equals(state) || "ABORTED".equals(state),
-        "State should be ACCEPTED or ABORTED (no executor), got: " + state);
-
-    if ("ABORTED".equals(state)) {
-      assertEquals(result.get("errorCode").asText(), "NO_EXECUTOR",
-          "Without executor, error should be NO_EXECUTOR");
-    }
+        "VISIBLE".equals(state) || "PREPARED".equals(state) || "ACCEPTED".equals(state),
+        "State should indicate success, got: " + state);
   }
 
   // ---- Test: Explicit OFFLINE type targeting works for single-type table ----
@@ -253,33 +246,38 @@ public class InsertIntoValuesClusterIntegrationTest extends BaseClusterIntegrati
     LOGGER.info("Explicit suffix result: {}", result);
     String state = result.get("state").asText();
     assertTrue(
-        "ACCEPTED".equals(state) || "ABORTED".equals(state),
-        "Should be ACCEPTED or ABORTED, got: " + state);
+        "VISIBLE".equals(state) || "PREPARED".equals(state) || "ACCEPTED".equals(state),
+        "Should indicate success, got: " + state);
   }
 
-  // ---- Test: Idempotency — NO_EXECUTOR means manifest not created,
-  //      so same requestId creates a new statement (both get NO_EXECUTOR) ----
+  // ---- Test: Idempotency — same requestId + payloadHash should return the
+  //      same statementId and not re-execute ----
 
   @Test
-  public void testInsertIdempotencyWithNoExecutor()
+  public void testInsertIdempotency()
       throws Exception {
-    String tableName = "insertIdempNoExec";
+    String tableName = "insertIdemp";
     createOfflineTable(tableName);
 
-    String requestId = "idemp-no-exec-001";
+    String requestId = "idemp-001";
     String payloadHash = "hash-abc";
 
     String payload = buildInsertRequestJson(tableName, null, requestId, payloadHash);
 
-    // First submit — fails at NO_EXECUTOR before manifest is created
+    // First submit — succeeds with executor registered
     JsonNode result1 = postInsertRequest(payload);
     LOGGER.info("First submit: {}", result1);
-    assertEquals(result1.get("errorCode").asText(), "NO_EXECUTOR");
+    String state1 = result1.get("state").asText();
+    assertFalse("ABORTED".equals(state1) && result1.has("errorCode")
+        && "NO_EXECUTOR".equals(result1.get("errorCode").asText()),
+        "Executor should be registered; should not get NO_EXECUTOR");
+    String statementId1 = result1.get("statementId").asText();
 
-    // Second submit — also fails at NO_EXECUTOR (no manifest to find)
+    // Second submit with same requestId + payloadHash — should be idempotent
     JsonNode result2 = postInsertRequest(payload);
     LOGGER.info("Second submit: {}", result2);
-    assertEquals(result2.get("errorCode").asText(), "NO_EXECUTOR");
+    assertEquals(result2.get("statementId").asText(), statementId1,
+        "Idempotent retry should return same statementId");
   }
 
   // ---- Test: Status API returns NOT_FOUND for unknown statement ----
