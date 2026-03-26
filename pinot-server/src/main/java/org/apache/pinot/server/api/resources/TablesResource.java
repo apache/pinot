@@ -260,7 +260,7 @@ public class TablesResource {
               // For raw STRING/BYTES column, set the columnLength as the length of the max value.
               Comparable<?> maxValue = columnMetadata.getMaxValue();
               if (maxValue instanceof String) {
-                columnLength = Utf8.encodedLength((String) columnMetadata.getMaxValue());
+                columnLength = Utf8.encodedLength((String) maxValue);
               } else if (maxValue instanceof ByteArray) {
                 columnLength = ((ByteArray) maxValue).length();
               } else {
