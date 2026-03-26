@@ -43,10 +43,17 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class PinotSegmentToParquetConverter implements PinotSegmentConverter {
   private final String _segmentDir;
   private final String _outputFile;
+  private final CompressionCodecName _compressionCodec;
 
   public PinotSegmentToParquetConverter(String segmentDir, String outputFile) {
+    this(segmentDir, outputFile, CompressionCodecName.GZIP);
+  }
+
+  public PinotSegmentToParquetConverter(String segmentDir, String outputFile,
+      CompressionCodecName compressionCodec) {
     _segmentDir = segmentDir;
     _outputFile = outputFile;
+    _compressionCodec = compressionCodec;
   }
 
   @Override
@@ -59,7 +66,7 @@ public class PinotSegmentToParquetConverter implements PinotSegmentConverter {
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(new File(_segmentDir))) {
       try (ParquetWriter<Record> parquetWriter =
           AvroParquetWriter.<Record>builder(outputFile).withSchema(avroSchema)
-              .withCompressionCodec(CompressionCodecName.GZIP)
+              .withCompressionCodec(_compressionCodec)
               .withConf(ParquetUtils.getParquetHadoopConfiguration()).build()) {
         GenericRow row = new GenericRow();
         while (pinotSegmentRecordReader.hasNext()) {
