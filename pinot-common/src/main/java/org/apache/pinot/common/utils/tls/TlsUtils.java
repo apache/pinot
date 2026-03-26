@@ -343,9 +343,6 @@ public final class TlsUtils {
         SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
     sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
     sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
-    // Netty 4.2 defaults endpointIdentificationAlgorithm to HTTPS (hostname verification enabled).
-    // Apply the value from TlsConfig, which defaults to empty (disabled) for backwards compatibility.
-    sslContextBuilder.endpointIdentificationAlgorithm(tlsConfig.getEndpointIdentificationAlgorithm());
 
     // Apply protocol restrictions if configured
     String[] allowedProtocols = tlsConfig.getAllowedProtocols();
