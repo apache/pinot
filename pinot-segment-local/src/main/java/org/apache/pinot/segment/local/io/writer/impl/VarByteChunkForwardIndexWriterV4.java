@@ -84,7 +84,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   private final File _dataBuffer;
   private final RandomAccessFile _output;
   private final FileChannel _dataChannel;
-  private final ByteBuffer _chunkBuffer;
+  protected final ByteBuffer _chunkBuffer;
   private final ByteBuffer _compressionBuffer;
   private final ChunkCompressor _chunkCompressor;
 
@@ -210,7 +210,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     }
   }
 
-  private void writeChunk() {
+  protected void writeChunk() {
     /*
     This method translates from the current state of the buffer, assuming there are 3 values of lengths a,b, and c:
     [-][a][a bytes][b][b bytes][c][c bytes]
@@ -243,13 +243,22 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
       accumulatedOffset += Integer.BYTES;
     }
     offsets[0] = Integer.BYTES * (numDocs + 1);
-    // write the offsets into the space created at the front
-    _chunkBuffer.position(Integer.BYTES);
-    _chunkBuffer.asIntBuffer().put(offsets);
+    // write the chunk header — V4 writes offsets, subclasses (V6) may override
+    writeChunkHeader(numDocs, offsets, limit);
     _chunkBuffer.position(0);
     _chunkBuffer.limit(limit);
     write(_chunkBuffer, false);
     clearChunkBuffer();
+  }
+
+  /**
+   * Writes the per-entry metadata into the chunk buffer header (positions 4 through (numDocs+1)*4).
+   * V4 writes cumulative byte offsets for O(1) random access.
+   * Subclasses (e.g. V6) may override to delta-encode offsets into individual entry sizes.
+   */
+  protected void writeChunkHeader(int numDocs, int[] offsets, int limit) {
+    _chunkBuffer.position(Integer.BYTES);
+    _chunkBuffer.asIntBuffer().put(offsets);
   }
 
   private void write(ByteBuffer buffer, boolean huge) {

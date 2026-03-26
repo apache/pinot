@@ -34,6 +34,7 @@ import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -48,7 +49,7 @@ import static org.testng.Assert.assertEquals;
 
 public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
 
-  private static File[] _dirs;
+  protected File[] _dirs;
 
   @DataProvider(parallel = true)
   public Object[][] params() {
@@ -72,12 +73,16 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
     return params;
   }
 
+  protected String getTestDirName() {
+    return "VarByteChunkV4Test";
+  }
+
   @BeforeClass
   public void forceMkDirs()
       throws IOException {
     _dirs = new File[10];
     for (int i = 0; i < _dirs.length; i++) {
-      _dirs[i] = new File(new File(FileUtils.getTempDirectory(), UUID.randomUUID().toString()), "VarByteChunkV4Test");
+      _dirs[i] = new File(new File(FileUtils.getTempDirectory(), UUID.randomUUID().toString()), getTestDirName());
       FileUtils.forceMkdir(_dirs[i]);
     }
   }
@@ -94,7 +99,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
       throws IOException {
     File stringSVFile = new File(file, "testStringSV");
     testWriteRead(stringSVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING, x -> x,
-        VarByteChunkForwardIndexWriterV4::putString, (reader, context, docId) -> reader.getString(docId, context));
+        VarByteChunkWriter::putString, (reader, context, docId) -> reader.getString(docId, context));
     FileUtils.deleteQuietly(stringSVFile);
   }
 
@@ -103,7 +108,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
       throws IOException {
     File bytesSVFile = new File(file, "testBytesSV");
     testWriteRead(bytesSVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES,
-        x -> x.getBytes(StandardCharsets.UTF_8), VarByteChunkForwardIndexWriterV4::putBytes,
+        x -> x.getBytes(StandardCharsets.UTF_8), VarByteChunkWriter::putBytes,
         (reader, context, docId) -> reader.getBytes(docId, context));
     FileUtils.deleteQuietly(bytesSVFile);
   }
@@ -113,7 +118,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
       throws IOException {
     File stringMVFile = new File(file, "testStringMV");
     testWriteRead(stringMVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING,
-        new StringSplitterMV(), VarByteChunkForwardIndexWriterV4::putStringMV,
+        new StringSplitterMV(), VarByteChunkWriter::putStringMV,
         (reader, context, docId) -> reader.getStringMV(docId, context));
     FileUtils.deleteQuietly(stringMVFile);
   }
@@ -123,7 +128,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
       throws IOException {
     File bytesMVFile = new File(file, "testBytesMV");
     testWriteRead(bytesMVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES, new ByteSplitterMV(),
-        VarByteChunkForwardIndexWriterV4::putBytesMV, (reader, context, docId) -> reader.getBytesMV(docId, context));
+        VarByteChunkWriter::putBytesMV, (reader, context, docId) -> reader.getBytesMV(docId, context));
     FileUtils.deleteQuietly(bytesMVFile);
   }
 
@@ -151,20 +156,29 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
     }
   }
 
-  private <T> void testWriteRead(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize,
+  protected VarByteChunkWriter createWriter(File file, ChunkCompressionType compressionType, int chunkSize)
+      throws IOException {
+    return new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
+  }
+
+  protected VarByteChunkForwardIndexReaderV4 createReader(PinotDataBuffer buffer, FieldSpec.DataType dataType,
+      boolean isSingleValue) {
+    return new VarByteChunkForwardIndexReaderV4(buffer, dataType, isSingleValue);
+  }
+
+  protected <T> void testWriteRead(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize,
       FieldSpec.DataType dataType, Function<String, T> forwardMapper,
-      BiConsumer<VarByteChunkForwardIndexWriterV4, T> write,
+      BiConsumer<VarByteChunkWriter, T> write,
       Read<T> read)
       throws IOException {
     List<T> values = randomStrings(1000, longestEntry).map(forwardMapper).collect(Collectors.toList());
-    try (VarByteChunkForwardIndexWriterV4 writer = new VarByteChunkForwardIndexWriterV4(file, compressionType,
-        chunkSize)) {
+    try (VarByteChunkWriter writer = createWriter(file, compressionType, chunkSize)) {
       for (T value : values) {
         write.accept(writer, value);
       }
     }
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
-        VarByteChunkForwardIndexReaderV4 reader = new VarByteChunkForwardIndexReaderV4(buffer, dataType, true);
+        VarByteChunkForwardIndexReaderV4 reader = createReader(buffer, dataType, true);
         VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
         for (int i = 0; i < values.size(); i++) {
           assertEquals(read.read(reader, context, i), values.get(i));

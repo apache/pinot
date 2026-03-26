@@ -22,6 +22,7 @@ package org.apache.pinot.segment.local.segment.index.forward;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
@@ -34,6 +35,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChu
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV5;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV6;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
@@ -117,7 +119,10 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
           : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
     }
 
-    if (version == VarByteChunkForwardIndexWriterV5.VERSION) {
+    if (version == VarByteChunkForwardIndexWriterV6.VERSION) {
+      // V6 delta-encodes chunk header (sizes instead of offsets) for better compression
+      return new VarByteChunkForwardIndexReaderV6(dataBuffer, storedType, isSingleValue);
+    } else if (version == VarByteChunkForwardIndexWriterV5.VERSION) {
       // V5 is the same as V4 except the multi-value docs have implicit value count rather than explicit
       return new VarByteChunkForwardIndexReaderV5(dataBuffer, storedType, isSingleValue);
     } else if (version == VarByteChunkForwardIndexWriterV4.VERSION) {
