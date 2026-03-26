@@ -73,6 +73,10 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
       description = "Parquet compression codec (GZIP/SNAPPY/ZSTD/LZ4/UNCOMPRESSED, default GZIP).")
   private String _parquetCompression = "GZIP";
 
+  @CommandLine.Option(names = {"-forwardIndexOnly"}, required = false,
+      description = "Load only forward index from the segment, skipping secondary indexes (default false).")
+  private boolean _forwardIndexOnly;
+
   @CommandLine.Option(names = {"-overwrite"}, required = false,
       description = "Overwrite the existing file (default false).")
   private boolean _overwrite;
@@ -147,7 +151,7 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
           case PARQUET:
             outputPath += ".parquet";
             new PinotSegmentToParquetConverter(inputPath, outputPath,
-                CompressionCodecName.valueOf(_parquetCompression.toUpperCase())).convert();
+                CompressionCodecName.valueOf(_parquetCompression.toUpperCase()), _forwardIndexOnly).convert();
             break;
           default:
             throw new RuntimeException("Unsupported conversion to file format: " + _outputFormat);

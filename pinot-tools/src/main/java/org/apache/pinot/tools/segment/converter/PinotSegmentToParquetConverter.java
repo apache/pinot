@@ -44,16 +44,18 @@ public class PinotSegmentToParquetConverter implements PinotSegmentConverter {
   private final String _segmentDir;
   private final String _outputFile;
   private final CompressionCodecName _compressionCodec;
+  private final boolean _forwardIndexOnly;
 
   public PinotSegmentToParquetConverter(String segmentDir, String outputFile) {
-    this(segmentDir, outputFile, CompressionCodecName.GZIP);
+    this(segmentDir, outputFile, CompressionCodecName.GZIP, false);
   }
 
   public PinotSegmentToParquetConverter(String segmentDir, String outputFile,
-      CompressionCodecName compressionCodec) {
+      CompressionCodecName compressionCodec, boolean forwardIndexOnly) {
     _segmentDir = segmentDir;
     _outputFile = outputFile;
     _compressionCodec = compressionCodec;
+    _forwardIndexOnly = forwardIndexOnly;
   }
 
   @Override
@@ -63,7 +65,9 @@ public class PinotSegmentToParquetConverter implements PinotSegmentConverter {
     Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(new SegmentMetadataImpl(indexDir).getSchema());
     OutputFile outputFile =
         HadoopOutputFile.fromPath(new Path(_outputFile), ParquetUtils.getParquetHadoopConfiguration());
-    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(new File(_segmentDir))) {
+    PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader();
+    pinotSegmentRecordReader.init(new File(_segmentDir), null, null, false, _forwardIndexOnly);
+    try (pinotSegmentRecordReader) {
       try (ParquetWriter<Record> parquetWriter =
           AvroParquetWriter.<Record>builder(outputFile).withSchema(avroSchema)
               .withCompressionCodec(_compressionCodec)

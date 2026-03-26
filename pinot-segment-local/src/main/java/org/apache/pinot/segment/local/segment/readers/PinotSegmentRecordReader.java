@@ -117,9 +117,23 @@ public class PinotSegmentRecordReader implements RecordReader {
    */
   public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
       boolean skipDefaultNullValues) {
+    init(indexDir, fieldsToRead, sortOrder, skipDefaultNullValues, false);
+  }
+
+  /**
+   * Initializes the record reader from an index directory with an option to load only forward index.
+   *
+   * @param indexDir Index directory
+   * @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+   * @param sortOrder List of sorted columns
+   * @param skipDefaultNullValues Whether to skip putting default null values into the record
+   * @param forwardIndexOnly Whether to load only forward index, dictionary, and null value vector
+   */
+  public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
+      boolean skipDefaultNullValues, boolean forwardIndexOnly) {
     IndexSegment indexSegment;
     try {
-      indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+      indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap, forwardIndexOnly);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while loading the segment from: " + indexDir, e);
     }
