@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -113,7 +112,7 @@ public class PipelineBreakerExecutorTest {
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, Long.toString(requestId),
             Accounting.DEFAULT_WORKLOAD_NAME, System.currentTimeMillis(), deadlineMs, deadlineMs, "brokerId",
             "serverId", "");
-    QueryThreadContext.MseWorkerInfo workerInfo = new QueryThreadContext.MseWorkerInfo(1, 2, Set.of(), Set.of());
+    QueryThreadContext.MseWorkerInfo workerInfo = new QueryThreadContext.MseWorkerInfo(1, 2);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, workerInfo,
         ThreadAccountantUtils.getNoOpAccountant())) {
       return PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan,

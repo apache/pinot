@@ -340,6 +340,10 @@ public class QueryThreadContext implements AutoCloseable {
     private final Set<Integer> _upstreamStageIds;
     private final Set<Integer> _downstreamStageIds;
 
+    public MseWorkerInfo(int stageId, int workerId) {
+      this(stageId, workerId, Set.of(), Set.of());
+    }
+
     public MseWorkerInfo(int stageId, int workerId, Set<Integer> upstreamStageIds, Set<Integer> downstreamStageIds) {
       _stageId = stageId;
       _workerId = workerId;

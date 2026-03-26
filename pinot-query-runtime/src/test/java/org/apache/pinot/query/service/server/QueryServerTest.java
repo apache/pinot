@@ -276,7 +276,7 @@ public class QueryServerTest extends QueryTestSet {
   public void testMdcSkipsEmptyStageIds() {
     QueryExecutionContext executionContext = QueryExecutionContext.forMseTest();
     QueryThreadContext.MseWorkerInfo workerInfo =
-        new QueryThreadContext.MseWorkerInfo(2, 0, Set.of(), Set.of());
+        new QueryThreadContext.MseWorkerInfo(2, 0);
 
     try (QueryThreadContext ignored = QueryThreadContext.open(executionContext, workerInfo,
         ThreadAccountantUtils.getNoOpAccountant())) {
