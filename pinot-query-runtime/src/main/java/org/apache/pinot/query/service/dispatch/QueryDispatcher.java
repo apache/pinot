@@ -643,43 +643,33 @@ public class QueryDispatcher {
   private static void reduceSerialized(SerializedDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
       PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
     DataBlock dataBlock = block.getDataBlock();
-    int numRows = dataBlock.getNumberOfRows();
-    if (numRows > 0) {
-      resultRows.ensureCapacity(resultRows.size() + numRows);
+    if (dataBlock.getNumberOfRows() > 0) {
       List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
-      for (Object[] rawRow : rawRows) {
-        Object[] row = new Object[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-          Object rawValue = rawRow[resultFields.get(i).getKey()];
-          if (rawValue != null) {
-            ColumnDataType dataType = columnTypes[i];
-            row[i] = dataType.format(dataType.toExternal(rawValue));
-          }
-        }
-        resultRows.add(row);
-      }
+      toExternalList(resultRows, numColumns, resultFields, columnTypes, rawRows);
     }
   }
 
-  /// Reduces a RowHeapDataBlock by extracting the rows and converting the values to the expected result types.
-  ///
-  /// This method mutates the received block; its cells are converted to external/formatted values.
   private static void reduceRowHeap(RowHeapDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
       PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
     List<Object[]> rows = block.getRows();
-    int numRows = rows.size();
-    if (numRows > 0) {
-      resultRows.ensureCapacity(resultRows.size() + numRows);
-      for (int i = 0; i < numRows; i++) {
-        Object[] row = rows.get(i);
-        for (int j = 0; j < numColumns; j++) {
-          if (row[j] != null) {
-            ColumnDataType dataType = columnTypes[j];
-            row[j] = dataType.format(dataType.toExternal(row[j]));
-          }
+    if (!rows.isEmpty()) {
+      toExternalList(resultRows, numColumns, resultFields, columnTypes, rows);
+    }
+  }
+
+  private static void toExternalList(ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes, List<Object[]> rows) {
+    resultRows.ensureCapacity(resultRows.size() + rows.size());
+    for (Object[] rawRow : rows) {
+      Object[] row = new Object[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        Object rawValue = rawRow[resultFields.get(i).getKey()];
+        if (rawValue != null) {
+          ColumnDataType dataType = columnTypes[i];
+          row[i] = dataType.format(dataType.toExternal(rawValue));
         }
-        resultRows.add(row);
       }
+      resultRows.add(row);
     }
   }
 
