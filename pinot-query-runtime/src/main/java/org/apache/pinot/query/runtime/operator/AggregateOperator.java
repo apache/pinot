@@ -230,6 +230,8 @@ public class AggregateOperator extends MultiStageOperator {
 
       // Record stat before we check for limit so we can propagate to query response
       _statMap.merge(StatKey.NUM_GROUPS, _groupByExecutor.getNumGroups());
+      _statMap.merge(StatKey.ROWS_IN, _groupByExecutor.getRowsIn());
+      _statMap.merge(StatKey.GENERATOR_TYPE, _groupByExecutor.getGeneratorType());
 
       if (rows.isEmpty()) {
         return _eosBlock;
@@ -481,6 +483,17 @@ public class AggregateOperator extends MultiStageOperator {
         return Math.max(value1, value2);
       }
     },
+    /**
+     * Total number of input rows fed to the group-by executor across all processBlock calls.
+     * Pure observability — does not affect query semantics.
+     */
+    ROWS_IN(StatMap.Type.LONG),
+    /**
+     * Short name of the GroupIdGenerator backend chosen for this operator
+     * (e.g. "OneIntKeyGroupIdGenerator", "MultiKeysGroupIdGenerator").
+     * Pure observability — does not affect query semantics.
+     */
+    GENERATOR_TYPE(StatMap.Type.STRING),
     /**
      * Allocated memory in bytes for this operator or its children in the same stage.
      */

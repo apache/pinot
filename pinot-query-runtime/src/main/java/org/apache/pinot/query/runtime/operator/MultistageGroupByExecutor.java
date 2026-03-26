@@ -64,6 +64,8 @@ public class MultistageGroupByExecutor {
   private final int _numGroupsLimit;
   private final int _numGroupsWarningLimit;
   private final boolean _filteredAggregationsSkipEmptyGroups;
+  // Observability counters — pure stats, no effect on query semantics.
+  private long _rowsIn;
 
   // Group By Result holders for each mode
   private final GroupByResultHolder[] _aggregateResultHolders;
@@ -309,6 +311,19 @@ public class MultistageGroupByExecutor {
     return _groupIdGenerator.getNumGroups() == _numGroupsLimit;
   }
 
+  /** Returns total rows fed to this executor across all {@link #processBlock} calls. Pure observability. */
+  public long getRowsIn() {
+    return _rowsIn;
+  }
+
+  /**
+   * Returns the simple class name of the {@link GroupIdGenerator} backend chosen for this executor.
+   * Pure observability — useful for diagnosing which hash-map variant is in use.
+   */
+  public String getGeneratorType() {
+    return _groupIdGenerator.getClass().getSimpleName();
+  }
+
   private void processAggregate(MseBlock.Data block) {
     if (_maxFilterArgId < 0) {
       processAggregateWithoutFilter(block);
@@ -318,6 +333,7 @@ public class MultistageGroupByExecutor {
   }
 
   private void processAggregateWithoutFilter(MseBlock.Data block) {
+    _rowsIn += block.getNumRows();
     int[] intKeys = generateGroupByKeys(block);
     int numGroups = _groupIdGenerator.getNumGroups();
     for (int i = 0; i < _aggFunctions.length; i++) {
@@ -330,6 +346,7 @@ public class MultistageGroupByExecutor {
   }
 
   private void processAggregateWithFilter(MseBlock.Data block) {
+    _rowsIn += block.getNumRows();
     // In the first loop, generate all the group keys, cache the matching rows
     int[] intKeys = _filteredAggregationsSkipEmptyGroups ? null : generateGroupByKeys(block);
     RoaringBitmap[] matchedBitmaps = new RoaringBitmap[_maxFilterArgId + 1];
@@ -374,6 +391,7 @@ public class MultistageGroupByExecutor {
   }
 
   private void processMerge(MseBlock.Data block) {
+    _rowsIn += block.getNumRows();
     int[] groupByKeys = generateGroupByKeys(block);
     int numRows = groupByKeys.length;
     int numFunctions = _aggFunctions.length;
