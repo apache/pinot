@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import com.google.common.base.Preconditions;
-import java.nio.charset.StandardCharsets;
+import com.google.common.base.Utf8;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -116,7 +116,7 @@ public class MutableColumnStatistics implements ColumnStatistics {
         break;
       case STRING:
         for (int i = 0; i < length; i++) {
-          int elementLength = _dictionary.getStringValue(i).getBytes(StandardCharsets.UTF_8).length;
+          int elementLength = Utf8.encodedLength(_dictionary.getStringValue(i));
           _minElementLength = Math.min(_minElementLength, elementLength);
           _maxElementLength = Math.max(_maxElementLength, elementLength);
         }
