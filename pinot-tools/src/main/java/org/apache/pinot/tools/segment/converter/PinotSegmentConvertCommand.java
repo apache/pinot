@@ -38,6 +38,7 @@ import picocli.CommandLine;
  *   <li>AVRO format</li>
  *   <li>CSV format</li>
  *   <li>JSON format</li>
+ *   <li>PARQUET format</li>
  * </ul>
  */
 @SuppressWarnings("FieldCanBeLocal")
@@ -54,7 +55,7 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
   private String _outputDir;
 
   @CommandLine.Option(names = {"-outputFormat"}, required = true,
-      description = "Format to convert to (AVRO/CSV/JSON).")
+      description = "Format to convert to (AVRO/CSV/JSON/PARQUET).")
   private String _outputFormat;
 
   @CommandLine.Option(names = {"-csvDelimiter"}, required = false, description = "CSV delimiter (default ',').")
@@ -138,6 +139,10 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
             outputPath += ".json";
             new PinotSegmentToJsonConverter(inputPath, outputPath).convert();
             break;
+          case PARQUET:
+            outputPath += ".parquet";
+            new PinotSegmentToParquetConverter(inputPath, outputPath).convert();
+            break;
           default:
             throw new RuntimeException("Unsupported conversion to file format: " + _outputFormat);
         }
@@ -152,6 +157,6 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
 
   @Override
   public String description() {
-    return "Convert Pinot segments to another format such as AVRO/CSV/JSON.";
+    return "Convert Pinot segments to another format such as AVRO/CSV/JSON/PARQUET.";
   }
 }
