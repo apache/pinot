@@ -56,7 +56,7 @@ public class MutableColumnStatisticsTest {
     when(dictionary.getStringValue(anyInt())).thenAnswer(
         (Answer<String>) invocation -> elements[(int) invocation.getArgument(0)]);
 
-    MutableColumnStatistics columnStatistics = new MutableColumnStatistics(dataSource, null);
+    MutableColumnStatistics columnStatistics = new MutableColumnStatistics(dataSource, null, false);
     assertEquals(columnStatistics.getLengthOfShortestElement(), minElementLength);
     assertEquals(columnStatistics.getLengthOfLargestElement(), maxElementLength);
   }

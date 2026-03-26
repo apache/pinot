@@ -48,9 +48,9 @@ public class CompactedDictEncodedColumnStatistics extends MutableColumnStatistic
   private Object _minValue; // Track min value from valid documents
   private Object _maxValue; // Track max value from valid documents
 
-  public CompactedDictEncodedColumnStatistics(DataSource dataSource, int[] sortedDocIds,
+  public CompactedDictEncodedColumnStatistics(DataSource dataSource, int[] sortedDocIds, boolean isSortedColumn,
       ThreadSafeMutableRoaringBitmap validDocIds) {
-    super(dataSource, sortedDocIds);
+    super(dataSource, sortedDocIds, isSortedColumn);
     _dataSource = dataSource;
 
     // Find which dictionary IDs are actually used by valid documents

@@ -44,20 +44,8 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
   private final Map<String, ColumnStatistics> _columnStatisticsMap = new HashMap<>();
   private final int _totalDocCount;
 
-  @Deprecated
   public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
-      StatsCollectorConfig statsCollectorConfig) {
-    this(mutableSegment, sortedDocIds, statsCollectorConfig, null, null);
-  }
-
-  @Deprecated
-  public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
-      StatsCollectorConfig statsCollectorConfig, @Nullable RecordReader recordReader) {
-    this(mutableSegment, sortedDocIds, statsCollectorConfig, recordReader, null);
-  }
-
-  public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
-      StatsCollectorConfig statsCollectorConfig, @Nullable RecordReader recordReader,
+      @Nullable String sortedColumn, StatsCollectorConfig statsCollectorConfig, @Nullable RecordReader recordReader,
       @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot) {
     _mutableSegment = mutableSegment;
 
@@ -80,6 +68,7 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
     // Create all column statistics
     for (String columnName : mutableSegment.getPhysicalColumnNames()) {
       DataSource dataSource = mutableSegment.getDataSource(columnName);
+      boolean isSortedColumn = columnName.equals(sortedColumn);
 
       // Handle map columns
       if (dataSource instanceof MutableMapDataSource) {
@@ -91,12 +80,14 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
       // Handle dictionary columns
       if (dataSource.getDictionary() != null) {
         _columnStatisticsMap.put(columnName,
-            createDictionaryColumnStatistics(dataSource, sortedDocIds, isUsingCompactedReader, validDocIdsSnapshot));
+            createDictionaryColumnStatistics(dataSource, sortedDocIds, isSortedColumn, isUsingCompactedReader,
+                validDocIdsSnapshot));
         continue;
       }
 
       // Handle no dictionary columns
-      _columnStatisticsMap.put(columnName, new MutableNoDictionaryColStatistics(dataSource));
+      _columnStatisticsMap.put(columnName,
+          new MutableNoDictionaryColStatistics(dataSource, sortedDocIds, isSortedColumn));
     }
   }
 
@@ -133,18 +124,18 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
    * Creates column statistics for dictionary columns.
    */
   private ColumnStatistics createDictionaryColumnStatistics(DataSource dataSource, int[] sortedDocIds,
-      boolean useCompactedStatistics, ThreadSafeMutableRoaringBitmap validDocIds) {
+      boolean isSortedColumn, boolean useCompactedStatistics, ThreadSafeMutableRoaringBitmap validDocIds) {
     if (useCompactedStatistics) {
       if (dataSource.getForwardIndex().isDictionaryEncoded()) {
         // Safe to use getDictId() - forward index supports dictionary operations
-        return new CompactedDictEncodedColumnStatistics(dataSource, sortedDocIds, validDocIds);
+        return new CompactedDictEncodedColumnStatistics(dataSource, sortedDocIds, isSortedColumn, validDocIds);
       } else {
         // Forward index doesn't support getDictId() - use raw value scanning
-        return new CompactedRawIndexDictColumnStatistics(dataSource, sortedDocIds, validDocIds);
+        return new CompactedRawIndexDictColumnStatistics(dataSource, sortedDocIds, isSortedColumn, validDocIds);
       }
     } else {
       // Regular case: non-compacted readers or no valid doc IDs available
-      return new MutableColumnStatistics(dataSource, sortedDocIds);
+      return new MutableColumnStatistics(dataSource, sortedDocIds, isSortedColumn);
     }
   }
 

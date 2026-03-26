@@ -263,15 +263,22 @@ public class RealtimeSegmentConfig {
       for (Map.Entry<String, FieldIndexConfigs> entry : indexConfigsByColName.entrySet()) {
         _indexConfigByCol.put(entry.getKey(), new FieldIndexConfigs.Builder(entry.getValue()));
       }
-      // Add inverted index to sorted column for 2 reasons:
+      // Add inverted index to dictionary-enabled sorted column for 2 reasons:
       // 1. Since sorted index doesn't apply to mutable segment, add inverted index to get better performance
       // 2. When converting mutable segment to immutable segment, we use sorted column's inverted index to accelerate
       //    the index creation
+      // NOTE: When the column is configured as no-dictionary (raw), sorting is done by reading raw values directly from
+      // the forward index.
       if (CollectionUtils.isNotEmpty(sortedColumns)) {
         String sortedColumn = sortedColumns.get(0);
-        FieldIndexConfigs.Builder builder =
-            _indexConfigByCol.computeIfAbsent(sortedColumn, k -> new FieldIndexConfigs.Builder());
-        builder.add(StandardIndexes.inverted(), new IndexConfig(false));
+        FieldIndexConfigs existingConfigs = indexConfigsByColName.get(sortedColumn);
+        boolean dictionaryEnabled =
+            existingConfigs == null || existingConfigs.getConfig(StandardIndexes.dictionary()).isEnabled();
+        if (dictionaryEnabled) {
+          FieldIndexConfigs.Builder builder =
+              _indexConfigByCol.computeIfAbsent(sortedColumn, k -> new FieldIndexConfigs.Builder());
+          builder.add(StandardIndexes.inverted(), new IndexConfig(false));
+        }
       }
     }
 
