@@ -172,6 +172,16 @@ public class QueryServer {
     } catch (Exception e) {
       throw new RuntimeException(e);
     } finally {
+      // Explicitly close all client channels and wait for completion so that remote peers detect
+      // the shutdown promptly (Netty 4.2 no longer force-closes channels during shutdownGracefully
+      // with a zero timeout).
+      for (SocketChannel ch : _allChannels.keySet()) {
+        try {
+          ch.close().sync();
+        } catch (Exception e) {
+          LOGGER.warn("Failed to close client channel: {}", ch, e);
+        }
+      }
       _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
       _bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
     }
