@@ -412,6 +412,50 @@ public class StreamingBrokerResponseJacksonSerializerTest {
   }
 
   @Test
+  public void testBooleanColumnWithExternalValues() throws Exception {
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"boolCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN}
+    );
+
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{true});
+    rows.add(new Object[]{false});
+
+    StreamingBrokerResponse.Metainfo metainfo = new TestMetainfo(Collections.emptyList());
+    StreamingBrokerResponse response = new StreamingBrokerResponse.ListStreamingBrokerResponse(
+        dataSchema, metainfo, rows);
+
+    JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
+    JsonNode rowsNode = json.get("resultTable").get("rows");
+    assertEquals(rowsNode.size(), 2);
+    assertTrue(rowsNode.get(0).get(0).asBoolean());
+    assertFalse(rowsNode.get(1).get(0).asBoolean());
+  }
+
+  @Test
+  public void testBytesColumnWithPreFormattedStringValues() throws Exception {
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"bytesCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BYTES}
+    );
+
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{"0a0b"});
+    rows.add(new Object[]{"ff"});
+
+    StreamingBrokerResponse.Metainfo metainfo = new TestMetainfo(Collections.emptyList());
+    StreamingBrokerResponse response = new StreamingBrokerResponse.ListStreamingBrokerResponse(
+        dataSchema, metainfo, rows);
+
+    JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
+    JsonNode rowsNode = json.get("resultTable").get("rows");
+    assertEquals(rowsNode.size(), 2);
+    assertEquals(rowsNode.get(0).get(0).asText(), "0a0b");
+    assertEquals(rowsNode.get(1).get(0).asText(), "ff");
+  }
+
+  @Test
   public void testModuleRegistration() throws Exception {
     ObjectMapper mapper = new ObjectMapper();
     StreamingBrokerResponseJacksonSerializer.registerModule(mapper, Comparator.naturalOrder());

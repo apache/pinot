@@ -105,21 +105,19 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
       // Fast path: cache one serializer per type-stable column (INT, LONG, STRING, arrays, etc.).
       @SuppressWarnings("unchecked")
       JsonSerializer<Object>[] serializers = new JsonSerializer[width];
-      // OBJECT columns are type-unstable (runtime type can vary per row), so cache serializers by runtime class.
+      // Runtime type can vary per row (OBJECT columns, or rows already converted/formatted by eager paths), so cache
+      // serializers by runtime class for fallback.
       @SuppressWarnings("unchecked")
-      Map<Class<?>, JsonSerializer<Object>>[] objectTypeColumnSerializers = new Map[width];
+      Map<Class<?>, JsonSerializer<Object>>[] runtimeColumnSerializers = new Map[width];
       DataSchema.ColumnDataType[] columnTypes = dataSchema.getColumnDataTypes();
       for (int colIdx = 0; colIdx < columnTypes.length; colIdx++) {
         DataSchema.ColumnDataType columnType = columnTypes[colIdx];
-        if (columnType == DataSchema.ColumnDataType.OBJECT) {
-          // Lazily populated during row serialization as new runtime classes are encountered.
-          objectTypeColumnSerializers[colIdx] = new HashMap<>();
-        } else {
+        if (columnType != DataSchema.ColumnDataType.OBJECT) {
           serializers[colIdx] = provider.findTypedValueSerializer(columnType.getExternalClass(), false, null);
         }
       }
       value.consumeData(data -> writeDataBlockContent(
-          data, gen, columnTypes, serializers, objectTypeColumnSerializers, width, provider));
+          data, gen, columnTypes, serializers, runtimeColumnSerializers, width, provider));
     } finally {
       gen.writeEndArray();
     }
@@ -127,7 +125,7 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
 
   private static void writeDataBlockContent(StreamingBrokerResponse.Data dataBlock, JsonGenerator gen,
       DataSchema.ColumnDataType[] columnTypes, JsonSerializer<Object>[] serializers,
-      Map<Class<?>, JsonSerializer<Object>>[] objectTypeColumnSerializers, int width, SerializerProvider provider) {
+      Map<Class<?>, JsonSerializer<Object>>[] runtimeColumnSerializers, int width, SerializerProvider provider) {
     while (dataBlock.next()) {
       // Make sure every row array is closed even if one value fails to serialize.
       boolean rowStarted = false;
@@ -139,20 +137,24 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
           if (rawValue == null) {
             gen.writeNull();
           } else {
-            DataSchema.ColumnDataType dataType = columnTypes[i];
-            Object external = dataType.toExternal(rawValue);
             JsonSerializer<Object> serializer = serializers[i];
-            if (serializer == null) {
-              // OBJECT fallback path: resolve serializer for this runtime class once, then reuse from cache.
-              Map<Class<?>, JsonSerializer<Object>> runtimeSerializers = objectTypeColumnSerializers[i];
-              Class<?> runtimeClass = external.getClass();
-              serializer = runtimeSerializers.get(runtimeClass);
-              if (serializer == null) {
-                serializer = provider.findTypedValueSerializer(runtimeClass, false, null);
-                runtimeSerializers.put(runtimeClass, serializer);
-              }
+            if (serializer != null && columnTypes[i].getExternalClass().isInstance(rawValue)) {
+              serializer.serialize(rawValue, gen, provider);
+              continue;
             }
-            serializer.serialize(external, gen, provider);
+            // Fallback path: resolve serializer for this runtime class once, then reuse from cache.
+            Map<Class<?>, JsonSerializer<Object>> runtimeSerializers = runtimeColumnSerializers[i];
+            if (runtimeSerializers == null) {
+              runtimeSerializers = new HashMap<>();
+              runtimeColumnSerializers[i] = runtimeSerializers;
+            }
+            Class<?> runtimeClass = rawValue.getClass();
+            serializer = runtimeSerializers.get(runtimeClass);
+            if (serializer == null) {
+              serializer = provider.findTypedValueSerializer(runtimeClass, false, null);
+              runtimeSerializers.put(runtimeClass, serializer);
+            }
+            serializer.serialize(rawValue, gen, provider);
           }
         }
       } catch (IOException e) {

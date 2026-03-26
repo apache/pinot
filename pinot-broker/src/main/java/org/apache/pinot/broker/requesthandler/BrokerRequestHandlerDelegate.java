@@ -29,6 +29,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
+import org.apache.pinot.common.response.EagerToLazyBrokerResponseAdaptor;
 import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -159,8 +160,12 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       }
     }
 
-    return requestHandler.handleStreamingRequest(
+    StreamingBrokerResponse response = requestHandler.handleStreamingRequest(
         request, sqlNodeAndOptions, requesterIdentity, requestContext, httpHeaders);
+    if (QueryOptionsUtils.isGetCursor(sqlNodeAndOptions.getOptions())) {
+      return getStreamingCursorResponse(QueryOptionsUtils.getCursorNumRows(sqlNodeAndOptions.getOptions()), response);
+    }
+    return response;
   }
 
   @Override
@@ -239,5 +244,18 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     CursorResponse cursorResponse = _responseStore.handleCursorRequest(response.getRequestId(), 0, numRows);
     cursorResponse.setCursorResultWriteTimeMs(cursorStoreTimeMs);
     return cursorResponse;
+  }
+
+  private StreamingBrokerResponse getStreamingCursorResponse(Integer numRows, StreamingBrokerResponse response)
+      throws Exception {
+    if (numRows == null) {
+      throw new RuntimeException("numRows not specified when requesting a cursor from streaming response");
+    }
+    BrokerResponse eagerResponse = response.asEagerBrokerResponse();
+    if (eagerResponse.getExceptionsSize() > 0) {
+      return new EagerToLazyBrokerResponseAdaptor(eagerResponse);
+    }
+    CursorResponse cursorResponse = getCursorResponse(numRows, eagerResponse);
+    return new EagerToLazyBrokerResponseAdaptor(cursorResponse);
   }
 }

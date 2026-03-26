@@ -708,8 +708,11 @@ public class PinotClientRequest {
       queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
 
       // Check if the client wants actual HTTP error codes instead of 200 OK
-      QueryErrorCode queryErrorCode = QueryErrorCode.fromErrorCode(queryErrorCodeHeaderValue);
-      httpStatus = queryErrorCode.getHttpResponseStatus();
+      if (Boolean.parseBoolean(httpHeaders.getHeaderString(
+          CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER))) {
+        QueryErrorCode queryErrorCode = QueryErrorCode.fromErrorCode(queryErrorCodeHeaderValue);
+        httpStatus = queryErrorCode.getHttpResponseStatus();
+      }
 
       // do log with the exception flagged with a particular marker for filtering
       MDC.put("queryErrorCode", Integer.toString(queryErrorCodeHeaderValue));

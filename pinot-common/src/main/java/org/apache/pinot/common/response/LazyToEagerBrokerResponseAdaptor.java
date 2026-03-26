@@ -68,11 +68,13 @@ public class LazyToEagerBrokerResponseAdaptor implements BrokerResponse {
         int width = dataSchema.size();
         rows = new ArrayList<>();
         metainfo = streamingResponse.consumeData(data -> {
-          Object[] row = new Object[width];
-          for (int colIdx = 0; colIdx < dataSchema.size(); colIdx++) {
-            row[colIdx] = data.get(colIdx);
+          while (data.next()) {
+            Object[] row = new Object[width];
+            for (int colIdx = 0; colIdx < dataSchema.size(); colIdx++) {
+              row[colIdx] = data.get(colIdx);
+            }
+            rows.add(row);
           }
-          rows.add(row);
         });
       }
     } catch (InterruptedException e) {
