@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -41,12 +42,10 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 
 
@@ -392,12 +391,11 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     int updatedLengthOfLongestEntry;
     switch (_storedType) {
       case STRING:
-        updatedLengthOfLongestEntry = Math.max(dictionary.getStringValue(dictId).getBytes(UTF_8).length,
+        updatedLengthOfLongestEntry = Math.max(Utf8.encodedLength(dictionary.getStringValue(dictId)),
             lengthOfLongestEntry);
         break;
       case BYTES:
-        ByteArray value = new ByteArray(dictionary.getBytesValue(dictId));
-        updatedLengthOfLongestEntry = Math.max(value.length(), lengthOfLongestEntry);
+        updatedLengthOfLongestEntry = Math.max(dictionary.getBytesValue(dictId).length, lengthOfLongestEntry);
         break;
       case BIG_DECIMAL:
         updatedLengthOfLongestEntry = Math.max(
@@ -414,13 +412,12 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     int curSizeOfRow = getInt(_forwardIndexMaxSizeBuffer, docId);
     switch (_storedType) {
       case STRING:
-        int newSizeOfEntry = dictionary.getStringValue(dictId).length() + curSizeOfRow;
+        int newSizeOfEntry = Utf8.encodedLength(dictionary.getStringValue(dictId)) + curSizeOfRow;
         putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
         maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
         break;
       case BYTES:
-        ByteArray value = new ByteArray(dictionary.getBytesValue(dictId));
-        newSizeOfEntry = value.length() + curSizeOfRow;
+        newSizeOfEntry = dictionary.getBytesValue(dictId).length + curSizeOfRow;
         putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
         maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
         break;

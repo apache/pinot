@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
+import com.google.common.base.Utf8;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.lang3.NotImplementedException;
@@ -171,7 +171,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       return ((byte[]) value).length;
     }
     if (value instanceof CharSequence) {
-      return ((CharSequence) value).toString().getBytes(StandardCharsets.UTF_8).length;
+      return Utf8.encodedLength((CharSequence) value);
     }
     if (value instanceof BigDecimal) {
       return BigDecimalUtils.byteSize((BigDecimal) value);

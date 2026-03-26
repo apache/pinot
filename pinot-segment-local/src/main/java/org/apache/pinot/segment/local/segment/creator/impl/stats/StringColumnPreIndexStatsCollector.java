@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Utf8;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
@@ -30,7 +31,6 @@ import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector implements CLPStatsProvider {
@@ -63,7 +63,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
           _clpStatsCollector.collect(value);
         }
 
-        int length = value.getBytes(UTF_8).length;
+        int length = Utf8.encodedLength(value);
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);
         rowLength += length;
@@ -82,7 +82,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         if (isPartitionEnabled()) {
           updatePartition(value);
         }
-        int valueLength = value.getBytes(UTF_8).length;
+        int valueLength = Utf8.encodedLength(value);
         _minLength = Math.min(_minLength, valueLength);
         _maxLength = Math.max(_maxLength, valueLength);
         _maxRowLength = _maxLength;

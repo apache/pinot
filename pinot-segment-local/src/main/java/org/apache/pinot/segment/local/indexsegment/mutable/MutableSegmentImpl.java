@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import it.unimi.dsi.fastutil.booleans.BooleanArrayList;
@@ -125,7 +126,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.MAP;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
@@ -1598,20 +1598,16 @@ public class MutableSegmentImpl implements MutableSegment {
 
       switch (dataType) {
         case STRING: {
-          for (Object obj : values) {
-            String value = (String) obj;
-            int length = value.getBytes(UTF_8).length;
-            rowLength += length;
+          for (Object value : values) {
+            rowLength += Utf8.encodedLength((String) value);
           }
 
           _varByteMVMaxRowLengthInBytes = Math.max(_varByteMVMaxRowLengthInBytes, rowLength);
           break;
         }
         case BYTES: {
-          for (Object obj : values) {
-            ByteArray value = new ByteArray((byte[]) obj);
-            int length = value.length();
-            rowLength += length;
+          for (Object value : values) {
+            rowLength += ((byte[]) value).length;
           }
 
           _varByteMVMaxRowLengthInBytes = Math.max(_varByteMVMaxRowLengthInBytes, rowLength);
