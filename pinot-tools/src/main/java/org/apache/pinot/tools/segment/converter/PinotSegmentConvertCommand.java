@@ -22,8 +22,8 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
@@ -71,7 +71,7 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
 
   @CommandLine.Option(names = {"-parquetCompression"}, required = false,
       description = "Parquet compression codec (GZIP/SNAPPY/ZSTD/LZ4/UNCOMPRESSED, default GZIP).")
-  private String _parquetCompression = "GZIP";
+  private CompressionCodecName _parquetCompression = CompressionCodecName.GZIP;
 
   @CommandLine.Option(names = {"-forwardIndexOnly"}, required = false,
       description = "Load only forward index from the segment, skipping secondary indexes (default false).")
@@ -150,8 +150,8 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
             break;
           case PARQUET:
             outputPath += ".parquet";
-            new PinotSegmentToParquetConverter(inputPath, outputPath,
-                CompressionCodecName.valueOf(_parquetCompression.toUpperCase()), _forwardIndexOnly).convert();
+            new PinotSegmentToParquetConverter(inputPath, outputPath, _parquetCompression, _forwardIndexOnly)
+                .convert();
             break;
           default:
             throw new RuntimeException("Unsupported conversion to file format: " + _outputFormat);

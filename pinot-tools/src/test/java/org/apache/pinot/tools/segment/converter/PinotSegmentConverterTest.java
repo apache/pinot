@@ -26,6 +26,7 @@ import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.json.JSONRecordReader;
+import org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -180,6 +181,34 @@ public class PinotSegmentConverterTest {
       assertEquals(record.getValue(INT_MV_COLUMN), new Object[]{7, 8});
       assertEquals(record.getValue(LONG_MV_COLUMN), new Object[]{9, 10});
       assertEquals(record.getValue(FLOAT_MV_COLUMN), new Object[]{11.0, 12.0});
+      assertEquals(record.getValue(DOUBLE_MV_COLUMN), new Object[]{13.0, 14.0});
+      assertEquals(record.getValue(STRING_MV_COLUMN), new Object[]{"15", "16"});
+
+      assertFalse(recordReader.hasNext());
+    }
+  }
+
+  @Test
+  public void testParquetConverter()
+      throws Exception {
+    File outputFile = new File(TEMP_DIR, "segment.parquet");
+    PinotSegmentToParquetConverter parquetConverter =
+        new PinotSegmentToParquetConverter(_segmentDir, outputFile.getPath());
+    parquetConverter.convert();
+
+    try (ParquetRecordReader recordReader = new ParquetRecordReader()) {
+      recordReader.init(outputFile, SCHEMA.getFieldSpecMap().keySet(), null);
+
+      GenericRow record = recordReader.next();
+      assertEquals(record.getValue(INT_SV_COLUMN), 1);
+      assertEquals(record.getValue(LONG_SV_COLUMN), 2L);
+      assertEquals(record.getValue(FLOAT_SV_COLUMN), 3.0f);
+      assertEquals(record.getValue(DOUBLE_SV_COLUMN), 4.0);
+      assertEquals(record.getValue(STRING_SV_COLUMN), "5");
+      assertEquals(record.getValue(BYTES_SV_COLUMN), new byte[]{6, 12, 34, 56});
+      assertEquals(record.getValue(INT_MV_COLUMN), new Object[]{7, 8});
+      assertEquals(record.getValue(LONG_MV_COLUMN), new Object[]{9L, 10L});
+      assertEquals(record.getValue(FLOAT_MV_COLUMN), new Object[]{11.0f, 12.0f});
       assertEquals(record.getValue(DOUBLE_MV_COLUMN), new Object[]{13.0, 14.0});
       assertEquals(record.getValue(STRING_MV_COLUMN), new Object[]{"15", "16"});
 
