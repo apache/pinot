@@ -68,7 +68,13 @@ public enum ExchangeStrategy {
   /**
    * Records are sent randomly from a given worker in the sender to some worker in the receiver.
    */
-  RANDOM_EXCHANGE(false);
+  RANDOM_EXCHANGE(false),
+  /**
+   * Pseudo-exchange for lookup join right side. The dim table stays in the same plan fragment as
+   * the join (no fragment split). Inserted by {@code LookupJoinRule} after worker/exchange assignment;
+   * handled transparently by {@code PlanFragmentAndMailboxAssignment.processLookupLocalExchange}.
+   */
+  LOOKUP_LOCAL_EXCHANGE(false);
 
   /**
    * This is true when the Exchange Strategy is such that it requires a List&lt;Integer&gt; representing the
@@ -109,6 +115,12 @@ public enum ExchangeStrategy {
       case SUB_PARTITIONING_RR_EXCHANGE:
         return RelDistributions.ROUND_ROBIN_DISTRIBUTED;
       case RANDOM_EXCHANGE:
+        return RelDistributions.RANDOM_DISTRIBUTED;
+      case LOOKUP_LOCAL_EXCHANGE:
+        // LOOKUP_LOCAL is a pseudo-exchange (no fragment split, no mailbox). This mapping is only used
+        // by the PhysicalExchange constructor to satisfy the Calcite Exchange superclass — it has no
+        // runtime significance since PlanFragmentAndMailboxAssignment handles LOOKUP_LOCAL transparently.
+        // Uses RANDOM_DISTRIBUTED as placeholder (Calcite's Exchange constructor rejects ANY).
         return RelDistributions.RANDOM_DISTRIBUTED;
       default:
         throw new IllegalStateException(String.format("Unexpected exchange strategy: %s", exchangeStrategy));

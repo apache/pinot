@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -56,11 +57,14 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.assertj.core.api.Assertions;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
@@ -119,6 +123,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         QueryTestCase.Table table = entry.getValue();
         Schema schema = constructSchema(tableName, table._schema);
         schema.setEnableColumnBasedNullHandling(testCase._extraProps.isEnableColumnBasedNullHandling());
+        if (table._primaryKeyColumns != null && !table._primaryKeyColumns.isEmpty()) {
+          schema.setPrimaryKeyColumns(table._primaryKeyColumns);
+        }
         schemaMap.put(tableName, schema);
         factory1.registerTable(schema, offlineTableName);
         factory2.registerTable(schema, offlineTableName);
@@ -126,6 +133,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         List<GenericRow> genericRows = toRow(columnAndTypes, table._inputs);
         if (table._replicated) {
           addSegmentReplicated(factory1, factory2, offlineTableName, genericRows);
+          if (table._isDimTable) {
+            registerMockDimensionTable(offlineTableName, schema, table, genericRows);
+          }
           continue;
         }
         // generate segments and dump into server1 and server2
@@ -256,6 +266,50 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     factory2.addSegment(offlineTableName, segment);
   }
 
+  /**
+   * Registers a mock DimensionTableDataManager for lookup join testing.
+   * The mock stores all rows in a HashMap keyed by primary key, supporting lookupValues() and containsKey().
+   */
+  private void registerMockDimensionTable(String offlineTableName, Schema schema, QueryTestCase.Table table,
+      List<GenericRow> rows) {
+    List<String> primaryKeyColumns = table._primaryKeyColumns;
+    if (primaryKeyColumns == null || primaryKeyColumns.isEmpty()) {
+      throw new IllegalStateException(
+          "isDimTable=true requires primaryKeyColumns to be set for table: " + offlineTableName);
+    }
+    // Build an in-memory lookup map: PrimaryKey -> GenericRow
+    Map<PrimaryKey, GenericRow> lookupMap = new HashMap<>();
+    for (GenericRow row : rows) {
+      Object[] pkValues = new Object[primaryKeyColumns.size()];
+      for (int i = 0; i < primaryKeyColumns.size(); i++) {
+        pkValues[i] = row.getValue(primaryKeyColumns.get(i));
+      }
+      lookupMap.put(new PrimaryKey(pkValues), row);
+    }
+    // Create and register a mock DimensionTableDataManager
+    DimensionTableDataManager mockDimManager = Mockito.mock(DimensionTableDataManager.class);
+    Mockito.when(mockDimManager.containsKey(ArgumentMatchers.any(PrimaryKey.class)))
+        .thenAnswer(invocation -> {
+          PrimaryKey pk = invocation.getArgument(0);
+          return lookupMap.containsKey(pk);
+        });
+    Mockito.when(mockDimManager.lookupValues(ArgumentMatchers.any(PrimaryKey.class),
+        ArgumentMatchers.any(String[].class))).thenAnswer(invocation -> {
+          PrimaryKey pk = invocation.getArgument(0);
+          String[] columns = invocation.getArgument(1);
+          GenericRow row = lookupMap.get(pk);
+          if (row == null) {
+            return null;
+          }
+          Object[] values = new Object[columns.length];
+          for (int i = 0; i < columns.length; i++) {
+            values[i] = row.getValue(columns[i]);
+          }
+          return values;
+        });
+    DimensionTableDataManager.registerDimensionTable(offlineTableName, mockDimManager);
+  }
+
   @AfterClass
   public void tearDown() {
     // Restore the original default timezone
@@ -269,7 +323,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
   public void testQueryTestCasesWithH2(String testCaseName, boolean isIgnored, String sql, String h2Sql,
-      @Nullable String expectErrorMsg, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
+      @Nullable String expectErrorMsg, boolean keepOutputRowOrder, boolean ignoreV2Optimizer, boolean ignoreLiteMode)
       throws Exception {
     // query pinot
     runQuery(sql, expectErrorMsg, false).ifPresent(queryResult -> {
@@ -285,7 +339,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
   public void testQueryTestCasesWithH2WithNewOptimizer(String testCaseName, boolean isIgnored, String sql, String h2Sql,
-      String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
+      String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer, boolean ignoreLiteMode)
       throws Exception {
     // query pinot
     if (ignoreV2Optimizer) {
@@ -304,7 +358,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
-      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
+      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer,
+      boolean ignoreLiteMode)
       throws Exception {
     runQuery(sql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
@@ -312,7 +367,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithNewOptimizerWithOutput(String testCaseName, boolean isIgnored, String sql,
-      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer,
+      boolean ignoreLiteMode)
       throws Exception {
     if (ignoreV2Optimizer) {
       throw new SkipException(
@@ -325,11 +381,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithLiteModeWithOutput(String testCaseName, boolean isIgnored, String sql,
-      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer,
+      boolean ignoreLiteMode)
       throws Exception {
-    if (ignoreV2Optimizer) {
+    if (ignoreV2Optimizer || ignoreLiteMode) {
       throw new SkipException(
-          "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
+          "Ignoring query for test-case with lite mode, testCase: " + testCaseName + ", SQL: " + sql);
     }
     final String finalSql = String.format("SET usePhysicalOptimizer=true; SET useLiteMode=true; %s", sql);
     runQuery(finalSql, expect, false).ifPresent(
@@ -457,7 +514,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           }
           Object[] testEntry = new Object[]{
               testCaseName, queryCase._ignored, sql, h2Sql, expectedRows, queryCase._expectedException,
-              queryCase._keepOutputRowOrder, queryCase._ignoreV2Optimizer
+              queryCase._keepOutputRowOrder, queryCase._ignoreV2Optimizer, queryCase._ignoreLiteMode
           };
           providerContent.add(testEntry);
         }
@@ -535,7 +592,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
               : replaceTableName(testCaseName, queryCase._sql);
           Object[] testEntry = new Object[]{
               testCaseName, queryCase._ignored, sql, h2Sql, queryCase._expectedException, queryCase._keepOutputRowOrder,
-              queryCase._ignoreV2Optimizer
+              queryCase._ignoreV2Optimizer, queryCase._ignoreLiteMode
           };
           providerContent.add(testEntry);
         }
