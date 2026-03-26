@@ -27,9 +27,12 @@ import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.io.DataOutputStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,6 +49,9 @@ import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.AuthorizationInterceptor;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.StageMetadata;
@@ -304,8 +310,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// (normally cancelling other already started workers and sending the error through GRPC)
   private CompletableFuture<Void> submitWorker(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> reqMetadata, QueryExecutionContext executionContext) {
+    PlanNode rootNode = stagePlan.getRootNode();
+    Set<Integer> upstreamStageIds = collectUpstreamStageIds(rootNode);
+    Set<Integer> downstreamStageIds = collectDownstreamStageIds(rootNode);
     QueryThreadContext.MseWorkerInfo mseWorkerInfo =
-        new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
+        new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId(),
+            upstreamStageIds, downstreamStageIds);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant)) {
       return _queryRunner.processQuery(workerMetadata, stagePlan, reqMetadata);
     }
@@ -368,11 +378,14 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       StageMetadata stageMetadata = stagePlan.getStageMetadata();
 
       Worker.ExplainResponse.Builder builder = Worker.ExplainResponse.newBuilder();
+      PlanNode rootNode = stagePlan.getRootNode();
+      Set<Integer> upstreamStageIds = collectUpstreamStageIds(rootNode);
+      Set<Integer> downstreamStageIds = collectDownstreamStageIds(rootNode);
       List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
       for (WorkerMetadata workerMetadata : workerMetadataList) {
         QueryThreadContext.MseWorkerInfo mseWorkerInfo =
             new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(),
-                workerMetadata.getWorkerId());
+                workerMetadata.getWorkerId(), upstreamStageIds, downstreamStageIds);
         StagePlan explainPlan;
         try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant)) {
           explainPlan = _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata);
@@ -440,6 +453,36 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
     responseObserver.onCompleted();
+  }
+
+  // Collects sender stage IDs from all MailboxReceiveNodes in the plan tree via BFS,
+  // since MailboxReceiveNodes can appear at any depth (e.g. joins have multiple inputs).
+  @VisibleForTesting
+  static Set<Integer> collectUpstreamStageIds(PlanNode rootNode) {
+    Set<Integer> ids = new HashSet<>();
+    ArrayDeque<PlanNode> queue = new ArrayDeque<>();
+    queue.add(rootNode);
+    while (!queue.isEmpty()) {
+      PlanNode node = queue.poll();
+      if (node instanceof MailboxReceiveNode) {
+        ids.add(((MailboxReceiveNode) node).getSenderStageId());
+      }
+      queue.addAll(node.getInputs());
+    }
+    return ids;
+  }
+
+  // Collects receiver stage IDs from the root MailboxSendNode.
+  @VisibleForTesting
+  static Set<Integer> collectDownstreamStageIds(PlanNode rootNode) {
+    if (rootNode instanceof MailboxSendNode) {
+      Set<Integer> ids = new HashSet<>();
+      for (int receiverId : ((MailboxSendNode) rootNode).getReceiverStageIds()) {
+        ids.add(receiverId);
+      }
+      return ids;
+    }
+    return Set.of();
   }
 
   private StagePlan deserializePlan(long requestId, Worker.StagePlan protoStagePlan) {
