@@ -50,6 +50,11 @@ public interface OpChainConverter {
 
   /**
    * Converts the plan node into an opchain for this converter.
+   *
+   * @param context The context of the conversion, which includes metadata and other information that may be needed
+   *                during the conversion process.
+   * @param tracker A tracker that must be called every time a PlanNode is converted into an operator, so the caller can
+   *                keep track of this mapping.
    */
   OpChain convert(PlanNode node, OpChainExecutionContext context, BiConsumer<PlanNode, MultiStageOperator> tracker);
 
