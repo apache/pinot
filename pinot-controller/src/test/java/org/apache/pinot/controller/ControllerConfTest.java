@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.utils.Enablement;
@@ -182,20 +181,12 @@ public class ControllerConfTest {
     Assert.assertEquals(statusCheckerWaitForPushTimeInSeconds, expectedDuration, confAsString);
   }
 
-  private int getRandomDurationInSeconds() {
-    return RAND.nextInt(50);
-  }
-
   private String getRandomPeriodInMinutes() {
     return getRandomMinutes() + "m";
   }
 
   private int getRandomMinutes() {
     return 1 + RAND.nextInt(10);
-  }
-
-  private String getRandomString() {
-    return RandomStringUtils.randomAlphanumeric(5);
   }
 
   @Test
@@ -205,7 +196,8 @@ public class ControllerConfTest {
     ControllerConf conf = new ControllerConf(controllerConfig);
     // Invalid period should fall back to the default value
     Assert.assertEquals(conf.getRetentionControllerFrequencyInSeconds(),
-        (int) TimeUtils.convertPeriodToSeconds(DEFAULT_RETENTION_MANAGER_FREQUENCY_PERIOD));
+        (int) TimeUnit.SECONDS.convert(
+            TimeUtils.convertPeriodToMillis(DEFAULT_RETENTION_MANAGER_FREQUENCY_PERIOD), TimeUnit.MILLISECONDS));
   }
 
   @Test
