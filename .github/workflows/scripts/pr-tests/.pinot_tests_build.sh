@@ -30,7 +30,7 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   mvn clean install \
     -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
     -am -B -T 16 -ntp \
-    -P github-actions,integration-tests,sqlparser \
+    -P github-actions,integration-tests \
     -pl 'pinot-integration-tests' || exit 1
 else
   # Unit Tests
@@ -40,7 +40,7 @@ else
     mvn clean install \
       -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
       -am -B -T 16 -ntp \
-      -P github-actions,sqlparser \
+      -P github-actions \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
@@ -53,7 +53,7 @@ else
     mvn clean install \
       -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
       -am -B -T 16 -ntp \
-      -P github-actions,sqlparser \
+      -P github-actions \
       -pl '!pinot-integration-tests' \
       -pl '!pinot-perf' \
       -pl '!pinot-distribution' || exit 1
