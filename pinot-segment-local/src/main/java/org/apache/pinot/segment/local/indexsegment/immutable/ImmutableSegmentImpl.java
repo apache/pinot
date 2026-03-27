@@ -32,6 +32,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.IndexSegmentUtils;
+import org.apache.pinot.segment.local.segment.index.columnarmap.ColumnarMapDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.map.ImmutableMapDataSource;
@@ -51,6 +52,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.ColumnarMapIndexReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
@@ -101,8 +103,16 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
       String colName = entry.getKey();
       ColumnMetadata columnMetadata = entry.getValue();
-      if (columnMetadata.getFieldSpec().getDataType() == FieldSpec.DataType.MAP) {
-        _dataSources.put(colName, new ImmutableMapDataSource(entry.getValue(), _indexContainerMap.get(colName)));
+      FieldSpec.DataType dataType = columnMetadata.getFieldSpec().getDataType();
+      if (dataType == FieldSpec.DataType.MAP) {
+        ColumnIndexContainer indexContainer = _indexContainerMap.get(colName);
+        ColumnarMapIndexReader columnarMapReader =
+            (ColumnarMapIndexReader) indexContainer.getIndex(StandardIndexes.columnarMap());
+        if (columnarMapReader != null) {
+          _dataSources.put(colName, new ColumnarMapDataSource(columnMetadata, columnarMapReader));
+        } else {
+          _dataSources.put(colName, new ImmutableMapDataSource(entry.getValue(), indexContainer));
+        }
       } else {
         _dataSources.put(colName, new ImmutableDataSource(entry.getValue(), _indexContainerMap.get(colName)));
       }

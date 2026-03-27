@@ -1,0 +1,174 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.segment.index.columnarmap;
+
+import java.io.IOException;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
+import org.apache.pinot.segment.spi.index.reader.ColumnarMapIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+
+
+/**
+ * A per-key {@link ForwardIndexReader} backed by a {@link ColumnarMapIndexReader}.
+ *
+ * <p>Each instance is bound to a single key within a MAP column. Reads for document IDs
+ * that do not contain the key return the type-appropriate zero/empty default value; the caller can
+ * combine this with the presence bitmap ({@link ColumnarMapIndexReader#getPresenceBitmap}) when null
+ * semantics are required.
+ *
+ * <p>When a {@link ColumnarMapKeyDictionary} is provided, this reader supports dictionary-encoded
+ * access via {@link #readDictIds}, enabling dictionary-based GROUP BY operations.
+ *
+ * <p>No context is needed because the {@link ColumnarMapIndexReader} implementations maintain their
+ * own internal state; {@link #createContext()} therefore returns {@code null}.
+ *
+ * <p>Lifecycle: this reader does NOT own the underlying {@link ColumnarMapIndexReader}—closing this
+ * reader is a no-op. The owning {@link ColumnarMapDataSource} is responsible for closing the reader.
+ */
+public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
+
+  private final ColumnarMapIndexReader _columnarMapIndexReader;
+  private final String _key;
+  private final DataType _storedType;
+  @Nullable
+  private final ColumnarMapKeyDictionary _dictionary;
+  @Nullable
+  private final FixedBitIntReaderWriter _dictIdReader;
+  @Nullable
+  private final ImmutableRoaringBitmap _presenceBitmap;
+  private final int _defaultDictId;
+
+  public ColumnarMapKeyForwardIndexReader(ColumnarMapIndexReader columnarMapIndexReader, String key,
+      DataType storedType) {
+    this(columnarMapIndexReader, key, storedType, null, null, null);
+  }
+
+  public ColumnarMapKeyForwardIndexReader(ColumnarMapIndexReader columnarMapIndexReader, String key,
+      DataType storedType, @Nullable ColumnarMapKeyDictionary dictionary) {
+    this(columnarMapIndexReader, key, storedType, dictionary, null, null);
+  }
+
+  public ColumnarMapKeyForwardIndexReader(ColumnarMapIndexReader columnarMapIndexReader, String key,
+      DataType storedType, @Nullable ColumnarMapKeyDictionary dictionary,
+      @Nullable FixedBitIntReaderWriter dictIdReader) {
+    this(columnarMapIndexReader, key, storedType, dictionary, dictIdReader, null);
+  }
+
+  public ColumnarMapKeyForwardIndexReader(ColumnarMapIndexReader columnarMapIndexReader, String key,
+      DataType storedType, @Nullable ColumnarMapKeyDictionary dictionary,
+      @Nullable FixedBitIntReaderWriter dictIdReader,
+      @Nullable ImmutableRoaringBitmap presenceBitmap) {
+    _columnarMapIndexReader = columnarMapIndexReader;
+    _key = key;
+    _storedType = storedType;
+    _dictionary = dictionary;
+    _dictIdReader = dictIdReader;
+    _presenceBitmap = presenceBitmap;
+    if (dictionary != null) {
+      String defaultValueStr = ColumnarMapKeyDictionary.getDefaultValueString(storedType);
+      int idx = dictionary.indexOf(defaultValueStr);
+      _defaultDictId = idx >= 0 ? idx : 0;
+    } else {
+      _defaultDictId = 0;
+    }
+  }
+
+  @Override
+  public boolean isDictionaryEncoded() {
+    return _dictionary != null;
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return true;
+  }
+
+  @Override
+  public DataType getStoredType() {
+    return _storedType;
+  }
+
+  @Override
+  public void readDictIds(int[] docIds, int length, int[] dictIdBuffer, ForwardIndexReaderContext context) {
+    if (_dictionary == null) {
+      throw new UnsupportedOperationException("Dictionary not available for key: " + _key);
+    }
+    if (_dictIdReader != null) {
+      // Fast path: sparse dictId forward index — use presence bitmap rank to get ordinal
+      for (int i = 0; i < length; i++) {
+        if (_presenceBitmap != null && _presenceBitmap.contains(docIds[i])) {
+          int ordinal = _presenceBitmap.rank(docIds[i]) - 1;
+          dictIdBuffer[i] = _dictIdReader.readInt(ordinal);
+        } else {
+          dictIdBuffer[i] = _defaultDictId;
+        }
+      }
+    } else {
+      // Slow path: getString + indexOf for mutable segments
+      for (int i = 0; i < length; i++) {
+        String rawValue = _columnarMapIndexReader.getString(docIds[i], _key);
+        if (rawValue == null || rawValue.isEmpty()) {
+          dictIdBuffer[i] = _defaultDictId; // default value position in dictionary
+        } else {
+          dictIdBuffer[i] = _dictionary.indexOf(rawValue);
+        }
+      }
+    }
+  }
+
+  @Override
+  public int getInt(int docId, ForwardIndexReaderContext context) {
+    return _columnarMapIndexReader.getInt(docId, _key);
+  }
+
+  @Override
+  public long getLong(int docId, ForwardIndexReaderContext context) {
+    return _columnarMapIndexReader.getLong(docId, _key);
+  }
+
+  @Override
+  public float getFloat(int docId, ForwardIndexReaderContext context) {
+    return _columnarMapIndexReader.getFloat(docId, _key);
+  }
+
+  @Override
+  public double getDouble(int docId, ForwardIndexReaderContext context) {
+    return _columnarMapIndexReader.getDouble(docId, _key);
+  }
+
+  @Override
+  public String getString(int docId, ForwardIndexReaderContext context) {
+    return _columnarMapIndexReader.getString(docId, _key);
+  }
+
+  @Override
+  public byte[] getBytes(int docId, ForwardIndexReaderContext context) {
+    return _columnarMapIndexReader.getBytes(docId, _key);
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    // no-op: the underlying reader is owned by ColumnarMapDataSource
+  }
+}

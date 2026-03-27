@@ -431,7 +431,7 @@ public class DataTableSerDeTest {
             STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
             break;
-          case MAP:
+          case MAP: {
             Map<String, Object> map = new HashMap<>();
             for (int j = 0; j < 1 + RANDOM.nextInt(20); j++) {
               map.put("k" + j, RandomStringUtils.random(RANDOM.nextInt(20)));
@@ -439,6 +439,7 @@ public class DataTableSerDeTest {
             MAPS[rowId] = map;
             dataTableBuilder.setColumn(colId, map);
             break;
+          }
           case OBJECT:
           case UNKNOWN:
             dataTableBuilder.setNull(colId);

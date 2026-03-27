@@ -139,6 +139,10 @@ public class ColumnMinMaxValueGenerator {
   }
 
   private boolean needAddColumnMinMaxValueForColumn(ColumnMetadata columnMetadata) {
+    // MAP columns with sparse map index have no forward index and no meaningful min/max values
+    if (columnMetadata.getFieldSpec().getDataType() == org.apache.pinot.spi.data.FieldSpec.DataType.MAP) {
+      return false;
+    }
     return columnMetadata.getMinValue() == null && columnMetadata.getMaxValue() == null
         && !columnMetadata.isMinMaxValueInvalid();
   }

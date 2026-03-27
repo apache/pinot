@@ -221,6 +221,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Override
   public ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
       throws Exception {
+    if (context.getFieldSpec().getDataType() == FieldSpec.DataType.MAP) {
+      return null;
+    }
     return ForwardIndexCreatorFactory.createIndexCreator(context, indexConfig);
   }
 
@@ -263,6 +266,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Override
   public MutableIndex createMutableIndex(MutableIndexContext context, ForwardIndexConfig config) {
     if (config.isDisabled()) {
+      return null;
+    }
+    if (context.getFieldSpec().getDataType() == FieldSpec.DataType.MAP) {
       return null;
     }
     String column = context.getFieldSpec().getName();

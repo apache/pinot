@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -519,6 +520,23 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public List<String> getComplexColumnNames() {
     return getQualifyingFields(FieldType.COMPLEX, true);
+  }
+
+  public List<String> getColumnarMapColumnNames() {
+    List<String> fields = new ArrayList<>();
+    for (FieldSpec fieldSpec : getSchema().getAllFieldSpecs()) {
+      if (fieldSpec.isVirtualColumn()) {
+        continue;
+      }
+      if (fieldSpec.getDataType() == FieldSpec.DataType.MAP) {
+        FieldIndexConfigs indexConfigs = _indexConfigsByColName.get(fieldSpec.getName());
+        if (indexConfigs != null && indexConfigs.getConfig(StandardIndexes.columnarMap()).isEnabled()) {
+          fields.add(fieldSpec.getName());
+        }
+      }
+    }
+    Collections.sort(fields);
+    return fields;
   }
 
   public void setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
