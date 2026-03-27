@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.index.fst.FstIndexUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -1348,25 +1349,54 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         List.of(FieldConfig.IndexType.FST), null, null));
 
     File fstFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
-    int legacyNativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
 
     runPreProcessor();
     assertTrue(fstFile.exists());
 
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "rw")) {
       randomAccessFile.seek(0);
-      randomAccessFile.writeInt(legacyNativeFstMagic);
+      randomAccessFile.writeInt(FstIndexUtils.LEGACY_NATIVE_FST_MAGIC);
     }
 
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
-      assertEquals(randomAccessFile.readInt(), legacyNativeFstMagic);
+      assertEquals(randomAccessFile.readInt(), FstIndexUtils.LEGACY_NATIVE_FST_MAGIC);
     }
 
     runPreProcessor();
 
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
-      assertNotEquals(randomAccessFile.readInt(), legacyNativeFstMagic);
+      assertNotEquals(randomAccessFile.readInt(), FstIndexUtils.LEGACY_NATIVE_FST_MAGIC);
     }
+  }
+
+  @Test
+  public void testV3ReplaceLegacyNativeTextIndex()
+      throws Exception {
+    buildV3Segment();
+
+    String strColumn = "column3";
+    _fieldConfigMap.put(strColumn, new FieldConfig(strColumn, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.TEXT), null, Map.of("storeInSegmentFile", "false")));
+
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(INDEX_DIR, SegmentVersion.v3);
+    File nativeTextFile =
+        new File(segmentDirectory, strColumn + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION);
+    File luceneTextFile =
+        new File(segmentDirectory, strColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
+    File staleLuceneFile = new File(luceneTextFile, "leftover.tmp");
+
+    runPreProcessor();
+    assertTrue(luceneTextFile.exists());
+
+    Files.writeString(staleLuceneFile.toPath(), "stale");
+    Files.writeString(nativeTextFile.toPath(), "legacy native text");
+    assertTrue(nativeTextFile.exists());
+
+    runPreProcessor();
+
+    assertFalse(nativeTextFile.exists());
+    assertFalse(staleLuceneFile.exists());
+    assertTrue(luceneTextFile.exists());
   }
 
   @Test

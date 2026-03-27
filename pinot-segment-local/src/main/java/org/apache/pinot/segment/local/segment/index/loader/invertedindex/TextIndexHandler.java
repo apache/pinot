@@ -129,14 +129,19 @@ public class TextIndexHandler extends BaseIndexHandler {
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    File segmentDirectory =
+        SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
+    Set<String> recreatedLegacyNativeColumns = new HashSet<>();
     for (String column : getColumnsWithLegacyNativeTextIndex()) {
       LOGGER.info("Removing legacy native text index file from segment: {}, column: {}", segmentName, column);
-      TextIndexUtils.cleanupTextIndex(_segmentDirectory.getSegmentMetadata().getIndexDir(), column);
+      cleanupTextIndexFiles(indexDir, segmentDirectory, column);
       if (columnsToAddIdx.contains(column)) {
         ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         if (shouldCreateTextIndex(columnMetadata)) {
           createTextIndexForColumn(segmentWriter, columnMetadata);
+          recreatedLegacyNativeColumns.add(column);
         }
         columnsToAddIdx.remove(column);
       }
@@ -157,6 +162,9 @@ public class TextIndexHandler extends BaseIndexHandler {
       }
     }
     for (String column : existingColumns) {
+      if (recreatedLegacyNativeColumns.contains(column)) {
+        continue;
+      }
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing text index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.text());
@@ -201,6 +209,8 @@ public class TextIndexHandler extends BaseIndexHandler {
   private void createTextIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    File segmentDirectory =
+        SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
     int numDocs = columnMetadata.getTotalDocs();
@@ -222,17 +232,10 @@ public class TextIndexHandler extends BaseIndexHandler {
       // Marker file does not exist, which means last run ended normally.
       // Create a marker file.
       FileUtils.touch(inProgress);
-    } else {
-      // Marker file exists, which means last run was interrupted.
-      // Clean up any existing text index files
-      cleanupExistingTextIndexFiles(indexDir, columnName);
     }
-    TextIndexUtils.cleanupTextIndex(indexDir, columnName);
+    cleanupTextIndexFiles(indexDir, segmentDirectory, columnName);
     FileUtils.deleteQuietly(inProgress);
     FileUtils.touch(inProgress);
-
-    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
-        _segmentDirectory.getSegmentMetadata().getVersion());
 
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
@@ -359,14 +362,17 @@ public class TextIndexHandler extends BaseIndexHandler {
   }
 
   /**
-   * Clean up existing text index files for recovery purposes.
+   * Clean up text index files for both the segment root and the versioned segment directory.
    *
    * @param indexDir the index directory
+   * @param segmentDirectory the versioned segment directory
    * @param columnName the column name
    */
-  private void cleanupExistingTextIndexFiles(File indexDir, String columnName) {
+  private void cleanupTextIndexFiles(File indexDir, File segmentDirectory, String columnName) {
     TextIndexUtils.cleanupTextIndex(indexDir, columnName);
-    FileUtils.deleteQuietly(new File(indexDir, columnName + ".text.inprogress"));
+    if (!segmentDirectory.equals(indexDir)) {
+      TextIndexUtils.cleanupTextIndex(segmentDirectory, columnName);
+    }
   }
 
   /**
@@ -397,12 +403,20 @@ public class TextIndexHandler extends BaseIndexHandler {
 
   private Set<String> getColumnsWithLegacyNativeTextIndex() {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    File segmentDirectory =
+        SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
     Set<String> columns = new HashSet<>();
     for (String column : _segmentDirectory.getSegmentMetadata().getAllColumns()) {
-      if (new File(indexDir, column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists()) {
+      if (hasLegacyNativeTextIndex(indexDir, segmentDirectory, column)) {
         columns.add(column);
       }
     }
     return columns;
+  }
+
+  private boolean hasLegacyNativeTextIndex(File indexDir, File segmentDirectory, String column) {
+    String legacyNativeTextIndexFile = column + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION;
+    return new File(indexDir, legacyNativeTextIndexFile).exists()
+        || (!segmentDirectory.equals(indexDir) && new File(segmentDirectory, legacyNativeTextIndexFile).exists());
   }
 }

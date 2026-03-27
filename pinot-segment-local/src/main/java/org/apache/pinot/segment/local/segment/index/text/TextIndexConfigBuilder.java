@@ -24,17 +24,12 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.utils.CsvParser;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 
 
 public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
   public TextIndexConfigBuilder() {
-    super((FSTType) null);
-  }
-
-  public TextIndexConfigBuilder(@Nullable FSTType fstType) {
-    super(fstType);
+    super();
   }
 
   public TextIndexConfigBuilder(TextIndexConfig other) {

@@ -44,9 +44,7 @@ import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -95,11 +93,8 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   @Override
   protected ColumnConfigDeserializer<FstIndexConfig> createDeserializerForLegacyConfigs() {
-    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.FST, (tableConfig, fieldConfig) -> {
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      FSTType fstIndexType = indexingConfig != null ? indexingConfig.getFSTIndexType() : null;
-      return new FstIndexConfig(fstIndexType);
-    });
+    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.FST,
+        (tableConfig, fieldConfig) -> new FstIndexConfig(false));
   }
 
   @Override
@@ -162,10 +157,5 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
         throws IndexReaderConstraintException, IOException {
       return createIndexReader(dataBuffer, metadata);
     }
-  }
-
-  @Override
-  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
-    tableConfig.getIndexingConfig().setFSTIndexType(null);
   }
 }

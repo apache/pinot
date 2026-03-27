@@ -30,6 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -176,7 +177,8 @@ public class FilePerIndexDirectoryTest implements PinotBuffersAfterMethodCheckRu
   @Test
   public void legacyNativeTextIndexIsIgnored()
       throws IOException {
-    File legacyNativeTextIndex = new File(TEMP_DIR, "foo" + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION);
+    File legacyNativeTextIndex =
+        new File(TEMP_DIR, "foo" + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION);
     Files.writeString(legacyNativeTextIndex.toPath(), "legacy");
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertFalse(fpi.hasIndexFor("foo", StandardIndexes.text()), "Legacy native text index should be ignored");
@@ -188,8 +190,7 @@ public class FilePerIndexDirectoryTest implements PinotBuffersAfterMethodCheckRu
   @Test
   public void testRemoveTextIndices()
       throws IOException {
-    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
-        null, null, false, false, 0, false, null);
+    TextIndexConfig config = new TextIndexConfigBuilder().build();
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);
@@ -256,8 +257,7 @@ public class FilePerIndexDirectoryTest implements PinotBuffersAfterMethodCheckRu
   @Test
   public void testGetColumnIndices()
       throws IOException {
-    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
-        null, null, false, false, 0, false, null);
+    TextIndexConfig config = new TextIndexConfigBuilder().build();
     // Write sth to buffers and flush them to index files on disk
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,

@@ -54,7 +54,6 @@ import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -131,8 +130,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
    */
   public LuceneTextIndexReader(String column, File indexDir, int numDocs,
       @Nullable Map<String, String> textIndexProperties) {
-    this(column, indexDir, numDocs,
-        new TextIndexConfigBuilder(FSTType.LUCENE).withProperties(textIndexProperties).build());
+    this(column, indexDir, numDocs, new TextIndexConfigBuilder().withProperties(textIndexProperties).build());
   }
 
   /**

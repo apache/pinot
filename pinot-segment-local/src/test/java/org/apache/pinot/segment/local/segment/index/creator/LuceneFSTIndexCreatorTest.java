@@ -23,8 +23,8 @@ import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator.CompilerAdapter;
 import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
+import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -91,7 +91,7 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
     uniqueValues[1] = "hello-world123";
     uniqueValues[2] = "still";
 
-    CompilerAdapter fstBuilder = spy(new CompilerAdapter());
+    FSTBuilder fstBuilder = spy(new FSTBuilder());
     // For the word "still" throw an exception so it is not indexed
     doThrow(IOException.class).when(fstBuilder).addEntry(eq("still"), anyInt());
     try (LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", "myTable_OFFLINE", true,
@@ -123,7 +123,7 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
     uniqueValues[1] = "hello-world123";
     uniqueValues[2] = "still";
 
-    CompilerAdapter fstBuilder = spy(new CompilerAdapter());
+    FSTBuilder fstBuilder = spy(new FSTBuilder());
     // For the word "still" throw an exception so it is not indexed
     doThrow(IOException.class).when(fstBuilder).addEntry(eq("still"), anyInt());
     assertThrows(IOException.class,

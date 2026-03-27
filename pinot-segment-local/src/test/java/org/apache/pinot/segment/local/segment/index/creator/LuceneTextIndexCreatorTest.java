@@ -24,6 +24,7 @@ import java.util.HashMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -40,8 +41,7 @@ public class LuceneTextIndexCreatorTest {
       throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
 
-    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
-        null, null, false, false, 0, false, null);
+    TextIndexConfig config = new TextIndexConfigBuilder().build();
     try (LuceneTextIndexCreator creator = new LuceneTextIndexCreator("foo", INDEX_DIR, true, false, null, null,
         config)) {
       creator.add("{\"clean\":\"this\"}");

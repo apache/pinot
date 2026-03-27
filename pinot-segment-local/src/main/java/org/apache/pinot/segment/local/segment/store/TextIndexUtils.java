@@ -103,7 +103,7 @@ public class TextIndexUtils {
     FileUtils.deleteQuietly(luceneV9MappingFile);
 
     // Remove the native index file
-    File nativeIndexFile = new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION);
+    File nativeIndexFile = new File(segDir, column + Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(nativeIndexFile);
   }
 

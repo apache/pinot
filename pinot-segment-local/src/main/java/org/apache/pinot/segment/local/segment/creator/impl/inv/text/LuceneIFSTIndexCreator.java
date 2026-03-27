@@ -21,22 +21,13 @@ package org.apache.pinot.segment.local.segment.creator.impl.inv.text;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.BytesRef;
-import org.apache.lucene.util.IntsRefBuilder;
-import org.apache.lucene.util.fst.ByteSequenceOutputs;
 import org.apache.lucene.util.fst.FST;
-import org.apache.lucene.util.fst.FSTCompiler;
-import org.apache.lucene.util.fst.Util;
 import org.apache.pinot.segment.local.segment.index.fst.FstIndexType;
 import org.apache.pinot.segment.local.utils.MetricUtils;
+import org.apache.pinot.segment.local.utils.fst.IFSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
@@ -58,10 +49,7 @@ public class LuceneIFSTIndexCreator implements FSTIndexCreator {
   private final String _columnName;
   private final String _tableNameWithType;
   private final boolean _continueOnError;
-  private final FSTCompiler<BytesRef> _ifstCompiler =
-      new FSTCompiler.Builder<>(FST.INPUT_TYPE.BYTE4, ByteSequenceOutputs.getSingleton()).build();
-  private final IntsRefBuilder _scratch = new IntsRefBuilder();
-  private final Map<String, List<Integer>> _aggregatedValues = new TreeMap<>();
+  private final IFSTBuilder _ifstBuilder = new IFSTBuilder();
 
   private int _dictId;
 
@@ -87,7 +75,7 @@ public class LuceneIFSTIndexCreator implements FSTIndexCreator {
     if (sortedEntries != null) {
       for (_dictId = 0; _dictId < sortedEntries.length; _dictId++) {
         try {
-          addEntry(sortedEntries[_dictId], _dictId);
+          _ifstBuilder.addEntry(sortedEntries[_dictId], _dictId);
         } catch (Exception e) {
           if (_continueOnError) {
             // Caught exception while trying to add, update metric and skip the document
@@ -113,7 +101,7 @@ public class LuceneIFSTIndexCreator implements FSTIndexCreator {
   public void add(String document)
       throws IOException {
     try {
-      addEntry(document, _dictId);
+      _ifstBuilder.addEntry(document, _dictId);
     } catch (Exception e) {
       if (_continueOnError) {
         // Caught exception while trying to add, update metric and skip the document
@@ -136,10 +124,7 @@ public class LuceneIFSTIndexCreator implements FSTIndexCreator {
   public void seal()
       throws IOException {
     LOGGER.info("Sealing IFST index: {}", _ifstIndexFile.getAbsolutePath());
-    for (Map.Entry<String, List<Integer>> entry : _aggregatedValues.entrySet()) {
-      _ifstCompiler.add(Util.toUTF16(entry.getKey(), _scratch), serializeDictionaryIds(entry.getValue()));
-    }
-    FST<BytesRef> ifst = FST.fromFSTReader(_ifstCompiler.compile(), _ifstCompiler.getFSTReader());
+    FST<BytesRef> ifst = _ifstBuilder.done();
     try (FileOutputStream outputStream = new FileOutputStream(_ifstIndexFile);
         OutputStreamDataOutput dataOutput = new OutputStreamDataOutput(outputStream)) {
       ifst.save(dataOutput, dataOutput);
@@ -149,44 +134,5 @@ public class LuceneIFSTIndexCreator implements FSTIndexCreator {
   @Override
   public void close()
       throws IOException {
-  }
-
-  private void addEntry(String key, int dictId) {
-    _aggregatedValues.computeIfAbsent(key.toLowerCase(Locale.ROOT), ignored -> new ArrayList<>()).add(dictId);
-  }
-
-  public static BytesRef serializeDictionaryIds(List<Integer> dictionaryIds) {
-    if (dictionaryIds == null) {
-      throw new IllegalArgumentException("Cannot serialize null dictionary id list");
-    }
-    ByteBuffer buffer = ByteBuffer.allocate(4 + (dictionaryIds.size() * 4));
-    buffer.putInt(dictionaryIds.size());
-    for (int dictionaryId : dictionaryIds) {
-      buffer.putInt(dictionaryId);
-    }
-    return new BytesRef(buffer.array(), 0, buffer.position());
-  }
-
-  public static List<Integer> deserializeDictionaryIds(@Nullable BytesRef bytesRef) {
-    if (bytesRef == null || bytesRef.length == 0) {
-      return new ArrayList<>();
-    }
-
-    ByteBuffer buffer = ByteBuffer.wrap(bytesRef.bytes, bytesRef.offset, bytesRef.length);
-    if (buffer.remaining() < 4) {
-      throw new RuntimeException(
-          "Corrupt IFST payload: not enough bytes for dictionary id list size. Length: " + bytesRef.length);
-    }
-    int listSize = buffer.getInt();
-    List<Integer> dictionaryIds = new ArrayList<>(listSize);
-    for (int i = 0; i < listSize; i++) {
-      if (buffer.remaining() < 4) {
-        throw new RuntimeException(
-            "Corrupt IFST payload: not enough bytes for dictionary id at index " + i + ". Expected " + listSize
-                + " ids but only found " + i);
-      }
-      dictionaryIds.add(buffer.getInt());
-    }
-    return dictionaryIds;
   }
 }

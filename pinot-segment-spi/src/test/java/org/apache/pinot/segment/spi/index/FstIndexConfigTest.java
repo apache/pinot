@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
@@ -35,7 +34,6 @@ public class FstIndexConfigTest {
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected type");
   }
 
   @Test
@@ -45,7 +43,6 @@ public class FstIndexConfigTest {
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected type");
   }
 
   @Test
@@ -55,7 +52,6 @@ public class FstIndexConfigTest {
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected type");
   }
 
   @Test
@@ -65,11 +61,10 @@ public class FstIndexConfigTest {
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
     assertTrue(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected type");
   }
 
   @Test
-  public void withSomeData()
+  public void withLegacyLuceneTypeIgnored()
       throws JsonProcessingException {
     String confStr = "{\n"
         + "        \"type\": \"LUCENE\"\n"
@@ -77,13 +72,13 @@ public class FstIndexConfigTest {
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertEquals(config.getFstType(), FSTType.LUCENE, "Unexpected type");
   }
 
-  @Test(expectedExceptions = JsonProcessingException.class,
-      expectedExceptionsMessageRegExp = ".*Unsupported FST type: NATIVE.*")
-  public void withUnsupportedType()
+  @Test
+  public void withLegacyNativeTypeIgnored()
       throws JsonProcessingException {
-    JsonUtils.stringToObject("{\"type\":\"NATIVE\"}", FstIndexConfig.class);
+    FstIndexConfig config = JsonUtils.stringToObject("{\"type\":\"NATIVE\"}", FstIndexConfig.class);
+
+    assertFalse(config.isDisabled(), "Unexpected disabled");
   }
 }

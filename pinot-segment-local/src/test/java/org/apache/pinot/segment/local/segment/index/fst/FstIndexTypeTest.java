@@ -20,12 +20,13 @@ package org.apache.pinot.segment.local.segment.index.fst;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
-import java.io.UncheckedIOException;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -67,23 +68,11 @@ public class FstIndexTypeTest {
           + "    \"indexTypes\" : [\"FST\"]\n"
           + " }");
 
-      assertEquals(new FstIndexConfig(null));
+      assertEquals(new FstIndexConfig());
     }
 
     @Test
-    public void oldFieldConfigFstExplicitLuceneType()
-        throws JsonProcessingException {
-      addFieldIndexConfig("{\n"
-          + "    \"name\": \"dimStr\",\n"
-          + "    \"indexTypes\" : [\"FST\"]\n"
-          + " }");
-      _tableConfig.getIndexingConfig().setFSTIndexType(FSTType.LUCENE);
-
-      assertEquals(new FstIndexConfig(FSTType.LUCENE));
-    }
-
-    @Test
-    public void newUnsupportedType()
+    public void newNativeTypeIsIgnored()
         throws JsonProcessingException {
       addFieldIndexConfig("{\n"
           + "    \"name\": \"dimStr\",\n"
@@ -93,16 +82,27 @@ public class FstIndexTypeTest {
           + "       }\n"
           + "    }\n"
           + " }");
-      try {
-        getActualConfig("dimStr", StandardIndexes.fst());
-        fail("Expected unsupported FST type exception");
-      } catch (UncheckedIOException e) {
-        assertTrue(e.getMessage().contains("Unsupported FST type: NATIVE"));
-      }
+      assertEquals(new FstIndexConfig());
     }
 
     @Test
-    public void newLucene()
+    public void newNativeTypeStillValid()
+        throws JsonProcessingException {
+      addFieldIndexConfig("{\n"
+          + "    \"name\": \"dimStr\",\n"
+          + "    \"indexes\" : {\n"
+          + "       \"fst\": {\n"
+          + "          \"type\": \"NATIVE\""
+          + "       }\n"
+          + "    }\n"
+          + " }");
+      Map<String, FieldIndexConfigs> configsByCol = FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig,
+          _schema);
+      StandardIndexes.fst().validate(configsByCol.get("dimStr"), _schema.getFieldSpecFor("dimStr"), _tableConfig);
+    }
+
+    @Test
+    public void newLuceneTypeIsIgnored()
         throws JsonProcessingException {
       addFieldIndexConfig("{\n"
           + "    \"name\": \"dimStr\",\n"
@@ -112,7 +112,7 @@ public class FstIndexTypeTest {
           + "       }\n"
           + "    }\n"
           + " }");
-      assertEquals(new FstIndexConfig(FSTType.LUCENE));
+      assertEquals(new FstIndexConfig());
     }
 
     @Test
@@ -125,7 +125,7 @@ public class FstIndexTypeTest {
           + "       }\n"
           + "    }\n"
           + " }");
-      assertEquals(new FstIndexConfig(null));
+      assertEquals(new FstIndexConfig());
     }
 
     @Test
@@ -135,7 +135,6 @@ public class FstIndexTypeTest {
           + "    \"name\": \"dimStr\",\n"
           + "    \"indexTypes\" : [\"FST\"]\n"
           + " }");
-      _tableConfig.getIndexingConfig().setFSTIndexType(FSTType.LUCENE);
       convertToUpdatedFormat();
       assertNotNull(_tableConfig.getFieldConfigList());
       assertFalse(_tableConfig.getFieldConfigList().isEmpty());
@@ -144,7 +143,6 @@ public class FstIndexTypeTest {
           .collect(Collectors.toList()).get(0);
       assertNotNull(fieldConfig.getIndexes().get(FstIndexType.INDEX_DISPLAY_NAME));
       assertTrue(fieldConfig.getIndexTypes().isEmpty());
-      assertNull(_tableConfig.getIndexingConfig().getFSTIndexType());
     }
   }
 
