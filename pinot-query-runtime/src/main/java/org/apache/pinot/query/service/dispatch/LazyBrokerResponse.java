@@ -33,6 +33,8 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.RoaringBitmap;
@@ -47,13 +49,13 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
   private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(LazyBrokerResponse.class);
 
   private final DataSchema _dataSchema;
-  private final MultiStageOperator _rootOperator;
+  private final OpChain _opChain;
   @Nullable
   private Metainfo _metainfo;
 
-  public LazyBrokerResponse(DataSchema dataSchema, MultiStageOperator rootOperator) {
+  public LazyBrokerResponse(DataSchema dataSchema, OpChain opchain) {
     _dataSchema = dataSchema;
-    _rootOperator = rootOperator;
+    _opChain = opchain;
   }
 
   @Override
@@ -75,12 +77,13 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
       return _metainfo;
     }
     long start = System.currentTimeMillis();
-    MseBlock mseBlock = _rootOperator.nextBlock();
+    MultiStageOperator rootOperator = _opChain.getRoot();
+    MseBlock mseBlock = rootOperator.nextBlock();
     while (!mseBlock.isEos()) {
       MseBlock.Data mseDataBlock = (MseBlock.Data) mseBlock;
       StreamingBrokerResponse.Data brokerBlock = mseDataBlock.accept(MseBlockDecorator.INSTANCE, _dataSchema);
       consumer.consume(brokerBlock);
-      mseBlock = _rootOperator.nextBlock();
+      mseBlock = rootOperator.nextBlock();
     }
     assert mseBlock.isEos();
     _metainfo = createMetainfo((MseBlock.Eos) mseBlock, System.currentTimeMillis() - start);
@@ -133,7 +136,7 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
 
   @Override
   public void close() {
-    _rootOperator.close();
+    _opChain.close();
   }
 
   // TODO: Improve the way the errors are compared
@@ -150,6 +153,10 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
       return -1;
     }
     return Integer.compare(errorCode1.getId(), errorCode2.getId());
+  }
+
+  public MultiStageQueryStats calculateStats() {
+    return _opChain.getRoot().calculateStats();
   }
 
   public static class MseBlockDecorator implements MseBlock.Data.Visitor<StreamingBrokerResponse.Data, DataSchema> {

@@ -72,6 +72,7 @@ import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -883,9 +884,11 @@ public class PinotClientRequest {
     }
   }
 
-  private boolean useStreaming(SqlNodeAndOptions sqlNodeAndOptions) {
-    // TODO: We should use query options and the default value stored in configs to determine whether to use streaming.
-    return true;
+  @VisibleForTesting
+  boolean useStreaming(SqlNodeAndOptions sqlNodeAndOptions) {
+    boolean defaultValue = _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE);
+    return QueryOptionsUtils.isUseStreamingResponse(sqlNodeAndOptions.getOptions(), defaultValue);
   }
 
   public static class KeysComparator implements Comparator<String> {
