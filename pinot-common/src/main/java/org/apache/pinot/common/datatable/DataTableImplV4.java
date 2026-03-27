@@ -35,7 +35,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -422,17 +421,11 @@ public class DataTableImplV4 implements DataTable {
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     writeLeadingSections(dataOutputStream);
 
-    // Add table serialization time and memory metadata if thread timer is enabled.
-    // TODO: The check on cpu time and memory measurement is not needed. We can remove it. But keeping it around for
-    // backward compatibility.
-    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
-      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(),
-          String.valueOf(resourceSnapshot.getCpuTimeNs()));
-    }
-    if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
-      getMetadata().put(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(),
-          String.valueOf(resourceSnapshot.getAllocatedBytes()));
-    }
+    // Add table serialization time and memory metadata.
+    getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(),
+        String.valueOf(resourceSnapshot.getCpuTimeNs()));
+    getMetadata().put(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(),
+        String.valueOf(resourceSnapshot.getAllocatedBytes()));
 
     // Write metadata: length followed by actual metadata bytes.
     // NOTE: We ignore metadata serialization time in "responseSerializationCpuTimeNs" as it's negligible while
