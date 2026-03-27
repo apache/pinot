@@ -175,6 +175,9 @@ public class QueryRouter {
   }
 
   public void shutDown() {
+    if (_serverChannelsTls != null) {
+      _serverChannelsTls.shutDown();
+    }
     _serverChannels.shutDown();
   }
 

@@ -49,4 +49,20 @@ public class TlsUtilsTest {
     TlsConfig tlsConfig = TlsUtils.extractTlsConfig(new PinotConfiguration(props), "tls", defaultConfig);
     Assert.assertEquals(tlsConfig.getAllowedProtocols(), new String[]{"TLSv1.2"});
   }
+
+  @Test
+  public void extractTlsConfigShouldReadEndpointIdentificationAlgorithm() {
+    Map<String, Object> props = new HashMap<>();
+    props.put("tls.endpointIdentificationAlgorithm", "HTTPS");
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(new PinotConfiguration(props), "tls");
+    Assert.assertEquals(tlsConfig.getEndpointIdentificationAlgorithm(), "HTTPS");
+  }
+
+  @Test
+  public void extractTlsConfigShouldFallbackToDefaultEndpointIdentificationAlgorithm() {
+    TlsConfig defaultConfig = new TlsConfig();
+    defaultConfig.setEndpointIdentificationAlgorithm("HTTPS");
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(new PinotConfiguration(new HashMap<>()), "tls", defaultConfig);
+    Assert.assertEquals(tlsConfig.getEndpointIdentificationAlgorithm(), "HTTPS");
+  }
 }

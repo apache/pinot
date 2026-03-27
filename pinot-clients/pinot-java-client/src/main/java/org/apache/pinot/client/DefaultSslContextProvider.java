@@ -23,6 +23,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
 
 
@@ -34,6 +35,13 @@ public class DefaultSslContextProvider implements SslContextProvider {
   @Override
   public DefaultAsyncHttpClientConfig.Builder configure(DefaultAsyncHttpClientConfig.Builder builder,
       @Nullable SSLContext sslContext, TlsProtocols tlsProtocols) {
+    return configure(builder, sslContext, tlsProtocols, null);
+  }
+
+  @Override
+  public DefaultAsyncHttpClientConfig.Builder configure(DefaultAsyncHttpClientConfig.Builder builder,
+      @Nullable SSLContext sslContext, @Nullable TlsProtocols tlsProtocols,
+      @Nullable String endpointIdentificationAlgorithm) {
     builder.setUseOpenSsl(false);
 
     List<String> enabledProtocolList = Collections.emptyList();
@@ -48,6 +56,10 @@ public class DefaultSslContextProvider implements SslContextProvider {
       builder.setSslEngineFactory((config, peerHost, peerPort) -> {
         SSLEngine engine = sslContext.createSSLEngine(peerHost, peerPort);
         engine.setUseClientMode(true);
+        SSLParameters sslParameters = engine.getSSLParameters();
+        sslParameters.setEndpointIdentificationAlgorithm(normalizeEndpointIdentificationAlgorithm(
+            endpointIdentificationAlgorithm));
+        engine.setSSLParameters(sslParameters);
         if (enabledProtocols.length > 0) {
           engine.setEnabledProtocols(enabledProtocols);
         }
@@ -58,5 +70,13 @@ public class DefaultSslContextProvider implements SslContextProvider {
       builder.setEnabledProtocols(enabledProtocols);
     }
     return builder;
+  }
+
+  @Nullable
+  private static String normalizeEndpointIdentificationAlgorithm(@Nullable String endpointIdentificationAlgorithm) {
+    if (endpointIdentificationAlgorithm == null || endpointIdentificationAlgorithm.isBlank()) {
+      return null;
+    }
+    return endpointIdentificationAlgorithm;
   }
 }

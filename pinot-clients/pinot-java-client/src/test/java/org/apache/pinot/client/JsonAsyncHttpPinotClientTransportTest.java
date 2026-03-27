@@ -26,10 +26,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.asynchttpclient.AsyncHttpClient;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -38,6 +41,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -105,6 +109,26 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     ExecutionStats stats = response.getExecutionStats();
     assertEquals(stats.getTotalDocs(), 115545);
     assertEquals(stats.getNumServersResponded(), 99);
+  }
+
+  @Test
+  public void testLegacyConstructorLeavesEndpointIdentificationAlgorithmUnset()
+      throws Exception {
+    SSLContext sslContext = SSLContext.getInstance("TLS");
+    sslContext.init(null, null, null);
+
+    JsonAsyncHttpPinotClientTransport transport =
+        new JsonAsyncHttpPinotClientTransport(null, "https", "", false, sslContext,
+            ConnectionTimeouts.create(1000, 1000, 1000), TlsProtocols.defaultProtocols(false), null);
+
+    Field httpClientField = JsonAsyncHttpPinotClientTransport.class.getDeclaredField("_httpClient");
+    httpClientField.setAccessible(true);
+    AsyncHttpClient httpClient = (AsyncHttpClient) httpClientField.get(transport);
+
+    assertNull(httpClient.getConfig().getSslEngineFactory().newSslEngine(httpClient.getConfig(), "localhost", 443)
+        .getSSLParameters().getEndpointIdentificationAlgorithm());
+
+    transport.close();
   }
 
   @Test

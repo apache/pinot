@@ -24,6 +24,7 @@ import java.util.Properties;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.ConnectionTimeouts;
 import org.apache.pinot.client.TlsProtocols;
+import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -36,6 +37,7 @@ public class PinotControllerTransportFactory {
   private Map<String, String> _headers = new HashMap<>();
   private String _scheme = CommonConstants.HTTP_PROTOCOL;
   private SSLContext _sslContext = null;
+  private String _endpointIdentificationAlgorithm = "";
 
   private boolean _tlsV10Enabled = false;
   private int _readTimeoutMs = Integer.parseInt(DEFAULT_CONTROLLER_READ_TIMEOUT_MS);
@@ -47,7 +49,8 @@ public class PinotControllerTransportFactory {
     ConnectionTimeouts connectionTimeouts =
         ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs, _handshakeTimeoutMs);
     TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
-    return new PinotControllerTransport(_headers, _scheme, _sslContext, connectionTimeouts, tlsProtocols, _appId);
+    return new PinotControllerTransport(_headers, _scheme, _sslContext, connectionTimeouts, tlsProtocols, _appId,
+        _endpointIdentificationAlgorithm);
   }
 
   public Map<String, String> getHeaders() {
@@ -74,6 +77,10 @@ public class PinotControllerTransportFactory {
     _sslContext = sslContext;
   }
 
+  public void setEndpointIdentificationAlgorithm(String endpointIdentificationAlgorithm) {
+    _endpointIdentificationAlgorithm = endpointIdentificationAlgorithm;
+  }
+
   public PinotControllerTransportFactory withConnectionProperties(Properties properties) {
     _readTimeoutMs =
         Integer.parseInt(properties.getProperty("controllerReadTimeoutMs", DEFAULT_CONTROLLER_READ_TIMEOUT_MS));
@@ -86,6 +93,12 @@ public class PinotControllerTransportFactory {
         Boolean.parseBoolean(properties.getProperty("controllerTlsV10Enabled", DEFAULT_CONTROLLER_TLS_V10_ENABLED))
             || Boolean.parseBoolean(
             System.getProperties().getProperty("controller.tlsV10Enabled", DEFAULT_CONTROLLER_TLS_V10_ENABLED));
+    if (_scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
+      _endpointIdentificationAlgorithm = DriverUtils.getTlsConfigFromJDBCProps(properties)
+          .getEndpointIdentificationAlgorithm();
+    } else {
+      _endpointIdentificationAlgorithm = "";
+    }
     return this;
   }
 }
