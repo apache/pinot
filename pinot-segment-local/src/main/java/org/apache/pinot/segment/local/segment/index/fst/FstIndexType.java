@@ -85,8 +85,6 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
           column);
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
           "Cannot create FST index on column: %s of stored type other than STRING", column);
-      Preconditions.checkState(fstIndexConfig.getFstType() != FSTType.NATIVE,
-          "Native FST index is no longer supported on column: %s", column);
     }
   }
 
@@ -113,8 +111,6 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
         "FST index is currently only supported on STRING type columns");
     Preconditions.checkState(context.hasDictionary(),
         "FST index is currently only supported on dictionary-encoded columns");
-    Preconditions.checkState(indexConfig.getFstType() != FSTType.NATIVE,
-        "Native FST index is no longer supported on column: %s", context.getFieldSpec().getName());
     return new LuceneFSTIndexCreator(context);
   }
 

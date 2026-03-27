@@ -79,4 +79,11 @@ public class FstIndexConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertEquals(config.getFstType(), FSTType.LUCENE, "Unexpected type");
   }
+
+  @Test(expectedExceptions = JsonProcessingException.class,
+      expectedExceptionsMessageRegExp = ".*Unsupported FST type: NATIVE.*")
+  public void withUnsupportedType()
+      throws JsonProcessingException {
+    JsonUtils.stringToObject("{\"type\":\"NATIVE\"}", FstIndexConfig.class);
+  }
 }

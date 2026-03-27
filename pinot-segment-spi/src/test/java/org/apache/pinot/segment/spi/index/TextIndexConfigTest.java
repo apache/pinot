@@ -122,6 +122,13 @@ public class TextIndexConfigTest {
     assertEquals(config.getLuceneMaxBufferSizeMB(), 1024, "Unexpected luceneMaxBufferSize");
   }
 
+  @Test(expectedExceptions = JsonProcessingException.class,
+      expectedExceptionsMessageRegExp = ".*Unsupported FST type: NATIVE.*")
+  public void withUnsupportedFstType()
+      throws JsonProcessingException {
+    JsonUtils.stringToObject("{\"fst\":\"NATIVE\"}", TextIndexConfig.class);
+  }
+
   @Test
   public void testRoundTripSerializationWithArrayValues()
       throws JsonProcessingException {

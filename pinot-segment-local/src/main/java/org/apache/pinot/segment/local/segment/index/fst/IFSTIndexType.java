@@ -107,11 +107,6 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
         "IFST index is currently only supported on STRING type columns");
     Preconditions.checkState(context.hasDictionary(),
         "IFST index is currently only supported on dictionary-encoded columns");
-    // IFST only supports Lucene implementation, not native FST
-    if (indexConfig.getFstType() == FSTType.NATIVE) {
-      throw new UnsupportedOperationException(
-          "Native FST is not supported for IFST index. Only Lucene implementation is supported.");
-    }
     return new LuceneIFSTIndexCreator(context);
   }
 

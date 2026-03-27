@@ -88,8 +88,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     if (textIndexConfig.isEnabled()) {
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
           "Cannot create TEXT index on column: %s of stored type other than STRING", fieldSpec.getName());
-      Preconditions.checkState(textIndexConfig.getFstType() != FSTType.NATIVE,
-          "Native text index is no longer supported on column: %s", fieldSpec.getName());
     }
   }
 
@@ -102,7 +100,8 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   protected ColumnConfigDeserializer<TextIndexConfig> createDeserializerForLegacyConfigs() {
     return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.TEXT, (tableConfig, fieldConfig) -> {
       Map<String, String> properties = fieldConfig.getProperties();
-      FSTType fstType = TextIndexUtils.isFstTypeNative(properties) ? FSTType.NATIVE : FSTType.LUCENE;
+      String fstTypeValue = TextIndexUtils.getFstType(properties);
+      FSTType fstType = fstTypeValue != null ? FSTType.forValue(fstTypeValue) : FSTType.LUCENE;
       return new TextIndexConfigBuilder(fstType).withProperties(properties).build();
     });
   }
@@ -112,8 +111,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       throws IOException {
     Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
         "Text index is currently only supported on STRING type columns");
-    Preconditions.checkState(indexConfig.getFstType() != FSTType.NATIVE,
-        "Native text index is no longer supported on column: %s", context.getFieldSpec().getName());
     return new LuceneTextIndexCreator(context, indexConfig.isStoreInSegmentFile(), indexConfig);
   }
 
@@ -170,8 +167,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     if (config.isDisabled()) {
       return null;
     }
-    Preconditions.checkState(config.getFstType() != FSTType.NATIVE,
-        "Native text index is no longer supported on column: %s", context.getFieldSpec().getName());
     return new RealtimeLuceneTextIndex(context.getFieldSpec().getName(), context.getConsumerDir(),
         context.getSegmentName(), config);
   }

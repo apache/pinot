@@ -116,16 +116,17 @@ public class TextIndexUtils {
     //@formatter:on
   }
 
-  public static boolean isFstTypeNative(@Nullable Map<String, String> textIndexProperties) {
+  @Nullable
+  public static String getFstType(@Nullable Map<String, String> textIndexProperties) {
     if (textIndexProperties == null) {
-      return false;
+      return null;
     }
     for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
       if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
-        return entry.getValue().equalsIgnoreCase(FieldConfig.TEXT_NATIVE_FST_LITERAL);
+        return entry.getValue();
       }
     }
-    return false;
+    return null;
   }
 
   public static List<String> extractStopWordsInclude(String colName,

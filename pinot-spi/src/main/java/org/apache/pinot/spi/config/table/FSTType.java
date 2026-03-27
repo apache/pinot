@@ -18,10 +18,27 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import java.util.Locale;
+import javax.annotation.Nullable;
+
 /**
- * Type of FST to be used. Native is retained for backward compatibility with older configs but is no longer
- * supported.
+ * Type of FST to be used.
  */
 public enum FSTType {
-  LUCENE, NATIVE
+  LUCENE;
+
+  @JsonCreator
+  public static FSTType forValue(@Nullable String value) {
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.trim().toUpperCase(Locale.ROOT);
+    for (FSTType type : values()) {
+      if (type.name().equals(normalized)) {
+        return type;
+      }
+    }
+    throw new IllegalArgumentException("Unsupported FST type: " + value);
+  }
 }
