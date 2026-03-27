@@ -26,8 +26,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.PriorityQueue;
+import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
-import org.apache.pinot.segment.local.utils.VectorDistanceFunction;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
@@ -183,7 +183,7 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
       float[][] vectors = _listVectors[probeIdx];
 
       for (int i = 0; i < docIds.length; i++) {
-        float dist = VectorDistanceFunction.computeDistance(searchQuery, vectors[i], _distanceFunction);
+        float dist = computeDistance(searchQuery, vectors[i]);
         if (maxHeap.size() < effectiveTopK) {
           maxHeap.offer(new ScoredDoc(docIds[i], dist));
         } else if (dist < maxHeap.peek()._distance) {
@@ -229,6 +229,25 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
   // -----------------------------------------------------------------------
 
   /**
+   * Computes distance between two vectors using the configured distance function.
+   * Internally uses L2 for EUCLIDEAN/L2, cosine for COSINE, negative dot for INNER_PRODUCT/DOT_PRODUCT.
+   */
+  private float computeDistance(float[] a, float[] b) {
+    switch (_distanceFunction) {
+      case EUCLIDEAN:
+      case L2:
+        return (float) VectorFunctions.euclideanDistance(a, b);
+      case COSINE:
+        return (float) VectorFunctions.cosineDistance(a, b);
+      case INNER_PRODUCT:
+      case DOT_PRODUCT:
+        return (float) -VectorFunctions.dotProduct(a, b);
+      default:
+        throw new IllegalArgumentException("Unsupported distance function: " + _distanceFunction);
+    }
+  }
+
+  /**
    * Finds the n closest centroids to the given query vector.
    *
    * @param query  the query vector
@@ -239,7 +258,7 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
     // Compute distance to each centroid
     float[] centroidDistances = new float[_nlist];
     for (int c = 0; c < _nlist; c++) {
-      centroidDistances[c] = VectorDistanceFunction.computeDistance(query, _centroids[c], _distanceFunction);
+      centroidDistances[c] = computeDistance(query, _centroids[c]);
     }
 
     // Find top-n using partial sort

@@ -31,11 +31,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
-import org.apache.pinot.segment.local.utils.VectorDistanceFunction;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
@@ -114,7 +114,7 @@ public class BenchmarkVectorIndex {
   static float[][] generateNormalizedVectors(int count, int dimension, long seed) {
     float[][] vectors = generateGaussianVectors(count, dimension, seed);
     for (int i = 0; i < count; i++) {
-      vectors[i] = VectorDistanceFunction.normalize(vectors[i]);
+      vectors[i] = normalizeVector(vectors[i]);
     }
     return vectors;
   }
@@ -132,7 +132,7 @@ public class BenchmarkVectorIndex {
     int n = corpus.length;
     float[] distances = new float[n];
     for (int i = 0; i < n; i++) {
-      distances[i] = VectorDistanceFunction.computeDistance(query, corpus[i], distFunc);
+      distances[i] = computeDistance(query, corpus[i], distFunc);
     }
     // Min-heap of (distance, docId) pairs -- but we need top-K smallest, so use a simple sort
     Integer[] indices = new Integer[n];
@@ -762,5 +762,40 @@ public class BenchmarkVectorIndex {
     out.println("  nlist = sqrt(N)  (e.g., 100 for N=10K, 316 for N=100K)");
     out.println("  nprobe = nlist/10 to nlist/4  (start with 4-8, increase for higher recall)");
     out.println("  trainSampleSize = min(65536, N)  (full dataset for N <= 65K)");
+  }
+
+  // ---------------------------------------------------------------------------
+  // Distance computation helpers (delegates to VectorFunctions)
+  // ---------------------------------------------------------------------------
+
+  static float computeDistance(float[] a, float[] b,
+      VectorIndexConfig.VectorDistanceFunction distFunc) {
+    switch (distFunc) {
+      case EUCLIDEAN:
+      case L2:
+        return (float) VectorFunctions.euclideanDistance(a, b);
+      case COSINE:
+        return (float) VectorFunctions.cosineDistance(a, b);
+      case INNER_PRODUCT:
+      case DOT_PRODUCT:
+        return (float) -VectorFunctions.dotProduct(a, b);
+      default:
+        throw new IllegalArgumentException("Unsupported distance function: " + distFunc);
+    }
+  }
+
+  static float[] normalizeVector(float[] vector) {
+    float norm = 0.0f;
+    for (float v : vector) {
+      norm += v * v;
+    }
+    norm = (float) Math.sqrt(norm);
+    float[] result = new float[vector.length];
+    if (norm > 0.0f) {
+      for (int i = 0; i < vector.length; i++) {
+        result[i] = vector[i] / norm;
+      }
+    }
+    return result;
   }
 }

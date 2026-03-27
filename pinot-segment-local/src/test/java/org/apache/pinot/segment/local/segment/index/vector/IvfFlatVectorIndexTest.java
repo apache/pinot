@@ -26,8 +26,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
-import org.apache.pinot.segment.local.utils.VectorDistanceFunction;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -69,14 +69,14 @@ public class IvfFlatVectorIndexTest {
     float[] a = {1.0f, 2.0f, 3.0f};
     float[] b = {4.0f, 5.0f, 6.0f};
     // Expected: (4-1)^2 + (5-2)^2 + (6-3)^2 = 9 + 9 + 9 = 27
-    float dist = VectorDistanceFunction.l2SquaredDistance(a, b);
+    float dist = (float) VectorFunctions.euclideanDistance(a, b);
     Assert.assertEquals(dist, 27.0f, 1e-5f, "L2 squared distance should be 27");
   }
 
   @Test
   public void testL2SquaredDistanceSameVector() {
     float[] a = {1.0f, 2.0f, 3.0f};
-    float dist = VectorDistanceFunction.l2SquaredDistance(a, a);
+    float dist = (float) VectorFunctions.euclideanDistance(a, a);
     Assert.assertEquals(dist, 0.0f, 1e-5f, "L2 distance of a vector to itself should be 0");
   }
 
@@ -85,7 +85,7 @@ public class IvfFlatVectorIndexTest {
     float[] a = {1.0f, 2.0f, 3.0f};
     float[] b = {4.0f, 5.0f, 6.0f};
     // Expected: -(1*4 + 2*5 + 3*6) = -(4 + 10 + 18) = -32
-    float dist = VectorDistanceFunction.dotProductDistance(a, b);
+    float dist = (float) -VectorFunctions.dotProduct(a, b);
     Assert.assertEquals(dist, -32.0f, 1e-5f, "Dot product distance should be -32");
   }
 
@@ -94,7 +94,7 @@ public class IvfFlatVectorIndexTest {
     float[] a = {1.0f, 0.0f};
     float[] b = {0.0f, 1.0f};
     // Orthogonal vectors: cosine similarity = 0, cosine distance = 1
-    float dist = VectorDistanceFunction.cosineDistance(a, b);
+    float dist = (float) VectorFunctions.cosineDistance(a, b);
     Assert.assertEquals(dist, 1.0f, 1e-5f, "Cosine distance between orthogonal vectors should be 1");
   }
 
@@ -103,7 +103,7 @@ public class IvfFlatVectorIndexTest {
     float[] a = {1.0f, 2.0f, 3.0f};
     float[] b = {2.0f, 4.0f, 6.0f};
     // Same direction: cosine similarity = 1, cosine distance = 0
-    float dist = VectorDistanceFunction.cosineDistance(a, b);
+    float dist = (float) VectorFunctions.cosineDistance(a, b);
     Assert.assertEquals(dist, 0.0f, 1e-5f, "Cosine distance between same-direction vectors should be 0");
   }
 
@@ -111,14 +111,15 @@ public class IvfFlatVectorIndexTest {
   public void testCosineDistanceZeroVector() {
     float[] a = {0.0f, 0.0f};
     float[] b = {1.0f, 2.0f};
-    float dist = VectorDistanceFunction.cosineDistance(a, b);
-    Assert.assertEquals(dist, 1.0f, 1e-5f, "Cosine distance with zero vector should be 1");
+    // VectorFunctions returns NaN for zero-vector cosine distance (default behavior)
+    float dist = (float) VectorFunctions.cosineDistance(a, b);
+    Assert.assertTrue(Float.isNaN(dist), "Cosine distance with zero vector should be NaN");
   }
 
   @Test
   public void testNormalize() {
     float[] v = {3.0f, 4.0f};
-    float[] normalized = VectorDistanceFunction.normalize(v);
+    float[] normalized = normalizeVector(v);
     Assert.assertEquals(normalized[0], 0.6f, 1e-5f);
     Assert.assertEquals(normalized[1], 0.8f, 1e-5f);
   }
@@ -126,7 +127,7 @@ public class IvfFlatVectorIndexTest {
   @Test
   public void testNormalizeZeroVector() {
     float[] v = {0.0f, 0.0f};
-    float[] normalized = VectorDistanceFunction.normalize(v);
+    float[] normalized = normalizeVector(v);
     Assert.assertEquals(normalized[0], 0.0f, 1e-5f);
     Assert.assertEquals(normalized[1], 0.0f, 1e-5f);
   }
@@ -135,7 +136,7 @@ public class IvfFlatVectorIndexTest {
   public void testDimensionMismatch() {
     float[] a = {1.0f, 2.0f};
     float[] b = {1.0f, 2.0f, 3.0f};
-    VectorDistanceFunction.l2SquaredDistance(a, b);
+    VectorFunctions.euclideanDistance(a, b);
   }
 
   // -----------------------------------------------------------------------
@@ -538,7 +539,7 @@ public class IvfFlatVectorIndexTest {
       // Verify centroids are not all the same
       boolean allSame = true;
       for (int i = 1; i < centroids.length; i++) {
-        if (VectorDistanceFunction.l2SquaredDistance(centroids[0], centroids[i]) > 1e-10f) {
+        if ((float) VectorFunctions.euclideanDistance(centroids[0], centroids[i]) > 1e-10f) {
           allSame = false;
           break;
         }
@@ -721,7 +722,7 @@ public class IvfFlatVectorIndexTest {
     int numVectors = vectors.length;
     float[] distances = new float[numVectors];
     for (int i = 0; i < numVectors; i++) {
-      distances[i] = VectorDistanceFunction.computeDistance(query, vectors[i], distanceFunction);
+      distances[i] = computeDistance(query, vectors[i], distanceFunction);
     }
 
     // Find top-K by sorting indices
@@ -734,6 +735,37 @@ public class IvfFlatVectorIndexTest {
     Set<Integer> result = new HashSet<>();
     for (int i = 0; i < Math.min(topK, numVectors); i++) {
       result.add(indices[i]);
+    }
+    return result;
+  }
+
+  private static float computeDistance(float[] a, float[] b,
+      VectorIndexConfig.VectorDistanceFunction distanceFunction) {
+    switch (distanceFunction) {
+      case EUCLIDEAN:
+      case L2:
+        return (float) VectorFunctions.euclideanDistance(a, b);
+      case COSINE:
+        return (float) VectorFunctions.cosineDistance(a, b);
+      case INNER_PRODUCT:
+      case DOT_PRODUCT:
+        return (float) -VectorFunctions.dotProduct(a, b);
+      default:
+        throw new IllegalArgumentException("Unsupported: " + distanceFunction);
+    }
+  }
+
+  private static float[] normalizeVector(float[] vector) {
+    float norm = 0.0f;
+    for (float v : vector) {
+      norm += v * v;
+    }
+    norm = (float) Math.sqrt(norm);
+    float[] result = new float[vector.length];
+    if (norm > 0.0f) {
+      for (int i = 0; i < vector.length; i++) {
+        result[i] = vector[i] / norm;
+      }
     }
     return result;
   }

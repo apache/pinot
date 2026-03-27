@@ -29,7 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.apache.pinot.segment.local.utils.VectorDistanceFunction;
+import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
@@ -287,7 +287,7 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
           }
         }
         // Track maximum centroid movement for convergence check
-        float movement = VectorDistanceFunction.l2SquaredDistance(centroids[c], newCentroids[c]);
+        float movement = (float) VectorFunctions.euclideanDistance(centroids[c], newCentroids[c]);
         maxMovement = Math.max(maxMovement, movement);
       }
 
@@ -357,10 +357,9 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   private float computeTrainingDistance(float[] a, float[] b) {
     // For cosine distance, use L2 on normalized vectors which groups by angular similarity
     if (_distanceFunction == VectorIndexConfig.VectorDistanceFunction.COSINE) {
-      return VectorDistanceFunction.l2SquaredDistance(
-          VectorDistanceFunction.normalize(a), VectorDistanceFunction.normalize(b));
+      return (float) VectorFunctions.euclideanDistance(normalizeVector(a), normalizeVector(b));
     }
-    return VectorDistanceFunction.l2SquaredDistance(a, b);
+    return (float) VectorFunctions.euclideanDistance(a, b);
   }
 
   // -----------------------------------------------------------------------
@@ -404,13 +403,55 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
     int nearest = 0;
     float nearestDist = Float.MAX_VALUE;
     for (int c = 0; c < centroids.length; c++) {
-      float dist = VectorDistanceFunction.computeDistance(vector, centroids[c], _distanceFunction);
+      float dist = computeDistance(vector, centroids[c]);
       if (dist < nearestDist) {
         nearestDist = dist;
         nearest = c;
       }
     }
     return nearest;
+  }
+
+  // -----------------------------------------------------------------------
+  // Distance computation helpers (delegates to VectorFunctions)
+  // -----------------------------------------------------------------------
+
+  /**
+   * Computes distance between two vectors using the configured distance function.
+   * Internally uses L2 for EUCLIDEAN/L2, cosine for COSINE, negative dot for INNER_PRODUCT/DOT_PRODUCT.
+   */
+  private float computeDistance(float[] a, float[] b) {
+    switch (_distanceFunction) {
+      case EUCLIDEAN:
+      case L2:
+        return (float) VectorFunctions.euclideanDistance(a, b);
+      case COSINE:
+        return (float) VectorFunctions.cosineDistance(a, b);
+      case INNER_PRODUCT:
+      case DOT_PRODUCT:
+        return (float) -VectorFunctions.dotProduct(a, b);
+      default:
+        throw new IllegalArgumentException("Unsupported distance function: " + _distanceFunction);
+    }
+  }
+
+  /**
+   * Returns a new unit-length copy of the given vector.
+   * If the vector has zero magnitude, a zero vector of the same length is returned.
+   */
+  private static float[] normalizeVector(float[] vector) {
+    float norm = 0.0f;
+    for (float v : vector) {
+      norm += v * v;
+    }
+    norm = (float) Math.sqrt(norm);
+    float[] result = new float[vector.length];
+    if (norm > 0.0f) {
+      for (int i = 0; i < vector.length; i++) {
+        result[i] = vector[i] / norm;
+      }
+    }
+    return result;
   }
 
   // -----------------------------------------------------------------------
