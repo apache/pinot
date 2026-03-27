@@ -36,19 +36,7 @@ import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasks
 
 public class ControllerConfTest {
 
-  private static final List<String> DEPRECATED_CONFIGS = List.of(
-      DEPRECATED_RETENTION_MANAGER_FREQUENCY_IN_SECONDS,
-      DEPRECATED_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
-      DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS,
-      DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS,
-      DEPRECATED_STATUS_CHECKER_FREQUENCY_IN_SECONDS,
-      DEPRECATED_TASK_MANAGER_FREQUENCY_IN_SECONDS,
-      DEPRECATED_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS,
-      DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS,
-      DEPRECATED_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
-      DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
-      DEPRECATED_STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS
-  );
+  // Deprecated configs have been removed - no configs to test for fallback behavior
 
   private static final List<String> NEW_CONFIGS = List.of(
       RETENTION_MANAGER_FREQUENCY_PERIOD,
@@ -67,98 +55,15 @@ public class ControllerConfTest {
   private static final Random RAND = new Random();
 
   /**
-   * When config contains: 1. Both deprecated config and the corresponding new config. 2. All new
-   * configurations are valid. 3. Some deprecated configurations are invalid, then new configs
-   * override deprecated configs (invalid deprecated configs do not throw exceptions when
-   * corresponding valid new configs are supplied as well)
-   */
-  @Test
-  public void validNewConfigOverridesCorrespondingValidOrInvalidOldConfigOnRead() {
-    //setup
-    Map<String, Object> controllerConfig = new HashMap<>();
-    int durationInSeconds = getRandomDurationInSeconds();
-    DEPRECATED_CONFIGS.forEach(config -> controllerConfig.put(config, durationInSeconds));
-    //put some invalid deprecated configs
-    controllerConfig.put(DEPRECATED_RETENTION_MANAGER_FREQUENCY_IN_SECONDS, getRandomString());
-    controllerConfig.put(DEPRECATED_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS, getRandomString());
-    //override all deprecated configs with valid new configs
-    String period = getRandomPeriodInMinutes();
-    NEW_CONFIGS.forEach(config -> controllerConfig.put(config, period));
-    ControllerConf conf = new ControllerConf(controllerConfig);
-    //execution and assertion
-    assertOnDurations(conf, TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(period), TimeUnit.MILLISECONDS),
-        controllerConfig);
-  }
-
-  /**
-   * When config contains: 1. Both deprecated config and the corresponding new config. 2. All
-   * deprecated configurations are valid. 3. Some new configurations are invalid, then exceptions
-   * are thrown when invalid new configurations are read (there is no fall-back to the corresponding
-   * valid deprecated configuration). For all valid new configurations, they override the
-   * corresponding deprecated configuration.
-   * Added fallback logic to use valid deprecated config when new config is invalid.
-   */
-  @Test
-  public void invalidNewConfigShouldNotThrowExceptionOnReadWithFallbackToCorrespondingValidDeprecatedConfig() {
-    //setup
-    Map<String, Object> controllerConfig = new HashMap<>();
-    int durationInSeconds = getRandomDurationInSeconds();
-    //all deprecated configs should be valid
-    DEPRECATED_CONFIGS.forEach(config -> controllerConfig.put(config, durationInSeconds));
-    String randomPeriodInMinutes = getRandomPeriodInMinutes();
-    NEW_CONFIGS.forEach(config -> controllerConfig.put(config, randomPeriodInMinutes));
-    //put some invalid new configs
-    String randomInvalidString = getRandomString();
-    controllerConfig.put(RETENTION_MANAGER_FREQUENCY_PERIOD, randomInvalidString);
-    ControllerConf conf = new ControllerConf(controllerConfig);
-    Assert.assertEquals(
-        conf.getRetentionControllerFrequencyInSeconds(),
-        durationInSeconds, // expected fallback value
-        "Should fallback to deprecated config value"
-    );
-    //test to assert that invalid config is captured in the invalid config map value
-    Map<String, String> invalidConfigs = conf.getInvalidConfigs();
-    Assert.assertTrue(invalidConfigs.containsKey(RETENTION_MANAGER_FREQUENCY_PERIOD));
-    Assert.assertEquals(
-        conf.getInvalidConfigs().get(RETENTION_MANAGER_FREQUENCY_PERIOD),
-        String.format(
-            "Invalid time spec '%s' for config '%s'. Falling back to default config.",
-            randomInvalidString, RETENTION_MANAGER_FREQUENCY_PERIOD
-        )
-    );
-  }
-
-  /**
-   * When only deprecated configs are supplied (new configs are not supplied), then the correct
+   * When only new configs are supplied (deprecated configs have been removed), then the correct
    * converted value is returned.
    */
   @Test
-  public void supplyingOnlyDeprecatedConfigsShouldReturnCorrectlyConvertedValue() {
-    //setup
-    Map<String, Object> controllerConfig = new HashMap<>();
-    int durationInSeconds = getRandomDurationInSeconds();
-    DEPRECATED_CONFIGS.forEach(config -> {
-      controllerConfig.put(config, durationInSeconds);
-    });
-    //pre-conditions: config should not contain any new config
-    NEW_CONFIGS.forEach(config -> Assert.assertFalse(controllerConfig.containsKey(config)));
-    ControllerConf conf = new ControllerConf(controllerConfig);
-    //execution and assertion
-    assertOnDurations(conf, durationInSeconds, controllerConfig);
-  }
-
-  /**
-   * When only new configs are supplied (deprecated configs are not supplied), then the correct
-   * converted value is returned.
-   */
-  @Test
-  public void supplyingOnlyNewConfigsShouldReturnCorrectlyConvertedValue() {
+  public void supplyingNewConfigsShouldReturnCorrectlyConvertedValue() {
     //setup
     Map<String, Object> controllerConfig = new HashMap<>();
     String period = getRandomPeriodInMinutes();
     NEW_CONFIGS.forEach(config -> controllerConfig.put(config, period));
-    //pre-conditions: controller config should not contain any deprecated config
-    DEPRECATED_CONFIGS.forEach(config -> Assert.assertFalse(controllerConfig.containsKey(config)));
     ControllerConf conf = new ControllerConf(controllerConfig);
     //execution and assertion
     assertOnDurations(conf, TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(period), TimeUnit.MILLISECONDS),
