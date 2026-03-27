@@ -82,10 +82,6 @@ if [[ ! -d "$SCAN_ROOT" ]]; then
     exit 1
 fi
 
-# Create a temporary directory for processing
-TEMP_DIR=$(mktemp -d)
-trap "rm -rf $TEMP_DIR" EXIT
-
 # Find all modules with src/main/java structure
 MODULES=$(find "$SCAN_ROOT" -maxdepth 4 -type d -path "*/src/main/java" 2>/dev/null | sed 's|/src/main/java$||' | sort)
 
