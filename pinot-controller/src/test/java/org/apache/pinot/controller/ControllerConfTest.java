@@ -44,12 +44,11 @@ public class ControllerConfTest {
       REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD,
       BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD,
       STATUS_CHECKER_FREQUENCY_PERIOD,
+      STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD,
       TASK_MANAGER_FREQUENCY_PERIOD,
       TASK_METRICS_EMITTER_FREQUENCY_PERIOD,
       SEGMENT_RELOCATOR_FREQUENCY_PERIOD,
-      SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD,
-      SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS,
-      STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD
+      SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD
   );
 
   private static final Random RAND = new Random();
@@ -168,6 +167,7 @@ public class ControllerConfTest {
     int realtimeSegmentValidationFrequencyInSeconds = conf.getRealtimeSegmentValidationFrequencyInSeconds();
     int offlineSegmentIntervalCheckerFrequencyInSeconds = conf.getOfflineSegmentIntervalCheckerFrequencyInSeconds();
     int retentionControllerFrequencyInSeconds = conf.getRetentionControllerFrequencyInSeconds();
+    int statusCheckerWaitForPushTimeInSeconds = conf.getStatusCheckerWaitForPushTimeInSeconds();
     //then
     String confAsString = controllerConfig.toString();
     Assert.assertEquals(segmentLevelValidationIntervalInSeconds, expectedDuration, confAsString);
@@ -179,6 +179,7 @@ public class ControllerConfTest {
     Assert.assertEquals(realtimeSegmentValidationFrequencyInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(offlineSegmentIntervalCheckerFrequencyInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(retentionControllerFrequencyInSeconds, expectedDuration, confAsString);
+    Assert.assertEquals(statusCheckerWaitForPushTimeInSeconds, expectedDuration, confAsString);
   }
 
   private int getRandomDurationInSeconds() {
