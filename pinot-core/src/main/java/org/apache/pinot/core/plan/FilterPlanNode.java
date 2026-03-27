@@ -266,9 +266,6 @@ public class FilterPlanNode implements PlanNode {
           PredicateEvaluator predicateEvaluator;
           TextIndexReader textIndexReader;
           switch (predicate.getType()) {
-            case TEXT_CONTAINS:
-              throw new UnsupportedOperationException(
-                  "TEXT_CONTAINS is no longer supported because native text index was removed");
             case TEXT_MATCH:
               textIndexReader = dataSource.getTextIndex();
               if (textIndexReader == null) {

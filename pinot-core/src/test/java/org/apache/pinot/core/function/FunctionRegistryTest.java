@@ -52,7 +52,7 @@ public class FunctionRegistryTest {
       TransformFunctionType.TIME_SERIES_BUCKET);
   private static final EnumSet<FilterKind> IGNORED_FILTER_KINDS = EnumSet.of(
       // Special filter functions without implementation
-      FilterKind.TEXT_MATCH, FilterKind.TEXT_CONTAINS, FilterKind.JSON_MATCH, FilterKind.VECTOR_SIMILARITY,
+      FilterKind.TEXT_MATCH, FilterKind.JSON_MATCH, FilterKind.VECTOR_SIMILARITY,
       // TODO: Support these functions
       FilterKind.RANGE, FilterKind.IN, FilterKind.NOT_IN);
 
