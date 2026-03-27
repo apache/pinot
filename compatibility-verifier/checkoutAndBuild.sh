@@ -95,7 +95,7 @@ function build() {
     buildComponents=":pinot-tools,:pinot-compatibility-verifier"
   fi
   for i in $(seq 1 $maxRetry); do
-    mvn clean package -am -pl ${buildComponents} -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
+    mvn clean package -am -pl ${buildComponents} -DskipTests -T1C -Psqlparser ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
     if [ $? -eq 0 ]; then break; fi
     if [ $i -eq $maxRetry ]; then exit 1; fi
     echo ""
@@ -106,7 +106,7 @@ function build() {
   done
   if [ $buildTests -eq 1 ]; then
     for i in $(seq 1 $maxRetry); do
-      mvn package -am -pl :pinot-integration-tests -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+      mvn package -am -pl :pinot-integration-tests -DskipTests -T1C -Psqlparser ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
       if [ $? -eq 0 ]; then break; fi
       if [ $i -eq $maxRetry ]; then exit 1; fi
       echo ""
