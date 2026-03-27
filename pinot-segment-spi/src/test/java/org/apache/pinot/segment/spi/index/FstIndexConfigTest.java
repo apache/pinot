@@ -72,11 +72,11 @@ public class FstIndexConfigTest {
   public void withSomeData()
       throws JsonProcessingException {
     String confStr = "{\n"
-        + "        \"type\": \"NATIVE\"\n"
+        + "        \"type\": \"LUCENE\"\n"
         + "}";
     FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertEquals(config.getFstType(), FSTType.NATIVE, "Unexpected type");
+    assertEquals(config.getFstType(), FSTType.LUCENE, "Unexpected type");
   }
 }

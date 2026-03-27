@@ -19,7 +19,8 @@
 package org.apache.pinot.spi.config.table;
 
 /**
- * Type of FST to be used
+ * Type of FST to be used. Native is retained for backward compatibility with older configs but is no longer
+ * supported.
  */
 public enum FSTType {
   LUCENE, NATIVE

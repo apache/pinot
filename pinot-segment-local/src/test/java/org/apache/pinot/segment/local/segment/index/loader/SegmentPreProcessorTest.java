@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.file.Files;
@@ -1335,6 +1336,37 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     assertFalse(txtFile.exists());
     assertFalse(fstFile.exists());
     assertFalse(bfFile.exists());
+  }
+
+  @Test
+  public void testV1ReplaceLegacyNativeFstIndex()
+      throws Exception {
+    buildV1Segment();
+
+    String strColumn = "column3";
+    _fieldConfigMap.put(strColumn, new FieldConfig(strColumn, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.FST), null, null));
+
+    File fstFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
+    int legacyNativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+
+    runPreProcessor();
+    assertTrue(fstFile.exists());
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "rw")) {
+      randomAccessFile.seek(0);
+      randomAccessFile.writeInt(legacyNativeFstMagic);
+    }
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
+      assertEquals(randomAccessFile.readInt(), legacyNativeFstMagic);
+    }
+
+    runPreProcessor();
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
+      assertNotEquals(randomAccessFile.readInt(), legacyNativeFstMagic);
+    }
   }
 
   @Test

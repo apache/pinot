@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FSTType;
@@ -151,6 +152,20 @@ public class FstIndexTypeTest {
       assertNotNull(fieldConfig.getIndexes().get(FstIndexType.INDEX_DISPLAY_NAME));
       assertTrue(fieldConfig.getIndexTypes().isEmpty());
       assertNull(_tableConfig.getIndexingConfig().getFSTIndexType());
+    }
+
+    @Test(expectedExceptions = IllegalStateException.class,
+        expectedExceptionsMessageRegExp = "Native FST index is no longer supported on column: dimStr")
+    public void nativeFstIsRejectedOnValidate()
+        throws JsonProcessingException {
+      addFieldIndexConfig("{\n"
+          + "    \"name\": \"dimStr\",\n"
+          + "    \"indexTypes\" : [\"FST\"]\n"
+          + " }");
+      _tableConfig.getIndexingConfig().setFSTIndexType(FSTType.NATIVE);
+
+      StandardIndexes.fst().validate(FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema)
+          .get("dimStr"), _schema.getFieldSpecFor("dimStr"), _tableConfig);
     }
   }
 

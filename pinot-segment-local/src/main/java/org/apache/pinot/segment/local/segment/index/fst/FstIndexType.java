@@ -27,9 +27,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.FSTIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
-import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
-import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
-import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -88,6 +85,8 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
           column);
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
           "Cannot create FST index on column: %s of stored type other than STRING", column);
+      Preconditions.checkState(fstIndexConfig.getFstType() != FSTType.NATIVE,
+          "Native FST index is no longer supported on column: %s", column);
     }
   }
 
@@ -114,11 +113,9 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
         "FST index is currently only supported on STRING type columns");
     Preconditions.checkState(context.hasDictionary(),
         "FST index is currently only supported on dictionary-encoded columns");
-    if (indexConfig.getFstType() == FSTType.NATIVE) {
-      return new NativeFSTIndexCreator(context);
-    } else {
-      return new LuceneFSTIndexCreator(context);
-    }
+    Preconditions.checkState(indexConfig.getFstType() != FSTType.NATIVE,
+        "Native FST index is no longer supported on column: %s", context.getFieldSpec().getName());
+    return new LuceneFSTIndexCreator(context);
   }
 
   @Override
@@ -156,12 +153,11 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
         throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.fst(),
             "This index requires a dictionary");
       }
-      int magicHeader = dataBuffer.getInt(0);
-      if (magicHeader == FSTHeader.FST_MAGIC) {
-        return new NativeFSTIndexReader(dataBuffer);
-      } else {
-        return new LuceneFSTIndexReader(dataBuffer);
+      if (FstIndexUtils.isLegacyNativeFst(dataBuffer)) {
+        throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.fst(),
+            "Native FST index is no longer supported. Reload the segment to rebuild it with Lucene");
       }
+      return new LuceneFSTIndexReader(dataBuffer);
     }
 
     @Override
