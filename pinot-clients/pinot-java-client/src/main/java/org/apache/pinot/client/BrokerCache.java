@@ -20,8 +20,6 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -40,6 +38,7 @@ import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.utils.BrokerSelectorUtils;
 import org.apache.pinot.client.utils.ConnectionUtils;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
@@ -56,6 +55,7 @@ import org.asynchttpclient.Response;
  * TODO can we introduce a SSE based controller endpoint to make the update reactive in the client?
  */
 public class BrokerCache {
+  private static final SslContextProvider SSL_CONTEXT_PROVIDER = SslContextProviderFactory.create();
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private static class BrokerInstance {
@@ -107,11 +107,6 @@ public class BrokerCache {
   public BrokerCache(Properties properties, String controllerUrl) {
     String scheme = properties.getProperty(SCHEME, CommonConstants.HTTP_PROTOCOL);
     DefaultAsyncHttpClientConfig.Builder builder = Dsl.config();
-    if (scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
-      SSLContext sslContext = ConnectionUtils.getSSLContextFromProperties(properties);
-      builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
-    }
-
     int readTimeoutMs = Integer.parseInt(properties.getProperty("controllerReadTimeoutMs",
         DEFAULT_CONTROLLER_READ_TIMEOUT_MS));
     int connectTimeoutMs = Integer.parseInt(properties.getProperty("controllerConnectTimeoutMs",
@@ -125,6 +120,11 @@ public class BrokerCache {
         DEFAULT_CONTROLLER_TLS_V10_ENABLED));
 
     TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(tlsV10Enabled);
+    if (scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
+      TlsConfig tlsConfig = ConnectionUtils.getTlsConfigFromProperties(properties);
+      SSLContext sslContext = ConnectionUtils.getSSLContextFromProperties(properties);
+      SSL_CONTEXT_PROVIDER.configure(builder, sslContext, tlsProtocols, tlsConfig.getEndpointIdentificationAlgorithm());
+    }
     builder.setReadTimeout(Duration.ofMillis(readTimeoutMs))
         .setConnectTimeout(Duration.ofMillis(connectTimeoutMs))
         .setHandshakeTimeout(handshakeTimeoutMs)

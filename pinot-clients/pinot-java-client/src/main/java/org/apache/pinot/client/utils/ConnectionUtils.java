@@ -52,10 +52,13 @@ public class ConnectionUtils {
   }
 
   public static SSLContext getSSLContextFromProperties(Properties properties) {
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(
-        new PinotConfiguration(new MapConfiguration(properties)), PINOT_JAVA_TLS_PREFIX);
+    TlsConfig tlsConfig = getTlsConfigFromProperties(properties);
     TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
     return TlsUtils.getSslContext();
+  }
+
+  public static TlsConfig getTlsConfigFromProperties(Properties properties) {
+    return TlsUtils.extractTlsConfig(new PinotConfiguration(new MapConfiguration(properties)), PINOT_JAVA_TLS_PREFIX);
   }
 
 

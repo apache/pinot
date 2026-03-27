@@ -24,6 +24,7 @@ import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -158,8 +159,15 @@ public class ServerChannels {
   }
 
   public void shutDown() {
-    // Shut down immediately
-    _eventLoopGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+    _serverToChannelMap.forEach((serverRoutingInstance, serverChannel) -> {
+      try {
+        serverChannel.closeChannel(true);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to close channel to server: {}", serverRoutingInstance, e);
+      }
+    });
+    _serverToChannelMap.clear();
+    _eventLoopGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS).syncUninterruptibly();
   }
 
   @VisibleForTesting
@@ -184,8 +192,9 @@ public class ServerChannels {
             protected void initChannel(SocketChannel ch) {
               if (_tlsConfig != null) {
                 // Add SSL handler first to encrypt and decrypt everything.
-                ch.pipeline()
-                    .addLast(ChannelHandlerFactory.SSL, ChannelHandlerFactory.getClientTlsHandler(_tlsConfig, ch));
+                ch.pipeline().addLast(ChannelHandlerFactory.SSL,
+                    ChannelHandlerFactory.getClientTlsHandler(_tlsConfig, ch, serverRoutingInstance.getHostname(),
+                        serverRoutingInstance.getPort()));
               }
 
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldBasedFrameDecoder());
@@ -203,8 +212,28 @@ public class ServerChannels {
     }
 
     void closeChannel() {
-      if (_channel != null) {
-        _channel.close();
+      closeChannel(false);
+    }
+
+    void closeChannel(boolean silentShutdown) {
+      Channel channel = _channel;
+      if (channel == null) {
+        return;
+      }
+      if (silentShutdown) {
+        setSilentShutdown();
+      }
+      ChannelFuture closeFuture = channel.close();
+      if (closeFuture != null) {
+        closeFuture.addListener(future -> {
+          if (!future.isSuccess()) {
+            LOGGER.warn("Failed to close channel for server routing instance: {}", _serverRoutingInstance,
+                future.cause());
+          }
+        });
+        if (!channel.eventLoop().inEventLoop()) {
+          closeFuture.syncUninterruptibly();
+        }
       }
     }
 

@@ -23,14 +23,16 @@ import org.testng.annotations.Test;
 
 public class TlsConfigTest {
   @Test
-  public void copyConstructorShouldCopyInsecureAndAllowedProtocols() {
+  public void copyConstructorShouldCopyInsecureAllowedProtocolsAndEndpointIdentificationAlgorithm() {
     TlsConfig original = new TlsConfig();
     original.setInsecure(true);
     original.setAllowedProtocols(new String[]{"TLSv1.2", "TLSv1.3"});
+    original.setEndpointIdentificationAlgorithm("HTTPS");
 
     TlsConfig copy = new TlsConfig(original);
     Assert.assertTrue(copy.isInsecure());
     Assert.assertEquals(copy.getAllowedProtocols(), new String[]{"TLSv1.2", "TLSv1.3"});
+    Assert.assertEquals(copy.getEndpointIdentificationAlgorithm(), "HTTPS");
 
     // Ensure returned array is a defensive copy
     String[] protocols = copy.getAllowedProtocols();
@@ -39,19 +41,25 @@ public class TlsConfigTest {
   }
 
   @Test
-  public void equalsAndHashCodeShouldIncludeAllowedProtocols() {
+  public void equalsAndHashCodeShouldIncludeAllowedProtocolsAndEndpointIdentificationAlgorithm() {
     TlsConfig a = new TlsConfig();
     a.setInsecure(true);
     a.setAllowedProtocols(new String[]{"TLSv1.2"});
+    a.setEndpointIdentificationAlgorithm("HTTPS");
 
     TlsConfig b = new TlsConfig();
     b.setInsecure(true);
     b.setAllowedProtocols(new String[]{"TLSv1.2"});
+    b.setEndpointIdentificationAlgorithm("HTTPS");
 
     Assert.assertEquals(a, b);
     Assert.assertEquals(a.hashCode(), b.hashCode());
 
     b.setAllowedProtocols(new String[]{"TLSv1.3"});
+    Assert.assertNotEquals(a, b);
+
+    b.setAllowedProtocols(new String[]{"TLSv1.2"});
+    b.setEndpointIdentificationAlgorithm("LDAPS");
     Assert.assertNotEquals(a, b);
   }
 }

@@ -24,8 +24,10 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslHandler;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.net.ssl.SSLParameters;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
@@ -72,7 +74,26 @@ public class ChannelHandlerFactory {
   public static ChannelHandler getClientTlsHandler(TlsConfig tlsConfig, SocketChannel ch) {
     SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE
         .computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> TlsUtils.buildClientContext(tlsConfig));
-    return sslContext.newHandler(ch.alloc());
+    return configureClientTlsHandler(tlsConfig, sslContext.newHandler(ch.alloc()));
+  }
+
+  public static ChannelHandler getClientTlsHandler(TlsConfig tlsConfig, SocketChannel ch, String peerHost,
+      int peerPort) {
+    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE
+        .computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> TlsUtils.buildClientContext(tlsConfig));
+    return configureClientTlsHandler(tlsConfig, sslContext.newHandler(ch.alloc(), peerHost, peerPort));
+  }
+
+  private static SslHandler configureClientTlsHandler(TlsConfig tlsConfig, SslHandler sslHandler) {
+    String endpointIdentificationAlgorithm = tlsConfig.getEndpointIdentificationAlgorithm();
+    SSLParameters sslParameters = sslHandler.engine().getSSLParameters();
+    if (endpointIdentificationAlgorithm == null || endpointIdentificationAlgorithm.isBlank()) {
+      sslParameters.setEndpointIdentificationAlgorithm(null);
+    } else {
+      sslParameters.setEndpointIdentificationAlgorithm(endpointIdentificationAlgorithm);
+    }
+    sslHandler.engine().setSSLParameters(sslParameters);
+    return sslHandler;
   }
 
   /**

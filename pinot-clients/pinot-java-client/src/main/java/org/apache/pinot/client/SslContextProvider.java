@@ -42,4 +42,19 @@ public interface SslContextProvider {
    */
   DefaultAsyncHttpClientConfig.Builder configure(DefaultAsyncHttpClientConfig.Builder builder,
       @Nullable SSLContext sslContext, TlsProtocols tlsProtocols);
+
+  /**
+   * Configure the AsyncHttpClient builder with SSL/TLS settings and an explicit endpoint identification algorithm.
+   *
+   * @param builder the client config builder to update
+   * @param sslContext optional SSL context to use
+   * @param tlsProtocols configured TLS protocol list; {@code null} means protocols should not be configured
+   * @param endpointIdentificationAlgorithm endpoint identification algorithm for hostname verification
+   * @return the same builder for chaining
+   */
+  default DefaultAsyncHttpClientConfig.Builder configure(DefaultAsyncHttpClientConfig.Builder builder,
+      @Nullable SSLContext sslContext, @Nullable TlsProtocols tlsProtocols,
+      @Nullable String endpointIdentificationAlgorithm) {
+    return configure(builder, sslContext, tlsProtocols);
+  }
 }

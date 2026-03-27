@@ -33,6 +33,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
@@ -43,6 +44,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -76,7 +78,7 @@ public class SslContextProviderTest {
     String protocol = selectSupportedProtocol(sslContext);
 
     SslContextProvider provider = new DefaultSslContextProvider();
-    provider.configure(builder, sslContext, tlsProtocolsWith(protocol));
+    provider.configure(builder, sslContext, tlsProtocolsWith(protocol), "HTTPS");
 
     DefaultAsyncHttpClientConfig config = builder.build();
     assertFalse(config.isUseOpenSsl());
@@ -85,8 +87,29 @@ public class SslContextProviderTest {
     SslEngineFactory engineFactory = config.getSslEngineFactory();
     assertNotNull(engineFactory);
     SSLEngine engine = engineFactory.newSslEngine(config, "localhost", 443);
+    SSLParameters sslParameters = engine.getSSLParameters();
     assertTrue(engine.getUseClientMode());
+    assertEquals(engine.getPeerHost(), "localhost");
+    assertEquals(engine.getPeerPort(), 443);
     assertEquals(engine.getEnabledProtocols(), new String[] {protocol});
+    assertEquals(sslParameters.getEndpointIdentificationAlgorithm(), "HTTPS");
+  }
+
+  @Test
+  public void testDefaultProviderLeavesEndpointIdentificationAlgorithmUnsetWhenBlank()
+      throws Exception {
+    DefaultAsyncHttpClientConfig.Builder builder = Dsl.config();
+
+    SSLContext sslContext = SSLContext.getInstance("TLS");
+    sslContext.init(null, null, null);
+    String protocol = selectSupportedProtocol(sslContext);
+
+    SslContextProvider provider = new DefaultSslContextProvider();
+    provider.configure(builder, sslContext, tlsProtocolsWith(protocol), " ");
+
+    DefaultAsyncHttpClientConfig config = builder.build();
+    SSLEngine engine = config.getSslEngineFactory().newSslEngine(config, "localhost", 443);
+    assertNull(engine.getSSLParameters().getEndpointIdentificationAlgorithm());
   }
 
   @Test
