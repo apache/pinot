@@ -35,17 +35,24 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class PinotSegmentToJsonConverter implements PinotSegmentConverter {
   private final String _segmentDir;
   private final String _outputFile;
+  private final boolean _forwardIndexOnly;
 
   public PinotSegmentToJsonConverter(String segmentDir, String outputFile) {
+    this(segmentDir, outputFile, false);
+  }
+
+  public PinotSegmentToJsonConverter(String segmentDir, String outputFile, boolean forwardIndexOnly) {
     _segmentDir = segmentDir;
     _outputFile = outputFile;
+    _forwardIndexOnly = forwardIndexOnly;
   }
 
   @Override
   public void convert()
       throws Exception {
-    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
-        BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
+    PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
+    recordReader.init(new File(_segmentDir), null, null, false, _forwardIndexOnly);
+    try (recordReader; BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
       GenericRow row = new GenericRow();
       while (recordReader.hasNext()) {
         row = recordReader.next(row);

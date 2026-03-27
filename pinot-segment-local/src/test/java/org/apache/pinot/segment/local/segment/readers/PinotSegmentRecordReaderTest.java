@@ -128,6 +128,32 @@ public class PinotSegmentRecordReaderTest {
     }
   }
 
+  @Test
+  public void testPinotSegmentRecordReaderForwardIndexOnly()
+      throws Exception {
+    List<GenericRow> outputRows = new ArrayList<>();
+
+    PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader();
+    pinotSegmentRecordReader.init(_segmentIndexDir, null, null, false, true);
+    try (pinotSegmentRecordReader) {
+      while (pinotSegmentRecordReader.hasNext()) {
+        outputRows.add(pinotSegmentRecordReader.next());
+      }
+    }
+
+    Assert.assertEquals(outputRows.size(), _rows.size(),
+        "Number of rows returned by PinotSegmentRecordReader with forwardIndexOnly is incorrect");
+    for (int i = 0; i < outputRows.size(); i++) {
+      GenericRow outputRow = outputRows.get(i);
+      GenericRow row = _rows.get(i);
+      Assert.assertEquals(outputRow.getValue(D_SV_1), row.getValue(D_SV_1));
+      Assert.assertTrue(PinotSegmentUtil.compareMultiValueColumn(outputRow.getValue(D_MV_1), row.getValue(D_MV_1)));
+      Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
+      Assert.assertEquals(outputRow.getValue(M2), row.getValue(M2));
+      Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
+    }
+  }
+
   @AfterClass
   public void cleanup() {
     FileUtils.deleteQuietly(new File(_segmentOutputDir));

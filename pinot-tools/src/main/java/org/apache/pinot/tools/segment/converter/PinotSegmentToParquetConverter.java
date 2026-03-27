@@ -20,31 +20,40 @@ package org.apache.pinot.tools.segment.converter;
 
 import java.io.File;
 import org.apache.avro.Schema;
-import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData.Record;
-import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.avro.AvroParquetWriter;
+import org.apache.parquet.hadoop.ParquetWriter;
+import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.apache.parquet.hadoop.util.HadoopOutputFile;
+import org.apache.parquet.io.OutputFile;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.plugin.inputformat.parquet.ParquetUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * The <code>PinotSegmentToAvroConverter</code> class is the tool to convert Pinot segment to AVRO format.
+ * The <code>PinotSegmentToParquetConverter</code> class is the tool to convert Pinot segment to Parquet format.
  */
-public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
+public class PinotSegmentToParquetConverter implements PinotSegmentConverter {
   private final String _segmentDir;
   private final String _outputFile;
+  private final CompressionCodecName _compressionCodec;
   private final boolean _forwardIndexOnly;
 
-  public PinotSegmentToAvroConverter(String segmentDir, String outputFile) {
-    this(segmentDir, outputFile, false);
+  public PinotSegmentToParquetConverter(String segmentDir, String outputFile) {
+    this(segmentDir, outputFile, CompressionCodecName.GZIP, false);
   }
 
-  public PinotSegmentToAvroConverter(String segmentDir, String outputFile, boolean forwardIndexOnly) {
+  public PinotSegmentToParquetConverter(String segmentDir, String outputFile,
+      CompressionCodecName compressionCodec, boolean forwardIndexOnly) {
     _segmentDir = segmentDir;
     _outputFile = outputFile;
+    _compressionCodec = compressionCodec;
     _forwardIndexOnly = forwardIndexOnly;
   }
 
@@ -53,18 +62,21 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
       throws Exception {
     File indexDir = new File(_segmentDir);
     Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(new SegmentMetadataImpl(indexDir).getSchema());
+    Configuration hadoopConf = ParquetUtils.getParquetHadoopConfiguration();
+    OutputFile outputFile = HadoopOutputFile.fromPath(new Path(_outputFile), hadoopConf);
     PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader();
-    pinotSegmentRecordReader.init(indexDir, null, null, false, _forwardIndexOnly);
+    pinotSegmentRecordReader.init(new File(_segmentDir), null, null, false, _forwardIndexOnly);
     try (pinotSegmentRecordReader) {
-      try (DataFileWriter<Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-        recordWriter.create(avroSchema, new File(_outputFile));
-
+      try (ParquetWriter<Record> parquetWriter =
+          AvroParquetWriter.<Record>builder(outputFile).withSchema(avroSchema)
+              .withCompressionCodec(_compressionCodec)
+              .withConf(hadoopConf).build()) {
         GenericRow row = new GenericRow();
         Record reusableRecord = new Record(avroSchema);
         while (pinotSegmentRecordReader.hasNext()) {
           row = pinotSegmentRecordReader.next(row);
           Record record = SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(row, reusableRecord);
-          recordWriter.append(record);
+          parquetWriter.write(record);
           row.clear();
         }
       }
