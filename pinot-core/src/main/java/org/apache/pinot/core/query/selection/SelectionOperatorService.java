@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
@@ -93,26 +92,11 @@ public class SelectionOperatorService {
   }
 
   /**
-   * Reduce multiple sorted (and unsorted) dataTables into a single resultTable, ordered, limited, and offset
+   * Reduce multiple sorted dataTables into a single resultTable, ordered, limited, and offset
    * @param dataTables dataTables to be reduced
    * @return resultTable
    */
   public ResultTable reduceWithOrdering(Collection<DataTable> dataTables) {
-    boolean allSorted = true;
-    for (DataTable dataTable : dataTables) {
-      String sorted = dataTable.getMetadata().get(DataTable.MetadataKey.SORTED.getName());
-      if (!Boolean.parseBoolean(sorted)) {
-        allSorted = false;
-        break;
-      }
-    }
-
-    // TODO: backward compatible, to be removed after 1.2.0 no longer supported
-    if (!allSorted) {
-      List<Object[]> heapSortedRows = heapSortDataTable(dataTables);
-      return new ResultTable(_dataSchema, heapSortedRows);
-    } // end todo
-
     if (dataTables.size() == 1) {
       // short circuit single table case
       DataTable dataTable = dataTables.iterator().next();
@@ -265,52 +249,5 @@ public class SelectionOperatorService {
       }
     }
     return resultRow;
-  }
-
-  /**
-   * Heapsort unsorted dataTables, this code is unreachable for
-   * server version >= 1.3.0 as server always performs sorting
-   * TODO: remove after 1.2.0 no longer supported
-   * @param dataTables unsorted dataTables
-   * @return sorted rows
-   */
-  private List<Object[]> heapSortDataTable(Collection<DataTable> dataTables) {
-    Comparator<Object[]> comparator = OrderByComparatorFactory.getComparator(_queryContext.getOrderByExpressions(),
-        _queryContext.isNullHandlingEnabled());
-    PriorityQueue<Object[]> heapSortRows =
-        new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-            comparator.reversed());
-    // reduce
-    for (DataTable dataTable : dataTables) {
-      int numRows = dataTable.getNumberOfRows();
-      if (_queryContext.isNullHandlingEnabled()) {
-        RoaringBitmap[] nullBitmaps = getNullBitmap(dataTable);
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
-              "SelectionOperatorService#heapSortDataTable");
-          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-          setNullsForRow(nullBitmaps, rowId, row);
-          SelectionOperatorUtils.addToPriorityQueue(row, heapSortRows, _numRowsToKeep);
-        }
-      } else {
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
-              "SelectionOperatorService#heapSortDataTable");
-          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-          SelectionOperatorUtils.addToPriorityQueue(row, heapSortRows, _numRowsToKeep);
-        }
-      }
-    }
-    // render
-    LinkedList<Object[]> resultRows = new LinkedList<>();
-    DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
-    while (heapSortRows.size() > _offset) {
-      Object[] row = heapSortRows.poll();
-      assert row != null;
-      Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
-      resultRows.addFirst(resultRow);
-    }
-    return resultRows;
   }
 }
