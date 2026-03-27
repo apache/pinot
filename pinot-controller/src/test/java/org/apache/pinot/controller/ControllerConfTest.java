@@ -205,7 +205,7 @@ public class ControllerConfTest {
     ControllerConf conf = new ControllerConf(controllerConfig);
     // Invalid period should fall back to the default value
     Assert.assertEquals(conf.getRetentionControllerFrequencyInSeconds(),
-        DEFAULT_RETENTION_MANAGER_FREQUENCY_IN_SECONDS);
+        (int) TimeUtils.convertPeriodToSeconds(DEFAULT_RETENTION_MANAGER_FREQUENCY_PERIOD));
   }
 
   @Test
