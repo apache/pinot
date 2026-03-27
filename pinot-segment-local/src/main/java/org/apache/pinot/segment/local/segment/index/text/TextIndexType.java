@@ -30,7 +30,6 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLucene
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
-import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -49,7 +48,6 @@ import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -98,12 +96,8 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
 
   @Override
   protected ColumnConfigDeserializer<TextIndexConfig> createDeserializerForLegacyConfigs() {
-    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.TEXT, (tableConfig, fieldConfig) -> {
-      Map<String, String> properties = fieldConfig.getProperties();
-      String fstTypeValue = TextIndexUtils.getFstType(properties);
-      FSTType fstType = fstTypeValue != null ? FSTType.forValue(fstTypeValue) : FSTType.LUCENE;
-      return new TextIndexConfigBuilder(fstType).withProperties(properties).build();
-    });
+    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.TEXT,
+        (tableConfig, fieldConfig) -> new TextIndexConfigBuilder().withProperties(fieldConfig.getProperties()).build());
   }
 
   @Override

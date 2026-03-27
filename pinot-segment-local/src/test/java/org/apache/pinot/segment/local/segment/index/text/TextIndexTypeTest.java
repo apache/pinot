@@ -22,12 +22,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.assertNull;
 
 
 public class TextIndexTypeTest {
@@ -35,7 +32,7 @@ public class TextIndexTypeTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     @Test
-    public void oldFieldConfigTextExplicitLuceneType()
+    public void oldFieldConfigTextIgnoresLegacyLuceneType()
         throws JsonProcessingException {
       addFieldIndexConfig("{\n"
           + "    \"name\": \"dimStr\",\n"
@@ -46,11 +43,11 @@ public class TextIndexTypeTest {
           + " }");
 
       TextIndexConfig config = getActualConfig("dimStr", StandardIndexes.text());
-      assertEquals(config.getFstType(), FSTType.LUCENE);
+      assertNull(config.getFstType());
     }
 
     @Test
-    public void oldFieldConfigTextUnsupportedType()
+    public void oldFieldConfigTextIgnoresLegacyNativeType()
         throws JsonProcessingException {
       addFieldIndexConfig("{\n"
           + "    \"name\": \"dimStr\",\n"
@@ -60,12 +57,8 @@ public class TextIndexTypeTest {
           + "    }\n"
           + " }");
 
-      try {
-        getActualConfig("dimStr", StandardIndexes.text());
-        fail("Expected unsupported FST type exception");
-      } catch (IllegalArgumentException e) {
-        assertTrue(e.getMessage().contains("Unsupported FST type: native"));
-      }
+      TextIndexConfig config = getActualConfig("dimStr", StandardIndexes.text());
+      assertNull(config.getFstType());
     }
   }
 }
