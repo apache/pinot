@@ -650,14 +650,11 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * Returns <code>controller.offline.segment.interval.checker.frequencyPeriod</code>, or
-   * <code>controller.offline.segment.interval.checker.frequencyPeriod</code> or the segment level
-   * validation interval, in the order of decreasing preference from left to right. Falls-back to
-   * the next config only if the current config is missing. This is done in order to retain the
-   * current behavior, wherein the offline validation tasks were done at segment level validation
-   * interval frequency The default value is the new DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS
+   * Returns the offline segment interval checker frequency in seconds.
+   * Reads {@code controller.offline.segment.interval.checker.frequencyPeriod} as a period string (e.g. "24h"),
+   * falling back to {@code DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS} if absent or invalid.
    *
-   * @return the supplied config in seconds
+   * @return the configured frequency in seconds
    */
   public int getOfflineSegmentIntervalCheckerFrequencyInSeconds() {
     return Optional.ofNullable(
@@ -674,14 +671,11 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * Returns <code>controller.realtime.segment.validation.frequencyPeriod</code> or
-   * <code>controller.realtime.segment.validation.frequencyInSeconds</code> or the default realtime segment
-   * validation frequncy, in the order of decreasing preference from left to right. This is done in
-   * order to retain the current behavior, wherein the realtime validation tasks were done at
-   * validation controller frequency The default value is the new
-   * DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS
+   * Returns the realtime segment validation frequency in seconds.
+   * Reads {@code controller.realtime.segment.validation.frequencyPeriod} as a period string (e.g. "1h"),
+   * falling back to {@code DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS} if absent or invalid.
    *
-   * @return supplied config in seconds
+   * @return the configured frequency in seconds
    */
   public int getRealtimeSegmentValidationFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD))
@@ -711,14 +705,11 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * Return <code>controller.broker.resource.validation.frequencyPeriod</code> or
-   * <code>controller.broker.resource.validation.frequencyInSeconds</code> or the default broker resource validation
-   * frequency, in order of decreasing preference from left to righ. This is done in order
-   * to retain the current behavior, wherein the broker resource validation tasks were done at
-   * validation controller frequency The default value is the new
-   * DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS
+   * Returns the broker resource validation frequency in seconds.
+   * Reads {@code controller.broker.resource.validation.frequencyPeriod} as a period string (e.g. "1h"),
+   * falling back to {@code DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS} if absent or invalid.
    *
-   * @return the supplied config in seconds
+   * @return the configured frequency in seconds
    */
   public int getBrokerResourceValidationFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD))
@@ -814,9 +805,9 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * RealtimeSegmentRelocator has been rebranded to SegmentRelocator. Returns <code>controller.segment.relocator
-   * .frequencyPeriod</code> or <code>controller.segment.relocator .frequencyInSeconds</code> or
-   * REALTIME_SEGMENT_RELOCATOR_FREQUENCY, in the order of decreasing perference (left -> right).
+   * Returns the segment relocator frequency in seconds.
+   * Reads {@code controller.segment.relocator.frequencyPeriod} as a period string (e.g. "1h"),
+   * falling back to {@code DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS} if absent or invalid.
    */
   public int getSegmentRelocatorFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD))
@@ -1267,9 +1258,9 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * RealtimeSegmentRelocator has been rebranded to SegmentRelocator.
-   * Check for SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS property, if not found, return
-   * REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS
+   * Returns the segment relocator initial delay in seconds.
+   * Reads {@code controller.segmentRelocator.initialDelayInSeconds}, falling back to a random
+   * value between {@code MIN_INITIAL_DELAY_IN_SECONDS} and {@code MAX_INITIAL_DELAY_IN_SECONDS}.
    */
   public long getSegmentRelocatorInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS,

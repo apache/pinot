@@ -199,6 +199,16 @@ public class ControllerConfTest {
   }
 
   @Test
+  public void invalidFrequencyPeriodShouldFallBackToDefault() {
+    Map<String, Object> controllerConfig = new HashMap<>();
+    controllerConfig.put(RETENTION_MANAGER_FREQUENCY_PERIOD, "notAValidPeriod");
+    ControllerConf conf = new ControllerConf(controllerConfig);
+    // Invalid period should fall back to the default value
+    Assert.assertEquals(conf.getRetentionControllerFrequencyInSeconds(),
+        DEFAULT_RETENTION_MANAGER_FREQUENCY_IN_SECONDS);
+  }
+
+  @Test
   public void testTaskQueueBoundingConfigDefaults() {
     ControllerConf conf = new ControllerConf();
 
