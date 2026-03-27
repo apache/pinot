@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -141,6 +142,17 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
 
     LOGGER.info("Creating IVF_FLAT index for column: {} in dir: {}, dimension={}, nlist={}, distance={}",
         column, indexDir.getAbsolutePath(), _dimension, _nlist, _distanceFunction);
+  }
+
+  @Override
+  public void add(Object[] values, @Nullable int[] dictIds) {
+    // The segment builder calls this overload for multi-value columns.
+    // Convert Object[] (boxed Floats) to float[] and delegate to add(float[]).
+    float[] floatValues = new float[_dimension];
+    for (int i = 0; i < values.length; i++) {
+      floatValues[i] = (Float) values[i];
+    }
+    add(floatValues);
   }
 
   @Override
