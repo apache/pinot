@@ -635,6 +635,33 @@ public class QueryOptionsUtils {
     return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
   }
 
+  // --- Vector search query option accessors ---
+
+  /**
+   * Returns the configured nprobe value for IVF_FLAT vector search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Integer getVectorNprobe(Map<String, String> queryOptions) {
+    String nprobe = queryOptions.get(QueryOptionKey.VECTOR_NPROBE);
+    return checkedParseIntPositive(QueryOptionKey.VECTOR_NPROBE, nprobe);
+  }
+
+  /**
+   * Returns whether exact rerank is enabled for vector search. Defaults to {@code false}.
+   */
+  public static boolean isVectorExactRerank(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK));
+  }
+
+  /**
+   * Returns the maximum number of ANN candidates for vector search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Integer getVectorMaxCandidates(Map<String, String> queryOptions) {
+    String maxCandidates = queryOptions.get(QueryOptionKey.VECTOR_MAX_CANDIDATES);
+    return checkedParseIntPositive(QueryOptionKey.VECTOR_MAX_CANDIDATES, maxCandidates);
+  }
+
   public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
     String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
     if (sortExchangeCopyThreshold != null) {

@@ -194,6 +194,68 @@ public class QueryOptionsUtilsTest {
     assertEquals(actualHash, "");
   }
 
+  // --- Vector search query option tests ---
+
+  @Test
+  public void testVectorNprobeValid() {
+    assertEquals(QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "8")), Integer.valueOf(8));
+    assertEquals(QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "1")), Integer.valueOf(1));
+    assertEquals(QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "128")), Integer.valueOf(128));
+  }
+
+  @Test
+  public void testVectorNprobeNull() {
+    assertNull(QueryOptionsUtils.getVectorNprobe(Map.of()));
+    assertNull(QueryOptionsUtils.getVectorNprobe(new HashMap<>()));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorNprobeZero() {
+    QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "0"));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorNprobeNegative() {
+    QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "-1"));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorNprobeNonNumeric() {
+    QueryOptionsUtils.getVectorNprobe(Map.of(VECTOR_NPROBE, "abc"));
+  }
+
+  @Test
+  public void testVectorExactRerank() {
+    org.testng.Assert.assertTrue(QueryOptionsUtils.isVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "true")));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "false")));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isVectorExactRerank(Map.of()));
+  }
+
+  @Test
+  public void testVectorMaxCandidatesValid() {
+    assertEquals(QueryOptionsUtils.getVectorMaxCandidates(Map.of(VECTOR_MAX_CANDIDATES, "100")),
+        Integer.valueOf(100));
+    assertEquals(QueryOptionsUtils.getVectorMaxCandidates(Map.of(VECTOR_MAX_CANDIDATES, "1")),
+        Integer.valueOf(1));
+  }
+
+  @Test
+  public void testVectorMaxCandidatesNull() {
+    assertNull(QueryOptionsUtils.getVectorMaxCandidates(Map.of()));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testVectorMaxCandidatesZero() {
+    QueryOptionsUtils.getVectorMaxCandidates(Map.of(VECTOR_MAX_CANDIDATES, "0"));
+  }
+
+  @Test
+  public void testVectorNprobeCaseInsensitiveResolution() {
+    Map<String, String> opts = Map.of("VECTORNPROBE", "16");
+    Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(opts);
+    assertEquals(QueryOptionsUtils.getVectorNprobe(resolved), Integer.valueOf(16));
+  }
+
   private static Object getValue(Map<String, String> map, String key) {
     switch (key) {
       // Positive ints
