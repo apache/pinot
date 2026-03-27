@@ -74,7 +74,8 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
   private CompressionCodecName _parquetCompression = CompressionCodecName.GZIP;
 
   @CommandLine.Option(names = {"-forwardIndexOnly"}, required = false,
-      description = "Load only forward index from the segment, skipping secondary indexes (default false).")
+      description = "When outputFormat is PARQUET, load only forward index from the segment, skipping secondary "
+          + "indexes; ignored for AVRO/CSV/JSON (default false).")
   private boolean _forwardIndexOnly;
 
   @CommandLine.Option(names = {"-overwrite"}, required = false,
