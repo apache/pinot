@@ -280,19 +280,21 @@ public class DataTableSerDeTest {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     DataTable dataTable = dataTableBuilder.build();
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // Response serialization metadata is always populated.
+    // When measurement is enabled, response serialization metadata should have positive values.
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName()));
-    Assert.assertNotNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
-    Assert.assertNotNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName()));
+    Assert.assertTrue(
+        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName())) > 0);
+    Assert.assertTrue(
+        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName())) > 0);
 
     // Disable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(false);
     dataTable = dataTableBuilder.build();
     newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // Response serialization metadata is still populated regardless of measurement setting.
+    // Response serialization metadata is always populated, but may be zero when measurement is disabled.
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
     Assert.assertNotNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
