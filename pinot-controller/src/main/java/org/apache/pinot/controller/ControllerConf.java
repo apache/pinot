@@ -104,7 +104,6 @@ public class ControllerConf extends PinotConfiguration {
 
   public static class ControllerPeriodicTasksConf {
     // frequency configs
-    // Deprecated as of 0.8.0
     public static final String RETENTION_MANAGER_FREQUENCY_PERIOD = "controller.retention.frequencyPeriod";
     public static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD =
         "controller.offline.segment.interval.checker.frequencyPeriod";
