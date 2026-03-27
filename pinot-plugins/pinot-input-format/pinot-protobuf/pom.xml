@@ -47,7 +47,6 @@
     <dependency>
       <groupId>com.github.os72</groupId>
       <artifactId>protobuf-dynamic</artifactId>
-      <version>${protobuf-dynamic.version}</version>
     </dependency>
   </dependencies>
   <build>

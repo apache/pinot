@@ -177,7 +177,6 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-launcher_${scala.compat.version}</artifactId>
-      <version>${spark3.version}</version>
     </dependency>
 
     <dependency>

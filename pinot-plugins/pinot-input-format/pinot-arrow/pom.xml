@@ -39,27 +39,22 @@
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-compression</artifactId>
-      <version>${arrow.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-format</artifactId>
-      <version>${arrow.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-memory-core</artifactId>
-      <version>${arrow.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-memory-netty</artifactId>
-      <version>${arrow.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-vector</artifactId>
-      <version>${arrow.version}</version>
     </dependency>
   </dependencies>
 

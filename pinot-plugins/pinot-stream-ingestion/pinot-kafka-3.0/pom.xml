@@ -44,12 +44,10 @@
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-clients</artifactId>
-      <version>${kafka3.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka_${scala.compat.version}</artifactId>
-      <version>${kafka3.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.apache.kafka</groupId>
@@ -81,7 +79,6 @@
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka_${scala.compat.version}</artifactId>
-      <version>${kafka3.version}</version>
       <classifier>test</classifier>
       <scope>test</scope>
       <exclusions>
@@ -94,14 +91,12 @@
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-clients</artifactId>
-      <version>${kafka3.version}</version>
       <classifier>test</classifier>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-server-common</artifactId>
-      <version>${kafka3.version}</version>
       <classifier>test</classifier>
       <scope>test</scope>
     </dependency>

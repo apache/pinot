@@ -55,7 +55,6 @@
     <dependency>
       <groupId>cloud.localstack</groupId>
       <artifactId>localstack-utils</artifactId>
-      <version>${localstack-utils.version}</version>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
