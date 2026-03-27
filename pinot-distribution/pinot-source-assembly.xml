@@ -54,7 +54,6 @@
         <exclude>kubernetes/**</exclude>
         <exclude>docker/**</exclude>
         <exclude>thirdeye/**</exclude>
-        <exclude>thirdeye/**</exclude>
       </excludes>
     </fileSet>
   </fileSets>
