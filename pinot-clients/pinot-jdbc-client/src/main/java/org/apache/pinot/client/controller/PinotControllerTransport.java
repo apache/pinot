@@ -54,6 +54,11 @@ public class PinotControllerTransport {
   private final AsyncHttpClient _httpClient;
 
   public PinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
+      ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols) {
+    this(headers, scheme, sslContext, connectionTimeouts, tlsProtocols, null, null);
+  }
+
+  public PinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
       ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols, @Nullable String appId) {
     this(headers, scheme, sslContext, connectionTimeouts, tlsProtocols, appId, null);
   }

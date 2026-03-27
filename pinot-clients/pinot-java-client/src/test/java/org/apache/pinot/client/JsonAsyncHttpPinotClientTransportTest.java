@@ -117,18 +117,23 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     SSLContext sslContext = SSLContext.getInstance("TLS");
     sslContext.init(null, null, null);
 
-    JsonAsyncHttpPinotClientTransport transport =
-        new JsonAsyncHttpPinotClientTransport(null, "https", "", false, sslContext,
-            ConnectionTimeouts.create(1000, 1000, 1000), TlsProtocols.defaultProtocols(false), null);
+    JsonAsyncHttpPinotClientTransport transport = null;
+    try {
+      transport =
+          new JsonAsyncHttpPinotClientTransport(null, "https", "", false, sslContext,
+              ConnectionTimeouts.create(1000, 1000, 1000), TlsProtocols.defaultProtocols(false), null);
 
-    Field httpClientField = JsonAsyncHttpPinotClientTransport.class.getDeclaredField("_httpClient");
-    httpClientField.setAccessible(true);
-    AsyncHttpClient httpClient = (AsyncHttpClient) httpClientField.get(transport);
+      Field httpClientField = JsonAsyncHttpPinotClientTransport.class.getDeclaredField("_httpClient");
+      httpClientField.setAccessible(true);
+      AsyncHttpClient httpClient = (AsyncHttpClient) httpClientField.get(transport);
 
-    assertNull(httpClient.getConfig().getSslEngineFactory().newSslEngine(httpClient.getConfig(), "localhost", 443)
-        .getSSLParameters().getEndpointIdentificationAlgorithm());
-
-    transport.close();
+      assertNull(httpClient.getConfig().getSslEngineFactory().newSslEngine(httpClient.getConfig(), "localhost", 443)
+          .getSSLParameters().getEndpointIdentificationAlgorithm());
+    } finally {
+      if (transport != null) {
+        transport.close();
+      }
+    }
   }
 
   @Test
