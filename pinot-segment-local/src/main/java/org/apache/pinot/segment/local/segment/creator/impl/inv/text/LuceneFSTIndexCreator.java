@@ -24,10 +24,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.lucene.store.OutputStreamDataOutput;
+import org.apache.lucene.util.IntsRefBuilder;
 import org.apache.lucene.util.fst.FST;
+import org.apache.lucene.util.fst.FSTCompiler;
+import org.apache.lucene.util.fst.PositiveIntOutputs;
+import org.apache.lucene.util.fst.Util;
 import org.apache.pinot.segment.local.segment.index.fst.FstIndexType;
 import org.apache.pinot.segment.local.utils.MetricUtils;
-import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
@@ -48,7 +51,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   private final String _columnName;
   private final String _tableNameWithType;
   private final boolean _continueOnError;
-  private final FSTBuilder _fstBuilder;
+  private final CompilerAdapter _compilerAdapter;
 
   private int _dictId;
 
@@ -67,23 +70,23 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
       @Nullable String[] sortedEntries)
       throws IOException {
-    this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new FSTBuilder());
+    this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new CompilerAdapter());
   }
 
   @VisibleForTesting
   public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
-      @Nullable String[] sortedEntries, FSTBuilder fstBuilder)
+      @Nullable String[] sortedEntries, CompilerAdapter compilerAdapter)
       throws IOException {
     _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
     _columnName = columnName;
     _tableNameWithType = tableNameWithType;
     _continueOnError = continueOnError;
-    _fstBuilder = fstBuilder;
+    _compilerAdapter = compilerAdapter;
 
     if (sortedEntries != null) {
       for (_dictId = 0; _dictId < sortedEntries.length; _dictId++) {
         try {
-          _fstBuilder.addEntry(sortedEntries[_dictId], _dictId);
+          _compilerAdapter.addEntry(sortedEntries[_dictId], _dictId);
         } catch (Exception e) {
           if (_continueOnError) {
             // Caught exception while trying to add, update metric and skip the document
@@ -109,7 +112,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   public void add(String document)
       throws IOException {
     try {
-      _fstBuilder.addEntry(document, _dictId);
+      _compilerAdapter.addEntry(document, _dictId);
     } catch (Exception e) {
       if (_continueOnError) {
         // Caught exception while trying to add, update metric and skip the document
@@ -132,7 +135,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   public void seal()
       throws IOException {
     LOGGER.info("Sealing FST index: {}", _fstIndexFile.getAbsolutePath());
-    FST<Long> fst = _fstBuilder.done();
+    FST<Long> fst = _compilerAdapter.compile();
     try (FileOutputStream outputStream = new FileOutputStream(_fstIndexFile);
         OutputStreamDataOutput dataOutput = new OutputStreamDataOutput(outputStream)) {
       fst.save(dataOutput, dataOutput);
@@ -142,5 +145,24 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   @Override
   public void close()
       throws IOException {
+  }
+
+  public static class CompilerAdapter {
+    private final FSTCompiler<Long> _fstCompiler;
+    private final IntsRefBuilder _scratch = new IntsRefBuilder();
+
+    public CompilerAdapter() {
+      _fstCompiler = new FSTCompiler.Builder<>(FST.INPUT_TYPE.BYTE4, PositiveIntOutputs.getSingleton()).build();
+    }
+
+    public void addEntry(String key, Integer value)
+        throws IOException {
+      _fstCompiler.add(Util.toUTF16(key, _scratch), value.longValue());
+    }
+
+    public FST<Long> compile()
+        throws IOException {
+      return FST.fromFSTReader(_fstCompiler.compile(), _fstCompiler.getFSTReader());
+    }
   }
 }
