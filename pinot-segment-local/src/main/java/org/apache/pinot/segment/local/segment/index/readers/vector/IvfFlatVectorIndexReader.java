@@ -203,6 +203,11 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
    * This allows query-time tuning of the recall/speed tradeoff.
    *
    * @param nprobe number of centroids to probe (clamped to [1, nlist])
+   *
+   * <p><b>Thread-safety note:</b> This method mutates a volatile field on the shared reader instance.
+   * In Pinot's query execution model, nprobe is set once per query before calling getDocIds(),
+   * and each query runs on a single thread per segment. A future improvement could pass nprobe
+   * as a parameter to getDocIds() to eliminate any cross-query visibility concern.</p>
    */
   public void setNprobe(int nprobe) {
     _nprobe = Math.max(1, Math.min(nprobe, _nlist));

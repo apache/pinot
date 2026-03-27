@@ -49,8 +49,8 @@ import org.slf4j.LoggerFactory;
  * <p>This operator supports backend-neutral vector search with the following capabilities:</p>
  * <ul>
  *   <li><b>nprobe dispatch:</b> If the underlying reader implements {@link NprobeAware}, the
- *       {@code vector.nprobe} query option is applied before search.</li>
- *   <li><b>Exact rerank:</b> When {@code vector.exactRerank=true}, ANN candidates are re-scored
+ *       {@code vectorNprobe} query option is applied before search.</li>
+ *   <li><b>Exact rerank:</b> When {@code vectorExactRerank=true}, ANN candidates are re-scored
  *       using exact distance from the forward index and re-sorted before final top-K selection.</li>
  *   <li><b>maxCandidates:</b> Controls how many ANN candidates are retrieved before rerank. Only
  *       meaningful when rerank is enabled.</li>

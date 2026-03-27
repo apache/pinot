@@ -52,6 +52,8 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -68,6 +70,7 @@ import org.apache.pinot.spi.data.Schema;
  * backward compatibility with existing table configurations.</p>
  */
 public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(VectorIndexType.class);
   public static final String INDEX_DISPLAY_NAME = "vector";
 
   protected VectorIndexType() {
@@ -203,7 +206,11 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
       case HNSW:
         return new MutableVectorIndex(context.getSegmentName(), context.getFieldSpec().getName(), config);
       case IVF_FLAT:
-        // IVF_FLAT does not support mutable indexes in phase 1; return null to skip index creation.
+        // IVF_FLAT does not support mutable indexes in phase 1.
+        LOGGER.warn("IVF_FLAT vector index does not support mutable/realtime segments. "
+            + "No vector index will be built for column: {} in segment: {}. "
+            + "Queries will fall back to exact scan.",
+            context.getFieldSpec().getName(), context.getSegmentName());
         return null;
       default:
         return null;
