@@ -280,7 +280,7 @@ public class DataTableSerDeTest {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     DataTable dataTable = dataTableBuilder.build();
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // When measurement is enabled, response serialization metadata should have positive values.
+    // When ThreadCpuTimeMeasurement is enabled, responseSerializationCpuTimeNs should be positive.
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName()));
@@ -294,12 +294,12 @@ public class DataTableSerDeTest {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(false);
     dataTable = dataTableBuilder.build();
     newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // Response serialization metadata is always populated, but may be zero when measurement is disabled.
+    // When measurement is disabled, response serialization metadata is absent.
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
-    Assert.assertNotNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName()));
-    Assert.assertNotNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName()));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName()));
   }
 
   private void fillDataTableWithRandomData(DataTableBuilder dataTableBuilder,
