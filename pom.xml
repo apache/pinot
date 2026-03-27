@@ -1840,6 +1840,23 @@
         <version>${flink.version}</version>
       </dependency>
 
+      <!-- Spark -->
+      <dependency>
+        <groupId>org.apache.spark</groupId>
+        <artifactId>spark-core_${scala.compat.version}</artifactId>
+        <version>${spark3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.spark</groupId>
+        <artifactId>spark-sql_${scala.compat.version}</artifactId>
+        <version>${spark3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.spark</groupId>
+        <artifactId>spark-launcher_${scala.compat.version}</artifactId>
+        <version>${spark3.version}</version>
+      </dependency>
+
       <!-- Lucene -->
       <dependency>
         <groupId>org.apache.lucene</groupId>
@@ -2079,6 +2096,16 @@
         <groupId>com.mchange</groupId>
         <artifactId>mchange-commons-java</artifactId>
         <version>${mchange-commons-java.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.os72</groupId>
+        <artifactId>protobuf-dynamic</artifactId>
+        <version>${protobuf-dynamic.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>cloud.localstack</groupId>
+        <artifactId>localstack-utils</artifactId>
+        <version>${localstack-utils.version}</version>
       </dependency>
 
       <!-- Test Libraries -->
@@ -2553,6 +2580,11 @@
               </goals>
             </execution>
           </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>build-helper-maven-plugin</artifactId>
+          <version>3.6.1</version>
         </plugin>
         <plugin>
           <groupId>com.github.eirslett</groupId>
