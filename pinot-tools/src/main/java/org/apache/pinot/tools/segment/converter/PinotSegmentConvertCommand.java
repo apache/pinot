@@ -74,8 +74,7 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
   private CompressionCodecName _parquetCompression = CompressionCodecName.GZIP;
 
   @CommandLine.Option(names = {"-forwardIndexOnly"}, required = false,
-      description = "When outputFormat is PARQUET, load only forward index from the segment, skipping secondary "
-          + "indexes; ignored for AVRO/CSV/JSON (default false).")
+      description = "Load only forward index from the segment, skipping secondary indexes (default false).")
   private boolean _forwardIndexOnly;
 
   @CommandLine.Option(names = {"-overwrite"}, required = false,
@@ -138,16 +137,16 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
         switch (FileFormat.fromString(_outputFormat)) {
           case AVRO:
             outputPath += ".avro";
-            new PinotSegmentToAvroConverter(inputPath, outputPath).convert();
+            new PinotSegmentToAvroConverter(inputPath, outputPath, _forwardIndexOnly).convert();
             break;
           case CSV:
             outputPath += ".csv";
-            new PinotSegmentToCsvConverter(inputPath, outputPath, _csvDelimiter, _csvDelimiter, _csvWithHeader)
-                .convert();
+            new PinotSegmentToCsvConverter(inputPath, outputPath, _csvDelimiter, _csvDelimiter, _csvWithHeader,
+                _forwardIndexOnly).convert();
             break;
           case JSON:
             outputPath += ".json";
-            new PinotSegmentToJsonConverter(inputPath, outputPath).convert();
+            new PinotSegmentToJsonConverter(inputPath, outputPath, _forwardIndexOnly).convert();
             break;
           case PARQUET:
             outputPath += ".parquet";
