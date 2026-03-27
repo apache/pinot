@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,10 +89,11 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
     // Initialize nprobe to the default; query-time tuning should use NprobeAware#setNprobe.
     int configuredNprobe = DEFAULT_NPROBE;
 
-    File indexFile = findIvfFlatIndexFile(indexDir, column);
-    if (indexFile == null) {
+    File indexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, column);
+    if (indexFile == null || !indexFile.exists()) {
       throw new IllegalStateException(
-          "Failed to find IVF_FLAT index file for column: " + column + " in dir: " + indexDir);
+          "Failed to find IVF_FLAT index file for column: " + column + " in dir: " + indexDir
+              + ". Expected file: " + column + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
     }
 
     try (DataInputStream in = new DataInputStream(new FileInputStream(indexFile))) {
@@ -284,30 +286,6 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
     }
 
     return bestIndices;
-  }
-
-  /**
-   * Locates the IVF_FLAT index file for a column, checking both V1 and V3 directory layouts.
-   */
-  private static File findIvfFlatIndexFile(File segmentIndexDir, String column) {
-    String fileName = column + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
-
-    // Check V3 directory first
-    File v3Dir = new File(segmentIndexDir, "v3");
-    if (v3Dir.isDirectory()) {
-      File v3File = new File(v3Dir, fileName);
-      if (v3File.exists()) {
-        return v3File;
-      }
-    }
-
-    // Fall back to V1 (top-level directory)
-    File v1File = new File(segmentIndexDir, fileName);
-    if (v1File.exists()) {
-      return v1File;
-    }
-
-    return null;
   }
 
   // -----------------------------------------------------------------------
