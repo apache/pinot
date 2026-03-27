@@ -282,6 +282,11 @@ public class QueryOptionsUtils {
     return checkedParseIntPositive(QueryOptionKey.CURSOR_NUM_ROWS, cursorNumRows);
   }
 
+  public static boolean isUseStreamingResponse(Map<String, String> queryOptions, boolean defaultValue) {
+    String useStreamingResponse = queryOptions.get(QueryOptionKey.USE_STREAMING_RESPONSE);
+    return useStreamingResponse != null ? Boolean.parseBoolean(useStreamingResponse) : defaultValue;
+  }
+
   public static Optional<Boolean> isExplainAskingServers(Map<String, String> queryOptions) {
     String value = queryOptions.get(QueryOptionKey.EXPLAIN_ASKING_SERVERS);
     if (value == null) {

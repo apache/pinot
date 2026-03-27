@@ -624,6 +624,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
         "pinot.broker.query.enable.auto.rewrite.aggregation.type";
+    public static final String CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE =
+        "pinot.broker.query.enable.streaming.response";
+    public static final boolean DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE = false;
 
     /// Config for sort exchange copy threshold in multi-stage engine.
     ///
@@ -838,6 +841,8 @@ public class CommonConstants {
         public static final String GET_CURSOR = "getCursor";
         // Number of rows that the cursor should contain
         public static final String CURSOR_NUM_ROWS = "cursorNumRows";
+        // Set to true to force broker streaming response for a query.
+        public static final String USE_STREAMING_RESPONSE = "useStreamingResponse";
 
         // Custom Query ID provided by the client
         public static final String CLIENT_QUERY_ID = "clientQueryId";

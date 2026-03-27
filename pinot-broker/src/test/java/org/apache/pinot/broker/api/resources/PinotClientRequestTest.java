@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.HttpHeaders;
@@ -40,6 +41,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -58,6 +60,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class PinotClientRequestTest {
@@ -66,6 +69,8 @@ public class PinotClientRequestTest {
   private SqlQueryExecutor _sqlQueryExecutor;
   @Mock
   private BrokerRequestHandler _requestHandler;
+  @Mock
+  private PinotConfiguration _brokerConf;
   @Mock
   private BrokerMetrics _brokerMetrics;
   @Mock
@@ -123,6 +128,33 @@ public class PinotClientRequestTest {
         1);
     assertEquals(tableDoesNotExistResponseWithHttpResponseCode.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
         QueryErrorCode.TABLE_DOES_NOT_EXIST.getId());
+  }
+
+  @Test
+  public void testUseStreamingUsesBrokerDefaultAndQueryOptionOverride() {
+    SqlNodeAndOptions noQueryOption = mock(SqlNodeAndOptions.class);
+    when(noQueryOption.getOptions()).thenReturn(Map.of());
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(false);
+    assertFalse(_pinotClientRequest.useStreaming(noQueryOption));
+
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(true);
+    assertTrue(_pinotClientRequest.useStreaming(noQueryOption));
+
+    SqlNodeAndOptions forceStreamingOn = mock(SqlNodeAndOptions.class);
+    when(forceStreamingOn.getOptions()).thenReturn(
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_STREAMING_RESPONSE, "true"));
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(false);
+    assertTrue(_pinotClientRequest.useStreaming(forceStreamingOn));
+
+    SqlNodeAndOptions forceStreamingOff = mock(SqlNodeAndOptions.class);
+    when(forceStreamingOff.getOptions()).thenReturn(
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_STREAMING_RESPONSE, "false"));
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(true);
+    assertFalse(_pinotClientRequest.useStreaming(forceStreamingOff));
   }
 
   @Test

@@ -93,6 +93,7 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -615,11 +616,16 @@ public class QueryDispatcher {
     OpChainExecutionContext opChainExecutionContext = OpChainExecutionContext.fromQueryContext(
         mailboxService, queryOptions, stageMetadata, workerMetadata.get(0), null, true, true);
 
-    MultiStageOperator rootOp = PlanNodeToOpChain.convertToOperator(rootNode, opChainExecutionContext);
+    OpChain rootOp = OpChainConverterDispatcher.convert(rootNode, opChainExecutionContext);
 
-    LazyBrokerResponse lazyBrokerResponse = new LazyBrokerResponse(resultSchema, rootOp);
+    try {
+      LazyBrokerResponse lazyBrokerResponse = new LazyBrokerResponse(resultSchema, rootOp);
 
-    return new DispatcherStreamingBrokerResponse(lazyBrokerResponse, rootOp, subPlan, queryDispatcher, servers);
+      return new DispatcherStreamingBrokerResponse(lazyBrokerResponse, subPlan, queryDispatcher, servers);
+    } catch (Throwable e) {
+      rootOp.close();
+      throw e;
+    }
   }
 
   public BrokerResponseNativeV2 submitAndReduceForTest(DispatchableSubPlan subPlan, Map<String, String> queryOptions)
@@ -898,7 +904,6 @@ public class QueryDispatcher {
   /// calculate the stats.
   public static class DispatcherStreamingBrokerResponse
       extends StreamingBrokerResponse.Delegator {
-    private final MultiStageOperator _rootOperator;
     private final DispatchableSubPlan _dispatchableSubPlan;
     /// The query dispatcher used to submit the query.
     ///
@@ -909,11 +914,10 @@ public class QueryDispatcher {
     private final Set<QueryServerInstance> _servers;
     private boolean _closed = false;
 
-    public DispatcherStreamingBrokerResponse(LazyBrokerResponse lazyBrokerResponse, MultiStageOperator rootOperator,
+    public DispatcherStreamingBrokerResponse(LazyBrokerResponse lazyBrokerResponse,
         DispatchableSubPlan dispatchableSubPlan, @Nullable QueryDispatcher dispatcher,
         @Nullable Set<QueryServerInstance> servers) {
       super(lazyBrokerResponse);
-      _rootOperator = rootOperator;
       _dispatchableSubPlan = dispatchableSubPlan;
       _dispatcher = dispatcher;
       _servers = servers;
@@ -924,7 +928,6 @@ public class QueryDispatcher {
       if (!_closed) {
         _closed = true;
         super.close();
-        _rootOperator.close();
         if (_dispatcher != null) {
           _dispatcher.cancel(QueryThreadContext.get().getExecutionContext().getRequestId());
         }
@@ -953,7 +956,7 @@ public class QueryDispatcher {
       try {
         Metainfo metainfo = _delegate.consumeData(consumer);
         metainfo.getExceptions().forEach(oldResponse::addException);
-        stats = _rootOperator.calculateStats();
+        stats = ((LazyBrokerResponse) _delegate).calculateStats();
       } catch (InterruptedException e) {
         if (_dispatcher != null) {
           // We cannot cancel with stats here because the current thread is already interrupted and we don't want to
