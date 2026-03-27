@@ -100,7 +100,7 @@ public class TextIndexConfigTest {
   public void withSomeData()
       throws JsonProcessingException {
     String confStr = "{\n"
-        + "        \"fst\": \"NATIVE\",\n"
+        + "        \"fst\": \"LUCENE\",\n"
         + "        \"rawValue\": \"fakeValue\",\n"
         + "        \"queryCache\": true,\n"
         + "        \"useANDForMultiTermQueries\": true,\n"
@@ -112,7 +112,7 @@ public class TextIndexConfigTest {
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertEquals(config.getFstType(), FSTType.NATIVE, "Unexpected fst");
+    assertEquals(config.getFstType(), FSTType.LUCENE, "Unexpected fst");
     assertEquals(config.getRawValueForTextIndex(), "fakeValue", "Unexpected rawValue");
     assertTrue(config.isEnableQueryCache(), "Unexpected queryCache");
     assertTrue(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
