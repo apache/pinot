@@ -91,11 +91,7 @@ public class PinotAdminTransport implements AutoCloseable {
     if (CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(scheme)) {
       try {
         TlsConfig tlsConfig = ConnectionUtils.getTlsConfigFromProperties(properties);
-        // NOTE: ConnectionUtils.getSSLContextFromProperties(...) installs a JVM-global default SSLSocketFactory
-        // and updates the shared TlsUtils SSLContext. PinotAdminTransport has historically inherited that process-
-        // wide side effect from the shared helper, so callers enabling HTTPS here should treat the TLS config as
-        // affecting other HttpsURLConnection-based clients in the same JVM.
-        SSLContext sslContext = ConnectionUtils.getSSLContextFromProperties(properties);
+        SSLContext sslContext = ConnectionUtils.createSSLContextFromProperties(properties);
         SSL_CONTEXT_PROVIDER.configure(builder, sslContext, null, tlsConfig.getEndpointIdentificationAlgorithm());
       } catch (Exception e) {
         LOGGER.warn("Failed to configure SSL context, proceeding without SSL", e);
