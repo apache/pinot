@@ -1011,8 +1011,7 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
   public void testForceReleaseLockWhenNoLockExists() throws Exception {
     // Setup controller with distributed locking enabled
     Map<String, Object> properties = getDefaultControllerConfiguration();
-    // Keep the scheduler disabled so the test can assert against an otherwise idle lock state.
-    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
 
     startController(properties);
