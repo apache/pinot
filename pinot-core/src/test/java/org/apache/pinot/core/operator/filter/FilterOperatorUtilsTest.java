@@ -248,6 +248,14 @@ public class FilterOperatorUtilsTest {
   }
 
   @Test
+  public void testTextMatchNotFenceZeroSearchableDocsReturnsEmpty() {
+    // searchableDocCount = 0 means Lucene searcher has not yet refreshed; NOT result must be empty
+    NotFilterOperator notOp = new NotFilterOperator(textMatchOp(TOTAL_DOCS, 0), TOTAL_DOCS, false);
+    List<Integer> result = TestUtils.getDocIds(notOp.getTrues());
+    assertEquals(result.size(), 0, "NOT result must be empty when no docs are visible to Lucene yet");
+  }
+
+  @Test
   public void testTextMatchNotFenceNoMatchesReturnsAllSearchable() {
     TextMatchPredicate predicate =
         new TextMatchPredicate(ExpressionContext.forIdentifier("__mergedTextIndex"), "nothing");
