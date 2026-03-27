@@ -228,6 +228,8 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
         if (docVector == null || docVector.length == 0) {
           continue;
         }
+        // TODO: derive distance function from segment's vector index config instead of hardcoding L2.
+        //  Currently correct for EUCLIDEAN/L2; may produce suboptimal rerank ordering for COSINE/DOT_PRODUCT.
         float distance = ExactVectorScanFilterOperator.computeL2SquaredDistance(queryVector, docVector);
         if (maxHeap.size() < topK) {
           maxHeap.add(new DocDistance(docId, distance));

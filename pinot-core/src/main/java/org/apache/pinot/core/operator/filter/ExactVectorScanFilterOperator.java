@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
+import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
@@ -189,16 +190,11 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
 
   /**
    * Computes the squared L2 (Euclidean) distance between two vectors.
-   * Uses squared distance to avoid the sqrt, which is monotonic so does not affect ranking.
+   * Delegates to {@link VectorFunctions#euclideanDistance(float[], float[])} which returns
+   * the sum of squared differences (no sqrt), sufficient for ranking.
    */
   static float computeL2SquaredDistance(float[] a, float[] b) {
-    int len = Math.min(a.length, b.length);
-    float sum = 0.0f;
-    for (int i = 0; i < len; i++) {
-      float diff = a[i] - b[i];
-      sum += diff * diff;
-    }
-    return sum;
+    return (float) VectorFunctions.euclideanDistance(a, b);
   }
 
   private void record(ImmutableRoaringBitmap matches) {

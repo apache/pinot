@@ -85,11 +85,8 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
   public IvfFlatVectorIndexReader(String column, File indexDir, VectorIndexConfig config) {
     _column = column;
 
-    // Determine nprobe from config
+    // Initialize nprobe to the default; query-time tuning should use NprobeAware#setNprobe.
     int configuredNprobe = DEFAULT_NPROBE;
-    if (config.getProperties() != null && config.getProperties().containsKey("nprobe")) {
-      configuredNprobe = Integer.parseInt(config.getProperties().get("nprobe"));
-    }
 
     File indexFile = findIvfFlatIndexFile(indexDir, column);
     if (indexFile == null) {
@@ -255,25 +252,33 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
    * @return array of centroid indices sorted by increasing distance
    */
   private int[] findClosestCentroids(float[] query, int n) {
-    // Compute distance to each centroid
-    float[] centroidDistances = new float[_nlist];
+    int[] bestIndices = new int[n];
+    if (n == 0) {
+      return bestIndices;
+    }
+
+    // Maintain a sorted top-n array (ascending by distance) using insertion sort.
+    // This avoids boxing Integer[] and O(nlist log nlist) full sort — we only need nprobe smallest.
+    float[] bestDistances = new float[n];
+    Arrays.fill(bestDistances, Float.POSITIVE_INFINITY);
+
     for (int c = 0; c < _nlist; c++) {
-      centroidDistances[c] = computeDistance(query, _centroids[c]);
+      float distance = computeDistance(query, _centroids[c]);
+      if (distance >= bestDistances[n - 1]) {
+        continue;
+      }
+      // Insert into sorted position by shifting larger entries right
+      int insertPos = n - 1;
+      while (insertPos > 0 && distance < bestDistances[insertPos - 1]) {
+        bestDistances[insertPos] = bestDistances[insertPos - 1];
+        bestIndices[insertPos] = bestIndices[insertPos - 1];
+        insertPos--;
+      }
+      bestDistances[insertPos] = distance;
+      bestIndices[insertPos] = c;
     }
 
-    // Find top-n using partial sort
-    // For simplicity, use an indexed sort on centroid distances
-    Integer[] indices = new Integer[_nlist];
-    for (int i = 0; i < _nlist; i++) {
-      indices[i] = i;
-    }
-    Arrays.sort(indices, (a, b) -> Float.compare(centroidDistances[a], centroidDistances[b]));
-
-    int[] result = new int[n];
-    for (int i = 0; i < n; i++) {
-      result[i] = indices[i];
-    }
-    return result;
+    return bestIndices;
   }
 
   /**

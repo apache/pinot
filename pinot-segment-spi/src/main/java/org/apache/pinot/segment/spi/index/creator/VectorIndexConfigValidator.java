@@ -128,6 +128,8 @@ public final class VectorIndexConfigValidator {
 
   /**
    * Ensures that properties belonging to a foreign backend are not present.
+   * Note: this only rejects known foreign-backend keys; arbitrary unknown keys are allowed
+   * to support forward-compatible extensibility.
    */
   private static void validateNoForeignProperties(Map<String, String> properties,
       Set<String> ownProperties, Set<String> foreignProperties,
