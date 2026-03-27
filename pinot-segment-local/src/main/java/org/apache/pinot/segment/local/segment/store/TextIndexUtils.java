@@ -44,9 +44,7 @@ import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -89,7 +87,7 @@ public class TextIndexUtils {
     }
   }
 
-  static void cleanupTextIndex(File segDir, String column) {
+  public static void cleanupTextIndex(File segDir, String column) {
     // Remove the lucene index file and potentially the docId mapping file.
     File luceneIndexFile = new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneIndexFile);
@@ -113,7 +111,6 @@ public class TextIndexUtils {
     //@formatter:off
     return new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists();
     //@formatter:on
@@ -129,10 +126,6 @@ public class TextIndexUtils {
       }
     }
     return false;
-  }
-
-  public static FSTType getFSTTypeOfIndex(File indexDir, String column) {
-    return SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, column) != null ? FSTType.LUCENE : FSTType.NATIVE;
   }
 
   public static List<String> extractStopWordsInclude(String colName,

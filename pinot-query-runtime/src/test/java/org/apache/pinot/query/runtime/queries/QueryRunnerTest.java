@@ -323,10 +323,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     //   - predicate only functions:
     testCases.add(new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"});
     testCases.add(new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index"});
-    testCases.add(new Object[]{"SELECT * FROM a WHERE textContains(col1, 'f')", "supported only on native text index"});
+    testCases.add(new Object[]{"SELECT * FROM a WHERE textContains(col1, 'f')",
+        "native text index was removed"});
     testCases.add(new Object[]{
         "SELECT * FROM a WHERE text_contains(col1, 'f')",
-        "supported only on native text index"}
+        "native text index was removed"}
     );
 
     //  - transform only functions

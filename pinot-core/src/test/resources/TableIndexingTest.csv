@@ -5,7 +5,6 @@ INT;sv;raw;fst_index;false;Cannot create FST index on column: col without dictio
 INT;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 INT;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 INT;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-INT;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;sv;raw;range_index;true;
 INT;sv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -17,7 +16,6 @@ INT;mv;raw;fst_index;false;Cannot create FST index on column: col without dictio
 INT;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
 INT;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 INT;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
-INT;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;mv;raw;range_index;true;
 INT;mv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -29,7 +27,6 @@ INT;sv;dict;fst_index;false;Cannot create FST index on column: col of stored typ
 INT;sv;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 INT;sv;dict;inverted_index;true;
 INT;sv;dict;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-INT;sv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;sv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;sv;dict;range_index;true;
 INT;sv;dict;startree_index;true;
@@ -41,7 +38,6 @@ INT;mv;dict;fst_index;false;Cannot create FST index on multi-value column: col
 INT;mv;dict;h3_index;false;Cannot create H3 index on multi-value column: col
 INT;mv;dict;inverted_index;true;
 INT;mv;dict;json_index;false;Cannot create JSON index on multi-value column: col
-INT;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;mv;dict;range_index;true;
 INT;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
@@ -53,7 +49,6 @@ LONG;sv;raw;fst_index;false;Cannot create FST index on column: col without dicti
 LONG;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 LONG;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 LONG;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-LONG;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;sv;raw;range_index;true;
 LONG;sv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -65,7 +60,6 @@ LONG;mv;raw;fst_index;false;Cannot create FST index on column: col without dicti
 LONG;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
 LONG;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 LONG;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
-LONG;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;mv;raw;range_index;true;
 LONG;mv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -77,7 +71,6 @@ LONG;sv;dict;fst_index;false;Cannot create FST index on column: col of stored ty
 LONG;sv;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 LONG;sv;dict;inverted_index;true;
 LONG;sv;dict;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-LONG;sv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;sv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;sv;dict;range_index;true;
 LONG;sv;dict;startree_index;true;
@@ -89,7 +82,6 @@ LONG;mv;dict;fst_index;false;Cannot create FST index on multi-value column: col
 LONG;mv;dict;h3_index;false;Cannot create H3 index on multi-value column: col
 LONG;mv;dict;inverted_index;true;
 LONG;mv;dict;json_index;false;Cannot create JSON index on multi-value column: col
-LONG;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;mv;dict;range_index;true;
 LONG;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
@@ -101,7 +93,6 @@ FLOAT;sv;raw;fst_index;false;Cannot create FST index on column: col without dict
 FLOAT;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 FLOAT;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 FLOAT;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-FLOAT;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;sv;raw;range_index;true;
 FLOAT;sv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -113,7 +104,6 @@ FLOAT;mv;raw;fst_index;false;Cannot create FST index on column: col without dict
 FLOAT;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
 FLOAT;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 FLOAT;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
-FLOAT;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;mv;raw;range_index;true;
 FLOAT;mv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -125,7 +115,6 @@ FLOAT;sv;dict;fst_index;false;Cannot create FST index on column: col of stored t
 FLOAT;sv;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 FLOAT;sv;dict;inverted_index;true;
 FLOAT;sv;dict;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-FLOAT;sv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;sv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;sv;dict;range_index;true;
 FLOAT;sv;dict;startree_index;true;
@@ -137,7 +126,6 @@ FLOAT;mv;dict;fst_index;false;Cannot create FST index on multi-value column: col
 FLOAT;mv;dict;h3_index;false;Cannot create H3 index on multi-value column: col
 FLOAT;mv;dict;inverted_index;true;
 FLOAT;mv;dict;json_index;false;Cannot create JSON index on multi-value column: col
-FLOAT;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;mv;dict;range_index;true;
 FLOAT;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
@@ -149,7 +137,6 @@ DOUBLE;sv;raw;fst_index;false;Cannot create FST index on column: col without dic
 DOUBLE;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 DOUBLE;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 DOUBLE;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-DOUBLE;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;sv;raw;range_index;true;
 DOUBLE;sv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -161,7 +148,6 @@ DOUBLE;mv;raw;fst_index;false;Cannot create FST index on column: col without dic
 DOUBLE;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
 DOUBLE;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 DOUBLE;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
-DOUBLE;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;mv;raw;range_index;true;
 DOUBLE;mv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -173,7 +159,6 @@ DOUBLE;sv;dict;fst_index;false;Cannot create FST index on column: col of stored 
 DOUBLE;sv;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 DOUBLE;sv;dict;inverted_index;true;
 DOUBLE;sv;dict;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-DOUBLE;sv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;sv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;sv;dict;range_index;true;
 DOUBLE;sv;dict;startree_index;true;
@@ -185,7 +170,6 @@ DOUBLE;mv;dict;fst_index;false;Cannot create FST index on multi-value column: co
 DOUBLE;mv;dict;h3_index;false;Cannot create H3 index on multi-value column: col
 DOUBLE;mv;dict;inverted_index;true;
 DOUBLE;mv;dict;json_index;false;Cannot create JSON index on multi-value column: col
-DOUBLE;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;mv;dict;range_index;true;
 DOUBLE;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
@@ -197,7 +181,6 @@ DECIMAL;sv_BIG;raw;fst_index;false;Cannot create FST index on column: col withou
 DECIMAL;sv_BIG;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 DECIMAL;sv_BIG;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 DECIMAL;sv_BIG;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-DECIMAL;sv_BIG;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DECIMAL;sv_BIG;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DECIMAL;sv_BIG;raw;range_index;false;Unsupported data type: BIG_DECIMAL
 DECIMAL;sv_BIG;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -209,7 +192,6 @@ DECIMAL;sv_BIG;dict;fst_index;false;Cannot create FST index on column: col of st
 DECIMAL;sv_BIG;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 DECIMAL;sv_BIG;dict;inverted_index;true;
 DECIMAL;sv_BIG;dict;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-DECIMAL;sv_BIG;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DECIMAL;sv_BIG;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DECIMAL;sv_BIG;dict;range_index;true;
 DECIMAL;sv_BIG;dict;startree_index;true;
@@ -221,7 +203,6 @@ BOOLEAN;sv;raw;fst_index;false;Cannot create FST index on column: col without di
 BOOLEAN;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 BOOLEAN;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 BOOLEAN;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-BOOLEAN;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;sv;raw;range_index;true;
 BOOLEAN;sv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -233,7 +214,6 @@ BOOLEAN;mv;raw;fst_index;false;Cannot create FST index on column: col without di
 BOOLEAN;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
 BOOLEAN;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 BOOLEAN;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
-BOOLEAN;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;mv;raw;range_index;true;
 BOOLEAN;mv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -245,7 +225,6 @@ BOOLEAN;sv;dict;fst_index;false;Cannot create FST index on column: col of stored
 BOOLEAN;sv;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 BOOLEAN;sv;dict;inverted_index;true;
 BOOLEAN;sv;dict;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-BOOLEAN;sv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;sv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;sv;dict;range_index;true;
 BOOLEAN;sv;dict;startree_index;true;
@@ -257,7 +236,6 @@ BOOLEAN;mv;dict;fst_index;false;Cannot create FST index on multi-value column: c
 BOOLEAN;mv;dict;h3_index;false;Cannot create H3 index on multi-value column: col
 BOOLEAN;mv;dict;inverted_index;true;
 BOOLEAN;mv;dict;json_index;false;Cannot create JSON index on multi-value column: col
-BOOLEAN;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BOOLEAN;mv;dict;range_index;true;
 BOOLEAN;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
@@ -269,7 +247,6 @@ TIMESTAMP;sv;raw;fst_index;false;Cannot create FST index on column: col without 
 TIMESTAMP;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 TIMESTAMP;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 TIMESTAMP;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-TIMESTAMP;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;sv;raw;range_index;true;
 TIMESTAMP;sv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -281,7 +258,6 @@ TIMESTAMP;mv;raw;fst_index;false;Cannot create FST index on column: col without 
 TIMESTAMP;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
 TIMESTAMP;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 TIMESTAMP;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
-TIMESTAMP;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;mv;raw;range_index;true;
 TIMESTAMP;mv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -293,7 +269,6 @@ TIMESTAMP;sv;dict;fst_index;false;Cannot create FST index on column: col of stor
 TIMESTAMP;sv;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 TIMESTAMP;sv;dict;inverted_index;true;
 TIMESTAMP;sv;dict;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-TIMESTAMP;sv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;sv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;sv;dict;range_index;true;
 TIMESTAMP;sv;dict;startree_index;true;
@@ -305,7 +280,6 @@ TIMESTAMP;mv;dict;fst_index;false;Cannot create FST index on multi-value column:
 TIMESTAMP;mv;dict;h3_index;false;Cannot create H3 index on multi-value column: col
 TIMESTAMP;mv;dict;inverted_index;true;
 TIMESTAMP;mv;dict;json_index;false;Cannot create JSON index on multi-value column: col
-TIMESTAMP;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 TIMESTAMP;mv;dict;range_index;true;
 TIMESTAMP;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
@@ -317,7 +291,6 @@ STRING;sv;raw;fst_index;false;Cannot create FST index on column: col without dic
 STRING;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 STRING;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 STRING;sv;raw;json_index;false;Column: col Unrecognized token 'str': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 15]
-STRING;sv;raw;native_text_index;true;
 STRING;sv;raw;text_index;true;
 STRING;sv;raw;range_index;false;Cannot create range index on non-numeric column: col without dictionary
 STRING;sv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -329,7 +302,6 @@ STRING;mv;raw;fst_index;false;Cannot create FST index on column: col without dic
 STRING;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
 STRING;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 STRING;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
-STRING;mv;raw;native_text_index;true;
 STRING;mv;raw;text_index;true;
 STRING;mv;raw;range_index;false;Cannot create range index on non-numeric column: col without dictionary
 STRING;mv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -341,7 +313,6 @@ STRING;sv;dict;fst_index;true;
 STRING;sv;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 STRING;sv;dict;inverted_index;true;
 STRING;sv;dict;json_index;false;Column: col Unrecognized token 'str': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 15]
-STRING;sv;dict;native_text_index;true;
 STRING;sv;dict;text_index;true;
 STRING;sv;dict;range_index;true;
 STRING;sv;dict;startree_index;false;
@@ -353,7 +324,6 @@ STRING;mv;dict;fst_index;false;Cannot create FST index on multi-value column: co
 STRING;mv;dict;h3_index;false;Cannot create H3 index on multi-value column: col
 STRING;mv;dict;inverted_index;true;
 STRING;mv;dict;json_index;false;Cannot create JSON index on multi-value column: col
-STRING;mv;dict;native_text_index;true;
 STRING;mv;dict;text_index;true;
 STRING;mv;dict;range_index;true;
 STRING;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
@@ -365,7 +335,6 @@ JSON;sv;raw;fst_index;false;Cannot create FST index on column: col without dicti
 JSON;sv;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 JSON;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 JSON;sv;raw;json_index;true;
-JSON;sv;raw;native_text_index;false;expected [1] but found [0]
 JSON;sv;raw;text_index;false;expected [1] but found [0]
 JSON;sv;raw;range_index;false;Cannot create range index on non-numeric column: col without dictionary
 JSON;sv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -377,7 +346,6 @@ JSON;sv;dict;fst_index;true;
 JSON;sv;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 JSON;sv;dict;inverted_index;true;
 JSON;sv;dict;json_index;true;
-JSON;sv;dict;native_text_index;false;expected [1] but found [0]
 JSON;sv;dict;text_index;false;expected [1] but found [0]
 JSON;sv;dict;range_index;true;
 JSON;sv;dict;startree_index;false;
@@ -389,7 +357,6 @@ BYTES;sv;raw;fst_index;false;Cannot create FST index on column: col without dict
 BYTES;sv;raw;h3_index;false;Caught exception while reading data
 BYTES;sv;raw;inverted_index;false;Caught exception while reading data
 BYTES;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-BYTES;sv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;sv;raw;range_index;false;Cannot create range index on non-numeric column: col without dictionary
 BYTES;sv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -401,7 +368,6 @@ BYTES;mv;raw;fst_index;false;Cannot create FST index on column: col without dict
 BYTES;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
 BYTES;mv;raw;inverted_index;false;Caught exception while reading data
 BYTES;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
-BYTES;mv;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;mv;raw;range_index;false;Cannot create range index on non-numeric column: col without dictionary
 BYTES;mv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -413,7 +379,6 @@ BYTES;sv;dict;fst_index;false;Cannot create FST index on column: col of stored t
 BYTES;sv;dict;h3_index;false;Caught exception while reading data
 BYTES;sv;dict;inverted_index;false;Caught exception while reading data
 BYTES;sv;dict;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
-BYTES;sv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;sv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;sv;dict;range_index;false;Caught exception while reading data
 BYTES;sv;dict;startree_index;false;Caught exception while reading data
@@ -425,7 +390,6 @@ BYTES;mv;dict;fst_index;false;Cannot create FST index on multi-value column: col
 BYTES;mv;dict;h3_index;false;Cannot create H3 index on multi-value column: col
 BYTES;mv;dict;inverted_index;false;Caught exception while reading data
 BYTES;mv;dict;json_index;false;Cannot create JSON index on multi-value column: col
-BYTES;mv;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 BYTES;mv;dict;range_index;false;Caught exception while reading data
 BYTES;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
@@ -437,7 +401,6 @@ STRING;map;raw;fst_index;false;Cannot create FST index on column: col without di
 STRING;map;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 STRING;map;raw;inverted_index;false;Cannot create inverted index on MAP column: col
 STRING;map;raw;json_index;true;
-STRING;map;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 STRING;map;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 STRING;map;raw;range_index;false;Cannot create range index on non-numeric column: col without dictionary
 STRING;map;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -449,7 +412,6 @@ STRING;map;dict;fst_index;false;Cannot create FST index on column: col of stored
 STRING;map;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 STRING;map;dict;inverted_index;false;Cannot create inverted index on MAP column: col
 STRING;map;dict;json_index;true;
-STRING;map;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 STRING;map;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 STRING;map;dict;range_index;false;Cannot create range index on MAP column: col
 STRING;map;dict;startree_index;false;Star-tree index cannot be created on MAP column: col
@@ -461,7 +423,6 @@ INT;map;raw;fst_index;false;Cannot create FST index on column: col without dicti
 INT;map;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 INT;map;raw;inverted_index;false;Cannot create inverted index on MAP column: col
 INT;map;raw;json_index;true;
-INT;map;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;map;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;map;raw;range_index;false;Cannot create range index on non-numeric column: col without dictionary
 INT;map;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -473,7 +434,6 @@ INT;map;dict;fst_index;false;Cannot create FST index on column: col of stored ty
 INT;map;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 INT;map;dict;inverted_index;false;Cannot create inverted index on MAP column: col
 INT;map;dict;json_index;true;
-INT;map;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;map;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 INT;map;dict;range_index;false;Cannot create range index on MAP column: col
 INT;map;dict;startree_index;false;Star-tree index cannot be created on MAP column: col
@@ -485,7 +445,6 @@ LONG;map;raw;fst_index;false;Cannot create FST index on column: col without dict
 LONG;map;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 LONG;map;raw;inverted_index;false;Cannot create inverted index on MAP column: col
 LONG;map;raw;json_index;true;
-LONG;map;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;map;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;map;raw;range_index;false;Cannot create range index on non-numeric column: col without dictionary
 LONG;map;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -497,7 +456,6 @@ LONG;map;dict;fst_index;false;Cannot create FST index on column: col of stored t
 LONG;map;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 LONG;map;dict;inverted_index;false;Cannot create inverted index on MAP column: col
 LONG;map;dict;json_index;true;
-LONG;map;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;map;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 LONG;map;dict;range_index;false;Cannot create range index on MAP column: col
 LONG;map;dict;startree_index;false;Star-tree index cannot be created on MAP column: col
@@ -509,7 +467,6 @@ FLOAT;map;raw;fst_index;false;Cannot create FST index on column: col without dic
 FLOAT;map;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 FLOAT;map;raw;inverted_index;false;Cannot create inverted index on MAP column: col
 FLOAT;map;raw;json_index;true;
-FLOAT;map;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;map;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;map;raw;range_index;false;Cannot create range index on non-numeric column: col without dictionary
 FLOAT;map;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -521,7 +478,6 @@ FLOAT;map;dict;fst_index;false;Cannot create FST index on column: col of stored 
 FLOAT;map;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 FLOAT;map;dict;inverted_index;false;Cannot create inverted index on MAP column: col
 FLOAT;map;dict;json_index;true;
-FLOAT;map;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;map;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 FLOAT;map;dict;range_index;false;Cannot create range index on MAP column: col
 FLOAT;map;dict;startree_index;false;Star-tree index cannot be created on MAP column: col
@@ -533,7 +489,6 @@ DOUBLE;map;raw;fst_index;false;Cannot create FST index on column: col without di
 DOUBLE;map;raw;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 DOUBLE;map;raw;inverted_index;false;Cannot create inverted index on MAP column: col
 DOUBLE;map;raw;json_index;true;
-DOUBLE;map;raw;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;map;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;map;raw;range_index;false;Cannot create range index on non-numeric column: col without dictionary
 DOUBLE;map;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
@@ -545,7 +500,6 @@ DOUBLE;map;dict;fst_index;false;Cannot create FST index on column: col of stored
 DOUBLE;map;dict;h3_index;false;Cannot create H3 index on column: col of stored type other than BYTES
 DOUBLE;map;dict;inverted_index;false;Cannot create inverted index on MAP column: col
 DOUBLE;map;dict;json_index;true;
-DOUBLE;map;dict;native_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;map;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
 DOUBLE;map;dict;range_index;false;Cannot create range index on MAP column: col
 DOUBLE;map;dict;startree_index;false;Star-tree index cannot be created on MAP column: col
