@@ -232,6 +232,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
   protected final List<UtilizationChecker> _utilizationCheckers = new ArrayList<>();
+  protected ResourceUtilizationChecker _resourceUtilizationChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
@@ -771,6 +772,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
+    if (_config.isResourceUtilizationCheckerCollectUsageAtStartup()) {
+      _serviceStatusCallbackList.add(generateResourceUtilizationCheckerStatusCallback());
+    }
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
@@ -849,6 +853,31 @@ public abstract class BaseControllerStarter implements ServiceStartable {
           _statusDescription = ServiceStatus.STATUS_DESCRIPTION_NONE;
           return ServiceStatus.Status.GOOD;
         }
+      }
+
+      @Override
+      public String getStatusDescription() {
+        return _statusDescription;
+      }
+    };
+  }
+
+  /**
+   * Service status callback that waits for the resource utilization checker to fetch servers' resource information.
+   */
+  private ServiceStatus.ServiceStatusCallback generateResourceUtilizationCheckerStatusCallback() {
+    return new ServiceStatus.ServiceStatusCallback() {
+      private volatile String _statusDescription =
+          "Waiting for resource utilization checker to fetch servers' resource information";
+
+      @Override
+      public ServiceStatus.Status getServiceStatus() {
+        if (_resourceUtilizationChecker.hasCompletedAtLeastOnce()) {
+          _statusDescription = ServiceStatus.STATUS_DESCRIPTION_NONE;
+          return ServiceStatus.Status.GOOD;
+        }
+
+        return ServiceStatus.Status.STARTING;
       }
 
       @Override
@@ -1023,9 +1052,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     PeriodicTask responseStoreCleaner = new ResponseStoreCleaner(_config, _helixResourceManager, _leadControllerManager,
         _controllerMetrics, _executorService, _connectionManager);
     periodicTasks.add(responseStoreCleaner);
-    PeriodicTask resourceUtilizationChecker = new ResourceUtilizationChecker(_config, _connectionManager,
+    _resourceUtilizationChecker = new ResourceUtilizationChecker(_config, _connectionManager,
         _controllerMetrics, _utilizationCheckers, _executorService, _helixResourceManager);
-    periodicTasks.add(resourceUtilizationChecker);
+    periodicTasks.add(_resourceUtilizationChecker);
     PeriodicTask tenantRebalanceChecker =
         new TenantRebalanceChecker(_config, _helixResourceManager, _tenantRebalancer);
     periodicTasks.add(tenantRebalanceChecker);

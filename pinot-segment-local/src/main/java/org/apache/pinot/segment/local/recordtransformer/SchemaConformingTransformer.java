@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
-import java.nio.charset.StandardCharsets;
+import com.google.common.base.Utf8;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -141,8 +141,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
         unindexableExtrasFieldName != null ? getAndValidateExtrasFieldType(schema, unindexableExtrasFieldName) : null;
     _mergedTextIndexFieldSpec = schema.getDimensionSpec(_transformerConfig.getMergedTextIndexField());
     _schemaTree = validateSchemaAndCreateTree(schema, _transformerConfig);
-    _jsonKeyValueSeparatorByteCount =
-        _transformerConfig.getJsonKeyValueSeparator().getBytes(StandardCharsets.UTF_8).length;
+    _jsonKeyValueSeparatorByteCount = Utf8.encodedLength(_transformerConfig.getJsonKeyValueSeparator());
     _continueOnError = ingestionConfig.isContinueOnError();
     _serverMetrics = ServerMetrics.get();
     _throttledLogger = new ThrottledLogger(_logger, ingestionConfig);

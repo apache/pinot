@@ -119,7 +119,13 @@
   <dependencies>
     <dependency>
       <groupId>io.prometheus.jmx</groupId>
-      <artifactId>jmx_prometheus_javaagent</artifactId>
+      <artifactId>collector</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-exporter-httpserver</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -398,7 +404,7 @@
       <id>sqlparser</id>
       <activation>
         <file>
-          <missing>${project.build.directory}/generated-sources/javacc/Parser.jj</missing>
+          <missing>${basedir}/target/generated-sources/javacc/Parser.jj</missing>
         </file>
       </activation>
       <build>

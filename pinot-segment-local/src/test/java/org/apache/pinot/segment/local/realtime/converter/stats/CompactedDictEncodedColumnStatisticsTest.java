@@ -55,7 +55,7 @@ public class CompactedDictEncodedColumnStatisticsTest {
     ThreadSafeMutableRoaringBitmap validDocIds = createValidDocIds(0, 1, 2);
 
     CompactedDictEncodedColumnStatistics stats =
-        new CompactedDictEncodedColumnStatistics(dataSource, null, validDocIds);
+        new CompactedDictEncodedColumnStatistics(dataSource, null, false, validDocIds);
 
     // Should find 2 unique dictionary IDs (0 and 1)
     Assert.assertEquals(stats.getCardinality(), 2);
@@ -91,7 +91,7 @@ public class CompactedDictEncodedColumnStatisticsTest {
     ThreadSafeMutableRoaringBitmap validDocIds = createValidDocIds(0, 1, 2);
 
     CompactedDictEncodedColumnStatistics stats =
-        new CompactedDictEncodedColumnStatistics(dataSource, null, validDocIds);
+        new CompactedDictEncodedColumnStatistics(dataSource, null, false, validDocIds);
 
     // Should find 3 unique dictionary IDs (0, 1, 2) across all multi-value entries
     Assert.assertEquals(stats.getCardinality(), 3);
@@ -129,7 +129,7 @@ public class CompactedDictEncodedColumnStatisticsTest {
     ThreadSafeMutableRoaringBitmap validDocIds = createValidDocIds(0, 2);
 
     CompactedDictEncodedColumnStatistics stats =
-        new CompactedDictEncodedColumnStatistics(dataSource, null, validDocIds);
+        new CompactedDictEncodedColumnStatistics(dataSource, null, false, validDocIds);
 
     // Should only find dictionary IDs from valid docs: {0, 1, 4} -> {"tag1", "tag2", "tag5"}
     Assert.assertEquals(stats.getCardinality(), 3);
@@ -162,7 +162,7 @@ public class CompactedDictEncodedColumnStatisticsTest {
     ThreadSafeMutableRoaringBitmap validDocIds = createValidDocIds(0, 1, 2);
 
     CompactedDictEncodedColumnStatistics stats =
-        new CompactedDictEncodedColumnStatistics(dataSource, null, validDocIds);
+        new CompactedDictEncodedColumnStatistics(dataSource, null, false, validDocIds);
 
     Assert.assertEquals(stats.getCardinality(), 2); // IDs 1 and 2 used
 

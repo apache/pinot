@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -33,6 +34,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 
 /**
@@ -500,5 +502,94 @@ public class FieldSpecTest {
         "JSON should contain dataType field: " + metricJson);
     Assert.assertTrue(metricJson.contains("\"singleValueField\":true"),
         "JSON should contain singleValueField field: " + metricJson);
+  }
+
+  @Test
+  public void testDescriptionAndTagsSerdeRoundtrip()
+      throws Exception {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("user_id", STRING, true);
+    fieldSpec.setDescription("Unique user identifier (UUID v4).");
+    fieldSpec.setTags(Arrays.asList("pii", "partition-key"));
+
+    // Verify toJsonObject() includes description and tags
+    String json = fieldSpec.toJsonObject().toString();
+    assertThat(json).contains("\"description\":\"Unique user identifier (UUID v4).\"");
+    assertThat(json).contains("\"tags\":[\"pii\",\"partition-key\"]");
+
+    // Roundtrip via toJsonObject()
+    DimensionFieldSpec deserialized = JsonUtils.stringToObject(json, DimensionFieldSpec.class);
+    assertThat(deserialized.getDescription()).isEqualTo("Unique user identifier (UUID v4).");
+    assertThat(deserialized.getTags()).isEqualTo(Arrays.asList("pii", "partition-key"));
+
+    // Jackson serde roundtrip
+    String jacksonJson = JsonUtils.objectToString(fieldSpec);
+    DimensionFieldSpec fromJackson = JsonUtils.stringToObject(jacksonJson, DimensionFieldSpec.class);
+    assertThat(fromJackson.getDescription()).isEqualTo("Unique user identifier (UUID v4).");
+    assertThat(fromJackson.getTags()).isEqualTo(Arrays.asList("pii", "partition-key"));
+  }
+
+  @Test
+  public void testDescriptionAndTagsOmittedWhenNotSet()
+      throws Exception {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("col1", INT, true);
+
+    // toJsonObject() path
+    String json = fieldSpec.toJsonObject().toString();
+    assertThat(json).as("description should be absent when null").doesNotContain("description");
+    assertThat(json).as("tags should be absent when null").doesNotContain("tags");
+
+    // Jackson path
+    String jacksonJson = JsonUtils.objectToString(fieldSpec);
+    assertThat(jacksonJson).as("description should be absent when null").doesNotContain("description");
+    assertThat(jacksonJson).as("tags should be absent when null").doesNotContain("tags");
+  }
+
+  @Test
+  public void testEmptyTagsOmittedFromJson()
+      throws Exception {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("col1", INT, true);
+    fieldSpec.setTags(List.of());
+
+    String json = fieldSpec.toJsonObject().toString();
+    assertThat(json).as("empty tags should be absent").doesNotContain("tags");
+
+    String jacksonJson = JsonUtils.objectToString(fieldSpec);
+    assertThat(jacksonJson).as("empty tags should be absent (Jackson)").doesNotContain("tags");
+  }
+
+  @Test
+  public void testOldJsonWithoutDescriptionDeserializesCleanly()
+      throws Exception {
+    String oldJson = "{\"name\":\"col1\",\"dataType\":\"STRING\"}";
+    DimensionFieldSpec fieldSpec = JsonUtils.stringToObject(oldJson, DimensionFieldSpec.class);
+    assertThat(fieldSpec.getDescription()).isNull();
+    assertThat(fieldSpec.getTags()).isNull();
+  }
+
+  @Test
+  public void testDescriptionAndTagsInEqualsAndHashCode() {
+    DimensionFieldSpec spec1 = new DimensionFieldSpec("col1", STRING, true);
+    DimensionFieldSpec spec2 = new DimensionFieldSpec("col1", STRING, true);
+    spec2.setDescription("some description");
+    spec2.setTags(Arrays.asList("tag1"));
+
+    assertThat(spec1).isNotEqualTo(spec2);
+    assertThat(spec1.hashCode()).isNotEqualTo(spec2.hashCode());
+
+    // Equal when both have the same description and tags
+    spec1.setDescription("some description");
+    spec1.setTags(Arrays.asList("tag1"));
+    assertThat(spec1).isEqualTo(spec2);
+    assertThat(spec1.hashCode()).isEqualTo(spec2.hashCode());
+  }
+
+  @Test
+  public void testDescriptionNotInBackwardCompatibility() {
+    DimensionFieldSpec oldSpec = new DimensionFieldSpec("col1", STRING, true);
+    DimensionFieldSpec newSpec = new DimensionFieldSpec("col1", STRING, true);
+    newSpec.setDescription("added description");
+    newSpec.setTags(Arrays.asList("new-tag"));
+
+    assertThat(newSpec.isBackwardCompatibleWith(oldSpec)).isTrue();
   }
 }

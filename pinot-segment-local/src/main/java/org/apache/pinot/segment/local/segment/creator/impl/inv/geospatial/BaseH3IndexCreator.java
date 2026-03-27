@@ -127,6 +127,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
         geometry.getGeometryType());
     Coordinate coordinate = geometry.getCoordinate();
+    Preconditions.checkState(coordinate != null, "Point has null coordinate and continueOnError is disabled");
     // TODO: support multiple resolutions
     long h3Id = H3Utils.H3_CORE.latLngToCell(coordinate.y, coordinate.x, _lowestResolution);
     RoaringBitmapWriter<RoaringBitmap> bitmapWriter = _postingListMap.get(h3Id);

@@ -19,8 +19,10 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
@@ -29,6 +31,8 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
 
@@ -36,12 +40,18 @@ import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
 public class MutableNoDictionaryColStatistics implements ColumnStatistics, CLPStatsProvider {
   private final DataSourceMetadata _dataSourceMetadata;
   private final MutableForwardIndex _forwardIndex;
+  @Nullable
+  private final int[] _sortedDocIds;
+  private final boolean _isSortedColumn;
 
-  public MutableNoDictionaryColStatistics(DataSource dataSource) {
+  public MutableNoDictionaryColStatistics(DataSource dataSource, @Nullable int[] sortedDocIds,
+      boolean isSortedColumn) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
     _forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
     Preconditions.checkState(_forwardIndex != null,
         String.format("Forward index should not be null for column: %s", _dataSourceMetadata.getFieldSpec().getName()));
+    _sortedDocIds = sortedDocIds;
+    _isSortedColumn = isSortedColumn;
   }
 
   @Override
@@ -76,7 +86,188 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics, CLPSt
 
   @Override
   public boolean isSorted() {
-    return false;
+    // Sorted column is guaranteed to be sorted by construction — no scan needed
+    if (_isSortedColumn) {
+      return true;
+    }
+
+    // Multi-valued column cannot be sorted
+    if (!_dataSourceMetadata.isSingleValue()) {
+      return false;
+    }
+
+    int numDocs = _dataSourceMetadata.getNumDocs();
+    if (numDocs <= 1) {
+      return true;
+    }
+
+    // Verify that values are non-decreasing when iterated in the given order
+    DataType storedType = _dataSourceMetadata.getFieldSpec().getDataType().getStoredType();
+    if (_sortedDocIds != null) {
+      switch (storedType) {
+        case INT: {
+          int prev = _forwardIndex.getInt(_sortedDocIds[0]);
+          for (int i = 1; i < numDocs; i++) {
+            int curr = _forwardIndex.getInt(_sortedDocIds[i]);
+            if (curr < prev) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case LONG: {
+          long prev = _forwardIndex.getLong(_sortedDocIds[0]);
+          for (int i = 1; i < numDocs; i++) {
+            long curr = _forwardIndex.getLong(_sortedDocIds[i]);
+            if (curr < prev) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case FLOAT: {
+          float prev = _forwardIndex.getFloat(_sortedDocIds[0]);
+          for (int i = 1; i < numDocs; i++) {
+            float curr = _forwardIndex.getFloat(_sortedDocIds[i]);
+            if (curr < prev) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case DOUBLE: {
+          double prev = _forwardIndex.getDouble(_sortedDocIds[0]);
+          for (int i = 1; i < numDocs; i++) {
+            double curr = _forwardIndex.getDouble(_sortedDocIds[i]);
+            if (curr < prev) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case BIG_DECIMAL: {
+          BigDecimal prev = _forwardIndex.getBigDecimal(_sortedDocIds[0]);
+          for (int i = 1; i < numDocs; i++) {
+            BigDecimal curr = _forwardIndex.getBigDecimal(_sortedDocIds[i]);
+            if (curr.compareTo(prev) < 0) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case STRING: {
+          String prev = _forwardIndex.getString(_sortedDocIds[0]);
+          for (int i = 1; i < numDocs; i++) {
+            String curr = _forwardIndex.getString(_sortedDocIds[i]);
+            if (curr.compareTo(prev) < 0) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case BYTES: {
+          byte[] prev = _forwardIndex.getBytes(_sortedDocIds[0]);
+          for (int i = 1; i < numDocs; i++) {
+            byte[] curr = _forwardIndex.getBytes(_sortedDocIds[i]);
+            if (ByteArray.compare(curr, prev) < 0) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        default:
+          return false;
+      }
+    } else {
+      switch (storedType) {
+        case INT: {
+          int prev = _forwardIndex.getInt(0);
+          for (int i = 1; i < numDocs; i++) {
+            int curr = _forwardIndex.getInt(i);
+            if (curr < prev) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case LONG: {
+          long prev = _forwardIndex.getLong(0);
+          for (int i = 1; i < numDocs; i++) {
+            long curr = _forwardIndex.getLong(i);
+            if (curr < prev) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case FLOAT: {
+          float prev = _forwardIndex.getFloat(0);
+          for (int i = 1; i < numDocs; i++) {
+            float curr = _forwardIndex.getFloat(i);
+            if (curr < prev) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case DOUBLE: {
+          double prev = _forwardIndex.getDouble(0);
+          for (int i = 1; i < numDocs; i++) {
+            double curr = _forwardIndex.getDouble(i);
+            if (curr < prev) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case BIG_DECIMAL: {
+          BigDecimal prev = _forwardIndex.getBigDecimal(0);
+          for (int i = 1; i < numDocs; i++) {
+            BigDecimal curr = _forwardIndex.getBigDecimal(i);
+            if (curr.compareTo(prev) < 0) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case STRING: {
+          String prev = _forwardIndex.getString(0);
+          for (int i = 1; i < numDocs; i++) {
+            String curr = _forwardIndex.getString(i);
+            if (curr.compareTo(prev) < 0) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        case BYTES: {
+          byte[] prev = _forwardIndex.getBytes(0);
+          for (int i = 1; i < numDocs; i++) {
+            byte[] curr = _forwardIndex.getBytes(i);
+            if (ByteArray.compare(curr, prev) < 0) {
+              return false;
+            }
+            prev = curr;
+          }
+          return true;
+        }
+        default:
+          return false;
+      }
+    }
   }
 
   @Override

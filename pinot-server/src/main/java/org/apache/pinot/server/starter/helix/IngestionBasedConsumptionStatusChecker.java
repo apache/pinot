@@ -116,6 +116,9 @@ public abstract class IngestionBasedConsumptionStatusChecker {
           } else if (isSegmentCaughtUp(segName, rtSegmentDataManager, realtimeTableDataManager)) {
             caughtUpSegments.add(segName);
           }
+        } catch (Exception e) {
+          _logger.warn("Exception checking consumption status for segment: {} from table: {}. "
+              + "Treating as not caught up.", segName, tableNameWithType, e);
         } finally {
           tableDataManager.releaseSegment(segmentDataManager);
         }

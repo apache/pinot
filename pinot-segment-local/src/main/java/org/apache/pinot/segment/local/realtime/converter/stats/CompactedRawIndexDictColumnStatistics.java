@@ -53,9 +53,9 @@ public class CompactedRawIndexDictColumnStatistics extends MutableColumnStatisti
   private final int _compactedCardinality;
   private final Object _compactedUniqueValues;
 
-  public CompactedRawIndexDictColumnStatistics(DataSource dataSource, int[] sortedDocIds,
+  public CompactedRawIndexDictColumnStatistics(DataSource dataSource, int[] sortedDocIds, boolean isSortedColumn,
       ThreadSafeMutableRoaringBitmap validDocIds) {
-    super(dataSource, sortedDocIds);
+    super(dataSource, sortedDocIds, isSortedColumn);
 
     Dictionary dictionary = dataSource.getDictionary();
     MutableForwardIndex forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();

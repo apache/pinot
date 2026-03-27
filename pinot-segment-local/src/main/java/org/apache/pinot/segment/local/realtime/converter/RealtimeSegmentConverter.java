@@ -81,7 +81,7 @@ public class RealtimeSegmentConverter {
 
   public void build(@Nullable SegmentVersion segmentVersion, @Nullable ServerMetrics serverMetrics)
       throws Exception {
-    SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema, true);
+    SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
 
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -131,14 +131,15 @@ public class RealtimeSegmentConverter {
       try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(
           validDocIdsSnapshot)) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader, validDocIdsSnapshot);
+        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, sortedColumn, useCompactedReader,
+            validDocIdsSnapshot);
         publishCompactionMetrics(serverMetrics, preCommitRowCount, driver, compactionStartTime);
       }
     } else {
       // Use regular PinotSegmentRecordReader (existing behavior)
       try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader, null);
+        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, sortedColumn, useCompactedReader, null);
       }
     }
 
@@ -201,18 +202,18 @@ public class RealtimeSegmentConverter {
    * Common method to build segment with the provided record reader
    */
   private void buildSegmentWithReader(SegmentIndexCreationDriverImpl driver, SegmentGeneratorConfig genConfig,
-      RecordReader recordReader, int[] sortedDocIds, boolean useCompactedReader,
+      RecordReader recordReader, int[] sortedDocIds, @Nullable String sortedColumn, boolean useCompactedReader,
       @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot)
       throws Exception {
     RealtimeSegmentSegmentCreationDataSource dataSource;
     if (useCompactedReader) {
       // For compacted readers, use the constructor that takes sortedDocIds and pass the validDocIds snapshot
       dataSource = new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds,
-          validDocIdsSnapshot);
+          sortedColumn, validDocIdsSnapshot);
     } else {
       // For regular readers, use the original constructor
-      dataSource =
-          new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, (PinotSegmentRecordReader) recordReader);
+      dataSource = new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl,
+          (PinotSegmentRecordReader) recordReader, sortedColumn);
     }
     // initializes reader
     driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName), InstanceType.SERVER);

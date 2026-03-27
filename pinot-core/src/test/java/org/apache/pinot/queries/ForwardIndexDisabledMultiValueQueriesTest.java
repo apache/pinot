@@ -117,7 +117,6 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
         .setTimeColumnName("daysSinceEpoch")
         .setNoDictionaryColumns(List.of("column5"))
         .setInvertedIndexColumns(List.of("column3", "column6", "column7", "column8", "column9"))
-        .setCreateInvertedIndexDuringSegmentGeneration(true)
         .setFieldConfigList(fieldConfigs)
         .build();
     //@formatter:on

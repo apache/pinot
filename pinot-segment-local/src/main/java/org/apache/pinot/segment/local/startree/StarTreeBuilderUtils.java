@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.startree;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -151,7 +152,7 @@ public class StarTreeBuilderUtils {
     for (String dimension : dimensions) {
       headerSizeInBytes += Integer.BYTES; // For dimension index
       headerSizeInBytes += Integer.BYTES; // For length of dimension name
-      headerSizeInBytes += dimension.getBytes(UTF_8).length; // For dimension name
+      headerSizeInBytes += Utf8.encodedLength(dimension); // For dimension name
     }
 
     headerSizeInBytes += Integer.BYTES; // For number of nodes.

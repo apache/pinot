@@ -20,6 +20,7 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
@@ -64,6 +65,8 @@ public class TableConfig extends BaseJsonConfig {
   public static final String TUNER_CONFIG_LIST_KEY = "tunerConfigs";
   public static final String TIER_OVERWRITES_KEY = "tierOverwrites";
   public static final String TABLE_SAMPLERS_KEY = "tableSamplers";
+  public static final String DESCRIPTION_KEY = "description";
+  public static final String TAGS_KEY = "tags";
 
   // Double underscore is reserved for real-time segment name delimiter
   public static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
@@ -84,6 +87,15 @@ public class TableConfig extends BaseJsonConfig {
   private IndexingConfig _indexingConfig;
 
   /* OPTIONAL FIELDS */
+
+  @JsonPropertyDescription("Human-readable description of the table, supports markdown")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private String _description;
+
+  @JsonPropertyDescription("Tags for categorizing and filtering the table")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  private List<String> _tags;
 
   private TableCustomConfig _customConfig;
 
@@ -205,6 +217,8 @@ public class TableConfig extends BaseJsonConfig {
     _instancePartitionsMap = tableConfig.getInstancePartitionsMap();
     _segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
     _tableSamplers = sanitizeAndValidateTableSamplers(tableConfig.getTableSamplers());
+    _description = tableConfig.getDescription();
+    _tags = tableConfig.getTags();
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -215,6 +229,26 @@ public class TableConfig extends BaseJsonConfig {
   public void setTableName(String tableNameWithType) {
     Preconditions.checkArgument(tableNameWithType != null, "'tableName' must be configured");
     _tableName = tableNameWithType;
+  }
+
+  @JsonProperty(DESCRIPTION_KEY)
+  @Nullable
+  public String getDescription() {
+    return _description;
+  }
+
+  public void setDescription(@Nullable String description) {
+    _description = description;
+  }
+
+  @JsonProperty(TAGS_KEY)
+  @Nullable
+  public List<String> getTags() {
+    return _tags;
+  }
+
+  public void setTags(@Nullable List<String> tags) {
+    _tags = tags;
   }
 
   @JsonProperty(TABLE_TYPE_KEY)

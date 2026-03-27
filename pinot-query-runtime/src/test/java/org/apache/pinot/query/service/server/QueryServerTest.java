@@ -30,15 +30,20 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
@@ -47,16 +52,24 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.MDC;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -96,6 +109,11 @@ public class QueryServerTest extends QueryTestSet {
     for (QueryServer worker : _queryServerMap.values()) {
       worker.shutdown();
     }
+  }
+
+  @AfterMethod
+  public void tearDownMethod() {
+    MDC.clear();
   }
 
   @Test
@@ -232,5 +250,115 @@ public class QueryServerTest extends QueryTestSet {
 
     return Worker.QueryRequest.newBuilder().addStagePlan(protoStagePlan)
         .setMetadata(QueryPlanSerDeUtils.toProtoProperties(requestMetadata)).build();
+  }
+
+  @Test
+  public void testMdcRegistersUpstreamDownstreamStageIds() {
+    QueryExecutionContext executionContext = QueryExecutionContext.forMseTest();
+    QueryThreadContext.MseWorkerInfo workerInfo =
+        new QueryThreadContext.MseWorkerInfo(1, 0, Set.of(2, 3), Set.of(0));
+
+    try (QueryThreadContext ignored = QueryThreadContext.open(executionContext, workerInfo,
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      assertEquals(MDC.get(LoggerConstants.UPSTREAM_STAGE_IDS_KEY.getKey()), "2,3");
+      assertEquals(MDC.get(LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.getKey()), "0");
+      assertEquals(MDC.get(LoggerConstants.STAGE_ID_KEY.getKey()), "1");
+      assertEquals(MDC.get(LoggerConstants.WORKER_ID_KEY.getKey()), "0");
+    }
+
+    assertNull(MDC.get(LoggerConstants.UPSTREAM_STAGE_IDS_KEY.getKey()));
+    assertNull(MDC.get(LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.getKey()));
+    assertNull(MDC.get(LoggerConstants.STAGE_ID_KEY.getKey()));
+    assertNull(MDC.get(LoggerConstants.WORKER_ID_KEY.getKey()));
+  }
+
+  @Test
+  public void testMdcSkipsEmptyStageIds() {
+    QueryExecutionContext executionContext = QueryExecutionContext.forMseTest();
+    QueryThreadContext.MseWorkerInfo workerInfo =
+        new QueryThreadContext.MseWorkerInfo(2, 0);
+
+    try (QueryThreadContext ignored = QueryThreadContext.open(executionContext, workerInfo,
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      assertNull(MDC.get(LoggerConstants.UPSTREAM_STAGE_IDS_KEY.getKey()));
+      assertNull(MDC.get(LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.getKey()));
+    }
+  }
+
+  private static final DataSchema DUMMY_SCHEMA =
+      new DataSchema(new String[]{"col"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+
+  private static MailboxReceiveNode receiveNode(int stageId, int senderStageId) {
+    return new MailboxReceiveNode(stageId, DUMMY_SCHEMA, senderStageId,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        null, null, false, false, null);
+  }
+
+  private static MailboxSendNode sendNode(int stageId, List<PlanNode> inputs, int receiverStageId) {
+    return new MailboxSendNode(stageId, DUMMY_SCHEMA, inputs, receiverStageId,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        null, false, null, false, "murmur");
+  }
+
+  private static MailboxSendNode sendNode(int stageId, List<PlanNode> inputs, List<Integer> receiverStageIds) {
+    return new MailboxSendNode(stageId, DUMMY_SCHEMA, inputs, receiverStageIds,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        null, false, null, false, "murmur");
+  }
+
+  @Test
+  public void testCollectUpstreamStageIdsSingleReceive() {
+    // SendNode(stage=1) → ReceiveNode(sender=2)
+    MailboxReceiveNode receive = receiveNode(1, 2);
+    MailboxSendNode root = sendNode(1, List.of(receive), 0);
+    assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of(2));
+  }
+
+  @Test
+  public void testCollectUpstreamStageIdsMultipleReceives() {
+    // SendNode(stage=1) → [ReceiveNode(sender=2), ReceiveNode(sender=3)]
+    MailboxReceiveNode receive1 = receiveNode(1, 2);
+    MailboxReceiveNode receive2 = receiveNode(1, 3);
+    MailboxSendNode root = sendNode(1, List.of(receive1, receive2), 0);
+    assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of(2, 3));
+  }
+
+  @Test
+  public void testCollectUpstreamStageIdsNestedReceive() {
+    // SendNode(stage=1) → SendNode(stage=1, inner) → ReceiveNode(sender=3)
+    MailboxReceiveNode receive = receiveNode(1, 3);
+    MailboxSendNode inner = sendNode(1, List.of(receive), 0);
+    MailboxSendNode root = sendNode(1, List.of(inner), 0);
+    assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of(3));
+  }
+
+  @Test
+  public void testCollectUpstreamStageIdsNoReceives() {
+    MailboxSendNode root = sendNode(1, List.of(), 0);
+    assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of());
+  }
+
+  @Test
+  public void testCollectUpstreamStageIdsReceiveAtRoot() {
+    MailboxReceiveNode root = receiveNode(1, 5);
+    assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of(5));
+  }
+
+  @Test
+  public void testCollectDownstreamStageIdsSingleReceiver() {
+    MailboxSendNode root = sendNode(1, List.of(), 0);
+    assertEquals(QueryServer.collectDownstreamStageIds(root), Set.of(0));
+  }
+
+  @Test
+  public void testCollectDownstreamStageIdsMultipleReceivers() {
+    MailboxSendNode root = sendNode(1, List.of(), List.of(0, 4));
+    assertEquals(QueryServer.collectDownstreamStageIds(root), Set.of(0, 4));
+  }
+
+  @Test
+  public void testCollectDownstreamStageIdsNonSendNode() {
+    MailboxReceiveNode root = receiveNode(1, 2);
+    assertEquals(QueryServer.collectDownstreamStageIds(root), Set.of());
   }
 }

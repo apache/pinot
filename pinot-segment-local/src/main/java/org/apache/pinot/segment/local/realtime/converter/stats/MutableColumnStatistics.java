@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import com.google.common.base.Preconditions;
-import java.nio.charset.StandardCharsets;
+import com.google.common.base.Utf8;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -41,6 +41,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 public class MutableColumnStatistics implements ColumnStatistics {
   private final DataSource _dataSource;
   private final int[] _sortedDocIdIterationOrder;
+  private final boolean _isSortedColumn;
 
   // NOTE: For new added columns during the ingestion, this will be constant value dictionary instead of mutable
   //       dictionary.
@@ -49,9 +50,11 @@ public class MutableColumnStatistics implements ColumnStatistics {
   private int _minElementLength = -1;
   private int _maxElementLength = -1;
 
-  public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIdIterationOrder) {
+  public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIdIterationOrder,
+      boolean isSortedColumn) {
     _dataSource = dataSource;
     _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
+    _isSortedColumn = isSortedColumn;
     _dictionary = dataSource.getDictionary();
   }
 
@@ -113,7 +116,7 @@ public class MutableColumnStatistics implements ColumnStatistics {
         break;
       case STRING:
         for (int i = 0; i < length; i++) {
-          int elementLength = _dictionary.getStringValue(i).getBytes(StandardCharsets.UTF_8).length;
+          int elementLength = Utf8.encodedLength(_dictionary.getStringValue(i));
           _minElementLength = Math.min(_minElementLength, elementLength);
           _maxElementLength = Math.max(_maxElementLength, elementLength);
         }
@@ -132,6 +135,11 @@ public class MutableColumnStatistics implements ColumnStatistics {
 
   @Override
   public boolean isSorted() {
+    // Sorted column is guaranteed to be sorted by construction — no scan needed
+    if (_isSortedColumn) {
+      return true;
+    }
+
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
 
     // Multi-valued column cannot be sorted

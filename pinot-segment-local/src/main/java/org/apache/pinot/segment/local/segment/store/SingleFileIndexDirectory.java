@@ -233,7 +233,14 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
     for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
       String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _segmentDirectory.getPath());
-      IndexKey indexKey = IndexKey.fromIndexName(parsedKeys[0], parsedKeys[1]);
+      IndexKey indexKey;
+      try {
+        indexKey = IndexKey.fromIndexName(parsedKeys[0], parsedKeys[1]);
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn("Skipping unknown index type: {} for column: {} in segment: {}", parsedKeys[1], parsedKeys[0],
+            _segmentDirectory);
+        continue;
+      }
       IndexEntry entry = _columnEntries.get(indexKey);
       if (entry == null) {
         entry = new IndexEntry(indexKey);

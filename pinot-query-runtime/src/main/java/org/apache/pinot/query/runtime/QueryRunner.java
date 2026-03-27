@@ -64,8 +64,8 @@ import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
@@ -330,7 +330,7 @@ public class QueryRunner {
             ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
                 rlsFilters);
       } else {
-        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+        opChain = OpChainConverterDispatcher.convert(stagePlan.getRootNode(), executionContext);
       }
       // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
@@ -546,6 +546,10 @@ public class QueryRunner {
     }
 
     return opChainMetadata;
+  }
+
+  public MailboxService getMailboxService() {
+    return _mailboxService;
   }
 
   public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {

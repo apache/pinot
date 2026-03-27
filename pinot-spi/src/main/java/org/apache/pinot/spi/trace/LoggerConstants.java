@@ -33,7 +33,11 @@ public enum LoggerConstants {
   /// The MSE worker id of the query.
   WORKER_ID_KEY("pinot.mse.workerId"),
   /// The MSE stage id of the query.
-  STAGE_ID_KEY("pinot.mse.stageId");
+  STAGE_ID_KEY("pinot.mse.stageId"),
+  // Comma-separated IDs of stages that send data to the current MSE stage.
+  UPSTREAM_STAGE_IDS_KEY("pinot.mse.upstreamStageIds"),
+  // Comma-separated IDs of stages the current MSE stage sends data to.
+  DOWNSTREAM_STAGE_IDS_KEY("pinot.mse.downstreamStageIds");
 
   private final String _key;
 

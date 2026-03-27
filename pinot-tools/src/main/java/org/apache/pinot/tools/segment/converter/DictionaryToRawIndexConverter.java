@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.segment.converter;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -53,7 +54,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -390,7 +390,7 @@ public class DictionaryToRawIndexConverter {
     int length = dictionary.length();
     for (int dictId = 0; dictId < length; dictId++) {
       String value = (String) dictionary.get(dictId);
-      lengthOfLongestEntry = Math.max(lengthOfLongestEntry, value.getBytes(UTF_8).length);
+      lengthOfLongestEntry = Math.max(lengthOfLongestEntry, Utf8.encodedLength(value));
     }
 
     return lengthOfLongestEntry;

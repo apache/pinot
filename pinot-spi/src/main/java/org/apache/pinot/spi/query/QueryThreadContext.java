@@ -21,9 +21,11 @@ package org.apache.pinot.spi.query;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
@@ -71,6 +73,16 @@ public class QueryThreadContext implements AutoCloseable {
     if (mseWorkerInfo != null) {
       LoggerConstants.STAGE_ID_KEY.registerInMdc(Integer.toString(mseWorkerInfo.getStageId()));
       LoggerConstants.WORKER_ID_KEY.registerInMdc(Integer.toString(mseWorkerInfo.getWorkerId()));
+      if (!mseWorkerInfo.getUpstreamStageIds().isEmpty()) {
+        LoggerConstants.UPSTREAM_STAGE_IDS_KEY.registerInMdc(
+            mseWorkerInfo.getUpstreamStageIds().stream().sorted().map(String::valueOf)
+                .collect(Collectors.joining(",")));
+      }
+      if (!mseWorkerInfo.getDownstreamStageIds().isEmpty()) {
+        LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.registerInMdc(
+            mseWorkerInfo.getDownstreamStageIds().stream().sorted().map(String::valueOf)
+                .collect(Collectors.joining(",")));
+      }
     }
   }
 
@@ -137,6 +149,12 @@ public class QueryThreadContext implements AutoCloseable {
     if (_mseWorkerInfo != null) {
       LoggerConstants.STAGE_ID_KEY.unregisterFromMdc();
       LoggerConstants.WORKER_ID_KEY.unregisterFromMdc();
+      if (LoggerConstants.UPSTREAM_STAGE_IDS_KEY.isRegistered()) {
+        LoggerConstants.UPSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+      }
+      if (LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.isRegistered()) {
+        LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+      }
     }
   }
 
@@ -161,7 +179,8 @@ public class QueryThreadContext implements AutoCloseable {
 
   @VisibleForTesting
   public static QueryThreadContext openForMseTest() {
-    return open(QueryExecutionContext.forMseTest(), new MseWorkerInfo(0, 0), ThreadAccountantUtils.getNoOpAccountant());
+    return open(QueryExecutionContext.forMseTest(), new MseWorkerInfo(0, 0, Set.of(), Set.of()),
+        ThreadAccountantUtils.getNoOpAccountant());
   }
 
   /// Returns the [QueryThreadContext] for the current thread.
@@ -318,10 +337,18 @@ public class QueryThreadContext implements AutoCloseable {
   public static class MseWorkerInfo {
     private final int _stageId;
     private final int _workerId;
+    private final Set<Integer> _upstreamStageIds;
+    private final Set<Integer> _downstreamStageIds;
 
     public MseWorkerInfo(int stageId, int workerId) {
+      this(stageId, workerId, Set.of(), Set.of());
+    }
+
+    public MseWorkerInfo(int stageId, int workerId, Set<Integer> upstreamStageIds, Set<Integer> downstreamStageIds) {
       _stageId = stageId;
       _workerId = workerId;
+      _upstreamStageIds = upstreamStageIds;
+      _downstreamStageIds = downstreamStageIds;
     }
 
     public int getStageId() {
@@ -330,6 +357,14 @@ public class QueryThreadContext implements AutoCloseable {
 
     public int getWorkerId() {
       return _workerId;
+    }
+
+    public Set<Integer> getUpstreamStageIds() {
+      return _upstreamStageIds;
+    }
+
+    public Set<Integer> getDownstreamStageIds() {
+      return _downstreamStageIds;
     }
   }
 }

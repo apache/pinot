@@ -47,6 +47,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
 
   private volatile boolean _started;
   private volatile boolean _running;
+  private volatile boolean _completedAtLeastOnce;
 
   // Default properties that tasks may use during execution. This variable is private and does not have any get or set
   // methods to prevent subclasses from gaining direct access to this variable. See run(Properties) method to see how
@@ -95,6 +96,14 @@ public abstract class BasePeriodicTask implements PeriodicTask {
    */
   public final boolean isRunning() {
     return _running;
+  }
+
+  /**
+   * Returns the status of the {@code completedAtLeastOnce} flag. This flag will be set after a task has
+   * completed at least once.
+   */
+  public final boolean hasCompletedAtLeastOnce() {
+    return _completedAtLeastOnce;
   }
 
   /**
@@ -160,6 +169,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
         }
         LOGGER.info("[TaskRequestId: {}] Finish running task: {} in {}ms", periodicTaskRequestId, _taskName,
             System.currentTimeMillis() - startTime);
+        _completedAtLeastOnce = true;
       } else {
         LOGGER.warn("[TaskRequestId: {}] Task: {} is skipped because it is not started or already stopped",
             periodicTaskRequestId, _taskName);

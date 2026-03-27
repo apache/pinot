@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -84,6 +85,10 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       _indexWriter =
           new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
               writerVersion);
+    } else if (writerVersion == VarByteChunkForwardIndexWriterV6.VERSION) {
+      int chunkSize =
+          ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
+      _indexWriter = new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize);
     } else {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);

@@ -19,7 +19,12 @@
 package org.apache.pinot.core.transport;
 
 import nl.jqno.equalsverifier.EqualsVerifier;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 public class ServerInstanceTest {
@@ -27,5 +32,53 @@ public class ServerInstanceTest {
   public void equalsVerifier() {
     EqualsVerifier.configure().forClass(ServerInstance.class).withOnlyTheseFields("_instanceId")
         .withNonnullFields("_instanceId").verify();
+  }
+
+  @Test
+  public void testExtractHostnameFromConfigWithServerPrefix() {
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost_1234"));
+    config.setHostName("Server_myhost");
+    assertEquals(ServerInstance.extractHostnameFromConfig(config), "myhost");
+  }
+
+  @Test
+  public void testExtractHostnameFromConfigWithoutPrefix() {
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost_1234"));
+    config.setHostName("myhost");
+    assertEquals(ServerInstance.extractHostnameFromConfig(config), "myhost");
+  }
+
+  @Test
+  public void testExtractHostnameFromConfigFallbackToInstanceName() {
+    // When hostname is null, falls back to parsing instance name
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost_1234"));
+    assertEquals(ServerInstance.extractHostnameFromConfig(config), "myhost");
+  }
+
+  @Test
+  public void testExtractHostnameFromConfigEmptyInstanceNameThrows() {
+    InstanceConfig config = new InstanceConfig(new ZNRecord(""));
+    assertThrows(ArrayIndexOutOfBoundsException.class, () -> ServerInstance.extractHostnameFromConfig(config));
+  }
+
+  @Test
+  public void testExtractPortFromConfigWithPort() {
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost_1234"));
+    config.setHostName("myhost");
+    config.setPort("1234");
+    assertEquals(ServerInstance.extractPortFromConfig(config), 1234);
+  }
+
+  @Test
+  public void testExtractPortFromConfigFallbackToInstanceName() {
+    // When port is null, falls back to parsing instance name
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost_1234"));
+    assertEquals(ServerInstance.extractPortFromConfig(config), 1234);
+  }
+
+  @Test
+  public void testExtractPortFromConfigNoPortThrows() {
+    InstanceConfig config = new InstanceConfig(new ZNRecord("Server_myhost"));
+    assertThrows(ArrayIndexOutOfBoundsException.class, () -> ServerInstance.extractPortFromConfig(config));
   }
 }

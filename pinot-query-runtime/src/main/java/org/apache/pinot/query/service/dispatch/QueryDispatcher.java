@@ -85,12 +85,14 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -708,27 +710,16 @@ public class QueryDispatcher {
     ArrayList<Object[]> resultRows = new ArrayList<>();
     MseBlock block;
     MultiStageQueryStats queryStats;
-    try (OpChain opChain = PlanNodeToOpChain.convert(rootNode, opChainExecutionContext, (a, b) -> {
+    try (OpChain opChain = OpChainConverterDispatcher.convert(rootNode, opChainExecutionContext, (a, b) -> {
     })) {
       MultiStageOperator rootOperator = opChain.getRoot();
       block = rootOperator.nextBlock();
       while (block.isData()) {
-        DataBlock dataBlock = ((MseBlock.Data) block).asSerialized().getDataBlock();
-        int numRows = dataBlock.getNumberOfRows();
-        if (numRows > 0) {
-          resultRows.ensureCapacity(resultRows.size() + numRows);
-          List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
-          for (Object[] rawRow : rawRows) {
-            Object[] row = new Object[numColumns];
-            for (int i = 0; i < numColumns; i++) {
-              Object rawValue = rawRow[resultFields.get(i).getKey()];
-              if (rawValue != null) {
-                ColumnDataType dataType = columnTypes[i];
-                row[i] = dataType.format(dataType.toExternal(rawValue));
-              }
-            }
-            resultRows.add(row);
-          }
+        MseBlock.Data dataBlock = (MseBlock.Data) block;
+        if (dataBlock.isSerialized()) {
+          reduceSerialized(dataBlock.asSerialized(), resultRows, numColumns, resultFields, columnTypes);
+        } else {
+          reduceRowHeap(dataBlock.asRowHeap(), resultRows, numColumns, resultFields, columnTypes);
         }
         block = rootOperator.nextBlock();
       }
@@ -765,6 +756,39 @@ public class QueryDispatcher {
     assert block.isSuccess();
     return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
+  }
+
+  private static void reduceSerialized(SerializedDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
+    DataBlock dataBlock = block.getDataBlock();
+    if (dataBlock.getNumberOfRows() > 0) {
+      List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
+      toExternalList(resultRows, numColumns, resultFields, columnTypes, rawRows);
+    }
+  }
+
+  private static void reduceRowHeap(RowHeapDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
+    List<Object[]> rows = block.getRows();
+    if (!rows.isEmpty()) {
+      toExternalList(resultRows, numColumns, resultFields, columnTypes, rows);
+    }
+  }
+
+  private static void toExternalList(ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes, List<Object[]> rows) {
+    resultRows.ensureCapacity(resultRows.size() + rows.size());
+    for (Object[] rawRow : rows) {
+      Object[] row = new Object[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        Object rawValue = rawRow[resultFields.get(i).getKey()];
+        if (rawValue != null) {
+          ColumnDataType dataType = columnTypes[i];
+          row[i] = dataType.format(dataType.toExternal(rawValue));
+        }
+      }
+      resultRows.add(row);
+    }
   }
 
   // TODO: Improve the way the errors are compared
