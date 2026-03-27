@@ -100,9 +100,9 @@ public class PinotAdminTransport implements AutoCloseable {
     if (CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(scheme)) {
       try {
         TlsConfig tlsConfig = ConnectionUtils.getTlsConfigFromProperties(properties);
-        SSLContext sslContext =
+        SSLContext contextToUse =
             _sslContext != null ? _sslContext : ConnectionUtils.createSSLContextFromProperties(properties);
-        SSL_CONTEXT_PROVIDER.configure(builder, sslContext, null, tlsConfig.getEndpointIdentificationAlgorithm());
+        SSL_CONTEXT_PROVIDER.configure(builder, contextToUse, null, tlsConfig.getEndpointIdentificationAlgorithm());
       } catch (Exception e) {
         LOGGER.warn("Failed to configure SSL context, proceeding without SSL", e);
       }

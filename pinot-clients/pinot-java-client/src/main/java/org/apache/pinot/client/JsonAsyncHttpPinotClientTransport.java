@@ -82,6 +82,13 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
       boolean useMultistageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
+      TlsProtocols tlsProtocols) {
+    this(headers, scheme, extraOptionString, useMultistageEngine, sslContext, connectionTimeouts, tlsProtocols, null,
+        null);
+  }
+
+  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
+      boolean useMultistageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
       TlsProtocols tlsProtocols, @Nullable String appId, @Nullable String endpointIdentificationAlgorithm) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
