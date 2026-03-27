@@ -141,7 +141,7 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
             break;
           case CSV:
             outputPath += ".csv";
-            new PinotSegmentToCsvConverter(inputPath, outputPath, _csvDelimiter, _csvDelimiter, _csvWithHeader,
+            new PinotSegmentToCsvConverter(inputPath, outputPath, _csvDelimiter, _csvListDelimiter, _csvWithHeader,
                 _forwardIndexOnly).convert();
             break;
           case JSON:

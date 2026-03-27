@@ -121,13 +121,14 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   /**
-   * Initializes the record reader from an index directory with an option to load only forward index.
+   * Initializes the record reader from an index directory with an option to skip column-level secondary indexes.
    *
    * @param indexDir Index directory
    * @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
    * @param sortOrder List of sorted columns
    * @param skipDefaultNullValues Whether to skip putting default null values into the record
-   * @param forwardIndexOnly Whether to load only forward index, dictionary, and null value vector
+   * @param forwardIndexOnly Whether to load only column-level forward index, dictionary, and null value vector,
+   *                         skipping other column-level secondary indexes
    */
   public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
       boolean skipDefaultNullValues, boolean forwardIndexOnly) {

@@ -72,9 +72,10 @@ public class ImmutableSegmentLoader {
   }
 
   /**
-   * Loads the segment in read-only mode with an option to load only forward index, dictionary,
-   * and null value vector. This is useful for tools like segment converters that only need to
-   * read data without requiring secondary indexes.
+   * Loads the segment in read-only mode with an option to load only column-level forward index, dictionary,
+   * and null value vector, skipping other column-level secondary indexes. Segment-level indexes (such as
+   * star-tree or multi-column text index) are still loaded when present. This is useful for tools like segment
+   * converters that only need to read data without requiring column-level secondary indexes.
    */
   public static ImmutableSegment load(File indexDir, ReadMode readMode, boolean forwardIndexOnly)
       throws Exception {
