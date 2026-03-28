@@ -118,6 +118,11 @@ public class ConstantValueStringDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int getValueSize(int dictId) {
+    return _bytes.length;
+  }
+
+  @Override
   public void getDictIds(List<String> values, IntSet dictIds) {
     if (values.contains(_value)) {
       dictIds.add(0);

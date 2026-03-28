@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.segment.converter;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -316,7 +315,7 @@ public class DictionaryToRawIndexConverter {
     ChunkCompressionType compressionType = ChunkCompressionType.valueOf(_compressionType);
     DataType storedType = dictionary.getValueType();
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
-    int lengthOfLongestEntry = (storedType == DataType.STRING) ? getLengthOfLongestEntry(dictionary) : -1;
+    int lengthOfLongestEntry = !storedType.isFixedWidth() ? getLengthOfLongestEntry(dictionary) : -1;
 
     try (ForwardIndexCreator rawIndexCreator = ForwardIndexCreatorFactory.getRawIndexCreatorForSVColumn(newSegment,
         compressionType, column, storedType, numDocs, lengthOfLongestEntry, false,
@@ -386,13 +385,10 @@ public class DictionaryToRawIndexConverter {
    */
   private int getLengthOfLongestEntry(Dictionary dictionary) {
     int lengthOfLongestEntry = 0;
-
     int length = dictionary.length();
     for (int dictId = 0; dictId < length; dictId++) {
-      String value = (String) dictionary.get(dictId);
-      lengthOfLongestEntry = Math.max(lengthOfLongestEntry, Utf8.encodedLength(value));
+      lengthOfLongestEntry = Math.max(lengthOfLongestEntry, dictionary.getValueSize(dictId));
     }
-
     return lengthOfLongestEntry;
   }
 

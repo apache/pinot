@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -30,7 +29,6 @@ import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -99,37 +97,16 @@ public class MutableColumnStatistics implements ColumnStatistics {
     if (storedType.isFixedWidth()) {
       _minElementLength = storedType.size();
       _maxElementLength = storedType.size();
-      return;
-    }
-
-    // If the stored type is not fixed width, iterate over the dictionary to find the min/max element length
-    _minElementLength = Integer.MAX_VALUE;
-    _maxElementLength = 0;
-    int length = _dictionary.length();
-    switch (storedType) {
-      case BIG_DECIMAL:
-        for (int i = 0; i < length; i++) {
-          int elementLength = BigDecimalUtils.byteSize(_dictionary.getBigDecimalValue(i));
-          _minElementLength = Math.min(_minElementLength, elementLength);
-          _maxElementLength = Math.max(_maxElementLength, elementLength);
-        }
-        break;
-      case STRING:
-        for (int i = 0; i < length; i++) {
-          int elementLength = Utf8.encodedLength(_dictionary.getStringValue(i));
-          _minElementLength = Math.min(_minElementLength, elementLength);
-          _maxElementLength = Math.max(_maxElementLength, elementLength);
-        }
-        break;
-      case BYTES:
-        for (int i = 0; i < length; i++) {
-          int elementLength = _dictionary.getBytesValue(i).length;
-          _minElementLength = Math.min(_minElementLength, elementLength);
-          _maxElementLength = Math.max(_maxElementLength, elementLength);
-        }
-        break;
-      default:
-        throw new IllegalStateException("Unsupported stored type: " + storedType);
+    } else {
+      // If the stored type is not fixed width, iterate over the dictionary to find the min/max element length
+      _minElementLength = Integer.MAX_VALUE;
+      _maxElementLength = 0;
+      int length = _dictionary.length();
+      for (int i = 0; i < length; i++) {
+        int elementLength = _dictionary.getValueSize(i);
+        _minElementLength = Math.min(_minElementLength, elementLength);
+        _maxElementLength = Math.max(_maxElementLength, elementLength);
+      }
     }
   }
 

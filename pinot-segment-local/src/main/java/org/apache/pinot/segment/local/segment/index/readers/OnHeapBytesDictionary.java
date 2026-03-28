@@ -124,4 +124,14 @@ public class OnHeapBytesDictionary extends BaseImmutableDictionary {
   public byte[] getBytesValue(int dictId) {
     return _dictIdToVal[dictId].getBytes();
   }
+
+  @Override
+  public ByteArray getByteArrayValue(int dictId) {
+    return _dictIdToVal[dictId];
+  }
+
+  @Override
+  public int getValueSize(int dictId) {
+    return _dictIdToVal[dictId].length();
+  }
 }

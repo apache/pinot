@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -41,7 +40,6 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -263,7 +261,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         int finalDictId = dictId;
         docIdsBitmap.stream().forEach(docId -> putInt(_forwardIndexValueBuffer, docId, finalDictId));
         if (!isFixedWidth) {
-          lengthOfLongestEntry = trackLengthOfLongestEntry(dictionary, lengthOfLongestEntry, dictId);
+          lengthOfLongestEntry = Math.max(lengthOfLongestEntry, dictionary.getValueSize(dictId));
         }
       }
 
@@ -315,7 +313,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         });
 
         if (!isFixedWidth) {
-          lengthOfLongestEntry = trackLengthOfLongestEntry(dictionary, lengthOfLongestEntry, dictId);
+          lengthOfLongestEntry = Math.max(lengthOfLongestEntry, dictionary.getValueSize(dictId));
         }
       }
 
@@ -387,49 +385,11 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     }
   }
 
-  private int trackLengthOfLongestEntry(Dictionary dictionary, int lengthOfLongestEntry, int dictId) {
-    int updatedLengthOfLongestEntry;
-    switch (_storedType) {
-      case STRING:
-        updatedLengthOfLongestEntry = Math.max(Utf8.encodedLength(dictionary.getStringValue(dictId)),
-            lengthOfLongestEntry);
-        break;
-      case BYTES:
-        updatedLengthOfLongestEntry = Math.max(dictionary.getBytesValue(dictId).length, lengthOfLongestEntry);
-        break;
-      case BIG_DECIMAL:
-        updatedLengthOfLongestEntry = Math.max(
-            BigDecimalUtils.byteSize(dictionary.getBigDecimalValue(dictId)), lengthOfLongestEntry);
-        break;
-      default:
-        throw new IllegalStateException("Trying to calculate lengthOfLongestEntry for invalid stored type: "
-            + _storedType);
-    }
-    return updatedLengthOfLongestEntry;
-  }
-
   private void trackMaxRowLengthInBytes(Dictionary dictionary, int[] maxRowLengthInBytes, int docId, int dictId) {
     int curSizeOfRow = getInt(_forwardIndexMaxSizeBuffer, docId);
-    switch (_storedType) {
-      case STRING:
-        int newSizeOfEntry = Utf8.encodedLength(dictionary.getStringValue(dictId)) + curSizeOfRow;
-        putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
-        maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
-        break;
-      case BYTES:
-        newSizeOfEntry = dictionary.getBytesValue(dictId).length + curSizeOfRow;
-        putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
-        maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
-        break;
-      case BIG_DECIMAL:
-        newSizeOfEntry = BigDecimalUtils.byteSize(dictionary.getBigDecimalValue(dictId)) + curSizeOfRow;
-        putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
-        maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
-        break;
-      default:
-        throw new IllegalStateException("Trying to calculate maxRowLengthInBytes for invalid stored type: "
-            + _storedType);
-    }
+    int newSizeOfEntry = dictionary.getValueSize(dictId) + curSizeOfRow;
+    putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
+    maxRowLengthInBytes[0] = Math.max(maxRowLengthInBytes[0], newSizeOfEntry);
   }
 
   private void writeToForwardIndex(Dictionary dictionary, IndexCreationContext context)

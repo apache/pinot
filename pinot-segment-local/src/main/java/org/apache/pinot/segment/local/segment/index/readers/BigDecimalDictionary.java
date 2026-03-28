@@ -99,6 +99,11 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int getValueSize(int dictId) {
+    return getByteSize(dictId);
+  }
+
+  @Override
   public void read32BitsMurmur3HashValues(int[] dictIds, int length, int[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {

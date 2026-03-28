@@ -124,6 +124,11 @@ public class SameValueMutableDictionary implements MutableDictionary {
   }
 
   @Override
+  public int getValueSize(int dictId) {
+    return _delegate.getValueSize(dictId);
+  }
+
+  @Override
   public void close()
       throws IOException {
     _delegate.close();

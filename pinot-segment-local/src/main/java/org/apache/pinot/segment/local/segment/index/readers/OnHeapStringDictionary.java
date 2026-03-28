@@ -128,4 +128,9 @@ public class OnHeapStringDictionary extends BaseImmutableDictionary {
   public byte[] getBytesValue(int dictId) {
     return _unpaddedBytes[dictId];
   }
+
+  @Override
+  public int getValueSize(int dictId) {
+    return _unpaddedBytes[dictId].length;
+  }
 }
