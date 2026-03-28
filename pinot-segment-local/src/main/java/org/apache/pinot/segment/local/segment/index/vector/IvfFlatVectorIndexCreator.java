@@ -148,8 +148,10 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   public void add(Object[] values, @Nullable int[] dictIds) {
     // The segment builder calls this overload for multi-value columns.
     // Convert Object[] (boxed Floats) to float[] and delegate to add(float[]).
+    Preconditions.checkArgument(values.length == _dimension,
+        "Vector dimension mismatch: expected %s, got %s", _dimension, values.length);
     float[] floatValues = new float[_dimension];
-    for (int i = 0; i < values.length; i++) {
+    for (int i = 0; i < _dimension; i++) {
       floatValues[i] = (Float) values[i];
     }
     add(floatValues);
