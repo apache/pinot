@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.maven.enforcer.rule.api.EnforcerRuleException;
 import org.apache.maven.enforcer.rule.api.EnforcerRuleHelper;
+import org.apache.maven.execution.DefaultMavenExecutionRequest;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.DependencyManagement;
@@ -37,23 +38,16 @@ public class PinotCustomDependencyVersionRuleTest {
 
   private PinotCustomDependencyVersionRule _rule;
   private EnforcerRuleHelper _helper;
-  private MavenProject _project;
-  private MavenSession _session;
 
   @BeforeMethod
-  public void setUp() throws Exception {
+  public void setUp() {
     _rule = new PinotCustomDependencyVersionRule("pinot-plugins,pinot-tools");
     _helper = Mockito.mock(EnforcerRuleHelper.class);
-    _session = Mockito.mock(MavenSession.class);
-    _project = Mockito.mock(MavenProject.class);
-
-    Mockito.when(_helper.evaluate("${project}")).thenReturn(_project);
-    Mockito.when(_helper.evaluate("${session}")).thenReturn(_session);
   }
 
   // Root POM with hardcoded version in <dependencyManagement>
   @Test
-  public void testExecuteWithHardcodedVersionInRootPom() throws EnforcerRuleException {
+  public void testExecuteWithHardcodedVersionInRootPom() throws Exception {
     Model model = new Model();
     DependencyManagement depMgmt = new DependencyManagement();
     Dependency dependency = new Dependency();
@@ -66,8 +60,8 @@ public class PinotCustomDependencyVersionRuleTest {
     depMgmt.setDependencies(dependencies);
     model.setDependencyManagement(depMgmt);
 
-    Mockito.when(_project.getOriginalModel()).thenReturn(model);
-    Mockito.when(_project.isExecutionRoot()).thenReturn(true);
+    MavenProject project = createProject("pinot", model, true, "pom.xml");
+    mockExecutionContext(project, createSession(project));
 
     EnforcerRuleException thrown = Assert.expectThrows(EnforcerRuleException.class, () -> {
       _rule.execute(_helper);
@@ -78,7 +72,7 @@ public class PinotCustomDependencyVersionRuleTest {
 
   // Root POM with no hardcoded version in <dependencyManagement>
   @Test
-  public void testExecuteWithNoHardcodedVersionInRootPom() throws EnforcerRuleException {
+  public void testExecuteWithNoHardcodedVersionInRootPom() throws Exception {
     Model model = new Model();
     DependencyManagement depMgmt = new DependencyManagement();
     Dependency dependency = new Dependency();
@@ -91,15 +85,15 @@ public class PinotCustomDependencyVersionRuleTest {
     depMgmt.setDependencies(dependencies);
     model.setDependencyManagement(depMgmt);
 
-    Mockito.when(_project.getOriginalModel()).thenReturn(model);
-    Mockito.when(_project.isExecutionRoot()).thenReturn(true);
+    MavenProject project = createProject("pinot", model, true, "pom.xml");
+    mockExecutionContext(project, createSession(project));
 
     _rule.execute(_helper);
   }
 
   // Submodule POM with hardcoded version in <dependencies>
   @Test
-  public void testExecuteWithVersionInSubmodulePOM() throws EnforcerRuleException {
+  public void testExecuteWithVersionInSubmodulePOM() throws Exception {
     Model model = new Model();
     Dependency dependency = new Dependency();
     dependency.setGroupId("org.apache.test");
@@ -110,10 +104,9 @@ public class PinotCustomDependencyVersionRuleTest {
     dependencies.add(dependency);
     model.setDependencies(dependencies);
 
-    Mockito.when(_project.getOriginalModel()).thenReturn(model);
-    Mockito.when(_project.isExecutionRoot()).thenReturn(false);
-    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
-    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-core"));   // non skipped
+    MavenProject rootProject = createProject("pinot", new Model(), true, "pom.xml");
+    MavenProject project = createProject("pinot-core", model, false, "pinot-core/pom.xml");
+    mockExecutionContext(project, createSession(rootProject));
 
     EnforcerRuleException thrown = Assert.expectThrows(EnforcerRuleException.class, () -> {
       _rule.execute(_helper);
@@ -124,7 +117,7 @@ public class PinotCustomDependencyVersionRuleTest {
 
   // Submodule POM with no version in <dependencies>
   @Test
-  public void testExecuteWithNoVersionInSubmodulePOM() throws EnforcerRuleException {
+  public void testExecuteWithNoVersionInSubmodulePOM() throws Exception {
     Model model = new Model();
     Dependency dependency = new Dependency();
     dependency.setGroupId("org.apache.test");
@@ -134,17 +127,16 @@ public class PinotCustomDependencyVersionRuleTest {
     dependencies.add(dependency);
     model.setDependencies(dependencies);
 
-    Mockito.when(_project.getOriginalModel()).thenReturn(model);
-    Mockito.when(_project.isExecutionRoot()).thenReturn(false);
-    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
-    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-core"));     // non skipped
+    MavenProject rootProject = createProject("pinot", new Model(), true, "pom.xml");
+    MavenProject project = createProject("pinot-core", model, false, "pinot-core/pom.xml");
+    mockExecutionContext(project, createSession(rootProject));
 
     _rule.execute(_helper);
   }
 
   // Submodule POM with version using a property (but still violates the rule)
   @Test
-  public void testExecuteWithVersionUsingPropertyInSubmodulePOM() throws EnforcerRuleException {
+  public void testExecuteWithVersionUsingPropertyInSubmodulePOM() throws Exception {
     Model model = new Model();
     Dependency dependency = new Dependency();
     dependency.setGroupId("org.apache.test");
@@ -155,10 +147,9 @@ public class PinotCustomDependencyVersionRuleTest {
     dependencies.add(dependency);
     model.setDependencies(dependencies);
 
-    Mockito.when(_project.getOriginalModel()).thenReturn(model);
-    Mockito.when(_project.isExecutionRoot()).thenReturn(false);
-    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
-    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-core"));   // non skipped
+    MavenProject rootProject = createProject("pinot", new Model(), true, "pom.xml");
+    MavenProject project = createProject("pinot-core", model, false, "pinot-core/pom.xml");
+    mockExecutionContext(project, createSession(rootProject));
 
     EnforcerRuleException thrown = Assert.expectThrows(EnforcerRuleException.class, () -> {
       _rule.execute(_helper);
@@ -169,7 +160,7 @@ public class PinotCustomDependencyVersionRuleTest {
 
   // Simulate a skipped module with hardcoded versions
   @Test
-  public void testExecuteWithSkippedModule() throws EnforcerRuleException {
+  public void testExecuteWithSkippedModule() throws Exception {
     Model model = new Model();
     Dependency dependency = new Dependency();
     dependency.setGroupId("org.apache.test");
@@ -180,15 +171,32 @@ public class PinotCustomDependencyVersionRuleTest {
     dependencies.add(dependency);
     model.setDependencies(dependencies);
 
-    Mockito.when(_project.getOriginalModel()).thenReturn(model);
-    Mockito.when(_project.isExecutionRoot()).thenReturn(false);
-    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
-    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-plugins"));    // skipped module
+    MavenProject rootProject = createProject("pinot", new Model(), true, "pom.xml");
+    MavenProject project = createProject("pinot-plugins-module", model, false, "pinot-plugins/pom.xml");
+    mockExecutionContext(project, createSession(rootProject));
 
     EnforcerRuleException thrown = Assert.expectThrows(EnforcerRuleException.class, () -> {
       _rule.execute(_helper);
     });
 
     Assert.assertTrue(thrown.getMessage().contains("Please refer to"));
+  }
+
+  private MavenProject createProject(String artifactId, Model originalModel, boolean executionRoot, String pomPath) {
+    MavenProject project = new MavenProject(originalModel);
+    project.setOriginalModel(originalModel);
+    project.setArtifactId(artifactId);
+    project.setExecutionRoot(executionRoot);
+    project.setFile(new File(pomPath).getAbsoluteFile());
+    return project;
+  }
+
+  private MavenSession createSession(MavenProject topLevelProject) {
+    return new MavenSession(null, new DefaultMavenExecutionRequest(), null, topLevelProject);
+  }
+
+  private void mockExecutionContext(MavenProject project, MavenSession session) throws Exception {
+    Mockito.when(_helper.evaluate("${project}")).thenReturn(project);
+    Mockito.when(_helper.evaluate("${session}")).thenReturn(session);
   }
 }

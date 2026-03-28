@@ -37,13 +37,13 @@ public class MutableColumnStatisticsTest {
   @Test
   public void testElementLength() {
     int numElements = 10;
-    String[] elements = new String[numElements];
+    int[] elementLengths = new int[numElements];
     int minElementLength = Integer.MAX_VALUE;
     int maxElementLength = 0;
     for (int i = 0; i < numElements; i++) {
       String randomString = RandomStringUtils.random(100);
-      elements[i] = randomString;
       int elementLength = randomString.getBytes(StandardCharsets.UTF_8).length;
+      elementLengths[i] = elementLength;
       minElementLength = Math.min(minElementLength, elementLength);
       maxElementLength = Math.max(maxElementLength, elementLength);
     }
@@ -53,8 +53,8 @@ public class MutableColumnStatisticsTest {
     when(dataSource.getDictionary()).thenReturn(dictionary);
     when(dictionary.getValueType()).thenReturn(DataType.STRING);
     when(dictionary.length()).thenReturn(numElements);
-    when(dictionary.getStringValue(anyInt())).thenAnswer(
-        (Answer<String>) invocation -> elements[(int) invocation.getArgument(0)]);
+    when(dictionary.getValueSize(anyInt())).thenAnswer(
+        (Answer<Integer>) invocation -> elementLengths[(int) invocation.getArgument(0)]);
 
     MutableColumnStatistics columnStatistics = new MutableColumnStatistics(dataSource, null, false);
     assertEquals(columnStatistics.getLengthOfShortestElement(), minElementLength);
