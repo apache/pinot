@@ -100,14 +100,23 @@ public class BenchmarkJsonIndexDistinct {
   private static final String ID_COLUMN = "id";
   private static final String TAGS_COLUMN = "tags";
   private static final String JSON_INDEX_DISTINCT_OPERATOR_NAME = "JsonIndexDistinctOperator";
+  private static final String SAME_PATH_FILTER =
+      "WHERE JSON_MATCH(tags, 'REGEXP_LIKE(\"$.instance\", ''.*test.*'')')";
+  private static final String EXTRA_FILTER =
+      "WHERE JSON_MATCH(tags, 'REGEXP_LIKE(\"$.instance\", ''.*test.*'')') "
+          + "AND JSON_MATCH(tags, '\"$.cluster\" = ''cluster-0''')";
   private static final String THREE_ARG_SAMPLE_QUERY =
       "SELECT DISTINCT JSON_EXTRACT_INDEX(tags, '$.instance', 'STRING') AS tag_value "
-          + "FROM myTable "
-          + "WHERE JSON_MATCH(tags, 'REGEXP_LIKE(\"$.instance\", ''.*test.*'')')";
+          + "FROM myTable " + SAME_PATH_FILTER;
   private static final String FOUR_ARG_SAMPLE_QUERY =
       "SELECT DISTINCT JSON_EXTRACT_INDEX(tags, '$.instance', 'STRING', '') AS tag_value "
-          + "FROM myTable "
-          + "WHERE JSON_MATCH(tags, 'REGEXP_LIKE(\"$.instance\", ''.*test.*'')')";
+          + "FROM myTable " + SAME_PATH_FILTER;
+  private static final String THREE_ARG_EXTRA_FILTER_SAMPLE_QUERY =
+      "SELECT DISTINCT JSON_EXTRACT_INDEX(tags, '$.instance', 'STRING') AS tag_value "
+          + "FROM myTable " + EXTRA_FILTER;
+  private static final String FOUR_ARG_EXTRA_FILTER_SAMPLE_QUERY =
+      "SELECT DISTINCT JSON_EXTRACT_INDEX(tags, '$.instance', 'STRING', '') AS tag_value "
+          + "FROM myTable " + EXTRA_FILTER;
   private static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
   private static final boolean ASSERT_SPEEDUP =
       Boolean.parseBoolean(System.getProperty("pinot.perf.jsonIndexDistinct.assertSpeedup", "true"));
@@ -138,7 +147,7 @@ public class BenchmarkJsonIndexDistinct {
   @Param({"1000000"})
   int _distinctLimit;
 
-  @Param({"THREE_ARG", "FOUR_ARG"})
+  @Param({"THREE_ARG", "FOUR_ARG", "THREE_ARG_EXTRA_FILTER", "FOUR_ARG_EXTRA_FILTER"})
   String _queryVariant;
 
   private IndexSegment _indexSegment;
@@ -150,12 +159,19 @@ public class BenchmarkJsonIndexDistinct {
   @Setup(Level.Trial)
   public void setup()
       throws Exception {
+    boolean extraFilter = _queryVariant.contains("EXTRA_FILTER");
     Preconditions.checkState(_numRows >= _instanceCardinality,
         "Benchmark requires numRows >= instanceCardinality but got numRows=%s instanceCardinality=%s",
         _numRows, _instanceCardinality);
-    _expectedDistinctCount = Math.max(1, Math.min(_instanceCardinality,
+    int matchingInstances = Math.max(1, Math.min(_instanceCardinality,
         (int) Math.round(_instanceCardinality * _testInstanceFraction)));
-    Preconditions.checkState(_distinctLimit >= _expectedDistinctCount,
+    // With the extra cluster-0 filter, only instances where instanceId % 32 == 0 pass the cross-path filter.
+    // Among matching instances [0, matchingInstances), those with id % 32 == 0 survive.
+    _expectedDistinctCount = extraFilter
+        ? (int) java.util.stream.IntStream.range(0, matchingInstances).filter(i -> i % 32 == 0).count()
+        : matchingInstances;
+    _expectedDistinctCount = Math.max(_expectedDistinctCount, extraFilter ? 0 : 1);
+    Preconditions.checkState(_distinctLimit >= Math.max(_expectedDistinctCount, 1),
         "Distinct limit must cover all matching values for deterministic validation. limit=%s expectedDistinct=%s",
         _distinctLimit, _expectedDistinctCount);
 
@@ -199,16 +215,20 @@ public class BenchmarkJsonIndexDistinct {
     QueryExecution baselineExecution = executeAndCollect(_baselineQueryContext);
     QueryExecution optimizedExecution = executeAndCollect(_optimizedQueryContext);
     Preconditions.checkState(baselineExecution._values.equals(optimizedExecution._values),
-        "Result mismatch. baseline=%s optimized=%s",
-        baselineExecution._values.size(), optimizedExecution._values.size());
-    Preconditions.checkState(optimizedExecution._values.size() == _expectedDistinctCount,
-        "Unexpected distinct count. expected=%s actual=%s", _expectedDistinctCount, optimizedExecution._values.size());
-    Preconditions.checkState(optimizedExecution._stats.getNumDocsScanned() == 0,
-        "JsonIndexDistinctOperator should not scan docs post-filter but scanned %s",
-        optimizedExecution._stats.getNumDocsScanned());
-    Preconditions.checkState(optimizedExecution._stats.getNumEntriesScannedPostFilter() == 0,
-        "JsonIndexDistinctOperator should not scan post-filter entries but scanned %s",
-        optimizedExecution._stats.getNumEntriesScannedPostFilter());
+        "Result mismatch. baseline=%s optimized=%s variant=%s",
+        baselineExecution._values.size(), optimizedExecution._values.size(), _queryVariant);
+    if (!extraFilter) {
+      Preconditions.checkState(optimizedExecution._values.size() == _expectedDistinctCount,
+          "Unexpected distinct count. expected=%s actual=%s variant=%s",
+          _expectedDistinctCount, optimizedExecution._values.size(), _queryVariant);
+      // Fast path (fully pushed down): no docs scanned, no entries scanned post-filter
+      Preconditions.checkState(optimizedExecution._stats.getNumDocsScanned() == 0,
+          "JsonIndexDistinctOperator should not scan docs post-filter but scanned %s",
+          optimizedExecution._stats.getNumDocsScanned());
+      Preconditions.checkState(optimizedExecution._stats.getNumEntriesScannedPostFilter() == 0,
+          "JsonIndexDistinctOperator should not scan post-filter entries but scanned %s",
+          optimizedExecution._stats.getNumEntriesScannedPostFilter());
+    }
     Preconditions.checkState(baselineExecution._stats.getNumEntriesScannedPostFilter() > 0,
         "Baseline DistinctOperator should scan post-filter entries");
   }
@@ -236,7 +256,7 @@ public class BenchmarkJsonIndexDistinct {
   }
 
   private void verifySpeedup() {
-    if (!ASSERT_SPEEDUP) {
+    if (!ASSERT_SPEEDUP || _queryVariant.contains("EXTRA_FILTER")) {
       return;
     }
 
@@ -343,6 +363,10 @@ public class BenchmarkJsonIndexDistinct {
         return THREE_ARG_SAMPLE_QUERY;
       case "FOUR_ARG":
         return FOUR_ARG_SAMPLE_QUERY;
+      case "THREE_ARG_EXTRA_FILTER":
+        return THREE_ARG_EXTRA_FILTER_SAMPLE_QUERY;
+      case "FOUR_ARG_EXTRA_FILTER":
+        return FOUR_ARG_EXTRA_FILTER_SAMPLE_QUERY;
       default:
         throw new IllegalStateException("Unsupported query variant: " + _queryVariant);
     }
