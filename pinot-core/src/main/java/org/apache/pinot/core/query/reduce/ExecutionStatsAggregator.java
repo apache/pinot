@@ -30,6 +30,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 
@@ -73,6 +74,9 @@ public class ExecutionStatsAggregator {
   private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
   private boolean _numGroupsWarningLimitReached = false;
+  private boolean _maxRowsInDistinctReached = false;
+  private boolean _maxRowsWithoutChangeInDistinctReached = false;
+  private boolean _maxExecutionTimeInDistinctReached = false;
 
   public ExecutionStatsAggregator(boolean enableTrace) {
     _enableTrace = enableTrace;
@@ -234,6 +238,29 @@ public class ExecutionStatsAggregator {
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
     _numGroupsWarningLimitReached |=
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName()));
+    String distinctEarlyTermination =
+        metadata.get(DataTable.MetadataKey.EARLY_TERMINATION_REASON.getName());
+    if (distinctEarlyTermination != null) {
+      try {
+        BaseResultsBlock.EarlyTerminationReason reason =
+            BaseResultsBlock.EarlyTerminationReason.valueOf(distinctEarlyTermination);
+        switch (reason) {
+          case DISTINCT_MAX_ROWS:
+            _maxRowsInDistinctReached = true;
+            break;
+          case DISTINCT_MAX_ROWS_WITHOUT_CHANGE:
+            _maxRowsWithoutChangeInDistinctReached = true;
+            break;
+          case DISTINCT_MAX_EXECUTION_TIME:
+            _maxExecutionTimeInDistinctReached = true;
+            break;
+          default:
+            break;
+        }
+      } catch (IllegalArgumentException e) {
+        // Ignore unknown reason.
+      }
+    }
   }
 
   public void setStats(String rawTableName, BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
@@ -257,6 +284,9 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setGroupsTrimmed(_groupsTrimmed);
     brokerResponseNative.setNumGroupsLimitReached(_numGroupsLimitReached);
     brokerResponseNative.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
+    brokerResponseNative.setMaxRowsInDistinctReached(_maxRowsInDistinctReached);
+    brokerResponseNative.setMaxRowsWithoutChangeInDistinctReached(_maxRowsWithoutChangeInDistinctReached);
+    brokerResponseNative.setMaxExecutionTimeInDistinctReached(_maxExecutionTimeInDistinctReached);
     brokerResponseNative.setOfflineThreadCpuTimeNs(_offlineThreadCpuTimeNs);
     brokerResponseNative.setRealtimeThreadCpuTimeNs(_realtimeThreadCpuTimeNs);
     brokerResponseNative.setOfflineSystemActivitiesCpuTimeNs(_offlineSystemActivitiesCpuTimeNs);
