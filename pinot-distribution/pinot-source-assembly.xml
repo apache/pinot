@@ -53,8 +53,6 @@
         <!-- Do not include docker, kubernetes related files -->
         <exclude>kubernetes/**</exclude>
         <exclude>docker/**</exclude>
-        <exclude>contrib/pinot-druid-benchmark/**</exclude>
-        <exclude>thirdeye/**</exclude>
         <exclude>thirdeye/**</exclude>
       </excludes>
     </fileSet>
