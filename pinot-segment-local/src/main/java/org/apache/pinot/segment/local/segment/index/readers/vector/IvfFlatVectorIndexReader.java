@@ -112,7 +112,11 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
       _numVectors = in.readInt();
       _nlist = in.readInt();
       int distanceFunctionOrdinal = in.readInt();
-      _distanceFunction = VectorIndexConfig.VectorDistanceFunction.values()[distanceFunctionOrdinal];
+      VectorIndexConfig.VectorDistanceFunction[] allFunctions = VectorIndexConfig.VectorDistanceFunction.values();
+      Preconditions.checkState(distanceFunctionOrdinal >= 0 && distanceFunctionOrdinal < allFunctions.length,
+          "Invalid distance function ordinal %s in IVF_FLAT index for column: %s (valid range: 0-%s)",
+          distanceFunctionOrdinal, column, allFunctions.length - 1);
+      _distanceFunction = allFunctions[distanceFunctionOrdinal];
 
       // Clamp nprobe to valid range
       _nprobe = Math.min(configuredNprobe, _nlist);
@@ -212,7 +216,10 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
    * as a parameter to getDocIds() to eliminate any cross-query visibility concern.</p>
    */
   public void setNprobe(int nprobe) {
-    _nprobe = Math.max(1, Math.min(nprobe, _nlist));
+    if (nprobe < 1) {
+      throw new IllegalArgumentException("nprobe must be >= 1, got: " + nprobe);
+    }
+    _nprobe = Math.min(nprobe, _nlist);
   }
 
   /**

@@ -114,11 +114,11 @@ public final class VectorIndexConfigValidator {
 
     switch (backendType) {
       case HNSW:
-        validateNoForeignProperties(properties, HNSW_PROPERTIES, IVF_FLAT_PROPERTIES, "HNSW", "IVF_FLAT");
+        validateNoForeignProperties(properties, IVF_FLAT_PROPERTIES, "HNSW", "IVF_FLAT");
         validateHnswProperties(properties);
         break;
       case IVF_FLAT:
-        validateNoForeignProperties(properties, IVF_FLAT_PROPERTIES, HNSW_PROPERTIES, "IVF_FLAT", "HNSW");
+        validateNoForeignProperties(properties, HNSW_PROPERTIES, "IVF_FLAT", "HNSW");
         validateIvfFlatProperties(properties);
         break;
       default:
@@ -132,8 +132,7 @@ public final class VectorIndexConfigValidator {
    * to support forward-compatible extensibility.
    */
   private static void validateNoForeignProperties(Map<String, String> properties,
-      Set<String> ownProperties, Set<String> foreignProperties,
-      String ownType, String foreignType) {
+      Set<String> foreignProperties, String ownType, String foreignType) {
     for (String key : properties.keySet()) {
       if (COMMON_PROPERTIES.contains(key)) {
         continue;

@@ -271,6 +271,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         return name.endsWith(hnswSuffix);
       }
     });
+    if (hnswIndexFiles == null) {
+      hnswIndexFiles = new File[0];
+    }
     for (File vectorIndexFile : hnswIndexFiles) {
       File[] indexFiles = vectorIndexFile.listFiles();
       File v3VectorIndexDir = new File(v3Dir, vectorIndexFile.getName());
