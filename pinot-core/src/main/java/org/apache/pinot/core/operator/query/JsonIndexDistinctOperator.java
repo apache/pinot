@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -114,9 +115,16 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
         && isOnlySamePathJsonMatchFilter(parsed, _queryContext.getFilter())
         && !jsonMatchFilterCanMatchMissingPath(pushedDownFilterJson);
 
+    // Fast path: when the filter is fully pushed down into the JSON index, we only need the distinct value strings.
+    // This avoids reading posting lists, building per-value bitmaps, and converting flattened doc IDs.
+    if (filterFullyPushedDown) {
+      Set<String> distinctValues = jsonIndexReader.getMatchingDistinctValues(
+          parsed._jsonPathString, pushedDownFilterJson);
+      return buildDistinctResultsFromValues(expr, parsed, distinctValues);
+    }
+
     // Evaluate the filter first so we can skip the (potentially expensive) index map when no docs match.
-    // For the scalar same-path JSON_MATCH case, the lookup itself is already exact and no row-level filter remains.
-    RoaringBitmap filteredDocIds = filterFullyPushedDown ? null : buildFilteredDocIds();
+    RoaringBitmap filteredDocIds = buildFilteredDocIds();
     if (filteredDocIds != null && filteredDocIds.isEmpty()) {
       ColumnDataType earlyColumnDataType = ColumnDataType.fromDataTypeSV(parsed._dataType);
       DataSchema earlyDataSchema = new DataSchema(
@@ -128,9 +136,6 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
           createDistinctTable(earlyDataSchema, parsed._dataType, earlyOrderBy), _queryContext);
     }
 
-    // Same-path JSON_MATCH can be pushed down for the scalar 3/4-arg form because each qualifying row contributes
-    // at most one value for the selected path. Exclusive predicates such as IS NULL are excluded from the fully
-    // pushed-down case because they can also match docs where the selected path is missing.
     // All other WHERE filters remain row-level and are applied after converting flattened doc IDs to real doc IDs.
     Map<String, RoaringBitmap> valueToMatchingDocs =
         jsonIndexReader.getMatchingFlattenedDocsMap(parsed._jsonPathString, pushedDownFilterJson);
@@ -138,7 +143,34 @@ public class JsonIndexDistinctOperator extends BaseOperator<DistinctResultsBlock
     // Always single-value (MV _ARRAY is rejected in parseJsonExtractIndex)
     jsonIndexReader.convertFlattenedDocIdsToDocIds(valueToMatchingDocs);
     return buildDistinctResultsBlock(expr, parsed, valueToMatchingDocs, filteredDocIds,
-        filteredDocIds == null && !filterFullyPushedDown);
+        filteredDocIds == null);
+  }
+
+  private DistinctResultsBlock buildDistinctResultsFromValues(ExpressionContext expr, ParsedJsonExtractIndex parsed,
+      Set<String> distinctValues) {
+    ColumnDataType columnDataType = ColumnDataType.fromDataTypeSV(parsed._dataType);
+    DataSchema dataSchema = new DataSchema(
+        new String[]{expr.toString()},
+        new ColumnDataType[]{columnDataType});
+    OrderByExpressionContext orderByExpression = _queryContext.getOrderByExpressions() != null
+        ? _queryContext.getOrderByExpressions().get(0) : null;
+    DistinctTable distinctTable = createDistinctTable(dataSchema, parsed._dataType, orderByExpression);
+    int limit = _queryContext.getLimit();
+
+    for (String value : distinctValues) {
+      _numEntriesExamined++;
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numEntriesExamined, EXPLAIN_NAME);
+
+      boolean done = addValueToDistinctTable(distinctTable, value, parsed._dataType, orderByExpression);
+      if (done) {
+        break;
+      }
+      if (orderByExpression == null && distinctTable.hasLimit() && distinctTable.size() >= limit) {
+        break;
+      }
+    }
+
+    return new DistinctResultsBlock(distinctTable, _queryContext);
   }
 
   private DistinctResultsBlock buildDistinctResultsBlock(ExpressionContext expr, ParsedJsonExtractIndex parsed,

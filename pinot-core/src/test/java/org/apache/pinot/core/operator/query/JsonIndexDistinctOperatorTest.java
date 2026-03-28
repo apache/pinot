@@ -67,23 +67,37 @@ public class JsonIndexDistinctOperatorTest {
   private static final String SAME_PATH_IS_NULL_FILTER = "\"$.instance\" IS NULL";
 
   @Test
-  public void testSamePathJsonMatchIsPushedIntoLookupForFourArgScalarForm() {
+  public void testSamePathJsonMatchUsesDistinctValuesFastPathForFourArgScalarForm() {
     QueryContext queryContext = distinctQuery(STRING_EXTRACT_WITH_EMPTY_DEFAULT, SAME_PATH_FILTER);
 
     JsonIndexReader jsonIndexReader = mock(JsonIndexReader.class);
-    Map<String, RoaringBitmap> flattenedDocsByValue = new HashMap<>();
-    flattenedDocsByValue.put("test-east", bitmap(10));
-    flattenedDocsByValue.put("test-west", bitmap(20));
-    when(jsonIndexReader.getMatchingFlattenedDocsMap("$.instance", SAME_PATH_FILTER)).thenReturn(flattenedDocsByValue);
-    stubConvertedDocIds(jsonIndexReader, Map.of("test-east", bitmap(0), "test-west", bitmap(1)));
+    when(jsonIndexReader.getMatchingDistinctValues("$.instance", SAME_PATH_FILTER))
+        .thenReturn(Set.of("test-east", "test-west"));
 
     DistinctResultsBlock resultsBlock =
         buildOperator(queryContext, jsonIndexReader, bufferBitmap(0, 1), 2).nextBlock();
 
     assertEquals(extractValues(resultsBlock), Set.of("test-east", "test-west"));
-    verify(jsonIndexReader).getMatchingFlattenedDocsMap("$.instance", SAME_PATH_FILTER);
-    verify(jsonIndexReader, never()).getMatchingFlattenedDocsMap("$.instance", null);
-    verify(jsonIndexReader).convertFlattenedDocIdsToDocIds(any());
+    verify(jsonIndexReader).getMatchingDistinctValues("$.instance", SAME_PATH_FILTER);
+    verify(jsonIndexReader, never()).getMatchingFlattenedDocsMap(any(), any());
+    verify(jsonIndexReader, never()).convertFlattenedDocIdsToDocIds(any());
+  }
+
+  @Test
+  public void testSamePathJsonMatchUsesDistinctValuesFastPathForThreeArgScalarForm() {
+    QueryContext queryContext = distinctQuery(STRING_EXTRACT, SAME_PATH_FILTER);
+
+    JsonIndexReader jsonIndexReader = mock(JsonIndexReader.class);
+    when(jsonIndexReader.getMatchingDistinctValues("$.instance", SAME_PATH_FILTER))
+        .thenReturn(Set.of("test-east", "test-west"));
+
+    DistinctResultsBlock resultsBlock =
+        buildOperator(queryContext, jsonIndexReader, bufferBitmap(0, 1), 2).nextBlock();
+
+    assertEquals(extractValues(resultsBlock), Set.of("test-east", "test-west"));
+    verify(jsonIndexReader).getMatchingDistinctValues("$.instance", SAME_PATH_FILTER);
+    verify(jsonIndexReader, never()).getMatchingFlattenedDocsMap(any(), any());
+    verify(jsonIndexReader, never()).convertFlattenedDocIdsToDocIds(any());
   }
 
   @Test
