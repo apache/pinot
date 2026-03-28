@@ -92,6 +92,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.query.validate.InClauseSizeValidationVisitor;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -237,9 +238,7 @@ public class QueryEnvironment {
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
   }
 
-  /// @deprecated Use [#compile] and then [plan][CompiledQuery#planQuery(long)] the returned query instead
   @VisibleForTesting
-  @Deprecated
   public DispatchableSubPlan planQuery(String sqlQuery) {
     try (CompiledQuery compiledQuery = compile(sqlQuery)) {
       return compiledQuery.planQuery(0).getQueryPlan();
@@ -415,6 +414,15 @@ public class QueryEnvironment {
       }
       validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
       validated.accept(new RowExpressionValidationVisitor());
+
+      // Validate IN clause size to prevent Calcite planner bottlenecks with large IN lists
+      int maxInClauseElements = QueryOptionsUtils.getMseMaxInClauseElements(
+          plannerContext.getOptions(), plannerContext.getEnvConfig().defaultMseMaxInClauseElements());
+
+      if (maxInClauseElements > 0) {
+        validated.accept(new InClauseSizeValidationVisitor(maxInClauseElements));
+      }
+
       return validated;
     } catch (QueryException e) {
       throw e;
@@ -861,6 +869,19 @@ public class QueryEnvironment {
     @Value.Default
     default int defaultSortExchangeCopyLimit() {
       return PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY.config.getFetchLimitThreshold();
+    }
+
+    /**
+     * Returns the maximum number of elements allowed in an IN clause for multi-stage engine queries.
+     * A value of 0 or negative disables this validation.
+     *
+     * This is treated as the default value for the broker and is expected to be obtained from a Pinot configuration.
+     * This default value can be overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#MSE_MAX_IN_CLAUSE_ELEMENTS}.
+     */
+    @Value.Default
+    default int defaultMseMaxInClauseElements() {
+      return CommonConstants.Broker.DEFAULT_MSE_MAX_IN_CLAUSE_ELEMENTS;
     }
   }
 
