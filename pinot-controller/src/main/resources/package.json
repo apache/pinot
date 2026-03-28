@@ -101,5 +101,13 @@
     "react-hook-form": "6.15.8",
     "react-router-dom": "5.3.3",
     "react-spring": "8.0.27"
+  },
+  "overrides": {
+    "underscore": "^1.13.8",
+    "minimatch@>=9.0.0 <9.0.7": "9.0.7",
+    "minimatch@>=10.0.0 <10.2.3": "10.2.3",
+    "glob@>=10.2.0 <10.5.0": "10.5.0",
+    "serialize-javascript": "^7.0.5",
+    "postcss@>=8.0.0 <8.4.31": "8.4.31"
   }
 }
