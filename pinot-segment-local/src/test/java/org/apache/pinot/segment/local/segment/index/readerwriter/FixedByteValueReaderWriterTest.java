@@ -76,6 +76,28 @@ public class FixedByteValueReaderWriterTest implements PinotBuffersAfterMethodCh
   }
 
   @Test(dataProvider = "params")
+  public void testGetValueSize(int maxStringLength, int configuredMaxLength, ByteOrder byteOrder)
+      throws IOException {
+    byte[] bytes = new byte[configuredMaxLength];
+    try (PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(configuredMaxLength * 1000L, byteOrder,
+        "testGetValueSize")) {
+      FixedByteValueReaderWriter readerWriter = new FixedByteValueReaderWriter(buffer);
+      List<Integer> lengths = new ArrayList<>(1000);
+      for (int i = 0; i < 1000; i++) {
+        int length = ThreadLocalRandom.current().nextInt(maxStringLength);
+        Arrays.fill(bytes, 0, length, (byte) 'a');
+        readerWriter.writeBytes(i, configuredMaxLength, bytes);
+        lengths.add(length);
+        Arrays.fill(bytes, 0, length, (byte) 0);
+      }
+      for (int i = 0; i < 1000; i++) {
+        assertEquals(readerWriter.getByteSize(i, configuredMaxLength), configuredMaxLength);
+        assertEquals(readerWriter.getUnpaddedByteSize(i, configuredMaxLength), (int) lengths.get(i));
+      }
+    }
+  }
+
+  @Test(dataProvider = "params")
   public void testFixedByteValueReaderWriterNonAscii(int maxStringLength, int configuredMaxLength, ByteOrder byteOrder)
       throws IOException {
     byte[] bytes = new byte[configuredMaxLength];

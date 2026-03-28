@@ -178,6 +178,11 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   @Override
+  public int getValueSize(int dictId) {
+    return _byteStore.getValueSize(dictId);
+  }
+
+  @Override
   protected void setValue(int dictId, Object value, byte[] serializedValue) {
     _byteStore.add(serializedValue);
   }

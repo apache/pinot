@@ -123,4 +123,9 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
   public byte[] getBytesValue(int dictId) {
     return _value;
   }
+
+  @Override
+  public int getValueSize(int dictId) {
+    return _value.length;
+  }
 }
