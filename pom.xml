@@ -199,7 +199,7 @@
     <spark3.version>3.5.8</spark3.version>
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.1.1</kafka4.version>
-    <confluent.version>7.9.5</confluent.version>
+    <confluent.version>8.2.0</confluent.version>
     <pulsar.version>4.0.9</pulsar.version>
     <flink.version>1.20.3</flink.version>
 
@@ -240,9 +240,9 @@
     <httpcore5.version>5.4.2</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>3.25.9</protobuf.version>
+    <protobuf.version>4.34.0</protobuf.version>
     <grpc.version>1.80.0</grpc.version>
-    <google.cloud.libraries.version>26.74.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.79.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.48.0</google.errorprone.version>
