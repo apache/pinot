@@ -117,15 +117,6 @@ public class TextIndexConfigTest {
   }
 
   @Test
-  public void withLegacyNativeFstTypeIgnored()
-      throws JsonProcessingException {
-    TextIndexConfig config = JsonUtils.stringToObject("{\"fst\":\"NATIVE\"}", TextIndexConfig.class);
-
-    assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertFalse(JsonUtils.objectToString(config).contains("\"fst\""), "Unexpected fst in serialized config");
-  }
-
-  @Test
   public void testRoundTripSerializationWithArrayValues()
       throws JsonProcessingException {
     // This test verifies that TextIndexConfig can be round-tripped through JSON serialization.

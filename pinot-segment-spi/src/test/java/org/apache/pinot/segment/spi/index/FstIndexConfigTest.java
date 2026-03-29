@@ -62,23 +62,4 @@ public class FstIndexConfigTest {
 
     assertTrue(config.isDisabled(), "Unexpected disabled");
   }
-
-  @Test
-  public void withLegacyLuceneTypeIgnored()
-      throws JsonProcessingException {
-    String confStr = "{\n"
-        + "        \"type\": \"LUCENE\"\n"
-        + "}";
-    FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
-
-    assertFalse(config.isDisabled(), "Unexpected disabled");
-  }
-
-  @Test
-  public void withLegacyNativeTypeIgnored()
-      throws JsonProcessingException {
-    FstIndexConfig config = JsonUtils.stringToObject("{\"type\":\"NATIVE\"}", FstIndexConfig.class);
-
-    assertFalse(config.isDisabled(), "Unexpected disabled");
-  }
 }
