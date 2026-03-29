@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.mutable;
 
+import java.nio.ByteBuffer;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -59,6 +60,20 @@ public class ThreadSafeMutableRoaringBitmap {
 
   public synchronized MutableRoaringBitmap getMutableRoaringBitmap() {
     return _mutableRoaringBitmap.clone();
+  }
+
+  /**
+   * Returns a point-in-time snapshot of the bitmap as a serialized byte array.
+   * This avoids cloning the full object clone() unlike in getMutableRoaringBitmap()
+   */
+  public synchronized byte[] toBytes() {
+    ByteBuffer buf = ByteBuffer.allocate(_mutableRoaringBitmap.serializedSizeInBytes());
+    _mutableRoaringBitmap.serialize(buf);
+    return buf.array();
+  }
+
+  public synchronized int getCardinality() {
+    return _mutableRoaringBitmap.getCardinality();
   }
 
   public synchronized boolean isEmpty() {

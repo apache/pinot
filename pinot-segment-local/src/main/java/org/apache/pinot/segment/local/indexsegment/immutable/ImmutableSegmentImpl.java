@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -160,13 +159,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         LOGGER.warn("Previous snapshot was not taken cleanly. Remove tmp file: {}", tmpFile);
         FileUtils.deleteQuietly(tmpFile);
       }
-      MutableRoaringBitmap docIdsSnapshot = docIds.getMutableRoaringBitmap();
-      try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(tmpFile))) {
-        docIdsSnapshot.serialize(dataOutputStream);
+      byte[] bytes = docIds.toBytes();
+      int cardinality = docIds.getCardinality();
+      try (FileOutputStream fos = new FileOutputStream(tmpFile)) {
+        fos.write(bytes);
       }
       Preconditions.checkState(tmpFile.renameTo(docIdsSnapshotFile),
           "Failed to rename tmp snapshot file: %s to snapshot file: %s", tmpFile, docIdsSnapshotFile);
-      LOGGER.info("Persisted docIds for segment: {} with: {}", getSegmentName(), docIdsSnapshot.getCardinality());
+      LOGGER.info("Persisted docIds for segment: {} with: {}", getSegmentName(), cardinality);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while persisting docIds to snapshot file: {}, skipping",
           docIdsSnapshotFile, e);

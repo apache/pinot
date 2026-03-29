@@ -592,6 +592,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         }
       }
       _trackedSegments.remove(oldSegment);
+      // Remove the segment eagerly so we need not wait until next snapshot cycle to remove replaced segment
+      _updatedSegmentsSinceLastSnapshot.remove(oldSegment);
     } finally {
       finishOperation();
     }
@@ -767,6 +769,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         doRemoveSegment(segment);
       }
       _trackedSegments.remove(segment);
+      // Remove the segment eagerly so we need not wait until next snapshot cycle to remove dropped segment
+      _updatedSegmentsSinceLastSnapshot.remove(segment);
     } finally {
       finishOperation();
     }
@@ -962,24 +966,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           continue;
         }
         ThreadSafeMutableRoaringBitmap queryableDocIdsBitMap = null;
-        ThreadSafeMutableRoaringBitmap validDocIdsBitMap =
-            immutableSegment.getValidDocIds() == null ? new ThreadSafeMutableRoaringBitmap()
-                : immutableSegment.getValidDocIds();
-        immutableSegment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME,
-            validDocIdsBitMap);
+        ThreadSafeMutableRoaringBitmap validDocIdsBitMap = immutableSegment.getValidDocIds();
+        immutableSegment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsBitMap);
         if (_deleteRecordColumn != null) {
-          queryableDocIdsBitMap =
-              immutableSegment.getQueryableDocIds() == null ? new ThreadSafeMutableRoaringBitmap()
-                  : immutableSegment.getQueryableDocIds();
+          queryableDocIdsBitMap = immutableSegment.getQueryableDocIds();
           immutableSegment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME,
               queryableDocIdsBitMap);
         }
         _updatedSegmentsSinceLastSnapshot.remove(segment);
         numImmutableSegments++;
-        numPrimaryKeysInSnapshot += validDocIdsBitMap.getMutableRoaringBitmap().getCardinality();
+        numPrimaryKeysInSnapshot += validDocIdsBitMap.getCardinality();
         if (_deleteRecordColumn != null) {
-          numQueryableDocIdsInSnapshot +=
-              queryableDocIdsBitMap.getMutableRoaringBitmap().getCardinality();
+          numQueryableDocIdsInSnapshot += queryableDocIdsBitMap.getCardinality();
         }
       } catch (Exception e) {
         _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
@@ -1004,21 +1002,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         }
         try {
           ThreadSafeMutableRoaringBitmap segmentQueryableDocIdsBitMap = null;
-          ThreadSafeMutableRoaringBitmap segmentValidDocIdsBitMap =
-              segment.getValidDocIds() == null ? new ThreadSafeMutableRoaringBitmap() : segment.getValidDocIds();
-          segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, segmentValidDocIdsBitMap);
+          ThreadSafeMutableRoaringBitmap segmentValidDocIdsBitMap = segment.getValidDocIds();
+          // segment that is out of TTL with no valid docId snapshot can be skipped while taking snapshot
+          // i.e such segments will have null bitmap
+          if (segmentValidDocIdsBitMap != null) {
+            segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, segmentValidDocIdsBitMap);
+            numPrimaryKeysInSnapshot += segmentValidDocIdsBitMap.getCardinality();
+          }
           if (_deleteRecordColumn != null) {
-            segmentQueryableDocIdsBitMap = segment.getQueryableDocIds() == null ? new ThreadSafeMutableRoaringBitmap()
-                : segment.getQueryableDocIds();
-            segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME,
-                segmentQueryableDocIdsBitMap);
+            segmentQueryableDocIdsBitMap = segment.getQueryableDocIds();
+            if (segmentQueryableDocIdsBitMap != null) {
+              segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME,
+                  segmentQueryableDocIdsBitMap);
+              numQueryableDocIdsInSnapshot += segmentQueryableDocIdsBitMap.getCardinality();
+            }
           }
           _updatedSegmentsSinceLastSnapshot.remove(segment);
           numImmutableSegments++;
-          numPrimaryKeysInSnapshot += segmentValidDocIdsBitMap.getMutableRoaringBitmap().getCardinality();
-          if (_deleteRecordColumn != null) {
-            numQueryableDocIdsInSnapshot += segmentQueryableDocIdsBitMap.getMutableRoaringBitmap().getCardinality();
-          }
         } catch (Exception e) {
           _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
         } finally {
