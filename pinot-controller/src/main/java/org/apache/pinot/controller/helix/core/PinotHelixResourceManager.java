@@ -117,6 +117,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.minion.MaterializedViewMetadataUtils;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
@@ -2434,6 +2435,15 @@ public class PinotHelixResourceManager {
     // Remove task related metadata
     MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, tableNameWithType);
     LOGGER.info("Deleting table {}: Removed all minion task metadata", tableNameWithType);
+
+    // Remove materialized view metadata (if any)
+    try {
+      MaterializedViewMetadataUtils.deleteMaterializedViewMetadata(_propertyStore, tableNameWithType);
+      LOGGER.info("Deleting table {}: Removed materialized view metadata", tableNameWithType);
+    } catch (Exception e) {
+      LOGGER.warn("Deleting table {}: No materialized view metadata to remove or removal failed",
+          tableNameWithType, e);
+    }
 
     // Remove table config
     // NOTE: This should always be the last step for deletion to avoid race condition in table re-create
