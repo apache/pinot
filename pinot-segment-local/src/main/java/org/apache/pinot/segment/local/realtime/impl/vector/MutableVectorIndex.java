@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.realtime.impl.vector;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -42,7 +41,6 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,23 +129,12 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
 
   @Override
   public MutableRoaringBitmap getDocIds(float[] vector, int topK) {
-    // Capture parent context for resource tracking in searcher thread
-    final QueryThreadContext parentContext = QueryThreadContext.getIfAvailable();
-    // Execute search in separate thread to protect FSDirectory from interrupt corruption
+    // Search is executed in SEARCHER_POOL which is wrapped with contextAwareExecutorService(executor, false).
+    // This propagates QueryThreadContext for CPU/memory tracking without registering the task for cancellation,
+    // preventing Thread.interrupt() during Lucene search which could corrupt FSDirectory.
     // See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
-    Callable<MutableRoaringBitmap> searchCallable = () -> {
-      if (parentContext != null) {
-        try (QueryThreadContext ignored = QueryThreadContext.open(
-            parentContext.getExecutionContext(),
-            parentContext.getMseWorkerInfo(),
-            parentContext.getAccountant())) {
-          return executeVectorSearch(vector, topK);
-        }
-      } else {
-        return executeVectorSearch(vector, topK);
-      }
-    };
-    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(searchCallable);
+    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(
+        () -> executeVectorSearch(vector, topK));
     try {
       return searchFuture.get();
     } catch (InterruptedException e) {

@@ -73,11 +73,18 @@ public class LuceneDocIdCollector implements Collector {
       @Override
       public void collect(int doc)
           throws IOException {
-        // We catch and convert to CollectionTerminatedException for clean Lucene handling
         try {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(
               _numDocsCollected++, "LuceneDocIdCollector");
         } catch (RuntimeException e) {
+          // Why CollectionTerminatedException: Lucene's IndexSearcher.search() specially handles this exception
+          // to gracefully stop document collection without treating it as an error. If we let the original
+          // TerminationException propagate, Lucene would wrap it and log errors unnecessarily.
+          //
+          // How termination info is preserved: When checkTerminationAndSampleUsagePeriodically() throws
+          // TerminationException (for OOM/timeout), it's already stored in QueryExecutionContext._terminateException
+          // before being thrown. After search completes, higher-level code retrieves the actual error via
+          // QueryThreadContext.getTerminateException() to include proper error details in query response.
           throw new CollectionTerminatedException();
         }
 

@@ -24,6 +24,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
+import java.util.concurrent.Future;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -197,12 +199,28 @@ public class QueryThreadContext implements AutoCloseable {
   }
 
   /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
-  /// state of the thread submitting the tasks.
+  /// state of the thread submitting the tasks. Tasks are registered for cancellation when the query is terminated.
   public static ExecutorService contextAwareExecutorService(ExecutorService executorService) {
-    return new DecoratorExecutorService(executorService, future -> get().getExecutionContext().addTask(future)) {
+    return contextAwareExecutorService(executorService, true);
+  }
+
+  /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
+  /// state of the thread submitting the tasks.
+  /// @param registerTaskForCancellation If true, tasks are registered with QueryExecutionContext.addTask() and will
+  ///                                    be cancelled (via Thread.interrupt()) when the query is terminated. Set to
+  ///                                    false for executors where interrupt could cause corruption
+  public static ExecutorService contextAwareExecutorService(ExecutorService executorService,
+      boolean registerTaskForCancellation) {
+    Consumer<Future<?>> onSubmit = registerTaskForCancellation
+        ? future -> get().getExecutionContext().addTask(future)
+        : future -> { };
+    return new DecoratorExecutorService(executorService, onSubmit) {
       @Override
       protected <T> Callable<T> decorate(Callable<T> task) {
-        QueryThreadContext parentThreadContext = get();
+        QueryThreadContext parentThreadContext = registerTaskForCancellation ? get() : getIfAvailable();
+        if (parentThreadContext == null) {
+          return task;
+        }
         return () -> {
           try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
               parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
@@ -213,7 +231,10 @@ public class QueryThreadContext implements AutoCloseable {
 
       @Override
       protected Runnable decorate(Runnable task) {
-        QueryThreadContext parentThreadContext = get();
+        QueryThreadContext parentThreadContext = registerTaskForCancellation ? get() : getIfAvailable();
+        if (parentThreadContext == null) {
+          return task;
+        }
         return () -> {
           try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
               parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {

@@ -72,7 +72,12 @@ public class RealtimeLuceneDocIdCollector implements Collector {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(
               _numDocsCollected++, "RealtimeLuceneDocIdCollector");
         } catch (RuntimeException e) {
-          // Convert to CollectionTerminatedException for clean Lucene handling
+          // CollectionTerminatedException - Lucene's IndexSearcher.search() specially handles this exception
+          // to gracefully stop document collection without treating it as an error.
+          // When checkTerminationAndSampleUsagePeriodically() throws
+          // TerminationException (for OOM/timeout), it's already stored in QueryExecutionContext._terminateException
+          // before being thrown. After search completes, higher-level code retrieves the actual error via
+          // QueryThreadContext.getTerminateException() to include proper error details in query response.
           throw new CollectionTerminatedException();
         }
 

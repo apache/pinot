@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
@@ -38,7 +37,6 @@ import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -158,26 +156,12 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       LuceneTextIndexUtils.LuceneTextIndexOptions options) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
     RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
-    // capture parent QueryThreadContext
-    final QueryThreadContext parentContext = QueryThreadContext.getIfAvailable();
-    // A thread interrupt during indexSearcher.search() can break the underlying FSDirectory used by the IndexWriter
-    // which the SearcherManager is created with. To ensure the index is never corrupted the search is executed
-    // in a child thread and the interrupt is handled in the current thread by canceling the search gracefully.
+    // Search is executed in SEARCHER_POOL which is wrapped with contextAwareExecutorService(executor, false).
+    // This propagates QueryThreadContext for CPU/memory tracking without registering the task for cancellation,
+    // preventing Thread.interrupt() during Lucene search which could corrupt FSDirectory.
     // See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
-    Callable<MutableRoaringBitmap> searchCallable = () -> {
-      if (parentContext != null) {
-        try (QueryThreadContext ignored = QueryThreadContext.open(
-            parentContext.getExecutionContext(),
-            parentContext.getMseWorkerInfo(),
-            parentContext.getAccountant())) {
-          return executeSearchWithOptions(actualQuery, options, docIDCollector);
-        }
-      } else {
-        // No parent context - run without tracking eg. tests, disabled accounting
-        return executeSearchWithOptions(actualQuery, options, docIDCollector);
-      }
-    };
-    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(searchCallable);
+    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(
+        () -> executeSearchWithOptions(actualQuery, options, docIDCollector));
     try {
       return searchFuture.get();
     } catch (InterruptedException e) {
@@ -216,26 +200,12 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private MutableRoaringBitmap getDocIdsWithoutOptions(String searchQuery) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
     RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
-    // Capture parent QueryThreadContext to propagate to searcher thread for resource tracking
-    final QueryThreadContext parentContext = QueryThreadContext.getIfAvailable();
-    // A thread interrupt during indexSearcher.search() can break the underlying FSDirectory used by the IndexWriter
-    // which the SearcherManager is created with. To ensure the index is never corrupted the search is executed
-    // in a child thread and the interrupt is handled in the current thread by canceling the search gracefully.
+    // Search is executed in SEARCHER_POOL which is wrapped with contextAwareExecutorService(executor, false).
+    // This propagates QueryThreadContext for CPU/memory tracking without registering the task for cancellation,
+    // preventing Thread.interrupt() during Lucene search which could corrupt FSDirectory.
     // See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
-    Callable<MutableRoaringBitmap> searchCallable = () -> {
-      // Propagate context to register searcher thread for CPU/memory tracking without Future registration
-      if (parentContext != null) {
-        try (QueryThreadContext ignored = QueryThreadContext.open(
-            parentContext.getExecutionContext(),
-            parentContext.getMseWorkerInfo(),
-            parentContext.getAccountant())) {
-          return executeSearchWithoutOptions(searchQuery, docIDCollector);
-        }
-      } else {
-        return executeSearchWithoutOptions(searchQuery, docIDCollector);
-      }
-    };
-    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(searchCallable);
+    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(
+        () -> executeSearchWithoutOptions(searchQuery, docIDCollector));
     try {
       return searchFuture.get();
     } catch (InterruptedException e) {
