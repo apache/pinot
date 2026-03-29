@@ -136,14 +136,14 @@ public class TextIndexHandler extends BaseIndexHandler {
     Set<String> recreatedLegacyNativeColumns = new HashSet<>();
     for (String column : getColumnsWithLegacyNativeTextIndex()) {
       LOGGER.info("Removing legacy native text index file from segment: {}, column: {}", segmentName, column);
-      cleanupTextIndexFiles(indexDir, segmentDirectory, column);
-      if (columnsToAddIdx.contains(column)) {
+      deleteLegacyNativeTextIndexFiles(indexDir, segmentDirectory, column);
+      segmentWriter.removeIndex(column, StandardIndexes.text());
+      if (columnsToAddIdx.remove(column)) {
         ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         if (shouldCreateTextIndex(columnMetadata)) {
           createTextIndexForColumn(segmentWriter, columnMetadata);
           recreatedLegacyNativeColumns.add(column);
         }
-        columnsToAddIdx.remove(column);
       }
     }
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
@@ -233,7 +233,7 @@ public class TextIndexHandler extends BaseIndexHandler {
       // Create a marker file.
       FileUtils.touch(inProgress);
     }
-    cleanupTextIndexFiles(indexDir, segmentDirectory, columnName);
+    segmentWriter.removeIndex(columnName, StandardIndexes.text());
     FileUtils.deleteQuietly(inProgress);
     FileUtils.touch(inProgress);
 
@@ -362,16 +362,13 @@ public class TextIndexHandler extends BaseIndexHandler {
   }
 
   /**
-   * Clean up text index files for both the segment root and the versioned segment directory.
-   *
-   * @param indexDir the index directory
-   * @param segmentDirectory the versioned segment directory
-   * @param columnName the column name
+   * Delete legacy native text index files from both the segment root and the versioned segment directory.
    */
-  private void cleanupTextIndexFiles(File indexDir, File segmentDirectory, String columnName) {
-    TextIndexUtils.cleanupTextIndex(indexDir, columnName);
+  private void deleteLegacyNativeTextIndexFiles(File indexDir, File segmentDirectory, String column) {
+    String nativeFileName = column + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION;
+    FileUtils.deleteQuietly(new File(indexDir, nativeFileName));
     if (!segmentDirectory.equals(indexDir)) {
-      TextIndexUtils.cleanupTextIndex(segmentDirectory, columnName);
+      FileUtils.deleteQuietly(new File(segmentDirectory, nativeFileName));
     }
   }
 

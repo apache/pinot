@@ -40,7 +40,6 @@ import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
-import org.apache.pinot.segment.local.segment.index.fst.FstIndexUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -1355,17 +1354,21 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "rw")) {
       randomAccessFile.seek(0);
-      randomAccessFile.writeInt(FstIndexUtils.LEGACY_NATIVE_FST_MAGIC);
+      // Write the legacy native FST magic header: '\fsa'
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      randomAccessFile.writeInt(nativeFstMagic);
     }
 
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
-      assertEquals(randomAccessFile.readInt(), FstIndexUtils.LEGACY_NATIVE_FST_MAGIC);
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      assertEquals(randomAccessFile.readInt(), nativeFstMagic);
     }
 
     runPreProcessor();
 
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
-      assertNotEquals(randomAccessFile.readInt(), FstIndexUtils.LEGACY_NATIVE_FST_MAGIC);
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      assertNotEquals(randomAccessFile.readInt(), nativeFstMagic);
     }
   }
 

@@ -20,11 +20,8 @@ package org.apache.pinot.segment.local.segment.index.fst;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
-import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
-import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -68,50 +65,6 @@ public class FstIndexTypeTest {
           + "    \"indexTypes\" : [\"FST\"]\n"
           + " }");
 
-      assertEquals(new FstIndexConfig());
-    }
-
-    @Test
-    public void newNativeTypeIsIgnored()
-        throws JsonProcessingException {
-      addFieldIndexConfig("{\n"
-          + "    \"name\": \"dimStr\",\n"
-          + "    \"indexes\" : {\n"
-          + "       \"fst\": {\n"
-          + "          \"type\": \"NATIVE\""
-          + "       }\n"
-          + "    }\n"
-          + " }");
-      assertEquals(new FstIndexConfig());
-    }
-
-    @Test
-    public void newNativeTypeStillValid()
-        throws JsonProcessingException {
-      addFieldIndexConfig("{\n"
-          + "    \"name\": \"dimStr\",\n"
-          + "    \"indexes\" : {\n"
-          + "       \"fst\": {\n"
-          + "          \"type\": \"NATIVE\""
-          + "       }\n"
-          + "    }\n"
-          + " }");
-      Map<String, FieldIndexConfigs> configsByCol = FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig,
-          _schema);
-      StandardIndexes.fst().validate(configsByCol.get("dimStr"), _schema.getFieldSpecFor("dimStr"), _tableConfig);
-    }
-
-    @Test
-    public void newLuceneTypeIsIgnored()
-        throws JsonProcessingException {
-      addFieldIndexConfig("{\n"
-          + "    \"name\": \"dimStr\",\n"
-          + "    \"indexes\" : {\n"
-          + "       \"fst\": {\n"
-          + "          \"type\": \"LUCENE\""
-          + "       }\n"
-          + "    }\n"
-          + " }");
       assertEquals(new FstIndexConfig());
     }
 

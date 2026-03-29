@@ -25,7 +25,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
  * Utilities for handling legacy native FST indexes during the Lucene-only transition.
  */
 public final class FstIndexUtils {
-  public static final int LEGACY_NATIVE_FST_MAGIC = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+  private static final int LEGACY_NATIVE_FST_MAGIC = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
 
   private FstIndexUtils() {
   }
