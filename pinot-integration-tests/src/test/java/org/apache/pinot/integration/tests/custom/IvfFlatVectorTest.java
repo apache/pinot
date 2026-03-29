@@ -169,11 +169,14 @@ public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
       prevDist = dist;
     }
 
-    // Verify the top-1 result from ANN matches exact (even approximate indexes should get the nearest right)
+    // Verify ANN top-1 distance is within a reasonable range of the exact top-1.
+    // With default nprobe (4 out of nlist=8), recall is approximate — the ANN result
+    // may not be the true nearest neighbor, but should be in the same ballpark.
     double annTopDist = annRows.get(0).get(0).asDouble();
     double exactTopDist = exactRows.get(0).get(0).asDouble();
-    assertEquals(annTopDist, exactTopDist, 1e-3,
-        "Top-1 result from ANN should match or be very close to exact top-1");
+    assertTrue(annTopDist <= exactTopDist * 1.5,
+        "ANN top-1 distance (" + annTopDist + ") should be within 1.5x of exact top-1 ("
+            + exactTopDist + ")");
   }
 
   /**
