@@ -32,6 +32,8 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <npm.script>build-ci</npm.script>
+    <nodeRepositoryUrl>https://nodejs.org/dist/</nodeRepositoryUrl>
+    <npmRepositoryUrl>https://registry.npmjs.org/npm/-/</npmRepositoryUrl>
   </properties>
   <dependencies>
     <dependency>
@@ -123,6 +125,8 @@
             <configuration>
               <nodeVersion>v16.15.0</nodeVersion>
               <npmVersion>8.5.5</npmVersion>
+              <nodeDownloadRoot>${nodeRepositoryUrl}</nodeDownloadRoot>
+              <npmDownloadRoot>${npmRepositoryUrl}</npmDownloadRoot>
             </configuration>
           </execution>
           <execution>
