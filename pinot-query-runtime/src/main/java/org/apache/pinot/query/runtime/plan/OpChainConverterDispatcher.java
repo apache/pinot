@@ -26,6 +26,8 @@ import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.slf4j.Logger;
@@ -73,6 +75,11 @@ public final class OpChainConverterDispatcher {
   public static OpChain convert(PlanNode node, OpChainExecutionContext context,
       BiConsumer<PlanNode, MultiStageOperator> tracker) {
     return _active.convert(node, context, tracker);
+  }
+
+  public static OpChain sendEarlyError(OpChainExecutionContext context, StagePlan stagePlan,
+      ErrorMseBlock errorBlock) {
+    return _active.sendEarlyError(context, stagePlan, errorBlock);
   }
 
   private static OpChainConverter resolveActiveConverter(@Nullable String overrideConverterId) {
