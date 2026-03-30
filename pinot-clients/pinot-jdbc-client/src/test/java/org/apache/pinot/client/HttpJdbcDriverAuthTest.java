@@ -37,7 +37,7 @@ import static org.testng.Assert.assertTrue;
  * so no mock server is needed. Headers are verified via reflection on the transport's
  * private {@code _headers} field.
  *
- * <p>The HTTP path (via {@link PinotDriver#getHeadersFromProperties})
+ * <p>The HTTP path (via {@link org.apache.pinot.client.utils.ConnectionUtils#getHeadersFromProperties})
  * extracts and strips the {@code headers.*} prefix, setting custom headers on the transport.
  */
 @Test
