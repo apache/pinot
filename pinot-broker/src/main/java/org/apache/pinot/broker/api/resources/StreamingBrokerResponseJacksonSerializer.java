@@ -29,6 +29,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -72,6 +74,9 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
   private static ResultTableWriteResult writeResultTable(StreamingBrokerResponse value, JsonGenerator gen,
       SerializerProvider provider)
       throws IOException, InterruptedException {
+    if (!value.shouldSerializeResultTable()) {
+      return consumeResultTableWithoutWritingJson(value);
+    }
     DataSchema dataSchema = value.getDataSchema();
     if (dataSchema == null) {
       return new ResultTableWriteResult(value.consumeData(data -> {
@@ -91,6 +96,23 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
     } finally {
       gen.writeEndObject(); // end of resultTable
     }
+  }
+
+  /// Consumes the full row stream without writing `resultTable` JSON (for `dropResults` on streaming responses).
+  private static ResultTableWriteResult consumeResultTableWithoutWritingJson(StreamingBrokerResponse value)
+      throws InterruptedException {
+    DataSchema dataSchema = value.getDataSchema();
+    if (dataSchema == null) {
+      return new ResultTableWriteResult(value.consumeData(data -> {
+      }), -1);
+    }
+    int[] rowCountHolder = new int[1];
+    StreamingBrokerResponse.Metainfo metainfo = value.consumeData(dataBlock -> {
+      while (dataBlock.next()) {
+        rowCountHolder[0]++;
+      }
+    });
+    return new ResultTableWriteResult(metainfo, rowCountHolder[0]);
   }
 
   /// Serializes the rows from the StreamingBrokerResponse.
@@ -175,6 +197,7 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
                   valueToSerialize = rawValue;
                 }
               }
+              valueToSerialize = formatForJsonIfNeeded(_columnTypes[i], valueToSerialize);
               JsonSerializer<Object> serializer = _serializers[i];
               if (serializer != null && externalClass.isInstance(valueToSerialize)) {
                 serializer.serialize(valueToSerialize, _gen, _provider);
@@ -207,6 +230,26 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
             }
           }
         }
+      }
+    }
+
+    private static Object formatForJsonIfNeeded(DataSchema.ColumnDataType columnType, Object value) {
+      if (value == null) {
+        return null;
+      }
+      switch (columnType) {
+        case BIG_DECIMAL:
+          return value instanceof BigDecimal ? columnType.format(value) : value;
+        case TIMESTAMP:
+          return value instanceof Timestamp ? columnType.format(value) : value;
+        case BYTES:
+          return value instanceof byte[] ? columnType.format(value) : value;
+        case TIMESTAMP_ARRAY:
+          return value instanceof Timestamp[] ? columnType.format(value) : value;
+        case BYTES_ARRAY:
+          return value instanceof byte[][] ? columnType.format(value) : value;
+        default:
+          return value;
       }
     }
   }

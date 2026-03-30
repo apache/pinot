@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -264,7 +266,27 @@ public class StreamingBrokerResponseJacksonSerializerTest {
 
     JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
 
-    assertEquals(json.toString(), "{\"exceptions\":[]}");
+    assertTrue(json.has("exceptions"));
+    assertEquals(json.get("exceptions").size(), 0);
+    assertFalse(json.has("resultTable"));
+  }
+
+  @Test
+  public void testOmitResultTableInJsonStillEmitsMetainfoAndDrainsRows() throws Exception {
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"c"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    List<Object[]> rows = List.of(new Object[]{1}, new Object[]{2});
+    StreamingBrokerResponse.Metainfo metainfo = new TestMetainfo(Collections.emptyList());
+    StreamingBrokerResponse inner =
+        new StreamingBrokerResponse.ListStreamingBrokerResponse(dataSchema, metainfo, rows);
+    StreamingBrokerResponse response = new StreamingBrokerResponse.OmitResultTableInJson(inner);
+
+    JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
+
+    assertFalse(json.has("resultTable"));
+    assertTrue(json.has("exceptions"));
+    assertEquals(json.get("numRowsResultSet").asInt(), 2);
   }
 
   @Test
@@ -453,6 +475,42 @@ public class StreamingBrokerResponseJacksonSerializerTest {
     assertEquals(rowsNode.size(), 2);
     assertEquals(rowsNode.get(0).get(0).asText(), "0a0b");
     assertEquals(rowsNode.get(1).get(0).asText(), "ff");
+  }
+
+  @Test
+  public void testTimestampColumnUsesFormattedJsonValue() throws Exception {
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"tsCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.TIMESTAMP}
+    );
+
+    long tsMillis = 1723593600000L;
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{tsMillis});
+    StreamingBrokerResponse.Metainfo metainfo = new TestMetainfo(Collections.emptyList());
+    StreamingBrokerResponse response = new StreamingBrokerResponse.ListStreamingBrokerResponse(
+        dataSchema, metainfo, rows);
+
+    JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
+    String expected = new Timestamp(tsMillis).toString();
+    assertEquals(json.get("resultTable").get("rows").get(0).get(0).asText(), expected);
+  }
+
+  @Test
+  public void testBigDecimalColumnUsesPlainStringJsonValue() throws Exception {
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"decimalCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BIG_DECIMAL}
+    );
+
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{new BigDecimal("1E+3")});
+    StreamingBrokerResponse.Metainfo metainfo = new TestMetainfo(Collections.emptyList());
+    StreamingBrokerResponse response = new StreamingBrokerResponse.ListStreamingBrokerResponse(
+        dataSchema, metainfo, rows);
+
+    JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
+    assertEquals(json.get("resultTable").get("rows").get(0).get(0).asText(), "1000");
   }
 
   @Test
