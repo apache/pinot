@@ -29,6 +29,8 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
+import org.apache.pinot.common.response.EagerToLazyBrokerResponseAdaptor;
+import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -45,7 +47,7 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
  * {@code BrokerRequestHandlerDelegate} delegates the inbound broker request to one of the enabled
  * {@link BrokerRequestHandler} based on the requested handle type.
  *
- * {@see: @CommonConstant
+ * @see org.apache.pinot.spi.utils.CommonConstants
  */
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
@@ -130,6 +132,43 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   }
 
   @Override
+  public StreamingBrokerResponse handleStreamingRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
+      throws Exception {
+    // Pinot installations may either use PinotClientRequest or this class in order to process a query that
+    // arrives via their custom container. The custom code may add its own overhead in either pre-processing
+    // or post-processing stages, and should be measured independently.
+    // In order to accommodate for both code paths, we set the request arrival time only if it is not already set.
+    if (requestContext.getRequestArrivalTimeMillis() <= 0) {
+      requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+    }
+    // Parse the query if needed
+    if (sqlNodeAndOptions == null) {
+      try {
+        sqlNodeAndOptions = RequestUtils.parseQuery(request.get(Request.SQL).asText(), request);
+      } catch (Exception e) {
+        return StreamingBrokerResponse.error(QueryErrorCode.SQL_PARSING, e.getMessage());
+      }
+    }
+
+    BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
+    if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
+      if (_multiStageBrokerRequestHandler != null) {
+        requestHandler = _multiStageBrokerRequestHandler;
+      } else {
+        return StreamingBrokerResponse.error(QueryErrorCode.INTERNAL, "V2 Multi-Stage query engine not enabled.");
+      }
+    }
+
+    StreamingBrokerResponse response = requestHandler.handleStreamingRequest(
+        request, sqlNodeAndOptions, requesterIdentity, requestContext, httpHeaders);
+    if (QueryOptionsUtils.isGetCursor(sqlNodeAndOptions.getOptions())) {
+      return getStreamingCursorResponse(QueryOptionsUtils.getCursorNumRows(sqlNodeAndOptions.getOptions()), response);
+    }
+    return response;
+  }
+
+  @Override
   public TimeSeriesBlock handleTimeSeriesRequest(String lang, String rawQueryParamString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
       HttpHeaders httpHeaders) throws QueryException {
@@ -205,5 +244,18 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     CursorResponse cursorResponse = _responseStore.handleCursorRequest(response.getRequestId(), 0, numRows);
     cursorResponse.setCursorResultWriteTimeMs(cursorStoreTimeMs);
     return cursorResponse;
+  }
+
+  private StreamingBrokerResponse getStreamingCursorResponse(Integer numRows, StreamingBrokerResponse response)
+      throws Exception {
+    if (numRows == null) {
+      throw new RuntimeException("numRows not specified when requesting a cursor from streaming response");
+    }
+    BrokerResponse eagerResponse = response.asEagerBrokerResponse();
+    if (eagerResponse.getExceptionsSize() > 0) {
+      return new EagerToLazyBrokerResponseAdaptor(eagerResponse);
+    }
+    CursorResponse cursorResponse = getCursorResponse(numRows, eagerResponse);
+    return new EagerToLazyBrokerResponseAdaptor(cursorResponse);
   }
 }

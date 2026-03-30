@@ -624,6 +624,15 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
         "pinot.broker.query.enable.auto.rewrite.aggregation.type";
+    /// Config to control whether broker SQL HTTP responses use the streaming response path by default.
+    ///
+    /// Default is `false`, which keeps the eager response path as the default behavior.
+    /// When set to `true`, broker SQL HTTP requests use streaming response by default.
+    ///
+    /// This can be overridden per query via [Request.QueryOptionKey#USE_STREAMING_RESPONSE].
+    public static final String CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE =
+        "pinot.broker.query.enable.streaming.response";
+    public static final boolean DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE = false;
 
     /// Config for sort exchange copy threshold in multi-stage engine.
     ///
@@ -847,6 +856,11 @@ public class CommonConstants {
         public static final String GET_CURSOR = "getCursor";
         // Number of rows that the cursor should contain
         public static final String CURSOR_NUM_ROWS = "cursorNumRows";
+        // Per-query override for broker response mode.
+        // If set to true, force streaming response mode for this query.
+        // If set to false, force eager response mode for this query.
+        // If unset, broker uses Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE default.
+        public static final String USE_STREAMING_RESPONSE = "useStreamingResponse";
 
         // Custom Query ID provided by the client
         public static final String CLIENT_QUERY_ID = "clientQueryId";

@@ -118,6 +118,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected boolean _useMultiStageQueryEngine = false;
   protected boolean _usePhysicalOptimizer = false;
+  protected boolean _useStreamingBrokerResponse = false;
 
   protected int getServerGrpcPort() {
     return _serverGrpcPort;
@@ -159,12 +160,28 @@ public abstract class ClusterTest extends ControllerTest {
     _usePhysicalOptimizer = usePhysicalOptimizer;
   }
 
+  protected boolean useStreamingBrokerResponse() {
+    return _useStreamingBrokerResponse;
+  }
+
+  protected void setUseStreamingBrokerResponse(boolean useStreamingBrokerResponse) {
+    _useStreamingBrokerResponse = useStreamingBrokerResponse;
+  }
+
   protected void disableMultiStageQueryEngine() {
     setUseMultiStageQueryEngine(false);
   }
 
   protected void enableMultiStageQueryEngine() {
     setUseMultiStageQueryEngine(true);
+  }
+
+  protected void disableStreamingBrokerResponse() {
+    setUseStreamingBrokerResponse(false);
+  }
+
+  protected void enableStreamingBrokerResponse() {
+    setUseStreamingBrokerResponse(true);
   }
 
   /**
@@ -202,8 +219,13 @@ public abstract class ClusterTest extends ControllerTest {
       _brokerGrpcEndpoint = "localhost:" + brokerGrpcPort;
     }
     _nextBrokerGrpcPort = brokerGrpcPort + 1;
+    configureIntegrationBrokerResponseMode(brokerConf);
     overrideBrokerConf(brokerConf);
     return brokerConf;
+  }
+
+  protected void configureIntegrationBrokerResponseMode(PinotConfiguration brokerConf) {
+    brokerConf.setProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE, true);
   }
 
   protected void startBroker()

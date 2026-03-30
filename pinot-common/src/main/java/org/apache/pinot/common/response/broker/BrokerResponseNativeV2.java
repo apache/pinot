@@ -112,7 +112,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public boolean isPartialResult() {
-    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached();
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached()
+        || isMaxRowsInWindowReached();
   }
 
   @Override
@@ -481,6 +482,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN),
+    MAX_ROWS_IN_WINDOW_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS(StatMap.Type.LONG) {
       @Override
       public long merge(long value1, long value2) {

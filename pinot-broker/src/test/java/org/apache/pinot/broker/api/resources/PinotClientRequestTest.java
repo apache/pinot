@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.HttpHeaders;
@@ -35,10 +36,12 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.EagerToLazyBrokerResponseAdaptor;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -57,6 +60,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class PinotClientRequestTest {
@@ -65,6 +69,8 @@ public class PinotClientRequestTest {
   private SqlQueryExecutor _sqlQueryExecutor;
   @Mock
   private BrokerRequestHandler _requestHandler;
+  @Mock
+  private PinotConfiguration _brokerConf;
   @Mock
   private BrokerMetrics _brokerMetrics;
   @Mock
@@ -125,29 +131,62 @@ public class PinotClientRequestTest {
   }
 
   @Test
+  public void testUseStreamingUsesBrokerDefaultAndQueryOptionOverride() {
+    SqlNodeAndOptions noQueryOption = mock(SqlNodeAndOptions.class);
+    when(noQueryOption.getOptions()).thenReturn(Map.of());
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(false);
+    assertFalse(_pinotClientRequest.useStreaming(noQueryOption));
+
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(true);
+    assertTrue(_pinotClientRequest.useStreaming(noQueryOption));
+
+    SqlNodeAndOptions forceStreamingOn = mock(SqlNodeAndOptions.class);
+    when(forceStreamingOn.getOptions()).thenReturn(
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_STREAMING_RESPONSE, "true"));
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(false);
+    assertTrue(_pinotClientRequest.useStreaming(forceStreamingOn));
+
+    SqlNodeAndOptions forceStreamingOff = mock(SqlNodeAndOptions.class);
+    when(forceStreamingOff.getOptions()).thenReturn(
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_STREAMING_RESPONSE, "false"));
+    when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(true);
+    assertFalse(_pinotClientRequest.useStreaming(forceStreamingOff));
+  }
+
+  @Test
   public void testPinotQueryComparisonApiSameQuery() throws Exception {
     AsyncResponse asyncResponse = mock(AsyncResponse.class);
     Request request = mock(Request.class);
     when(request.getRequestURL()).thenReturn(new StringBuilder());
     when(_requestHandler.handleRequest(any(), any(), any(), any(), any()))
-        .thenReturn(BrokerResponseNative.EMPTY_RESULT);
+        .thenAnswer(invocation -> getComparisonResult());
+    when(_requestHandler.handleStreamingRequest(any(), any(), any(), any(), any()))
+        .thenAnswer(invocation -> new EagerToLazyBrokerResponseAdaptor(getComparisonResult()));
     _pinotClientRequest.processSqlQueryWithBothEnginesAndCompareResults("{\"sql\": \"SELECT * FROM mytable\"}",
         asyncResponse, request, null);
 
-    ArgumentCaptor<JsonNode> requestCaptor = ArgumentCaptor.forClass(JsonNode.class);
-    ArgumentCaptor<SqlNodeAndOptions> sqlNodeAndOptionsCaptor = ArgumentCaptor.forClass(SqlNodeAndOptions.class);
-    verify(_requestHandler, times(2)).handleRequest(requestCaptor.capture(), sqlNodeAndOptionsCaptor.capture(),
-        any(), any(), any());
+    List<JsonNode> requestNodes = new ArrayList<>();
+    List<SqlNodeAndOptions> sqlNodeAndOptions = new ArrayList<>();
+    mockingDetails(_requestHandler).getInvocations().forEach(invocation -> {
+      String method = invocation.getMethod().getName();
+      if (method.equals("handleRequest") || method.equals("handleStreamingRequest")) {
+        requestNodes.add((JsonNode) invocation.getArguments()[0]);
+        sqlNodeAndOptions.add((SqlNodeAndOptions) invocation.getArguments()[1]);
+      }
+    });
+    assertEquals(requestNodes.size(), 2);
     verify(asyncResponse, times(1)).resume(any(Response.class));
 
-    assertEquals(requestCaptor.getAllValues().size(), 2);
-    assertEquals(requestCaptor.getAllValues().get(0).get("sql").asText(), "SELECT * FROM mytable");
-    assertEquals(requestCaptor.getAllValues().get(1).get("sql").asText(), "SELECT * FROM mytable");
+    assertEquals(requestNodes.get(0).get("sql").asText(), "SELECT * FROM mytable");
+    assertEquals(requestNodes.get(1).get("sql").asText(), "SELECT * FROM mytable");
 
-    assertEquals(sqlNodeAndOptionsCaptor.getAllValues().size(), 2);
-    assertFalse(sqlNodeAndOptionsCaptor.getAllValues().get(0).getOptions()
+    assertFalse(sqlNodeAndOptions.get(0).getOptions()
         .containsKey(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE));
-    assertEquals(sqlNodeAndOptionsCaptor.getAllValues().get(1).getOptions()
+    assertEquals(sqlNodeAndOptions.get(1).getOptions()
         .get(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE), "true");
   }
 
@@ -157,17 +196,24 @@ public class PinotClientRequestTest {
     Request request = mock(Request.class);
     when(request.getRequestURL()).thenReturn(new StringBuilder());
     when(_requestHandler.handleRequest(any(), any(), any(), any(), any()))
-        .thenReturn(BrokerResponseNative.EMPTY_RESULT);
+        .thenAnswer(invocation -> getComparisonResult());
+    when(_requestHandler.handleStreamingRequest(any(), any(), any(), any(), any()))
+        .thenAnswer(invocation -> new EagerToLazyBrokerResponseAdaptor(getComparisonResult()));
     _pinotClientRequest.processSqlQueryWithBothEnginesAndCompareResults("{\"sqlV1\": \"SELECT v1 FROM mytable\","
             + "\"sqlV2\": \"SELECT v2 FROM mytable\"}", asyncResponse, request, null);
 
-    ArgumentCaptor<JsonNode> requestCaptor = ArgumentCaptor.forClass(JsonNode.class);
-    verify(_requestHandler, times(2)).handleRequest(requestCaptor.capture(), any(), any(), any(), any());
+    List<JsonNode> requestNodes = new ArrayList<>();
+    mockingDetails(_requestHandler).getInvocations().forEach(invocation -> {
+      String method = invocation.getMethod().getName();
+      if (method.equals("handleRequest") || method.equals("handleStreamingRequest")) {
+        requestNodes.add((JsonNode) invocation.getArguments()[0]);
+      }
+    });
+    assertEquals(requestNodes.size(), 2);
     verify(asyncResponse, times(1)).resume(any(Response.class));
 
-    assertEquals(requestCaptor.getAllValues().size(), 2);
-    assertEquals(requestCaptor.getAllValues().get(0).get("sql").asText(), "SELECT v1 FROM mytable");
-    assertEquals(requestCaptor.getAllValues().get(1).get("sql").asText(), "SELECT v2 FROM mytable");
+    assertEquals(requestNodes.get(0).get("sql").asText(), "SELECT v1 FROM mytable");
+    assertEquals(requestNodes.get(1).get("sql").asText(), "SELECT v2 FROM mytable");
   }
 
   @Test
@@ -310,5 +356,15 @@ public class PinotClientRequestTest {
     verify(_brokerMetrics).addMeteredGlobalValue(eq(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES), sizeCaptor.capture());
     assertEquals(sizeCaptor.getValue().longValue(), expectedSize,
         "Metric should record the actual response size in bytes");
+  }
+
+  private static BrokerResponseNative getComparisonResult() {
+    BrokerResponseNative response = new BrokerResponseNative();
+    DataSchema dataSchema = new DataSchema(new String[]{"col1"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{"value"});
+    response.setResultTable(new ResultTable(dataSchema, rows));
+    return response;
   }
 }
