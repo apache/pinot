@@ -20,7 +20,9 @@ package org.apache.pinot.segment.spi.creator;
 
 import java.io.File;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -128,6 +130,12 @@ public interface IndexCreationContext {
 
   boolean isContinueOnError();
 
+  /**
+   * Returns the {@link ForwardIndexConfig} for this column, or {@code null} if not set.
+   */
+  @Nullable
+  ForwardIndexConfig getForwardIndexConfig();
+
   final class Builder {
     private ColumnStatistics _columnStatistics;
     private File _indexDir;
@@ -154,6 +162,7 @@ public interface IndexCreationContext {
     private int[] _immutableToMutableIdMap;
     private String _tableNameWithType;
     private boolean _continueOnError;
+    private ForwardIndexConfig _forwardIndexConfig;
 
     public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
       return withLengthOfLongestEntry(columnIndexCreationInfo.getLengthOfLongestEntry())
@@ -302,13 +311,19 @@ public interface IndexCreationContext {
       return this;
     }
 
+    public Builder withForwardIndexConfig(ForwardIndexConfig forwardIndexConfig) {
+      _forwardIndexConfig = forwardIndexConfig;
+      return this;
+    }
+
     public Common build() {
       return new Common(Objects.requireNonNull(_indexDir), _lengthOfLongestEntry, _maxNumberOfMultiValueElements,
           _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
           _totalNumberOfEntries, _totalDocs, _hasDictionary, _forwardIndexEncoding, _minValue, _maxValue,
           _forwardIndexDisabled,
           _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose, _columnStatistics,
-          _realtimeConversion, _consumerDir, _immutableToMutableIdMap, _tableNameWithType, _continueOnError);
+          _realtimeConversion, _consumerDir, _immutableToMutableIdMap, _tableNameWithType, _continueOnError,
+          _forwardIndexConfig);
     }
 
     public Builder withSortedUniqueElementsArray(Object sortedUniqueElementsArray) {
@@ -348,6 +363,7 @@ public interface IndexCreationContext {
     private final int[] _immutableToMutableIdMap;
     private final String _tableNameWithType;
     private final boolean _continueOnError;
+    private final ForwardIndexConfig _forwardIndexConfig;
 
     private Common(File indexDir, int lengthOfLongestEntry,
         int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
@@ -356,7 +372,8 @@ public interface IndexCreationContext {
         Comparable<?> maxValue,
         boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength,
         boolean textCommitOnClose, ColumnStatistics columnStatistics, boolean realtimeConversion, File consumerDir,
-        int[] immutableToMutableIdMap, String tableNameWithType, boolean continueOnError) {
+        int[] immutableToMutableIdMap, String tableNameWithType, boolean continueOnError,
+        ForwardIndexConfig forwardIndexConfig) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
@@ -382,6 +399,7 @@ public interface IndexCreationContext {
       _immutableToMutableIdMap = immutableToMutableIdMap;
       _tableNameWithType = tableNameWithType;
       _continueOnError = continueOnError;
+      _forwardIndexConfig = forwardIndexConfig;
     }
 
     public FieldSpec getFieldSpec() {
@@ -496,6 +514,12 @@ public interface IndexCreationContext {
     @Override
     public boolean isContinueOnError() {
       return _continueOnError;
+    }
+
+    @Nullable
+    @Override
+    public ForwardIndexConfig getForwardIndexConfig() {
+      return _forwardIndexConfig;
     }
   }
 }

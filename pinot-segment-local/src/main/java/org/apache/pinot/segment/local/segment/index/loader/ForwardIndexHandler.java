@@ -547,8 +547,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           builder.withMaxRowLengthInBytes(maxRowLengthInBytes);
         }
       }
-      IndexCreationContext context = builder.build();
       ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      builder.withForwardIndexConfig(config);
+      IndexCreationContext context = builder.build();
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         if (!reader.getStoredType().equals(creator.getValueType())) {
           // Creator stored type should match reader stored type for raw columns. We do not support changing datatypes.
@@ -906,18 +907,19 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           segmentName, column);
       ColumnIndexCreationInfo creationInfo =
           new ColumnIndexCreationInfo(statsCollector, true, useVarLength, false, fieldSpec.getDefaultNullValue());
+      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
       IndexCreationContext context = IndexCreationContext.builder()
           .withIndexDir(indexDir)
           .withFieldSpec(fieldSpec)
           .withColumnIndexCreationInfo(creationInfo)
           .withTotalDocs(numDocs)
           .withDictionary(true)
+          .withForwardIndexConfig(config)
           .withForwardIndexEncoding(IndexCreationContext.ForwardIndexEncoding.DICTIONARY)
           .withTableNameWithType(_tableConfig.getTableName())
           .withContinueOnError(
               _tableConfig.getIngestionConfig() != null && _tableConfig.getIngestionConfig().isContinueOnError())
           .build();
-      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         forwardIndexRewriteHelper(column, existingColMetadata, reader, creator, numDocs, dictionaryCreator, null);
       }
@@ -1106,8 +1108,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           builder.withMaxRowLengthInBytes(getMaxRowLength(columnMetadata, reader, dictionary));
         }
       }
-      IndexCreationContext context = builder.build();
       ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      builder.withForwardIndexConfig(config);
+      IndexCreationContext context = builder.build();
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         forwardIndexRewriteHelper(column, columnMetadata, reader, creator, columnMetadata.getTotalDocs(), null,
             dictionary);

@@ -45,8 +45,9 @@ public class ForwardIndexCreatorFactory {
   private ForwardIndexCreatorFactory() {
   }
 
-  public static ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
+  public static ForwardIndexCreator createIndexCreator(IndexCreationContext context)
       throws Exception {
+    ForwardIndexConfig indexConfig = context.getForwardIndexConfig();
     File indexDir = context.getIndexDir();
     FieldSpec fieldSpec = context.getFieldSpec();
     String columnName = fieldSpec.getName();

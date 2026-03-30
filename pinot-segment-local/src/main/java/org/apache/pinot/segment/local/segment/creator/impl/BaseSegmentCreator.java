@@ -203,6 +203,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return IndexCreationContext.builder()
         .withIndexDir(_indexDir)
         .withDictionary(dictEnabledColumn)
+        .withForwardIndexConfig(forwardIndexConfig)
         .withForwardIndexEncoding(forwardIndexConfig.getForwardIndexEncoding())
         .withFieldSpec(fieldSpec)
         .withTotalDocs(_totalDocs)

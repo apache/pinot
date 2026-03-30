@@ -243,7 +243,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Override
   public ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
       throws Exception {
-    return ForwardIndexCreatorFactory.createIndexCreator(context, indexConfig);
+    return ForwardIndexCreatorFactory.createIndexCreator(context);
   }
 
   @Override

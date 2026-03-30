@@ -1251,6 +1251,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         .withColumnIndexCreationInfo(indexCreationInfo)
         .withTotalDocs(numDocs)
         .withDictionary(hasDictionary)
+        .withForwardIndexConfig(forwardIndexConfig)
         .withForwardIndexEncoding(forwardIndexConfig.getForwardIndexEncoding())
         .withTableNameWithType(_tableConfig.getTableName())
         .withContinueOnError(_tableConfig.getIngestionConfig() != null

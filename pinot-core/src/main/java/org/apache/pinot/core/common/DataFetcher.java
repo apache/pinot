@@ -496,14 +496,9 @@ public class DataFetcher implements AutoCloseable {
     void readDictIdsMV(int[] docIds, int length, int[][] dictIdsBuffer) {
       Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
-      if (_useDictionary) {
-        for (int i = 0; i < length; i++) {
-          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
-          dictIdsBuffer[i] = Arrays.copyOfRange(_reusableMVDictIds, 0, numValues);
-        }
-      } else {
-        Preconditions.checkState(_dictionary != null, "Dictionary must be present for raw forward index");
-        readDictIdsMVFromRawValues(docIds, length, dictIdsBuffer, readerContext);
+      for (int i = 0; i < length; i++) {
+        int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
+        dictIdsBuffer[i] = Arrays.copyOfRange(_reusableMVDictIds, 0, numValues);
       }
     }
 
@@ -640,74 +635,6 @@ public class DataFetcher implements AutoCloseable {
         case BYTES:
           for (int i = 0; i < length; i++) {
             dictIdBuffer[i] = _dictionary.indexOf(new ByteArray(_reader.getBytes(docIds[i], readerContext)));
-          }
-          return;
-        default:
-          throw new IllegalStateException("Unsupported storedType=" + _storedType + " for dictionary lookup");
-      }
-    }
-
-    private void readDictIdsMVFromRawValues(int[] docIds, int length, int[][] dictIdsBuffer,
-        ForwardIndexReaderContext readerContext) {
-      switch (_storedType) {
-        case INT:
-          for (int i = 0; i < length; i++) {
-            int[] values = _reader.getIntMV(docIds[i], readerContext);
-            int[] dictIds = new int[values.length];
-            for (int j = 0; j < values.length; j++) {
-              dictIds[j] = _dictionary.indexOf(values[j]);
-            }
-            dictIdsBuffer[i] = dictIds;
-          }
-          return;
-        case LONG:
-          for (int i = 0; i < length; i++) {
-            long[] values = _reader.getLongMV(docIds[i], readerContext);
-            int[] dictIds = new int[values.length];
-            for (int j = 0; j < values.length; j++) {
-              dictIds[j] = _dictionary.indexOf(values[j]);
-            }
-            dictIdsBuffer[i] = dictIds;
-          }
-          return;
-        case FLOAT:
-          for (int i = 0; i < length; i++) {
-            float[] values = _reader.getFloatMV(docIds[i], readerContext);
-            int[] dictIds = new int[values.length];
-            for (int j = 0; j < values.length; j++) {
-              dictIds[j] = _dictionary.indexOf(values[j]);
-            }
-            dictIdsBuffer[i] = dictIds;
-          }
-          return;
-        case DOUBLE:
-          for (int i = 0; i < length; i++) {
-            double[] values = _reader.getDoubleMV(docIds[i], readerContext);
-            int[] dictIds = new int[values.length];
-            for (int j = 0; j < values.length; j++) {
-              dictIds[j] = _dictionary.indexOf(values[j]);
-            }
-            dictIdsBuffer[i] = dictIds;
-          }
-          return;
-        case STRING:
-          for (int i = 0; i < length; i++) {
-            String[] values = _reader.getStringMV(docIds[i], readerContext);
-            int[] dictIds = new int[values.length];
-            for (int j = 0; j < values.length; j++) {
-              dictIds[j] = _dictionary.indexOf(values[j]);
-            }
-            dictIdsBuffer[i] = dictIds;
-          }
-          return;
-        case BYTES:
-          for (int i = 0; i < length; i++) {
-            byte[][] values = _reader.getBytesMV(docIds[i], readerContext);
-            int[] dictIds = new int[values.length];
-            for (int j = 0; j < values.length; j++) {
-              dictIds[j] = _dictionary.indexOf(new ByteArray(values[j]));
-            }
-            dictIdsBuffer[i] = dictIds;
           }
           return;
         default:
