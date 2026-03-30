@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.segment.readers.sort;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.Arrays;
+import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -37,14 +37,6 @@ public class PinotSegmentSorter implements SegmentSorter {
     _columnReaderMap = columnReaderMap;
   }
 
-  /**
-   * Sort the segment by the sort order columns. Orderings are computed by comparing dictionary ids.
-   *
-   * TODO: add the support for no-dictionary and multi-value columns.
-   *
-   * @param sortOrder a list of column names that represent the sorting order
-   * @return an array of sorted docIds
-   */
   @Override
   public int[] getSortedDocIds(List<String> sortOrder) {
     int numSortedColumns = sortOrder.size();
@@ -55,8 +47,6 @@ public class PinotSegmentSorter implements SegmentSorter {
       Preconditions.checkState(sortedColumnReader != null, "Failed to find sorted column: %s", sortedColumn);
       Preconditions
           .checkState(sortedColumnReader.isSingleValue(), "Unsupported sorted multi-value column: %s", sortedColumn);
-      Preconditions
-          .checkState(sortedColumnReader.hasDictionary(), "Unsupported sorted no-dictionary column: %s", sortedColumn);
       sortedColumnReaders[i] = sortedColumnReader;
     }
 
@@ -64,25 +54,15 @@ public class PinotSegmentSorter implements SegmentSorter {
     for (int i = 0; i < _numDocs; i++) {
       sortedDocIds[i] = i;
     }
-
-    Arrays.quickSort(0, _numDocs, (i1, i2) -> {
-      int docId1 = sortedDocIds[i1];
-      int docId2 = sortedDocIds[i2];
-
+    IntArrays.quickSort(sortedDocIds, (docId1, docId2) -> {
       for (PinotSegmentColumnReader sortedColumnReader : sortedColumnReaders) {
-        int result = sortedColumnReader.getDictionary()
-            .compare(sortedColumnReader.getDictId(docId1), sortedColumnReader.getDictId(docId2));
+        int result = sortedColumnReader.compare(docId1, docId2);
         if (result != 0) {
           return result;
         }
       }
       return 0;
-    }, (i, j) -> {
-      int temp = sortedDocIds[i];
-      sortedDocIds[i] = sortedDocIds[j];
-      sortedDocIds[j] = temp;
     });
-
     return sortedDocIds;
   }
 }
