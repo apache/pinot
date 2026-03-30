@@ -338,6 +338,12 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   private <C extends IndexConfig> void tryCreateIndexCreator(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
       IndexType<C, ?, ?> index, IndexCreationContext.Common context, FieldIndexConfigs fieldIndexConfigs)
       throws Exception {
+    // Skip forward index for MAP columns that have columnar map index enabled
+    if (index == StandardIndexes.forward()
+        && context.getFieldSpec().getDataType() == FieldSpec.DataType.MAP
+        && fieldIndexConfigs.getConfig(StandardIndexes.columnarMap()).isEnabled()) {
+      return;
+    }
     C config = fieldIndexConfigs.getConfig(index);
     if (config.isEnabled()) {
       IndexCreator creator = index.createIndexCreator(context, config);
