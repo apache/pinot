@@ -27,7 +27,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -141,8 +141,8 @@ public class HashJoinOperator extends BaseJoinOperator {
     if (key == null) {
       return true;
     }
-    if (key instanceof Key) {
-      Object[] components = ((Key) key).getValues();
+    if (key instanceof Record) {
+      Object[] components = ((Record) key).getValues();
       for (Object comp : components) {
         if (comp == null) {
           return true;

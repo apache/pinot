@@ -27,7 +27,7 @@ import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.collections.DualValueList;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
@@ -154,14 +154,14 @@ public class LastValueWindowFunction extends ValueWindowFunction {
         "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
 
     List<Object> result = new ArrayList<>(numRows);
-    Map<Key, Object> lastValueForKey = new HashMap<>();
+    Map<Record, Object> lastValueForKey = new HashMap<>();
 
     // The window frame here is either RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW or RANGE BETWEEN CURRENT ROW
     // AND CURRENT ROW. In both cases, the result for each row is the value of the last row in the partition with the
     // same order key as the current row.
     for (int i = numRows - 1; i >= 0; i--) {
       Object[] row = rows.get(i);
-      Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+      Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
 
       // Two map lookups used intentionally to differentiate between explicit null values versus missing keys
       if (lastValueForKey.containsKey(orderKey)) {
@@ -186,11 +186,11 @@ public class LastValueWindowFunction extends ValueWindowFunction {
 
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUpperBoundCurrentRow()) {
       List<Object> result = new ArrayList<>(numRows);
-      Map<Key, Object> lastValueForKey = new HashMap<>();
+      Map<Record, Object> lastValueForKey = new HashMap<>();
       Object lastNonNullValue = null;
 
       for (Object[] row : rows) {
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         Object value = extractValueFromRow(row);
 
         if (value != null) {
@@ -210,10 +210,10 @@ public class LastValueWindowFunction extends ValueWindowFunction {
 
     if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUpperBoundCurrentRow()) {
       List<Object> result = new ArrayList<>(numRows);
-      Map<Key, Object> lastValueForKey = new HashMap<>();
+      Map<Record, Object> lastValueForKey = new HashMap<>();
 
       for (Object[] row : rows) {
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         Object value = extractValueFromRow(row);
 
         if (value != null) {
@@ -232,7 +232,7 @@ public class LastValueWindowFunction extends ValueWindowFunction {
       // Get last non-null value and fill it in all rows from the first row till the last row of the peer group of the
       // row with the non-null value
       int indexOfLastNonNullValue = indexOfLastNonNullValueInWindow(rows, 0, numRows - 1);
-      Key lastNonNullValueKey;
+      Record lastNonNullValueKey;
 
       // No non-null values
       if (indexOfLastNonNullValue == -1) {

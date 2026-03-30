@@ -33,7 +33,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.docvalsets.RowBasedBlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
@@ -49,7 +49,7 @@ import org.apache.pinot.core.util.GapfillUtils;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GapfillProcessor extends BaseGapfillProcessor {
 
-  private final Set<Key> _groupByKeys;
+  private final Set<Record> _groupByKeys;
   private final Map<String, ExpressionContext> _fillExpressions;
   private int[] _sourceColumnIndexForResultSchema = null;
 
@@ -173,7 +173,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
       DataSchema dataSchema, GapfillFilterHandler postGapfillFilterHandler) {
     ColumnDataType[] resultColumnDataTypes = dataSchema.getColumnDataTypes();
     int numResultColumns = resultColumnDataTypes.length;
-    Set<Key> keys = new HashSet<>(_groupByKeys);
+    Set<Record> keys = new HashSet<>(_groupByKeys);
 
     if (rawRowsForBucket != null) {
       for (Object[] resultRow : rawRowsForBucket) {
@@ -194,14 +194,14 @@ public class GapfillProcessor extends BaseGapfillProcessor {
               bucketedResult.add(resultRow);
             }
           }
-          Key key = constructGroupKeys(resultRow);
+          Record key = constructGroupKeys(resultRow);
           keys.remove(key);
           _previousByGroupKey.put(key, resultRow);
         }
       }
     }
 
-    for (Key key : keys) {
+    for (Record key : keys) {
       Object[] gapfillRow = new Object[numResultColumns];
       int keyIndex = 0;
       if (resultColumnDataTypes[_timeBucketColumnIndex] == ColumnDataType.LONG) {
@@ -346,7 +346,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
         // the data will not be used for gapfill, skip it
         continue;
       }
-      Key key = constructGroupKeys(row);
+      Record key = constructGroupKeys(row);
       _groupByKeys.add(key);
       if (index < 0) {
         // the data can potentially be used for previous value

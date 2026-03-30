@@ -28,7 +28,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -152,7 +151,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
                 for (int i = 0; i < _numAggregationFunctions; i++) {
                   values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
                 }
-                _indexedTable.upsert(new Key(keys), new Record(values));
+                _indexedTable.upsert(new Record(keys), new Record(values));
               }
             } finally {
               // Release the resources used by the group key generator

@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
 
@@ -45,8 +45,8 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
   private final static int COLUMN_TYPE_SUM = 1;
   private final static int COLUMN_TYPE_AVG = 2;
   protected Map<Integer, Integer> _filteredMap;
-  protected final Map<Key, Integer> _groupByKeys;
-  protected final Map<Key, Integer> _previousIndexByGroupKey;
+  protected final Map<Record, Integer> _groupByKeys;
+  protected final Map<Record, Integer> _previousIndexByGroupKey;
 
   SumAvgGapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     super(queryContext, gapfillType);
@@ -76,7 +76,7 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
       }
     }
 
-    for (Map.Entry<Key, Integer> entry : _groupByKeys.entrySet()) {
+    for (Map.Entry<Record, Integer> entry : _groupByKeys.entrySet()) {
       if (_previousIndexByGroupKey.containsKey(entry.getKey())) {
         if (_postGapfillFilterHandler == null
             || _postGapfillFilterHandler.isMatch(rows.get(_previousIndexByGroupKey.get(entry.getKey())))) {
@@ -108,7 +108,7 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
         timeBucketedRawRows[timeBucketedRawRowsIndex++] = i;
         break;
       }
-      Key key = constructGroupKeys(row);
+      Record key = constructGroupKeys(row);
       _groupByKeys.putIfAbsent(key, _groupByKeys.size());
       if (index < 0) {
         // the data can potentially be used for previous value
@@ -155,7 +155,7 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
       int timeBucketIndex = findGapfillBucketIndex(time);
       for (int i = timeBucketedRawRows[timeBucketIndex]; i < timeBucketedRawRows[timeBucketIndex + 1]; i++) {
         Object[] resultRow = rows.get(i);
-        Key key = constructGroupKeys(resultRow);
+        Record key = constructGroupKeys(resultRow);
         int groupKeyIndex = _groupByKeys.get(key);
         if ((_filteredMap.containsKey(groupKeyIndex))) {
           for (int j = 0; j < _columnTypes.length; j++) {

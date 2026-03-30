@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
@@ -38,13 +38,13 @@ public class AggregationUtils {
   private AggregationUtils() {
   }
 
-  public static Key extractRowKey(Object[] row, int[] indices) {
+  public static Record extractRowKey(Object[] row, int[] indices) {
     int numKeys = indices.length;
     Object[] values = new Object[numKeys];
     for (int i = 0; i < numKeys; i++) {
       values[i] = row[indices[i]];
     }
-    return new Key(values);
+    return new Record(values);
   }
 
   /**
@@ -54,10 +54,10 @@ public class AggregationUtils {
 
     protected final int _inputRef;
     protected final Object _literal;
-    protected final Map<Key, Object> _results = new HashMap<>();
+    protected final Map<Record, Object> _results = new HashMap<>();
     protected final ColumnDataType _dataType;
 
-    public Map<Key, Object> getResults() {
+    public Map<Record, Object> getResults() {
       return _results;
     }
 

@@ -179,7 +179,7 @@ public class SortedRecordTable extends BaseTable {
   }
 
   @Override
-  public boolean upsert(Key key, Record record) {
+  public boolean upsert(Record key, Record record) {
     throw new UnsupportedOperationException("method unused for SortedRecordTable");
   }
 }

@@ -28,7 +28,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
@@ -3122,7 +3122,7 @@ public class WindowAggregateOperatorTest {
         for (int i = 0; i < numKeys; i++) {
           values[i] = row[keys.get(i)];
         }
-        key = new Key(values);
+        key = new Record(values);
       }
       keyedResultRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
     }

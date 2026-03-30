@@ -45,7 +45,7 @@ import org.apache.pinot.core.util.trace.TraceCallable;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
   private final ExecutorService _executorService;
-  protected final Map<Key, Record> _lookupMap;
+  protected final Map<Record, Record> _lookupMap;
   protected final boolean _hasFinalInput;
   protected final int _resultSize;
   protected final int _numKeyColumns;
@@ -73,7 +73,7 @@ public abstract class IndexedTable extends BaseTable {
    * @param lookupMap     Map from keys to records
    */
   protected IndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
-      int trimSize, int trimThreshold, Map<Key, Record> lookupMap, ExecutorService executorService) {
+      int trimSize, int trimThreshold, Map<Record, Record> lookupMap, ExecutorService executorService) {
     super(dataSchema);
 
     Preconditions.checkArgument(resultSize >= 0, "Result size can't be negative");
@@ -106,20 +106,20 @@ public abstract class IndexedTable extends BaseTable {
     // NOTE: The record will always have key columns (group-by expressions) in the front. This is handled in
     //       AggregationGroupByOrderByOperator.
     Object[] keyValues = Arrays.copyOf(record.getValues(), _numKeyColumns);
-    return upsert(new Key(keyValues), record);
+    return upsert(new Record(keyValues), record);
   }
 
   /**
    * Adds a record with new key or updates a record with existing key.
    */
-  protected void addOrUpdateRecord(Key key, Record newRecord) {
+  protected void addOrUpdateRecord(Record key, Record newRecord) {
     _lookupMap.compute(key, (k, v) -> v == null ? newRecord : updateRecord(v, newRecord));
   }
 
   /**
    * Updates a record with existing key. Record with new key will be ignored.
    */
-  protected void updateExistingRecord(Key key, Record newRecord) {
+  protected void updateExistingRecord(Record key, Record newRecord) {
     _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
   }
 

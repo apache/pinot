@@ -30,7 +30,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
@@ -210,7 +210,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
    * @return the final block, which must be either an end of stream or an error.
    */
   private MseBlock computeBlocks() {
-    Map<Key, List<Object[]>> partitionRows = new HashMap<>();
+    Map<Record, List<Object[]>> partitionRows = new HashMap<>();
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
       List<Object[]> container = ((MseBlock.Data) block).asRowHeap().getRows();
@@ -236,7 +236,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       }
       for (Object[] row : container) {
         // TODO: Revisit null direction handling for all query types
-        Key key = AggregationUtils.extractRowKey(row, _keys);
+        Record key = AggregationUtils.extractRowKey(row, _keys);
         checkTerminationAndSampleUsagePeriodically(_numRows, EXPLAIN_NAME);
         partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
       }
@@ -254,7 +254,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     List<Object[]> rows = new ArrayList<>(_numRows);
-    for (Map.Entry<Key, List<Object[]>> e : partitionRows.entrySet()) {
+    for (Map.Entry<Record, List<Object[]>> e : partitionRows.entrySet()) {
       List<Object[]> rowList = e.getValue();
 
       // Each window function will return a list of results for each row in the input set

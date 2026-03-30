@@ -41,7 +41,7 @@ public class SimpleIndexedTable extends IndexedTable {
    * Non thread safe implementation of upsert to insert {@link Record} into the {@link Table}
    */
   @Override
-  public boolean upsert(Key key, Record record) {
+  public boolean upsert(Record key, Record record) {
     if (_hasOrderBy) {
       addOrUpdateRecord(key, record);
       if (_lookupMap.size() >= _trimThreshold) {

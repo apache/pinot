@@ -29,7 +29,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -54,7 +54,7 @@ public abstract class BaseGapfillProcessor {
   protected final long _postGapfillTimeBucketSize;
   protected final int _numOfTimeBuckets;
   protected final List<Integer> _groupByKeyIndexes;
-  protected final Map<Key, Object[]> _previousByGroupKey;
+  protected final Map<Record, Object[]> _previousByGroupKey;
   protected long _count = 0;
   protected final List<ExpressionContext> _timeSeries;
   protected int _timeBucketColumnIndex;
@@ -232,12 +232,12 @@ public abstract class BaseGapfillProcessor {
     throw new UnsupportedOperationException("Time column not found in the result set.");
   }
 
-  protected Key constructGroupKeys(Object[] row) {
+  protected Record constructGroupKeys(Object[] row) {
     Object[] groupKeys = new Object[_groupByKeyIndexes.size()];
     for (int i = 0; i < _groupByKeyIndexes.size(); i++) {
       groupKeys[i] = row[_groupByKeyIndexes.get(i)];
     }
-    return new Key(groupKeys);
+    return new Record(groupKeys);
   }
 
   protected long truncate(long epoch) {

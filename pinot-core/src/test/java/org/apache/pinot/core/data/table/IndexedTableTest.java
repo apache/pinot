@@ -247,8 +247,8 @@ public class IndexedTableTest {
     }
   }
 
-  private Key getKey(Object[] keys) {
-    return new Key(keys);
+  private Record getKey(Object[] keys) {
+    return new Record(keys);
   }
 
   private Record getRecord(Object[] columns) {

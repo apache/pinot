@@ -42,7 +42,7 @@ import java.util.Arrays;
  *   <li>STRING_ARRAY: String[]</li>
  * </ul>
  */
-public class Record {
+public class Record implements Comparable<Record> {
   private final Object[] _values;
 
   public Record(Object[] values) {
@@ -68,5 +68,26 @@ public class Record {
   @Override
   public String toString() {
     return Arrays.toString(_values);
+  }
+
+  @SuppressWarnings("unchecked")
+  @Override
+  public int compareTo(Record other) {
+    for (int i = 0; i < _values.length; i++) {
+      Object a = _values[i];
+      Object b = other._values[i];
+      if (a == null && b == null) {
+        continue;
+      } else if (a == null) {
+        return 1;   // null > non-null
+      } else if (b == null) {
+        return -1;  // non-null < null
+      }
+      int cmp = ((Comparable<Object>) a).compareTo(b);
+      if (cmp != 0) {
+        return cmp;
+      }
+    }
+    return 0;
   }
 }

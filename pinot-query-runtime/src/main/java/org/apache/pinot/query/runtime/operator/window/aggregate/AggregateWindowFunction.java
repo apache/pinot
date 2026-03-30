@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
@@ -121,15 +121,15 @@ public class AggregateWindowFunction extends WindowFunction {
       // The window frame is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW - this means that the result for rows
       // with the same order key will be the same - equal to the aggregated result from the first row of the partition
       // to the last row with that order key.
-      Map<Key, Object> keyedResult = new HashMap<>();
+      Map<Record, Object> keyedResult = new HashMap<>();
       for (Object[] row : rows) {
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         _windowValueAggregator.addValue(extractValueFromRow(row));
         keyedResult.put(orderKey, _windowValueAggregator.getCurrentAggregatedValue());
       }
 
       for (Object[] row : rows) {
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         results.add(keyedResult.get(orderKey));
       }
       return results;
@@ -137,17 +137,17 @@ public class AggregateWindowFunction extends WindowFunction {
       // The window frame is RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING - this means that the result for rows
       // with the same order key will be the same - equal to the aggregated result from the first row with that order
       // key to the last row of the partition.
-      Map<Key, Object> keyedResult = new HashMap<>();
+      Map<Record, Object> keyedResult = new HashMap<>();
       // Do a reverse iteration
       for (int i = rows.size() - 1; i >= 0; i--) {
         Object[] row = rows.get(i);
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         _windowValueAggregator.addValue(extractValueFromRow(row));
         keyedResult.put(orderKey, _windowValueAggregator.getCurrentAggregatedValue());
       }
 
       for (Object[] row : rows) {
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         results.add(keyedResult.get(orderKey));
       }
       return results;
@@ -155,16 +155,16 @@ public class AggregateWindowFunction extends WindowFunction {
       // The window frame is RANGE BETWEEN CURRENT ROW AND CURRENT ROW - this means that the result for rows with the
       // same order key will be the same - equal to the aggregated result from the first row with that order key to the
       // last row with that order key.
-      Map<Key, WindowValueAggregator<Object>> keyedAggregator = new HashMap<>();
+      Map<Record, WindowValueAggregator<Object>> keyedAggregator = new HashMap<>();
       for (Object[] row : rows) {
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         keyedAggregator.computeIfAbsent(orderKey,
                 k -> WindowValueAggregatorFactory.getWindowValueAggregator(_functionName, _dataType, false))
             .addValue(extractValueFromRow(row));
       }
 
       for (Object[] row : rows) {
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         results.add(keyedAggregator.get(orderKey).getCurrentAggregatedValue());
       }
       return results;

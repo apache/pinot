@@ -27,7 +27,7 @@ import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.collections.DualValueList;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
@@ -163,9 +163,9 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
     // The window frame here is either RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING or RANGE BETWEEN CURRENT ROW
     // AND CURRENT ROW. In both cases, the result for each row is the value of the first row in the partition with the
     // same order key as the current row.
-    Map<Key, Object> firstValueForKey = new HashMap<>();
+    Map<Record, Object> firstValueForKey = new HashMap<>();
     for (Object[] row : rows) {
-      Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+      Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
 
       // Two map lookups used intentionally to differentiate between explicit null values versus missing keys
       if (firstValueForKey.containsKey(orderKey)) {
@@ -191,7 +191,7 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
       // Find the first non-null value and fill it in all rows starting from the first row of the peer group of the row
       // with the first non-null value
       int firstNonNullValueIndex = indexOfFirstNonNullValueInWindow(rows, 0, numRows - 1);
-      Key firstNonNullValueKey;
+      Record firstNonNullValueKey;
 
       // No non-null values
       if (firstNonNullValueIndex == -1) {
@@ -204,7 +204,7 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
       int nullEndIndex;
       for (nullEndIndex = 0; nullEndIndex < numRows; nullEndIndex++) {
         Object[] row = rows.get(nullEndIndex);
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         if (orderKey.equals(firstNonNullValueKey)) {
           break;
         }
@@ -216,10 +216,10 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
 
     if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUpperBoundCurrentRow()) {
       List<Object> result = new ArrayList<>(numRows);
-      Map<Key, Object> firstValueForKey = new HashMap<>();
+      Map<Record, Object> firstValueForKey = new HashMap<>();
 
       for (Object[] row : rows) {
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         Object value = extractValueFromRow(row);
 
         if (value != null) {
@@ -236,10 +236,10 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
 
     if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUnboundedFollowing()) {
       List<Object> result = new ArrayList<>(numRows);
-      Map<Key, Object> firstValueForKey = new HashMap<>();
+      Map<Record, Object> firstValueForKey = new HashMap<>();
 
       for (Object[] row : rows) {
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         Object value = extractValueFromRow(row);
 
         if (value != null) {
@@ -252,7 +252,7 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
       Object prevNonNullValue = null;
       for (int i = numRows - 1; i >= 0; i--) {
         Object[] row = rows.get(i);
-        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        Record orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         Object value = firstValueForKey.get(orderKey);
 
         if (value != null) {

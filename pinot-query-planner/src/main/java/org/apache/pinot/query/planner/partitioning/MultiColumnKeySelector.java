@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 
 
-public class MultiColumnKeySelector implements KeySelector<Key> {
+public class MultiColumnKeySelector implements KeySelector<Record> {
   private final int[] _keyIds;
   private final String _hashFunction;
   private final HashFunctionSelector.MvHasher _hasher;
@@ -37,13 +37,13 @@ public class MultiColumnKeySelector implements KeySelector<Key> {
   }
 
   @Override
-  public Key getKey(Object[] row) {
+  public Record getKey(Object[] row) {
     int numKeys = _keyIds.length;
     Object[] values = new Object[numKeys];
     for (int i = 0; i < numKeys; i++) {
       values[i] = row[_keyIds[i]];
     }
-    return new Key(values);
+    return new Record(values);
   }
 
   @Override

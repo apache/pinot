@@ -23,7 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
 
@@ -39,7 +39,7 @@ import org.apache.pinot.core.util.GapfillUtils;
  * the aggregated count as necessary.
  */
 class CountGapfillProcessor extends BaseGapfillProcessor {
-  protected final Set<Key> _filteredSet;
+  protected final Set<Record> _filteredSet;
 
   CountGapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     super(queryContext, gapfillType);
@@ -113,7 +113,7 @@ class CountGapfillProcessor extends BaseGapfillProcessor {
   }
 
   private void updateCounter(Object[] row) {
-    Key key = constructGroupKeys(row);
+    Record key = constructGroupKeys(row);
     boolean isFilter = _postGapfillFilterHandler == null || _postGapfillFilterHandler.isMatch(row);
     if (_filteredSet.contains(key) != isFilter) {
       if (isFilter) {

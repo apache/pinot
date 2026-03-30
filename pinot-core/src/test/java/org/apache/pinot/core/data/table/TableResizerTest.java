@@ -56,9 +56,9 @@ public class TableResizerTest {
   private static final int TRIM_TO_SIZE = 3;
   private static final int NUM_RESULT_HOLDER = 4;
 
-  private Map<Key, Record> _recordsMap;
+  private Map<Record, Record> _recordsMap;
   private List<Record> _records;
-  private List<Key> _keys;
+  private List<Record> _keys;
   private GroupKeyGenerator _groupKeyGenerator;
   private GroupByResultHolder[] _groupByResultHolders;
 
@@ -75,9 +75,9 @@ public class TableResizerTest {
     }), new Record(new Object[]{
         "c", 300, 5.0, 20.0, 100.0, new IntOpenHashSet(new int[]{1, 2, 3, 4}), new AvgPair(10, 5) /* 2 */
     }));
-    _keys = Arrays.asList(new Key(new Object[]{"a", 10, 1.0}), new Key(new Object[]{"b", 10, 2.0}),
-        new Key(new Object[]{"c", 200, 3.0}), new Key(new Object[]{"c", 50, 4.0}),
-        new Key(new Object[]{"c", 300, 5.0}));
+    _keys = Arrays.asList(new Record(new Object[]{"a", 10, 1.0}), new Record(new Object[]{"b", 10, 2.0}),
+        new Record(new Object[]{"c", 200, 3.0}), new Record(new Object[]{"c", 50, 4.0}),
+        new Record(new Object[]{"c", 300, 5.0}));
 
     int numRecords = _records.size();
     _recordsMap = new HashMap<>();
@@ -121,7 +121,7 @@ public class TableResizerTest {
     // d1 asc
     TableResizer tableResizer =
         new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d1"));
-    Map<Key, Record> recordsMap = new HashMap<>(_recordsMap);
+    Map<Record, Record> recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(recordsMap.size(), TRIM_TO_SIZE);
     assertTrue(recordsMap.containsKey(_keys.get(0))); // a, b
@@ -256,7 +256,7 @@ public class TableResizerTest {
     // d1 asc
     TableResizer tableResizer =
         new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d1"));
-    Map<Key, Record> recordsMap = new HashMap<>(_recordsMap);
+    Map<Record, Record> recordsMap = new HashMap<>(_recordsMap);
     List<Record> sortedRecords = tableResizer.getSortedTopRecords(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
     assertEquals(sortedRecords.get(0), _records.get(0));  // a, b

@@ -43,7 +43,7 @@ public class UnboundedConcurrentIndexedTable extends ConcurrentIndexedTable {
   }
 
   @Override
-  protected void upsertWithOrderBy(Key key, Record record) {
+  protected void upsertWithOrderBy(Record key, Record record) {
     addOrUpdateRecord(key, record);
   }
 }

@@ -170,7 +170,7 @@ public class TableResizer {
   /**
    * Constructs an IntermediateRecord by extracting the order-by values from the record.
    */
-  private IntermediateRecord getIntermediateRecord(Key key, Record record) {
+  private IntermediateRecord getIntermediateRecord(Record key, Record record) {
     Comparable[] orderByValues = new Comparable[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
       orderByValues[i] = _orderByValueExtractors[i].extract(record);
@@ -181,7 +181,7 @@ public class TableResizer {
   /**
    * Resizes the recordsMap to the given size.
    */
-  public void resizeRecordsMap(Map<Key, Record> recordsMap, int size) {
+  public void resizeRecordsMap(Map<Record, Record> recordsMap, int size) {
     int numRecordsToEvict = recordsMap.size() - size;
     if (numRecordsToEvict <= 0) {
       return;
@@ -207,23 +207,23 @@ public class TableResizer {
   /**
    * Returns a heap of the top records from the recordsMap.
    */
-  private IntermediateRecord[] getTopRecordsHeap(Map<Key, Record> recordsMap, int size,
+  private IntermediateRecord[] getTopRecordsHeap(Map<Record, Record> recordsMap, int size,
       Comparator<IntermediateRecord> comparator) {
     // Should not reach here when map size <= heap size because there is no need to create a heap
     assert recordsMap.size() > size;
-    Iterator<Map.Entry<Key, Record>> mapEntryIterator = recordsMap.entrySet().iterator();
+    Iterator<Map.Entry<Record, Record>> mapEntryIterator = recordsMap.entrySet().iterator();
 
     // Initialize a heap with the first 'size' map entries
     IntermediateRecord[] heap = new IntermediateRecord[size];
     for (int i = 0; i < size; i++) {
-      Map.Entry<Key, Record> entry = mapEntryIterator.next();
+      Map.Entry<Record, Record> entry = mapEntryIterator.next();
       heap[i] = getIntermediateRecord(entry.getKey(), entry.getValue());
     }
     makeHeap(heap, size, comparator);
 
     // Keep updating the heap with the remaining map entries
     while (mapEntryIterator.hasNext()) {
-      Map.Entry<Key, Record> entry = mapEntryIterator.next();
+      Map.Entry<Record, Record> entry = mapEntryIterator.next();
       IntermediateRecord intermediateRecord = getIntermediateRecord(entry.getKey(), entry.getValue());
       if (comparator.compare(intermediateRecord, heap[0]) > 0) {
         heap[0] = intermediateRecord;
@@ -269,12 +269,12 @@ public class TableResizer {
   /**
    * Returns the top records from the recordsMap.
    */
-  public Collection<Record> getTopRecords(Map<Key, Record> recordsMap, int size, boolean sort) {
+  public Collection<Record> getTopRecords(Map<Record, Record> recordsMap, int size, boolean sort) {
     return sort ? getSortedTopRecords(recordsMap, size) : getUnsortedTopRecords(recordsMap, size);
   }
 
   @VisibleForTesting
-  List<Record> getSortedTopRecords(Map<Key, Record> recordsMap, int size) {
+  List<Record> getSortedTopRecords(Map<Record, Record> recordsMap, int size) {
     int numRecords = recordsMap.size();
     if (numRecords == 0) {
       return Collections.emptyList();
@@ -283,7 +283,7 @@ public class TableResizer {
       // Use quick sort if all the records are top records
       IntermediateRecord[] intermediateRecords = new IntermediateRecord[numRecords];
       int index = 0;
-      for (Map.Entry<Key, Record> entry : recordsMap.entrySet()) {
+      for (Map.Entry<Record, Record> entry : recordsMap.entrySet()) {
         intermediateRecords[index++] = getIntermediateRecord(entry.getKey(), entry.getValue());
       }
       Arrays.sort(intermediateRecords, _intermediateRecordComparator);
@@ -306,7 +306,7 @@ public class TableResizer {
     }
   }
 
-  private Collection<Record> getUnsortedTopRecords(Map<Key, Record> recordsMap, int size) {
+  private Collection<Record> getUnsortedTopRecords(Map<Record, Record> recordsMap, int size) {
     int numRecords = recordsMap.size();
     if (numRecords <= size) {
       return recordsMap.values();
@@ -398,7 +398,7 @@ public class TableResizer {
       values[_numGroupByExpressions + i] =
           _aggregationFunctions[i].extractGroupByResult(groupByResultHolders[i], groupId);
     }
-    return getIntermediateRecord(new Key(keys), new Record(values));
+    return getIntermediateRecord(new Record(keys), new Record(values));
   }
 
   /**

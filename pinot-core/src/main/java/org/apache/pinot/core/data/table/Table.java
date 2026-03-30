@@ -37,7 +37,7 @@ public interface Table {
    * Updates the table with the given record indexed on the given key, returns {@code true} if the table can take more
    * records, {@code false} otherwise.
    */
-  boolean upsert(Key key, Record record);
+  boolean upsert(Record key, Record record);
 
   /**
    * Merge all records from the given table, returns {@code true} if the table can take more records, {@code false}

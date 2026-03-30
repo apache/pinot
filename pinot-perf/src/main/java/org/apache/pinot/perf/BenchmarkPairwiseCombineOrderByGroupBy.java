@@ -40,7 +40,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SortedRecordTable;
 import org.apache.pinot.core.data.table.SortedRecords;
@@ -163,10 +162,10 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
     };
 
     Constructor<IntermediateRecord> constructor =
-        IntermediateRecord.class.getDeclaredConstructor(Key.class, Record.class, Comparable[].class);
+        IntermediateRecord.class.getDeclaredConstructor(Record.class, Record.class, Comparable[].class);
     constructor.setAccessible(true);
 
-    return constructor.newInstance(new Key(key), new Record(record), null);
+    return constructor.newInstance(new Record(key), new Record(record), null);
   }
 
   @Benchmark

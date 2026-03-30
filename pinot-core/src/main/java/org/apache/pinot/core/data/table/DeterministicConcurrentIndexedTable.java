@@ -37,13 +37,13 @@ public class DeterministicConcurrentIndexedTable extends IndexedTable {
    * Thread safe implementation of upsert for inserting {@link Record} into {@link Table}
    */
   @Override
-  public boolean upsert(Key key, Record record) {
+  public boolean upsert(Record key, Record record) {
     upsertWithoutOrderBy(key, record);
     return true;
   }
 
-  protected void upsertWithoutOrderBy(Key key, Record record) {
-    ConcurrentSkipListMap<Key, Record> map = (ConcurrentSkipListMap<Key, Record>) _lookupMap;
+  protected void upsertWithoutOrderBy(Record key, Record record) {
+    ConcurrentSkipListMap<Record, Record> map = (ConcurrentSkipListMap<Record, Record>) _lookupMap;
 
     if (map.size() < _resultSize || map.containsKey(key)) {
       addOrUpdateRecord(key, record);

@@ -43,7 +43,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
    * Thread safe implementation of upsert for inserting {@link Record} into {@link Table}
    */
   @Override
-  public boolean upsert(Key key, Record record) {
+  public boolean upsert(Record key, Record record) {
     if (_hasOrderBy) {
       upsertWithOrderBy(key, record);
     } else {
@@ -52,7 +52,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
     return true;
   }
 
-  protected void upsertWithOrderBy(Key key, Record record) {
+  protected void upsertWithOrderBy(Record key, Record record) {
     _readWriteLock.readLock().lock();
     try {
       addOrUpdateRecord(key, record);
@@ -72,7 +72,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
     }
   }
 
-  protected void upsertWithoutOrderBy(Key key, Record record) {
+  protected void upsertWithoutOrderBy(Record key, Record record) {
     if (_noMoreNewRecords.get()) {
       updateExistingRecord(key, record);
     } else {

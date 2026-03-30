@@ -21,7 +21,7 @@ package org.apache.pinot.query.runtime.operator.join;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -306,9 +306,9 @@ public class LookupTableTest {
     ObjectLookupTable table = new ObjectLookupTable();
 
     // Test with composite keys (Key objects)
-    Key compositeKey1 = new Key(new Object[]{"string1", 100});
-    Key compositeKey2 = new Key(new Object[]{"string2", 200});
-    Key compositeKey3 = new Key(new Object[]{"string1", 100}); // Same as compositeKey1
+    Record compositeKey1 = new Record(new Object[]{"string1", 100});
+    Record compositeKey2 = new Record(new Object[]{"string2", 200});
+    Record compositeKey3 = new Record(new Object[]{"string1", 100}); // Same as compositeKey1
 
     Object[] row1 = {"value1", 1.0};
     Object[] row2 = {"value2", 2.0};

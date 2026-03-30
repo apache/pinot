@@ -125,6 +125,6 @@ public class DeterministicIndexedTableTest {
   }
   private void upsert(DeterministicConcurrentIndexedTable table, Object[] row) {
     Object[] key = new Object[]{row[0]};
-    table.upsert(new Key(key), new Record(row));
+    table.upsert(new Record(key), new Record(row));
   }
 }
