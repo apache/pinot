@@ -5,5 +5,3 @@ app/public/
 # Local environment variables
 .env
 .env.local
-# favicon is copied here by the predev/prebuild npm scripts
-app/public/

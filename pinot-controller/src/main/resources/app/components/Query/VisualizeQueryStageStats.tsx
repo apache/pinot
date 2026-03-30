@@ -26,8 +26,7 @@ import ReactFlow, {
   Edge,
   ControlButton
 } from "react-flow-renderer";
-// Removed problematic dagre/graphlib imports to allow UI to load
-// Will use simple layout positioning instead
+// Use a simple built-in layout here instead of carrying an extra graph-layout dependency.
 import { Typography, useTheme } from "@material-ui/core";
 import "react-flow-renderer/dist/style.css";
 import isEmpty from "lodash/isEmpty";

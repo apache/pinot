@@ -23,34 +23,25 @@
  * console warnings from third-party libraries that are known and expected.
  */
 
-// Store the original console methods
-const originalWarn = console.warn;
-const originalError = console.error;
+const isDevelopment = process.env.NODE_ENV === 'development';
 
-// List of warning patterns to suppress
-const suppressedWarnings = [
-  /findDOMNode is deprecated/,
-  /componentWillReceiveProps has been renamed/,
-  /componentWillMount has been renamed/,
-  /Legacy context API has been detected/,
-];
+if (isDevelopment) {
+  const originalWarn = console.warn;
 
-// Override console.warn to filter out known warnings
-console.warn = (...args: any[]) => {
-  const message = args.join(' ');
-  const shouldSuppress = suppressedWarnings.some(pattern => pattern.test(message));
-  
-  if (!shouldSuppress) {
-    originalWarn.apply(console, args);
-  }
-};
+  // Keep the suppression list narrow and dev-only so production warnings remain visible.
+  const suppressedWarnings = [
+    /findDOMNode is deprecated/,
+    /componentWillReceiveProps has been renamed/,
+    /componentWillMount has been renamed/,
+    /Legacy context API has been detected/,
+  ];
 
-// Override console.error to filter out known errors (if needed)
-console.error = (...args: any[]) => {
-  const message = args.join(' ');
-  const shouldSuppress = suppressedWarnings.some(pattern => pattern.test(message));
-  
-  if (!shouldSuppress) {
-    originalError.apply(console, args);
-  }
-};
+  console.warn = (...args: any[]) => {
+    const message = args.join(' ');
+    const shouldSuppress = suppressedWarnings.some((pattern) => pattern.test(message));
+
+    if (!shouldSuppress) {
+      originalWarn.apply(console, args);
+    }
+  };
+}
