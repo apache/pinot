@@ -111,25 +111,10 @@ public class ForwardIndexConfig extends IndexConfig {
       @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion,
       @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
       @JsonProperty("targetDocsPerChunk") @Nullable Integer targetDocsPerChunk,
-      @JsonProperty("configs") @Nullable Map<String, Object> configs,
-      @JsonProperty("forwardIndexEncoding") @Nullable IndexCreationContext.ForwardIndexEncoding forwardIndexEncoding) {
+      @JsonProperty("configs") @Nullable Map<String, Object> configs) {
     this(disabled, getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType),
         deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk, configs,
-        forwardIndexEncoding);
-  }
-
-  /**
-   * @deprecated Use the constructor that also accepts {@code forwardIndexEncoding}.
-   */
-  @Deprecated
-  public ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
-      @Nullable ChunkCompressionType chunkCompressionType, @Nullable DictIdCompressionType dictIdCompressionType,
-      @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
-      @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk,
-      @Nullable Map<String, Object> configs) {
-    this(disabled, compressionCodec, chunkCompressionType, dictIdCompressionType, deriveNumDocsPerChunk,
-        rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk, configs,
-        IndexCreationContext.ForwardIndexEncoding.DICTIONARY);
+        null);
   }
 
   private ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
@@ -276,6 +261,7 @@ public class ForwardIndexConfig extends IndexConfig {
     return _configs;
   }
 
+  @JsonIgnore
   public IndexCreationContext.ForwardIndexEncoding getForwardIndexEncoding() {
     return _forwardIndexEncoding;
   }
@@ -294,14 +280,13 @@ public class ForwardIndexConfig extends IndexConfig {
     ForwardIndexConfig that = (ForwardIndexConfig) o;
     return _compressionCodec == that._compressionCodec && _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
         && _rawIndexWriterVersion == that._rawIndexWriterVersion && Objects.equals(_targetMaxChunkSize,
-        that._targetMaxChunkSize) && _targetDocsPerChunk == that._targetDocsPerChunk
-        && _forwardIndexEncoding == that._forwardIndexEncoding;
+        that._targetMaxChunkSize) && _targetDocsPerChunk == that._targetDocsPerChunk;
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _compressionCodec, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
-        _targetMaxChunkSize, _targetDocsPerChunk, _forwardIndexEncoding);
+        _targetMaxChunkSize, _targetDocsPerChunk);
   }
 
   public static class Builder {
