@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.readers;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -30,6 +31,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -73,10 +75,15 @@ public class PinotSegmentColumnReader implements Closeable {
     return _forwardIndexReader.isSingleValue();
   }
 
+  public DataType getStoredType() {
+    return _forwardIndexReader.getStoredType();
+  }
+
   public boolean hasDictionary() {
     return _dictionary != null;
   }
 
+  @Nullable
   public Dictionary getDictionary() {
     return _dictionary;
   }
@@ -211,6 +218,14 @@ public class PinotSegmentColumnReader implements Closeable {
     }
   }
 
+  public BigDecimal getBigDecimal(int docId) {
+    if (_dictionary != null) {
+      return _dictionary.getBigDecimalValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
+    } else {
+      return _forwardIndexReader.getBigDecimal(docId, _forwardIndexReaderContext);
+    }
+  }
+
   public String getString(int docId) {
     if (_dictionary != null) {
       return _dictionary.getStringValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
@@ -292,6 +307,42 @@ public class PinotSegmentColumnReader implements Closeable {
       return values;
     } else {
       return _forwardIndexReader.getBytesMV(docId, _forwardIndexReaderContext);
+    }
+  }
+
+  /// Compares two documents by this column's value. For dictionary-encoded columns the comparison is done via
+  /// dictionary ids; for no-dictionary columns values are read directly from the forward index and compared by type.
+  public int compare(int docId1, int docId2) {
+    assert _forwardIndexReader.isSingleValue();
+    if (_dictionary != null) {
+      return _dictionary.compare(_forwardIndexReader.getDictId(docId1, _forwardIndexReaderContext),
+          _forwardIndexReader.getDictId(docId2, _forwardIndexReaderContext));
+    }
+    switch (_forwardIndexReader.getStoredType()) {
+      case INT:
+        return Integer.compare(_forwardIndexReader.getInt(docId1, _forwardIndexReaderContext),
+            _forwardIndexReader.getInt(docId2, _forwardIndexReaderContext));
+      case LONG:
+        return Long.compare(_forwardIndexReader.getLong(docId1, _forwardIndexReaderContext),
+            _forwardIndexReader.getLong(docId2, _forwardIndexReaderContext));
+      case FLOAT:
+        return Float.compare(_forwardIndexReader.getFloat(docId1, _forwardIndexReaderContext),
+            _forwardIndexReader.getFloat(docId2, _forwardIndexReaderContext));
+      case DOUBLE:
+        return Double.compare(_forwardIndexReader.getDouble(docId1, _forwardIndexReaderContext),
+            _forwardIndexReader.getDouble(docId2, _forwardIndexReaderContext));
+      case BIG_DECIMAL:
+        return _forwardIndexReader.getBigDecimal(docId1, _forwardIndexReaderContext)
+            .compareTo(_forwardIndexReader.getBigDecimal(docId2, _forwardIndexReaderContext));
+      case STRING:
+        return _forwardIndexReader.getString(docId1, _forwardIndexReaderContext)
+            .compareTo(_forwardIndexReader.getString(docId2, _forwardIndexReaderContext));
+      case BYTES:
+        return ByteArray.compare(_forwardIndexReader.getBytes(docId1, _forwardIndexReaderContext),
+            _forwardIndexReader.getBytes(docId2, _forwardIndexReaderContext));
+      default:
+        throw new IllegalStateException(
+            "Unsupported no-dictionary column type: " + _forwardIndexReader.getStoredType());
     }
   }
 
