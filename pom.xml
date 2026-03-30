@@ -2407,6 +2407,8 @@
                       <exclude>org.apache.hadoop.thirdparty:hadoop-shaded-protobuf_3_7</exclude>
                       <!-- Use org.bouncycastle:bcprov-jdk18on -->
                       <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
+                      <!-- Use at.yawk.lz4:lz4-java -->
+                      <exclude>org.lz4:lz4-java</exclude>
                     </excludes>
                   </bannedDependencies>
                 </rules>
