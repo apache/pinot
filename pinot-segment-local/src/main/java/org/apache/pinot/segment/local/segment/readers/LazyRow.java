@@ -46,7 +46,6 @@ public class LazyRow {
   }
 
   public void init(IndexSegment segment, int docId) {
-    clear();
     _segment = segment;
     _docId = docId;
   }
@@ -91,6 +90,7 @@ public class LazyRow {
   public void clear() {
     _fieldToValueMap.clear();
     _nullValueFields.clear();
+    _segment = null;
   }
 
   public Set<String> getColumnNames() {

@@ -564,6 +564,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               _reusePreviousRow.init(currentSegment, currentDocId);
               _partialUpsertHandler.merge(_reusePreviousRow, record, _reuseMergeResultHolder);
               _reuseMergeResultHolder.clear();
+              _reusePreviousRow.clear();
             }
           }
           return recordLocation;
