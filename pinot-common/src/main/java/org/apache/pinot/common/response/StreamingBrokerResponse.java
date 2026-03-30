@@ -85,6 +85,14 @@ public interface StreamingBrokerResponse extends AutoCloseable {
     return new WithListener(this, onConsumptionFinished);
   }
 
+  /// Whether the broker HTTP JSON serializer should write a `resultTable` field.
+  ///
+  /// When false, the stream is still fully consumed (for correct stats and side effects) but rows are not written to
+  /// the response body, matching `dropResults=true` behavior on eager responses.
+  default boolean shouldSerializeResultTable() {
+    return true;
+  }
+
   static StreamingBrokerResponse error(QueryErrorCode errorCode) {
     return error(errorCode, null);
   }
@@ -198,6 +206,7 @@ public interface StreamingBrokerResponse extends AutoCloseable {
     }
   }
 
+  @FunctionalInterface
   interface DataConsumer {
     void consume(Data data)
         throws InterruptedException;
@@ -338,6 +347,23 @@ public interface StreamingBrokerResponse extends AutoCloseable {
     @Override
     public void close() {
       _delegate.close();
+    }
+
+    @Override
+    public boolean shouldSerializeResultTable() {
+      return _delegate.shouldSerializeResultTable();
+    }
+  }
+
+  /// Delegates to another response but omits `resultTable` from JSON; see [shouldSerializeResultTable].
+  class OmitResultTableInJson extends Delegator {
+    public OmitResultTableInJson(StreamingBrokerResponse delegate) {
+      super(delegate);
+    }
+
+    @Override
+    public boolean shouldSerializeResultTable() {
+      return false;
     }
   }
 

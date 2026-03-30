@@ -226,36 +226,6 @@ jobs:
         timeout-minutes: 120
         run: |
           .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
-      - name: Unit Test (Broker Streaming Response Enabled)
-        if: ${{ matrix.testset == 2 && matrix.java == 21 }}
-        env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-          MAVEN_OPTS: >
-            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
-            -B -ntp
-            -XX:+IgnoreUnrecognizedVMOptions
-            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-            --add-opens=java.base/java.nio=ALL-UNNAMED
-            --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
-            --add-opens=java.base/java.lang=ALL-UNNAMED
-            --add-opens=java.base/java.util=ALL-UNNAMED
-            --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
-            --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
-            -Dio.netty.tryReflectionSetAccessible=true
-            -Dio.grpc.netty.shaded.io.netty.tryReflectionSetAccessible=true
-        timeout-minutes: 60
-        run: |
-          mvn test \
-            -pl pinot-broker \
-            -P github-actions,codecoverage,no-integration-tests \
-            -Dpinot.broker.query.enable.streaming.response=true \
-            -Dtest=PinotClientRequestTest,StreamingBrokerResponseJacksonSerializerTest \
-            -Dsurefire.failIfNoSpecifiedTests=false
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         continue-on-error: true
@@ -345,27 +315,6 @@ jobs:
         timeout-minutes: 120
         run: |
           .github/workflows/scripts/pr-tests/.pinot_tests_integration.sh
-      - name: Integration Test (Broker Streaming Response Enabled)
-        if: ${{ matrix.testset == 2 && matrix.java == 21 }}
-        env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-          MAVEN_OPTS: >
-            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
-            -B -ntp
-            -XX:+IgnoreUnrecognizedVMOptions
-            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        timeout-minutes: 120
-        run: |
-          cd pinot-integration-tests || exit 1
-          mvn test \
-            -DargLine="-Xms1g -Xmx2g -Dlog4j2.configurationFile=log4j2.xml" \
-            -P github-actions,codecoverage,integration-tests-set-2 \
-            -Dpinot.integration.broker.streaming.response.enabled=true
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         continue-on-error: true

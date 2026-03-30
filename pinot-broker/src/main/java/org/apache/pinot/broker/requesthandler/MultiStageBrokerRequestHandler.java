@@ -572,7 +572,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     brokerResponse.setTimeUsedMs(totalTimeMs);
     augmentStatistics(context._requestContext, brokerResponse);
-    if (QueryOptionsUtils.shouldDropResults(context._queryOptions)) {
+    boolean isExplain = context._compiledQuery.getSqlNodeAndOptions().getSqlNode().getKind() == SqlKind.EXPLAIN;
+    if (!isExplain && QueryOptionsUtils.shouldDropResults(context._queryOptions)) {
       brokerResponse.setResultTable(null);
     }
 
@@ -591,7 +592,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /// the exception is thrown during post-reduce processing, it is still caught and handled properly.
   private StreamingBrokerResponse postDecorate(StreamingBrokerResponse response, SqlNodeAndOptions sqlNodeAndOptions,
       long requestId) {
-    return new StreamingBrokerResponse.Delegator(response) {
+    StreamingBrokerResponse inner = response;
+    if (sqlNodeAndOptions.getSqlNode().getKind() != SqlKind.EXPLAIN
+        && QueryOptionsUtils.shouldDropResults(sqlNodeAndOptions.getOptions())) {
+      inner = new StreamingBrokerResponse.OmitResultTableInJson(response);
+    }
+    return new StreamingBrokerResponse.Delegator(inner) {
       Metainfo _metainfo;
 
       @Override
