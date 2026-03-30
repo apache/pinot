@@ -28,6 +28,17 @@ import { AppLoadingIndicator } from './components/AppLoadingIndicator';
 import { AuthWorkflow } from 'Models';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 
+const INITIAL_BOOTSTRAP_TIMEOUT_MS = 3000;
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallbackValue: T) => {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => {
+      window.setTimeout(() => resolve(fallbackValue), timeoutMs);
+    }),
+  ]);
+};
+
 export const App = () => {
   const [clusterName, setClusterName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -55,39 +66,66 @@ export const App = () => {
   }, [authWorkflow])
 
   const fetchUserRole = async () => {
-    const userListResponse = await PinotMethodUtils.getUserList();
-    let userObj = userListResponse.users;
-    let userData = [];
-    for (let key in userObj) {
-      if (userObj.hasOwnProperty(key)) {
-        userData.push(userObj[key]);
-      }
+    if (!app_state.username) {
+      return;
     }
-    let role = "";
 
-    for (let item of userData) {
-      if (item.username === app_state.username && item.component === 'CONTROLLER') {
-        role = item.role;
+    try {
+      const userListResponse = await withTimeout<{ users: Record<string, any> }>(
+        PinotMethodUtils.getUserList() as Promise<{ users: Record<string, any> }>,
+        INITIAL_BOOTSTRAP_TIMEOUT_MS,
+        { users: {} },
+      );
+      let userObj = userListResponse.users;
+      let userData = [];
+      for (let key in userObj) {
+        if (userObj.hasOwnProperty(key)) {
+          userData.push(userObj[key]);
+        }
       }
-    }
-    if (role === 'ADMIN') {
-      app_state.role = "ADMIN";
-      setRole('ADMIN')
+      let role = "";
+
+      for (let item of userData) {
+        if (item.username === app_state.username && item.component === 'CONTROLLER') {
+          role = item.role;
+        }
+      }
+
+      if (role === 'ADMIN') {
+        app_state.role = "ADMIN";
+        setRole('ADMIN')
+      }
+    } catch (error) {
+      console.warn('Unable to load user role during initial app bootstrap.', error);
     }
   }
 
   const fetchClusterName = async () => {
-    const clusterNameResponse = await PinotMethodUtils.getClusterName();
-    localStorage.setItem('pinot_ui:clusterName', clusterNameResponse);
-    setClusterName(clusterNameResponse);
+    try {
+      const clusterNameResponse = await PinotMethodUtils.getClusterName();
+      localStorage.setItem('pinot_ui:clusterName', clusterNameResponse);
+      setClusterName(clusterNameResponse);
+    } catch (error) {
+      console.warn('Unable to load cluster name during initial app bootstrap.', error);
+    }
   };
 
   const fetchClusterConfig = async () => {
-    const clusterConfig = await PinotMethodUtils.getClusterConfigJSON();
-    app_state.queryConsoleOnlyView = clusterConfig?.queryConsoleOnlyView === 'true';
-    app_state.hideQueryConsoleTab = clusterConfig?.hideQueryConsoleTab === 'true';
-
-    setLoading(false);
+    try {
+      const clusterConfig = await withTimeout(
+        PinotMethodUtils.getClusterConfigJSON(),
+        INITIAL_BOOTSTRAP_TIMEOUT_MS,
+        {},
+      );
+      app_state.queryConsoleOnlyView = clusterConfig?.queryConsoleOnlyView === 'true';
+      app_state.hideQueryConsoleTab = clusterConfig?.hideQueryConsoleTab === 'true';
+    } catch (error) {
+      console.warn('Unable to load cluster config during initial app bootstrap.', error);
+      app_state.queryConsoleOnlyView = false;
+      app_state.hideQueryConsoleTab = false;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getRouterData = () => {

@@ -32,24 +32,39 @@ const PackageVersions = () => {
     records: []
   });
 
-  const fetchData = async () => {
-    try {
-      const result = await PinotMethodUtils.getPackageVersionsData();
-      setTableData(result);
-      setError(null);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to fetch package versions');
-      setTableData({
-        columns: ['Package', 'Version'],
-        records: [],
-        error: err?.message || 'Failed to fetch package versions'
-      });
-    } finally {
-      setFetching(false);
-    }
-  };
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchData = async () => {
+      try {
+        const result = await PinotMethodUtils.getPackageVersionsData();
+        if (!isMounted) {
+          return;
+        }
+        setTableData(result);
+        setError(null);
+      } catch (err: any) {
+        if (!isMounted) {
+          return;
+        }
+        setError(err?.message || 'Failed to fetch package versions');
+        setTableData({
+          columns: ['Package', 'Version'],
+          records: [],
+          error: err?.message || 'Failed to fetch package versions'
+        });
+      } finally {
+        if (isMounted) {
+          setFetching(false);
+        }
+      }
+    };
+
     fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

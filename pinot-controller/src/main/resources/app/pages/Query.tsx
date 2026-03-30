@@ -45,7 +45,7 @@ import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils, { QUERY_STATS_COLUMNS } from '../utils/PinotMethodUtils';
 import '../styles/styles.css';
 import {Resizable} from "re-resizable";
-import {useHistory, useLocation} from 'react-router';
+import {useHistory, useLocation} from 'react-router-dom';
 import sqlFormatter from '@sqltools/formatter';
 import {FlamegraphMode, FlameGraphQueryStageStats} from '../components/Query/FlamegraphQueryStageStats';
 import {VisualizeQueryStageStats} from '../components/Query/VisualizeQueryStageStats';
@@ -61,6 +61,25 @@ enum ErrorViewType {
   JSON = 'json',
   VISUAL = 'visual',
 }
+
+const QUERY_BOOTSTRAP_TIMEOUT_MS = 3000;
+const EMPTY_TABLE_LIST = {
+  columns: ['Tables'],
+  records: [],
+};
+const EMPTY_LOGICAL_TABLE_LIST = {
+  columns: ['Logical Tables'],
+  records: [],
+};
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallbackValue: T) => {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => {
+      window.setTimeout(() => resolve(fallbackValue), timeoutMs);
+    }),
+  ]);
+};
 
 const useStyles = makeStyles((theme) => ({
   title: {
@@ -428,11 +447,28 @@ const QueryPage = () => {
   };
 
   const fetchData = async () => {
-    const result = await PinotMethodUtils.getQueryTablesList({bothType: false});
-    setTableList(result);
-    const logicalTablesResult = await PinotMethodUtils.getQueryLogicalTablesList();
-    setLogicalTableList(logicalTablesResult);
-    setFetching(false);
+    try {
+      const [result, logicalTablesResult] = await Promise.all([
+        withTimeout(
+          PinotMethodUtils.getQueryTablesList({bothType: false}),
+          QUERY_BOOTSTRAP_TIMEOUT_MS,
+          EMPTY_TABLE_LIST,
+        ),
+        withTimeout(
+          PinotMethodUtils.getQueryLogicalTablesList(),
+          QUERY_BOOTSTRAP_TIMEOUT_MS,
+          EMPTY_LOGICAL_TABLE_LIST,
+        ),
+      ]);
+      setTableList(result);
+      setLogicalTableList(logicalTablesResult);
+    } catch (error) {
+      console.warn('Unable to load query console table metadata during initial bootstrap.', error);
+      setTableList(EMPTY_TABLE_LIST);
+      setLogicalTableList(EMPTY_LOGICAL_TABLE_LIST);
+    } finally {
+      setFetching(false);
+    }
   };
 
   useEffect(() => {

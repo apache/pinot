@@ -18,24 +18,80 @@
  */
 
 /**
- * Wrapper for jsonlint to handle CommonJS compatibility issues with Vite.
- * The jsonlint package uses CommonJS require() which doesn't work in browser ESM context.
- * This wrapper provides a safe import and exposes the parser for CodeMirror's json-lint addon.
+ * Browser-safe JSON lint adapter for CodeMirror.
+ * CodeMirror's json-lint addon only needs a parser object with `parse()` and
+ * `parseError()` hooks, so we can avoid bundling the Node-oriented jsonlint package.
  */
 
-// Import the jsonlint module - Vite will handle the CJS transformation
-import jsonlintModule from 'jsonlint';
+type JsonLintLocation = {
+  first_line: number;
+  first_column: number;
+  last_line: number;
+  last_column: number;
+};
 
-// The jsonlint module exports { parser, parse, main }
-// We only need the parser for CodeMirror's json-lint addon
-// Extract the parser - it's the actual jsonlint parser object
-const jsonlint = (jsonlintModule as any)?.parser || jsonlintModule;
+type JsonLintHash = {
+  loc: JsonLintLocation;
+};
 
-// Export for use in the application
+type JsonLintParser = {
+  parseError?: (message: string, hash: JsonLintHash) => void;
+  parse: (text: string) => unknown;
+};
+
+const getErrorIndex = (message: string) => {
+  const positionMatch = message.match(/position (\d+)/i);
+  if (positionMatch) {
+    return Number(positionMatch[1]);
+  }
+
+  return 0;
+};
+
+const getLocationFromIndex = (text: string, index: number): JsonLintLocation => {
+  const boundedIndex = Math.max(0, Math.min(index, text.length));
+  let line = 1;
+  let column = 0;
+
+  for (let cursor = 0; cursor < boundedIndex; cursor += 1) {
+    if (text[cursor] === '\n') {
+      line += 1;
+      column = 0;
+    } else {
+      column += 1;
+    }
+  }
+
+  return {
+    first_line: line,
+    first_column: column,
+    last_line: line,
+    last_column: column + 1,
+  };
+};
+
+const jsonlint: JsonLintParser = {
+  parse(text: string) {
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const hash = {
+        loc: getLocationFromIndex(text, getErrorIndex(message)),
+      };
+
+      if (typeof jsonlint.parseError === 'function') {
+        jsonlint.parseError(message, hash);
+        return null;
+      }
+
+      throw error;
+    }
+  },
+};
+
 export default jsonlint;
 
-// Set it globally for CodeMirror's json-lint addon
-// CodeMirror expects window.jsonlint to be the parser object with a parse() method
 if (typeof window !== 'undefined') {
   (window as any).jsonlint = jsonlint;
 }

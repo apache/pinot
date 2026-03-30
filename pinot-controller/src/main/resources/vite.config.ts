@@ -59,11 +59,20 @@ export default defineConfig(({ mode }) => {
     ],
 
     resolve: {
-      alias: {
-        // Map the bare 'Models' specifier used throughout the app to the
-        // actual TypeScript module (replaces the old webpack resolve.modules trick)
-        Models: path.join(__dirname, 'app', 'Models.ts'),
-      },
+      alias: [
+        {
+          // Material UI v4 icon deep imports resolve to CommonJS entrypoints by default,
+          // which Vite then treats as module objects instead of React components.
+          find: /^@material-ui\/icons\/(.*)$/,
+          replacement: '@material-ui/icons/esm/$1',
+        },
+        {
+          // Map the bare 'Models' specifier used throughout the app to the
+          // actual TypeScript module (replaces the old webpack resolve.modules trick)
+          find: 'Models',
+          replacement: path.join(__dirname, 'app', 'Models.ts'),
+        },
+      ],
     },
 
     define: {
@@ -72,8 +81,6 @@ export default defineConfig(({ mode }) => {
       // Several CJS packages (react-codemirror2, etc.) reference Node.js `global`.
       // Browsers don't have it – map it to the standard globalThis.
       global: 'globalThis',
-      // Fix jsonlint error: line 429 checks "require.main === module"
-      'require.main': 'undefined',
     },
 
     server: {
@@ -117,7 +124,6 @@ export default defineConfig(({ mode }) => {
       // in their package.json need explicit inclusion to avoid import errors.
       include: [
         'json-bigint',
-        'jsonlint',
         'react-spring',
         'react-diff-viewer',
         'react-codemirror2',

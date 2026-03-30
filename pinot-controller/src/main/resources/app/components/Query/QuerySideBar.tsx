@@ -27,7 +27,7 @@ import { TableData } from 'Models';
 import CustomizedTables from '../Table';
 import QueryIcon from '@material-ui/icons/QueryBuilder';
 import TimelineIcon from '@material-ui/icons/Timeline';
-import { useHistory, useLocation } from 'react-router';
+import { useHistory, useLocation } from 'react-router-dom';
 
 const drawerWidth = 300;
 

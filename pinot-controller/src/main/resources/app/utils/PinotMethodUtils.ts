@@ -125,7 +125,7 @@ import {
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
-import { matchPath } from 'react-router';
+import { matchPath } from 'react-router-dom';
 import RouterData from '../router';
 import JSONbigBase from 'json-bigint';
 const JSONbig = JSONbigBase({ storeAsString: true });
