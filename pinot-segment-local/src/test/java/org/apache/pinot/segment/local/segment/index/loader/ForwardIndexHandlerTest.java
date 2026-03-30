@@ -39,8 +39,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -657,12 +657,12 @@ public class ForwardIndexHandlerTest {
       assertEquals(computeOperations(),
           Map.of(METRIC_LZ4_INTEGER, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY)));
 
-      // TEST5: Enable Dictionary for sorted column.
+      // TEST5: Sorted forward indexes are always materialized as dictionary-encoded on disk, so removing the RAW
+      // config is a no-op for the existing segment.
       resetIndexConfigs();
       _noDictionaryColumns.remove(DIM_RAW_SORTED_INTEGER);
       _fieldConfigMap.remove(DIM_RAW_SORTED_INTEGER);
-      assertEquals(computeOperations(),
-          Map.of(DIM_RAW_SORTED_INTEGER, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY)));
+      assertTrue(computeOperations().isEmpty());
     }
   }
 
@@ -988,6 +988,9 @@ public class ForwardIndexHandlerTest {
   public void testChangeCompressionForSingleColumn()
       throws Exception {
     for (String column : RAW_COLUMNS_WITH_FORWARD_INDEX) {
+      if (RAW_SORTED_COLUMNS.contains(column)) {
+        continue;
+      }
       // For every noDictionaryColumn, change the compressionType to all available types, one by one.
       for (CompressionCodec compressionType : RAW_COMPRESSION_TYPES) {
         SegmentMetadataImpl existingSegmentMetadata;
@@ -1031,9 +1034,8 @@ public class ForwardIndexHandlerTest {
   @Test
   public void testChangeCompressionAndIndexVersion()
       throws Exception {
-    List<String> columns = new ArrayList<>(RAW_SNAPPY_COLUMNS.size() + RAW_SORTED_COLUMNS.size());
+    List<String> columns = new ArrayList<>(RAW_SNAPPY_COLUMNS.size());
     columns.addAll(RAW_SNAPPY_COLUMNS);
-    columns.addAll(RAW_SORTED_COLUMNS);
     for (String column : columns) {
       // Convert from SNAPPY v2 to LZ4 v4
       SegmentMetadataImpl existingSegmentMetadata;

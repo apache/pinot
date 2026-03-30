@@ -42,7 +42,6 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunk
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
@@ -136,9 +135,6 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
       ForwardIndexConfig indexConfig) {
     if (metadata.isSorted()) {
       return false;
-    }
-    if (indexConfig != null && indexConfig.getForwardIndexEncoding() == IndexCreationContext.ForwardIndexEncoding.RAW) {
-      return true;
     }
     if (!metadata.isForwardIndexDictionaryEncoded()) {
       return true;

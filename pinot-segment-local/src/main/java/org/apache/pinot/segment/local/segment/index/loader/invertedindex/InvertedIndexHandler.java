@@ -23,23 +23,21 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.RawValueBitmapInvertedIndexCreator;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.readers.RawValueBitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
-import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -133,36 +131,36 @@ public class InvertedIndexHandler extends BaseIndexHandler {
 
   private boolean shouldRebuildInvertedIndex(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
       throws Exception {
-    return hasLegacyRawValueInvertedIndex(segmentReader, columnMetadata) == columnMetadata.hasDictionary();
+    if (!columnMetadata.hasDictionary()) {
+      return false;
+    }
+    return isLegacyRawValueInvertedIndexFormat(
+        segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.inverted()), columnMetadata);
   }
 
   private boolean shouldRebuildInvertedIndex(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
-    return hasLegacyRawValueInvertedIndex(segmentWriter, columnMetadata) == columnMetadata.hasDictionary();
-  }
-
-  private boolean hasLegacyRawValueInvertedIndex(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
-      throws Exception {
-    String columnName = columnMetadata.getColumnName();
-    try (RawValueBitmapInvertedIndexReader ignored =
-        new RawValueBitmapInvertedIndexReader(segmentReader.getIndexFor(columnName, StandardIndexes.inverted()),
-            columnMetadata.getDataType())) {
-      return true;
-    } catch (Exception e) {
+    if (!columnMetadata.hasDictionary()) {
       return false;
     }
+    return isLegacyRawValueInvertedIndexFormat(
+        segmentWriter.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.inverted()), columnMetadata);
   }
 
-  private boolean hasLegacyRawValueInvertedIndex(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
-      throws Exception {
-    String columnName = columnMetadata.getColumnName();
-    try (RawValueBitmapInvertedIndexReader ignored =
-        new RawValueBitmapInvertedIndexReader(segmentWriter.getIndexFor(columnName, StandardIndexes.inverted()),
-            columnMetadata.getDataType())) {
-      return true;
-    } catch (Exception e) {
+  static boolean isLegacyRawValueInvertedIndexFormat(PinotDataBuffer dataBuffer, ColumnMetadata columnMetadata) {
+    if (dataBuffer.size() < 44) {
       return false;
     }
+    if (dataBuffer.getInt(0) != 1 || dataBuffer.getInt(4) != columnMetadata.getCardinality()) {
+      return false;
+    }
+    long dictionaryOffset = dataBuffer.getLong(12);
+    long dictionaryLength = dataBuffer.getLong(20);
+    long invertedIndexOffset = dataBuffer.getLong(28);
+    long invertedIndexLength = dataBuffer.getLong(36);
+    long dataBufferSize = dataBuffer.size();
+    return dictionaryOffset >= 44 && dictionaryLength >= 0 && invertedIndexOffset >= dictionaryOffset + dictionaryLength
+        && invertedIndexLength >= 0 && invertedIndexOffset + invertedIndexLength <= dataBufferSize;
   }
 
   private void createInvertedIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
@@ -194,86 +192,40 @@ public class InvertedIndexHandler extends BaseIndexHandler {
         .withContinueOnError(_tableConfig.getIngestionConfig() != null
             && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
-    if (columnMetadata.hasDictionary()) {
-      // Dictionary-based inverted index
+    // Raw-forward columns now use a shared standalone dictionary plus the standard bitmap inverted index format.
+    // Legacy raw-value inverted indexes are rebuilt during reload before the segment becomes queryable.
+    if (!columnMetadata.hasDictionary()) {
+      throw new IllegalStateException("Inverted index requires dictionary after reload for column: " + columnName);
+    }
 
-
-      try (DictionaryBasedInvertedIndexCreator creator = StandardIndexes.inverted()
-          .createIndexCreator(context, IndexConfig.ENABLED)) {
-
-        try (
-            ForwardIndexReader forwardIndexReader = StandardIndexes.forward()
-            .getReaderFactory()
-            .createIndexReader(segmentWriter, _fieldIndexConfigs.get(columnName), columnMetadata);
-            ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
-          if (forwardIndexReader.isDictionaryEncoded()) {
-            if (columnMetadata.isSingleValue()) {
-              // Single-value column.
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getDictId(i, readerContext));
-              }
-            } else {
-              // Multi-value column.
-              int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-              for (int i = 0; i < numDocs; i++) {
-                int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-                creator.add(dictIds, length);
-              }
+    try (DictionaryBasedInvertedIndexCreator creator = StandardIndexes.inverted()
+        .createIndexCreator(context, IndexConfig.ENABLED)) {
+      try (
+          ForwardIndexReader forwardIndexReader = StandardIndexes.forward()
+          .getReaderFactory()
+          .createIndexReader(segmentWriter, _fieldIndexConfigs.get(columnName), columnMetadata);
+          ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
+        if (forwardIndexReader.isDictionaryEncoded()) {
+          if (columnMetadata.isSingleValue()) {
+            // Single-value column.
+            for (int i = 0; i < numDocs; i++) {
+              creator.add(forwardIndexReader.getDictId(i, readerContext));
             }
           } else {
-            try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
-              addRawValuesToDictionaryBasedInvertedIndex(creator, forwardIndexReader, readerContext, dictionary,
-                  columnMetadata, numDocs);
+            // Multi-value column.
+            int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+            for (int i = 0; i < numDocs; i++) {
+              int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
+              creator.add(dictIds, length);
             }
           }
-          creator.seal();
-        }
-      }
-    } else {
-      // Raw value based inverted index
-      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward()
-          .getReaderFactory();
-      try (RawValueBitmapInvertedIndexCreator creator = new RawValueBitmapInvertedIndexCreator(context);
-          ForwardIndexReader forwardIndexReader = readerFactory
-              .createIndexReader(segmentWriter, _fieldIndexConfigs.get(columnName), columnMetadata);
-          ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
-        if (columnMetadata.isSingleValue()) {
-          // Single-value column
-          switch (columnMetadata.getDataType()) {
-            case INT:
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getInt(i, readerContext));
-              }
-              break;
-            case LONG:
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getLong(i, readerContext));
-              }
-              break;
-            case FLOAT:
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getFloat(i, readerContext));
-              }
-              break;
-            case DOUBLE:
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getDouble(i, readerContext));
-              }
-              break;
-            case STRING:
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getString(i, readerContext));
-              }
-              break;
-            default:
-              throw new IllegalStateException(
-                  "Unsupported data type for raw inverted index: " + columnMetadata.getDataType());
-          }
         } else {
-          // Multi-value columns not supported for raw inverted index
-          throw new IllegalStateException("Raw inverted index not supported for multi-value columns: " + columnName);
+          try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
+            addRawValuesToDictionaryBasedInvertedIndex(creator, forwardIndexReader, readerContext, dictionary,
+                columnMetadata, numDocs);
+          }
         }
-        creator.close();
+        creator.seal();
       }
     }
 

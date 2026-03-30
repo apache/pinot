@@ -77,10 +77,17 @@ public class FieldIndexConfigsUtil {
       if (forwardIndexConfig.isDisabled()) {
         continue;
       }
-      IndexCreationContext.ForwardIndexEncoding forwardIndexEncoding =
-          rawForwardColumns.contains(fieldSpec.getName())
-              ? IndexCreationContext.ForwardIndexEncoding.RAW
-              : IndexCreationContext.ForwardIndexEncoding.DICTIONARY;
+      // If the parsed ForwardIndexConfig already specifies RAW encoding (via the new indexes.forward syntax),
+      // respect it and do not overwrite with the legacy lookup. Only use the legacy lookup to determine encoding
+      // when the parsed config has the default DICTIONARY encoding.
+      IndexCreationContext.ForwardIndexEncoding forwardIndexEncoding;
+      if (forwardIndexConfig.getForwardIndexEncoding() == IndexCreationContext.ForwardIndexEncoding.RAW) {
+        forwardIndexEncoding = IndexCreationContext.ForwardIndexEncoding.RAW;
+      } else {
+        forwardIndexEncoding = rawForwardColumns.contains(fieldSpec.getName())
+            ? IndexCreationContext.ForwardIndexEncoding.RAW
+            : IndexCreationContext.ForwardIndexEncoding.DICTIONARY;
+      }
       if (forwardIndexConfig.getForwardIndexEncoding() != forwardIndexEncoding) {
         FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder(fieldIndexConfigs);
         builder.add(StandardIndexes.forward(),

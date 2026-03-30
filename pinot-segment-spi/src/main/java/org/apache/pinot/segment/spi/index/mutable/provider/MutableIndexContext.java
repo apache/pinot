@@ -57,6 +57,20 @@ public class MutableIndexContext {
     _consumerDir = consumerDir;
   }
 
+  /**
+   * @deprecated Use the constructor that also accepts {@code forwardIndexEncoding}.
+   */
+  @Deprecated
+  public MutableIndexContext(FieldSpec fieldSpec, int fixedLengthBytes, boolean hasDictionary, String segmentName,
+      PinotDataBufferMemoryManager memoryManager, int capacity, boolean offHeap, int estimatedColSize,
+      int estimatedCardinality, int avgNumMultiValues, File consumerDir) {
+    this(fieldSpec, fixedLengthBytes, hasDictionary,
+        hasDictionary ? IndexCreationContext.ForwardIndexEncoding.DICTIONARY
+            : IndexCreationContext.ForwardIndexEncoding.RAW,
+        segmentName, memoryManager, capacity, offHeap, estimatedColSize, estimatedCardinality, avgNumMultiValues,
+        consumerDir);
+  }
+
   public PinotDataBufferMemoryManager getMemoryManager() {
     return _memoryManager;
   }

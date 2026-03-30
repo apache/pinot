@@ -26,7 +26,6 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.BaseDictIdBasedRegexpLikePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.local.segment.index.readers.RawValueBitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -125,9 +124,6 @@ public class FilterOperatorUtils {
         }
         if (dataSource.getInvertedIndex() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
-          if (dataSource.getInvertedIndex() instanceof RawValueBitmapInvertedIndexReader) {
-            return new RawValueInvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
-          }
           if (!predicateEvaluator.isDictionaryBased()) {
             return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
           }
@@ -228,8 +224,7 @@ public class FilterOperatorUtils {
             return PrioritizedFilterOperator.HIGH_PRIORITY;
           }
           if (filterOperator instanceof BitmapBasedFilterOperator
-              || filterOperator instanceof InvertedIndexFilterOperator
-              || filterOperator instanceof RawValueInvertedIndexFilterOperator) {
+              || filterOperator instanceof InvertedIndexFilterOperator) {
             return PrioritizedFilterOperator.MEDIUM_PRIORITY;
           }
           if (filterOperator instanceof RangeIndexBasedFilterOperator

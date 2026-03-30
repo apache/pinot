@@ -312,9 +312,29 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           columnOperationsMap.put(column, Collections.singletonList(Operation.DISABLE_DICTIONARY));
         }
       } else if (!existingHasDict && newIsDict) {
-        // Existing column is raw forward without a shared dictionary. New config requires a dictionary, but the
-        // chosen forward encoding remains independent and is resolved in the operation handler.
-        columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
+        // Existing column is raw forward without a shared dictionary. New config requires a dictionary.
+        // Before enabling the dictionary, apply the same optimize-dictionary heuristics that segment creation
+        // uses (via DictionaryIndexType.ignoreDictionaryOverride) so that reload does not force a dictionary
+        // onto a high-cardinality column that segment creation would have kept raw.
+        ColumnMetadata colMeta = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+        if (fieldSpec != null && colMeta != null && !colMeta.isSorted()) {
+          boolean keepDict = DictionaryIndexType.ignoreDictionaryOverride(
+              _tableConfig.getIndexingConfig().isOptimizeDictionary(),
+              _tableConfig.getIndexingConfig().isOptimizeDictionaryForMetrics(),
+              _tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(),
+              _tableConfig.getIndexingConfig().getNoDictionaryCardinalityRatioThreshold(),
+              fieldSpec, newConf, colMeta.getCardinality(), colMeta.getTotalDocs());
+          if (keepDict) {
+            columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
+          } else {
+            LOGGER.info("Skipping ENABLE_DICTIONARY for column: {} of segment: {} because optimize-dictionary "
+                + "heuristics determined dictionary is not beneficial (cardinality={}, totalDocs={})",
+                column, segmentName, colMeta.getCardinality(), colMeta.getTotalDocs());
+          }
+        } else {
+          columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
+        }
       } else if (existingHasDict && !newIsDict) {
         // Existing column has dictionary. New config for the column is RAW.
         if (shouldDisableDictionary(column, _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column))) {

@@ -132,7 +132,6 @@ public class RawForwardIndexInvertedIndexTest extends CustomDataQueryClusterInte
     return List.of(RAW_DIMENSION);
   }
 
-  @Override
   protected boolean isCreateInvertedIndexDuringSegmentGeneration() {
     return true;
   }

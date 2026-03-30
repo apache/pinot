@@ -118,6 +118,20 @@ public class ForwardIndexConfig extends IndexConfig {
         forwardIndexEncoding);
   }
 
+  /**
+   * @deprecated Use the constructor that also accepts {@code forwardIndexEncoding}.
+   */
+  @Deprecated
+  public ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
+      @Nullable ChunkCompressionType chunkCompressionType, @Nullable DictIdCompressionType dictIdCompressionType,
+      @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
+      @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk,
+      @Nullable Map<String, Object> configs) {
+    this(disabled, compressionCodec, chunkCompressionType, dictIdCompressionType, deriveNumDocsPerChunk,
+        rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk, configs,
+        IndexCreationContext.ForwardIndexEncoding.DICTIONARY);
+  }
+
   private ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
       @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
       @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk,
