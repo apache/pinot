@@ -131,7 +131,7 @@ public class DictionaryIndexConfig extends IndexConfig {
       }
       IndexConfig indexConfig = fieldIndexConfigs.getConfig(indexType);
       if (indexConfig != null && indexConfig.isEnabled()
-          && indexType.requiresDictionary(fieldSpec, fieldIndexConfigs)) {
+          && indexType.requiresDictionary(fieldSpec, indexConfig)) {
         return true;
       }
     }
@@ -150,7 +150,7 @@ public class DictionaryIndexConfig extends IndexConfig {
       }
       IndexConfig indexConfig = fieldIndexConfigs.getConfig(indexType);
       if (indexConfig != null && indexConfig.isEnabled()
-          && indexType.requiresDictionary(fieldSpec, fieldIndexConfigs)) {
+          && indexType.requiresDictionary(fieldSpec, indexConfig)) {
         indexTypes.add(indexType);
       }
     }

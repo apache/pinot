@@ -182,7 +182,7 @@ public class FieldIndexConfigsUtilTest {
     }
 
     @Override
-    public boolean requiresDictionary(FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs) {
+    public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
       return true;
     }
 

@@ -83,8 +83,7 @@ public class DataFetcher implements AutoCloseable {
         "Forward index disabled for column: %s, cannot create DataFetcher!", column);
     Dictionary dictionary = dataSource.getDictionary();
     boolean useDictionary = forwardIndexReader.isDictionaryEncoded() && dictionary != null;
-    ColumnValueReader columnValueReader =
-        new ColumnValueReader(forwardIndexReader, dictionary, useDictionary, forwardIndexReader.isDictionaryEncoded());
+    ColumnValueReader columnValueReader = new ColumnValueReader(forwardIndexReader, dictionary, useDictionary);
     _columnValueReaderMap.put(column, columnValueReader);
   }
 
@@ -317,21 +316,14 @@ public class DataFetcher implements AutoCloseable {
     final DataType _storedType;
     final boolean _singleValue;
     final boolean _useDictionary;
-    final boolean _forwardIsDictionaryEncoded;
 
     boolean _readerContextCreated;
     ForwardIndexReaderContext _readerContext;
 
-    ColumnValueReader(ForwardIndexReader reader, @Nullable Dictionary dictionary, boolean useDictionary,
-        boolean forwardIsDictionaryEncoded) {
+    ColumnValueReader(ForwardIndexReader reader, @Nullable Dictionary dictionary, boolean useDictionary) {
       _reader = reader;
       _dictionary = dictionary;
       _useDictionary = useDictionary;
-      _forwardIsDictionaryEncoded = forwardIsDictionaryEncoded;
-      if (_useDictionary) {
-        Preconditions.checkState(_dictionary != null,
-            "Dictionary must be present for dictionary-encoded forward index");
-      }
       _storedType = reader.getStoredType();
       _singleValue = reader.isSingleValue();
     }
@@ -347,7 +339,7 @@ public class DataFetcher implements AutoCloseable {
     void readDictIds(int[] docIds, int length, int[] dictIdBuffer) {
       Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
-      if (_forwardIsDictionaryEncoded) {
+      if (_useDictionary) {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
       } else {
         Preconditions.checkState(_dictionary != null, "Dictionary must be present for raw forward index");
@@ -504,7 +496,7 @@ public class DataFetcher implements AutoCloseable {
     void readDictIdsMV(int[] docIds, int length, int[][] dictIdsBuffer) {
       Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
-      if (_forwardIsDictionaryEncoded) {
+      if (_useDictionary) {
         for (int i = 0; i < length; i++) {
           int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
           dictIdsBuffer[i] = Arrays.copyOfRange(_reusableMVDictIds, 0, numValues);

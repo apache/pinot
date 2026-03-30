@@ -168,10 +168,15 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     return INDEX_DISPLAY_NAME;
   }
 
+  /**
+   * Overrides the default deserializer to use {@code withFallbackAlternative} instead of {@code
+   * withExclusiveAlternative}. The default exclusive mode errors when the same column appears in both the new
+   * {@code indexes.forward} config and the legacy {@code fieldConfigList}. Forward indexes have many legacy
+   * configuration paths, so fallback mode is used to let both styles coexist: the new syntax takes precedence,
+   * and legacy is consulted only when the new syntax doesn't provide a config for a column.
+   */
   @Override
   protected ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
-    // Forward index configs can be specified via indexes.* or legacy field config properties; allow fallback so both
-    // styles can coexist across columns without treating them as mutually exclusive.
     ColumnConfigDeserializer<ForwardIndexConfig> fromIndexes =
         IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
     ColumnConfigDeserializer<ForwardIndexConfig> legacy = createDeserializerForLegacyConfigs();
@@ -215,6 +220,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig) {
     ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder();
     builder.withCompressionCodec(fieldConfig.getCompressionCodec());
+    // Bug fix: propagate RAW encoding from legacy FieldConfig so that downstream code sees the correct encoding.
+    // Without this, columns configured as RAW via fieldConfigList would lose that information during deserialization.
     builder.withForwardIndexEncoding(fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
         ? IndexCreationContext.ForwardIndexEncoding.RAW
         : IndexCreationContext.ForwardIndexEncoding.DICTIONARY);
@@ -251,7 +258,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   /**
-   * Returns forward index file extensions applicable to the column.
+   * Returns forward index file extensions applicable to the column. Uses {@code isForwardIndexDictionaryEncoded()}
+   * instead of {@code hasDictionary()} to correctly handle columns that have a shared dictionary but a raw forward
+   * index — such columns should use the raw extension, not the dictionary-encoded one.
    */
   public List<String> getFileExtension(ColumnMetadata columnMetadata) {
     if (columnMetadata.isForwardIndexDictionaryEncoded()) {

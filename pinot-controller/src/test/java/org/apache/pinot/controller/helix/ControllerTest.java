@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -799,39 +798,15 @@ public class ControllerTest {
   }
 
   public TableConfig getOfflineTableConfig(String tableName) {
-    if (_helixResourceManager != null) {
-      TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
-      assertNotNull(offlineTableConfig);
-      return offlineTableConfig;
-    }
-    Preconditions.checkState(_controllerRequestClient != null,
-        "Controller request client is not initialized; controller may not be running");
-    // Fall back to HTTP access when HelixResourceManager isn't available (e.g. external controller in tests).
-    try {
-      TableConfig offlineTableConfig = getControllerRequestClient().getTableConfig(tableName, TableType.OFFLINE);
-      assertNotNull(offlineTableConfig);
-      return offlineTableConfig;
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
+    assertNotNull(offlineTableConfig);
+    return offlineTableConfig;
   }
 
   public TableConfig getRealtimeTableConfig(String tableName) {
-    if (_helixResourceManager != null) {
-      TableConfig realtimeTableConfig = _helixResourceManager.getRealtimeTableConfig(tableName);
-      assertNotNull(realtimeTableConfig);
-      return realtimeTableConfig;
-    }
-    Preconditions.checkState(_controllerRequestClient != null,
-        "Controller request client is not initialized; controller may not be running");
-    // Fall back to HTTP access when HelixResourceManager isn't available (e.g. external controller in tests).
-    try {
-      TableConfig realtimeTableConfig = getControllerRequestClient().getTableConfig(tableName, TableType.REALTIME);
-      assertNotNull(realtimeTableConfig);
-      return realtimeTableConfig;
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    TableConfig realtimeTableConfig = _helixResourceManager.getRealtimeTableConfig(tableName);
+    assertNotNull(realtimeTableConfig);
+    return realtimeTableConfig;
   }
 
   public void dropOfflineTable(String tableName)

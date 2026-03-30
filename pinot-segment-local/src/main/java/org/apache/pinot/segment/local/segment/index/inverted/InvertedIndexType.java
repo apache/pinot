@@ -211,7 +211,7 @@ public class InvertedIndexType
   }
 
   @Override
-  public boolean requiresDictionary(FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs) {
-    return fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled();
+  public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
+    return true;
   }
 }

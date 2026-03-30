@@ -121,9 +121,11 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
 
   /**
    * Indicates whether this index requires a dictionary to function for the provided column.
-   * FieldIndexConfigs is provided so index types can consult related per-column index settings when deciding.
+   *
+   * @param fieldSpec the column's field spec
+   * @param indexConfig the per-column config for this specific index type
    */
-  default boolean requiresDictionary(FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs) {
+  default boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
     return false;
   }
 
