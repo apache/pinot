@@ -322,7 +322,7 @@ public abstract class AbstractJdbcDriverAuthTest {
 
   /**
    * Tests that {@code headers.Authorization} takes precedence over URL credentials.
-   * Per the Javadoc: (header.Authorization property) > (username and password in URL)
+   * Per the Javadoc: (headers.Authorization property) > (username and password in URL)
    */
   @Test
   public void testHeadersAuthOverridesUrlCredentials()
