@@ -178,6 +178,8 @@
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.4.0</h3.version>
+    <ipaddress.version>5.6.2</ipaddress.version>
+    <openhft.chronicle-bom.version>2.27ea100</openhft.chronicle-bom.version>
     <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
@@ -189,12 +191,26 @@
     <janino.version>3.1.12</janino.version>
     <ayza.version>10.0.4</ayza.version>
     <jbcrypt.version>0.4</jbcrypt.version>
-    <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
     <scala-xml.version>2.4.0</scala-xml.version>
-    <fmpp.version>0.9.16</fmpp.version>
-    <localstack-utils.version>0.2.23</localstack-utils.version>
+    <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
-    <enforcer-api.version>3.6.2</enforcer-api.version>
+    <localstack-utils.version>0.2.23</localstack-utils.version>
+    <checker-qual.version>3.54.0</checker-qual.version>
+    <groovy-all.version>2.4.21</groovy-all.version>
+    <xml-apis.version>2.0.2</xml-apis.version>
+    <roaring-bitmap.version>1.6.13</roaring-bitmap.version>
+    <prometheus.jmx-exporter.version>1.5.0</prometheus.jmx-exporter.version>
+    <prometheus.metrics.version>1.5.1</prometheus.metrics.version>
+    <fastutil.version>8.5.18</fastutil.version>
+    <disruptor.version>4.0.0</disruptor.version>
+    <snakeyaml.version>2.6</snakeyaml.version>
+    <hadoop-shaded-protobuf_3_25.version>1.5.0</hadoop-shaded-protobuf_3_25.version>
+    <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
+    <datasketches-java.version>6.2.0</datasketches-java.version>
+    <t-digest.version>3.2</t-digest.version>
+    <picocli.version>4.7.7</picocli.version>
+    <tyrus-standalone-client.version>2.2.2</tyrus-standalone-client.version>
+    <jopt-simple.version>5.0.4</jopt-simple.version>
 
     <spark3.version>3.5.8</spark3.version>
     <kafka3.version>3.9.2</kafka3.version>
@@ -254,6 +270,16 @@
     <scala-2.13.version>2.13.18</scala-2.13.version>
     <scala.compat.version>2.12</scala.compat.version>
 
+    <!-- For Dependency Verifier module -->
+    <enforcer-api.version>3.6.2</enforcer-api.version>
+    <maven.version>3.9.14</maven.version>
+    <jdom2.version>2.0.6.1</jdom2.version>
+    <plexus-utils.version>4.0.3</plexus-utils.version>
+    <plexus-xml.version>3.0.2</plexus-xml.version>
+
+    <!-- For maven-antrun-plugin -->
+    <fmpp.version>0.9.16</fmpp.version>
+
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.1</kerby.version>
     <jline.version>4.0.9</jline.version>
@@ -282,28 +308,6 @@
     <ivy.version>2.5.3</ivy.version>
     <c3p0.version>0.12.0</c3p0.version>
     <mchange-commons-java.version>0.4.0</mchange-commons-java.version>
-    <checker-qual.version>3.54.0</checker-qual.version>
-    <groovy-all.version>2.4.21</groovy-all.version>
-    <xml-apis.version>2.0.2</xml-apis.version>
-    <roaring-bitmap.version>1.6.13</roaring-bitmap.version>
-    <prometheus.jmx-exporter.version>1.5.0</prometheus.jmx-exporter.version>
-    <prometheus.metrics.version>1.5.1</prometheus.metrics.version>
-    <fastutil.version>8.5.18</fastutil.version>
-    <disruptor.version>4.0.0</disruptor.version>
-    <snakeyaml.version>2.6</snakeyaml.version>
-    <hadoop-shaded-protobuf_3_25.version>1.5.0</hadoop-shaded-protobuf_3_25.version>
-    <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
-    <datasketches-java.version>6.2.0</datasketches-java.version>
-    <t-digest.version>3.2</t-digest.version>
-    <picocli.version>4.7.7</picocli.version>
-    <tyrus-standalone-client.version>2.2.2</tyrus-standalone-client.version>
-    <jopt-simple.version>5.0.4</jopt-simple.version>
-    <ipaddress.version>5.6.2</ipaddress.version>
-    <openhft.chronicle-bom.version>2.27ea100</openhft.chronicle-bom.version>
-    <jdom2.version>2.0.6.1</jdom2.version>
-    <maven.version>3.9.14</maven.version>
-    <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
-    <plexus-utils.version>3.6.0</plexus-utils.version>
     <animal-sniffer-annotations.version>1.27</animal-sniffer-annotations.version>
 
     <!-- Test Libraries -->
@@ -316,9 +320,9 @@
     <jnr-posix.version>3.1.21</jnr-posix.version>
     <scalatest.version>3.2.20</scalatest.version>
     <assertj.version>3.27.7</assertj.version>
+
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
-
     <japicmp.skip>true</japicmp.skip>
   </properties>
 
@@ -1730,6 +1734,16 @@
         <artifactId>plexus-classworlds</artifactId>
         <version>${plexus-classworlds.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.github.os72</groupId>
+        <artifactId>protobuf-dynamic</artifactId>
+        <version>${protobuf-dynamic.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>cloud.localstack</groupId>
+        <artifactId>localstack-utils</artifactId>
+        <version>${localstack-utils.version}</version>
+      </dependency>
 
       <!-- AWS SDK -->
       <dependency>
@@ -1824,6 +1838,7 @@
         <scope>import</scope>
       </dependency>
 
+      <!-- Flink -->
       <dependency>
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-clients</artifactId>
@@ -1877,6 +1892,34 @@
         <groupId>org.apache.lucene</groupId>
         <artifactId>lucene-analysis-common</artifactId>
         <version>${lucene.version}</version>
+      </dependency>
+
+      <!-- For Dependency Verifier module -->
+      <dependency>
+        <groupId>org.apache.maven.enforcer</groupId>
+        <artifactId>enforcer-api</artifactId>
+        <version>${enforcer-api.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-core</artifactId>
+        <version>${maven.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jdom</groupId>
+        <artifactId>jdom2</artifactId>
+        <version>${jdom2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.plexus</groupId>
+        <artifactId>plexus-utils</artifactId>
+        <version>${plexus-utils.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.plexus</groupId>
+        <artifactId>plexus-xml</artifactId>
+        <version>${plexus-xml.version}</version>
       </dependency>
 
       <!-- Solve conflicts and vulnerabilities -->
@@ -2097,15 +2140,11 @@
         <artifactId>mchange-commons-java</artifactId>
         <version>${mchange-commons-java.version}</version>
       </dependency>
+      <!-- Used by grpc-netty-shade and google-cloud-storage -->
       <dependency>
-        <groupId>com.github.os72</groupId>
-        <artifactId>protobuf-dynamic</artifactId>
-        <version>${protobuf-dynamic.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>cloud.localstack</groupId>
-        <artifactId>localstack-utils</artifactId>
-        <version>${localstack-utils.version}</version>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>animal-sniffer-annotations</artifactId>
+        <version>${animal-sniffer-annotations.version}</version>
       </dependency>
 
       <!-- Test Libraries -->
@@ -2174,43 +2213,6 @@
         <version>${assertj.version}</version>
         <type>pom</type>
         <scope>import</scope>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.maven.enforcer</groupId>
-        <artifactId>enforcer-api</artifactId>
-        <version>${enforcer-api.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.maven</groupId>
-        <artifactId>maven-core</artifactId>
-        <version>${maven.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.maven</groupId>
-        <artifactId>maven-plugin-api</artifactId>
-        <version>${maven.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.jdom</groupId>
-        <artifactId>jdom2</artifactId>
-        <version>${jdom2.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.plexus</groupId>
-        <artifactId>plexus-component-annotations</artifactId>
-        <version>${plexus-component-annotations.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.plexus</groupId>
-        <artifactId>plexus-utils</artifactId>
-        <version>${plexus-utils.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>animal-sniffer-annotations</artifactId>
-        <version>${animal-sniffer-annotations.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
