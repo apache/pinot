@@ -29,12 +29,12 @@ This package contains code for Pinot Controller UI.
 ```shell
 cd pinot-controller/src/main/resources
 ```
-3. Switch to node `v20.11.0`.
-Use nvm to switch to the required Node.js version used by the `frontend-maven-plugin` in `pinot-controller/pom.xml`. If you don’t have nvm, install it from [here](https://github.com/nvm-sh/nvm).
+3. Switch to Node `v24.14.1`.
+Use nvm to switch to the required Node.js version used by the `frontend-maven-plugin` in `pinot-controller/pom.xml`. This release line ships with npm `11.11.0`. If you don’t have nvm, install it from [here](https://github.com/nvm-sh/nvm).
 ```shell
-nvm use 20.11.0
+nvm use 24.14.1
 ```
-4. Install required packages. Make sure you are using node `v20.11.0`.
+4. Install required packages. Make sure you are using Node `v24.14.1`.
 ```shell
 npm ci
 ```
