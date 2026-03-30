@@ -149,7 +149,7 @@ public interface IndexCreationContext {
     private int _totalNumberOfEntries;
     private int _totalDocs;
     private boolean _hasDictionary = true;
-    private ForwardIndexEncoding _forwardIndexEncoding = ForwardIndexEncoding.RAW;
+    private ForwardIndexEncoding _forwardIndexEncoding = ForwardIndexEncoding.DICTIONARY;
     private Comparable<?> _minValue;
     private Comparable<?> _maxValue;
     private boolean _forwardIndexDisabled;
