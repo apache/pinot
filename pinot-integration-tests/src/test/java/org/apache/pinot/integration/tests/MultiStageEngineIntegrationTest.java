@@ -2127,6 +2127,36 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         .hasErrorCode(errorCode);
   }
 
+  /// Verifies that the streaming group-by feature produces correct results when the query option
+  /// streamingGroupByFlushThreshold is set. Compares streaming results against a baseline query without the option.
+  @Test
+  public void testStreamingGroupBy()
+      throws Exception {
+    // Baseline: normal group-by query
+    String baseQuery = "SELECT AirlineID, SUM(Distance), COUNT(*) FROM mytable GROUP BY AirlineID ORDER BY AirlineID";
+    JsonNode baselineResponse = postQuery(baseQuery);
+    JsonNode baselineRows = baselineResponse.get("resultTable").get("rows");
+    assertTrue(baselineRows.size() > 0, "Baseline query should return results");
+
+    // Streaming group-by with a low flush threshold to force multiple flushes
+    String streamingQuery = "SET streamingGroupByFlushThreshold = 5; "
+        + "SELECT AirlineID, SUM(Distance), COUNT(*) FROM mytable GROUP BY AirlineID ORDER BY AirlineID";
+    JsonNode streamingResponse = postQuery(streamingQuery);
+    JsonNode streamingRows = streamingResponse.get("resultTable").get("rows");
+
+    // Results should be identical
+    assertEquals(streamingRows.size(), baselineRows.size(),
+        "Streaming group-by should return same number of groups as baseline");
+    for (int i = 0; i < baselineRows.size(); i++) {
+      assertEquals(streamingRows.get(i).get(0).asLong(), baselineRows.get(i).get(0).asLong(),
+          "AirlineID mismatch at row " + i);
+      assertEquals(streamingRows.get(i).get(1).asDouble(), baselineRows.get(i).get(1).asDouble(), 0.01,
+          "SUM(Distance) mismatch at row " + i);
+      assertEquals(streamingRows.get(i).get(2).asLong(), baselineRows.get(i).get(2).asLong(),
+          "COUNT(*) mismatch at row " + i);
+    }
+  }
+
   private JsonNode getQueryResultForDBTest(String column, String tableName, @Nullable String database,
       Map<String, String> headers)
       throws Exception {
