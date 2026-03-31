@@ -88,7 +88,9 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
   }
 
   private String sourceName(int topicIndex) {
-    return "TOPIC_" + topicIndex;
+    int maxIndex = getNumTopics() - 1;
+    int width = String.valueOf(maxIndex).length();
+    return String.format("TOPIC_%0" + width + "d", topicIndex);
   }
 
   private int valueRangeStart(int topicIndex) {
@@ -260,17 +262,11 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
         Duration.ofSeconds(12));
 
     for (int i = 0; i < numTopics; i++) {
-      pushCsvRecordsIntoKafka(generateRecords(i), topicName(i));
+      pushCsvIntoKafka(generateRecords(i), topicName(i));
     }
 
     waitForAllDocsLoaded(600_000L);
   }
-
-  private void pushCsvRecordsIntoKafka(List<String> csvRecords, String topic)
-      throws Exception {
-    ClusterIntegrationTestUtils.pushCsvIntoKafka(csvRecords, "localhost:" + getKafkaPort(), topic, null, false);
-  }
-
   private int getNumConsumingPartitions(String tableNameWithType) {
     IdealState idealState = _controllerStarter.getHelixResourceManager().getTableIdealState(tableNameWithType);
     if (idealState == null) {
@@ -339,10 +335,10 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
       JsonNode response = postQuery(
           "SELECT MIN(value), MAX(value) FROM " + TABLE_NAME + " WHERE source = '" + source + "'");
       JsonNode row = response.get("resultTable").get("rows").get(0);
-      assertTrue(row.get(0).asInt() >= expectedMin,
-          source + " min value should be >= " + expectedMin + " but was " + row.get(0).asInt());
-      assertTrue(row.get(1).asInt() <= expectedMax,
-          source + " max value should be <= " + expectedMax + " but was " + row.get(1).asInt());
+      assertEquals(row.get(0).asInt(), expectedMin,
+          source + " min value should be " + expectedMin + " but was " + row.get(0).asInt());
+      assertEquals(row.get(1).asInt(), expectedMax,
+          source + " max value should be " + expectedMax + " but was " + row.get(1).asInt());
     }
   }
 
@@ -412,7 +408,7 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
     for (String segmentName : idealState.getPartitionSet()) {
       if (LLCSegmentName.isLLCSegment(segmentName)) {
         int pgId = new LLCSegmentName(segmentName).getPartitionGroupId();
-        topicIndicesSeen.add(pgId / IngestionConfigUtils.PARTITION_PADDING_OFFSET);
+        topicIndicesSeen.add(IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(pgId));
       }
     }
     for (int i = 0; i < numTopics; i++) {
