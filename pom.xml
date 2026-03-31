@@ -275,7 +275,7 @@
     <maven.version>3.9.14</maven.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <plexus-utils.version>4.0.3</plexus-utils.version>
-    <plexus-xml.version>4.1.1</plexus-xml.version>
+    <plexus-xml.version>3.0.2</plexus-xml.version>
 
     <!-- For maven-antrun-plugin -->
     <fmpp.version>0.9.16</fmpp.version>
