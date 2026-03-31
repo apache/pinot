@@ -76,6 +76,34 @@ public class ThreadSafeMutableRoaringBitmap {
     return _mutableRoaringBitmap.getCardinality();
   }
 
+  /**
+   * Returns a consistent point-in-time snapshot containing both the serialized bytes and
+   * cardinality captured under a single lock.
+   */
+  public synchronized DocIdSnapshot toSnapshot() {
+    ByteBuffer buf = ByteBuffer.allocate(_mutableRoaringBitmap.serializedSizeInBytes());
+    _mutableRoaringBitmap.serialize(buf);
+    return new DocIdSnapshot(buf.array(), _mutableRoaringBitmap.getCardinality());
+  }
+
+  public static final class DocIdSnapshot {
+    private final byte[] _bytes;
+    private final int _cardinality;
+
+    public DocIdSnapshot(byte[] bytes, int cardinality) {
+      _bytes = bytes;
+      _cardinality = cardinality;
+    }
+
+    public byte[] getBytes() {
+      return _bytes;
+    }
+
+    public int getCardinality() {
+      return _cardinality;
+    }
+  }
+
   public synchronized boolean isEmpty() {
     return _mutableRoaringBitmap.isEmpty();
   }

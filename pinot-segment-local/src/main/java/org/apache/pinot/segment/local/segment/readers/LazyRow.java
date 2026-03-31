@@ -46,6 +46,7 @@ public class LazyRow {
   }
 
   public void init(IndexSegment segment, int docId) {
+    clear();
     _segment = segment;
     _docId = docId;
   }

@@ -150,7 +150,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     return null;
   }
 
-  public void persistDocIdsSnapshot(String fileName, ThreadSafeMutableRoaringBitmap docIds) {
+  public int persistDocIdsSnapshot(String fileName, ThreadSafeMutableRoaringBitmap docIds) {
     File docIdsSnapshotFile = getSnapshotFile(fileName);
     try {
       File tmpFile =
@@ -159,17 +159,18 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         LOGGER.warn("Previous snapshot was not taken cleanly. Remove tmp file: {}", tmpFile);
         FileUtils.deleteQuietly(tmpFile);
       }
-      byte[] bytes = docIds.toBytes();
-      int cardinality = docIds.getCardinality();
+      ThreadSafeMutableRoaringBitmap.DocIdSnapshot snapshot = docIds.toSnapshot();
       try (FileOutputStream fos = new FileOutputStream(tmpFile)) {
-        fos.write(bytes);
+        fos.write(snapshot.getBytes());
       }
       Preconditions.checkState(tmpFile.renameTo(docIdsSnapshotFile),
           "Failed to rename tmp snapshot file: %s to snapshot file: %s", tmpFile, docIdsSnapshotFile);
-      LOGGER.info("Persisted docIds for segment: {} with: {}", getSegmentName(), cardinality);
+      LOGGER.info("Persisted docIds for segment: {} with: {}", getSegmentName(), snapshot.getCardinality());
+      return snapshot.getCardinality();
     } catch (Exception e) {
       LOGGER.warn("Caught exception while persisting docIds to snapshot file: {}, skipping",
           docIdsSnapshotFile, e);
+      return 0;
     }
   }
 
