@@ -118,18 +118,9 @@ public class FSTIndexHandler extends BaseIndexHandler {
     for (String column : legacyNativeColumns) {
       LOGGER.info("Removing legacy native FST index from segment: {}, column: {}", segmentName, column);
       segmentWriter.removeIndex(column, StandardIndexes.fst());
-      if (columnsToAddIdx.remove(column)) {
-        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-        if (shouldCreateFSTIndex(columnMetadata)) {
-          createFSTIndexForColumn(segmentWriter, columnMetadata);
-        }
-      }
     }
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.fst());
     for (String column : existingColumns) {
-      if (legacyNativeColumns.contains(column)) {
-        continue;
-      }
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing FST index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.fst());

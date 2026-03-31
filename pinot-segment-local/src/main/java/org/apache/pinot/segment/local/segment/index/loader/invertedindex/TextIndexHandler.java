@@ -133,18 +133,10 @@ public class TextIndexHandler extends BaseIndexHandler {
     File segmentDirectory =
         SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
-    Set<String> recreatedLegacyNativeColumns = new HashSet<>();
     for (String column : getColumnsWithLegacyNativeTextIndex()) {
       LOGGER.info("Removing legacy native text index file from segment: {}, column: {}", segmentName, column);
       deleteLegacyNativeTextIndexFiles(indexDir, segmentDirectory, column);
       segmentWriter.removeIndex(column, StandardIndexes.text());
-      if (columnsToAddIdx.remove(column)) {
-        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-        if (shouldCreateTextIndex(columnMetadata)) {
-          createTextIndexForColumn(segmentWriter, columnMetadata);
-          recreatedLegacyNativeColumns.add(column);
-        }
-      }
     }
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
     // Handle configuration changes for existing indexes
@@ -162,9 +154,6 @@ public class TextIndexHandler extends BaseIndexHandler {
       }
     }
     for (String column : existingColumns) {
-      if (recreatedLegacyNativeColumns.contains(column)) {
-        continue;
-      }
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing text index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.text());
