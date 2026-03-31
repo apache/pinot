@@ -965,25 +965,32 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           segmentsWithoutSnapshot.add(immutableSegment);
           continue;
         }
+        boolean snapshotPersisted = false;
         ThreadSafeMutableRoaringBitmap validDocIdsBitMap = immutableSegment.getValidDocIds();
-        int validCardinality = 0;
         if (validDocIdsBitMap != null) {
-          validCardinality =
+          int validCardinality =
               immutableSegment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsBitMap);
-          numPrimaryKeysInSnapshot += validCardinality;
+          if (validCardinality > 0) {
+            numPrimaryKeysInSnapshot += validCardinality;
+            snapshotPersisted = true;
+          }
         }
-        int queryableCardinality = 0;
         if (_deleteRecordColumn != null) {
           ThreadSafeMutableRoaringBitmap queryableDocIdsBitMap = immutableSegment.getQueryableDocIds();
           if (queryableDocIdsBitMap != null) {
-            queryableCardinality =
+            int queryableCardinality =
                 immutableSegment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME,
                     queryableDocIdsBitMap);
-            numQueryableDocIdsInSnapshot += queryableCardinality;
+            if (queryableCardinality > 0) {
+              numQueryableDocIdsInSnapshot += queryableCardinality;
+              snapshotPersisted = true;
+            }
           }
         }
-        _updatedSegmentsSinceLastSnapshot.remove(segment);
-        numImmutableSegments++;
+        if (snapshotPersisted) {
+          _updatedSegmentsSinceLastSnapshot.remove(segment);
+          numImmutableSegments++;
+        }
       } catch (Exception e) {
         _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
         isSegmentSkipped = true;
@@ -1006,24 +1013,33 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           continue;
         }
         try {
+          boolean snapshotPersisted = false;
           ThreadSafeMutableRoaringBitmap segmentValidDocIdsBitMap = segment.getValidDocIds();
           // segment that is out of TTL with no valid docId snapshot can be skipped while taking snapshot
           // i.e such segments will have null bitmap
           if (segmentValidDocIdsBitMap != null) {
             int validCardinality =
                 segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, segmentValidDocIdsBitMap);
-            numPrimaryKeysInSnapshot += validCardinality;
+            if (validCardinality > 0) {
+              numPrimaryKeysInSnapshot += validCardinality;
+              snapshotPersisted = true;
+            }
           }
           if (_deleteRecordColumn != null) {
             ThreadSafeMutableRoaringBitmap segmentQueryableDocIdsBitMap = segment.getQueryableDocIds();
             if (segmentQueryableDocIdsBitMap != null) {
               int queryableCardinality = segment.persistDocIdsSnapshot(
                   V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, segmentQueryableDocIdsBitMap);
-              numQueryableDocIdsInSnapshot += queryableCardinality;
+              if (queryableCardinality > 0) {
+                numQueryableDocIdsInSnapshot += queryableCardinality;
+                snapshotPersisted = true;
+              }
             }
           }
-          _updatedSegmentsSinceLastSnapshot.remove(segment);
-          numImmutableSegments++;
+          if (snapshotPersisted) {
+            _updatedSegmentsSinceLastSnapshot.remove(segment);
+            numImmutableSegments++;
+          }
         } catch (Exception e) {
           _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
         } finally {
