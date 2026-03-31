@@ -261,7 +261,8 @@ public class PrioritySchedulerTest {
       return create(new PinotConfiguration());
     }
 
-    ResourceManager getResourceManager() {
+    @Override
+    public ResourceManager getResourceManager() {
       return _resourceManager;
     }
 
