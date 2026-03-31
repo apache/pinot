@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,9 +28,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -38,20 +39,18 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -66,7 +65,7 @@ import static org.testng.Assert.assertNotNull;
  * <p>Queries then verify that every topic's data is present and correctly isolated.
  * Subclasses can override {@link #getNumTopics()} to test with a different number of topics.
  */
-public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class MultiTopicRealtimeClusterIntegrationTest extends CustomDataQueryClusterIntegrationTest {
   private static final String TABLE_NAME = "multiTopicTable";
   private static final String TOPIC_PREFIX = "multiTopicTest_topic";
   private static final int NUM_PARTITIONS_PER_TOPIC = 2;
@@ -102,12 +101,12 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
   }
 
   @Override
-  protected String getTableName() {
+  public String getTableName() {
     return TABLE_NAME;
   }
 
   @Override
-  protected String getKafkaTopic() {
+  public String getKafkaTopic() {
     return topicName(0);
   }
 
@@ -122,8 +121,8 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
   }
 
   @Override
-  protected String getTimeColumnName() {
-    return "ts";
+  public boolean isRealtimeTable() {
+    return true;
   }
 
   @Override
@@ -137,27 +136,7 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
   }
 
   @Override
-  protected List<String> getNoDictionaryColumns() {
-    return List.of();
-  }
-
-  @Override
-  protected List<String> getRangeIndexColumns() {
-    return List.of();
-  }
-
-  @Override
-  protected List<String> getBloomFilterColumns() {
-    return List.of();
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, false);
-  }
-
-  @Override
-  protected Schema createSchema() {
+  public Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("id", FieldSpec.DataType.INT)
         .addSingleValueDimension("name", FieldSpec.DataType.STRING)
@@ -168,6 +147,10 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
   }
 
   @Override
+  public List<File> createAvroFiles() {
+    return List.of();
+  }
+
   protected IngestionConfig getIngestionConfig() {
     int numTopics = getNumTopics();
     List<Map<String, String>> streamConfigMaps = new ArrayList<>(numTopics);
@@ -179,18 +162,13 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
     return ingestionConfig;
   }
 
-  @Override
-  protected Map<String, String> getStreamConfigs() {
-    return null;
-  }
-
   private Map<String, String> buildStreamConfigMap(String topicName) {
     String streamType = "kafka";
     Map<String, String> map = new HashMap<>();
     map.put(StreamConfigProperties.STREAM_TYPE, streamType);
     map.put(KafkaStreamConfigProperties.constructStreamProperty(
             KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
-        getKafkaBrokerList());
+        getSharedKafkaBrokerList());
     map.put(StreamConfigProperties.constructStreamProperty(streamType,
         StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), getStreamConsumerFactoryClassName());
     map.put(StreamConfigProperties.constructStreamProperty(streamType,
@@ -222,21 +200,17 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
     return records;
   }
 
+  @Override
   @BeforeClass
   public void setUp()
       throws Exception {
+    initControllerRequestURLBuilder();
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     int numTopics = getNumTopics();
-
-    startZk();
-    startKafkaWithoutTopic();
     for (int i = 0; i < numTopics; i++) {
-      createKafkaTopic(topicName(i), NUM_PARTITIONS_PER_TOPIC);
+      createSharedKafkaTopic(topicName(i), NUM_PARTITIONS_PER_TOPIC);
     }
-    startController();
-    startBroker();
-    startServer();
 
     Schema schema = createSchema();
     addSchema(schema);
@@ -262,13 +236,15 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
         Duration.ofSeconds(12));
 
     for (int i = 0; i < numTopics; i++) {
-      pushCsvIntoKafka(generateRecords(i), topicName(i));
+      ClusterIntegrationTestUtils.pushCsvIntoKafka(generateRecords(i),
+          getSharedKafkaBrokerList(), topicName(i), null, injectTombstones());
     }
 
     waitForAllDocsLoaded(600_000L);
   }
+
   private int getNumConsumingPartitions(String tableNameWithType) {
-    IdealState idealState = _controllerStarter.getHelixResourceManager().getTableIdealState(tableNameWithType);
+    IdealState idealState = getSharedHelixResourceManager().getTableIdealState(tableNameWithType);
     if (idealState == null) {
       return 0;
     }
@@ -401,7 +377,7 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
   public void testSegmentsFromAllTopics() {
     int numTopics = getNumTopics();
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
-    IdealState idealState = _controllerStarter.getHelixResourceManager().getTableIdealState(realtimeTableName);
+    IdealState idealState = getSharedHelixResourceManager().getTableIdealState(realtimeTableName);
     assertNotNull(idealState);
 
     Set<Integer> topicIndicesSeen = new HashSet<>();
@@ -429,20 +405,5 @@ public class MultiTopicRealtimeClusterIntegrationTest extends BaseClusterIntegra
     for (int i = 0; i < numTopics; i++) {
       assertEquals(rows.get(i).get(0).asText(), sourceName(i));
     }
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
-    dropRealtimeTable(TABLE_NAME);
-    waitForTableDataManagerRemoved(realtimeTableName);
-    waitForEVToDisappear(realtimeTableName);
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
   }
 }

@@ -323,6 +323,20 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     return getSharedControllerStarter().getHelixResourceManager();
   }
 
+  /**
+   * Returns the Kafka broker list from the shared suite instance.
+   */
+  protected String getSharedKafkaBrokerList() {
+    return _sharedClusterTestSuite.getKafkaBrokerList();
+  }
+
+  /**
+   * Creates a Kafka topic on the shared suite's Kafka cluster.
+   */
+  protected void createSharedKafkaTopic(String topic, int numPartitions) {
+    _sharedClusterTestSuite.createKafkaTopic(topic, numPartitions);
+  }
+
   @Override
   public String getHelixClusterName() {
     return "CustomDataQueryClusterIntegrationTest";
