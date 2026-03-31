@@ -274,9 +274,14 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   }
 
   public static ColumnMetadataImpl fromPropertiesConfiguration(String column, PropertiesConfiguration config) {
-    boolean hasDictionary = config.getBoolean(Column.getKeyFor(column, Column.HAS_DICTIONARY), true);
+    boolean hasDictionaryOnDisk = config.getBoolean(Column.getKeyFor(column, Column.HAS_DICTIONARY), true);
+    boolean hasSharedDictionary =
+        config.getBoolean(Column.getKeyFor(column, Column.HAS_SHARED_DICTIONARY), false);
+    // A column has a dictionary if either HAS_DICTIONARY (traditional dict-encoded forward) or
+    // HAS_SHARED_DICTIONARY (raw forward with a dictionary for secondary indexes) is true.
+    boolean hasDictionary = hasDictionaryOnDisk || hasSharedDictionary;
     String forwardIndexEncodingValue = config.getString(Column.getKeyFor(column, Column.FORWARD_INDEX_ENCODING),
-        hasDictionary ? IndexCreationContext.ForwardIndexEncoding.DICTIONARY.name()
+        hasDictionaryOnDisk ? IndexCreationContext.ForwardIndexEncoding.DICTIONARY.name()
             : IndexCreationContext.ForwardIndexEncoding.RAW.name());
     Builder builder = new Builder().setTotalDocs(config.getInt(Column.getKeyFor(column, Column.TOTAL_DOCS)))
         .setCardinality(config.getInt(Column.getKeyFor(column, Column.CARDINALITY)))

@@ -1005,8 +1005,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
 
+    // Use HAS_SHARED_DICTIONARY instead of HAS_DICTIONARY so that master nodes (which use hasDictionary() to
+    // choose the forward index reader) still see hasDictionary=false and correctly load the raw forward index.
+    // New nodes read HAS_SHARED_DICTIONARY and load the dictionary for secondary indexes.
     Map<String, String> metadataProperties = new HashMap<>();
-    metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(true));
+    metadataProperties.put(getKeyFor(column, HAS_SHARED_DICTIONARY), String.valueOf(true));
     metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING),
         IndexCreationContext.ForwardIndexEncoding.RAW.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE),

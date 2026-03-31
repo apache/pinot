@@ -251,15 +251,13 @@ public class InvertedIndexHandler extends BaseIndexHandler {
             creator.addInt(value, dictionary.indexOf(value));
           }
         } else {
-          int[][] values = new int[numDocs][];
-          int[][] dictIds = new int[numDocs][];
           for (int i = 0; i < numDocs; i++) {
-            values[i] = forwardIndexReader.getIntMV(i, readerContext);
-            dictIds[i] = new int[values[i].length];
-            for (int j = 0; j < values[i].length; j++) {
-              dictIds[i][j] = dictionary.indexOf(values[i][j]);
+            int[] values = forwardIndexReader.getIntMV(i, readerContext);
+            int[] dictIds = new int[values.length];
+            for (int j = 0; j < values.length; j++) {
+              dictIds[j] = dictionary.indexOf(values[j]);
             }
-            creator.addIntMV(values[i], dictIds[i]);
+            creator.addIntMV(values, dictIds);
           }
         }
         return;

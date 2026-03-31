@@ -113,6 +113,10 @@ public class V1Constants {
       public static final String COLUMN_TYPE = "columnType";
       public static final String IS_SORTED = "isSorted";
       public static final String HAS_DICTIONARY = "hasDictionary";
+      // Indicates a dictionary exists for secondary indexes (inverted, FST, etc.) while the forward index remains
+      // raw-encoded. Kept separate from HAS_DICTIONARY for backward compatibility: master nodes that don't understand
+      // this property will see HAS_DICTIONARY=false and correctly load the raw forward index.
+      public static final String HAS_SHARED_DICTIONARY = "hasSharedDictionary";
       public static final String FORWARD_INDEX_ENCODING = "forwardIndexEncoding";
       public static final String IS_SINGLE_VALUED = "isSingleValues";
       public static final String MAX_MULTI_VALUE_ELEMENTS = "maxNumberOfMultiValues";
