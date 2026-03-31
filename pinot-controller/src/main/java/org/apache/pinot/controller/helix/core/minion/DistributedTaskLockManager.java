@@ -89,20 +89,18 @@ public class DistributedTaskLockManager {
         _controllerInstanceId);
 
     try {
-      // Check if task generation is already in progress
-      if (isTaskGenerationInProgress(tableNameWithType)) {
-        LOGGER.info("Task generation already in progress for: {} by this or another controller", tableNameWithType);
-        return null;
-      }
-
-      // Try to acquire the lock using ephemeral node
+      // Try to acquire the lock using ephemeral node directly.
+      // Note: We do NOT check isTaskGenerationInProgress() before attempting to acquire the lock,
+      // as that would create a TOCTOU (Time-Of-Check-Time-Of-Use) race condition where another
+      // controller could acquire the lock between the check and the actual acquisition attempt.
+      // The tryAcquireSessionBasedLock() operation is atomic and handles the lock acquisition correctly.
       TaskLock lock = tryAcquireSessionBasedLock(tableNameWithType);
       if (lock != null) {
         LOGGER.info("Successfully acquired task generation lock for table: {} by controller: {}", tableNameWithType,
             _controllerInstanceId);
         return lock;
       } else {
-        LOGGER.warn("Could not acquire lock for table: {} - another controller must hold it", tableNameWithType);
+        LOGGER.debug("Could not acquire lock for table: {} - another controller must hold it", tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.error("Error while trying to acquire task lock for table: {}", tableNameWithType, e);

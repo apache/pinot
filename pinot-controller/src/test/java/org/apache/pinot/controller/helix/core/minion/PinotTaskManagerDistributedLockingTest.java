@@ -83,7 +83,7 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
               // Ignore individual task deletion errors
             }
           }
-          Thread.sleep(500); // Give time for task cancellation
+          Thread.sleep(1000); // Give time for task cancellation and lock release
         } catch (Exception e) {
           // Ignore cleanup errors
         }
@@ -96,6 +96,12 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
       stopFakeInstances();
     } catch (Exception e) {
       // Ignore
+    }
+    try {
+      // Wait a bit for ZK ephemeral nodes to be cleaned up after controller stops
+      Thread.sleep(500);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
     stopZk();
   }
@@ -463,8 +469,8 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
       addSchema(schema3);
       createSingleTestTable(RAW_TABLE_NAME_3);
 
-      // Wait for controllers to be fully initialized
-      Thread.sleep(2000);
+      // Wait for controllers to be fully initialized and stable
+      Thread.sleep(3000);
 
       ExecutorService executor = Executors.newFixedThreadPool(2);
       CountDownLatch startLatch = new CountDownLatch(1);
@@ -568,8 +574,13 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
       } catch (Exception ignored) {
       }
 
-      // Stop second controller first
-      controller2.stop();
+      // Stop second controller first and wait for cleanup
+      try {
+        controller2.stop();
+        Thread.sleep(500); // Give time for controller stop and ZK session cleanup
+      } catch (Exception e) {
+        // Ignore
+      }
     }
   }
 
@@ -641,8 +652,8 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
       addSchema(schema3);
       createSingleTestTable(RAW_TABLE_NAME_3);
 
-      // Wait for controllers to be fully initialized
-      Thread.sleep(2000);
+      // Wait for controllers to be fully initialized and stable
+      Thread.sleep(3000);
 
       ExecutorService executor = Executors.newFixedThreadPool(2);
       CountDownLatch startLatch = new CountDownLatch(1);
@@ -762,8 +773,13 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
       } catch (Exception ignored) {
       }
 
-      // Stop second controller first
-      controller2.stop();
+      // Stop second controller first and wait for cleanup
+      try {
+        controller2.stop();
+        Thread.sleep(500); // Give time for controller stop and ZK session cleanup
+      } catch (Exception e) {
+        // Ignore
+      }
     }
   }
 

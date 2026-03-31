@@ -110,10 +110,12 @@ public class PinotCustomDependencyVersionRuleTest {
     dependencies.add(dependency);
     model.setDependencies(dependencies);
 
+    MavenProject rootProject = Mockito.mock(MavenProject.class);
     Mockito.when(_project.getOriginalModel()).thenReturn(model);
     Mockito.when(_project.isExecutionRoot()).thenReturn(false);
-    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
-    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-core"));   // non skipped
+    Mockito.when(_session.getTopLevelProject()).thenReturn(rootProject);
+    Mockito.when(rootProject.getBasedir()).thenReturn(new File("/root/pinot"));
+    Mockito.when(_project.getBasedir()).thenReturn(new File("/root/pinot/pinot-core"));   // non skipped
 
     EnforcerRuleException thrown = Assert.expectThrows(EnforcerRuleException.class, () -> {
       _rule.execute(_helper);
@@ -134,10 +136,12 @@ public class PinotCustomDependencyVersionRuleTest {
     dependencies.add(dependency);
     model.setDependencies(dependencies);
 
+    MavenProject rootProject = Mockito.mock(MavenProject.class);
     Mockito.when(_project.getOriginalModel()).thenReturn(model);
     Mockito.when(_project.isExecutionRoot()).thenReturn(false);
-    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
-    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-core"));     // non skipped
+    Mockito.when(_session.getTopLevelProject()).thenReturn(rootProject);
+    Mockito.when(rootProject.getBasedir()).thenReturn(new File("/root/pinot"));
+    Mockito.when(_project.getBasedir()).thenReturn(new File("/root/pinot/pinot-core"));     // non skipped
 
     _rule.execute(_helper);
   }
@@ -155,10 +159,12 @@ public class PinotCustomDependencyVersionRuleTest {
     dependencies.add(dependency);
     model.setDependencies(dependencies);
 
+    MavenProject rootProject = Mockito.mock(MavenProject.class);
     Mockito.when(_project.getOriginalModel()).thenReturn(model);
     Mockito.when(_project.isExecutionRoot()).thenReturn(false);
-    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
-    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-core"));   // non skipped
+    Mockito.when(_session.getTopLevelProject()).thenReturn(rootProject);
+    Mockito.when(rootProject.getBasedir()).thenReturn(new File("/root/pinot"));
+    Mockito.when(_project.getBasedir()).thenReturn(new File("/root/pinot/pinot-core"));   // non skipped
 
     EnforcerRuleException thrown = Assert.expectThrows(EnforcerRuleException.class, () -> {
       _rule.execute(_helper);
@@ -180,15 +186,14 @@ public class PinotCustomDependencyVersionRuleTest {
     dependencies.add(dependency);
     model.setDependencies(dependencies);
 
+    MavenProject rootProject = Mockito.mock(MavenProject.class);
     Mockito.when(_project.getOriginalModel()).thenReturn(model);
     Mockito.when(_project.isExecutionRoot()).thenReturn(false);
-    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
-    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-plugins"));    // skipped module
+    Mockito.when(_session.getTopLevelProject()).thenReturn(rootProject);
+    Mockito.when(rootProject.getBasedir()).thenReturn(new File("/root/pinot"));
+    Mockito.when(_project.getBasedir()).thenReturn(new File("/root/pinot/pinot-plugins"));    // skipped module
 
-    EnforcerRuleException thrown = Assert.expectThrows(EnforcerRuleException.class, () -> {
-      _rule.execute(_helper);
-    });
-
-    Assert.assertTrue(thrown.getMessage().contains("Please refer to"));
+    // Should NOT throw because pinot-plugins is in the skipModules list
+    _rule.execute(_helper);
   }
 }
