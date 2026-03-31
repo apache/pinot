@@ -239,13 +239,13 @@ public class TableConfigsRestletResource {
       }
 
       if (offlineTableConfig != null) {
-        tuneConfig(offlineTableConfig, schema);
+        applyTuning(offlineTableConfig, schema);
         if (!ignoreActiveTasks) {
           PinotTableRestletResource.tableTasksValidation(offlineTableConfig, _pinotHelixTaskResourceManager);
         }
       }
       if (realtimeTableConfig != null) {
-        tuneConfig(realtimeTableConfig, schema);
+        applyTuning(realtimeTableConfig, schema);
         if (!ignoreActiveTasks) {
           PinotTableRestletResource.tableTasksValidation(realtimeTableConfig, _pinotHelixTaskResourceManager);
         }
@@ -407,7 +407,7 @@ public class TableConfigsRestletResource {
       LOGGER.info("Updated schema: {}", tableName);
 
       if (offlineTableConfig != null) {
-        tuneConfig(offlineTableConfig, schema);
+        applyTuning(offlineTableConfig, schema);
         if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
           _pinotHelixResourceManager.updateTableConfig(offlineTableConfig, forceTableSchemaUpdate);
           LOGGER.info("Updated offline table config: {}", tableName);
@@ -417,7 +417,7 @@ public class TableConfigsRestletResource {
         }
       }
       if (realtimeTableConfig != null) {
-        tuneConfig(realtimeTableConfig, schema);
+        applyTuning(realtimeTableConfig, schema);
         if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
           _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig, forceTableSchemaUpdate);
           LOGGER.info("Updated realtime table config: {}", tableName);
@@ -459,6 +459,47 @@ public class TableConfigsRestletResource {
           + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
+    Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
+        parseAndValidateTableConfigs(tableConfigsStr, typesToSkip, httpHeaders, request);
+    TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+    ObjectNode response = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
+    response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));
+    return response.toString();
+  }
+
+  /**
+   * Validates and tunes the {@link TableConfigs} as provided in the tableConfigsStr json, by applying tuner configs,
+   * ensuring min replicas and storage quota constraints, and returns the tuned TableConfigs.
+   */
+  @POST
+  @Path("/tableConfigs/tune")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Tune the TableConfigs",
+      notes = "Validates and applies tuning (tuner configs, min replicas, storage quota) to the TableConfigs, "
+          + "returning the result that would be stored on create/update")
+  @ManualAuthorization // performed after parsing TableConfigs
+  public String tuneConfig(String tableConfigsStr,
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
+          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES|ACTIVE_TASKS)")
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
+      @Context Request request) {
+    Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
+        parseAndValidateTableConfigs(tableConfigsStr, typesToSkip, httpHeaders, request);
+    TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+    Schema schema = tableConfigs.getSchema();
+    if (tableConfigs.getOffline() != null) {
+      applyTuning(tableConfigs.getOffline(), schema);
+    }
+    if (tableConfigs.getRealtime() != null) {
+      applyTuning(tableConfigs.getRealtime(), schema);
+    }
+    ObjectNode response = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
+    response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));
+    return response.toString();
+  }
+
+  private Pair<TableConfigs, Map<String, Object>> parseAndValidateTableConfigs(String tableConfigsStr,
+      @Nullable String typesToSkip, HttpHeaders httpHeaders, Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     try {
       tableConfigsAndUnrecognizedProps =
@@ -481,13 +522,10 @@ public class TableConfigsRestletResource {
     if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
-
-    ObjectNode response = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
-    response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));
-    return response.toString();
+    return tableConfigsAndUnrecognizedProps;
   }
 
-  private void tuneConfig(TableConfig tableConfig, Schema schema) {
+  private void applyTuning(TableConfig tableConfig, Schema schema) {
     TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
     TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
