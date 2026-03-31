@@ -58,49 +58,51 @@ public class ThreadSafeMutableRoaringBitmap {
     _mutableRoaringBitmap.add(newDocId);
   }
 
+  public synchronized boolean isEmpty() {
+    return _mutableRoaringBitmap.isEmpty();
+  }
+
+  public synchronized int getCardinality() {
+    return _mutableRoaringBitmap.getCardinality();
+  }
+
   public synchronized MutableRoaringBitmap getMutableRoaringBitmap() {
     return _mutableRoaringBitmap.clone();
   }
 
-  /**
-   * Returns a point-in-time snapshot of the bitmap as a serialized byte array.
-   * This avoids cloning the full object clone() unlike in getMutableRoaringBitmap()
-   */
-  public synchronized byte[] toBytes() {
-    ByteBuffer buf = ByteBuffer.allocate(_mutableRoaringBitmap.serializedSizeInBytes());
-    _mutableRoaringBitmap.serialize(buf);
-    return buf.array();
+  /// Returns a point-in-time snapshot of the bitmap as a serialized byte array.
+  /// This avoids cloning the full object clone() unlike in getMutableRoaringBitmap()
+  public synchronized byte[] getBytes() {
+    return serialize();
   }
 
-  /**
-   * Returns a consistent point-in-time snapshot containing both the serialized bytes and
-   * cardinality captured under a single lock.
-   */
-  public synchronized DocIdSnapshot toSnapshot() {
-    ByteBuffer buf = ByteBuffer.allocate(_mutableRoaringBitmap.serializedSizeInBytes());
-    _mutableRoaringBitmap.serialize(buf);
-    return new DocIdSnapshot(buf.array(), _mutableRoaringBitmap.getCardinality());
+  /// Returns a consistent point-in-time snapshot containing both cardinality and serialized bytes captured under a
+  /// single lock.
+  public synchronized CardinalityAndBytes getBytesAndCardinality() {
+    return new CardinalityAndBytes(_mutableRoaringBitmap.getCardinality(), serialize());
   }
 
-  public static final class DocIdSnapshot {
-    private final byte[] _bytes;
+  private byte[] serialize() {
+    byte[] bytes = new byte[_mutableRoaringBitmap.serializedSizeInBytes()];
+    _mutableRoaringBitmap.serialize(ByteBuffer.wrap(bytes));
+    return bytes;
+  }
+
+  public static final class CardinalityAndBytes {
     private final int _cardinality;
+    private final byte[] _bytes;
 
-    public DocIdSnapshot(byte[] bytes, int cardinality) {
-      _bytes = bytes;
+    public CardinalityAndBytes(int cardinality, byte[] bytes) {
       _cardinality = cardinality;
-    }
-
-    public byte[] getBytes() {
-      return _bytes;
+      _bytes = bytes;
     }
 
     public int getCardinality() {
       return _cardinality;
     }
-  }
 
-  public synchronized boolean isEmpty() {
-    return _mutableRoaringBitmap.isEmpty();
+    public byte[] getBytes() {
+      return _bytes;
+    }
   }
 }
