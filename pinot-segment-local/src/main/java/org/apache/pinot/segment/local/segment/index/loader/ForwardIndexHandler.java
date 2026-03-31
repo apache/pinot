@@ -313,27 +313,33 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
       } else if (!existingHasDict && newIsDict) {
         // Existing column is raw forward without a shared dictionary. New config requires a dictionary.
-        // Before enabling the dictionary, apply the same optimize-dictionary heuristics that segment creation
-        // uses (via DictionaryIndexType.ignoreDictionaryOverride) so that reload does not force a dictionary
-        // onto a high-cardinality column that segment creation would have kept raw.
-        ColumnMetadata colMeta = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        // If any enabled index requires a dictionary, always enable it regardless of optimize-dictionary
+        // heuristics. Otherwise, apply the heuristics so reload doesn't force a dictionary onto a
+        // high-cardinality column that segment creation would have kept raw.
         FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-        if (fieldSpec != null && colMeta != null && !colMeta.isSorted()) {
-          boolean keepDict = DictionaryIndexType.ignoreDictionaryOverride(
-              _tableConfig.getIndexingConfig().isOptimizeDictionary(),
-              _tableConfig.getIndexingConfig().isOptimizeDictionaryForMetrics(),
-              _tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(),
-              _tableConfig.getIndexingConfig().getNoDictionaryCardinalityRatioThreshold(),
-              fieldSpec, newConf, colMeta.getCardinality(), colMeta.getTotalDocs());
-          if (keepDict) {
-            columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
-          } else {
-            LOGGER.info("Skipping ENABLE_DICTIONARY for column: {} of segment: {} because optimize-dictionary "
-                + "heuristics determined dictionary is not beneficial (cardinality={}, totalDocs={})",
-                column, segmentName, colMeta.getCardinality(), colMeta.getTotalDocs());
-          }
-        } else {
+        boolean indexRequiresDict = fieldSpec != null
+            && DictionaryIndexConfig.isDictionaryRequired(fieldSpec, newConf);
+        if (indexRequiresDict) {
           columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
+        } else {
+          ColumnMetadata colMeta = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+          if (fieldSpec != null && colMeta != null && !colMeta.isSorted()) {
+            boolean keepDict = DictionaryIndexType.ignoreDictionaryOverride(
+                _tableConfig.getIndexingConfig().isOptimizeDictionary(),
+                _tableConfig.getIndexingConfig().isOptimizeDictionaryForMetrics(),
+                _tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(),
+                _tableConfig.getIndexingConfig().getNoDictionaryCardinalityRatioThreshold(),
+                fieldSpec, newConf, colMeta.getCardinality(), colMeta.getTotalDocs());
+            if (keepDict) {
+              columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
+            } else {
+              LOGGER.info("Skipping ENABLE_DICTIONARY for column: {} of segment: {} because optimize-dictionary "
+                  + "heuristics determined dictionary is not beneficial (cardinality={}, totalDocs={})",
+                  column, segmentName, colMeta.getCardinality(), colMeta.getTotalDocs());
+            }
+          } else {
+            columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
+          }
         }
       } else if (existingHasDict && !newIsDict) {
         // Existing column has dictionary. New config for the column is RAW.
@@ -368,6 +374,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     LOGGER.info("{}: Updating metadata properties for segment={} and column={}", reason, segmentName, column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
+    metadataProperties.put(getKeyFor(column, HAS_SHARED_DICTIONARY), String.valueOf(false));
     metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING),
         IndexCreationContext.ForwardIndexEncoding.RAW.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
