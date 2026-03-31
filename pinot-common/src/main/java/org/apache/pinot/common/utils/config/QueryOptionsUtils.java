@@ -353,7 +353,7 @@ public class QueryOptionsUtils {
   @Nullable
   public static Integer getStreamingGroupByFlushThreshold(Map<String, String> queryOptions) {
     String value = queryOptions.get(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD);
-    return checkedParseIntPositive(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD, value);
+    return checkedParseIntNonNegative(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD, value);
   }
 
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
