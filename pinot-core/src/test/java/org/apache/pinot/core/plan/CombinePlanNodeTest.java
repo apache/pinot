@@ -29,8 +29,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.util.TestUtils;
@@ -162,5 +164,17 @@ public class CombinePlanNodeTest {
     }
     TestUtils.waitForCondition((aVoid) -> exp.get() instanceof QueryCancelledException, 10_000,
         "Should have been cancelled");
+  }
+
+  @Test
+  public void testPartitionedGroupByDefaultsToEffectiveParallelism() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SET groupByAlgorithm='partitioned'; SELECT column, COUNT(*) FROM testTable GROUP BY column");
+
+    new InstancePlanMakerImplV2().makeInstancePlan(List.of(), queryContext, _executorService);
+
+    Assert.assertEquals(queryContext.getNumGroupByPartitions(),
+        Math.max(InstancePlanMakerImplV2.DEFAULT_NUM_GROUP_BY_PARTITIONS,
+            QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY));
   }
 }

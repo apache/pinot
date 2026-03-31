@@ -842,6 +842,7 @@ public class CommonConstants {
         // possible.
         public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
             "optimizeMaxInitialResultHolderCapacity";
+        public static final String NUM_GROUP_BY_PARTITIONS = "numGroupByPartitions";
 
         // Set to true if a cursor should be returned instead of the complete result set
         public static final String GET_CURSOR = "getCursor";

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.data.table;
 
-import java.util.HashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.utils.DataSchema;
@@ -26,15 +26,18 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
- * {@link Table} implementation for aggregating TableRecords based on combination of keys
+ * {@link Table} implementation for aggregating TableRecords based on combination of keys.
+ * Uses fastutil's {@link Object2ObjectOpenHashMap} for open-addressing, which provides better
+ * cache locality and avoids per-entry {@code Map.Entry} object allocations compared to
+ * {@code java.util.HashMap}.
  */
 @NotThreadSafe
 public class SimpleIndexedTable extends IndexedTable {
 
   public SimpleIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
       int trimSize, int trimThreshold, int initialCapacity, ExecutorService executorService) {
-    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new HashMap<>(initialCapacity),
-        executorService);
+    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
+        new Object2ObjectOpenHashMap<>(initialCapacity), executorService);
   }
 
   /**

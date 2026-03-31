@@ -299,4 +299,94 @@ public class IndexedTableTest {
 
     checkEvicted(indexedTable, "f", "g");
   }
+
+  @Test
+  public void testMergePartitionTableInvalidatesFinishedTopRecords() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT SUM(m1) FROM testTable GROUP BY d1 ORDER BY SUM(m1) DESC");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "sum(m1)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE});
+
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    try {
+      IndexedTable indexedTable =
+          new SimpleIndexedTable(dataSchema, false, queryContext, 1, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY,
+              executorService);
+      indexedTable.upsert(getRecord(new Object[]{"a", 10d}));
+      indexedTable.upsert(getRecord(new Object[]{"b", 20d}));
+      indexedTable.finish(true);
+      Assert.assertEquals(indexedTable.size(), 1);
+
+      IndexedTable mergeTable =
+          new SimpleIndexedTable(dataSchema, false, queryContext, 1, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY,
+              executorService);
+      mergeTable.upsert(getRecord(new Object[]{"c", 30d}));
+
+      indexedTable.mergePartitionTable(mergeTable);
+
+      Assert.assertEquals(indexedTable.size(), 3);
+      List<String> mergedRecords = new ArrayList<>();
+      indexedTable.iterator().forEachRemaining(record -> mergedRecords.add((String) record.getValues()[0]));
+      Assert.assertEquals(mergedRecords.size(), 3);
+      Assert.assertTrue(mergedRecords.containsAll(Arrays.asList("a", "b", "c")));
+
+      indexedTable.finish(true);
+      Assert.assertEquals(indexedTable.size(), 1);
+      Assert.assertEquals(indexedTable.iterator().next().getValues()[0], "c");
+    } finally {
+      executorService.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testMergePartitionTablePropagatesResizeStats() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT SUM(m1) FROM testTable GROUP BY d1 ORDER BY SUM(m1) DESC");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "sum(m1)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE});
+
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    try {
+      // Create a table that will be trimmed (trimThreshold=5, trimSize=3)
+      IndexedTable trimmedTable =
+          new SimpleIndexedTable(dataSchema, false, queryContext, 3, 3, 5, INITIAL_CAPACITY, executorService);
+      for (int i = 0; i < 6; i++) {
+        trimmedTable.upsert(new Key(new Object[]{"k" + i}), getRecord(new Object[]{"k" + i, (double) i}));
+      }
+      Assert.assertTrue(trimmedTable.isTrimmed(), "trimmedTable should be trimmed after exceeding threshold");
+      int trimmedResizes = trimmedTable.getNumResizes();
+      Assert.assertTrue(trimmedResizes > 0);
+
+      // Create a non-trimmed table
+      IndexedTable survivingTable =
+          new SimpleIndexedTable(dataSchema, false, queryContext, 100, 100, Integer.MAX_VALUE, INITIAL_CAPACITY,
+              executorService);
+      survivingTable.upsert(new Key(new Object[]{"x"}), getRecord(new Object[]{"x", 99d}));
+      Assert.assertFalse(survivingTable.isTrimmed());
+      Assert.assertEquals(survivingTable.getNumResizes(), 0);
+
+      // mergePartitionTable should propagate resize stats
+      survivingTable.mergePartitionTable(trimmedTable);
+      Assert.assertEquals(survivingTable.getNumResizes(), trimmedResizes);
+      Assert.assertTrue(survivingTable.isTrimmed(),
+          "Surviving table should report trimmed after absorbing a trimmed table");
+
+      // absorbResizeStats should also work for merge() path
+      IndexedTable tableA =
+          new SimpleIndexedTable(dataSchema, false, queryContext, 100, 100, Integer.MAX_VALUE, INITIAL_CAPACITY,
+              executorService);
+      IndexedTable tableB =
+          new SimpleIndexedTable(dataSchema, false, queryContext, 3, 3, 5, INITIAL_CAPACITY, executorService);
+      for (int i = 0; i < 6; i++) {
+        tableB.upsert(new Key(new Object[]{"b" + i}), getRecord(new Object[]{"b" + i, (double) i}));
+      }
+      Assert.assertTrue(tableB.isTrimmed());
+      tableA.merge(tableB);
+      tableA.absorbResizeStats(tableB);
+      Assert.assertTrue(tableA.isTrimmed(),
+          "tableA should report trimmed after merge + absorbResizeStats from trimmed tableB");
+    } finally {
+      executorService.shutdownNow();
+    }
+  }
 }
