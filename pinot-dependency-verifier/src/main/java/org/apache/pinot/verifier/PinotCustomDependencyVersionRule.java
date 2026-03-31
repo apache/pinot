@@ -100,12 +100,7 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
       return;
     }
 
-    List<Dependency> deps = originalModel.getDependencies();
-
-    // Check if any submodule POM has hardcoded versions
-    verifyNoHardcodedVersions(project, deps);
-
-    // Skip configured modules
+    // Skip configured modules before any version checks
     if (_skipModuleList != null && !_skipModuleList.isEmpty()) {
       Path rootPath = session.getTopLevelProject().getBasedir().toPath().toAbsolutePath().normalize();
       Path modulePath = project.getBasedir().toPath().toAbsolutePath().normalize();
@@ -118,6 +113,11 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
         }
       }
     }
+
+    List<Dependency> deps = originalModel.getDependencies();
+
+    // Check if any submodule POM has hardcoded versions
+    verifyNoHardcodedVersions(project, deps);
 
     // Any dependencies listed under <dependencies> in any submodule POM should not include <version> tags
     for (Dependency d : deps) {
