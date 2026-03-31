@@ -72,10 +72,6 @@ public class ThreadSafeMutableRoaringBitmap {
     return buf.array();
   }
 
-  public synchronized int getCardinality() {
-    return _mutableRoaringBitmap.getCardinality();
-  }
-
   /**
    * Returns a consistent point-in-time snapshot containing both the serialized bytes and
    * cardinality captured under a single lock.
