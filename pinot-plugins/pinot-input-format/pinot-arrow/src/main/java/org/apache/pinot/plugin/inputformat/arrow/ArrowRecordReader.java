@@ -54,7 +54,11 @@ public class ArrowRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     _converter = new ArrowToGenericRowConverter(fieldsToRead);
-    _allocator = new RootAllocator();
+    long allocatorLimit = ArrowRecordReaderConfig.DEFAULT_ALLOCATOR_LIMIT;
+    if (recordReaderConfig instanceof ArrowRecordReaderConfig) {
+      allocatorLimit = ((ArrowRecordReaderConfig) recordReaderConfig).getAllocatorLimit();
+    }
+    _allocator = new RootAllocator(allocatorLimit);
     openFile();
   }
 
@@ -65,10 +69,21 @@ public class ArrowRecordReader implements RecordReader {
     _root = _arrowFileReader.getVectorSchemaRoot();
     _nextRowId = 0;
     _currentBatchRowCount = 0;
-    _hasNextBatch = _arrowFileReader.loadNextBatch();
-    if (_hasNextBatch) {
-      _currentBatchRowCount = _root.getRowCount();
+    advanceToNonEmptyBatch();
+  }
+
+  private void advanceToNonEmptyBatch()
+      throws IOException {
+    while (_arrowFileReader.loadNextBatch()) {
+      int rowCount = _root.getRowCount();
+      if (rowCount > 0) {
+        _hasNextBatch = true;
+        _currentBatchRowCount = rowCount;
+        _nextRowId = 0;
+        return;
+      }
     }
+    _hasNextBatch = false;
   }
 
   @Override
@@ -82,11 +97,7 @@ public class ArrowRecordReader implements RecordReader {
     _converter.convertSingleRow(_arrowFileReader, _root, _nextRowId, reuse);
     _nextRowId++;
     if (_nextRowId >= _currentBatchRowCount) {
-      _hasNextBatch = _arrowFileReader.loadNextBatch();
-      if (_hasNextBatch) {
-        _currentBatchRowCount = _root.getRowCount();
-        _nextRowId = 0;
-      }
+      advanceToNonEmptyBatch();
     }
     return reuse;
   }
@@ -101,13 +112,44 @@ public class ArrowRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
-    closeFile();
-    _allocator.close();
+    try {
+      closeFile();
+    } finally {
+      if (_allocator != null) {
+        _allocator.close();
+        _allocator = null;
+      }
+    }
   }
 
   private void closeFile()
       throws IOException {
-    _arrowFileReader.close();
-    _fileInputStream.close();
+    IOException exception = null;
+
+    if (_arrowFileReader != null) {
+      try {
+        _arrowFileReader.close();
+      } catch (IOException e) {
+        exception = e;
+      } finally {
+        _arrowFileReader = null;
+      }
+    }
+
+    if (_fileInputStream != null) {
+      try {
+        _fileInputStream.close();
+      } catch (IOException e) {
+        if (exception == null) {
+          exception = e;
+        }
+      } finally {
+        _fileInputStream = null;
+      }
+    }
+
+    if (exception != null) {
+      throw exception;
+    }
   }
 }

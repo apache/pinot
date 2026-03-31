@@ -46,6 +46,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.Test;
 
 
@@ -257,7 +258,7 @@ public class ArrowRecordReaderTest extends AbstractRecordReaderTest {
   @Test
   @Override
   public void testGzipRecordReader() {
-    // Arrow IPC file format requires seekable channels and does not support gzip compression
+    throw new SkipException("Arrow IPC file format requires seekable channels and does not support gzip compression");
   }
 
   @Test

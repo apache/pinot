@@ -60,7 +60,7 @@ public class ArrowToGenericRowConverter {
    * @param fieldsToRead Set of field names to read. If null or empty, reads all fields.
    */
   public ArrowToGenericRowConverter(@Nullable Set<String> fieldsToRead) {
-    _fieldsToRead = (fieldsToRead == null || fieldsToRead.isEmpty()) ? null : fieldsToRead;
+    _fieldsToRead = (fieldsToRead == null || fieldsToRead.isEmpty()) ? null : Set.copyOf(fieldsToRead);
   }
 
   /**
@@ -121,6 +121,11 @@ public class ArrowToGenericRowConverter {
   @Nullable
   public GenericRow convertSingleRow(
       ArrowReader reader, VectorSchemaRoot root, int rowIndex) {
+    int rowCount = root.getRowCount();
+    if (rowIndex < 0 || rowIndex >= rowCount) {
+      logger.warn("Row index {} is out of bounds [0, {}) for Arrow batch", rowIndex, rowCount);
+      return null;
+    }
     return convertSingleRow(reader, root, rowIndex, new GenericRow());
   }
 
@@ -135,6 +140,7 @@ public class ArrowToGenericRowConverter {
    */
   public GenericRow convertSingleRow(
       ArrowReader reader, VectorSchemaRoot root, int rowIndex, GenericRow reuse) {
+    reuse.clear();
     int convertedFields = 0;
 
     // Process all fields in the Arrow schema
@@ -162,6 +168,8 @@ public class ArrowToGenericRowConverter {
           Object pinotCompatibleValue = convertArrowTypeToPinotCompatible(value);
           reuse.putValue(fieldName, pinotCompatibleValue);
           convertedFields++;
+        } else {
+          reuse.putValue(fieldName, null);
         }
       } catch (Exception e) {
         logger.error("Error extracting value for field: {} at row {}", fieldName, rowIndex, e);
