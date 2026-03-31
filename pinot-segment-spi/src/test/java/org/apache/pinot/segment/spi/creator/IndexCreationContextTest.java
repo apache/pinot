@@ -58,12 +58,12 @@ public class IndexCreationContextTest {
   }
 
   @Test
-  public void testDefaultForwardEncodingIsRaw() {
+  public void testDefaultForwardEncodingIsDictionary() {
     IndexCreationContext.Common context = IndexCreationContext.builder()
         .withIndexDir(new File("."))
-        .withFieldSpec(new DimensionFieldSpec("rawCol", FieldSpec.DataType.STRING, true))
+        .withFieldSpec(new DimensionFieldSpec("col", FieldSpec.DataType.STRING, true))
         .build();
 
-    assertEquals(context.getForwardIndexEncoding(), IndexCreationContext.ForwardIndexEncoding.RAW);
+    assertEquals(context.getForwardIndexEncoding(), IndexCreationContext.ForwardIndexEncoding.DICTIONARY);
   }
 }

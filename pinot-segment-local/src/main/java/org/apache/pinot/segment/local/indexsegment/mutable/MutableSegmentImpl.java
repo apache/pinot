@@ -80,6 +80,7 @@ import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -320,7 +321,9 @@ public class MutableSegmentImpl implements MutableSegment {
               .withFieldSpec(fieldSpec)
               .withMemoryManager(_memoryManager)
               .withDictionary(hasDictionary)
-              .withForwardIndexEncoding(indexConfigs.getConfig(StandardIndexes.forward()).getForwardIndexEncoding())
+              .withForwardIndexEncoding(hasDictionary
+                  ? IndexCreationContext.ForwardIndexEncoding.DICTIONARY
+                  : IndexCreationContext.ForwardIndexEncoding.RAW)
               .withCapacity(_capacity)
               .offHeap(_offHeap)
               .withSegmentName(_segmentName)
