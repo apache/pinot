@@ -123,8 +123,8 @@
               <goal>install-node-and-npm</goal>
             </goals>
             <configuration>
-              <nodeVersion>v16.15.0</nodeVersion>
-              <npmVersion>8.5.5</npmVersion>
+              <nodeVersion>v24.14.1</nodeVersion>
+              <npmVersion>11.11.0</npmVersion>
               <nodeDownloadRoot>${nodeRepositoryUrl}</nodeDownloadRoot>
               <npmDownloadRoot>${npmRepositoryUrl}</npmDownloadRoot>
             </configuration>
@@ -191,14 +191,20 @@
                 </goals>
                 <configuration>
                   <fileSet>
-                    <directory>${project.basedir}/src/main/resources/app</directory>
-                    <outputDirectory>${project.basedir}/src/main/resources/dist/webapp/js</outputDirectory>
+                    <directory>${project.basedir}/src/main/resources</directory>
+                    <outputDirectory>${project.basedir}/src/main/resources/dist/webapp</outputDirectory>
                     <includes>
-                      <include>**/*</include>
+                      <include>app/**/*</include>
+                      <include>package.json</include>
+                      <include>package-lock.json</include>
+                      <include>tsconfig.json</include>
+                      <include>vite.config.ts</include>
+                      <include>.npmrc</include>
+                      <include>favicon.ico</include>
                     </includes>
                     <mapper>
                       <type>merge</type>
-                      <to>main.js</to>
+                      <to>index.html</to>
                     </mapper>
                   </fileSet>
                   <name>skip.npm</name>

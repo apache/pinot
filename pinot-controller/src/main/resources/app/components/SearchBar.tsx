@@ -18,7 +18,7 @@
  */
 
 import React from 'react';
-import makeStyles from '@material-ui/core/styles/makeStyles';
+import { makeStyles } from '@material-ui/core/styles';
 import SearchIcon from '@material-ui/icons/Search';
 import InputBase, { InputBaseProps } from '@material-ui/core/InputBase';
 

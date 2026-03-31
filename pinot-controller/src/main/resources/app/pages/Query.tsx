@@ -43,9 +43,10 @@ import QuerySideBar from '../components/Query/QuerySideBar';
 import TableToolbar from '../components/TableToolbar';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils, { QUERY_STATS_COLUMNS } from '../utils/PinotMethodUtils';
+import { runBootstrapRequest } from '../utils/bootstrap';
 import '../styles/styles.css';
 import {Resizable} from "re-resizable";
-import {useHistory, useLocation} from 'react-router';
+import {useHistory, useLocation} from 'react-router-dom';
 import sqlFormatter from '@sqltools/formatter';
 import {FlamegraphMode, FlameGraphQueryStageStats} from '../components/Query/FlamegraphQueryStageStats';
 import {VisualizeQueryStageStats} from '../components/Query/VisualizeQueryStageStats';
@@ -61,6 +62,16 @@ enum ErrorViewType {
   JSON = 'json',
   VISUAL = 'visual',
 }
+
+const QUERY_BOOTSTRAP_TIMEOUT_MS = 3000;
+const EMPTY_TABLE_LIST = {
+  columns: ['Tables'],
+  records: [],
+};
+const EMPTY_LOGICAL_TABLE_LIST = {
+  columns: ['Logical Tables'],
+  records: [],
+};
 
 const useStyles = makeStyles((theme) => ({
   title: {
@@ -427,19 +438,78 @@ const QueryPage = () => {
     }, 3000);
   };
 
-  const fetchData = async () => {
-    const result = await PinotMethodUtils.getQueryTablesList({bothType: false});
-    setTableList(result);
-    const logicalTablesResult = await PinotMethodUtils.getQueryLogicalTablesList();
-    setLogicalTableList(logicalTablesResult);
-    setFetching(false);
+  const fetchData = () => {
+    let tablesReady = false;
+    let logicalTablesReady = false;
+
+    const markReady = (section: 'tables' | 'logicalTables') => {
+      if (section === 'tables') {
+        if (tablesReady) {
+          return;
+        }
+        tablesReady = true;
+      } else {
+        if (logicalTablesReady) {
+          return;
+        }
+        logicalTablesReady = true;
+      }
+
+      if (tablesReady && logicalTablesReady) {
+        setFetching(false);
+      }
+    };
+
+    const cancelTables = runBootstrapRequest<TableData>({
+      request: PinotMethodUtils.getQueryTablesList({bothType: false}),
+      timeoutMs: QUERY_BOOTSTRAP_TIMEOUT_MS,
+      onInitialTimeout: () => {
+        setTableList(EMPTY_TABLE_LIST);
+        markReady('tables');
+      },
+      onSuccess: (result) => {
+        setTableList(result);
+        markReady('tables');
+      },
+      onError: (error) => {
+        console.warn('Unable to load query console table metadata during initial bootstrap.', error);
+        setTableList(EMPTY_TABLE_LIST);
+        markReady('tables');
+      },
+    });
+
+    const cancelLogicalTables = runBootstrapRequest<TableData>({
+      request: PinotMethodUtils.getQueryLogicalTablesList(),
+      timeoutMs: QUERY_BOOTSTRAP_TIMEOUT_MS,
+      onInitialTimeout: () => {
+        setLogicalTableList(EMPTY_LOGICAL_TABLE_LIST);
+        markReady('logicalTables');
+      },
+      onSuccess: (logicalTablesResult) => {
+        setLogicalTableList(logicalTablesResult);
+        markReady('logicalTables');
+      },
+      onError: (error) => {
+        console.warn('Unable to load query logical table metadata during initial bootstrap.', error);
+        setLogicalTableList(EMPTY_LOGICAL_TABLE_LIST);
+        markReady('logicalTables');
+      },
+    });
+
+    return () => {
+      cancelTables();
+      cancelLogicalTables();
+    };
   };
 
   useEffect(() => {
-    fetchData();
+    const cancelFetchData = fetchData();
     if(inputQuery){
       handleRunNow(inputQuery);
     }
+    return () => {
+      cancelFetchData();
+    };
   }, []);
 
   useEffect(()=>{

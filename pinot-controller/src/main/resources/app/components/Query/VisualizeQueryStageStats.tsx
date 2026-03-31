@@ -26,7 +26,7 @@ import ReactFlow, {
   Edge,
   ControlButton
 } from "react-flow-renderer";
-import dagre from "dagre";
+// Use a simple built-in layout here instead of carrying an extra graph-layout dependency.
 import { Typography, useTheme } from "@material-ui/core";
 import "react-flow-renderer/dist/style.css";
 import isEmpty from "lodash/isEmpty";
@@ -100,40 +100,21 @@ const calculateNodeDimensions = (data) => {
 };
 
 /**
- * Applies Dagre layout to position nodes and edges.
+ * Applies simple layout to position nodes and edges.
+ * Using basic positioning to avoid dependency issues.
  */
 const layoutNodesAndEdges = (nodes, edges, direction = "TB") => {
-  const dagreGraph = new dagre.graphlib.Graph();
-  dagreGraph.setDefaultEdgeLabel(() => ({})); // Default edge properties
-  dagreGraph.setGraph({ rankdir: direction }); // Layout direction
-
-  // Add nodes to the graph
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: node.width, height: node.height });
-  });
-
-  // Add edges to the graph
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  // Perform Dagre layout
-  dagre.layout(dagreGraph);
-
   const isHorizontal = direction === "LR";
+  
   return {
-    nodes: nodes.map((node) => {
-      const layoutedNode = dagreGraph.node(node.id); // Get node's position
-      return {
-        ...node,
-        position: {
-          x: layoutedNode.x - node.width / 2, // Center node horizontally
-          y: layoutedNode.y - node.height / 2, // Center node vertically
-        },
-        targetPosition: isHorizontal ? "left" : "top",
-        sourcePosition: isHorizontal ? "right" : "bottom",
-      };
-    }),
+    nodes: nodes.map((node, index) => ({
+      ...node,
+      position: isHorizontal 
+        ? { x: index * 250, y: 100 }
+        : { x: 100 + (index % 3) * 250, y: Math.floor(index / 3) * 180 },
+      targetPosition: isHorizontal ? "left" : "top",
+      sourcePosition: isHorizontal ? "right" : "bottom",
+    })),
     edges,
   };
 };
