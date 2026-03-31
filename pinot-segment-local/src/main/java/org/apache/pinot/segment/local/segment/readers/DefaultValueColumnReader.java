@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
 
@@ -36,7 +38,7 @@ public class DefaultValueColumnReader implements ColumnReader {
   private final int _numDocs;
   private final Object _defaultValue;
   private final FieldSpec _fieldSpec;
-  private final FieldSpec.DataType _dataType;
+  private final DataType _dataType;
 
   // Pre-computed multi-value arrays for reuse
   private int[] _defaultIntMV;
@@ -156,32 +158,37 @@ public class DefaultValueColumnReader implements ColumnReader {
 
   @Override
   public boolean isInt() {
-    return _dataType == FieldSpec.DataType.INT;
+    return _dataType == DataType.INT;
   }
 
   @Override
   public boolean isLong() {
-    return _dataType == FieldSpec.DataType.LONG;
+    return _dataType == DataType.LONG;
   }
 
   @Override
   public boolean isFloat() {
-    return _dataType == FieldSpec.DataType.FLOAT;
+    return _dataType == DataType.FLOAT;
   }
 
   @Override
   public boolean isDouble() {
-    return _dataType == FieldSpec.DataType.DOUBLE;
+    return _dataType == DataType.DOUBLE;
+  }
+
+  @Override
+  public boolean isBigDecimal() {
+    return _dataType == DataType.BIG_DECIMAL;
   }
 
   @Override
   public boolean isString() {
-    return _dataType == FieldSpec.DataType.STRING;
+    return _dataType == DataType.STRING;
   }
 
   @Override
   public boolean isBytes() {
-    return _dataType == FieldSpec.DataType.BYTES;
+    return _dataType == DataType.BYTES;
   }
 
   @Override
@@ -218,6 +225,15 @@ public class DefaultValueColumnReader implements ColumnReader {
     }
     _currentIndex++;
     return ((Number) _defaultValue).doubleValue();
+  }
+
+  @Override
+  public BigDecimal nextBigDecimal() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return (BigDecimal) _defaultValue;
   }
 
   @Override
@@ -332,6 +348,12 @@ public class DefaultValueColumnReader implements ColumnReader {
   public double getDouble(int docId) {
     validateDocId(docId);
     return ((Number) _defaultValue).doubleValue();
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int docId) {
+    validateDocId(docId);
+    return (BigDecimal) _defaultValue;
   }
 
   @Override
