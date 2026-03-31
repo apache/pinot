@@ -304,7 +304,8 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
         KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS,
         "Kafka topic '" + topic + "' metadata is not visible to consumers");
     // For transactional consumers, verify metadata is visible with read_committed isolation level too
-    TestUtils.waitForCondition(aVoid -> isKafkaTopicMetadataReadyForConsumer(topic, expectedPartitions, "read_committed"),
+    TestUtils.waitForCondition(
+        aVoid -> isKafkaTopicMetadataReadyForConsumer(topic, expectedPartitions, "read_committed"),
         200L, KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS,
         "Kafka topic '" + topic + "' metadata is not visible to read_committed consumers");
   }
@@ -328,7 +329,8 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
   private boolean isKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions, String isolationLevel) {
     Properties consumerProps = new Properties();
     consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
-    consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "pinot-kafka-topic-ready-" + isolationLevel + "-" + UUID.randomUUID());
+    consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG,
+        "pinot-kafka-topic-ready-" + isolationLevel + "-" + UUID.randomUUID());
     consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
     consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
     consumerProps.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, isolationLevel);
