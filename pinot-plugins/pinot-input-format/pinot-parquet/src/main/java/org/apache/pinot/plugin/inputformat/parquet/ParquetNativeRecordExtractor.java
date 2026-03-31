@@ -38,8 +38,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.joda.time.DateTimeConstants;
 
-import static java.lang.Math.pow;
-
 
 /**
  * ParquetNativeRecordExtractor extract values from Parquet {@link Group}.
@@ -56,34 +54,6 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
   private Set<String> _fields;
   private boolean _extractAll = false;
-
-  public static BigDecimal binaryToDecimal(Binary value, int precision, int scale) {
-    /*
-     * Precision <= 18 checks for the max number of digits for an unscaled long,
-     * else treat with big integer conversion
-     */
-    if (precision <= 18) {
-      ByteBuffer buffer = value.toByteBuffer();
-      byte[] bytes = buffer.array();
-      int start = buffer.arrayOffset() + buffer.position();
-      int end = buffer.arrayOffset() + buffer.limit();
-      long unscaled = 0L;
-      int i = start;
-      while (i < end) {
-        unscaled = (unscaled << 8 | bytes[i] & 0xff);
-        i++;
-      }
-      int bits = 8 * (end - start);
-      long unscaledNew = (unscaled << (64 - bits)) >> (64 - bits);
-      if (unscaledNew <= -pow(10, 18) || unscaledNew >= pow(10, 18)) {
-        return new BigDecimal(unscaledNew);
-      } else {
-        return BigDecimal.valueOf(unscaledNew / pow(10, scale));
-      }
-    } else {
-      return new BigDecimal(new BigInteger(value.getBytes()), scale);
-    }
-  }
 
   @Override
   public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
@@ -172,15 +142,11 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
         case BINARY:
         case FIXED_LEN_BYTE_ARRAY:
           if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
-            LogicalTypeAnnotation.DecimalLogicalTypeAnnotation decimalLogicalTypeAnnotation =
-                (LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalTypeAnnotation;
-            return binaryToDecimal(from.getBinary(fieldIndex, index), decimalLogicalTypeAnnotation.getPrecision(),
-                decimalLogicalTypeAnnotation.getScale());
+            return new BigDecimal(new BigInteger(from.getBinary(fieldIndex, index).getBytes()),
+                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalTypeAnnotation).getScale());
           }
-          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation) {
-            return from.getValueToString(fieldIndex, index);
-          }
-          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation
+              || logicalTypeAnnotation instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
             return from.getValueToString(fieldIndex, index);
           }
           return from.getBinary(fieldIndex, index).getBytes();
