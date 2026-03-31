@@ -208,6 +208,16 @@ public final class ComplexFieldSpec extends FieldSpec {
       childFieldSpecsNode.put(entry.getKey(), entry.getValue().toJsonObject());
     }
     jsonObject.put("childFieldSpecs", childFieldSpecsNode);
+    if (_keyTypes != null && !_keyTypes.isEmpty()) {
+      ObjectNode keyTypesNode = JsonUtils.newObjectNode();
+      for (Map.Entry<String, DataType> entry : _keyTypes.entrySet()) {
+        keyTypesNode.put(entry.getKey(), entry.getValue().name());
+      }
+      jsonObject.set("keyTypes", keyTypesNode);
+    }
+    if (_defaultValueType != null) {
+      jsonObject.put("defaultValueType", _defaultValueType.name());
+    }
     return jsonObject;
   }
 }
