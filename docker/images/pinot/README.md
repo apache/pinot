@@ -29,7 +29,7 @@ There is a docker build script which will build a given Git repo/branch and tag 
 Usage:
 
 ```SHELL
-./docker-build.sh [Docker Tag] [Git Branch] [Pinot Git URL] [Kafka Version] [Java Version] [JDK Version] [OpenJDK Image ]
+./docker-build.sh [Docker Tag] [Git Branch] [Pinot Git URL] [Kafka Version] [Java Version]
 ```
 
 This script will check out Pinot Repo `[Pinot Git URL]` on branch `[Git Branch]` and build the docker image for that.
@@ -44,11 +44,7 @@ The docker image is tagged as `[Docker Tag]`.
 
 `Kafka Version`: The Kafka Version to build pinot with. Default is `2.0`
 
-`Java Version`: The Java Build and Runtime image version. Default is `11`
-
-`JDK Version`: The JDK parameter to build pinot, set as part of maven build option: `-Djdk.version=${JDK_VERSION}`. Default is `11`
-
-`OpenJDK Image`: Base image to use for Pinot build and runtime. Default is `openjdk`.
+`Java Version`: The Java build and runtime image version. Default is `21`
 
 * Example of building and tagging a snapshot on your own fork:
 ```SHELL
@@ -62,21 +58,21 @@ The docker image is tagged as `[Docker Tag]`.
 
 ### Build image with arm64 base image
 
-For users on Mac M1 chips, they need to build the images with arm64 base image, e.g. `arm64v8/openjdk`
+For users on Mac M1 chips, build the image for the `linux/arm64` platform.
 
 * Example of building an arm64 image:
 ```SHELL
-./docker-build.sh pinot:latest master https://github.com/apache/pinot.git 2.0 11 11 arm64v8/openjdk
+./docker-build.sh pinot:latest master https://github.com/apache/pinot.git 2.0 21
 ```
 
 or just run the docker build script directly
 ```SHELL
-docker build -t pinot:latest --no-cache --network=host --build-arg PINOT_GIT_URL=https://github.com/apache/pinot.git --build-arg PINOT_BRANCH=master --build-arg JDK_VERSION=11 --build-arg OPENJDK_IMAGE=arm64v8/openjdk -f Dockerfile .
+docker build -t pinot:latest --no-cache --network=host --build-arg PINOT_GIT_URL=https://github.com/apache/pinot.git --build-arg PINOT_BRANCH=master --build-arg JDK_VERSION=21 -f Dockerfile .
 ```
 
 Note that if you are not on arm64 machine, you can still build the image by turning on the experimental feature of docker, and add `--platform linux/arm64` into the `docker build ...` script, e.g.
 ```SHELL
-docker build -t pinot:latest --platform linux/arm64 --no-cache --network=host --build-arg PINOT_GIT_URL=https://github.com/apache/pinot.git --build-arg PINOT_BRANCH=master --build-arg JDK_VERSION=11 --build-arg OPENJDK_IMAGE=arm64v8/openjdk -f Dockerfile .
+docker build -t pinot:latest --platform linux/arm64 --no-cache --network=host --build-arg PINOT_GIT_URL=https://github.com/apache/pinot.git --build-arg PINOT_BRANCH=master --build-arg JDK_VERSION=21 -f Dockerfile .
 ```
 
 ## How to publish a docker image

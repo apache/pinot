@@ -18,7 +18,7 @@
 #
 FROM debian:buster-slim
 
-ARG version=11.0.18.10-1
+ARG JAVA_VERSION=21
 # In addition to installing the Amazon corretto, we also install
 # fontconfig. The folks who manage the docker hub's
 # official image library have found that font management
@@ -38,11 +38,11 @@ RUN set -eux \
   && add-apt-repository 'deb https://apt.corretto.aws stable main' \
   && mkdir -p /usr/share/man/man1 || true \
   && apt-get update \
-  && apt-get install -y java-11-amazon-corretto-jdk=1:$version \
+  && apt-get install -y java-${JAVA_VERSION}-amazon-corretto-jdk \
   && rm -rf /var/lib/apt/lists/*
 
 ENV LANG C.UTF-8
-ENV JAVA_HOME=/usr/lib/jvm/java-11-amazon-corretto
+ENV JAVA_HOME=/usr/lib/jvm/java-${JAVA_VERSION}-amazon-corretto
 
 # install maven
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \

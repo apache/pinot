@@ -24,7 +24,7 @@ An interactive and batch command-line client for Apache Pinot. It supports a ric
 
 ## Requirements
 
-- Java 11+ on PATH (Java 22+ recommended for performance)
+- Java 21+ on PATH
 
 ## Build
 
@@ -167,5 +167,4 @@ pinot-clients/pinot-cli/target/pinot-cli-*-executable.jar \
 
 - CLI arguments take precedence over config file values.
 - Pager is only used in interactive mode. Batch mode prints directly to stdout.
-
 

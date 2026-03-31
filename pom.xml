@@ -110,7 +110,7 @@
   <properties>
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
-    <jdk.version>11</jdk.version>
+    <jdk.version>21</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <!-- Setting maven.compiler flags to the jdk version. These are used by maven plugins like maven-javadoc-plugin -->
@@ -351,6 +351,10 @@
                 <phase>validate</phase>
                 <configuration>
                   <rules>
+                    <requireJavaVersion>
+                      <version>[21,)</version>
+                      <message>Apache Pinot requires JDK 21 or newer to build.</message>
+                    </requireJavaVersion>
                     <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
                       <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
                         pinot-tools,contrib,pinot-dependency-verifier</skipModules>
@@ -2389,6 +2393,10 @@
               <phase>validate</phase>
               <configuration>
                 <rules>
+                  <requireJavaVersion>
+                    <version>[21,)</version>
+                    <message>Apache Pinot requires JDK 21 or newer to build.</message>
+                  </requireJavaVersion>
                   <dependencyConvergence/>
                   <bannedDependencies>
                     <excludes>

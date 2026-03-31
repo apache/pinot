@@ -28,7 +28,7 @@ if [ -z "${PINOT_GIT_URL}" ]; then
   PINOT_GIT_URL="https://github.com/apache/pinot.git"
 fi
 if [ -z "${JDK_VERSION}" ]; then
-  JDK_VERSION="11"
+  JDK_VERSION="21"
 fi
 
 
@@ -60,7 +60,7 @@ for runtimeImage in "${runtimeImages[@]}"; do
   for tag in "${tags[@]}"; do
     DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-${runtimeImage}-${platformTag} "
 
-    if [ "${runtimeImage}" == "11-amazoncorretto" ]; then
+    if [ "${runtimeImage}" == "21-amazoncorretto" ]; then
       if [ "${tag}" == "latest" ]; then
         DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:latest-${platformTag} "
       fi
@@ -80,7 +80,7 @@ for runtimeImage in "${runtimeImages[@]}"; do
   for tag in "${tags[@]}"; do
     docker push ${DOCKER_IMAGE_NAME}:${tag}-${runtimeImage}-${platformTag}
 
-    if [ "${runtimeImage}" == "11-amazoncorretto" ]; then
+    if [ "${runtimeImage}" == "21-amazoncorretto" ]; then
       if [ "${tag}" == "latest" ]; then
         docker push ${DOCKER_IMAGE_NAME}:${tag}-${platformTag}
       fi
