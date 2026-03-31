@@ -35,6 +35,6 @@ docker buildx build \
   --platform=${BUILD_PLATFORM} \
   --file ${OPEN_JDK_DIST}.dockerfile \
   --tag apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG} \
-  --build-arg JAVA_VERSION=${JDK_VERSION:-11} \
+  --build-arg JAVA_VERSION=${JDK_VERSION:-17} \
   --push \
   .

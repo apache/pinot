@@ -9,7 +9,7 @@ This document guides AI coding assistants (Copilot, Cursor, etc.) contributing t
 
 ## Libraries and Frameworks
 
-- Most source code is written in Java 11.
+- Most source code is written in Java 17.
 - Code in `pinot-clients` is written in Java 8.
 - Pinot UI is a React.js frontend. It is stored in `pinot-controller/src/main/resources/`.
 - The code is compiled with Maven and follows a multimodule structure. Use each module's `pom.xml` to

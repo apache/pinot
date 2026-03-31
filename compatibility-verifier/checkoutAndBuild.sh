@@ -76,7 +76,8 @@ function build() {
   local buildId=$3
   local buildCompatibilityVerifier=$4
   local repoOption=""
-  local versionOption="-Djdk.version=11"
+  # Let each checked-out revision build with its own configured Java baseline.
+  local versionOption=""
   local maxRetry=5
 
   mkdir -p ${MVN_CACHE_DIR}

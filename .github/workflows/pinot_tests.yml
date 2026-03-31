@@ -54,10 +54,10 @@ jobs:
     name: Pinot Linter Test Set
     steps:
       - uses: actions/checkout@v5
-      - name: Set up JDK 11
+      - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
-          java-version: 11
+          java-version: 17
           distribution: 'temurin'
           cache: 'maven'
       - name: Install pinot-dependency-verifier into repo
@@ -90,10 +90,10 @@ jobs:
     name: Pinot Binary Compatibility Check
     steps:
       - uses: actions/checkout@v5
-      - name: Set up JDK 11
+      - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
-          java-version: 11
+          java-version: 17
           distribution: 'temurin'
           cache: 'maven'
       # Step that does that actual cache save and restore
@@ -154,7 +154,7 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 21 ]
+        java: [ 17, 21 ]
         distribution: [ "temurin" ]
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
@@ -260,7 +260,7 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 21 ]
+        java: [ 17, 21 ]
         distribution: [ "temurin" ]
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
@@ -385,10 +385,10 @@ jobs:
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v5
-      - name: Set up JDK 11
+      - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
-          java-version: 11
+          java-version: 17
           distribution: 'temurin'
           cache: 'maven'
       - name: Setup node
@@ -443,10 +443,10 @@ jobs:
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v5
-      - name: Set up JDK 11
+      - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
-          java-version: 11
+          java-version: 17
           distribution: 'temurin'
           cache: 'maven'
       - name: Setup node
@@ -494,7 +494,7 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        java: [ 11, 21 ]
+        java: [ 17, 21 ]
         distribution: [ "temurin" ]
     name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
     steps:

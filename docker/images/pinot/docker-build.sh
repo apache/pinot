@@ -51,11 +51,11 @@ fi
 
 if [[ "$#" -gt 4 ]]
 then
-  JAVA_VERSION=$5
+  JDK_VERSION=$5
 else
-  JAVA_VERSION=11
+  JDK_VERSION=17
 fi
 
-echo "Trying to build Pinot docker image from Git URL: [ ${PINOT_GIT_URL} ] on branch: [ ${PINOT_BRANCH} ] and tag it as: [ ${DOCKER_TAG} ]. Kafka Dependencies: [ ${KAFKA_VERSION} ]. Java Version: [ ${JAVA_VERSION} ]."
+echo "Trying to build Pinot docker image from Git URL: [ ${PINOT_GIT_URL} ] on branch: [ ${PINOT_BRANCH} ] and tag it as: [ ${DOCKER_TAG} ]. Kafka Dependencies: [ ${KAFKA_VERSION} ]. JDK Version: [ ${JDK_VERSION} ]."
 
-docker build --no-cache -t ${DOCKER_TAG} --build-arg PINOT_BRANCH=${PINOT_BRANCH} --build-arg PINOT_GIT_URL=${PINOT_GIT_URL} --build-arg KAFKA_VERSION=${KAFKA_VERSION} --build-arg JAVA_VERSION=${JAVA_VERSION} -f Dockerfile .
+docker build --no-cache -t ${DOCKER_TAG} --build-arg PINOT_BRANCH=${PINOT_BRANCH} --build-arg PINOT_GIT_URL=${PINOT_GIT_URL} --build-arg KAFKA_VERSION=${KAFKA_VERSION} --build-arg JDK_VERSION=${JDK_VERSION} -f Dockerfile .

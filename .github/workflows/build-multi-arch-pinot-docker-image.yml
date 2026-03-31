@@ -59,7 +59,7 @@ jobs:
     strategy:
       matrix:
         arch: [ "amd64", "arm64" ]
-        base-image-tag: [ "11-amazoncorretto", "11-ms-openjdk" ]
+        base-image-tag: [ "17-amazoncorretto", "17-ms-openjdk" ]
         include:
           - arch: amd64
             runner: ubuntu-24.04
@@ -82,6 +82,7 @@ jobs:
           DOCKER_IMAGE_NAME: ${{ github.event.inputs.dockerImageName }}
           BUILD_PLATFORM: "linux/${{ matrix.arch }}"
           BASE_IMAGE_TAG: ${{ matrix.base-image-tag }}
+          JDK_VERSION: "17"
           PINOT_GIT_URL: ${{ github.event.inputs.gitUrl }}
           PINOT_BRANCH: "${{needs.generate-build-info.outputs.commit-id}}"
           TAGS: "${{needs.generate-build-info.outputs.tags}}"
@@ -101,5 +102,5 @@ jobs:
         env:
           TAGS: "${{needs.generate-build-info.outputs.tags}}"
           BUILD_PLATFORM: "linux/arm64,linux/amd64"
-          BASE_IMAGE_TAGS: "11-amazoncorretto,11-ms-openjdk"
+          BASE_IMAGE_TAGS: "17-amazoncorretto,17-ms-openjdk"
         run: .github/workflows/scripts/docker/.pinot_multi_arch_docker_image_manifest_package.sh
