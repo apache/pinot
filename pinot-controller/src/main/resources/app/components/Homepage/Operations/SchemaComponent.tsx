@@ -22,7 +22,6 @@ import { createStyles, FormControl, Grid, IconButton, Input, InputLabel, makeSty
 import AddIcon from '@material-ui/icons/Add';
 import ClearIcon from '@material-ui/icons/Clear';
 import { Autocomplete } from '@material-ui/lab';
-import { debug } from 'webpack';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({

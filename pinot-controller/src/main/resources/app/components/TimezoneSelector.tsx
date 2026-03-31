@@ -78,15 +78,12 @@ const TimezoneSelector: React.FC<TimezoneSelectorProps> = ({
   const classes = useStyles();
   const { currentTimezone, setTimezone } = useTimezone();
   const [searchTerm, setSearchTerm] = useState('');
-  const [standardTimezones, setStandardTimezones] = useState<Array<{ value: string; label: string }>>([]);
-  const [filteredTimezones, setFilteredTimezones] = useState<Array<{ value: string; label: string }>>([]);
-
-  useEffect(() => {
-    // Load standardized timezones
-    const timezones = getStandardTimezones();
-    setStandardTimezones(timezones);
-    setFilteredTimezones(timezones);
-  }, []);
+  const [standardTimezones] = useState<Array<{ value: string; label: string }>>(() => getStandardTimezones());
+  const [filteredTimezones, setFilteredTimezones] = useState<Array<{ value: string; label: string }>>(() => getStandardTimezones());
+  const selectedTimezone = standardizeTimezone(currentTimezone);
+  const selectedTimezoneValue = standardTimezones.some((timezone) => timezone.value === selectedTimezone)
+    ? selectedTimezone
+    : '';
 
   useEffect(() => {
     // Filter timezones based on search term
@@ -122,7 +119,7 @@ const TimezoneSelector: React.FC<TimezoneSelectorProps> = ({
     <FormControl variant={variant} size={size} className={classes.formControl}>
       <InputLabel>Timezone</InputLabel>
       <Select
-        value={standardizeTimezone(currentTimezone)}
+        value={selectedTimezoneValue}
         onChange={handleTimezoneChange}
         className={classes.select}
         MenuProps={{

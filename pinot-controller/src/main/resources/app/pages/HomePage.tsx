@@ -91,38 +91,6 @@ const HomePage = () => {
 
   const { taskTypes, taskTypesTable } = useTaskTypesTable();
 
-  const fetchData = async () => {
-    PinotMethodUtils.getAllInstances().then((res) => {
-      setControllerCount(res[InstanceType.CONTROLLER].length);
-      setBrokerCount(res[InstanceType.BROKER].length);
-      setServerCount(res[InstanceType.SERVER].length);
-      setMinionCount(res[InstanceType.MINION].length);
-      setInstances(res);
-      setFetchingInstances(false);
-    });
-
-    PinotMethodUtils.getQueryTablesList({ bothType: true }).then((res) => {
-      setTablesCount(res.records.length);
-      setFetchingTables(false);
-    });
-
-    getTenants().then((res) => {
-      const tenantNames = union(
-        res.data.SERVER_TENANTS,
-        res.data.BROKER_TENANTS
-      );
-      setTenantscount(tenantNames.length);
-      setFetchingTenants(false);
-    });
-
-    fetchClusterName().then((clusterNameRes) => {
-      setClusterName(clusterNameRes);
-      PinotMethodUtils.getLiveInstance(clusterNameRes).then((res) => {
-        setLiveInstanceNames(res.data || []);
-      });
-    });
-  };
-
   const fetchClusterName = () => {
     let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
     if (!clusterNameRes) {
@@ -133,7 +101,56 @@ const HomePage = () => {
   };
 
   useEffect(() => {
-    fetchData();
+    let isMounted = true;
+
+    PinotMethodUtils.getAllInstances().then((res) => {
+      if (!isMounted) {
+        return;
+      }
+      setControllerCount(res[InstanceType.CONTROLLER].length);
+      setBrokerCount(res[InstanceType.BROKER].length);
+      setServerCount(res[InstanceType.SERVER].length);
+      setMinionCount(res[InstanceType.MINION].length);
+      setInstances(res);
+      setFetchingInstances(false);
+    });
+
+    PinotMethodUtils.getQueryTablesList({ bothType: true }).then((res) => {
+      if (!isMounted) {
+        return;
+      }
+      setTablesCount(res.records.length);
+      setFetchingTables(false);
+    });
+
+    getTenants().then((res) => {
+      if (!isMounted) {
+        return;
+      }
+      const tenantNames = union(
+        res.data.SERVER_TENANTS,
+        res.data.BROKER_TENANTS
+      );
+      setTenantscount(tenantNames.length);
+      setFetchingTenants(false);
+    });
+
+    fetchClusterName().then((clusterNameRes) => {
+      if (!isMounted) {
+        return;
+      }
+      setClusterName(clusterNameRes);
+      PinotMethodUtils.getLiveInstance(clusterNameRes).then((res) => {
+        if (!isMounted) {
+          return;
+        }
+        setLiveInstanceNames(res.data || []);
+      });
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const loading = <Skeleton animation={'wave'} width={50} />;
