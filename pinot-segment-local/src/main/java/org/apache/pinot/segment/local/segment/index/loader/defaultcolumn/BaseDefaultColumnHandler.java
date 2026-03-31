@@ -1234,25 +1234,29 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       int numDocs, String column, boolean hasDictionary)
       throws Exception {
 
-    IndexCreationContext indexCreationContext = IndexCreationContext.builder()
-        .withIndexDir(_indexDir)
-        .withFieldSpec(fieldSpec)
-        .withColumnIndexCreationInfo(indexCreationInfo)
-        .withTotalDocs(numDocs)
-        .withDictionary(hasDictionary)
-        .withTableNameWithType(_tableConfig.getTableName())
-        .withContinueOnError(_tableConfig.getIngestionConfig() != null
-            && _tableConfig.getIngestionConfig().isContinueOnError())
-        .build();
-
     ForwardIndexConfig forwardIndexConfig = null;
     FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
     if (fieldIndexConfig != null) {
       forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
     }
     if (forwardIndexConfig == null) {
-      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null, null);
+      forwardIndexConfig = new ForwardIndexConfig.Builder().withForwardIndexEncoding(
+          hasDictionary ? IndexCreationContext.ForwardIndexEncoding.DICTIONARY
+              : IndexCreationContext.ForwardIndexEncoding.RAW).build();
     }
+
+    IndexCreationContext indexCreationContext = IndexCreationContext.builder()
+        .withIndexDir(_indexDir)
+        .withFieldSpec(fieldSpec)
+        .withColumnIndexCreationInfo(indexCreationInfo)
+        .withTotalDocs(numDocs)
+        .withDictionary(hasDictionary)
+        .withForwardIndexConfig(forwardIndexConfig)
+        .withForwardIndexEncoding(forwardIndexConfig.getForwardIndexEncoding())
+        .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
+        .build();
     return StandardIndexes.forward().createIndexCreator(indexCreationContext, forwardIndexConfig);
   }
 
@@ -1266,9 +1270,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         throws IOException, IndexReaderConstraintException {
 
       IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-      FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
-          .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
-          .build();
+      ForwardIndexConfig forwardIndexConfig = null;
+      FieldIndexConfigs fieldIndexConfigs =
+          _indexLoadingConfig.getFieldIndexConfigByColName().get(columnMetadata.getColumnName());
+      if (fieldIndexConfigs != null) {
+        forwardIndexConfig = fieldIndexConfigs.getConfig(StandardIndexes.forward());
+      }
+      if (forwardIndexConfig == null) {
+        forwardIndexConfig = new ForwardIndexConfig.Builder()
+            .withForwardIndexEncoding(columnMetadata.getForwardIndexEncoding()).build();
+      }
+      fieldIndexConfigs = new FieldIndexConfigs.Builder().add(StandardIndexes.forward(), forwardIndexConfig).build();
       _forwardIndexReader = readerFactory.createIndexReader(_segmentWriter, fieldIndexConfigs, columnMetadata);
       if (columnMetadata.hasDictionary()) {
         _dictionary = DictionaryIndexType.read(_segmentWriter, columnMetadata);

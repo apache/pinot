@@ -109,20 +109,25 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
       FieldSpec fieldSpec) {
     String column = fieldSpec.getName();
     CompressionCodec compressionCodec = forwardIndexConfig.getCompressionCodec();
-    DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
-    if (dictionaryConfig.isEnabled()) {
-      Preconditions.checkState(compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex(),
-          "Compression codec: %s is not applicable to dictionary encoded column: %s", compressionCodec, column);
-    } else {
+    if (compressionCodec == null) {
+      // No explicit codec — compatible with both dict-encoded and raw forward indexes.
+      return;
+    }
+    // A column may have dictionaryConfig.isEnabled()=true because a secondary index (inverted, FST) needs it,
+    // while the forward index remains raw. Use the codec's applicability to decide validation path:
+    // if the codec is applicable to raw indexes, validate as raw-forward.
+    if (compressionCodec.isApplicableToRawIndex()) {
       boolean isCLPCodec = compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
           || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4;
       if (isCLPCodec) {
         Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
             "Cannot apply CLP compression codec to column: %s of stored type other than STRING", column);
-      } else {
-        Preconditions.checkState(compressionCodec == null || compressionCodec.isApplicableToRawIndex(),
-            "Compression codec: %s is not applicable to raw column: %s", compressionCodec, column);
       }
+    } else {
+      // Dict-only codec (e.g., MV_ENTRY_DICT) — dictionary must be present
+      DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
+      Preconditions.checkState(dictionaryConfig.isEnabled(),
+          "Compression codec: %s requires dictionary for column: %s", compressionCodec, column);
     }
   }
 
@@ -221,7 +226,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Override
   public ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
       throws Exception {
-    return ForwardIndexCreatorFactory.createIndexCreator(context, indexConfig);
+    return ForwardIndexCreatorFactory.createIndexCreator(context);
   }
 
   @Override

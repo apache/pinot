@@ -25,16 +25,27 @@ import java.util.Collections;
 import java.util.List;
 import java.util.OptionalInt;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -116,6 +127,63 @@ public class FilterOperatorUtilsTest {
     filterOperator = FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT,
         Arrays.asList(MATCH_ALL_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
+  }
+
+  @Test
+  public void testLeafFilterOperatorFallsBackToScanForNonDictionaryPredicateEvaluator() {
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.isNullHandlingEnabled()).thenReturn(false);
+    when(queryContext.isIndexUseAllowed(any(DataSource.class), eq(FieldConfig.IndexType.INVERTED))).thenReturn(true);
+
+    DataSource dataSource = mock(DataSource.class);
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    FieldSpec fieldSpec = mock(FieldSpec.class);
+    when(dataSourceMetadata.isSorted()).thenReturn(false);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSourceMetadata.isSingleValue()).thenReturn(true);
+    when(dataSourceMetadata.getFieldSpec()).thenReturn(fieldSpec);
+    when(fieldSpec.getName()).thenReturn("testColumn");
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+    when(dataSource.getForwardIndex()).thenReturn(mock(ForwardIndexReader.class));
+
+    PredicateEvaluator predicateEvaluator = mock(PredicateEvaluator.class);
+    when(predicateEvaluator.isAlwaysFalse()).thenReturn(false);
+    when(predicateEvaluator.isAlwaysTrue()).thenReturn(false);
+    when(predicateEvaluator.getPredicateType()).thenReturn(Predicate.Type.EQ);
+    when(predicateEvaluator.isDictionaryBased()).thenReturn(false);
+    when(predicateEvaluator.isExclusive()).thenReturn(false);
+
+    when(dataSource.getInvertedIndex()).thenReturn(mock(InvertedIndexReader.class));
+    BaseFilterOperator filterOperator =
+        FilterOperatorUtils.getLeafFilterOperator(queryContext, predicateEvaluator, dataSource, NUM_DOCS);
+    assertTrue(filterOperator instanceof ScanBasedFilterOperator);
+  }
+
+  @Test
+  public void testLeafFilterOperatorUsesStandardInvertedIndexWhenDictionaryBased()
+      throws Exception {
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.isNullHandlingEnabled()).thenReturn(false);
+    when(queryContext.isIndexUseAllowed(any(DataSource.class), eq(FieldConfig.IndexType.INVERTED))).thenReturn(true);
+
+    DataSource dataSource = mock(DataSource.class);
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.isSorted()).thenReturn(false);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSourceMetadata.isSingleValue()).thenReturn(true);
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+    when(dataSource.getInvertedIndex()).thenReturn(mock(InvertedIndexReader.class));
+
+    PredicateEvaluator predicateEvaluator = mock(PredicateEvaluator.class);
+    when(predicateEvaluator.isAlwaysFalse()).thenReturn(false);
+    when(predicateEvaluator.isAlwaysTrue()).thenReturn(false);
+    when(predicateEvaluator.getPredicateType()).thenReturn(Predicate.Type.EQ);
+    when(predicateEvaluator.isDictionaryBased()).thenReturn(true);
+    when(predicateEvaluator.isExclusive()).thenReturn(false);
+
+    BaseFilterOperator filterOperator =
+        FilterOperatorUtils.getLeafFilterOperator(queryContext, predicateEvaluator, dataSource, NUM_DOCS);
+    assertTrue(filterOperator instanceof InvertedIndexFilterOperator);
   }
 
   @DataProvider

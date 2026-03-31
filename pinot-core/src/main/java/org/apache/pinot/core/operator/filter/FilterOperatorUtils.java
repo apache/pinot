@@ -124,9 +124,8 @@ public class FilterOperatorUtils {
         }
         if (dataSource.getInvertedIndex() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
-          // Use raw value inverted index filter operator for raw encoded columns
           if (!predicateEvaluator.isDictionaryBased()) {
-            return new RawValueInvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+            return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
           }
           return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
@@ -225,8 +224,7 @@ public class FilterOperatorUtils {
             return PrioritizedFilterOperator.HIGH_PRIORITY;
           }
           if (filterOperator instanceof BitmapBasedFilterOperator
-              || filterOperator instanceof InvertedIndexFilterOperator
-              || filterOperator instanceof RawValueInvertedIndexFilterOperator) {
+              || filterOperator instanceof InvertedIndexFilterOperator) {
             return PrioritizedFilterOperator.MEDIUM_PRIORITY;
           }
           if (filterOperator instanceof RangeIndexBasedFilterOperator

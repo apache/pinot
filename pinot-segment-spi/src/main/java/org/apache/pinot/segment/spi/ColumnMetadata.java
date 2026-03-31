@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -78,6 +79,15 @@ public interface ColumnMetadata {
 
   @JsonProperty
   boolean hasDictionary();
+
+  default IndexCreationContext.ForwardIndexEncoding getForwardIndexEncoding() {
+    return hasDictionary() ? IndexCreationContext.ForwardIndexEncoding.DICTIONARY
+        : IndexCreationContext.ForwardIndexEncoding.RAW;
+  }
+
+  default boolean isForwardIndexDictionaryEncoded() {
+    return getForwardIndexEncoding() == IndexCreationContext.ForwardIndexEncoding.DICTIONARY;
+  }
 
   int getColumnMaxLength();
 

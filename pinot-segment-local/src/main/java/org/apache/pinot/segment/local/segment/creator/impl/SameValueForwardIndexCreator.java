@@ -46,6 +46,11 @@ class SameValueForwardIndexCreator implements ForwardIndexCreator {
   }
 
   @Override
+  public void add(Object cellValue, int dictId) {
+    addRaw(cellValue);
+  }
+
+  @Override
   public boolean isSingleValue() {
     return _delegate.isSingleValue();
   }

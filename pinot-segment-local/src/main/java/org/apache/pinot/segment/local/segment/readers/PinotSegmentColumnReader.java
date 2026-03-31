@@ -93,8 +93,8 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public Object getValue(int docId) {
-    if (_dictionary != null) {
-      // Dictionary based
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
+      // Dictionary-encoded forward index
       if (_forwardIndexReader.isSingleValue()) {
         return _dictionary.get(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
       } else {
@@ -187,7 +187,7 @@ public class PinotSegmentColumnReader implements Closeable {
   // Single-value accessors
 
   public int getInt(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       return _dictionary.getIntValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getInt(docId, _forwardIndexReaderContext);
@@ -195,7 +195,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public long getLong(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       return _dictionary.getLongValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getLong(docId, _forwardIndexReaderContext);
@@ -203,7 +203,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public float getFloat(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       return _dictionary.getFloatValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getFloat(docId, _forwardIndexReaderContext);
@@ -211,7 +211,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public double getDouble(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       return _dictionary.getDoubleValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getDouble(docId, _forwardIndexReaderContext);
@@ -227,7 +227,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public String getString(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       return _dictionary.getStringValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getString(docId, _forwardIndexReaderContext);
@@ -235,7 +235,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public byte[] getBytes(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       return _dictionary.getBytesValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getBytes(docId, _forwardIndexReaderContext);
@@ -245,7 +245,7 @@ public class PinotSegmentColumnReader implements Closeable {
   // Multi-value accessors
 
   public int[] getIntMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       int[] values = new int[numValues];
       _dictionary.readIntValues(_dictIdBuffer, numValues, values);
@@ -256,7 +256,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public long[] getLongMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       long[] values = new long[numValues];
       _dictionary.readLongValues(_dictIdBuffer, numValues, values);
@@ -267,7 +267,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public float[] getFloatMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       float[] values = new float[numValues];
       _dictionary.readFloatValues(_dictIdBuffer, numValues, values);
@@ -278,7 +278,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public double[] getDoubleMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       double[] values = new double[numValues];
       _dictionary.readDoubleValues(_dictIdBuffer, numValues, values);
@@ -289,7 +289,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public String[] getStringMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       String[] values = new String[numValues];
       _dictionary.readStringValues(_dictIdBuffer, numValues, values);
@@ -300,7 +300,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public byte[][] getBytesMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded() && _dictionary != null) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       byte[][] values = new byte[numValues][];
       _dictionary.readBytesValues(_dictIdBuffer, numValues, values);

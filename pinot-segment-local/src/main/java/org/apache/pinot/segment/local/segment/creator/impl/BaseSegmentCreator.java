@@ -198,10 +198,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     ColumnIndexCreationInfo columnIndexCreationInfo = _indexCreationInfoMap.get(fieldSpec.getName());
     FieldIndexConfigs fieldIndexConfig = _config.getIndexConfigsByColName().get(fieldSpec.getName());
     boolean forwardIndexDisabled = !fieldIndexConfig.getConfig(StandardIndexes.forward()).isEnabled();
+    ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
 
     return IndexCreationContext.builder()
         .withIndexDir(_indexDir)
         .withDictionary(dictEnabledColumn)
+        .withForwardIndexConfig(forwardIndexConfig)
+        .withForwardIndexEncoding(forwardIndexConfig.getForwardIndexEncoding())
         .withFieldSpec(fieldSpec)
         .withTotalDocs(_totalDocs)
         .withColumnIndexCreationInfo(columnIndexCreationInfo)
@@ -367,8 +370,21 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     String column = spec.getName();
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
+    // Infer dictionary existence based on index
+    boolean dictionaryRequired = DictionaryIndexConfig.isDictionaryRequired(spec, fieldIndexConfigs);
     if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
+      if (dictionaryRequired) {
+        LOGGER.warn("Found indexes {} require dictionary, but dictionary is disabled explicitly.",
+            DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(spec, fieldIndexConfigs));
+      }
       return false;
+    }
+
+    // If any enabled index requires a dictionary for this column, short-circuit the optimization heuristics.
+    // Otherwise, optimizeDictionary* could override the dictionary requirement and cause index creation failures
+    // (e.g., FST/IFST expect a dictionary but the column gets switched to no-dictionary).
+    if (dictionaryRequired) {
+      return true;
     }
 
     return DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),
@@ -537,8 +553,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       ColumnIndexCreationInfo columnIndexCreationInfo = entry.getValue();
       SegmentDictionaryCreator dictionaryCreator = _colIndexes.get(column).getDictionaryCreator();
       int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerEntry() : 0;
+      IndexCreationContext.ForwardIndexEncoding forwardIndexEncoding =
+          _config.getIndexConfigsByColName().get(column).getConfig(StandardIndexes.forward()).getForwardIndexEncoding();
       addColumnMetadataInfo(properties, column, columnIndexCreationInfo, _totalDocs, _schema.getFieldSpecFor(column),
-          dictionaryCreator != null, dictionaryElementSize);
+          dictionaryCreator != null, dictionaryElementSize, forwardIndexEncoding);
     }
 
     SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();
@@ -555,6 +573,14 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
       ColumnIndexCreationInfo columnIndexCreationInfo, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
       int dictionaryElementSize) {
+    addColumnMetadataInfo(properties, column, columnIndexCreationInfo, totalDocs, fieldSpec, hasDictionary,
+        dictionaryElementSize, hasDictionary ? IndexCreationContext.ForwardIndexEncoding.DICTIONARY
+            : IndexCreationContext.ForwardIndexEncoding.RAW);
+  }
+
+  public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
+      ColumnIndexCreationInfo columnIndexCreationInfo, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
+      int dictionaryElementSize, IndexCreationContext.ForwardIndexEncoding forwardIndexEncoding) {
     int cardinality = columnIndexCreationInfo.getDistinctValueCount();
     properties.setProperty(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
@@ -572,6 +598,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldType));
     properties.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(columnIndexCreationInfo.isSorted()));
     properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));
+    properties.setProperty(getKeyFor(column, FORWARD_INDEX_ENCODING), forwardIndexEncoding.name());
     properties.setProperty(getKeyFor(column, IS_SINGLE_VALUED), String.valueOf(fieldSpec.isSingleValueField()));
     properties.setProperty(getKeyFor(column, MAX_MULTI_VALUE_ELEMENTS),
         String.valueOf(columnIndexCreationInfo.getMaxNumberOfMultiValueElements()));

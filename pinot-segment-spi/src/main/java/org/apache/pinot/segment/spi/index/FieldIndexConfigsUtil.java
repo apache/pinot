@@ -24,8 +24,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -46,9 +48,50 @@ public class FieldIndexConfigsUtil {
     for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
       readConfig(builderMap, indexType, tableConfig, schema, deserializerProvider);
     }
-
-    return builderMap.entrySet().stream()
+    Map<String, FieldIndexConfigs> configsByCol = builderMap.entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().build()));
+    // Handles dictionary implicit enablement, e.g. inverted index
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      FieldIndexConfigs fieldIndexConfigs = configsByCol.get(fieldSpec.getName());
+      if (fieldIndexConfigs == null) {
+        continue;
+      }
+      IndexConfig dictionaryIndexConfig = fieldIndexConfigs.getConfig(StandardIndexes.dictionary());
+      if (dictionaryIndexConfig == null || dictionaryIndexConfig.isDisabled()) {
+        if (DictionaryIndexConfig.isDictionaryRequired(fieldSpec, fieldIndexConfigs)) {
+          FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder(fieldIndexConfigs)
+              .undeclare(StandardIndexes.dictionary())
+              .add(StandardIndexes.dictionary(), DictionaryIndexConfig.DEFAULT);
+          configsByCol.put(fieldSpec.getName(), builder.build());
+        }
+      }
+    }
+
+    Set<String> rawForwardColumns = ForwardIndexUtils.getRawForwardIndexColumns(tableConfig);
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      FieldIndexConfigs fieldIndexConfigs = configsByCol.get(fieldSpec.getName());
+      if (fieldIndexConfigs == null) {
+        continue;
+      }
+      ForwardIndexConfig forwardIndexConfig = fieldIndexConfigs.getConfig(StandardIndexes.forward());
+      if (forwardIndexConfig.isDisabled()) {
+        continue;
+      }
+      // The encoding is always derived from FieldConfig.encodingType or legacy noDictionaryColumns config,
+      // not from ForwardIndexConfig. FieldConfig.encodingType is the source of truth for RAW vs DICTIONARY.
+      IndexCreationContext.ForwardIndexEncoding forwardIndexEncoding =
+          rawForwardColumns.contains(fieldSpec.getName())
+              ? IndexCreationContext.ForwardIndexEncoding.RAW
+              : IndexCreationContext.ForwardIndexEncoding.DICTIONARY;
+      if (forwardIndexConfig.getForwardIndexEncoding() != forwardIndexEncoding) {
+        FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder(fieldIndexConfigs);
+        builder.add(StandardIndexes.forward(),
+            new ForwardIndexConfig.Builder(forwardIndexConfig).withForwardIndexEncoding(forwardIndexEncoding).build());
+        configsByCol.put(fieldSpec.getName(), builder.build());
+      }
+    }
+
+    return configsByCol;
   }
 
   @FunctionalInterface
