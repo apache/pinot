@@ -140,6 +140,23 @@ public class PinotAdminClientTest {
   }
 
   @Test
+  public void testGetTypedTableConfig()
+      throws Exception {
+    TableConfig expectedTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("tbl1").build();
+    String jsonResponse = "{\"OFFLINE\":" + JsonUtils.objectToString(expectedTableConfig) + "}";
+    JsonNode mockResponse = new ObjectMapper().readTree(jsonResponse);
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(mockResponse);
+
+    TableConfig tableConfig = _adminClient.getTableClient().getTableConfigObjectForType("tbl1", TableType.OFFLINE);
+
+    assertEquals(tableConfig.getTableName(), "tbl1_OFFLINE");
+    assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/tables/tbl1"), eq(Map.of("type", "OFFLINE")),
+        eq(HEADERS));
+  }
+
+  @Test
   public void testListSchemas()
       throws Exception {
     String jsonResponse = "{\"schemas\": [\"sch1\", \"sch2\"]}";

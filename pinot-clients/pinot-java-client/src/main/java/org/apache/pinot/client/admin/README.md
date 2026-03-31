@@ -55,6 +55,9 @@ The admin client consists of:
 
 ```java
 import org.apache.pinot.client.admin.*;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 
 // Create client without authentication
 try(PinotAdminClient adminClient = new PinotAdminClient("localhost:9000")){
@@ -63,6 +66,9 @@ List<String> tables = adminClient.getTableClient().listTables(null, null, null);
 
 // Get a specific table configuration
 String config = adminClient.getTableClient().getTableConfig("myTable");
+
+// Get a typed table configuration
+TableConfig offlineConfig = adminClient.getTableClient().getTableConfigObjectForType("myTable", TableType.OFFLINE);
 
 // List schemas
 List<String> schemas = adminClient.getSchemaClient().listSchemaNames();
@@ -152,7 +158,7 @@ List<String> schemas = schemaClient.listSchemaNames();
 // Get schema configuration as JSON
 String schema = schemaClient.getSchema("mySchema");
 
-// Get a typed Schema object
+// Get a typed schema object
 Schema schemaObject = schemaClient.getSchemaObject("mySchema");
 
 // Create a new schema
