@@ -19,9 +19,10 @@
 package org.apache.pinot.segment.local.segment.readers;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
 
@@ -40,7 +41,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   private final PinotSegmentColumnReader _segmentColumnReader;
   private final String _columnName;
   private final int _numDocs;
-  private final FieldSpec.DataType _dataType;
+  private final DataType _dataType;
   private final boolean _skipDefaultNullValues;
 
   private int _currentIndex;
@@ -87,7 +88,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
    *                              the segment's stored value (which contains the default).
    */
   public PinotSegmentColumnReaderImpl(PinotSegmentColumnReader segmentColumnReader, String columnName,
-      int numDocs, FieldSpec.DataType dataType, boolean skipDefaultNullValues) {
+      int numDocs, DataType dataType, boolean skipDefaultNullValues) {
     _segmentColumnReader = segmentColumnReader;
     _columnName = columnName;
     _numDocs = numDocs;
@@ -148,32 +149,37 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
 
   @Override
   public boolean isInt() {
-    return _dataType == FieldSpec.DataType.INT;
+    return _dataType == DataType.INT;
   }
 
   @Override
   public boolean isLong() {
-    return _dataType == FieldSpec.DataType.LONG;
+    return _dataType == DataType.LONG;
   }
 
   @Override
   public boolean isFloat() {
-    return _dataType == FieldSpec.DataType.FLOAT;
+    return _dataType == DataType.FLOAT;
   }
 
   @Override
   public boolean isDouble() {
-    return _dataType == FieldSpec.DataType.DOUBLE;
+    return _dataType == DataType.DOUBLE;
+  }
+
+  @Override
+  public boolean isBigDecimal() {
+    return _dataType == DataType.BIG_DECIMAL;
   }
 
   @Override
   public boolean isString() {
-    return _dataType == FieldSpec.DataType.STRING;
+    return _dataType == DataType.STRING;
   }
 
   @Override
   public boolean isBytes() {
-    return _dataType == FieldSpec.DataType.BYTES;
+    return _dataType == DataType.BYTES;
   }
 
   @Override
@@ -212,6 +218,16 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
       throw new IllegalStateException("No more values available");
     }
     double value = _segmentColumnReader.getDouble(_currentIndex);
+    _currentIndex++;
+    return value;
+  }
+
+  @Override
+  public BigDecimal nextBigDecimal() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    BigDecimal value = _segmentColumnReader.getBigDecimal(_currentIndex);
     _currentIndex++;
     return value;
   }
@@ -342,6 +358,11 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   @Override
   public double getDouble(int docId) {
     return _segmentColumnReader.getDouble(docId);
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int docId) {
+    return _segmentColumnReader.getBigDecimal(docId);
   }
 
   @Override

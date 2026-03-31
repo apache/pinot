@@ -56,27 +56,33 @@ public class DataTypeColumnTransformer implements ColumnTransformer {
     // If source and destination data types are primitive types and the same, no transformation is needed.
     if (_columnReader.isSingleValue()) {
       if (_columnReader.isInt()) {
-        return _destDataType.equals(PinotDataType.INTEGER);
+        return _destDataType == PinotDataType.INTEGER;
       } else if (_columnReader.isLong()) {
-        return _destDataType.equals(PinotDataType.LONG);
+        return _destDataType == PinotDataType.LONG;
       } else if (_columnReader.isFloat()) {
-        return _destDataType.equals(PinotDataType.FLOAT);
+        return _destDataType == PinotDataType.FLOAT;
       } else if (_columnReader.isDouble()) {
-        return _destDataType.equals(PinotDataType.DOUBLE);
+        return _destDataType == PinotDataType.DOUBLE;
+      } else if (_columnReader.isBigDecimal()) {
+        return _destDataType == PinotDataType.BIG_DECIMAL;
       } else if (_columnReader.isString()) {
-        return _destDataType.equals(PinotDataType.STRING);
+        return _destDataType == PinotDataType.STRING;
+      } else if (_columnReader.isBytes()) {
+        return _destDataType == PinotDataType.BYTES;
       }
     } else {
       if (_columnReader.isInt()) {
-        return _destDataType.equals(PinotDataType.INTEGER_ARRAY);
+        return _destDataType == PinotDataType.INTEGER_ARRAY;
       } else if (_columnReader.isLong()) {
-        return _destDataType.equals(PinotDataType.LONG_ARRAY);
+        return _destDataType == PinotDataType.LONG_ARRAY;
       } else if (_columnReader.isFloat()) {
-        return _destDataType.equals(PinotDataType.FLOAT_ARRAY);
+        return _destDataType == PinotDataType.FLOAT_ARRAY;
       } else if (_columnReader.isDouble()) {
-        return _destDataType.equals(PinotDataType.DOUBLE_ARRAY);
+        return _destDataType == PinotDataType.DOUBLE_ARRAY;
       } else if (_columnReader.isString()) {
-        return _destDataType.equals(PinotDataType.STRING_ARRAY);
+        return _destDataType == PinotDataType.STRING_ARRAY;
+      } else if (_columnReader.isBytes()) {
+        return _destDataType == PinotDataType.BYTES_ARRAY;
       }
     }
     // For other types, because there is no overhead to cast to Object, always call transform() which handles all cases
