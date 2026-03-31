@@ -50,7 +50,7 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql2rel.RelDecorrelator;
+import org.apache.calcite.sql2rel.PinotRelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
@@ -450,10 +450,10 @@ public class QueryEnvironment {
       }
       RelNode rootNode = relRoot.rel;
       try {
-        // NOTE: DO NOT use converter.decorrelate(sqlNode, rootNode) because the converted type check can fail. This is
-        //       probably a bug in Calcite.
+        // NOTE: Use PinotRelDecorrelator instead of RelDecorrelator.decorrelateQuery because Calcite 1.41.0 has
+        //       a strict type assertion (CALCITE-7379) that fails when decorrelation changes nullability.
         RelBuilder relBuilder = PinotRuleUtils.PINOT_REL_FACTORY.create(cluster, null);
-        rootNode = RelDecorrelator.decorrelateQuery(rootNode, relBuilder);
+        rootNode = PinotRelDecorrelator.decorrelateQuery(rootNode, relBuilder);
       } catch (Throwable e) {
         throw new RuntimeException("Failed to decorrelate query:\n" + RelOptUtil.toString(rootNode), e);
       }

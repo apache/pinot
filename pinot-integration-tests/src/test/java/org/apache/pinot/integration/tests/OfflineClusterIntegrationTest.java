@@ -2949,9 +2949,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testQueryWithRepeatedColumnsV1()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryWithRepeatedColumns(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     //test repeated columns in selection query
     String query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testQuery(query);
@@ -2968,30 +2969,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     query = "SELECT ArrTime, ArrTime, COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
         + "GROUP BY ArrTime, ArrTime";
     testQuery(query);
-  }
-
-  // these tests actually checks a calcite limitation.
-  // Once it is fixed in calcite, we should merge this tests with testQueryRepetedColumnsV1
-  @Test
-  public void testQueryWithRepeatedColumnsV2()
-      throws Exception {
-    setUseMultiStageQueryEngine(true);
-    //test repeated columns in selection query
-    String query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
-    testQuery(query);
-
-    //test repeated columns in selection query with order by
-    query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' order by ArrTime";
-    testQueryError(query, QueryErrorCode.QUERY_VALIDATION);
-
-    //test repeated columns in agg query
-    query = "SELECT COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
-    testQuery(query);
-
-    //test repeated columns in agg group by query
-    query = "SELECT ArrTime, ArrTime, COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
-        + "GROUP BY ArrTime, ArrTime";
-    testQueryError(query, QueryErrorCode.QUERY_VALIDATION);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

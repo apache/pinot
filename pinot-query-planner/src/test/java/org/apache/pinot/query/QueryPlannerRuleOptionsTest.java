@@ -115,20 +115,11 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     String explain = explainQueryWithRuleDisabled(query,
         PlannerRuleNames.PRUNE_EMPTY_CORRELATE_LEFT);
     //@formatter:off
+    // In Calcite 1.41.0+, the decorrelator converts the correlate to a join (CALCITE-7010), so
+    // PRUNE_EMPTY_CORRELATE_LEFT is no longer exercised. PRUNE_EMPTY_JOIN_LEFT (still enabled) prunes it instead.
     assertEquals(explain,
         "Execution Plan\n"
-            + "LogicalProject(col1=[$0], col2=[$1], col3=[$2], "
-            + "col4=[$3], col5=[$4], col6=[$5], col7=[$6], ts=[$7], ts_timestamp=[$8])\n"
-            + "  LogicalFilter(condition=[IS NOT NULL($9)])\n"
-            + "    LogicalCorrelate(correlation=[$cor0], joinType=[left], requiredColumns=[{0}])\n"
-            + "      LogicalValues(tuples=[[]])\n"
-            + "      PinotLogicalAggregate(group=[{}], agg#0=[MIN($0)], aggType=[FINAL])\n"
-            + "        PinotLogicalExchange(distribution=[hash])\n"
-            + "          PinotLogicalAggregate(group=[{}], agg#0=[MIN($0)], aggType=[LEAF])\n"
-            + "            LogicalProject($f0=[true])\n"
-            + "              LogicalFilter(condition=[=($cor0.col1, $0)])\n"
-            + "                LogicalProject(col1=[$0])\n"
-            + "                  PinotLogicalTableScan(table=[[default, b]])\n");
+            + "LogicalValues(tuples=[[]])\n");
     //@formatter:on
   }
 
