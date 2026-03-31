@@ -37,21 +37,21 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * TODO: Gather more info on the fly to avoid scanning the segment
  */
 public class MutableColumnStatistics implements ColumnStatistics {
-  private final DataSource _dataSource;
-  private final int[] _sortedDocIdIterationOrder;
-  private final boolean _isSortedColumn;
+  protected final DataSource _dataSource;
+  @Nullable
+  protected final int[] _sortedDocIds;
+  protected final boolean _isSortedColumn;
 
   // NOTE: For new added columns during the ingestion, this will be constant value dictionary instead of mutable
   //       dictionary.
-  private final Dictionary _dictionary;
+  protected final Dictionary _dictionary;
 
   private int _minElementLength = -1;
   private int _maxElementLength = -1;
 
-  public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIdIterationOrder,
-      boolean isSortedColumn) {
+  public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSource = dataSource;
-    _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
+    _sortedDocIds = sortedDocIds;
     _isSortedColumn = isSortedColumn;
     _dictionary = dataSource.getDictionary();
   }
@@ -93,10 +93,11 @@ public class MutableColumnStatistics implements ColumnStatistics {
       return;
     }
 
-    DataType storedType = _dictionary.getValueType();
-    if (storedType.isFixedWidth()) {
-      _minElementLength = storedType.size();
-      _maxElementLength = storedType.size();
+    DataType valueType = _dictionary.getValueType();
+    if (valueType.isFixedWidth()) {
+      int length = valueType.size();
+      _minElementLength = length;
+      _maxElementLength = length;
     } else {
       // If the stored type is not fixed width, iterate over the dictionary to find the min/max element length
       _minElementLength = Integer.MAX_VALUE;
@@ -125,7 +126,7 @@ public class MutableColumnStatistics implements ColumnStatistics {
     }
 
     // If there is only one distinct value, then it is sorted
-    if (getCardinality() == 1) {
+    if (getCardinality() <= 1) {
       return true;
     }
 
@@ -135,10 +136,10 @@ public class MutableColumnStatistics implements ColumnStatistics {
         String.format("Forward index should not be null for column: %s", dataSourceMetadata.getFieldSpec().getName()));
     int numDocs = dataSourceMetadata.getNumDocs();
     // Iterate with the sorted order if provided
-    if (_sortedDocIdIterationOrder != null) {
-      int previousDictId = mutableForwardIndex.getDictId(_sortedDocIdIterationOrder[0]);
+    if (_sortedDocIds != null) {
+      int previousDictId = mutableForwardIndex.getDictId(_sortedDocIds[0]);
       for (int i = 1; i < numDocs; i++) {
-        int currentDictId = mutableForwardIndex.getDictId(_sortedDocIdIterationOrder[i]);
+        int currentDictId = mutableForwardIndex.getDictId(_sortedDocIds[i]);
         if (_dictionary.compare(previousDictId, currentDictId) > 0) {
           return false;
         }
@@ -169,13 +170,13 @@ public class MutableColumnStatistics implements ColumnStatistics {
   }
 
   @Override
-  public PartitionFunction getPartitionFunction() {
-    return _dataSource.getDataSourceMetadata().getPartitionFunction();
+  public int getMaxRowLengthInBytes() {
+    return _dataSource.getDataSourceMetadata().getMaxRowLengthInBytes();
   }
 
   @Override
-  public int getMaxRowLengthInBytes() {
-    return _dataSource.getDataSourceMetadata().getMaxRowLengthInBytes();
+  public PartitionFunction getPartitionFunction() {
+    return _dataSource.getDataSourceMetadata().getPartitionFunction();
   }
 
   @Override

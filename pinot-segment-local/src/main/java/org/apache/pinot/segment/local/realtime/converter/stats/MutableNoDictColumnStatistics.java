@@ -37,19 +37,18 @@ import org.apache.pinot.spi.utils.ByteArray;
 import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
 
 
-public class MutableNoDictionaryColStatistics implements ColumnStatistics, CLPStatsProvider {
-  private final DataSourceMetadata _dataSourceMetadata;
-  private final MutableForwardIndex _forwardIndex;
+public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStatsProvider {
+  protected final DataSourceMetadata _dataSourceMetadata;
+  protected final MutableForwardIndex _forwardIndex;
   @Nullable
-  private final int[] _sortedDocIds;
-  private final boolean _isSortedColumn;
+  protected final int[] _sortedDocIds;
+  protected final boolean _isSortedColumn;
 
-  public MutableNoDictionaryColStatistics(DataSource dataSource, @Nullable int[] sortedDocIds,
-      boolean isSortedColumn) {
+  public MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
     _forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
-    Preconditions.checkState(_forwardIndex != null,
-        String.format("Forward index should not be null for column: %s", _dataSourceMetadata.getFieldSpec().getName()));
+    Preconditions.checkState(_forwardIndex != null, "Forward index should not be null for column: %s",
+        _dataSourceMetadata.getFieldSpec().getName());
     _sortedDocIds = sortedDocIds;
     _isSortedColumn = isSortedColumn;
   }
@@ -102,9 +101,9 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics, CLPSt
     }
 
     // Verify that values are non-decreasing when iterated in the given order
-    DataType storedType = _dataSourceMetadata.getFieldSpec().getDataType().getStoredType();
+    DataType valueType = _forwardIndex.getStoredType();
     if (_sortedDocIds != null) {
-      switch (storedType) {
+      switch (valueType) {
         case INT: {
           int prev = _forwardIndex.getInt(_sortedDocIds[0]);
           for (int i = 1; i < numDocs; i++) {
@@ -183,10 +182,10 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics, CLPSt
           return true;
         }
         default:
-          return false;
+          throw new IllegalStateException("Unsupported value type: " + valueType);
       }
     } else {
-      switch (storedType) {
+      switch (valueType) {
         case INT: {
           int prev = _forwardIndex.getInt(0);
           for (int i = 1; i < numDocs; i++) {
@@ -265,7 +264,7 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics, CLPSt
           return true;
         }
         default:
-          return false;
+          throw new IllegalStateException("Unsupported value type: " + valueType);
       }
     }
   }
@@ -278,6 +277,11 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics, CLPSt
   @Override
   public int getMaxNumberOfMultiValues() {
     return _dataSourceMetadata.getMaxNumValuesPerMVEntry();
+  }
+
+  @Override
+  public int getMaxRowLengthInBytes() {
+    return _dataSourceMetadata.getMaxRowLengthInBytes();
   }
 
   @Override

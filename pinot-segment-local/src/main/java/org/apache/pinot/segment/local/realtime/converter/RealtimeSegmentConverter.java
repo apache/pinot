@@ -26,7 +26,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
+import org.apache.pinot.segment.local.realtime.converter.stats.MutableSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
@@ -42,6 +42,7 @@ import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,24 +123,22 @@ public class RealtimeSegmentConverter {
 
     if (useCompactedReader) {
       // Take a snapshot of validDocIds at the beginning of conversion to ensure consistency
-      ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = getValidDocIdSnapshot();
-      if (validDocIdsSnapshot == null) {
+      RoaringBitmap validDocIds = getValidDocIds();
+      if (validDocIds == null) {
         throw new IllegalStateException("Cannot use CompactedPinotSegmentRecordReader without valid document IDs. "
             + "Segment may be corrupted.");
       }
       // Use CompactedPinotSegmentRecordReader to remove obsolete/invalidated records
-      try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(
-          validDocIdsSnapshot)) {
+      try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(validDocIds)) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, sortedColumn, useCompactedReader,
-            validDocIdsSnapshot);
+        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, sortedColumn, validDocIds);
         publishCompactionMetrics(serverMetrics, preCommitRowCount, driver, compactionStartTime);
       }
     } else {
       // Use regular PinotSegmentRecordReader (existing behavior)
       try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, sortedColumn, useCompactedReader, null);
+        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, sortedColumn, null);
       }
     }
 
@@ -152,13 +151,10 @@ public class RealtimeSegmentConverter {
     }
   }
 
-  private @Nullable ThreadSafeMutableRoaringBitmap getValidDocIdSnapshot() {
-    ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = null;
-    if (_realtimeSegmentImpl.getValidDocIds() != null) {
-      validDocIdsSnapshot = new ThreadSafeMutableRoaringBitmap(
-          _realtimeSegmentImpl.getValidDocIds().getMutableRoaringBitmap());
-    }
-    return validDocIdsSnapshot;
+  @Nullable
+  private RoaringBitmap getValidDocIds() {
+    ThreadSafeMutableRoaringBitmap validDocIds = _realtimeSegmentImpl.getValidDocIds();
+    return validDocIds != null ? validDocIds.getMutableRoaringBitmap().toRoaringBitmap() : null;
   }
 
   /**
@@ -202,28 +198,17 @@ public class RealtimeSegmentConverter {
    * Common method to build segment with the provided record reader
    */
   private void buildSegmentWithReader(SegmentIndexCreationDriverImpl driver, SegmentGeneratorConfig genConfig,
-      RecordReader recordReader, int[] sortedDocIds, @Nullable String sortedColumn, boolean useCompactedReader,
-      @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot)
+      RecordReader recordReader, int[] sortedDocIds, @Nullable String sortedColumn, @Nullable RoaringBitmap validDocIds)
       throws Exception {
-    RealtimeSegmentSegmentCreationDataSource dataSource;
-    if (useCompactedReader) {
-      // For compacted readers, use the constructor that takes sortedDocIds and pass the validDocIds snapshot
-      dataSource = new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds,
-          sortedColumn, validDocIdsSnapshot);
-    } else {
-      // For regular readers, use the original constructor
-      dataSource = new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl,
-          (PinotSegmentRecordReader) recordReader, sortedColumn);
-    }
-    // initializes reader
+    MutableSegmentCreationDataSource dataSource =
+        new MutableSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds, sortedColumn,
+            validDocIds);
     driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName), InstanceType.SERVER);
 
     if (!_enableColumnMajor) {
       driver.build();
     } else {
-      //buildByColumn uses validDocIds to skip invalid record while indexing each column. We pass the validDocIds
-      // only if we are using compacted reader.
-      driver.buildByColumn(_realtimeSegmentImpl, useCompactedReader ? validDocIdsSnapshot : null);
+      driver.buildByColumn(_realtimeSegmentImpl, validDocIds);
     }
   }
 
