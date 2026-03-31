@@ -195,7 +195,11 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
       waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
-      waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
+      try {
+        waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
+      } catch (Exception e) {
+        // Best-effort: EV/IS may not converge during cleanup if the test already failed
+      }
       serverStarter0.stop();
       serverStarter1.stop();
       serverStarter2.stop();

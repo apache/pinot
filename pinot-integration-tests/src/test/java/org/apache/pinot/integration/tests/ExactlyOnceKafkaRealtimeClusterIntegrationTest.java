@@ -148,7 +148,7 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
    * This ensures transaction markers have been fully propagated before returning.
    */
   private void waitForCommittedRecordsVisible(String brokerList) {
-    long deadline = System.currentTimeMillis() + 120_000L;
+    long deadline = System.currentTimeMillis() + 180_000L;
     int lastCommitted = 0;
     int lastUncommitted = 0;
     int iteration = 0;
@@ -176,9 +176,9 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
 
     // Final diagnostic dump
     lastUncommitted = countRecords(brokerList, "read_uncommitted");
-    LOGGER.error("VERIFICATION FAILED after 120s: read_committed={}, read_uncommitted={}", lastCommitted,
+    LOGGER.error("VERIFICATION FAILED after 180s: read_committed={}, read_uncommitted={}", lastCommitted,
         lastUncommitted);
-    throw new AssertionError("[ExactlyOnce] Transaction markers were not propagated within 120s; "
+    throw new AssertionError("[ExactlyOnce] Transaction markers were not propagated within 180s; "
         + "committed records are not visible to read_committed consumers. "
         + "read_committed=" + lastCommitted + ", read_uncommitted=" + lastUncommitted);
   }

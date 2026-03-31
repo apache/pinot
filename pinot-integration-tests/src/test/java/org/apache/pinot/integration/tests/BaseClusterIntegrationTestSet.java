@@ -952,8 +952,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
             JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
         return idealState._realtime.equals(externalView._realtime) && idealState._offline.equals(externalView._offline);
       } catch (Exception e) {
-        Assert.fail("Caught exception while waiting for table EV and IS to converge", e);
-        return null;
+        // Transient HTTP errors are expected during rebalance; retry instead of failing immediately
+        return false;
       }
     }, 1000L, timeoutMs, "Failed to converge EV and IS for table: " + tableName);
   }
