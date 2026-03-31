@@ -20,14 +20,18 @@ package org.apache.pinot.tools.utils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Reader;
 import java.net.ServerSocket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
+import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -99,9 +103,9 @@ public class PinotConfigUtils {
       return null;
     }
 
-    PropertiesConfiguration propertiesConfiguration =
-        CommonsConfigurationUtils.fromFile(configFile, true, null, true);
-    Map<String, Object> properties = CommonsConfigurationUtils.toMap(propertiesConfiguration);
+    validateNoDuplicateKeys(configFile);
+    Configurations configs = new Configurations();
+    Map<String, Object> properties = CommonsConfigurationUtils.toMap(configs.properties(configFile));
     ControllerConf conf = new ControllerConf(properties);
 
     conf.setPinotFSFactoryClasses(null);
@@ -145,9 +149,9 @@ public class PinotConfigUtils {
     }
     File configFile = new File(configFileName);
     if (configFile.exists()) {
-      PropertiesConfiguration propertiesConfiguration =
-          CommonsConfigurationUtils.fromFile(configFile, true, null, true);
-      return CommonsConfigurationUtils.toMap(propertiesConfiguration);
+      validateNoDuplicateKeys(configFile);
+      Configurations configs = new Configurations();
+      return CommonsConfigurationUtils.toMap(configs.properties(configFile));
     }
     return null;
   }
@@ -253,6 +257,26 @@ public class PinotConfigUtils {
     }
   }
 
+  private static void validateNoDuplicateKeys(File configFile)
+      throws ConfigurationException {
+    try (Reader reader = Files.newBufferedReader(configFile.toPath(), StandardCharsets.UTF_8)) {
+      DuplicateKeyTrackingReader propertiesReader = new DuplicateKeyTrackingReader(reader);
+      Map<String, Integer> firstDefinitionLineByKey = new HashMap<>();
+      while (propertiesReader.nextProperty()) {
+        String key = propertiesReader.getPropertyName();
+        Integer firstDefinitionLine =
+            firstDefinitionLineByKey.putIfAbsent(key, propertiesReader.getPropertyLineNumber());
+        if (firstDefinitionLine != null) {
+          throw new ConfigurationException(String.format(
+              "Duplicate key '%s' found in config file %s at line %d (first defined at line %d)", key,
+              configFile.getAbsolutePath(), propertiesReader.getPropertyLineNumber(), firstDefinitionLine));
+        }
+      }
+    } catch (IOException e) {
+      throw new ConfigurationException("Failed to validate config file " + configFile.getAbsolutePath(), e);
+    }
+  }
+
   private static List<String> validateControllerAccessProtocols(ControllerConf conf)
       throws ConfigurationException {
     List<String> listeners = conf.getControllerAccessProtocols();
@@ -303,5 +327,68 @@ public class PinotConfigUtils {
     }
 
     return Optional.empty();
+  }
+
+  private static final class DuplicateKeyTrackingReader extends PropertiesReader {
+    private int _propertyLineNumber;
+
+    private DuplicateKeyTrackingReader(Reader reader) {
+      super(reader);
+    }
+
+    private int getPropertyLineNumber() {
+      return _propertyLineNumber;
+    }
+
+    @Override
+    public String readProperty()
+        throws IOException {
+      getCommentLines().clear();
+      StringBuilder buffer = new StringBuilder();
+      _propertyLineNumber = -1;
+
+      while (true) {
+        String line = readLine();
+        if (line == null) {
+          return buffer.length() > 0 ? buffer.toString() : null;
+        }
+
+        if (isPropertiesCommentLine(line) || (_propertyLineNumber < 0 && isDoubleSlashCommentLine(line))) {
+          getCommentLines().add(line);
+          continue;
+        }
+
+        if (_propertyLineNumber < 0) {
+          _propertyLineNumber = getLineNumber();
+        }
+
+        line = line.trim();
+        if (!hasLineContinuation(line)) {
+          buffer.append(line);
+          break;
+        }
+        buffer.append(line, 0, line.length() - 1);
+      }
+
+      return buffer.toString();
+    }
+
+    private static boolean hasLineContinuation(String line) {
+      int trailingBackslashCount = 0;
+      for (int index = line.length() - 1; index >= 0 && line.charAt(index) == '\\'; index--) {
+        trailingBackslashCount++;
+      }
+      return trailingBackslashCount % 2 != 0;
+    }
+
+    private static boolean isDoubleSlashCommentLine(String line) {
+      String trimmed = line.trim();
+      return trimmed.startsWith("//");
+    }
+
+    private static boolean isPropertiesCommentLine(String line) {
+      String trimmed = line.trim();
+      return trimmed.isEmpty() || trimmed.charAt(0) == '#' || trimmed.charAt(0) == '!';
+    }
   }
 }

@@ -50,14 +50,4 @@
     <isMultiline>true</isMultiline>
     <padLines>false</padLines>
   </ftl_style>
-  <conf_style>
-    <firstLine>#</firstLine>
-    <beforeEachLine># </beforeEachLine>
-    <endLine>#</endLine>
-    <firstLineDetectionPattern>^#.*$</firstLineDetectionPattern>
-    <lastLineDetectionPattern>^#.*$</lastLineDetectionPattern>
-    <allowBlankLines>false</allowBlankLines>
-    <isMultiline>false</isMultiline>
-    <padLines>false</padLines>
-  </conf_style>
 </additionalHeaders>
