@@ -110,6 +110,11 @@
   <properties>
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
+    <!--
+      Pinot services build against Java 21 by default.
+      Library modules used from external JVMs can override jdk.version locally to
+      keep publishing a lower bytecode level for consumers.
+    -->
     <jdk.version>21</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 

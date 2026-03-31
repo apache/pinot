@@ -121,7 +121,8 @@ Drop your video or a link to your session in the [#pinot-youtube-channel](https:
 $ git clone https://github.com/apache/pinot.git
 $ cd pinot
 
-# Pinot requires JDK 21+ to build and run
+# Pinot services require JDK 21+ to build and run
+# Java/JDBC clients and SPI artifacts continue to target Java 11 bytecode
 
 # Build Pinot
 # -Pbin-dist is required to build the binary distribution
