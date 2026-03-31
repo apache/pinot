@@ -129,13 +129,9 @@ public class TextIndexHandler extends BaseIndexHandler {
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
-    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
-    File segmentDirectory =
-        SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     for (String column : getColumnsWithLegacyNativeTextIndex()) {
       LOGGER.info("Removing legacy native text index file from segment: {}, column: {}", segmentName, column);
-      deleteLegacyNativeTextIndexFiles(indexDir, segmentDirectory, column);
       segmentWriter.removeIndex(column, StandardIndexes.text());
     }
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
@@ -215,15 +211,9 @@ public class TextIndexHandler extends BaseIndexHandler {
     LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}, storeInSegmentFile: {}",
         columnName, segmentName, hasDictionary, storeInSegmentFile);
 
-    // Create in-progress marker file for recovery
+    // Clean up any existing text index and create in-progress marker for recovery
     File inProgress = new File(indexDir, columnName + ".text.inprogress");
-    if (!inProgress.exists()) {
-      // Marker file does not exist, which means last run ended normally.
-      // Create a marker file.
-      FileUtils.touch(inProgress);
-    }
     segmentWriter.removeIndex(columnName, StandardIndexes.text());
-    FileUtils.deleteQuietly(inProgress);
     FileUtils.touch(inProgress);
 
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
@@ -348,17 +338,6 @@ public class TextIndexHandler extends BaseIndexHandler {
 
     // If the expected format doesn't match the existing format, we need an update
     return expectedFormat != currentFormat;
-  }
-
-  /**
-   * Delete legacy native text index files from both the segment root and the versioned segment directory.
-   */
-  private void deleteLegacyNativeTextIndexFiles(File indexDir, File segmentDirectory, String column) {
-    String nativeFileName = column + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION;
-    FileUtils.deleteQuietly(new File(indexDir, nativeFileName));
-    if (!segmentDirectory.equals(indexDir)) {
-      FileUtils.deleteQuietly(new File(segmentDirectory, nativeFileName));
-    }
   }
 
   /**
