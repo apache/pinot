@@ -561,9 +561,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
             int currentDocId = recordLocation.getDocId();
             if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-              _reusePreviousRow.init(currentSegment, currentDocId);
-              _partialUpsertHandler.merge(_reusePreviousRow, record, _reuseMergeResultHolder);
-              _reuseMergeResultHolder.clear();
+              try {
+                _reusePreviousRow.init(currentSegment, currentDocId);
+                _partialUpsertHandler.merge(_reusePreviousRow, record, _reuseMergeResultHolder);
+              } finally {
+                _reuseMergeResultHolder.clear();
+                _reusePreviousRow.clear();
+              }
             }
           }
           return recordLocation;
