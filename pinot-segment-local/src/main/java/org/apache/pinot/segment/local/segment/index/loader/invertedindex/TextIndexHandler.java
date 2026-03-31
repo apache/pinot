@@ -211,10 +211,17 @@ public class TextIndexHandler extends BaseIndexHandler {
     LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}, storeInSegmentFile: {}",
         columnName, segmentName, hasDictionary, storeInSegmentFile);
 
-    // Clean up any existing text index and create in-progress marker for recovery
+    // Create in-progress marker file for recovery
     File inProgress = new File(indexDir, columnName + ".text.inprogress");
-    segmentWriter.removeIndex(columnName, StandardIndexes.text());
-    FileUtils.touch(inProgress);
+    if (!inProgress.exists()) {
+      // Marker file does not exist, which means last run ended normally.
+      // Create a marker file.
+      FileUtils.touch(inProgress);
+    } else {
+      // Marker file exists, which means last run was interrupted.
+      // Clean up any existing text index files
+      cleanupExistingTextIndexFiles(indexDir, columnName);
+    }
 
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
@@ -338,6 +345,27 @@ public class TextIndexHandler extends BaseIndexHandler {
 
     // If the expected format doesn't match the existing format, we need an update
     return expectedFormat != currentFormat;
+  }
+
+  /**
+   * Clean up existing text index files for recovery purposes.
+   *
+   * @param indexDir the index directory
+   * @param columnName the column name
+   */
+  private void cleanupExistingTextIndexFiles(File indexDir, String columnName) {
+    // Remove any existing text index files for this column
+    File[] textIndexFiles = indexDir.listFiles((dir, name) -> {
+      // Look for text index files for this column
+      return name.startsWith(columnName) && (name.endsWith(V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION)
+          || name.endsWith(".text.inprogress"));
+    });
+
+    if (textIndexFiles != null) {
+      for (File file : textIndexFiles) {
+        FileUtils.deleteQuietly(file);
+      }
+    }
   }
 
   /**
