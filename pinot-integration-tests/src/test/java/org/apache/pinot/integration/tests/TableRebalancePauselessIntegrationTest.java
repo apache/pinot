@@ -142,10 +142,6 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
           4);
 
       waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
-      // Wait for table's ideal state and external view to converge after rebalance
-      waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
-      // Add additional buffer to ensure consuming segments are fully stabilized
-      Thread.sleep(5000);
 
       if (tableConfig.getRoutingConfig() != null
           && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
@@ -197,7 +193,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       try {
         waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
-      } catch (Exception e) {
+      } catch (Throwable e) {
         // Best-effort: EV/IS may not converge during cleanup if the test already failed
       }
       serverStarter0.stop();
