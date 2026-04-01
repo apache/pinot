@@ -23,8 +23,6 @@ import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.ByteArray;
 
 /**
  * Sorter implementation for pinot segments
@@ -58,7 +56,7 @@ public class PinotSegmentSorter implements SegmentSorter {
       sortedColumnReaders[i] = sortedColumnReader;
 
       if (!sortedColumnReader.hasDictionary()) {
-        preReadValues[i] = preReadAllValues(sortedColumnReader);
+        preReadValues[i] = sortedColumnReader.readAllValuesForSorting(_numDocs);
       }
     }
 
@@ -82,52 +80,5 @@ public class PinotSegmentSorter implements SegmentSorter {
       return 0;
     });
     return sortedDocIds;
-  }
-
-  /// Reads all values for a no-dictionary column into a Comparable array via a single sequential
-  /// pass. This avoids repeated chunk decompression during quicksort's random-access comparisons.
-  private Comparable[] preReadAllValues(PinotSegmentColumnReader reader) {
-    DataType storedType = reader.getStoredType();
-    Comparable[] values = new Comparable[_numDocs];
-    switch (storedType) {
-      case INT:
-        for (int i = 0; i < _numDocs; i++) {
-          values[i] = reader.getInt(i);
-        }
-        break;
-      case LONG:
-        for (int i = 0; i < _numDocs; i++) {
-          values[i] = reader.getLong(i);
-        }
-        break;
-      case FLOAT:
-        for (int i = 0; i < _numDocs; i++) {
-          values[i] = reader.getFloat(i);
-        }
-        break;
-      case DOUBLE:
-        for (int i = 0; i < _numDocs; i++) {
-          values[i] = reader.getDouble(i);
-        }
-        break;
-      case BIG_DECIMAL:
-        for (int i = 0; i < _numDocs; i++) {
-          values[i] = reader.getBigDecimal(i);
-        }
-        break;
-      case STRING:
-        for (int i = 0; i < _numDocs; i++) {
-          values[i] = reader.getString(i);
-        }
-        break;
-      case BYTES:
-        for (int i = 0; i < _numDocs; i++) {
-          values[i] = new ByteArray(reader.getBytes(i));
-        }
-        break;
-      default:
-        throw new IllegalStateException("Unsupported no-dictionary column type: " + storedType);
-    }
-    return values;
   }
 }
