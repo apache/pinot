@@ -91,7 +91,7 @@ public class SegmentOperationsThrottler {
     _throttlerName = throttlerName;
     _thresholdGauge = thresholdGauge;
     _countGauge = countGauge;
-    LOGGER.info("Initializing SegmentOperationsThrottlerSet {}, maxConcurrency: {}, "
+    LOGGER.info("Initializing SegmentOperationsThrottler {}, maxConcurrency: {}, "
             + "maxConcurrencyBeforeServingQueries: {}, isServingQueries: {}",
         throttlerName, maxConcurrency, maxConcurrencyBeforeServingQueries,
         isServingQueries);
