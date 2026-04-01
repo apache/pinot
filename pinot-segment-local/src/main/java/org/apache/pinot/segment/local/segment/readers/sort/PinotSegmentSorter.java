@@ -23,11 +23,16 @@ import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
-
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 /**
  * Sorter implementation for pinot segments
+ * Sorts documents within a segment by one or more columns. For no-dictionary columns, values are
+ * pre-materialized into in-memory arrays before sorting so that the comparator never needs to
+ * decompress forward-index chunks during the random-access phase of quicksort.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class PinotSegmentSorter implements SegmentSorter {
   private final int _numDocs;
   private final Map<String, PinotSegmentColumnReader> _columnReaderMap;
@@ -41,6 +46,9 @@ public class PinotSegmentSorter implements SegmentSorter {
   public int[] getSortedDocIds(List<String> sortOrder) {
     int numSortedColumns = sortOrder.size();
     PinotSegmentColumnReader[] sortedColumnReaders = new PinotSegmentColumnReader[numSortedColumns];
+    // Pre-materialized values for no-dictionary columns; null for dictionary-encoded columns
+    Comparable[][] preReadValues = new Comparable[numSortedColumns][];
+
     for (int i = 0; i < numSortedColumns; i++) {
       String sortedColumn = sortOrder.get(i);
       PinotSegmentColumnReader sortedColumnReader = _columnReaderMap.get(sortedColumn);
@@ -48,15 +56,25 @@ public class PinotSegmentSorter implements SegmentSorter {
       Preconditions
           .checkState(sortedColumnReader.isSingleValue(), "Unsupported sorted multi-value column: %s", sortedColumn);
       sortedColumnReaders[i] = sortedColumnReader;
+
+      if (!sortedColumnReader.hasDictionary()) {
+        preReadValues[i] = preReadAllValues(sortedColumnReader);
+      }
     }
 
     int[] sortedDocIds = new int[_numDocs];
     for (int i = 0; i < _numDocs; i++) {
       sortedDocIds[i] = i;
     }
+
     IntArrays.quickSort(sortedDocIds, (docId1, docId2) -> {
-      for (PinotSegmentColumnReader sortedColumnReader : sortedColumnReaders) {
-        int result = sortedColumnReader.compare(docId1, docId2);
+      for (int j = 0; j < numSortedColumns; j++) {
+        int result;
+        if (preReadValues[j] != null) {
+          result = preReadValues[j][docId1].compareTo(preReadValues[j][docId2]);
+        } else {
+          result = sortedColumnReaders[j].compare(docId1, docId2);
+        }
         if (result != 0) {
           return result;
         }
@@ -64,5 +82,52 @@ public class PinotSegmentSorter implements SegmentSorter {
       return 0;
     });
     return sortedDocIds;
+  }
+
+  /// Reads all values for a no-dictionary column into a Comparable array via a single sequential
+  /// pass. This avoids repeated chunk decompression during quicksort's random-access comparisons.
+  private Comparable[] preReadAllValues(PinotSegmentColumnReader reader) {
+    DataType storedType = reader.getStoredType();
+    Comparable[] values = new Comparable[_numDocs];
+    switch (storedType) {
+      case INT:
+        for (int i = 0; i < _numDocs; i++) {
+          values[i] = reader.getInt(i);
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < _numDocs; i++) {
+          values[i] = reader.getLong(i);
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < _numDocs; i++) {
+          values[i] = reader.getFloat(i);
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < _numDocs; i++) {
+          values[i] = reader.getDouble(i);
+        }
+        break;
+      case BIG_DECIMAL:
+        for (int i = 0; i < _numDocs; i++) {
+          values[i] = reader.getBigDecimal(i);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < _numDocs; i++) {
+          values[i] = reader.getString(i);
+        }
+        break;
+      case BYTES:
+        for (int i = 0; i < _numDocs; i++) {
+          values[i] = new ByteArray(reader.getBytes(i));
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unsupported no-dictionary column type: " + storedType);
+    }
+    return values;
   }
 }
