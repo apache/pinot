@@ -38,9 +38,11 @@ import java.util.Arrays;
  */
 public class Key implements Comparable<Key> {
   private final Object[] _values;
+  private final int _hashCode;
 
   public Key(Object[] values) {
     _values = values;
+    _hashCode = Arrays.hashCode(values);
   }
 
   public Object[] getValues() {
@@ -56,7 +58,7 @@ public class Key implements Comparable<Key> {
 
   @Override
   public int hashCode() {
-    return Arrays.hashCode(_values);
+    return _hashCode;
   }
 
   @Override

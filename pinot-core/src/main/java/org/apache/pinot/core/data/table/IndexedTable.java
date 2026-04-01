@@ -109,6 +109,23 @@ public abstract class IndexedTable extends BaseTable {
     return upsert(new Key(keyValues), record);
   }
 
+  @Override
+  public boolean merge(Table table) {
+    if (table instanceof IndexedTable) {
+      // Optimized path: iterate the source's entry set directly to reuse existing Key objects,
+      // avoiding per-record Arrays.copyOf + new Key + Arrays.hashCode overhead.
+      for (Map.Entry<Key, Record> entry : ((IndexedTable) table)._lookupMap.entrySet()) {
+        upsert(entry.getKey(), entry.getValue());
+      }
+    } else {
+      Iterator<Record> iterator = table.iterator();
+      while (iterator.hasNext()) {
+        upsert(iterator.next());
+      }
+    }
+    return true;
+  }
+
   /**
    * Adds a record with new key or updates a record with existing key.
    */
@@ -263,7 +280,47 @@ public abstract class IndexedTable extends BaseTable {
 
   @Override
   public Iterator<Record> iterator() {
+    if (_topRecords == null) {
+      return _lookupMap.values().iterator();
+    }
     return _topRecords.iterator();
+  }
+
+
+  /**
+   * Merges records from a disjoint partition table into this table using {@code putAll}.
+   * <p><b>Precondition:</b> the source table must have no overlapping keys with this table
+   * (i.e. they come from disjoint hash partitions). If keys overlap, {@code putAll} will
+   * silently overwrite existing entries instead of aggregating them. Use {@link #merge(Table)}
+   * for tables that may share keys.
+   */
+  public void mergePartitionTable(Table table) {
+    _topRecords = null;
+    if (table instanceof IndexedTable) {
+      IndexedTable other = (IndexedTable) table;
+      _lookupMap.putAll(other._lookupMap);
+      _numResizes += other._numResizes;
+      _resizeTimeNs += other._resizeTimeNs;
+    } else {
+      Iterator<Record> iterator = table.iterator();
+      while (iterator.hasNext()) {
+        // NOTE: For performance concern, does not check the return value of the upsert(). Override this method if
+        //       upsert() can return false.
+        upsert(iterator.next());
+      }
+    }
+    if (_lookupMap.size() >= _trimThreshold) {
+      resize();
+    }
+  }
+
+  /**
+   * Absorbs trim/resize statistics from another table that was merged into this one.
+   * Call after {@link #merge(Table)} to preserve the absorbed table's trim history.
+   */
+  public void absorbResizeStats(IndexedTable other) {
+    _numResizes += other._numResizes;
+    _resizeTimeNs += other._resizeTimeNs;
   }
 
   public int getNumResizes() {

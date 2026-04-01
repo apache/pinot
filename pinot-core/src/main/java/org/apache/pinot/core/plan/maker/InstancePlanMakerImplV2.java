@@ -51,6 +51,7 @@ import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -100,6 +101,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final String GROUPBY_TRIM_THRESHOLD_KEY = Server.GROUPBY_TRIM_THRESHOLD;
   @Deprecated
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
+  public static final int DEFAULT_NUM_GROUP_BY_PARTITIONS = 1;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
 
@@ -256,6 +258,14 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         queryContext.setMinInitialIndexedTableCapacity(minInitialIndexedTableCapacity);
       } else {
         queryContext.setMinInitialIndexedTableCapacity(_minInitialIndexedTableCapacity);
+      }
+      Integer numGroupByPartitions = QueryOptionsUtils.getNumGroupByPartitions(queryOptions);
+      if (numGroupByPartitions != null) {
+        queryContext.setNumGroupByPartitions(numGroupByPartitions);
+      } else {
+        int effectiveParallelism = queryContext.getMaxExecutionThreads() > 0 ? queryContext.getMaxExecutionThreads()
+            : QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY;
+        queryContext.setNumGroupByPartitions(Math.max(DEFAULT_NUM_GROUP_BY_PARTITIONS, effectiveParallelism));
       }
       // Set numGroupsLimit
       Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(queryOptions);
