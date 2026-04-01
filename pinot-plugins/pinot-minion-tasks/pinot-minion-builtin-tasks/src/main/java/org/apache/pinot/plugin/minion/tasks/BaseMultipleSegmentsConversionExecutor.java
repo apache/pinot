@@ -171,6 +171,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     _eventObserver = observer;
   }
 
+  public String getOutputTableNameWithType(Map<String, String> taskConfigs) {
+    return taskConfigs.get(MinionConstants.TABLE_NAME_KEY);
+  }
+
   @Override
   public List<SegmentConversionResult> executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
@@ -179,7 +183,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     _eventObserver = MinionEventObservers.getInstance().getMinionEventObserver(pinotTaskConfig.getTaskId());
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> taskConfigs = pinotTaskConfig.getConfigs();
-    String tableNameWithType = taskConfigs.get(MinionConstants.TABLE_NAME_KEY);
+    String tableNameWithType = getOutputTableNameWithType(taskConfigs);
     String inputSegmentNames = taskConfigs.get(MinionConstants.SEGMENT_NAME_KEY);
     String[] segmentNames = inputSegmentNames.split(MinionConstants.SEGMENT_NAME_SEPARATOR);
     String uploadURL = taskConfigs.get(MinionConstants.UPLOAD_URL_KEY);
