@@ -228,10 +228,7 @@ public class QueryThreadContext implements AutoCloseable {
 
       @Override
       protected Runnable decorate(Runnable task) {
-        QueryThreadContext parentThreadContext = registerTaskForCancellation ? get() : getIfAvailable();
-        if (parentThreadContext == null) {
-          return task;
-        }
+        QueryThreadContext parentThreadContext = get();
         return () -> {
           try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
               parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
