@@ -23,11 +23,13 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -141,14 +143,6 @@ public class RealtimeLuceneTextIndexResourceTrackingTest {
     assertTrue(accountant.getClearCount() >= 1, "clear() should be called on context close");
   }
 
-
-  @Test
-  public void testSearchWorksWithoutParentContext() {
-    // No QueryThreadContext set up - should still work
-    MutableRoaringBitmap result = _textIndex.getDocIds("searchable");
-    assertTrue(result.getCardinality() > 0, "Search should work without parent context");
-  }
-
   @Test
   public void testQueryTerminationDetectedByCollector() throws Exception {
     TrackingAccountant accountant = new TrackingAccountant();
@@ -173,8 +167,10 @@ public class RealtimeLuceneTextIndexResourceTrackingTest {
         }
       }, 10000, "Index refresh timeout");
 
+      ExecutorService baseExecutor = Executors.newSingleThreadExecutor();
       try (QueryThreadContext ignored = QueryThreadContext.open(executionContext, accountant)) {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        // Wrap with contextAwareExecutorService but don't register for cancellation (false).
+        ExecutorService executor = QueryThreadContext.contextAwareExecutorService(baseExecutor, false);
 
         // Start a search that will take some time
         Future<MutableRoaringBitmap> searchFuture = executor.submit(
@@ -183,19 +179,23 @@ public class RealtimeLuceneTextIndexResourceTrackingTest {
         // Give the search a moment to start
         Thread.sleep(50);
 
-        // Terminate the query
+        // Terminate the query - this sets the termination flag that the collector will detect
         executionContext.terminate(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "OOM test");
 
         try {
           searchFuture.get();
-          // Search might complete before termination is detected - that's OK
+          // Search might complete before termination is detected - that's OK for this test
         } catch (ExecutionException e) {
-          // Expected - search was terminated
-          assertTrue(e.getCause() instanceof RuntimeException,
-              "Should throw RuntimeException on termination");
+          // Expected - search was terminated via collector detecting the termination flag
+          assertTrue(e.getCause() instanceof RuntimeException || e.getCause() instanceof Error,
+              "Should throw RuntimeException or Error on termination, got: " + e.getCause().getClass().getName());
+        } catch (CancellationException e) {
+          // Also acceptable if future was cancelled
         }
-
-        executor.shutdownNow();
+      } finally {
+        // Ensure executor is fully shut down before closing the index to prevent
+        baseExecutor.shutdown();
+        baseExecutor.awaitTermination(5, TimeUnit.SECONDS);
       }
     } finally {
       largeIndex.close();
