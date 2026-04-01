@@ -113,7 +113,8 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
 
     // Retrieve table config and check for consistent push
     TableConfig tableConfig =
-        SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken());
+        SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken(),
+            _spec.getTlsSpec());
     boolean consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(tableConfig);
 
     // Determine push parallelism

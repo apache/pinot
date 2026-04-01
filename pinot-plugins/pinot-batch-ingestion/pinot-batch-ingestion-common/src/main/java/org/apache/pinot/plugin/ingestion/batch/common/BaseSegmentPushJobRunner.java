@@ -67,7 +67,8 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     // Read Table config
     if (_spec.getTableSpec().getTableConfigURI() != null) {
       _tableConfig =
-          SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
+          SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken(),
+              spec.getTlsSpec());
       _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_tableConfig);
     }
   }

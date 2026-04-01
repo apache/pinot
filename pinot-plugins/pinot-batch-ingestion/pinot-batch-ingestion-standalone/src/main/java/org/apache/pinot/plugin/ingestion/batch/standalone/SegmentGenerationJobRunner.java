@@ -143,7 +143,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
           .generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
-    _schema = SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken());
+    _schema = SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken(),
+        _spec.getTlsSpec());
 
     // Read Table config
     if (_spec.getTableSpec().getTableConfigURI() == null) {
@@ -155,7 +156,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
           .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
-    _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
+    _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken(),
+        spec.getTlsSpec());
 
     _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_tableConfig);
 
