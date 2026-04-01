@@ -27,18 +27,29 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class PinotSegmentRestletResourceTest {
+
+  @Mock
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @InjectMocks
   PinotSegmentRestletResource _pinotSegmentRestletResource;
@@ -130,6 +141,80 @@ public class PinotSegmentRestletResourceTest {
         _pinotSegmentRestletResource.getPartitionIDToOldestSegment(segments, idealStateSegmentSet);
 
     assertEquals(expectedResult, result);
+  }
+
+  @Test
+  public void testGetSegmentsWithInvalidPartitionMetadata()
+      throws TableNotFoundException {
+    String tableName = "testTable";
+    String tableNameWithType = "testTable_OFFLINE";
+    when(_pinotHelixResourceManager.getExistingTableNamesWithType(eq(tableName), any()))
+        .thenReturn(List.of(tableNameWithType));
+
+    // seg0: null partition metadata, no column filter → valid
+    SegmentZKMetadata seg0 = new SegmentZKMetadata("seg0");
+
+    // seg1: single partition per column, no column filter → valid
+    SegmentZKMetadata seg1 = new SegmentZKMetadata("seg1");
+    seg1.getSimpleFields().put(CommonConstants.Segment.PARTITION_METADATA,
+        "{\"columnPartitionMap\":{\"col\":{\"functionName\":\"Modulo\",\"numPartitions\":4,\"partitions\":[0]}}}");
+
+    // seg2: multiple partitions for a column, no column filter → invalid
+    SegmentZKMetadata seg2 = new SegmentZKMetadata("seg2");
+    seg2.getSimpleFields().put(CommonConstants.Segment.PARTITION_METADATA,
+        "{\"columnPartitionMap\":{\"col\":{\"functionName\":\"Modulo\",\"numPartitions\":4,\"partitions\":[0,1]}}}");
+
+    // seg3: malformed JSON → invalid
+    SegmentZKMetadata seg3 = new SegmentZKMetadata("seg3");
+    seg3.getSimpleFields().put(CommonConstants.Segment.PARTITION_METADATA, "not-valid-json");
+
+    when(_pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType))
+        .thenReturn(List.of(seg0, seg1, seg2, seg3));
+
+    // no column filter: seg0 (null) is valid, seg1 is valid, seg2 (multi-partition) and seg3 (malformed) are invalid
+    Map<String, String> result =
+        _pinotSegmentRestletResource.getSegmentsWithInvalidPartitionMetadata(tableName, "OFFLINE", null, null);
+    assertEquals(result.size(), 2);
+    assertTrue(result.containsKey("seg2"));
+    assertTrue(result.containsKey("seg3"));
+  }
+
+  @Test
+  public void testGetSegmentsWithInvalidPartitionMetadataWithColumnFilter()
+      throws TableNotFoundException {
+    String tableName = "testTable2";
+    String tableNameWithType = "testTable2_OFFLINE";
+    when(_pinotHelixResourceManager.getExistingTableNamesWithType(eq(tableName), any()))
+        .thenReturn(List.of(tableNameWithType));
+
+    // seg0: null partition metadata, column specified → invalid
+    SegmentZKMetadata seg0 = new SegmentZKMetadata("seg0");
+
+    // seg1: single partition for the specified column → valid
+    SegmentZKMetadata seg1 = new SegmentZKMetadata("seg1");
+    seg1.getSimpleFields().put(CommonConstants.Segment.PARTITION_METADATA,
+        "{\"columnPartitionMap\":{\"col\":{\"functionName\":\"Modulo\",\"numPartitions\":4,\"partitions\":[2]}}}");
+
+    // seg2: multiple partitions for the specified column → invalid
+    SegmentZKMetadata seg2 = new SegmentZKMetadata("seg2");
+    seg2.getSimpleFields().put(CommonConstants.Segment.PARTITION_METADATA,
+        "{\"columnPartitionMap\":{\"col\":{\"functionName\":\"Modulo\",\"numPartitions\":4,\"partitions\":[0,1]}}}");
+
+    // seg3: specified column not present in partition metadata → invalid
+    SegmentZKMetadata seg3 = new SegmentZKMetadata("seg3");
+    seg3.getSimpleFields().put(CommonConstants.Segment.PARTITION_METADATA,
+        "{\"columnPartitionMap\":{\"otherCol\":{\"functionName\":\"Modulo\",\"numPartitions\":4,\"partitions\":[0]}}}");
+
+    when(_pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType))
+        .thenReturn(List.of(seg0, seg1, seg2, seg3));
+
+    // with column filter "col": seg0 (null metadata), seg2 (multi-partition), seg3 (column absent) are invalid
+    Map<String, String> result =
+        _pinotSegmentRestletResource.getSegmentsWithInvalidPartitionMetadata(tableName, "OFFLINE", "col", null);
+    assertEquals(result.size(), 3);
+    assertTrue(result.containsKey("seg0"));
+    assertTrue(result.containsKey("seg2"));
+    assertTrue(result.containsKey("seg3"));
   }
 
   private List<String> getSegmentForPartition(String tableName, int partitionID, int sequenceNumberOffset,
