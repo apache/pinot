@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.file.Files;
@@ -1335,6 +1336,70 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     assertFalse(txtFile.exists());
     assertFalse(fstFile.exists());
     assertFalse(bfFile.exists());
+  }
+
+  @Test
+  public void testV1ReplaceLegacyNativeFstIndex()
+      throws Exception {
+    buildV1Segment();
+
+    String strColumn = "column3";
+    _fieldConfigMap.put(strColumn, new FieldConfig(strColumn, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.FST), null, null));
+
+    File fstFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
+
+    runPreProcessor();
+    assertTrue(fstFile.exists());
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "rw")) {
+      randomAccessFile.seek(0);
+      // Write the legacy native FST magic header: '\fsa'
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      randomAccessFile.writeInt(nativeFstMagic);
+    }
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      assertEquals(randomAccessFile.readInt(), nativeFstMagic);
+    }
+
+    runPreProcessor();
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      assertNotEquals(randomAccessFile.readInt(), nativeFstMagic);
+    }
+  }
+
+  @Test
+  public void testV3ReplaceLegacyNativeTextIndex()
+      throws Exception {
+    buildV3Segment();
+
+    String strColumn = "column3";
+    _fieldConfigMap.put(strColumn, new FieldConfig(strColumn, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.TEXT), null, Map.of("storeInSegmentFile", "false")));
+
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(INDEX_DIR, SegmentVersion.v3);
+    File nativeTextFile =
+        new File(segmentDirectory, strColumn + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION);
+    File luceneTextFile =
+        new File(segmentDirectory, strColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
+    File staleLuceneFile = new File(luceneTextFile, "leftover.tmp");
+
+    runPreProcessor();
+    assertTrue(luceneTextFile.exists());
+
+    Files.writeString(staleLuceneFile.toPath(), "stale");
+    Files.writeString(nativeTextFile.toPath(), "legacy native text");
+    assertTrue(nativeTextFile.exists());
+
+    runPreProcessor();
+
+    assertFalse(nativeTextFile.exists());
+    assertFalse(staleLuceneFile.exists());
+    assertTrue(luceneTextFile.exists());
   }
 
   @Test

@@ -19,10 +19,7 @@
 package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.net.URL;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
@@ -151,17 +148,12 @@ public class TestCompression {
   @Test
   public void testGzipCompressedFileHasSize()
       throws Exception {
-
-    // read file into fileContent
-    ByteBuffer fileContent;
-    int fileSize;
-    URL url = getClass().getResource("/data/words.txt");
-    try (RandomAccessFile raf = new RandomAccessFile(url.getFile(), "r"); FileChannel channel = raf.getChannel()) {
-      fileSize = (int) raf.length();
-      fileContent = ByteBuffer.allocateDirect(fileSize);
-      Assert.assertEquals(fileSize, channel.read(fileContent));
-      fileContent.flip(); // ready for consumption
-    }
+    byte[] input = ("the quick brown fox jumps over the lazy dog\n").repeat(4096).getBytes(UTF_8);
+    String expected = new String(input, UTF_8);
+    int fileSize = input.length;
+    ByteBuffer fileContent = ByteBuffer.allocateDirect(fileSize);
+    fileContent.put(input);
+    fileContent.flip();
 
     // compress fileContent into compressed
     ByteBuffer compressed;
@@ -185,8 +177,9 @@ public class TestCompression {
       decompressed = ByteBuffer.allocateDirect(requiredSize);
       decompressedSize = gzip.decompress(compressed, decompressed);
       Assert.assertEquals(fileSize, decompressedSize);
-      decompressed.flip();
-      Assert.assertEquals(UTF_8.decode(fileContent).toString(), UTF_8.decode(decompressed).toString());
+      decompressed.position(0);
+      decompressed.limit(decompressedSize);
+      Assert.assertEquals(UTF_8.decode(decompressed).toString(), expected);
     }
   }
 

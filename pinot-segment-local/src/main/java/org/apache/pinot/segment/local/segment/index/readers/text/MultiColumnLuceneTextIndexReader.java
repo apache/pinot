@@ -57,7 +57,6 @@ import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.CsvParser;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -179,7 +178,7 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
       Map<String, String> sharedConfig,
       Map<String, Map<String, String>> perColumnConfig) {
     _columns = columns;
-    TextIndexConfig config = new TextIndexConfigBuilder(FSTType.LUCENE).withProperties(sharedConfig).build();
+    TextIndexConfig config = new TextIndexConfigBuilder().withProperties(sharedConfig).build();
     try {
       File indexFile = getTextIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());

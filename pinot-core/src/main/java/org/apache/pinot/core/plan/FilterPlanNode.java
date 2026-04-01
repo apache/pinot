@@ -31,7 +31,6 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
-import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
@@ -45,7 +44,6 @@ import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
-import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
@@ -54,8 +52,6 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
-import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -270,13 +266,6 @@ public class FilterPlanNode implements PlanNode {
           PredicateEvaluator predicateEvaluator;
           TextIndexReader textIndexReader;
           switch (predicate.getType()) {
-            case TEXT_CONTAINS:
-              textIndexReader = dataSource.getTextIndex();
-              if (!(textIndexReader instanceof NativeTextIndexReader)
-                  && !(textIndexReader instanceof NativeMutableTextIndex)) {
-                throw new UnsupportedOperationException("TEXT_CONTAINS is supported only on native text index");
-              }
-              return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
               textIndexReader = dataSource.getTextIndex();
               if (textIndexReader == null) {
@@ -288,11 +277,6 @@ public class FilterPlanNode implements PlanNode {
 
               Preconditions.checkState(textIndexReader != null,
                   "Cannot apply TEXT_MATCH on column: %s without text index", column);
-              // We could check for real time and segment Lucene reader, but easier to check the other way round
-              if (textIndexReader instanceof NativeTextIndexReader
-                  || textIndexReader instanceof NativeMutableTextIndex) {
-                throw new UnsupportedOperationException("TEXT_MATCH is not supported on native text index");
-              }
 
               if (textIndexReader.isMultiColumn()) {
                 return new TextMatchFilterOperator(column, textIndexReader, (TextMatchPredicate) predicate, numDocs);

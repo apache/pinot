@@ -36,7 +36,6 @@ import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
-import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
@@ -253,9 +252,6 @@ public class RequestContextUtils {
       case LIKE:
         return FilterContext.forPredicate(new RegexpLikePredicate(getExpression(operands.get(0)),
             RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1))), "i"));
-      case TEXT_CONTAINS:
-        return FilterContext.forPredicate(
-            new TextContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case TEXT_MATCH:
         String options = operands.size() > 2 ? getStringValue(operands.get(2)) : null;
         return FilterContext.forPredicate(
@@ -439,8 +435,6 @@ public class RequestContextUtils {
       case LIKE:
         return FilterContext.forPredicate(new RegexpLikePredicate(operands.get(0),
             RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1))), "i"));
-      case TEXT_CONTAINS:
-        return FilterContext.forPredicate(new TextContainsPredicate(operands.get(0), getStringValue(operands.get(1))));
       case TEXT_MATCH:
         String options = operands.size() > 2 ? getStringValue(operands.get(2)) : null;
         return FilterContext.forPredicate(

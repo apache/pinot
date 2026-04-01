@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -100,31 +99,6 @@ public class TextMatchTransformFunctionTest {
       Assert.fail();
     } catch (BadQueryRequestException e) {
       Assert.assertEquals(e.getCause().getMessage(), "Cannot apply TEXT_MATCH on column: id without text index");
-    }
-
-    try {
-      FluentQueryTest.withBaseDir(_baseDir)
-          .givenTable(
-              new Schema.SchemaBuilder()
-                  .setSchemaName("testTable")
-                  .addMetricField("id", FieldSpec.DataType.INT)
-                  .addSingleValueDimension("skills", FieldSpec.DataType.STRING)
-                  .build(),
-              new TableConfigBuilder(TableType.OFFLINE)
-                  .setTableName("testTable")
-                  .addFieldConfig(
-                      new FieldConfig("skills", FieldConfig.EncodingType.RAW,
-                          List.of(FieldConfig.IndexType.TEXT), null,
-                          Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)))
-                  .build())
-          .onFirstInstance(
-              new Object[]{1, "swimming"}
-          )
-          .whenQuery("select TEXT_MATCH(skills, 'sewing') as match from testTable");
-      Assert.fail();
-    } catch (BadQueryRequestException e) {
-      Assert.assertEquals(e.getCause().getMessage(),
-          "TEXT_MATCH is not supported on column: skills with native text index");
     }
 
     try {

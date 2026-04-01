@@ -202,22 +202,18 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseFSTBasedRegexpLikeQueries
     List<Object[]> expected = new ArrayList<>();
     expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
     expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
-    expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
-    expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
-    testInterSegmentsSelectionQuery(query, 4, expected);
+    testInterSegmentsSelectionQuery(query, 2, expected);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') AND "
         + "REGEXP_LIKE(NO_INDEX_COL, 'test1') AND INT_COL=1000 LIMIT 50000";
     expected = new ArrayList<>();
     expected.add(new Object[]{1000, "www.domain1.com/a"});
     expected.add(new Object[]{1000, "www.domain1.com/a"});
-    expected.add(new Object[]{1000, "www.domain1.com/a"});
-    expected.add(new Object[]{1000, "www.domain1.com/a"});
-    testInterSegmentsSelectionQuery(query, 4, expected);
+    testInterSegmentsSelectionQuery(query, 2, expected);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND "
         + "REGEXP_LIKE(URL_COL, '.*/b') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') ORDER  BY INT_COL LIMIT 5000";
-    testInterSegmentsSelectionQuery(query, 48, null);
+    testInterSegmentsSelectionQuery(query, 24, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND "
         + "REGEXP_LIKE(URL_COL, '.*/a') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
@@ -225,22 +221,22 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseFSTBasedRegexpLikeQueries
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND "
         + "REGEXP_LIKE(URL_COL, '.*/a') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
-    testInterSegmentsSelectionQuery(query, 52, null);
+    testInterSegmentsSelectionQuery(query, 26, null);
 
     query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, 'www.domain1.*/a')";
-    testInterSegmentsCountQuery(query, 256);
+    testInterSegmentsCountQuery(query, 128);
 
     query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') "
         + "AND INT_COL > 1005 ";
-    testInterSegmentsCountQuery(query, 200);
+    testInterSegmentsCountQuery(query, 100);
 
     query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') AND REGEXP_LIKE(NO_INDEX_COL, 'test1')";
-    testInterSegmentsCountQuery(query, 204);
+    testInterSegmentsCountQuery(query, 102);
 
     query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') AND REGEXP_LIKE(NO_INDEX_COL, 'test1')";
-    testInterSegmentsCountQuery(query, 208);
+    testInterSegmentsCountQuery(query, 104);
 
     query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*')";
-    testInterSegmentsCountQuery(query, 1024);
+    testInterSegmentsCountQuery(query, 512);
   }
 }

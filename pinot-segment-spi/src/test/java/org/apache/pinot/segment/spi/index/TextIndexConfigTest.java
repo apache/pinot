@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
@@ -35,7 +34,6 @@ public class TextIndexConfigTest {
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected fst");
     assertNull(config.getRawValueForTextIndex(), "Unexpected rawValue");
     assertFalse(config.isEnableQueryCache(), "Unexpected queryCache");
     assertFalse(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
@@ -52,7 +50,6 @@ public class TextIndexConfigTest {
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected fst");
     assertNull(config.getRawValueForTextIndex(), "Unexpected rawValue");
     assertFalse(config.isEnableQueryCache(), "Unexpected queryCache");
     assertFalse(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
@@ -69,7 +66,6 @@ public class TextIndexConfigTest {
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected fst");
     assertNull(config.getRawValueForTextIndex(), "Unexpected rawValue");
     assertFalse(config.isEnableQueryCache(), "Unexpected queryCache");
     assertFalse(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
@@ -86,7 +82,6 @@ public class TextIndexConfigTest {
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
     assertTrue(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getFstType(), "Unexpected fst");
     assertNull(config.getRawValueForTextIndex(), "Unexpected rawValue");
     assertFalse(config.isEnableQueryCache(), "Unexpected queryCache");
     assertFalse(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
@@ -100,7 +95,7 @@ public class TextIndexConfigTest {
   public void withSomeData()
       throws JsonProcessingException {
     String confStr = "{\n"
-        + "        \"fst\": \"NATIVE\",\n"
+        + "        \"fst\": \"LUCENE\",\n"
         + "        \"rawValue\": \"fakeValue\",\n"
         + "        \"queryCache\": true,\n"
         + "        \"useANDForMultiTermQueries\": true,\n"
@@ -112,7 +107,6 @@ public class TextIndexConfigTest {
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertEquals(config.getFstType(), FSTType.NATIVE, "Unexpected fst");
     assertEquals(config.getRawValueForTextIndex(), "fakeValue", "Unexpected rawValue");
     assertTrue(config.isEnableQueryCache(), "Unexpected queryCache");
     assertTrue(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");

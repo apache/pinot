@@ -20,11 +20,13 @@
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.fst.FstIndexUtils;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
@@ -37,6 +39,7 @@ import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -80,6 +83,12 @@ public class FSTIndexHandler extends BaseIndexHandler {
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
+    Set<String> legacyNativeColumns = getColumnsWithLegacyNativeFstIndex(segmentReader);
+    if (!legacyNativeColumns.isEmpty()) {
+      LOGGER.info("Need to replace legacy native FST index files from segment: {}, columns: {}", segmentName,
+          legacyNativeColumns);
+      return true;
+    }
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.fst());
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
@@ -105,6 +114,11 @@ public class FSTIndexHandler extends BaseIndexHandler {
     // Remove indices not set in table config any more
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
+    Set<String> legacyNativeColumns = getColumnsWithLegacyNativeFstIndex(segmentWriter);
+    for (String column : legacyNativeColumns) {
+      LOGGER.info("Removing legacy native FST index from segment: {}, column: {}", segmentName, column);
+      segmentWriter.removeIndex(column, StandardIndexes.fst());
+    }
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.fst());
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
@@ -124,6 +138,21 @@ public class FSTIndexHandler extends BaseIndexHandler {
   @Override
   public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
       throws Exception {
+  }
+
+  private Set<String> getColumnsWithLegacyNativeFstIndex(SegmentDirectory.Reader segmentReader) {
+    Set<String> columns = new HashSet<>();
+    for (String column : segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.fst())) {
+      try {
+        PinotDataBuffer fstBuffer = segmentReader.getIndexFor(column, StandardIndexes.fst());
+        if (FstIndexUtils.isLegacyNativeFst(fstBuffer)) {
+          columns.add(column);
+        }
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while inspecting FST index for column: " + column, e);
+      }
+    }
+    return columns;
   }
 
   private boolean shouldCreateFSTIndex(ColumnMetadata columnMetadata) {

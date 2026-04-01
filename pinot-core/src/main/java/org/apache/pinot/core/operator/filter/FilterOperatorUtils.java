@@ -230,7 +230,6 @@ public class FilterOperatorUtils {
             return PrioritizedFilterOperator.MEDIUM_PRIORITY;
           }
           if (filterOperator instanceof RangeIndexBasedFilterOperator
-              || filterOperator instanceof TextContainsFilterOperator
               || filterOperator instanceof TextMatchFilterOperator || filterOperator instanceof JsonMatchFilterOperator
               || filterOperator instanceof H3IndexFilterOperator
               || filterOperator instanceof H3InclusionIndexFilterOperator) {

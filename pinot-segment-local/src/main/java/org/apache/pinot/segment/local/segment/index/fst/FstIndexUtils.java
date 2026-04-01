@@ -16,16 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.utils.nativefst;
+package org.apache.pinot.segment.local.segment.index.fst;
 
-import org.apache.pinot.segment.local.utils.nativefst.builder.FSTSerializerImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**
- * ImmutableFSTSerializer tests
+ * Utilities for handling legacy native FST indexes during the Lucene-only transition.
  */
-public class ImmutableFSTSerializerTest extends SerializerTestBase {
-  protected FSTSerializerImpl createSerializer() {
-    return new FSTSerializerImpl();
+public final class FstIndexUtils {
+  private static final int LEGACY_NATIVE_FST_MAGIC = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+
+  private FstIndexUtils() {
+  }
+
+  public static boolean isLegacyNativeFst(PinotDataBuffer fstBuffer) {
+    if (fstBuffer.size() < Integer.BYTES) {
+      return false;
+    }
+    return fstBuffer.getInt(0) == LEGACY_NATIVE_FST_MAGIC;
   }
 }

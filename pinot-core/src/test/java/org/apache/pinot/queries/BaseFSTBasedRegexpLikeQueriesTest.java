@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -45,7 +44,6 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -129,16 +127,11 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    List<IndexSegment> segments = new ArrayList<>();
-    for (FSTType fstType : Arrays.asList(FSTType.LUCENE, FSTType.NATIVE)) {
-      buildSegment(fstType, getIndexType());
-      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, SCHEMA);
-      ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-      segments.add(segment);
-    }
-
-    _indexSegment = segments.get(ThreadLocalRandom.current().nextInt(2));
-    _indexSegments = segments;
+    buildSegment(getIndexType());
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, SCHEMA);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+    _indexSegment = segment;
+    _indexSegments = List.of(segment);
   }
 
   @AfterClass
@@ -181,12 +174,11 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
     return rows;
   }
 
-  private void buildSegment(FSTType fstType, String indexType)
+  private void buildSegment(String indexType)
       throws Exception {
     List<GenericRow> rows = createTestData();
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(getFieldConfigs(indexType)).build();
-    _tableConfig.getIndexingConfig().setFSTIndexType(fstType);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);

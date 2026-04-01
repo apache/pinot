@@ -123,7 +123,6 @@ public class FilterOperatorUtilsTest {
     SortedIndexBasedFilterOperator sorted = mock(SortedIndexBasedFilterOperator.class);
     BitmapBasedFilterOperator bitmap = mock(BitmapBasedFilterOperator.class);
     RangeIndexBasedFilterOperator range = mock(RangeIndexBasedFilterOperator.class);
-    TextContainsFilterOperator textContains = mock(TextContainsFilterOperator.class);
     TextMatchFilterOperator textMatch = mock(TextMatchFilterOperator.class);
     JsonMatchFilterOperator jsonMatch = mock(JsonMatchFilterOperator.class);
     H3IndexFilterOperator h3 = mock(H3IndexFilterOperator.class);
@@ -148,7 +147,7 @@ public class FilterOperatorUtilsTest {
     List<? extends List<? extends BaseFilterOperator>> expectedOrder = Lists.newArrayList(
         Lists.newArrayList(sorted, notWithHighPriority),
         Lists.newArrayList(bitmap),
-        Lists.newArrayList(range, textContains, textMatch, jsonMatch, h3, h3Inclusion),
+        Lists.newArrayList(range, textMatch, jsonMatch, h3, h3Inclusion),
         Lists.newArrayList(andFilterOperator),
         Lists.newArrayList(orFilterOperator, notWithLowPriority),
         Lists.newArrayList(expression),

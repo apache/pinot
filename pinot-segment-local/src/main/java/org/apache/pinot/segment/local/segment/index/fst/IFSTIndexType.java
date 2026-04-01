@@ -43,9 +43,7 @@ import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -91,11 +89,8 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
 
   @Override
   protected ColumnConfigDeserializer<FstIndexConfig> createDeserializerForLegacyConfigs() {
-    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.IFST, (tableConfig, fieldConfig) -> {
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      FSTType fstIndexType = indexingConfig != null ? indexingConfig.getFSTIndexType() : null;
-      return new FstIndexConfig(fstIndexType);
-    });
+    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.IFST,
+        (tableConfig, fieldConfig) -> new FstIndexConfig(false));
   }
 
   @Override
@@ -107,11 +102,6 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
         "IFST index is currently only supported on STRING type columns");
     Preconditions.checkState(context.hasDictionary(),
         "IFST index is currently only supported on dictionary-encoded columns");
-    // IFST only supports Lucene implementation, not native FST
-    if (indexConfig.getFstType() == FSTType.NATIVE) {
-      throw new UnsupportedOperationException(
-          "Native FST is not supported for IFST index. Only Lucene implementation is supported.");
-    }
     return new LuceneIFSTIndexCreator(context);
   }
 
@@ -159,10 +149,5 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
         throws IndexReaderConstraintException, IOException {
       return createIndexReader(dataBuffer, metadata);
     }
-  }
-
-  @Override
-  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
-    tableConfig.getIndexingConfig().setFSTIndexType(null);
   }
 }

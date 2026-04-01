@@ -34,7 +34,6 @@ public interface Predicate {
     NOT_IN(true),
     RANGE,
     REGEXP_LIKE,
-    TEXT_CONTAINS,
     TEXT_MATCH,
     JSON_MATCH,
     IS_NULL,

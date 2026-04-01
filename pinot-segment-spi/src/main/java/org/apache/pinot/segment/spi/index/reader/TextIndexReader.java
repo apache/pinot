@@ -32,7 +32,7 @@ public interface TextIndexReader extends IndexReader {
 
   /**
    * Returns the matching document ids for the given search query.
-   * This is the legacy method for backward compatibility with native/FST text index readers.
+   * This is the legacy entry point retained for backward compatibility.
    */
   MutableRoaringBitmap getDocIds(String searchQuery);
 
@@ -45,7 +45,7 @@ public interface TextIndexReader extends IndexReader {
    * @return Matching document ids
    */
   default MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
-    // Default implementation falls back to the regular method for backward compatibility
+    // Default implementation falls back to the legacy method for backward compatibility.
     return getDocIds(searchQuery);
   }
 
