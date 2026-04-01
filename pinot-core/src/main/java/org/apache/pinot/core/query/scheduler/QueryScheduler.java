@@ -98,6 +98,13 @@ public abstract class QueryScheduler {
    */
   public void start() {
     _isRunning = true;
+    // Initialize global throttling default concurrency from the number of query runner threads
+    try {
+      ThrottlingRuntime.setDefaultConcurrency(_resourceManager.getNumQueryRunnerThreads());
+    } catch (Throwable t) {
+      // Be defensive: throttling is best-effort and should not block startup
+      LOGGER.debug("Failed to initialize ThrottlingRuntime default concurrency.", t);
+    }
   }
 
   /**
