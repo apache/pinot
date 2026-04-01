@@ -21,7 +21,9 @@ package org.apache.pinot.segment.local.realtime.converter.stats;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.ColumnarMapColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.index.columnarmap.ColumnarMapDataSource;
 import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -77,6 +79,14 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
         continue;
       }
 
+      // Handle MAP columns with sparse map index
+      if (dataSource instanceof ColumnarMapDataSource) {
+        _columnStatisticsMap.put(columnName,
+            createColumnarMapColumnStatistics(columnName, dataSource, isUsingCompactedReader, validDocIdsSnapshot,
+                statsCollectorConfig));
+        continue;
+      }
+
       // Handle dictionary columns
       if (dataSource.getDictionary() != null) {
         _columnStatisticsMap.put(columnName,
@@ -118,6 +128,24 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
 
     mapColumnPreIndexStatsCollector.seal();
     return mapColumnPreIndexStatsCollector;
+  }
+
+  /**
+   * Creates column statistics for MAP columns with sparse map index.
+   */
+  private ColumnStatistics createColumnarMapColumnStatistics(String columnName, DataSource dataSource,
+      boolean useCompactedStatistics, ThreadSafeMutableRoaringBitmap validDocIds,
+      StatsCollectorConfig statsCollectorConfig) {
+    ColumnarMapColumnPreIndexStatsCollector collector =
+        new ColumnarMapColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
+    int numDocs = useCompactedStatistics && validDocIds != null
+        ? validDocIds.getMutableRoaringBitmap().getCardinality()
+        : dataSource.getDataSourceMetadata().getNumDocs();
+    for (int i = 0; i < numDocs; i++) {
+      collector.collect((Object) null);
+    }
+    collector.seal();
+    return collector;
   }
 
   /**

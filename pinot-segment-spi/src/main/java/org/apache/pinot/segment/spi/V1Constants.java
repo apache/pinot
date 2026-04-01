@@ -46,6 +46,7 @@ public class V1Constants {
     public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
     public static final String BITMAP_RANGE_INDEX_FILE_EXTENSION = ".bitmap.range";
     public static final String JSON_INDEX_FILE_EXTENSION = ".json.idx";
+    public static final String COLUMNAR_MAP_INDEX_FILE_EXTENSION = ".columnarmap.idx";
     public static final String NATIVE_TEXT_INDEX_FILE_EXTENSION = ".nativetext.idx";
     public static final String H3_INDEX_FILE_EXTENSION = ".h3.idx";
     public static final String BLOOM_FILTER_FILE_EXTENSION = ".bloom";
@@ -94,6 +95,7 @@ public class V1Constants {
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
       public static final String SEGMENT_PADDING_CHARACTER = "segment.padding.character";
       public static final String COMPLEX_COLUMNS = "segment.complex.column.names";
+      public static final String COLUMNAR_MAP_COLUMNS = "segment.columnarmap.column.names";
 
       public static final String CUSTOM_SUBSET = "custom";
 
@@ -128,6 +130,9 @@ public class V1Constants {
       public static final String DATETIME_FORMAT = "datetimeFormat";
       public static final String DATETIME_GRANULARITY = "datetimeGranularity";
       public static final String COMPLEX_CHILD_FIELD_NAMES = "complexChildFieldNames";
+      public static final String COLUMNAR_MAP_KEY_NAMES = "columnarMapKeyNames";
+      public static final String COLUMNAR_MAP_KEY_TYPE_PREFIX = "columnarMapKeyType";
+      public static final String COLUMNAR_MAP_DEFAULT_VALUE_TYPE = "columnarMapDefaultValueType";
 
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
       public static final String SCHEMA_MAX_LENGTH = "schemaMaxLength";
