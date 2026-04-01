@@ -71,6 +71,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     startController();
     startBrokers(1);
     startServers(1);
+
+    // Wait for broker to be ready before getting port (avoid race condition)
+    TestUtils.waitForCondition(aVoid -> !_brokerPorts.isEmpty(), 500, 30000, "Broker ports not available");
     _brokerHostPort = LOCAL_HOST + ":" + _brokerPorts.get(0);
 
     // Create and upload the schema and table config
@@ -84,6 +87,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     addSchema(schema);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig();
     addLogicalTableConfig(logicalTableConfig);
+
+    // Wait for cluster to be ready before creating connection
+    Thread.sleep(500);
 
     Properties properties = new Properties();
     properties.put(FAIL_ON_EXCEPTIONS, "FALSE");
