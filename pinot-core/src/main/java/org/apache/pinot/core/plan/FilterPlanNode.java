@@ -21,8 +21,10 @@ package org.apache.pinot.core.plan;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -51,6 +53,7 @@ import org.apache.pinot.core.operator.filter.predicate.IFSTBasedRegexpPredicateE
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
+import org.apache.pinot.core.query.request.context.ArrayJoinContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -91,6 +94,14 @@ public class FilterPlanNode implements PlanNode {
   public BaseFilterOperator run() {
     MutableRoaringBitmap queryableDocIdsSnapshot = _segmentContext.getQueryableDocIdsSnapshot();
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+
+    if (shouldSkipArrayJoinFilter(_filter)) {
+      if (queryableDocIdsSnapshot != null) {
+        return new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
+      } else {
+        return new MatchAllFilterOperator(numDocs);
+      }
+    }
 
     if (_filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
@@ -355,5 +366,37 @@ public class FilterPlanNode implements PlanNode {
       default:
         throw new IllegalStateException();
     }
+  }
+
+  private boolean shouldSkipArrayJoinFilter(@Nullable FilterContext filter) {
+    if (filter == null) {
+      return false;
+    }
+    List<ArrayJoinContext> arrayJoinContexts = _queryContext.getArrayJoinContexts();
+    if (arrayJoinContexts == null || arrayJoinContexts.isEmpty()) {
+      return false;
+    }
+    Set<String> arrayJoinColumns = new HashSet<>();
+    for (ArrayJoinContext context : arrayJoinContexts) {
+      for (ArrayJoinContext.Operand operand : context.getOperands()) {
+        ExpressionContext expression = operand.getExpression();
+        expression.getColumns(arrayJoinColumns);
+        String alias = operand.getAlias();
+        if (alias != null) {
+          arrayJoinColumns.add(alias);
+        }
+      }
+    }
+    if (arrayJoinColumns.isEmpty()) {
+      return false;
+    }
+    Set<String> filterColumns = new HashSet<>();
+    filter.getColumns(filterColumns);
+    for (String column : filterColumns) {
+      if (arrayJoinColumns.contains(column)) {
+        return true;
+      }
+    }
+    return false;
   }
 }
