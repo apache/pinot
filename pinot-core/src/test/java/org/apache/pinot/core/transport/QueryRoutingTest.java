@@ -497,7 +497,7 @@ public class QueryRoutingTest {
 
   @Test
   public void testSkipUnavailableServer()
-      throws IOException, InterruptedException {
+      throws Exception {
     // Use dynamically allocated ports to avoid resource conflict with other tests
     int port1 = getAvailablePort();
     int port2 = getAvailablePort();
