@@ -26,10 +26,12 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
-
-/// Sorts documents within a segment by one or more columns. For no-dictionary columns, values are
-/// pre-materialized into in-memory arrays before sorting so that the comparator never needs to
-/// decompress forward-index chunks during the random-access phase of quicksort.
+/**
+ * Sorter implementation for pinot segments
+ * Sorts documents within a segment by one or more columns. For no-dictionary columns, values are
+ * pre-materialized into in-memory arrays before sorting so that the comparator never needs to
+ * decompress forward-index chunks during the random-access phase of quicksort.
+ */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class PinotSegmentSorter implements SegmentSorter {
   private final int _numDocs;
@@ -128,5 +130,4 @@ public class PinotSegmentSorter implements SegmentSorter {
     }
     return values;
   }
-
 }
