@@ -155,6 +155,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
   private final int _mainPartitionId; // partition id designated for this consuming segment
+  private final boolean _dropRecordOnPartitionMismatch;
   private final boolean _defaultNullHandlingEnabled;
   private final File _consumerDir;
 
@@ -248,6 +249,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionColumn = config.getPartitionColumn();
     _partitionFunction = config.getPartitionFunction();
     _mainPartitionId = config.getPartitionId();
+    _dropRecordOnPartitionMismatch = config.isDropRecordOnPartitionMismatch();
     _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
     _consumerDir = new File(config.getConsumerDir());
 
@@ -624,6 +626,27 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public boolean index(GenericRow row, @Nullable StreamMessageMetadata metadata)
       throws IOException {
+    if (_partitionColumn != null) {
+      Object value = row.getValue(_partitionColumn);
+      Preconditions.checkState(value != null, "Failed to find value for partition column: %s", _partitionColumn);
+      IndexContainer indexContainer = _indexContainerMap.get(_partitionColumn);
+      String stringValue = indexContainer._fieldSpec.getDataType().toString(value);
+      int partition = _partitionFunction.getPartition(stringValue);
+      if (partition != _mainPartitionId) {
+        if (_serverMetrics != null) {
+          _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
+        }
+        if (_dropRecordOnPartitionMismatch) {
+          return true;
+        }
+        if (indexContainer._partitions.add(partition)) {
+          // for every partition other than mainPartitionId, log a warning once
+          _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, _partitionColumn,
+              stringValue);
+        }
+      }
+    }
+
     boolean canTakeMore;
     int numDocsIndexed = _numDocsIndexed;
 
@@ -901,23 +924,6 @@ public class MutableSegmentImpl implements MutableSegment {
       DataType dataType = fieldSpec.getDataType();
 
       if (fieldSpec.isSingleValueField()) {
-        // Check partitions
-        if (column.equals(_partitionColumn)) {
-          String stringValue = dataType.toString(value);
-          int partition = _partitionFunction.getPartition(stringValue);
-          if (partition != _mainPartitionId) {
-            if (indexContainer._partitions.add(partition)) {
-              // for every partition other than mainPartitionId, log a warning once
-              _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column,
-                  stringValue);
-            }
-            // always emit a metric when a partition other than mainPartitionId is detected
-            if (_serverMetrics != null) {
-              _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
-            }
-          }
-        }
-
         // Update numValues info
         indexContainer._valuesInfo.updateSVNumValues();
 

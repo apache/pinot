@@ -34,6 +34,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
@@ -141,5 +142,30 @@ public class MutableSegmentImplTestUtils {
 
     RealtimeSegmentConfig realtimeSegmentConfig = segmentConfBuilder.build();
     return new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics);
+  }
+
+  public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, String partitionColumn,
+      PartitionFunction partitionFunction, int partitionId, boolean dropRecordOnPartitionMismatch) {
+    RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
+    when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
+    when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
+
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(TABLE_NAME_WITH_TYPE)
+        .setSegmentName(SEGMENT_NAME)
+        .setStreamName(STREAM_NAME)
+        .setSchema(schema)
+        .setCapacity(100000)
+        .setAvgNumMultiValues(2)
+        .setSegmentZKMetadata(new SegmentZKMetadata(SEGMENT_NAME))
+        .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME))
+        .setStatsHistory(statsHistory)
+        .setPartitionColumn(partitionColumn)
+        .setPartitionFunction(partitionFunction)
+        .setPartitionId(partitionId)
+        .setDropRecordOnPartitionMismatch(dropRecordOnPartitionMismatch)
+        .setConsumerDir(TEMP_DIR.getAbsolutePath() + "/" + UUID.randomUUID() + "/consumerDir")
+        .build();
+    return new MutableSegmentImpl(realtimeSegmentConfig, null);
   }
 }
