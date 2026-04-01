@@ -213,14 +213,11 @@ public class QueryThreadContext implements AutoCloseable {
       boolean registerTaskForCancellation) {
     Consumer<Future<?>> onSubmit = registerTaskForCancellation
         ? future -> get().getExecutionContext().addTask(future)
-        : future -> { };
+        : null;
     return new DecoratorExecutorService(executorService, onSubmit) {
       @Override
       protected <T> Callable<T> decorate(Callable<T> task) {
-        QueryThreadContext parentThreadContext = registerTaskForCancellation ? get() : getIfAvailable();
-        if (parentThreadContext == null) {
-          return task;
-        }
+        QueryThreadContext parentThreadContext = get();
         return () -> {
           try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
               parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
