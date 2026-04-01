@@ -782,7 +782,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       SegmentDictionaryCreator dictionaryCreator) {
     boolean isSVColumn = reader.isSingleValue();
     int maxNumValuesPerEntry = existingColumnMetadata.getMaxNumberOfMultiValues();
-    PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null, maxNumValuesPerEntry);
+    PinotSegmentColumnReader columnReader =
+        new PinotSegmentColumnReader(reader, null, null, maxNumValuesPerEntry);
 
     for (int i = 0; i < numDocs; i++) {
       Object obj = columnReader.getValue(i);
