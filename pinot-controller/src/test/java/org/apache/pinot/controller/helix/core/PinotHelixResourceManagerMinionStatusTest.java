@@ -24,11 +24,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.task.JobContext;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
-import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.controller.api.resources.MinionStatusResponse;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -54,6 +55,7 @@ import static org.testng.Assert.assertTrue;
  */
 public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
 
+  private static final String TEST_TASK_QUEUE = "TaskQueue_TestType";
   private PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
 
   @BeforeClass
@@ -80,24 +82,44 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     } catch (Exception e) {
       // Ignore errors getting all instances
     }
+    // Clean up the test task queue resource config if it was created
+    try {
+      removeTaskQueueResourceConfig();
+    } catch (Exception e) {
+      // Ignore if not present
+    }
   }
 
   /**
-   * Helper method to create a mock TaskDriver with workflows and jobs containing tasks assigned to minions
+   * Creates a resource config ZNode in ZK so that getChildNames(resourceConfigs()) returns the task queue name.
+   */
+  private void createTaskQueueResourceConfig() {
+    HelixDataAccessor accessor = _helixResourceManager.getHelixZkManager().getHelixDataAccessor();
+    accessor.setProperty(accessor.keyBuilder().resourceConfig(TEST_TASK_QUEUE),
+        new ResourceConfig(TEST_TASK_QUEUE));
+  }
+
+  /**
+   * Removes the resource config ZNode created for the test task queue.
+   */
+  private void removeTaskQueueResourceConfig() {
+    HelixDataAccessor accessor = _helixResourceManager.getHelixZkManager().getHelixDataAccessor();
+    accessor.removeProperty(accessor.keyBuilder().resourceConfig(TEST_TASK_QUEUE));
+  }
+
+  /**
+   * Helper method to create a mock TaskDriver with workflows and jobs containing tasks assigned to minions.
+   * Also creates the task queue resource config in ZK so that it is discoverable via getChildNames.
    * @param taskAssignments Map of minion instance ID to number of RUNNING tasks
    * @return Mocked TaskDriver
    */
   private TaskDriver createMockTaskDriverWithRunningTasks(Map<String, Integer> taskAssignments) {
+    createTaskQueueResourceConfig();
     TaskDriver mockTaskDriver = mock(TaskDriver.class);
 
-    // Create a mock workflows - getWorkflows() returns a Map<String, WorkflowConfig>
-    Map<String, WorkflowConfig> workflows = new HashMap<>();
-    workflows.put("TestWorkflow1", mock(WorkflowConfig.class));
-    when(mockTaskDriver.getWorkflows()).thenReturn(workflows);
-
-    // Create workflow context with jobs
+    // Create workflow context with jobs for the task queue
     WorkflowContext workflowContext = mock(WorkflowContext.class);
-    when(mockTaskDriver.getWorkflowContext("TestWorkflow1")).thenReturn(workflowContext);
+    when(mockTaskDriver.getWorkflowContext(TEST_TASK_QUEUE)).thenReturn(workflowContext);
 
     Map<String, TaskState> jobStates = new HashMap<>();
     jobStates.put("TestJob1", TaskState.IN_PROGRESS);
@@ -180,12 +202,6 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
       } else {
         assertEquals(status.getRunningTaskCount(), 0);
       }
-    }
-
-    // Cleanup
-    for (int i = 0; i < 3; i++) {
-      String minionInstanceId = "Minion_minion-test-" + i + ".example.com_" + (9514);
-      _helixResourceManager.dropInstance(minionInstanceId);
     }
   }
 
@@ -614,10 +630,11 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
         Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     _helixResourceManager.addInstance(minion, false);
 
-    // Create a mock TaskDriver that throws an exception when accessing workflows
+    // Create a task queue resource config and a mock TaskDriver that throws when getting workflow context
+    createTaskQueueResourceConfig();
     TaskDriver mockTaskDriver = mock(TaskDriver.class);
     Mockito.doThrow(new RuntimeException("Simulated task driver failure"))
-        .when(mockTaskDriver).getWorkflows();
+        .when(mockTaskDriver).getWorkflowContext(TEST_TASK_QUEUE);
 
     PinotHelixTaskResourceManager taskResourceManager = new PinotHelixTaskResourceManager(
         _helixResourceManager, mockTaskDriver);
@@ -628,9 +645,6 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     assertNotNull(response);
     assertEquals(response.getCurrentMinionCount(), 1);
     assertEquals(response.getMinionStatus().get(0).getRunningTaskCount(), 0);
-
-    // Cleanup
-    _helixResourceManager.dropInstance(minionId);
   }
 
   @Test
