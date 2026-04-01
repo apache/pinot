@@ -20,9 +20,16 @@ package org.apache.pinot.query.runtime.plan;
 
 import com.google.auto.service.AutoService;
 import java.util.function.BiConsumer;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.operator.ErrorOperator;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /**
@@ -57,6 +64,39 @@ public interface OpChainConverter {
    *                keep track of this mapping.
    */
   OpChain convert(PlanNode node, OpChainExecutionContext context, BiConsumer<PlanNode, MultiStageOperator> tracker);
+
+  /**
+   * Builds a minimal op-chain that sends an already-detected stage error to downstream receivers.
+   *
+   * This is used, for example, when a pipeline breaker detects an error and needs to propagate it to downstream stages.
+   *
+   * <p>The default implementation uses a Java {@link ErrorOperator} + {@link MailboxSendOperator} pipeline.
+   */
+  default OpChain sendEarlyError(OpChainExecutionContext context, StagePlan stagePlan,
+      ErrorMseBlock errorBlock) {
+    if (!(stagePlan.getRootNode() instanceof MailboxSendNode)) {
+      throw new IllegalStateException("Expected MailboxSendNode root for error propagation, got: "
+          + stagePlan.getRootNode().getClass().getSimpleName());
+    }
+    MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
+    String message = extractErrorMessage(errorBlock);
+    MultiStageOperator errorOp = new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, message);
+    MultiStageOperator sendOp = new MailboxSendOperator(context, errorOp, rootNode);
+    return new OpChain(context, sendOp);
+  }
+
+  private static String extractErrorMessage(ErrorMseBlock errorBlock) {
+    String message = errorBlock.getErrorMessages().get(errorBlock.getMainErrorCode());
+    if (StringUtils.isNotBlank(message)) {
+      return message;
+    }
+    for (String value : errorBlock.getErrorMessages().values()) {
+      if (StringUtils.isNotBlank(value)) {
+        return value;
+      }
+    }
+    return "Query execution failed";
+  }
 
   @AutoService(OpChainConverter.class)
   class DefaultOpChainConverter implements OpChainConverter {
