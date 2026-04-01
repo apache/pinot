@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SequentialSortedGroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.SortedGroupByCombineOperator;
+import org.apache.pinot.core.operator.streaming.StreamingGroupByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -125,44 +126,50 @@ public class CombinePlanNode implements PlanNode {
       }, _executorService, _queryContext.getEndTimeMs());
     }
 
-    if (_streamer != null
-          && QueryContextUtils.isSelectionOnlyQuery(_queryContext) && _queryContext.getLimit() != 0) {
-      // Use streaming operator only for non-empty selection-only query
-      return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
-    } else {
-      if (QueryContextUtils.isAggregationQuery(_queryContext)) {
-        if (_queryContext.getGroupByExpressions() == null) {
-          // Aggregation only
-          return new AggregationCombineOperator(operators, _queryContext, _executorService);
-        } else {
-          // Sorted aggregation group-by, when safeTrim and limit is not too large
-          if (_queryContext.shouldSortAggregateUnderSafeTrim()) {
-            if (operators.size() < _queryContext.getSortAggregateSequentialCombineNumSegmentsThreshold()) {
-              return new SequentialSortedGroupByCombineOperator(operators, _queryContext, _executorService);
-            }
-            return new SortedGroupByCombineOperator(operators, _queryContext, _executorService);
-          }
-          // Aggregation group-by
-          return new GroupByCombineOperator(operators, _queryContext, _executorService);
-        }
-      } else if (QueryContextUtils.isSelectionQuery(_queryContext)) {
-        if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
-          // Selection only
-          return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
-        } else {
-          // Selection order-by
-          List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
-          assert orderByExpressions != null;
-          if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
-            return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
-          } else {
-            return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
-          }
-        }
-      } else {
-        assert QueryContextUtils.isDistinctQuery(_queryContext);
-        return new DistinctCombineOperator(operators, _queryContext, _executorService);
+    if (_streamer != null) {
+      if (QueryContextUtils.isSelectionOnlyQuery(_queryContext) && _queryContext.getLimit() != 0) {
+        // Use streaming operator only for non-empty selection-only query
+        return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
       }
+      int flushThreshold = _queryContext.getStreamingGroupByFlushThreshold();
+      if (flushThreshold > 0 && QueryContextUtils.isAggregationQuery(_queryContext)
+          && _queryContext.getGroupByExpressions() != null) {
+        // Use streaming group-by operator for MSE leaf stages with flush threshold
+        return new StreamingGroupByCombineOperator(operators, _queryContext, _executorService, flushThreshold);
+      }
+    }
+    if (QueryContextUtils.isAggregationQuery(_queryContext)) {
+      if (_queryContext.getGroupByExpressions() == null) {
+        // Aggregation only
+        return new AggregationCombineOperator(operators, _queryContext, _executorService);
+      } else {
+        // Sorted aggregation group-by, when safeTrim and limit is not too large
+        if (_queryContext.shouldSortAggregateUnderSafeTrim()) {
+          if (operators.size() < _queryContext.getSortAggregateSequentialCombineNumSegmentsThreshold()) {
+            return new SequentialSortedGroupByCombineOperator(operators, _queryContext, _executorService);
+          }
+          return new SortedGroupByCombineOperator(operators, _queryContext, _executorService);
+        }
+        // Aggregation group-by
+        return new GroupByCombineOperator(operators, _queryContext, _executorService);
+      }
+    } else if (QueryContextUtils.isSelectionQuery(_queryContext)) {
+      if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
+        // Selection only
+        return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
+      } else {
+        // Selection order-by
+        List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
+        assert orderByExpressions != null;
+        if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+          return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+        } else {
+          return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+        }
+      }
+    } else {
+      assert QueryContextUtils.isDistinctQuery(_queryContext);
+      return new DistinctCombineOperator(operators, _queryContext, _executorService);
     }
   }
 }

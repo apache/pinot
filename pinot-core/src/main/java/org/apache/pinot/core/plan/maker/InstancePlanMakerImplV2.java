@@ -303,6 +303,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       } else {
         queryContext.setChunkSizeExtractFinalResult(DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT);
       }
+      // Set streamingGroupByFlushThreshold
+      Integer streamingGroupByFlushThreshold =
+          QueryOptionsUtils.getStreamingGroupByFlushThreshold(queryOptions);
+      if (streamingGroupByFlushThreshold != null) {
+        queryContext.setStreamingGroupByFlushThreshold(streamingGroupByFlushThreshold);
+      }
     }
   }
 
