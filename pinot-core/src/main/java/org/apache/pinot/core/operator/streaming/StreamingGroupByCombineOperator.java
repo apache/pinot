@@ -67,6 +67,9 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
   // Main-thread-only state for accumulating group-by results
   private DataSchema _dataSchema;
   private SimpleIndexedTable _indexedTable;
+  private boolean _groupsTrimmed;
+  private boolean _numGroupsLimitReached;
+  private boolean _numGroupsWarningLimitReached;
 
   public StreamingGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, int flushThreshold) {
@@ -145,6 +148,15 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
       _dataSchema = resultsBlock.getDataSchema();
       _indexedTable = createNewIndexedTable();
     }
+    if (resultsBlock.isGroupsTrimmed()) {
+      _groupsTrimmed = true;
+    }
+    if (resultsBlock.isNumGroupsLimitReached()) {
+      _numGroupsLimitReached = true;
+    }
+    if (resultsBlock.isNumGroupsWarningLimitReached()) {
+      _numGroupsWarningLimitReached = true;
+    }
     List<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
     if (intermediateRecords == null) {
       AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
@@ -179,6 +191,9 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
   private GroupByResultsBlock flushTable() {
     _indexedTable.finish(false);
     GroupByResultsBlock block = new GroupByResultsBlock(_indexedTable, _queryContext);
+    block.setGroupsTrimmed(_groupsTrimmed);
+    block.setNumGroupsLimitReached(_numGroupsLimitReached);
+    block.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
     _indexedTable = createNewIndexedTable();
     return block;
   }
