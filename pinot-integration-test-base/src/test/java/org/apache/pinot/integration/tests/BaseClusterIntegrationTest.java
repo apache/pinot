@@ -119,8 +119,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
   protected static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
   protected static final int DEFAULT_MAX_NUM_KAFKA_MESSAGES_PER_BATCH = 10000;
-  private static final long KAFKA_CLUSTER_READY_TIMEOUT_MS = 120_000L;
-  private static final long KAFKA_TOPIC_READY_TIMEOUT_MS = 120_000L;
+  private static final long KAFKA_CLUSTER_READY_TIMEOUT_MS = 180_000L;
+  private static final long KAFKA_TOPIC_READY_TIMEOUT_MS = 180_000L;
   protected static final List<String> DEFAULT_NO_DICTIONARY_COLUMNS =
       Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
   protected static final String DEFAULT_SORTED_COLUMN = "Carrier";
@@ -843,7 +843,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         KAFKA_CLUSTER_READY_TIMEOUT_MS,
         "Kafka brokers are not ready");
     if (requireTransactions) {
-      TestUtils.waitForCondition(aVoid -> canInitTransactions(brokerList), 500L, KAFKA_CLUSTER_READY_TIMEOUT_MS,
+      // Wait for transaction coordinator with longer initial delay and timeout
+      TestUtils.waitForCondition(aVoid -> canInitTransactions(brokerList), 1000L, KAFKA_CLUSTER_READY_TIMEOUT_MS,
           "Kafka transaction coordinator is not ready");
     }
   }
@@ -872,6 +873,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     producerProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
     try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(producerProps)) {
       producer.initTransactions();
+      // Complete a full transaction cycle to verify coordinator is truly ready
+      producer.beginTransaction();
+      producer.commitTransaction();
       return true;
     } catch (Exception e) {
       return false;
