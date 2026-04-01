@@ -21,6 +21,8 @@ package org.apache.pinot.core.query.scheduler.resources;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -60,6 +62,14 @@ public abstract class ResourceManager {
     DEFAULT_QUERY_WORKER_THREADS = 2 * numCores;
   }
 
+  /**
+   * Listener notified after thread pools have been resized.
+   */
+  @FunctionalInterface
+  public interface ThreadPoolResizeListener {
+    void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads);
+  }
+
   // set the main query runner priority higher than NORM but lower than MAX
   // because if a query is complete we want to deserialize and return response as soon
   // as possible
@@ -68,6 +78,7 @@ public abstract class ResourceManager {
   // including planning, distributing operators across threads, waiting and
   // reducing the results from the parallel set of operators (CombineOperator)
   //
+  protected final PinotConfiguration _config;
   protected final ListeningExecutorService _queryRunners;
   protected final ListeningExecutorService _queryWorkers;
   protected final ThreadPoolExecutor _queryRunnerPool;
@@ -75,10 +86,13 @@ public abstract class ResourceManager {
   protected volatile int _numQueryRunnerThreads;
   protected volatile int _numQueryWorkerThreads;
 
+  private final List<ThreadPoolResizeListener> _resizeListeners = new CopyOnWriteArrayList<>();
+
   /**
    * @param config configuration for initializing resource manager
    */
   public ResourceManager(PinotConfiguration config) {
+    _config = config;
     _numQueryRunnerThreads = config.getProperty(QUERY_RUNNER_CONFIG_KEY, DEFAULT_QUERY_RUNNER_THREADS);
     _numQueryWorkerThreads = config.getProperty(QUERY_WORKER_CONFIG_KEY, DEFAULT_QUERY_WORKER_THREADS);
 
@@ -133,6 +147,25 @@ public abstract class ResourceManager {
 
     LOGGER.info("Resized thread pools: runner {} -> {}, worker {} -> {}",
         oldRunnerThreads, newRunnerThreads, oldWorkerThreads, newWorkerThreads);
+
+    onThreadPoolsResized(newRunnerThreads, newWorkerThreads);
+    for (ThreadPoolResizeListener listener : _resizeListeners) {
+      listener.onThreadPoolsResized(newRunnerThreads, newWorkerThreads);
+    }
+  }
+
+  /**
+   * Registers a listener to be notified after thread pools are resized.
+   */
+  public void addThreadPoolResizeListener(ThreadPoolResizeListener listener) {
+    _resizeListeners.add(listener);
+  }
+
+  /**
+   * Hook for subclasses to update dependent state (e.g. resource limit policies) after thread pools are resized.
+   * Called before external listeners are notified.
+   */
+  protected void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads) {
   }
 
   private static void resizePool(ThreadPoolExecutor pool, int oldSize, int newSize, String poolName) {

@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.scheduler.resources;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -105,6 +106,44 @@ public class ResourceManagerTest {
     _resourceManager.resizeThreadPools(2, -1);
     assertEquals(_resourceManager.getNumQueryRunnerThreads(), 2);
     assertEquals(_resourceManager.getNumQueryWorkerThreads(), 4);
+  }
+
+  @Test
+  public void testResizeListenerCalledOnResize() {
+    _resourceManager = getResourceManager(2, 4, 1, 3);
+    AtomicInteger capturedRunners = new AtomicInteger(-1);
+    AtomicInteger capturedWorkers = new AtomicInteger(-1);
+    _resourceManager.addThreadPoolResizeListener((newRunnerThreads, newWorkerThreads) -> {
+      capturedRunners.set(newRunnerThreads);
+      capturedWorkers.set(newWorkerThreads);
+    });
+
+    _resourceManager.resizeThreadPools(6, 12);
+    assertEquals(capturedRunners.get(), 6);
+    assertEquals(capturedWorkers.get(), 12);
+  }
+
+  @Test
+  public void testResizeListenerNotCalledOnNoChange() {
+    _resourceManager = getResourceManager(2, 4, 1, 3);
+    AtomicInteger callCount = new AtomicInteger(0);
+    _resourceManager.addThreadPoolResizeListener((newRunnerThreads, newWorkerThreads) -> callCount.incrementAndGet());
+
+    _resourceManager.resizeThreadPools(2, 4);
+    assertEquals(callCount.get(), 0);
+  }
+
+  @Test
+  public void testResizeListenerNotCalledOnInvalidValues() {
+    _resourceManager = getResourceManager(2, 4, 1, 3);
+    AtomicInteger callCount = new AtomicInteger(0);
+    _resourceManager.addThreadPoolResizeListener((newRunnerThreads, newWorkerThreads) -> callCount.incrementAndGet());
+
+    _resourceManager.resizeThreadPools(0, 4);
+    assertEquals(callCount.get(), 0);
+
+    _resourceManager.resizeThreadPools(2, -1);
+    assertEquals(callCount.get(), 0);
   }
 
   private ResourceManager getResourceManager(int runners, int workers, final int softLimit, final int hardLimit) {
