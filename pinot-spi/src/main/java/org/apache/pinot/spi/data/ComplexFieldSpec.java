@@ -79,13 +79,20 @@ public final class ComplexFieldSpec extends FieldSpec {
   }
 
   public FieldSpec getChildFieldSpec(String child) {
-    return _childFieldSpecs.get(child);
+    return getChildFieldSpecs().get(child);
   }
 
+  public void addChildFieldSpec(String child, FieldSpec fieldSpec) {
+    _childFieldSpecs.put(child, fieldSpec);
+  }
+
+  @JsonIgnore
   public Map<String, FieldSpec> getChildFieldSpecs() {
     if (_childFieldSpecs.isEmpty() && _dataType == DataType.MAP) {
-      _childFieldSpecs.put(KEY_FIELD, new DimensionFieldSpec(KEY_FIELD, DataType.STRING, true));
-      _childFieldSpecs.put(VALUE_FIELD, new DimensionFieldSpec(VALUE_FIELD, DataType.STRING, true));
+      Map<String, FieldSpec> defaults = new HashMap<>();
+      defaults.put(KEY_FIELD, new DimensionFieldSpec(KEY_FIELD, DataType.STRING, true));
+      defaults.put(VALUE_FIELD, new DimensionFieldSpec(VALUE_FIELD, DataType.STRING, true));
+      return defaults;
     }
     return _childFieldSpecs;
   }
@@ -203,11 +210,13 @@ public final class ComplexFieldSpec extends FieldSpec {
 
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = super.toJsonObject();
-    ObjectNode childFieldSpecsNode = JsonUtils.newObjectNode();
-    for (Map.Entry<String, FieldSpec> entry : _childFieldSpecs.entrySet()) {
-      childFieldSpecsNode.put(entry.getKey(), entry.getValue().toJsonObject());
+    if (!_childFieldSpecs.isEmpty()) {
+      ObjectNode childFieldSpecsNode = JsonUtils.newObjectNode();
+      for (Map.Entry<String, FieldSpec> entry : _childFieldSpecs.entrySet()) {
+        childFieldSpecsNode.put(entry.getKey(), entry.getValue().toJsonObject());
+      }
+      jsonObject.put("childFieldSpecs", childFieldSpecsNode);
     }
-    jsonObject.put("childFieldSpecs", childFieldSpecsNode);
     if (_keyTypes != null && !_keyTypes.isEmpty()) {
       ObjectNode keyTypesNode = JsonUtils.newObjectNode();
       for (Map.Entry<String, DataType> entry : _keyTypes.entrySet()) {
