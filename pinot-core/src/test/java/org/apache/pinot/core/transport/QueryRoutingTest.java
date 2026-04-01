@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.Futures;
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -53,22 +54,18 @@ import static org.testng.Assert.*;
 
 
 public class QueryRoutingTest {
-  private static final int TEST_PORT = 12345;
-  private static final ServerInstance SERVER_INSTANCE = new ServerInstance("localhost", TEST_PORT);
-  private static final ServerRoutingInstance OFFLINE_SERVER_ROUTING_INSTANCE =
-      SERVER_INSTANCE.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
-  private static final ServerRoutingInstance REALTIME_SERVER_ROUTING_INSTANCE =
-      SERVER_INSTANCE.toServerRoutingInstance(TableType.REALTIME, ServerInstance.RoutingType.NETTY);
   private static final BrokerRequest BROKER_REQUEST =
       CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
-  private static final Map<ServerInstance, SegmentsToQuery> ROUTING_TABLE =
-      Collections.singletonMap(SERVER_INSTANCE,
-          new SegmentsToQuery(Collections.emptyList(), Collections.emptyList()));
 
   private QueryRouter _queryRouter;
   private ServerRoutingStatsManager _serverRoutingStatsManager;
   int _requestCount;
   private QueryServer _queryServer;
+  private int _testPort;
+  private ServerInstance _serverInstance;
+  private ServerRoutingInstance _offlineServerRoutingInstance;
+  private ServerRoutingInstance _realtimeServerRoutingInstance;
+  private Map<ServerInstance, SegmentsToQuery> _routingTable;
 
   @BeforeClass
   public void setUp() {
@@ -85,8 +82,18 @@ public class QueryRoutingTest {
   @AfterMethod
   void shutdownServer() {
     if (_queryServer != null) {
-      _queryServer.shutDown();
+      try {
+        _queryServer.shutDown();
+      } catch (Exception e) {
+        // Ignore exceptions during shutdown
+      }
       _queryServer = null;
+    }
+    // Wait a bit to ensure the port is released
+    try {
+      Thread.sleep(100);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -95,8 +102,27 @@ public class QueryRoutingTest {
     ServerMetrics.deregister();
   }
 
+  private int getAvailablePort() {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to get available port", e);
+    }
+  }
+
+  private void initializeTestPort(int port) {
+    _testPort = port;
+    _serverInstance = new ServerInstance("localhost", _testPort);
+    _offlineServerRoutingInstance =
+        _serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+    _realtimeServerRoutingInstance =
+        _serverInstance.toServerRoutingInstance(TableType.REALTIME, ServerInstance.RoutingType.NETTY);
+    _routingTable = Collections.singletonMap(_serverInstance,
+        new SegmentsToQuery(Collections.emptyList(), Collections.emptyList()));
+  }
+
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes) {
-    return getQueryServer(responseDelayMs, responseBytes, TEST_PORT);
+    return getQueryServer(responseDelayMs, responseBytes, _testPort);
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes, int port) {
@@ -104,6 +130,18 @@ public class QueryRoutingTest {
         mockQueryScheduler(responseDelayMs, responseBytes), mock(AccessControl.class),
         ThreadAccountantUtils.getNoOpAccountant());
     return new QueryServer(port, null, handler);
+  }
+
+  private void startQueryServerWithWait(QueryServer server) throws Exception {
+    server.start();
+    // Wait for server to be fully ready with a timeout
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return server.getChannel() != null && server.getChannel().isActive();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 10L, 5000, "Query server failed to start");
   }
 
   private QueryScheduler mockQueryScheduler(int responseDelayMs, byte[] responseBytes) {
@@ -118,23 +156,24 @@ public class QueryRoutingTest {
   @Test
   public void testValidResponse()
       throws Exception {
+    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = SERVER_INSTANCE.getInstanceId();
+    String serverId = _serverInstance.getInstanceId();
 
     // Start the server
     _queryServer = getQueryServer(0, responseBytes);
-    _queryServer.start();
+    startQueryServerWithWait(_queryServer);
 
     // OFFLINE only
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 600_000L);
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 600_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
-    ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+    assertTrue(response.containsKey(_offlineServerRoutingInstance));
+    ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
     assertNotNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseSize(), responseBytes.length);
     // 2 requests - query submit and query response.
@@ -144,11 +183,11 @@ public class QueryRoutingTest {
 
     // REALTIME only
     asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", null, null, BROKER_REQUEST, ROUTING_TABLE, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", null, null, BROKER_REQUEST, _routingTable, 1_000L);
     response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(REALTIME_SERVER_ROUTING_INSTANCE));
-    serverResponse = response.get(REALTIME_SERVER_ROUTING_INSTANCE);
+    assertTrue(response.containsKey(_realtimeServerRoutingInstance));
+    serverResponse = response.get(_realtimeServerRoutingInstance);
     assertNotNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseSize(), responseBytes.length);
     _requestCount += 2;
@@ -157,16 +196,16 @@ public class QueryRoutingTest {
 
     // Hybrid
     asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE,
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, BROKER_REQUEST, _routingTable,
             1_000L);
     response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 2);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
-    serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+    assertTrue(response.containsKey(_offlineServerRoutingInstance));
+    serverResponse = response.get(_offlineServerRoutingInstance);
     assertNotNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseSize(), responseBytes.length);
-    assertTrue(response.containsKey(REALTIME_SERVER_ROUTING_INSTANCE));
-    serverResponse = response.get(REALTIME_SERVER_ROUTING_INSTANCE);
+    assertTrue(response.containsKey(_realtimeServerRoutingInstance));
+    serverResponse = response.get(_realtimeServerRoutingInstance);
     assertNotNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseSize(), responseBytes.length);
     _requestCount += 4;
@@ -177,20 +216,21 @@ public class QueryRoutingTest {
   @Test
   public void testInvalidResponse()
       throws Exception {
+    initializeTestPort(getAvailablePort());
     long requestId = 123;
-    String serverId = SERVER_INSTANCE.getInstanceId();
+    String serverId = _serverInstance.getInstanceId();
 
     // Start the server
     _queryServer = getQueryServer(0, new byte[0]);
-    _queryServer.start();
+    startQueryServerWithWait(_queryServer);
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
-    ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+    assertTrue(response.containsKey(_offlineServerRoutingInstance));
+    ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
     assertNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseDelayMs(), -1);
     assertEquals(serverResponse.getResponseSize(), 0);
@@ -205,23 +245,24 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForQueryServerException()
       throws Exception {
+    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     dataTable.addException(QueryErrorCode.SERVER_TABLE_MISSING, "Test error message");
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = SERVER_INSTANCE.getInstanceId();
+    String serverId = _serverInstance.getInstanceId();
     // Start the server
     _queryServer = getQueryServer(0, responseBytes);
-    _queryServer.start();
+    startQueryServerWithWait(_queryServer);
 
     // Send a query with ServerSide exception and check if the latency is set to timeout value.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
+    assertTrue(response.containsKey(_offlineServerRoutingInstance));
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
@@ -244,25 +285,26 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForClientException()
       throws Exception {
+    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     dataTable.addException(QueryErrorCode.QUERY_CANCELLATION, "Test error message");
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = SERVER_INSTANCE.getInstanceId();
+    String serverId = _serverInstance.getInstanceId();
     // Start the server
     _queryServer = getQueryServer(0, responseBytes);
-    _queryServer.start();
+    startQueryServerWithWait(_queryServer);
 
     // Send a query with client side errors.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
 
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
-    ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+    assertTrue(response.containsKey(_offlineServerRoutingInstance));
+    ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
@@ -282,25 +324,26 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForMultipleExceptions()
       throws Exception {
+    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     dataTable.addException(QueryErrorCode.QUERY_CANCELLATION, "Test cancellation error message");
     dataTable.addException(QueryErrorCode.SERVER_TABLE_MISSING, "Test table missing error message");
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = SERVER_INSTANCE.getInstanceId();
+    String serverId = _serverInstance.getInstanceId();
     // Start the server
     _queryServer = getQueryServer(0, responseBytes);
-    _queryServer.start();
+    startQueryServerWithWait(_queryServer);
 
     // Send a query with multiple exceptions. Make sure that the latency is set to timeout value even if a single
     //server-side exception is seen.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
+    assertTrue(response.containsKey(_offlineServerRoutingInstance));
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
@@ -322,23 +365,24 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForNoException()
       throws Exception {
+    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = SERVER_INSTANCE.getInstanceId();
+    String serverId = _serverInstance.getInstanceId();
     // Start the server
     _queryServer = getQueryServer(0, responseBytes);
-    _queryServer.start();
+    startQueryServerWithWait(_queryServer);
 
     // Send a valid query and get latency
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
-    ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+    assertTrue(response.containsKey(_offlineServerRoutingInstance));
+    ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
@@ -356,23 +400,24 @@ public class QueryRoutingTest {
   @Test
   public void testNonMatchingRequestId()
       throws Exception {
+    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = SERVER_INSTANCE.getInstanceId();
+    String serverId = _serverInstance.getInstanceId();
 
     // Start the server
     _queryServer = getQueryServer(0, responseBytes);
-    _queryServer.start();
+    startQueryServerWithWait(_queryServer);
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, _routingTable, null, null, 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
-    ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+    assertTrue(response.containsKey(_offlineServerRoutingInstance));
+    ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
     assertNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseDelayMs(), -1);
     assertEquals(serverResponse.getResponseSize(), 0);
@@ -387,6 +432,7 @@ public class QueryRoutingTest {
   @Test
   public void testServerDown()
       throws Exception {
+    initializeTestPort(getAvailablePort());
     long requestId = 123;
     // To avoid flakyness, set timeoutMs to 2000 msec. For some test runs, it can take up to
     // 1400 msec to mark request as failed.
@@ -394,15 +440,15 @@ public class QueryRoutingTest {
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = SERVER_INSTANCE.getInstanceId();
+    String serverId = _serverInstance.getInstanceId();
 
     // Start the server
     _queryServer = getQueryServer(500, responseBytes);
-    _queryServer.start();
+    startQueryServerWithWait(_queryServer);
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs);
+        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, _routingTable, null, null, timeoutMs);
 
     // Shut down the server before getting the response
     _queryServer.shutDown();
@@ -413,8 +459,8 @@ public class QueryRoutingTest {
 
       Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
       assertEquals(response.size(), 1);
-      assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
-      ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+      assertTrue(response.containsKey(_offlineServerRoutingInstance));
+      ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
       assertNull(serverResponse.getDataTable());
       assertEquals(serverResponse.getResponseDelayMs(), -1);
       assertEquals(serverResponse.getResponseSize(), 0);
@@ -428,11 +474,11 @@ public class QueryRoutingTest {
       // Submit query after server is down
       startTimeMs = System.currentTimeMillis();
       asyncQueryResponse =
-          _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs);
+          _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, _routingTable, null, null, timeoutMs);
       response = asyncQueryResponse.getFinalResponses();
       assertEquals(response.size(), 1);
-      assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
-      serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+      assertTrue(response.containsKey(_offlineServerRoutingInstance));
+      serverResponse = response.get(_offlineServerRoutingInstance);
       assertNull(serverResponse.getDataTable());
       assertEquals(serverResponse.getSubmitDelayMs(), -1);
       assertEquals(serverResponse.getResponseDelayMs(), -1);
@@ -452,11 +498,11 @@ public class QueryRoutingTest {
   @Test
   public void testSkipUnavailableServer()
       throws IOException, InterruptedException {
-    // Using a different port is a hack to avoid resource conflict with other tests, ideally _queryServer.shutdown()
-    // should ensure there is no possibility of resource conflict.
-    int port = 12346;
-    ServerInstance serverInstance1 = new ServerInstance("localhost", port);
-    ServerInstance serverInstance2 = new ServerInstance("localhost", port + 1);
+    // Use dynamically allocated ports to avoid resource conflict with other tests
+    int port1 = getAvailablePort();
+    int port2 = getAvailablePort();
+    ServerInstance serverInstance1 = new ServerInstance("localhost", port1);
+    ServerInstance serverInstance2 = new ServerInstance("localhost", port2);
     ServerRoutingInstance serverRoutingInstance1 =
         serverInstance1.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
     ServerRoutingInstance serverRoutingInstance2 =
@@ -478,8 +524,8 @@ public class QueryRoutingTest {
     byte[] successResponseBytes = dataTableSuccess.toBytes();
 
     // Only start a single QueryServer, on port from serverInstance1
-    _queryServer = getQueryServer(500, successResponseBytes, port);
-    _queryServer.start();
+    _queryServer = getQueryServer(500, successResponseBytes, port1);
+    startQueryServerWithWait(_queryServer);
 
     // Submit the query with skipUnavailableServers=true, the single started server should return a valid response
     BrokerRequest brokerRequest =
