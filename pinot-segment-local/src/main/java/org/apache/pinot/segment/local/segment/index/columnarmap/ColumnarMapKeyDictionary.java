@@ -25,13 +25,13 @@ import it.unimi.dsi.fastutil.ints.IntSets;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Comparator;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -268,7 +268,7 @@ public class ColumnarMapKeyDictionary implements Dictionary {
   @Override
   public byte[] getBytesValue(int dictId) {
     checkDictId(dictId);
-    return _sortedValues[dictId].getBytes(StandardCharsets.UTF_8);
+    return BytesUtils.toBytes(_sortedValues[dictId]);
   }
 
   private void checkDictId(int dictId) {

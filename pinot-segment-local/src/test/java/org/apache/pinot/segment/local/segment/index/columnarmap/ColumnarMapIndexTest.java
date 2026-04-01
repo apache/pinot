@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.reader.ColumnarMapIndexReader;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.ColumnarMapIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
@@ -305,6 +306,10 @@ public class ColumnarMapIndexTest {
       assertEquals(mutableIndex.getFloat(1, "price"), 14.99f, 0.001f);
       assertEquals(mutableIndex.getString(0, "brand"), "acme");
       assertEquals(mutableIndex.getString(2, "brand"), "foo");
+
+      // Test getString on numeric key — must not throw ClassCastException
+      assertEquals(mutableIndex.getString(0, "price"), "9.99");
+      assertEquals(mutableIndex.getString(1, "price"), "14.99");
 
       // Test getMap
       Map<String, Object> doc0 = mutableIndex.getMap(0);
@@ -1108,16 +1113,17 @@ public class ColumnarMapIndexTest {
       org.apache.pinot.segment.spi.index.reader.Dictionary dict = ds.getDictionary();
       assertNotNull(dict);
 
-      // Read dictIds only for present docs (doc 3 is absent)
-      int[] docIds = {0, 1, 2, 4};
-      int[] dictIdBuffer = new int[4];
-      fwd.readDictIds(docIds, 4, dictIdBuffer, null);
+      // Read dictIds including absent doc 3
+      int[] docIds = {0, 1, 2, 3, 4};
+      int[] dictIdBuffer = new int[5];
+      fwd.readDictIds(docIds, 5, dictIdBuffer, null);
 
       // Verify via dictionary lookup
       assertEquals(dict.getStringValue(dictIdBuffer[0]), "active");
       assertEquals(dict.getStringValue(dictIdBuffer[1]), "inactive");
       assertEquals(dict.getStringValue(dictIdBuffer[2]), "active");
-      assertEquals(dict.getStringValue(dictIdBuffer[3]), "pending");
+      assertEquals(dictIdBuffer[3], Dictionary.NULL_VALUE_INDEX, "Absent doc should get NULL_VALUE_INDEX");
+      assertEquals(dict.getStringValue(dictIdBuffer[4]), "pending");
 
       // Verify same dictIds for same values
       assertEquals(dictIdBuffer[0], dictIdBuffer[2], "Same value 'active' should have same dictId");
@@ -1146,6 +1152,42 @@ public class ColumnarMapIndexTest {
 
       assertEquals(reader.getString(0, "name"), "alice");
       assertEquals(reader.getString(1, "name"), "bob");
+    }
+  }
+
+  @Test
+  public void testBytesDictionaryRoundTrip()
+      throws IOException {
+    Map<String, FieldSpec.DataType> keyTypes = new HashMap<>();
+    keyTypes.put("data", FieldSpec.DataType.BYTES);
+
+    byte[] val1 = new byte[]{(byte) 0xFF, 0x00, 0x42};
+    byte[] val2 = new byte[]{0x01, 0x02, 0x03};
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object>[] docs = new Map[]{
+        Map.of("data", val1),
+        Map.of("data", val2),
+        Map.of("data", val1)
+    };
+
+    File indexFile = createIndex(keyTypes, docs);
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+        ImmutableColumnarMapIndexReader reader = new ImmutableColumnarMapIndexReader(buffer, null)) {
+      assertEquals(reader.getBytes(0, "data"), val1);
+      assertEquals(reader.getBytes(1, "data"), val2);
+      assertEquals(reader.getBytes(2, "data"), val1);
+
+      // Verify dictionary round-trip
+      ColumnarMapKeyDictionary dict = reader.getKeyDictionary("data");
+      assertNotNull(dict);
+      for (int i = 0; i < dict.length(); i++) {
+        byte[] bytesVal = dict.getBytesValue(i);
+        String hexStr = dict.getStringValue(i);
+        assertEquals(bytesVal, org.apache.pinot.spi.utils.BytesUtils.toBytes(hexStr),
+            "getBytesValue must decode hex back to raw bytes");
+      }
     }
   }
 

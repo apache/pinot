@@ -135,12 +135,10 @@ public class ColumnMinMaxValueGenerator {
   }
 
   private boolean needAddColumnMinMaxValueForColumn(String columnName) {
-    return needAddColumnMinMaxValueForColumn(_segmentMetadata.getColumnMetadataFor(columnName));
-  }
-
-  private boolean needAddColumnMinMaxValueForColumn(ColumnMetadata columnMetadata) {
-    // MAP columns with sparse map index have no forward index and no meaningful min/max values
-    if (columnMetadata.getFieldSpec().getDataType() == org.apache.pinot.spi.data.FieldSpec.DataType.MAP) {
+    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
+    // Only skip min/max for MAP columns that have a columnar map index
+    if (columnMetadata.getFieldSpec().getDataType() == FieldSpec.DataType.MAP
+        && _segmentWriter.hasIndexFor(columnName, StandardIndexes.columnarMap())) {
       return false;
     }
     return columnMetadata.getMinValue() == null && columnMetadata.getMaxValue() == null
@@ -149,7 +147,7 @@ public class ColumnMinMaxValueGenerator {
 
   private void addColumnMinMaxValueForColumn(String columnName) {
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
-    if (!needAddColumnMinMaxValueForColumn(columnMetadata)) {
+    if (!needAddColumnMinMaxValueForColumn(columnName)) {
       return;
     }
     try {

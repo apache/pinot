@@ -22,6 +22,7 @@ import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.spi.index.reader.ColumnarMapIndexReader;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -56,7 +57,6 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
   private final FixedBitIntReaderWriter _dictIdReader;
   @Nullable
   private final ImmutableRoaringBitmap _presenceBitmap;
-  private final int _defaultDictId;
 
   public ColumnarMapKeyForwardIndexReader(ColumnarMapIndexReader columnarMapIndexReader, String key,
       DataType storedType) {
@@ -84,13 +84,6 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
     _dictionary = dictionary;
     _dictIdReader = dictIdReader;
     _presenceBitmap = presenceBitmap;
-    if (dictionary != null) {
-      String defaultValueStr = ColumnarMapKeyDictionary.getDefaultValueString(storedType);
-      int idx = dictionary.indexOf(defaultValueStr);
-      _defaultDictId = idx >= 0 ? idx : 0;
-    } else {
-      _defaultDictId = 0;
-    }
   }
 
   @Override
@@ -120,7 +113,7 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
           int ordinal = _presenceBitmap.rank(docIds[i]) - 1;
           dictIdBuffer[i] = _dictIdReader.readInt(ordinal);
         } else {
-          dictIdBuffer[i] = _defaultDictId;
+          dictIdBuffer[i] = Dictionary.NULL_VALUE_INDEX;
         }
       }
     } else {
@@ -128,7 +121,7 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
       for (int i = 0; i < length; i++) {
         String rawValue = _columnarMapIndexReader.getString(docIds[i], _key);
         if (rawValue == null || rawValue.isEmpty()) {
-          dictIdBuffer[i] = _defaultDictId; // default value position in dictionary
+          dictIdBuffer[i] = Dictionary.NULL_VALUE_INDEX;
         } else {
           dictIdBuffer[i] = _dictionary.indexOf(rawValue);
         }

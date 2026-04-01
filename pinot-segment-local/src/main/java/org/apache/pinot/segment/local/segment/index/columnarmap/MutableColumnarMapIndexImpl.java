@@ -326,7 +326,7 @@ public class MutableColumnarMapIndexImpl implements MutableIndex, ColumnarMapInd
       }
       int ordinal = bitmap.rank(docId) - 1;
       List<Object> vals = _values.get(key);
-      return vals != null && ordinal >= 0 && ordinal < vals.size() ? (String) vals.get(ordinal) : "";
+      return vals != null && ordinal >= 0 && ordinal < vals.size() ? String.valueOf(vals.get(ordinal)) : "";
     } finally {
       _lock.readLock().unlock();
     }
