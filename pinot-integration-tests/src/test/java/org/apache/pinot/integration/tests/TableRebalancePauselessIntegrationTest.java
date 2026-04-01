@@ -142,33 +142,37 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
           4);
 
       waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
+      // Wait for table's ideal state and external view to converge after rebalance
+      waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
+      // Add additional buffer to ensure consuming segments are fully stabilized
+      Thread.sleep(5000);
 
       if (tableConfig.getRoutingConfig() != null
           && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
           tableConfig.getRoutingConfig().getInstanceSelectorType())) {
         // test: move segments from tenantA to tenantB
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true,
+        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantB, true,
             FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantB to tenantA with batch size
         rebalanceConfig.setBatchSizePerServer(1);
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, true,
+        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantA, true,
             FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
         // committed
         rebalanceConfig.setIncludeConsuming(false);
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false,
+        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantB, false,
             FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       } else {
         // test: move segments from tenantA to tenantB
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true,
+        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantB, true,
             FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantB to tenantA with includeConsuming = false, consuming segment should not be
         // committed
         rebalanceConfig.setIncludeConsuming(false);
-        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, false,
+        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantA, false,
             FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       }
     } catch (Exception e) {
@@ -191,6 +195,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
       waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
+      waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       serverStarter0.stop();
       serverStarter1.stop();
       serverStarter2.stop();
