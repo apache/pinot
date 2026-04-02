@@ -36,15 +36,20 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 public class RebalanceResult {
   private final String _jobId;
   private final Status _status;
+  @Nullable
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Map<InstancePartitionsType, InstancePartitions> _instanceAssignment;
+  @Nullable
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Map<String, InstancePartitions> _tierInstanceAssignment;
+  @Nullable
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Map<String, Map<String, String>> _segmentAssignment;
   private final String _description;
+  @Nullable
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Map<String, RebalancePreCheckerResult> _preChecksResult;
+  @Nullable
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final RebalanceSummaryResult _rebalanceSummaryResult;
 
@@ -87,21 +92,25 @@ public class RebalanceResult {
     return _instanceAssignment;
   }
 
+  @Nullable
   @JsonProperty
   public Map<String, InstancePartitions> getTierInstanceAssignment() {
     return _tierInstanceAssignment;
   }
 
+  @Nullable
   @JsonProperty
   public Map<String, Map<String, String>> getSegmentAssignment() {
     return _segmentAssignment;
   }
 
+  @Nullable
   @JsonProperty
   public Map<String, RebalancePreCheckerResult> getPreChecksResult() {
     return _preChecksResult;
   }
 
+  @Nullable
   @JsonProperty
   public RebalanceSummaryResult getRebalanceSummaryResult() {
     return _rebalanceSummaryResult;
