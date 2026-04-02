@@ -98,14 +98,14 @@ public class FilterOperatorUtils {
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
           return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
+        if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.RANGE)) {
+          return new RangeIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+        }
         if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() == null
             && dataSource.getDataSourceMetadata().isSingleValue()
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
           return new RawSortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
-        }
-        if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)
-            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.RANGE)) {
-          return new RangeIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
@@ -125,11 +125,6 @@ public class FilterOperatorUtils {
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
           return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
-        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() == null
-            && dataSource.getDataSourceMetadata().isSingleValue()
-            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
-          return new RawSortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
-        }
         if (dataSource.getInvertedIndex() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
           // Use raw value inverted index filter operator for raw encoded columns
@@ -141,6 +136,11 @@ public class FilterOperatorUtils {
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.RANGE)) {
           return new RangeIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+        }
+        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() == null
+            && dataSource.getDataSourceMetadata().isSingleValue()
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
+          return new RawSortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       }
