@@ -83,7 +83,17 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   AUDIT_RESPONSE_FAILURES("failures", true),
   AUDIT_REQUEST_PAYLOAD_TRUNCATED("count", true),
   // Upsert compact merge task metrics
-  UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false);
+  UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false),
+
+  // Insert statement metrics
+  INSERT_STATEMENTS_SUBMITTED("InsertStatementsSubmitted", true),
+  INSERT_STATEMENTS_COMMITTED("InsertStatementsCommitted", true),
+  INSERT_STATEMENTS_ABORTED("InsertStatementsAborted", true),
+  INSERT_STATEMENTS_RECOVERY_REPLAYED("InsertStatementsRecoveryReplayed", true),
+  INSERT_STATEMENTS_RECOVERY_CLEANED("InsertStatementsRecoveryCleaned", true),
+  INSERT_STATEMENTS_RECOVERY_FAILED("InsertStatementsRecoveryFailed", true),
+  INSERT_STATEMENTS_GC("InsertStatementsGarbageCollected", true),
+  INSERT_STATEMENTS_VISIBLE("InsertStatementsVisible", true);
 
   private final String _brokerMeterName;
   private final String _unit;
