@@ -1021,11 +1021,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
           .keySet();
     }
 
-    // Wait for completion based on the flag
+    // Always wait for rebalance completion to ensure force commit has happened
+    waitForRebalanceToComplete(rebalanceResult.getJobId(), timeoutMs);
+    // Additionally wait for EV/IS convergence if requested, to ensure routing stability
     if (waitForEVISConverge) {
       waitForTableEVISConverge(getTableName(), timeoutMs);
-    } else {
-      waitForRebalanceToComplete(rebalanceResult.getJobId(), timeoutMs);
     }
 
     // Check if segments were committed (only if there were consuming segments to move)
