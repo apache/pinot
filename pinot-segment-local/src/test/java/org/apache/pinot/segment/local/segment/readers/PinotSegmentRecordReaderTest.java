@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.readers;
 import com.google.common.io.Files;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -52,6 +53,7 @@ public class PinotSegmentRecordReaderTest {
 
   private String _segmentOutputDir;
   private File _segmentIndexDir;
+  private File _rawNoDictSegmentIndexDir;
   private List<GenericRow> _rows;
   private RecordReader _recordReader;
 
@@ -66,6 +68,12 @@ public class PinotSegmentRecordReaderTest {
     _recordReader = new GenericRowRecordReader(_rows);
     _segmentIndexDir =
         PinotSegmentUtil.createSegment(tableConfig, schema, segmentName, _segmentOutputDir, _recordReader);
+
+    TableConfig rawNoDictTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME)
+            .setNoDictionaryColumns(Collections.singletonList(D_SV_1)).build();
+    _rawNoDictSegmentIndexDir = PinotSegmentUtil.createSegment(rawNoDictTableConfig, schema,
+        segmentName + "_raw_no_dict", _segmentOutputDir, new GenericRowRecordReader(_rows));
   }
 
   private Schema createPinotSchema() {
@@ -120,6 +128,31 @@ public class PinotSegmentRecordReaderTest {
         "Number of _rows returned by PinotSegmentRecordReader is incorrect");
 
     // Check that the _rows are sorted based on sorted column
+    GenericRow prev = outputRows.get(0);
+    for (int i = 1; i < outputRows.size(); i++) {
+      GenericRow current = outputRows.get(i);
+      Assert.assertTrue(((String) prev.getValue(D_SV_1)).compareTo((String) current.getValue(D_SV_1)) <= 0);
+      prev = current;
+    }
+  }
+
+  @Test
+  public void testPinotSegmentRecordReaderSortedRawStringColumn()
+      throws Exception {
+    List<GenericRow> outputRows = new ArrayList<>();
+    List<String> sortOrder = new ArrayList<>();
+    sortOrder.add(D_SV_1);
+
+    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(_rawNoDictSegmentIndexDir,
+        null, sortOrder)) {
+      while (pinotSegmentRecordReader.hasNext()) {
+        outputRows.add(pinotSegmentRecordReader.next());
+      }
+    }
+
+    Assert.assertEquals(outputRows.size(), _rows.size(),
+        "Number of rows returned by PinotSegmentRecordReader is incorrect");
+
     GenericRow prev = outputRows.get(0);
     for (int i = 1; i < outputRows.size(); i++) {
       GenericRow current = outputRows.get(i);

@@ -358,18 +358,18 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       return false;
     }
 
-    // Sorted columns should always have a dictionary.
-    if (existingColumnMetadata.isSorted()) {
-      LOGGER.warn("Cannot disable dictionary for column={} as it is sorted.", column);
-      return false;
-    }
-
     // Allow disabling dictionary only if the new config specifies that inverted index and FST index should not
     // be present. So for existing segments where inverted index and FST index are already present, disabling
     // dictionary will only be allowed if FST and inverted index are also disabled.
     if (hasIndex(column, StandardIndexes.inverted()) || hasIndex(column, StandardIndexes.fst())) {
       LOGGER.warn("Cannot disable dictionary as column={} has FST index or inverted index or both.", column);
       return false;
+    }
+
+    if (existingColumnMetadata.isSorted()) {
+      LOGGER.warn("Disabling dictionary for sorted column={}. The sorted index will not be used for query "
+          + "filtering (equality/range predicates will fall back to column scans). Consider adding a range index "
+          + "on this column to maintain query performance.", column);
     }
 
     return true;

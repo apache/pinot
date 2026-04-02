@@ -24,16 +24,21 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
@@ -126,6 +131,69 @@ public class SegmentGenerationWithSortedColumnTest implements PinotBuffersAfterM
 
     ColumnMetadata nonSortedColMeta = segmentMetadata.getColumnMetadataFor(STRING_COLUMN);
     assertFalse(nonSortedColMeta.isSorted(), "Non-sorted column must have isSorted=false");
+  }
+
+  /// Verifies end-to-end creation of a no-dictionary sorted STRING column from 10 input rows, including
+  /// segment metadata and raw forward-index reads.
+  @Test
+  public void testRawSortedStringForwardIndexCreationAndRead()
+      throws Exception {
+    File outDir = new File(TMP_DIR, "raw_sorted_string_" + System.nanoTime());
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .setSortedColumn(SORTED_COLUMN)
+        .setNoDictionaryColumns(List.of(SORTED_COLUMN))
+        .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(SORTED_COLUMN, DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+        .build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(outDir.getAbsolutePath());
+    config.setSegmentName("testSegment");
+
+    int numRows = 10;
+    List<String> expectedValues = new ArrayList<>(numRows);
+    List<GenericRow> rows = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      String value = String.format("value-%02d", i);
+      expectedValues.add(value);
+
+      GenericRow row = new GenericRow();
+      row.putValue(SORTED_COLUMN, value);
+      row.putValue(STRING_COLUMN, "payload-" + (numRows - 1 - i));
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(driver.getOutputDirectory());
+    ColumnMetadata sortedColMeta = segmentMetadata.getColumnMetadataFor(SORTED_COLUMN);
+    assertEquals(sortedColMeta.getTotalDocs(), numRows);
+    assertTrue(sortedColMeta.isSorted(), "Raw sorted string column must have isSorted=true");
+    assertFalse(sortedColMeta.hasDictionary(), "Raw sorted string column must not have a dictionary");
+    assertEquals(sortedColMeta.getMinValue(), expectedValues.get(0));
+    assertEquals(sortedColMeta.getMaxValue(), expectedValues.get(numRows - 1));
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(driver.getOutputDirectory(), ReadMode.heap);
+    try {
+      ForwardIndexReader forwardIndex = segment.getForwardIndex(SORTED_COLUMN);
+      assertFalse(forwardIndex.isDictionaryEncoded(), "Forward index must stay raw for the sorted string column");
+      assertTrue(forwardIndex.isSingleValue(), "Sorted string test column must be single-value");
+      assertEquals(forwardIndex.getStoredType(), DataType.STRING);
+
+      try (ForwardIndexReaderContext context = forwardIndex.createContext()) {
+        for (int i = 0; i < numRows; i++) {
+          assertEquals(forwardIndex.getString(i, context), expectedValues.get(i));
+        }
+      }
+    } finally {
+      segment.destroy();
+    }
   }
 
   /// Returns the i-th ascending value for the given data type, out of numRows total rows.
