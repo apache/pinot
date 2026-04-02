@@ -88,17 +88,20 @@ public class FilterOperatorUtils {
         return new MatchAllFilterOperator(numDocs);
       }
 
-      // Currently sorted index based filtering is supported only for
-      // dictionary encoded columns. The on-disk segment metadata
-      // will indicate if the column is sorted or not regardless of
-      // whether it is raw or dictionary encoded. Here when creating
-      // the filter operator, we need to make sure that sort filter
-      // operator is used only if the column is sorted and has dictionary.
+      // Sorted index based filtering is supported for both dictionary encoded and raw columns.
+      // For dictionary encoded sorted columns, SortedIndexBasedFilterOperator uses the sorted
+      // index reader. For raw sorted columns, RawSortedIndexBasedFilterOperator uses binary
+      // search on the forward index.
       Predicate.Type predicateType = predicateEvaluator.getPredicateType();
       if (predicateType == Predicate.Type.RANGE) {
         if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
           return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+        }
+        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() == null
+            && dataSource.getDataSourceMetadata().isSingleValue()
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
+          return new RawSortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.RANGE)) {
@@ -121,6 +124,11 @@ public class FilterOperatorUtils {
         if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
           return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+        }
+        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() == null
+            && dataSource.getDataSourceMetadata().isSingleValue()
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
+          return new RawSortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         if (dataSource.getInvertedIndex() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
@@ -221,7 +229,8 @@ public class FilterOperatorUtils {
               return priority.getAsInt();
             }
           }
-          if (filterOperator instanceof SortedIndexBasedFilterOperator) {
+          if (filterOperator instanceof SortedIndexBasedFilterOperator
+              || filterOperator instanceof RawSortedIndexBasedFilterOperator) {
             return PrioritizedFilterOperator.HIGH_PRIORITY;
           }
           if (filterOperator instanceof BitmapBasedFilterOperator
