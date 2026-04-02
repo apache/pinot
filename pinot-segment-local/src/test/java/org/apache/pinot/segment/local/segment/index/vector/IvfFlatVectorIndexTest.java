@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
@@ -427,6 +428,65 @@ public class IvfFlatVectorIndexTest {
 
       MutableRoaringBitmap result = (MutableRoaringBitmap) reader.getDocIds(vectors[0], 5);
       Assert.assertTrue(result.getCardinality() > 0);
+    }
+  }
+
+  @Test
+  public void testReaderClearNprobeResetsToDefault()
+      throws IOException {
+    int numVectors = 24;
+    int dimension = 6;
+    int nlist = 4;
+
+    VectorIndexConfig config = createConfig(VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, dimension, nlist);
+    float[][] vectors = generateRandomVectors(numVectors, dimension, TEST_SEED);
+
+    try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator(COLUMN_NAME, _tempDir, config)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+      int defaultNprobe = Math.min(4, reader.getNlist());
+      Assert.assertEquals(reader.getNprobe(), defaultNprobe);
+      reader.setNprobe(1);
+      Assert.assertEquals(reader.getNprobe(), 1);
+      reader.clearNprobe();
+      Assert.assertEquals(reader.getNprobe(), defaultNprobe);
+    }
+  }
+
+  @Test
+  public void testReaderNprobeOverrideIsThreadLocal()
+      throws Exception {
+    int numVectors = 24;
+    int dimension = 6;
+    int nlist = 4;
+
+    VectorIndexConfig config = createConfig(VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, dimension, nlist);
+    float[][] vectors = generateRandomVectors(numVectors, dimension, TEST_SEED);
+
+    try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator(COLUMN_NAME, _tempDir, config)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+      int defaultNprobe = reader.getNprobe();
+      reader.setNprobe(1);
+      Assert.assertEquals(reader.getNprobe(), 1);
+
+      AtomicInteger otherThreadNprobe = new AtomicInteger(-1);
+      Thread thread = new Thread(() -> otherThreadNprobe.set(reader.getNprobe()));
+      thread.start();
+      thread.join();
+
+      Assert.assertEquals(otherThreadNprobe.get(), defaultNprobe);
+      Assert.assertEquals(reader.getNprobe(), 1);
     }
   }
 

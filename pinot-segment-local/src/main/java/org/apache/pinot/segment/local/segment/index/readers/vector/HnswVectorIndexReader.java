@@ -23,6 +23,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -35,6 +37,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -87,7 +90,7 @@ public class HnswVectorIndexReader implements VectorIndexReader {
    */
   private File getVectorIndexFile(File segmentIndexDir) {
     // will return null if file does not exist
-    File file = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, _column);
+    File file = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, _column, VectorBackendType.HNSW);
     if (file == null) {
       throw new IllegalStateException("Failed to find HNSW index file for column: " + _column);
     }
@@ -123,6 +126,17 @@ public class HnswVectorIndexReader implements VectorIndexReader {
    * we release the vector index
    * @throws IOException
    */
+  @Override
+  public Map<String, Object> getIndexDebugInfo() {
+    Map<String, Object> info = new LinkedHashMap<>();
+    info.put("backend", "HNSW");
+    info.put("column", _column);
+    info.put("numDocs", _indexReader.numDocs());
+    info.put("numDeletedDocs", _indexReader.numDeletedDocs());
+    info.put("luceneSegments", _indexReader.leaves().size());
+    return info;
+  }
+
   @Override
   public void close()
       throws IOException {

@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorInde
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.VectorIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.vector.IvfPqVectorIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -48,6 +49,7 @@ import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -64,6 +66,7 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>{@link VectorBackendType#HNSW} - Lucene-based HNSW graph index (mutable and immutable segments)</li>
  *   <li>{@link VectorBackendType#IVF_FLAT} - Inverted file with flat vectors (immutable segments only)</li>
+ *   <li>{@link VectorBackendType#IVF_PQ} - Inverted file with residual product quantization (immutable only)</li>
  * </ul>
  *
  * <p>If the {@code vectorIndexType} field is absent in the config, it defaults to HNSW for
@@ -99,8 +102,10 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
       // Resolve the backend type (defaults to HNSW if not specified)
       VectorBackendType backendType = vectorIndexConfig.resolveBackendType();
-      Preconditions.checkState(backendType == VectorBackendType.HNSW || backendType == VectorBackendType.IVF_FLAT,
-          "Unsupported vector index type: %s for column: %s. Supported types: HNSW, IVF_FLAT",
+      Preconditions.checkState(
+          backendType == VectorBackendType.HNSW || backendType == VectorBackendType.IVF_FLAT
+              || backendType == VectorBackendType.IVF_PQ,
+          "Unsupported vector index type: %s for column: %s. Supported types: HNSW, IVF_FLAT, IVF_PQ",
           vectorIndexConfig.getVectorIndexType(), column);
 
       // Run backend-aware property validation
@@ -133,6 +138,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         return new HnswVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
       case IVF_FLAT:
         return new IvfFlatVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
+      case IVF_PQ:
+        return new IvfPqVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
       default:
         throw new IllegalStateException("Unsupported vector backend type: " + backendType);
     }
@@ -152,9 +159,13 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
   @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     return List.of(V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_V99_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_V912_INDEX_FILE_EXTENSION,
-        V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+        V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
   }
 
   /**
@@ -177,13 +188,26 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
       }
       File segmentDir = segmentReader.toSegmentDirectory().getPath().toFile();
       VectorIndexConfig indexConfig = fieldIndexConfigs.getConfig(StandardIndexes.vector());
+      if (indexConfig.isDisabled()) {
+        return null;
+      }
       VectorBackendType backendType = indexConfig.resolveBackendType();
+      File configuredIndexFile =
+          SegmentDirectoryPaths.findVectorIndexIndexFile(segmentDir, metadata.getColumnName(), indexConfig);
+      if (configuredIndexFile == null || !configuredIndexFile.exists()) {
+        LOGGER.warn("Skipping vector index reader for column: {} because configured backend {} does not have a "
+                + "matching on-disk artifact in segment: {}",
+            metadata.getColumnName(), backendType, segmentDir);
+        return null;
+      }
 
       switch (backendType) {
         case HNSW:
           return new HnswVectorIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
         case IVF_FLAT:
           return new IvfFlatVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
+        case IVF_PQ:
+          return new IvfPqVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
         default:
           throw new IllegalStateException("Unsupported vector backend type: " + backendType);
       }
@@ -206,11 +230,11 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
       case HNSW:
         return new MutableVectorIndex(context.getSegmentName(), context.getFieldSpec().getName(), config);
       case IVF_FLAT:
-        // IVF_FLAT does not support mutable indexes in phase 1.
-        LOGGER.warn("IVF_FLAT vector index does not support mutable/realtime segments. "
+      case IVF_PQ:
+        LOGGER.warn("{} vector index does not support mutable/realtime segments. "
             + "No vector index will be built for column: {} in segment: {}. "
             + "Queries will fall back to exact scan.",
-            context.getFieldSpec().getName(), context.getSegmentName());
+            backendType, context.getFieldSpec().getName(), context.getSegmentName());
         return null;
       default:
         return null;

@@ -23,12 +23,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
-import org.apache.pinot.common.function.scalar.VectorFunctions;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -64,6 +65,7 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
   private final ForwardIndexReader<?> _forwardIndexReader;
   private final VectorSimilarityPredicate _predicate;
   private final String _column;
+  private final VectorExplainContext _vectorExplainContext;
   private ImmutableRoaringBitmap _matches;
 
   /**
@@ -76,10 +78,19 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
    */
   public ExactVectorScanFilterOperator(ForwardIndexReader<?> forwardIndexReader,
       VectorSimilarityPredicate predicate, String column, int numDocs) {
+    this(forwardIndexReader, predicate, column, numDocs, null, "vector_index_missing");
+  }
+
+  public ExactVectorScanFilterOperator(ForwardIndexReader<?> forwardIndexReader,
+      VectorSimilarityPredicate predicate, String column, int numDocs, @Nullable VectorIndexConfig vectorIndexConfig,
+      String fallbackReason) {
     super(numDocs, false);
     _forwardIndexReader = forwardIndexReader;
     _predicate = predicate;
     _column = column;
+    _vectorExplainContext = new VectorExplainContext(VectorDistanceUtils.resolveBackendType(vectorIndexConfig),
+        VectorDistanceUtils.resolveDistanceFunction(vectorIndexConfig), VectorSearchParams.DEFAULT_NPROBE, false,
+        predicate.getTopK(), fallbackReason);
   }
 
   @Override
@@ -122,8 +133,11 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     return EXPLAIN_NAME + "(indexLookUp:exact_scan"
         + ", operator:" + _predicate.getType()
         + ", vector identifier:" + _column
+        + ", backend:" + _vectorExplainContext.getBackendType()
+        + ", distanceFunction:" + _vectorExplainContext.getDistanceFunction()
         + ", vector literal:" + Arrays.toString(_predicate.getValue())
         + ", topK to search:" + _predicate.getTopK()
+        + ", fallbackReason:" + _vectorExplainContext.getFallbackReason()
         + ')';
   }
 
@@ -138,7 +152,10 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     attributeBuilder.putString("indexLookUp", "exact_scan");
     attributeBuilder.putString("operator", _predicate.getType().name());
     attributeBuilder.putString("vectorIdentifier", _column);
+    attributeBuilder.putString("backend", _vectorExplainContext.getBackendType().name());
+    attributeBuilder.putString("distanceFunction", _vectorExplainContext.getDistanceFunction().name());
     attributeBuilder.putString("vectorLiteral", Arrays.toString(_predicate.getValue()));
+    attributeBuilder.putString("fallbackReason", _vectorExplainContext.getFallbackReason());
     attributeBuilder.putLongIdempotent("topKtoSearch", _predicate.getTopK());
   }
 
@@ -149,7 +166,8 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
   @SuppressWarnings("unchecked")
   private ImmutableRoaringBitmap computeExactTopK() {
     LOGGER.warn("Performing exact vector scan fallback on column: {} for segment with {} docs. "
-        + "This is expensive -- consider adding a vector index.", _column, _numDocs);
+            + "reason={}, distanceFunction={}. This is expensive -- consider adding a vector index.",
+        _column, _numDocs, _vectorExplainContext.getFallbackReason(), _vectorExplainContext.getDistanceFunction());
 
     float[] queryVector = _predicate.getValue();
     int topK = _predicate.getTopK();
@@ -165,7 +183,8 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
         if (docVector == null || docVector.length == 0) {
           continue;
         }
-        float distance = computeL2SquaredDistance(queryVector, docVector);
+        float distance = VectorDistanceUtils.computeDistance(queryVector, docVector,
+            _vectorExplainContext.getDistanceFunction());
         if (maxHeap.size() < topK) {
           maxHeap.add(new DocDistance(docId, distance));
         } else if (distance < maxHeap.peek()._distance) {
@@ -194,7 +213,7 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
    * the sum of squared differences (no sqrt), sufficient for ranking.
    */
   static float computeL2SquaredDistance(float[] a, float[] b) {
-    return (float) VectorFunctions.euclideanDistance(a, b);
+    return VectorDistanceUtils.computeDistance(a, b, VectorIndexConfig.VectorDistanceFunction.L2);
   }
 
   private void record(ImmutableRoaringBitmap matches) {

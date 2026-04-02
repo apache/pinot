@@ -44,6 +44,13 @@ public class VectorBackendTypeTest {
     assertEquals(VectorBackendType.fromString("Ivf_Flat"), VectorBackendType.IVF_FLAT);
   }
 
+  @Test
+  public void testFromStringIvfPq() {
+    assertEquals(VectorBackendType.fromString("IVF_PQ"), VectorBackendType.IVF_PQ);
+    assertEquals(VectorBackendType.fromString("ivf_pq"), VectorBackendType.IVF_PQ);
+    assertEquals(VectorBackendType.fromString("Ivf_Pq"), VectorBackendType.IVF_PQ);
+  }
+
   @Test(expectedExceptions = IllegalArgumentException.class,
       expectedExceptionsMessageRegExp = ".*Unknown vector backend type.*INVALID.*")
   public void testFromStringInvalid() {
@@ -62,6 +69,8 @@ public class VectorBackendTypeTest {
     assertTrue(VectorBackendType.isValid("hnsw"));
     assertTrue(VectorBackendType.isValid("IVF_FLAT"));
     assertTrue(VectorBackendType.isValid("ivf_flat"));
+    assertTrue(VectorBackendType.isValid("IVF_PQ"));
+    assertTrue(VectorBackendType.isValid("ivf_pq"));
 
     assertFalse(VectorBackendType.isValid("INVALID"));
     assertFalse(VectorBackendType.isValid(""));
@@ -72,5 +81,21 @@ public class VectorBackendTypeTest {
   public void testDescription() {
     assertTrue(VectorBackendType.HNSW.getDescription().contains("Hierarchical"));
     assertTrue(VectorBackendType.IVF_FLAT.getDescription().contains("flat"));
+    assertTrue(VectorBackendType.IVF_PQ.getDescription().contains("quantized"));
+  }
+
+  @Test
+  public void testCapabilities() {
+    assertTrue(VectorBackendType.HNSW.supportsMutableSegments());
+    assertFalse(VectorBackendType.HNSW.supportsNprobe());
+    assertFalse(VectorBackendType.HNSW.defaultExactRerankEnabled());
+
+    assertFalse(VectorBackendType.IVF_FLAT.supportsMutableSegments());
+    assertTrue(VectorBackendType.IVF_FLAT.supportsNprobe());
+    assertFalse(VectorBackendType.IVF_FLAT.defaultExactRerankEnabled());
+
+    assertFalse(VectorBackendType.IVF_PQ.supportsMutableSegments());
+    assertTrue(VectorBackendType.IVF_PQ.supportsNprobe());
+    assertTrue(VectorBackendType.IVF_PQ.defaultExactRerankEnabled());
   }
 }

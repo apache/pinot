@@ -39,3 +39,62 @@ $ ./mvnw package -DskipTests
 $ cd target/pinot-perf-pkg/bin
 $ ./pinot-BenchmarkDictionary.sh
 ```
+
+# Vector index benchmark
+
+`org.apache.pinot.perf.BenchmarkVectorIndex` compares Exact Scan, HNSW, IVF_FLAT, and IVF_PQ on synthetic datasets.
+
+What it reports:
+- Build time
+- Build throughput in docs/sec
+- Peak heap growth during build
+- On-disk index size
+- Recall@10 and Recall@100
+- Query latency p50/p95/p99
+
+Datasets:
+- Euclidean Gaussian
+- Cosine normalized
+- Inner product with magnitude skew
+
+Run it with Maven:
+
+```bash
+cd pinot-perf
+../mvnw exec:java \
+  -Dexec.mainClass=org.apache.pinot.perf.BenchmarkVectorIndex
+```
+
+Useful tuning properties:
+
+```bash
+-Dpinot.perf.vector.dimension=128
+-Dpinot.perf.vector.datasetSizes=1000,10000,100000
+-Dpinot.perf.vector.queries=200
+-Dpinot.perf.vector.warmupQueries=50
+-Dpinot.perf.vector.nlist=16,32,64,128,256
+-Dpinot.perf.vector.nprobe=1,2,4,8,16,32
+-Dpinot.perf.vector.pqM=8,16
+-Dpinot.perf.vector.pqNbits=8
+-Dpinot.perf.vector.memoryPollMs=10
+-Dpinot.perf.vector.sweepSize=10000
+-Dpinot.perf.vector.sweepDimension=128
+-Dpinot.perf.vector.skipSweep=true
+```
+
+Small smoke run:
+
+```bash
+cd pinot-perf
+../mvnw exec:java \
+  -Dexec.mainClass=org.apache.pinot.perf.BenchmarkVectorIndex \
+  -Dpinot.perf.vector.dimension=16 \
+  -Dpinot.perf.vector.datasetSizes=100 \
+  -Dpinot.perf.vector.queries=10 \
+  -Dpinot.perf.vector.warmupQueries=3 \
+  -Dpinot.perf.vector.nlist=4,8 \
+  -Dpinot.perf.vector.nprobe=1,2 \
+  -Dpinot.perf.vector.pqM=4,8 \
+  -Dpinot.perf.vector.pqNbits=4 \
+  -Dpinot.perf.vector.skipSweep=true
+```
