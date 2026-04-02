@@ -99,6 +99,7 @@ public class PinotConfigUtils {
       return null;
     }
 
+    CommonsConfigurationUtils.validateNoDuplicateKeys(configFile);
     Configurations configs = new Configurations();
     Map<String, Object> properties = CommonsConfigurationUtils.toMap(configs.properties(configFile));
     ControllerConf conf = new ControllerConf(properties);
@@ -144,10 +145,10 @@ public class PinotConfigUtils {
     }
     File configFile = new File(configFileName);
     if (configFile.exists()) {
+      CommonsConfigurationUtils.validateNoDuplicateKeys(configFile);
       Configurations configs = new Configurations();
       return CommonsConfigurationUtils.toMap(configs.properties(configFile));
     }
-
     return null;
   }
 
