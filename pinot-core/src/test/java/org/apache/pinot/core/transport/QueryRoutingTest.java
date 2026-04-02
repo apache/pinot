@@ -19,7 +19,7 @@
 package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.Futures;
-import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.Collections;
 import java.util.HashMap;
@@ -102,14 +102,6 @@ public class QueryRoutingTest {
     ServerMetrics.deregister();
   }
 
-  private int getAvailablePort() {
-    try (ServerSocket socket = new ServerSocket(0)) {
-      return socket.getLocalPort();
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to get available port", e);
-    }
-  }
-
   private void initializeTestPort(int port) {
     _testPort = port;
     _serverInstance = new ServerInstance("localhost", _testPort);
@@ -122,7 +114,7 @@ public class QueryRoutingTest {
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes) {
-    return getQueryServer(responseDelayMs, responseBytes, _testPort);
+    return getQueryServer(responseDelayMs, responseBytes, 0);
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes, int port) {
@@ -132,7 +124,11 @@ public class QueryRoutingTest {
     return new QueryServer(port, null, handler);
   }
 
-  private void startQueryServerWithWait(QueryServer server) throws Exception {
+  /**
+   * Starts the query server and waits for it to be ready. Uses port 0 to let the OS assign a free port,
+   * avoiding TOCTOU race conditions. Returns the actual bound port.
+   */
+  private int startQueryServerWithWait(QueryServer server) throws Exception {
     server.start();
     // Wait for server to be fully ready with a timeout
     TestUtils.waitForCondition(aVoid -> {
@@ -142,6 +138,7 @@ public class QueryRoutingTest {
         return false;
       }
     }, 10L, 5000, "Query server failed to start");
+    return ((InetSocketAddress) server.getChannel().localAddress()).getPort();
   }
 
   private QueryScheduler mockQueryScheduler(int responseDelayMs, byte[] responseBytes) {
@@ -156,16 +153,15 @@ public class QueryRoutingTest {
   @Test
   public void testValidResponse()
       throws Exception {
-    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = _serverInstance.getInstanceId();
 
-    // Start the server
+    // Start the server on port 0 (OS-assigned) to avoid TOCTOU race, then initialize test fixtures from actual port
     _queryServer = getQueryServer(0, responseBytes);
-    startQueryServerWithWait(_queryServer);
+    initializeTestPort(startQueryServerWithWait(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
 
     // OFFLINE only
     AsyncQueryResponse asyncQueryResponse =
@@ -216,13 +212,12 @@ public class QueryRoutingTest {
   @Test
   public void testInvalidResponse()
       throws Exception {
-    initializeTestPort(getAvailablePort());
     long requestId = 123;
-    String serverId = _serverInstance.getInstanceId();
 
-    // Start the server
+    // Start the server on port 0 (OS-assigned) to avoid TOCTOU race
     _queryServer = getQueryServer(0, new byte[0]);
-    startQueryServerWithWait(_queryServer);
+    initializeTestPort(startQueryServerWithWait(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
@@ -245,16 +240,15 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForQueryServerException()
       throws Exception {
-    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     dataTable.addException(QueryErrorCode.SERVER_TABLE_MISSING, "Test error message");
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = _serverInstance.getInstanceId();
-    // Start the server
+    // Start the server on port 0 (OS-assigned) to avoid TOCTOU race
     _queryServer = getQueryServer(0, responseBytes);
-    startQueryServerWithWait(_queryServer);
+    initializeTestPort(startQueryServerWithWait(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
 
     // Send a query with ServerSide exception and check if the latency is set to timeout value.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
@@ -285,16 +279,15 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForClientException()
       throws Exception {
-    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     dataTable.addException(QueryErrorCode.QUERY_CANCELLATION, "Test error message");
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = _serverInstance.getInstanceId();
-    // Start the server
+    // Start the server on port 0 (OS-assigned) to avoid TOCTOU race
     _queryServer = getQueryServer(0, responseBytes);
-    startQueryServerWithWait(_queryServer);
+    initializeTestPort(startQueryServerWithWait(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
 
     // Send a query with client side errors.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
@@ -324,17 +317,16 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForMultipleExceptions()
       throws Exception {
-    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     dataTable.addException(QueryErrorCode.QUERY_CANCELLATION, "Test cancellation error message");
     dataTable.addException(QueryErrorCode.SERVER_TABLE_MISSING, "Test table missing error message");
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = _serverInstance.getInstanceId();
-    // Start the server
+    // Start the server on port 0 (OS-assigned) to avoid TOCTOU race
     _queryServer = getQueryServer(0, responseBytes);
-    startQueryServerWithWait(_queryServer);
+    initializeTestPort(startQueryServerWithWait(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
 
     // Send a query with multiple exceptions. Make sure that the latency is set to timeout value even if a single
     //server-side exception is seen.
@@ -365,15 +357,14 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForNoException()
       throws Exception {
-    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = _serverInstance.getInstanceId();
-    // Start the server
+    // Start the server on port 0 (OS-assigned) to avoid TOCTOU race
     _queryServer = getQueryServer(0, responseBytes);
-    startQueryServerWithWait(_queryServer);
+    initializeTestPort(startQueryServerWithWait(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
 
     // Send a valid query and get latency
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
@@ -400,16 +391,15 @@ public class QueryRoutingTest {
   @Test
   public void testNonMatchingRequestId()
       throws Exception {
-    initializeTestPort(getAvailablePort());
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = _serverInstance.getInstanceId();
 
-    // Start the server
+    // Start the server on port 0 (OS-assigned) to avoid TOCTOU race
     _queryServer = getQueryServer(0, responseBytes);
-    startQueryServerWithWait(_queryServer);
+    initializeTestPort(startQueryServerWithWait(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
@@ -432,7 +422,6 @@ public class QueryRoutingTest {
   @Test
   public void testServerDown()
       throws Exception {
-    initializeTestPort(getAvailablePort());
     long requestId = 123;
     // To avoid flakyness, set timeoutMs to 2000 msec. For some test runs, it can take up to
     // 1400 msec to mark request as failed.
@@ -440,11 +429,11 @@ public class QueryRoutingTest {
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
-    String serverId = _serverInstance.getInstanceId();
 
-    // Start the server
+    // Start the server on port 0 (OS-assigned) to avoid TOCTOU race
     _queryServer = getQueryServer(500, responseBytes);
-    startQueryServerWithWait(_queryServer);
+    initializeTestPort(startQueryServerWithWait(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
@@ -498,19 +487,6 @@ public class QueryRoutingTest {
   @Test
   public void testSkipUnavailableServer()
       throws Exception {
-    // Use dynamically allocated ports to avoid resource conflict with other tests
-    int port1 = getAvailablePort();
-    int port2 = getAvailablePort();
-    ServerInstance serverInstance1 = new ServerInstance("localhost", port1);
-    ServerInstance serverInstance2 = new ServerInstance("localhost", port2);
-    ServerRoutingInstance serverRoutingInstance1 =
-        serverInstance1.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
-    ServerRoutingInstance serverRoutingInstance2 =
-        serverInstance2.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
-    Map<ServerInstance, SegmentsToQuery> routingTable =
-        Map.of(serverInstance1, new SegmentsToQuery(Collections.emptyList(), Collections.emptyList()),
-            serverInstance2, new SegmentsToQuery(Collections.emptyList(), Collections.emptyList()));
-
     long requestId = 123;
     DataSchema dataSchema =
         new DataSchema(new String[]{"column1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
@@ -523,9 +499,34 @@ public class QueryRoutingTest {
     dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] successResponseBytes = dataTableSuccess.toBytes();
 
-    // Only start a single QueryServer, on port from serverInstance1
-    _queryServer = getQueryServer(500, successResponseBytes, port1);
-    startQueryServerWithWait(_queryServer);
+    // Start server1 on port 0 (OS-assigned) to avoid TOCTOU race
+    _queryServer = getQueryServer(500, successResponseBytes, 0);
+    int port1 = startQueryServerWithWait(_queryServer);
+
+    // For server2 (unavailable server), use a port that is guaranteed to have nothing listening.
+    // Use ServerSocket(0) to find a free port, then close it — no TOCTOU risk here since we intentionally
+    // want nothing bound on this port.
+    int port2;
+    try (ServerSocket socket = new ServerSocket(0)) {
+      port2 = socket.getLocalPort();
+      // Ensure port2 != port1
+      while (port2 == port1) {
+        socket.close();
+        try (ServerSocket s2 = new ServerSocket(0)) {
+          port2 = s2.getLocalPort();
+        }
+      }
+    }
+
+    ServerInstance serverInstance1 = new ServerInstance("localhost", port1);
+    ServerInstance serverInstance2 = new ServerInstance("localhost", port2);
+    ServerRoutingInstance serverRoutingInstance1 =
+        serverInstance1.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+    ServerRoutingInstance serverRoutingInstance2 =
+        serverInstance2.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+    Map<ServerInstance, SegmentsToQuery> routingTable =
+        Map.of(serverInstance1, new SegmentsToQuery(Collections.emptyList(), Collections.emptyList()),
+            serverInstance2, new SegmentsToQuery(Collections.emptyList(), Collections.emptyList()));
 
     // Submit the query with skipUnavailableServers=true, the single started server should return a valid response
     BrokerRequest brokerRequest =
