@@ -123,7 +123,7 @@ public abstract class ResourceManager {
    * @param newRunnerThreads desired number of query runner threads (must be &gt; 0)
    * @param newWorkerThreads desired number of query worker threads (must be &gt; 0)
    */
-  public void resizeThreadPools(int newRunnerThreads, int newWorkerThreads) {
+  public synchronized void resizeThreadPools(int newRunnerThreads, int newWorkerThreads) {
     if (newRunnerThreads <= 0 || newWorkerThreads <= 0) {
       LOGGER.warn("Invalid thread pool sizes: runnerThreads={}, workerThreads={}. Sizes must be > 0. Skipping resize.",
           newRunnerThreads, newWorkerThreads);
@@ -168,7 +168,7 @@ public abstract class ResourceManager {
   protected void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads) {
   }
 
-  private static void resizePool(ThreadPoolExecutor pool, int oldSize, int newSize, String poolName) {
+  private synchronized void resizePool(ThreadPoolExecutor pool, int oldSize, int newSize, String poolName) {
     if (oldSize == newSize) {
       return;
     }
