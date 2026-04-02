@@ -172,6 +172,10 @@ In order to query pinot, try to open `localhost:9000` from your browser.
 
 ## Developer Setup: All-in-One Without Demo Data
 
+For more deployment options, see the
+[Running Pinot in Docker](https://docs.pinot.apache.org/basics/getting-started/running-pinot-in-docker)
+guide in the Pinot documentation.
+
 The `QuickStart` command is convenient for trying Pinot, but it has two limitations for
 ongoing development work:
 
