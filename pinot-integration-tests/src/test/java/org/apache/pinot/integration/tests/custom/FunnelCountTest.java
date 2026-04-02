@@ -348,4 +348,33 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(rows.size(), 1);
     assertStepCounts(rows.get(0).get(0), EXPECTED_FILTERED);
   }
+
+  // ---------- WHERE clause filters out ALL rows ----------
+
+  private static final long[] EXPECTED_ALL_FILTERED = {0, 0, 0, 0};
+
+  private String emptyResultQuery(String settings) {
+    return overallQuery(settings) + " WHERE " + USER_ID_COL + " > 100";
+  }
+
+  private String emptyResultGroupByQuery(String settings) {
+    return String.format("SELECT %s, %s FROM %s WHERE %s > 100 GROUP BY %s ORDER BY %s",
+        CATEGORY_COL, funnelCountAggregation(settings), TABLE_NAME, USER_ID_COL, CATEGORY_COL, CATEGORY_COL);
+  }
+
+  @Test(dataProvider = "allStrategies")
+  public void testEmptyResultOverall(String settings)
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(emptyResultQuery(settings)));
+    assertOverallResult(rows, EXPECTED_ALL_FILTERED);
+  }
+
+  @Test(dataProvider = "allStrategies")
+  public void testEmptyResultGroupBy(String settings)
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(emptyResultGroupByQuery(settings)));
+    assertEquals(rows.size(), 0, "Expected zero groups when all rows are filtered");
+  }
 }
