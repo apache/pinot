@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -1127,6 +1128,102 @@ public class ColumnarMapIndexTest {
 
       // Verify same dictIds for same values
       assertEquals(dictIdBuffer[0], dictIdBuffer[2], "Same value 'active' should have same dictId");
+    }
+  }
+
+  @Test
+  public void testReadDictIdsWithGaps()
+      throws IOException {
+    // Verify co-iterator readDictIds works correctly with non-sequential docIds (filtered GROUP BY)
+    Map<String, FieldSpec.DataType> keyTypes = new HashMap<>();
+    keyTypes.put("color", FieldSpec.DataType.STRING);
+
+    // 20 docs, key present in ~60%: docs 0,1,3,5,6,8,10,12,14,16,17,19
+    @SuppressWarnings("unchecked")
+    Map<String, Object>[] docs = new Map[20];
+    String[] colors = {"red", "blue", "green", "red", "blue"};
+    int[] presentDocs = {0, 1, 3, 5, 6, 8, 10, 12, 14, 16, 17, 19};
+    Set<Integer> presentSet = new HashSet<>();
+    for (int d : presentDocs) {
+      presentSet.add(d);
+    }
+    int colorIdx = 0;
+    for (int i = 0; i < 20; i++) {
+      if (presentSet.contains(i)) {
+        docs[i] = Map.of("color", colors[colorIdx % colors.length]);
+        colorIdx++;
+      } else {
+        docs[i] = new HashMap<>();
+      }
+    }
+
+    ComplexFieldSpec fieldSpec = buildMapFieldSpec(COLUMN_NAME);
+    ColumnarMapIndexConfig config = new ColumnarMapIndexConfig(true, null, true, null, 1000);
+    File indexFile =
+        new File(INDEX_DIR, COLUMN_NAME + V1Constants.Indexes.COLUMNAR_MAP_INDEX_FILE_EXTENSION);
+
+    try (OnHeapColumnarMapIndexCreator creator = new OnHeapColumnarMapIndexCreator(
+        INDEX_DIR, COLUMN_NAME, fieldSpec, config, keyTypes, FieldSpec.DataType.STRING)) {
+      for (Map<String, Object> doc : docs) {
+        creator.add(doc);
+      }
+      creator.seal();
+    }
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+        ImmutableColumnarMapIndexReader reader = new ImmutableColumnarMapIndexReader(buffer, null)) {
+
+      org.apache.pinot.segment.spi.datasource.DataSource ds =
+          new ColumnarMapDataSource(buildColumnMetadata(fieldSpec, 20), reader).getKeyDataSource("color");
+      assertNotNull(ds);
+
+      org.apache.pinot.segment.spi.index.reader.ForwardIndexReader<?> fwd = ds.getForwardIndex();
+      assertTrue(fwd.isDictionaryEncoded());
+      org.apache.pinot.segment.spi.index.reader.Dictionary dict = ds.getDictionary();
+      assertNotNull(dict);
+
+      // Case 1: sparse docIds with gaps (simulates filtered GROUP BY)
+      int[] sparseDocIds = {0, 3, 7, 15, 19};
+      int[] dictIdBuffer = new int[5];
+      fwd.readDictIds(sparseDocIds, 5, dictIdBuffer, null);
+
+      assertEquals(dict.getStringValue(dictIdBuffer[0]), "red");    // doc 0 present
+      assertEquals(dict.getStringValue(dictIdBuffer[1]), "green");  // doc 3 present
+      assertEquals(dictIdBuffer[2], Dictionary.NULL_VALUE_INDEX);   // doc 7 absent
+      assertEquals(dictIdBuffer[3], Dictionary.NULL_VALUE_INDEX);   // doc 15 absent
+      assertEquals(dict.getStringValue(dictIdBuffer[4]), "blue");   // doc 19 present
+
+      // Case 2: all docIds absent
+      int[] absentDocIds = {2, 4, 7, 9, 11};
+      int[] absentBuffer = new int[5];
+      fwd.readDictIds(absentDocIds, 5, absentBuffer, null);
+      for (int i = 0; i < 5; i++) {
+        assertEquals(absentBuffer[i], Dictionary.NULL_VALUE_INDEX,
+            "Doc " + absentDocIds[i] + " should be absent");
+      }
+
+      // Case 3: all docIds present
+      int[] allPresentDocIds = {0, 1, 3, 5, 6};
+      int[] presentBuffer = new int[5];
+      fwd.readDictIds(allPresentDocIds, 5, presentBuffer, null);
+      for (int i = 0; i < 5; i++) {
+        assertNotEquals(presentBuffer[i], Dictionary.NULL_VALUE_INDEX,
+            "Doc " + allPresentDocIds[i] + " should be present");
+      }
+
+      // Case 4: single doc
+      int[] singleDoc = {10};
+      int[] singleBuffer = new int[1];
+      fwd.readDictIds(singleDoc, 1, singleBuffer, null);
+      assertNotEquals(singleBuffer[0], Dictionary.NULL_VALUE_INDEX);
+
+      // Case 5: late docIds (simulates blocks from end of segment)
+      int[] lateDocIds = {16, 17, 19};
+      int[] lateBuffer = new int[3];
+      fwd.readDictIds(lateDocIds, 3, lateBuffer, null);
+      assertNotEquals(lateBuffer[0], Dictionary.NULL_VALUE_INDEX); // doc 16 present
+      assertNotEquals(lateBuffer[1], Dictionary.NULL_VALUE_INDEX); // doc 17 present
+      assertNotEquals(lateBuffer[2], Dictionary.NULL_VALUE_INDEX); // doc 19 present
     }
   }
 

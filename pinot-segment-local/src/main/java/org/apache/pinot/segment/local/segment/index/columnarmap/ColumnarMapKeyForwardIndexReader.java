@@ -26,6 +26,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -101,20 +102,49 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
     return _storedType;
   }
 
+  /**
+   * Batch-reads dictionary IDs for a sorted array of document IDs.
+   *
+   * <p>When a sparse dictId forward index is available, this method uses a co-iteration
+   * strategy instead of per-document {@code rank()} calls. A single {@code rankLong()} seeds
+   * the ordinal for the first docId in the batch, then a {@link PeekableIntIterator} walks
+   * the presence bitmap forward alongside the sorted docIds. This reduces per-block cost
+   * from O(blockSize × numContainers) to O(numContainers + blockSize).
+   *
+   * <p><b>Contract:</b> {@code docIds} must be in ascending order (always true for Pinot
+   * query blocks).
+   */
   @Override
   public void readDictIds(int[] docIds, int length, int[] dictIdBuffer, ForwardIndexReaderContext context) {
     if (_dictionary == null) {
       throw new UnsupportedOperationException("Dictionary not available for key: " + _key);
     }
-    if (_dictIdReader != null) {
-      // Fast path: sparse dictId forward index — use presence bitmap rank to get ordinal
+    if (_dictIdReader != null && _presenceBitmap != null) {
+      // Fast path: co-iterate sorted docIds with presence bitmap iterator.
+      // Seed ordinal with one rankLong() call for the first docId, then walk forward.
+      int firstDocId = docIds[0];
+      PeekableIntIterator iter = _presenceBitmap.getIntIterator();
+      iter.advanceIfNeeded(firstDocId);
+      int ordinal = (firstDocId == 0) ? 0 : (int) _presenceBitmap.rankLong(firstDocId - 1);
+
       for (int i = 0; i < length; i++) {
-        if (_presenceBitmap != null && _presenceBitmap.contains(docIds[i])) {
-          int ordinal = _presenceBitmap.rank(docIds[i]) - 1;
+        int docId = docIds[i];
+        while (iter.hasNext() && iter.peekNext() < docId) {
+          iter.next();
+          ordinal++;
+        }
+        if (iter.hasNext() && iter.peekNext() == docId) {
           dictIdBuffer[i] = _dictIdReader.readInt(ordinal);
+          iter.next();
+          ordinal++;
         } else {
           dictIdBuffer[i] = Dictionary.NULL_VALUE_INDEX;
         }
+      }
+    } else if (_dictIdReader != null) {
+      // Fallback when presence bitmap is not available
+      for (int i = 0; i < length; i++) {
+        dictIdBuffer[i] = Dictionary.NULL_VALUE_INDEX;
       }
     } else {
       // Slow path: getString + indexOf for mutable segments
