@@ -71,6 +71,7 @@ public class V1Constants {
     public static final String VECTOR_V912_INDEX_FILE_EXTENSION = ".vector.v912.index";
     public static final String VECTOR_V912_HNSW_INDEX_FILE_EXTENSION = ".vector.v912.hnsw.index";
     public static final String VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".vector.hnsw.mapping";
+    public static final String VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION = ".vector.ivfflat.index";
   }
 
   public static class MetadataKeys {

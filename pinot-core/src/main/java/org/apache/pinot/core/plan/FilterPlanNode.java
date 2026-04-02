@@ -37,6 +37,7 @@ import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
+import org.apache.pinot.core.operator.filter.ExactVectorScanFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
@@ -45,6 +46,7 @@ import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorSearchParams;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.IFSTBasedRegexpPredicateEvaluatorFactory;
@@ -58,6 +60,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -323,10 +326,8 @@ public class FilterPlanNode implements PlanNode {
                   column);
               return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, numDocs);
             case VECTOR_SIMILARITY:
-              VectorIndexReader vectorIndex = dataSource.getVectorIndex();
-              Preconditions.checkState(vectorIndex != null,
-                  "Cannot apply VECTOR_SIMILARITY on column: %s without vector index", column);
-              return new VectorSimilarityFilterOperator(vectorIndex, (VectorSimilarityPredicate) predicate, numDocs);
+              return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
+                  numDocs);
             case IS_NULL: {
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {
@@ -355,5 +356,37 @@ public class FilterPlanNode implements PlanNode {
       default:
         throw new IllegalStateException();
     }
+  }
+
+  /**
+   * Constructs the appropriate vector similarity filter operator based on index availability.
+   *
+   * <p>Decision tree:</p>
+   * <ol>
+   *   <li>If the segment has a vector index for the column, use {@link VectorSimilarityFilterOperator}
+   *       with query options (nprobe, rerank, maxCandidates).</li>
+   *   <li>If no vector index exists, fall back to {@link ExactVectorScanFilterOperator} which
+   *       performs brute-force scan of the forward index.</li>
+   * </ol>
+   */
+  private BaseFilterOperator constructVectorSimilarityOperator(DataSource dataSource,
+      VectorSimilarityPredicate predicate, String column, int numDocs) {
+    VectorIndexReader vectorIndex = dataSource.getVectorIndex();
+    VectorSearchParams searchParams = VectorSearchParams.fromQueryOptions(_queryContext.getQueryOptions());
+
+    if (vectorIndex != null) {
+      // ANN index path: pass forward index reader only if rerank is enabled
+      ForwardIndexReader<?> forwardIndexReader = null;
+      if (searchParams.isExactRerank()) {
+        forwardIndexReader = dataSource.getForwardIndex();
+      }
+      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader);
+    }
+
+    // Exact scan fallback: no vector index on this segment
+    ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
+    Preconditions.checkState(forwardIndexReader != null,
+        "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
+    return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs);
   }
 }

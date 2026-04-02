@@ -262,21 +262,33 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
   private void copyVectorIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
-    // TODO: see if this can be done by reusing some existing methods
-    String suffix = V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
-    File[] vectorIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
+    // Copy HNSW index directories (Lucene-based, stored as directories)
+    String hnswSuffix = V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
+    File[] hnswIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
-        return name.endsWith(suffix);
+        return name.endsWith(hnswSuffix);
       }
     });
-    for (File vectorIndexFile : vectorIndexFiles) {
+    if (hnswIndexFiles == null) {
+      hnswIndexFiles = new File[0];
+    }
+    for (File vectorIndexFile : hnswIndexFiles) {
       File[] indexFiles = vectorIndexFile.listFiles();
       File v3VectorIndexDir = new File(v3Dir, vectorIndexFile.getName());
       v3VectorIndexDir.mkdir();
       for (File indexFile : indexFiles) {
         File v3VectorIndexFile = new File(v3VectorIndexDir, indexFile.getName());
         Files.copy(indexFile.toPath(), v3VectorIndexFile.toPath());
+      }
+    }
+
+    // Copy IVF_FLAT index files (single flat files, not directories)
+    String ivfFlatSuffix = V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
+    File[] ivfFlatIndexFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(ivfFlatSuffix));
+    if (ivfFlatIndexFiles != null) {
+      for (File ivfFlatFile : ivfFlatIndexFiles) {
+        Files.copy(ivfFlatFile.toPath(), new File(v3Dir, ivfFlatFile.getName()).toPath());
       }
     }
   }

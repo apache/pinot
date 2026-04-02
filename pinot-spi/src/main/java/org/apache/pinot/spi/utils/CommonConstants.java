@@ -905,6 +905,20 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
+
+        // Vector search query options
+
+        /** Number of inverted-list probes for IVF_FLAT vector index. Higher values improve recall
+         *  at the cost of latency. Only relevant when the segment's vector index uses IVF_FLAT. */
+        public static final String VECTOR_NPROBE = "vectorNprobe";
+
+        /** When true, ANN results are re-scored using exact distance from the forward index and
+         *  re-sorted before returning top-K. Improves accuracy at the cost of latency. */
+        public static final String VECTOR_EXACT_RERANK = "vectorExactRerank";
+
+        /** Maximum number of ANN candidates to retrieve before applying exact rerank or final
+         *  top-K selection. Defaults to topK * 10 if not set. */
+        public static final String VECTOR_MAX_CANDIDATES = "vectorMaxCandidates";
       }
 
       public static class QueryOptionValue {

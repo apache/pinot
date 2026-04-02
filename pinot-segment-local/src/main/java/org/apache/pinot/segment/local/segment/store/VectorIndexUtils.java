@@ -52,11 +52,16 @@ public class VectorIndexUtils {
     FileUtils.deleteQuietly(nativeV99IndexFile);
     File nativeV912IndexFile = new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(nativeV912IndexFile);
+
+    // Remove the IVF_FLAT index file
+    File ivfFlatIndexFile = new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(ivfFlatIndexFile);
   }
 
   static boolean hasVectorIndex(File segDir, String column) {
     return new File(segDir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists();
+        || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION).exists();
   }
 
   public static VectorSimilarityFunction toSimilarityFunction(
@@ -70,6 +75,8 @@ public class VectorIndexUtils {
         return VectorSimilarityFunction.EUCLIDEAN;
       case DOT_PRODUCT:
         return VectorSimilarityFunction.DOT_PRODUCT;
+      case L2:
+        return VectorSimilarityFunction.EUCLIDEAN;
       default:
         throw new IllegalArgumentException("Unknown distance function: " + distanceFunction);
     }

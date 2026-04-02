@@ -144,6 +144,12 @@ public class SegmentDirectoryPaths {
       vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
       formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
     }
+
+    // check for IVF_FLAT index, if null
+    if (formatFile == null) {
+      String ivfFlatFile = column + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(segmentIndexDir, ivfFlatFile);
+    }
     return formatFile;
   }
 
