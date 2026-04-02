@@ -103,6 +103,10 @@ import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.cleanup.StaleInstancesCleanupTask;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
+import org.apache.pinot.controller.helix.core.ingest.ControllerRowInsertExecutor;
+import org.apache.pinot.controller.helix.core.ingest.FileInsertExecutor;
+import org.apache.pinot.controller.helix.core.ingest.InsertStatementCoordinator;
+import org.apache.pinot.controller.helix.core.ingest.InsertStatementStore;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
@@ -151,6 +155,9 @@ import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingest.InsertExecutor;
+import org.apache.pinot.spi.ingest.InsertRequest;
+import org.apache.pinot.spi.ingest.InsertResult;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -220,6 +227,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
   protected PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   protected SegmentCompletionManager _segmentCompletionManager;
+  protected InsertStatementCoordinator _insertStatementCoordinator;
   protected LeadControllerManager _leadControllerManager;
   protected List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbackList;
   protected StaleInstancesCleanupTask _staleInstancesCleanupTask;
@@ -632,7 +640,38 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
             _leadControllerManager, _config.getSegmentCommitTimeoutSeconds(), segmentCompletionConfig);
 
+    // Initialize InsertStatementCoordinator for push-based INSERT INTO
+    InsertStatementStore insertStatementStore =
+        new InsertStatementStore(_helixResourceManager.getPropertyStore());
+    _insertStatementCoordinator =
+        new InsertStatementCoordinator(_helixResourceManager, insertStatementStore, _controllerMetrics);
+
+    // Register executors with the coordinator so broker-issued INSERTs are routed correctly
+    ControllerRowInsertExecutor rowInsertExecutor = new ControllerRowInsertExecutor(_helixResourceManager);
+    _insertStatementCoordinator.registerExecutor("ROW", rowInsertExecutor);
+
+    _insertStatementCoordinator.start();
+
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
+    // Wire the coordinator (not the raw executor) so that controller-local INSERTs go through
+    // the same idempotency, hybrid-table validation, and manifest tracking as HTTP-submitted ones.
+    InsertStatementCoordinator coordinator = _insertStatementCoordinator;
+    _sqlQueryExecutor.setInsertExecutor(new InsertExecutor() {
+      @Override
+      public InsertResult execute(InsertRequest request) {
+        return coordinator.submitInsert(request);
+      }
+
+      @Override
+      public InsertResult getStatus(String statementId) {
+        return coordinator.getStatus(statementId, null);
+      }
+
+      @Override
+      public InsertResult abort(String statementId) {
+        return coordinator.abortStatement(statementId, null);
+      }
+    });
 
     _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
     _connectionManager.setDefaultSocketConfig(
@@ -662,6 +701,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
+
+    // Register FILE executor now that _taskManager is available (created during periodic task setup)
+    if (_taskManager != null) {
+      FileInsertExecutor fileInsertExecutor = new FileInsertExecutor(_helixResourceManager, _taskManager);
+      _insertStatementCoordinator.registerExecutor("FILE", fileInsertExecutor);
+    }
 
     // Register ControllerPeriodicTasks as cluster config change listeners
     LOGGER.info("Registering ControllerPeriodicTasks as cluster config change listeners");
@@ -728,6 +773,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_tableSizeReader).to(TableSizeReader.class);
         bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
+        bind(_insertStatementCoordinator).to(InsertStatementCoordinator.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
 
         bindAsContract(PinotTableReloadService.class).in(Singleton.class);
@@ -1139,6 +1185,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // Stop PinotLLCSegmentManager before stopping Jersey API. It is possible that stopping Jersey API
       // may interrupt the handlers waiting on an I/O.
       _pinotLLCRealtimeSegmentManager.stop();
+
+      LOGGER.info("Stopping insert statement coordinator");
+      _insertStatementCoordinator.stop();
 
       LOGGER.info("Closing PinotFS classes");
       PinotFSFactory.shutdown();

@@ -21,14 +21,23 @@ package org.apache.pinot.sql.parsers.dml;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
+import org.apache.pinot.sql.parsers.parser.SqlInsertIntoValues;
 
 
+/**
+ * Parses a {@link SqlNodeAndOptions} into a concrete {@link DataManipulationStatement}.
+ *
+ * <p>Dispatches based on the SqlNode type to the appropriate DML statement parser.
+ */
 public class DataManipulationStatementParser {
   private DataManipulationStatementParser() {
   }
 
   public static DataManipulationStatement parse(SqlNodeAndOptions sqlNodeAndOptions) {
     SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
+    if (sqlNode instanceof SqlInsertIntoValues) {
+      return InsertIntoValues.parse(sqlNodeAndOptions);
+    }
     if (sqlNode instanceof SqlInsertFromFile) {
       return InsertIntoFile.parse(sqlNodeAndOptions);
     }
