@@ -55,7 +55,6 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
   private final ColumnarMapKeyDictionary _dictionary;
   @Nullable
   private final FixedBitIntReaderWriter _dictIdReader;
-  @Nullable
   private final ImmutableRoaringBitmap _presenceBitmap;
 
   public ColumnarMapKeyForwardIndexReader(ColumnarMapIndexReader columnarMapIndexReader, String key,
@@ -83,7 +82,13 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
     _storedType = storedType;
     _dictionary = dictionary;
     _dictIdReader = dictIdReader;
-    _presenceBitmap = presenceBitmap;
+    _presenceBitmap = presenceBitmap != null ? presenceBitmap : ImmutableRoaringBitmap.bitmapOf();
+    if (dictionary != null) {
+      String defaultValueStr = ColumnarMapKeyDictionary.getDefaultValueString(storedType);
+      _defaultDictId = dictionary.indexOf(defaultValueStr);
+    } else {
+      _defaultDictId = 0;
+    }
   }
 
   @Override
@@ -110,6 +115,11 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
    * the presence bitmap forward alongside the sorted docIds. This reduces per-block cost
    * from O(blockSize × numContainers) to O(numContainers + blockSize).
    *
+   * <p>Absent docs return {@code _defaultDictId} — the dictId of the type's default value
+   * (0 for INT/LONG, 0.0 for FLOAT/DOUBLE, "" for STRING). This matches Pinot's standard
+   * nullable column behavior where nulls are indistinguishable from the default value when
+   * null handling is not enabled.
+   *
    * <p><b>Contract:</b> {@code docIds} must be in ascending order (always true for Pinot
    * query blocks).
    */
@@ -118,7 +128,7 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
     if (_dictionary == null) {
       throw new UnsupportedOperationException("Dictionary not available for key: " + _key);
     }
-    if (_dictIdReader != null && _presenceBitmap != null) {
+    if (_dictIdReader != null) {
       // Fast path: co-iterate sorted docIds with presence bitmap iterator.
       // Seed ordinal with one rankLong() call for the first docId, then walk forward.
       int firstDocId = docIds[0];
@@ -139,11 +149,6 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
         } else {
           dictIdBuffer[i] = _defaultDictId;
         }
-      }
-    } else if (_dictIdReader != null) {
-      // Fallback when presence bitmap is not available
-      for (int i = 0; i < length; i++) {
-        dictIdBuffer[i] = _defaultDictId;
       }
     } else {
       // Slow path: getString + indexOf for mutable segments

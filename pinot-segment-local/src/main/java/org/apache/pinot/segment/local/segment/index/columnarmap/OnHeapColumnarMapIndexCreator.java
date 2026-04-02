@@ -574,7 +574,11 @@ public class OnHeapColumnarMapIndexCreator implements ColumnarMapIndexCreator {
   private byte[] buildDictIdForwardIndex(TreeMap<String, RoaringBitmap> valueToDocIds,
       DataType storedType, RoaringBitmap presence)
       throws IOException {
-    // Build sorted distinct values array (no default value needed — absent docs use presence bitmap)
+    // Ensure the default value is in the dictionary so absent docs can map to it at query time.
+    // This matches Pinot's standard nullable column behavior where nulls get the default value's dictId.
+    String defaultValue = ColumnarMapKeyDictionary.getDefaultValueString(storedType);
+    valueToDocIds.putIfAbsent(defaultValue, new RoaringBitmap());
+
     String[] distinctValues = valueToDocIds.keySet().toArray(new String[0]);
     sortValues(distinctValues, storedType);
 
