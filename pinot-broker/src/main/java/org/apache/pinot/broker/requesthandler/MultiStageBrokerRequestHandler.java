@@ -198,6 +198,23 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   @Override
   public void start() {
     _queryDispatcher.start();
+    warmupCompile();
+  }
+
+  /**
+   * Best-effort warmup of the Calcite compile pipeline before serving traffic. Reduces but does
+   * not guarantee that cold-start compilation times won't breach the timeout limit enforced in #14946.
+   */
+  private void warmupCompile() {
+    try {
+      ImmutableQueryEnvironment.Config warmupConf = getQueryEnvConf(null, Map.of(), -1L);
+      QueryEnvironment warmupEnv = new QueryEnvironment(warmupConf, _multiClusterRoutingContext);
+      long startMs = System.currentTimeMillis();
+      _queryCompileExecutor.submit(() -> warmupEnv.compile("SELECT 1")).get(30, TimeUnit.SECONDS);
+      LOGGER.info("MSE startup warmup completed in {}ms", System.currentTimeMillis() - startMs);
+    } catch (Exception e) {
+      LOGGER.warn("MSE broker startup warmup failed", e);
+    }
   }
 
   @Override
