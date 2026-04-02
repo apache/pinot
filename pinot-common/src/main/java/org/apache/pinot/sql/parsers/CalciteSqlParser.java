@@ -65,6 +65,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
+import org.apache.pinot.sql.parsers.parser.SqlInsertIntoValues;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -129,7 +130,7 @@ public class CalciteSqlParser {
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
     for (SqlNode sqlNode : sqlNodeList) {
-      if (sqlNode instanceof SqlInsertFromFile) {
+      if (sqlNode instanceof SqlInsertFromFile || sqlNode instanceof SqlInsertIntoValues) {
         // extract insert statement (execution statement)
         if (sqlType == null) {
           sqlType = PinotSqlType.DML;
