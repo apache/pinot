@@ -20,10 +20,12 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.IOException;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.CollectionTerminatedException;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.LeafCollector;
 import org.apache.lucene.search.Scorable;
 import org.apache.lucene.search.ScoreMode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -51,6 +53,8 @@ public class RealtimeLuceneDocIdCollector implements Collector {
   @Override
   public LeafCollector getLeafCollector(LeafReaderContext context) {
     return new LeafCollector() {
+      // Counter for periodic termination check
+      private int _numDocsCollected = 0;
 
       @Override
       public void setScorer(Scorable scorer)
@@ -64,6 +68,19 @@ public class RealtimeLuceneDocIdCollector implements Collector {
         if (_shouldCancel) {
           throw new RuntimeException("TEXT_MATCH query was cancelled");
         }
+        try {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(
+              _numDocsCollected++, "RealtimeLuceneDocIdCollector");
+        } catch (RuntimeException e) {
+          // CollectionTerminatedException - Lucene's IndexSearcher.search() specially handles this exception
+          // to gracefully stop document collection without treating it as an error.
+          // When checkTerminationAndSampleUsagePeriodically() throws
+          // TerminationException (for OOM/timeout), it's already stored in QueryExecutionContext._terminateException
+          // before being thrown. After search completes, higher-level code retrieves the actual error via
+          // QueryThreadContext.getTerminateException() to include proper error details in query response.
+          throw new CollectionTerminatedException();
+        }
+
         // Compute the absolute lucene docID across sub-indexes as doc that is passed is relative to the current reader
         _docIds.add(context.docBase + doc);
       }
@@ -72,5 +89,9 @@ public class RealtimeLuceneDocIdCollector implements Collector {
 
   public void markShouldCancel() {
     _shouldCancel = true;
+  }
+
+  public MutableRoaringBitmap getDocIds() {
+    return _docIds;
   }
 }

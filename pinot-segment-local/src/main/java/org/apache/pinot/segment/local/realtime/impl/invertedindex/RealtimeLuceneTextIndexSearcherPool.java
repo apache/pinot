@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.utils.ScalingThreadPoolExecutor;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -27,13 +28,19 @@ import org.apache.pinot.common.utils.ScalingThreadPoolExecutor;
  * The pool max size is equivalent to pinot.query.scheduler.query_worker_threads to ensure each worker thread can have
  * an accompanying Lucene searcher thread if needed. init() is called in BaseServerStarter to avoid creating a
  * dependency on pinot-core.
+ *
+ * The executor is wrapped with QueryThreadContext.contextAwareExecutorService(executor, false) to propagate
+ * QueryThreadContext for CPU/memory tracking, but WITHOUT registering tasks for cancellation. This prevents
+ * Thread.interrupt() during Lucene search which could corrupt FSDirectory used by IndexWriter.
+ * See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
  */
 public class RealtimeLuceneTextIndexSearcherPool {
   private static RealtimeLuceneTextIndexSearcherPool _singletonInstance;
   private static ExecutorService _executorService;
 
   private RealtimeLuceneTextIndexSearcherPool(int size) {
-    _executorService = ScalingThreadPoolExecutor.newScalingThreadPool(0, size, 500);
+    ExecutorService baseExecutor = ScalingThreadPoolExecutor.newScalingThreadPool(0, size, 500);
+    _executorService = QueryThreadContext.contextAwareExecutorService(baseExecutor, false);
   }
 
   public static RealtimeLuceneTextIndexSearcherPool getInstance() {
