@@ -1817,7 +1817,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
         .setConsumerDir(consumerDir)
-        .setTextIndexConfig(_tableConfig.getIndexingConfig().getMultiColumnTextIndexConfig());
+        .setTextIndexConfig(_tableConfig.getIndexingConfig().getMultiColumnTextIndexConfig())
+        .setDropRecordOnPartitionMismatch(ingestionConfig != null
+            && ingestionConfig.getStreamIngestionConfig() != null
+            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);

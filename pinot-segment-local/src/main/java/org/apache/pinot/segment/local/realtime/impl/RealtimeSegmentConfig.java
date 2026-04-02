@@ -71,6 +71,7 @@ public class RealtimeSegmentConfig {
   private final String _consumerDir;
   @Nullable
   private final MultiColumnTextIndexConfig _multiColIndexConfig;
+  private final boolean _dropRecordOnPartitionMismatch;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
 
@@ -99,7 +100,8 @@ public class RealtimeSegmentConfig {
       @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager,
       String consumerDir,
-      @Nullable MultiColumnTextIndexConfig textIndexConfig) {
+      @Nullable MultiColumnTextIndexConfig textIndexConfig,
+      boolean dropRecordOnPartitionMismatch) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -122,6 +124,7 @@ public class RealtimeSegmentConfig {
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _consumerDir = consumerDir;
     _multiColIndexConfig = textIndexConfig;
+    _dropRecordOnPartitionMismatch = dropRecordOnPartitionMismatch;
   }
 
   public String getTableNameWithType() {
@@ -217,6 +220,10 @@ public class RealtimeSegmentConfig {
     return _multiColIndexConfig;
   }
 
+  public boolean isDropRecordOnPartitionMismatch() {
+    return _dropRecordOnPartitionMismatch;
+  }
+
   public static class Builder {
     private String _tableNameWithType;
     private String _segmentName;
@@ -244,6 +251,7 @@ public class RealtimeSegmentConfig {
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private String _consumerDir;
     private MultiColumnTextIndexConfig _textIndexConfig;
+    private boolean _dropRecordOnPartitionMismatch;
 
     public Builder() {
       _indexConfigByCol = new HashMap<>();
@@ -416,6 +424,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setDropRecordOnPartitionMismatch(boolean dropRecordOnPartitionMismatch) {
+      _dropRecordOnPartitionMismatch = dropRecordOnPartitionMismatch;
+      return this;
+    }
+
     public RealtimeSegmentConfig build() {
       Map<String, FieldIndexConfigs> indexConfigByCol = Maps.newHashMapWithExpectedSize(_indexConfigByCol.size());
       for (Map.Entry<String, FieldIndexConfigs.Builder> entry : _indexConfigByCol.entrySet()) {
@@ -426,7 +439,7 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, Collections.unmodifiableMap(indexConfigByCol), _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _ingestionAggregationConfigs, _defaultNullHandlingEnabled, _partitionUpsertMetadataManager,
-          _partitionDedupMetadataManager, _consumerDir, _textIndexConfig);
+          _partitionDedupMetadataManager, _consumerDir, _textIndexConfig, _dropRecordOnPartitionMismatch);
     }
   }
 }

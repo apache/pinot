@@ -155,6 +155,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
   private final int _mainPartitionId; // partition id designated for this consuming segment
+  private final boolean _dropRecordOnPartitionMismatch;
   private final boolean _defaultNullHandlingEnabled;
   private final File _consumerDir;
 
@@ -248,6 +249,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionColumn = config.getPartitionColumn();
     _partitionFunction = config.getPartitionFunction();
     _mainPartitionId = config.getPartitionId();
+    _dropRecordOnPartitionMismatch = config.isDropRecordOnPartitionMismatch();
     _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
     _consumerDir = new File(config.getConsumerDir());
 
@@ -624,8 +626,27 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public boolean index(GenericRow row, @Nullable StreamMessageMetadata metadata)
       throws IOException {
-    boolean canTakeMore;
-    int numDocsIndexed = _numDocsIndexed;
+    if (_partitionColumn != null) {
+      Object value = row.getValue(_partitionColumn);
+      Preconditions.checkState(value != null, "Failed to find value for partition column: %s", _partitionColumn);
+      IndexContainer indexContainer = _indexContainerMap.get(_partitionColumn);
+      String stringValue = indexContainer._fieldSpec.getDataType().toString(value);
+      int partition = _partitionFunction.getPartition(stringValue);
+      if (partition != _mainPartitionId) {
+        if (_serverMetrics != null) {
+          _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
+        }
+        if (_dropRecordOnPartitionMismatch) {
+          updateIndexedAndIngestionTime(metadata);
+          return true;
+        }
+        if (indexContainer._partitions.add(partition)) {
+          // for every partition other than mainPartitionId, log a warning once
+          _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, _partitionColumn,
+              stringValue);
+        }
+      }
+    }
 
     if (isDedupEnabled()) {
       DedupRecordInfo dedupRecordInfo = getDedupRecordInfo(row);
@@ -633,6 +654,7 @@ public class MutableSegmentImpl implements MutableSegment {
         if (_serverMetrics != null) {
           _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
         }
+        updateIndexedAndIngestionTime(metadata);
         return true;
       }
     }
@@ -644,6 +666,8 @@ public class MutableSegmentImpl implements MutableSegment {
     // NOTE: We must do this before we index a single column to avoid partially indexing the row
     validateLengthOfMVColumns(row);
 
+    boolean canTakeMore;
+    int numDocsIndexed = _numDocsIndexed;
     if (isUpsertEnabled()) {
       RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
@@ -704,13 +728,15 @@ public class MutableSegmentImpl implements MutableSegment {
       _numDocsIndexed = numDocsIndexed;
     }
 
-    // Update last indexed time and latest ingestion time
+    updateIndexedAndIngestionTime(metadata);
+    return canTakeMore;
+  }
+
+  private void updateIndexedAndIngestionTime(@Nullable StreamMessageMetadata metadata) {
     _lastIndexedTimeMs = System.currentTimeMillis();
     if (metadata != null) {
       updateIngestionTimestamp(metadata.getRecordIngestionTimeMs());
     }
-
-    return canTakeMore;
   }
 
   /**
@@ -901,23 +927,6 @@ public class MutableSegmentImpl implements MutableSegment {
       DataType dataType = fieldSpec.getDataType();
 
       if (fieldSpec.isSingleValueField()) {
-        // Check partitions
-        if (column.equals(_partitionColumn)) {
-          String stringValue = dataType.toString(value);
-          int partition = _partitionFunction.getPartition(stringValue);
-          if (partition != _mainPartitionId) {
-            if (indexContainer._partitions.add(partition)) {
-              // for every partition other than mainPartitionId, log a warning once
-              _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column,
-                  stringValue);
-            }
-            // always emit a metric when a partition other than mainPartitionId is detected
-            if (_serverMetrics != null) {
-              _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
-            }
-          }
-        }
-
         // Update numValues info
         indexContainer._valuesInfo.updateSVNumValues();
 
