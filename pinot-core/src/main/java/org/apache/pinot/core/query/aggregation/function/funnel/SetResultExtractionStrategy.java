@@ -47,7 +47,7 @@ class SetResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWra
     if (dictIdsWrapper == null) {
       List<Set> result = new ArrayList<>(_numSteps);
       for (int i = 0; i < _numSteps; i++) {
-        result.add(new IntOpenHashSet());
+        result.add(new ObjectOpenHashSet<>());
       }
       return result;
     }

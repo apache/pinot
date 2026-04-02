@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -37,7 +36,11 @@ class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIds
   @Override
   public List<RoaringBitmap> extractIntermediateResult(DictIdsWrapper dictIdsWrapper) {
     if (dictIdsWrapper == null) {
-      return Collections.nCopies(_numSteps, new RoaringBitmap());
+      List<RoaringBitmap> result = new ArrayList<>(_numSteps);
+      for (int i = 0; i < _numSteps; i++) {
+        result.add(new RoaringBitmap());
+      }
+      return result;
     }
     Dictionary dictionary = dictIdsWrapper._dictionary;
     List<RoaringBitmap> result = new ArrayList<>(_numSteps);
