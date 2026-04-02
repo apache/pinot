@@ -22,7 +22,6 @@ import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.spi.index.reader.ColumnarMapIndexReader;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -138,20 +137,20 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
           iter.next();
           ordinal++;
         } else {
-          dictIdBuffer[i] = Dictionary.NULL_VALUE_INDEX;
+          dictIdBuffer[i] = _defaultDictId;
         }
       }
     } else if (_dictIdReader != null) {
       // Fallback when presence bitmap is not available
       for (int i = 0; i < length; i++) {
-        dictIdBuffer[i] = Dictionary.NULL_VALUE_INDEX;
+        dictIdBuffer[i] = _defaultDictId;
       }
     } else {
       // Slow path: getString + indexOf for mutable segments
       for (int i = 0; i < length; i++) {
         String rawValue = _columnarMapIndexReader.getString(docIds[i], _key);
         if (rawValue == null || rawValue.isEmpty()) {
-          dictIdBuffer[i] = Dictionary.NULL_VALUE_INDEX;
+          dictIdBuffer[i] = _defaultDictId;
         } else {
           dictIdBuffer[i] = _dictionary.indexOf(rawValue);
         }
