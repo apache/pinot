@@ -637,6 +637,7 @@ public class MutableSegmentImpl implements MutableSegment {
           _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
         }
         if (_dropRecordOnPartitionMismatch) {
+          updateIndexedAndIngestionTime(metadata);
           return true;
         }
         if (indexContainer._partitions.add(partition)) {
@@ -647,15 +648,13 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
 
-    boolean canTakeMore;
-    int numDocsIndexed = _numDocsIndexed;
-
     if (isDedupEnabled()) {
       DedupRecordInfo dedupRecordInfo = getDedupRecordInfo(row);
       if (_partitionDedupMetadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, this)) {
         if (_serverMetrics != null) {
           _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
         }
+        updateIndexedAndIngestionTime(metadata);
         return true;
       }
     }
@@ -667,6 +666,8 @@ public class MutableSegmentImpl implements MutableSegment {
     // NOTE: We must do this before we index a single column to avoid partially indexing the row
     validateLengthOfMVColumns(row);
 
+    boolean canTakeMore;
+    int numDocsIndexed = _numDocsIndexed;
     if (isUpsertEnabled()) {
       RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
@@ -727,13 +728,15 @@ public class MutableSegmentImpl implements MutableSegment {
       _numDocsIndexed = numDocsIndexed;
     }
 
-    // Update last indexed time and latest ingestion time
+    updateIndexedAndIngestionTime(metadata);
+    return canTakeMore;
+  }
+
+  private void updateIndexedAndIngestionTime(@Nullable StreamMessageMetadata metadata) {
     _lastIndexedTimeMs = System.currentTimeMillis();
     if (metadata != null) {
       updateIngestionTimestamp(metadata.getRecordIngestionTimeMs());
     }
-
-    return canTakeMore;
   }
 
   /**

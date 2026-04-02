@@ -49,6 +49,7 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -180,6 +181,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsHistoryFile);
 
     // Initialize mutable segment with configurations
+    IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder(indexLoadingConfig)
         .setTableNameWithType(_tableNameWithType)
         .setSegmentName(_segmentName)
@@ -191,7 +193,10 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation())
         .setMemoryManager(new MmapMemoryManager(FileUtils.getTempDirectory().getAbsolutePath(), _segmentName, null))
         .setStatsHistory(statsHistory)
-        .setConsumerDir(_resourceDataDir.getAbsolutePath());
+        .setConsumerDir(_resourceDataDir.getAbsolutePath())
+        .setDropRecordOnPartitionMismatch(ingestionConfig != null
+            && ingestionConfig.getStreamIngestionConfig() != null
+            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
 
     setPartitionParameters(realtimeSegmentConfigBuilder, _tableConfig.getIndexingConfig().getSegmentPartitionConfig());
 
@@ -395,7 +400,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
    *  - partition group id
    */
   private void setPartitionParameters(RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder,
-      SegmentPartitionConfig segmentPartitionConfig) {
+      @Nullable SegmentPartitionConfig segmentPartitionConfig) {
     if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
       if (columnPartitionMap.size() == 1) {
