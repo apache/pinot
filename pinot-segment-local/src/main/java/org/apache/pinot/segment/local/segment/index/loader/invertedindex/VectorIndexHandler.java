@@ -25,13 +25,14 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -62,10 +63,19 @@ public class VectorIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_vectorConfigs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.vector());
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing Vector index from segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+      VectorIndexConfig desiredConfig = _vectorConfigs.get(column);
+      VectorBackendType desiredBackend = desiredConfig.resolveBackendType();
+      VectorBackendType existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
+      if (existingBackend != null && existingBackend != desiredBackend) {
+        LOGGER.info("Need to rebuild Vector index for segment: {}, column: {} (backend changed from {} to {})",
+            segmentName, column, existingBackend, desiredBackend);
         return true;
       }
     }
@@ -84,14 +94,25 @@ public class VectorIndexHandler extends BaseIndexHandler {
   public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
     Set<String> columnsToAddIdx = new HashSet<>(_vectorConfigs.keySet());
-    // Remove indices not set in table config any more
+    // Remove indices not set in table config any more, or where the configured backend changed.
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.vector());
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing Vector index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.vector());
         LOGGER.info("Removed existing Vector index from segment: {}, column: {}", segmentName, column);
+        continue;
+      }
+      VectorIndexConfig desiredConfig = _vectorConfigs.get(column);
+      VectorBackendType desiredBackend = desiredConfig.resolveBackendType();
+      VectorBackendType existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
+      if (existingBackend != null && existingBackend != desiredBackend) {
+        LOGGER.info("Rebuilding Vector index for segment: {}, column: {} (backend changed from {} to {})",
+            segmentName, column, existingBackend, desiredBackend);
+        segmentWriter.removeIndex(column, StandardIndexes.vector());
+        columnsToAddIdx.add(column);
       }
     }
     for (String column : columnsToAddIdx) {
@@ -114,11 +135,11 @@ public class VectorIndexHandler extends BaseIndexHandler {
         _segmentDirectory.getSegmentMetadata().getVersion());
 
     String columnName = columnMetadata.getColumnName();
-    File inProgress =
-        new File(segmentDirectory, columnName
-            + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION + ".inprogress");
-    File vectorIndexFile =
-        new File(segmentDirectory, columnName + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    VectorIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.vector());
+    VectorBackendType backendType = config.resolveBackendType();
+    String vectorIndexFileExtension = VectorIndexUtils.getIndexFileExtension(backendType);
+    File inProgress = new File(segmentDirectory, columnName + vectorIndexFileExtension + ".inprogress");
+    File vectorIndexFile = new File(segmentDirectory, columnName + vectorIndexFileExtension);
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
@@ -180,11 +201,16 @@ public class VectorIndexHandler extends BaseIndexHandler {
             .createIndexReader(segmentWriter, colIndexConf, columnMetadata);
         VectorIndexCreator vectorIndexCreator = StandardIndexes.vector().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
-      float[] vector = new float[columnMetadata.getMaxNumberOfMultiValues()];
-      int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+      int vectorDimension = config.getVectorDimension();
+      int bufferSize = Math.max(vectorDimension, columnMetadata.getMaxNumberOfMultiValues());
+      float[] vector = new float[vectorDimension];
+      int[] dictIds = new int[bufferSize];
       for (int i = 0; i < numDocs; i++) {
-        forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-        for (int j = 0; j < dictIds.length; j++) {
+        int numValues = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
+        Preconditions.checkState(numValues == vector.length,
+            "Vector column: %s expected %s values but found %s for docId: %s", columnName, vector.length, numValues,
+            i);
+        for (int j = 0; j < numValues; j++) {
           vector[j] = dictionary.getFloatValue(dictIds[j]);
         }
         vectorIndexCreator.add(vector);
@@ -214,9 +240,17 @@ public class VectorIndexHandler extends BaseIndexHandler {
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         VectorIndexCreator vectorIndexCreator = StandardIndexes.vector().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
-      float[] vector = new float[columnMetadata.getMaxNumberOfMultiValues()];
+      int vectorDimension = config.getVectorDimension();
+      int bufferSize = Math.max(vectorDimension, columnMetadata.getMaxNumberOfMultiValues());
+      float[] readBuffer = new float[bufferSize];
+      float[] vector = new float[vectorDimension];
       for (int i = 0; i < numDocs; i++) {
-        forwardIndexReader.getFloatMV(i, vector, readerContext);
+        int numValues = forwardIndexReader.getFloatMV(i, readBuffer, readerContext);
+        Preconditions.checkState(numValues == vector.length,
+            "Vector column: %s expected %s values but found %s for docId: %s", columnName, vector.length, numValues,
+            i);
+        System.arraycopy(readBuffer, 0, vector, 0, vector.length);
+        vectorIndexCreator.add(vector);
       }
       vectorIndexCreator.seal();
     }

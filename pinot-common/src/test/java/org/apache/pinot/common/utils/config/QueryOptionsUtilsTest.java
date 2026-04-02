@@ -229,6 +229,9 @@ public class QueryOptionsUtilsTest {
     org.testng.Assert.assertTrue(QueryOptionsUtils.isVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "true")));
     org.testng.Assert.assertFalse(QueryOptionsUtils.isVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "false")));
     org.testng.Assert.assertFalse(QueryOptionsUtils.isVectorExactRerank(Map.of()));
+    assertEquals(QueryOptionsUtils.getVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "true")), Boolean.TRUE);
+    assertEquals(QueryOptionsUtils.getVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "false")), Boolean.FALSE);
+    assertNull(QueryOptionsUtils.getVectorExactRerank(Map.of()));
   }
 
   @Test

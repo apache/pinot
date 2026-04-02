@@ -35,6 +35,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -87,7 +88,7 @@ public class HnswVectorIndexReader implements VectorIndexReader {
    */
   private File getVectorIndexFile(File segmentIndexDir) {
     // will return null if file does not exist
-    File file = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, _column);
+    File file = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, _column, VectorBackendType.HNSW);
     if (file == null) {
       throw new IllegalStateException("Failed to find HNSW index file for column: " + _column);
     }

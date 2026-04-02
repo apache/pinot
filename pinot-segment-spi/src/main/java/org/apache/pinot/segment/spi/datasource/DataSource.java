@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -138,4 +139,13 @@ public interface DataSource {
    */
   @Nullable
   VectorIndexReader getVectorIndex();
+
+  /**
+   * Returns the configured vector index config for the column if present in table/index loading config,
+   * even when the segment does not currently have an ANN artifact on disk.
+   */
+  @Nullable
+  default VectorIndexConfig getVectorIndexConfig() {
+    return null;
+  }
 }

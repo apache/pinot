@@ -89,7 +89,7 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
     // Initialize nprobe to the default; query-time tuning should use NprobeAware#setNprobe.
     int configuredNprobe = DEFAULT_NPROBE;
 
-    File indexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, column);
+    File indexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, column, config);
     if (indexFile == null || !indexFile.exists()) {
       throw new IllegalStateException(
           "Failed to find IVF_FLAT index file for column: " + column + " in dir: " + indexDir

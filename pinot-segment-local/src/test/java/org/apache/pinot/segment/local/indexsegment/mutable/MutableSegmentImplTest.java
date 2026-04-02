@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -32,6 +34,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -224,6 +227,29 @@ public class MutableSegmentImplTest {
       assertEquals(freshSegment.getSegmentMetadata().getLatestIngestionTimestamp(), ingestionTimeMs);
     } finally {
       freshSegment.destroy();
+    }
+  }
+
+  @Test
+  public void testVectorIndexConfigOnMutableSegmentWithoutMutableVectorReader() {
+    Schema vectorSchema = new Schema.SchemaBuilder().setSchemaName("vectorSchema")
+        .addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addMultiValueDimension("embedding", FieldSpec.DataType.FLOAT)
+        .build();
+    VectorIndexConfig vectorIndexConfig =
+        new VectorIndexConfig(false, "IVF_PQ", 4, 1, VectorIndexConfig.VectorDistanceFunction.COSINE,
+            Map.of("nlist", "1", "pq_m", "2", "pq_nbits", "8"));
+    MutableSegmentImpl mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImplWithVectorIndexConfigs(vectorSchema, Set.of(), Set.of(),
+            Set.of(),
+            Map.of("embedding", vectorIndexConfig), null);
+    try {
+      DataSource dataSource = mutableSegment.getDataSource("embedding");
+      Assert.assertNull(dataSource.getVectorIndex(),
+          "IVF-based vector indexes should not build a mutable vector reader for consuming segments");
+      assertEquals(dataSource.getVectorIndexConfig(), vectorIndexConfig);
+    } finally {
+      mutableSegment.destroy();
     }
   }
 

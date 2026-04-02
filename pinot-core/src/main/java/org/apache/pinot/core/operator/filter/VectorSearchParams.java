@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 
 
 /**
@@ -38,10 +39,11 @@ public final class VectorSearchParams {
   public static final int DEFAULT_NPROBE = 4;
 
   /** Singleton instance with all defaults, used when no query options are specified. */
-  public static final VectorSearchParams DEFAULT = new VectorSearchParams(null, false, null);
+  public static final VectorSearchParams DEFAULT = new VectorSearchParams(null, null, null);
 
   private final int _nprobe;
-  private final boolean _exactRerank;
+  @Nullable
+  private final Boolean _exactRerankOverride;
   private final int _maxCandidates;
   private final boolean _maxCandidatesExplicit;
 
@@ -49,12 +51,14 @@ public final class VectorSearchParams {
    * Constructs search params from raw query option values.
    *
    * @param nprobe number of IVF probes, or null for default
-   * @param exactRerank whether to re-score ANN candidates with exact distance
+   * @param exactRerankOverride whether to re-score ANN candidates with exact distance, or null to use the backend
+   *                           default
    * @param maxCandidates max candidates before final top-K, or null for default (topK * 10)
    */
-  public VectorSearchParams(@Nullable Integer nprobe, boolean exactRerank, @Nullable Integer maxCandidates) {
+  public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
+      @Nullable Integer maxCandidates) {
     _nprobe = nprobe != null ? nprobe : DEFAULT_NPROBE;
-    _exactRerank = exactRerank;
+    _exactRerankOverride = exactRerankOverride;
     _maxCandidates = maxCandidates != null ? maxCandidates : 0;
     _maxCandidatesExplicit = maxCandidates != null;
   }
@@ -72,10 +76,10 @@ public final class VectorSearchParams {
     }
 
     Integer nprobe = QueryOptionsUtils.getVectorNprobe(queryOptions);
-    boolean exactRerank = QueryOptionsUtils.isVectorExactRerank(queryOptions);
+    Boolean exactRerank = QueryOptionsUtils.getVectorExactRerank(queryOptions);
     Integer maxCandidates = QueryOptionsUtils.getVectorMaxCandidates(queryOptions);
 
-    if (nprobe == null && !exactRerank && maxCandidates == null) {
+    if (nprobe == null && exactRerank == null && maxCandidates == null) {
       return DEFAULT;
     }
 
@@ -92,8 +96,13 @@ public final class VectorSearchParams {
   /**
    * Returns whether exact rerank is enabled.
    */
-  public boolean isExactRerank() {
-    return _exactRerank;
+  public boolean isExactRerank(VectorBackendType backendType) {
+    return _exactRerankOverride != null ? _exactRerankOverride : backendType.defaultExactRerankEnabled();
+  }
+
+  @Nullable
+  public Boolean getExactRerankOverride() {
+    return _exactRerankOverride;
   }
 
   /**
@@ -102,13 +111,17 @@ public final class VectorSearchParams {
    * Otherwise, returns {@code topK * 10} as the default.
    *
    * @param topK the top-K value from the predicate
+   * @param numDocs the number of documents in the segment
    * @return effective max candidates
    */
-  public int getEffectiveMaxCandidates(int topK) {
-    if (_maxCandidatesExplicit) {
-      return Math.max(_maxCandidates, topK);
+  public int getEffectiveMaxCandidates(int topK, int numDocs) {
+    int requested = _maxCandidatesExplicit ? _maxCandidates : topK * 10;
+    if (numDocs <= 0) {
+      return topK;
     }
-    return topK * 10;
+    int effectiveMaxCandidates = Math.max(topK, Math.min(requested, numDocs));
+    // Vector readers cannot return more candidates than the segment contains.
+    return Math.min(effectiveMaxCandidates, numDocs);
   }
 
   /**
@@ -120,7 +133,8 @@ public final class VectorSearchParams {
 
   @Override
   public String toString() {
-    return "VectorSearchParams{nprobe=" + _nprobe + ", exactRerank=" + _exactRerank
+    return "VectorSearchParams{nprobe=" + _nprobe + ", exactRerank="
+        + (_exactRerankOverride != null ? _exactRerankOverride : "backend_default")
         + ", maxCandidates=" + (_maxCandidatesExplicit ? _maxCandidates : "default(topK*10)") + '}';
   }
 }
