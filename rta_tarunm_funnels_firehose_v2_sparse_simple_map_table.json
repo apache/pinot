@@ -1,0 +1,67 @@
+{
+  "REALTIME": {
+    "tableName": "rta_tarunm_funnels_firehose_v2_sparse_REALTIME",
+    "tableType": "REALTIME",
+    "segmentsConfig": {
+      "peerSegmentDownloadScheme": "http",
+      "minimizeDataMovement": false,
+      "replicasPerPartition": "2",
+      "deletedSegmentsRetentionPeriod": "0d",
+      "replication": "2",
+      "retentionTimeUnit": "DAYS",
+      "timeColumnName": "created_at_epoch_ms",
+      "segmentPushType": "APPEND",
+      "segmentAssignmentStrategy": "replicagroup",
+      "timeType": "MILLISECONDS",
+      "retentionTimeValue": "2"
+    },
+    "tenants": {
+      "broker": "testBroker",
+      "server": "testServer"
+    },
+    "tableIndexConfig": {
+      "columnMajorSegmentBuilderEnabled": true,
+      "noDictionarySizeRatioThreshold": 0.85,
+      "rangeIndexVersion": 2,
+      "loadMode": "MMAP",
+      "aggregateMetrics": false,
+      "nullHandlingEnabled": true,
+      "streamConfigs": {
+        "stream.kafka.topic.name": "hp-funnels-analytics-hydrated-events",
+        "realtime.segment.flush.threshold.rows": "0",
+        "realtime.segment.flush.threshold.time": "86400000",
+        "realtime.segment.flush.threshold.segment.size": "200M",
+        "realtime.segment.flush.autotune.initialRows": "5000000",
+        "stream.kafka.decoder.class.name": "com.uber.uPinot.decoder.HeatpipeKafkaMessageDecoderV3",
+        "streamType": "kafka",
+        "stream.kafka.consumer.type": "simple",
+        "stream.kafka.consumer.prop.auto.offset.reset": "largest",
+        "stream.kafka.metadata.populate": "true",
+        "stream.kafka.broker.list": "kafka-agg1.phx.uber.internal:9443"
+      },
+      "invertedIndexColumns": [
+        "funnel_name",
+        "funnel_node",
+        "funnel_node_status"
+      ],
+      "rangeIndexColumns": [
+        "created_at_epoch_ms"
+      ]
+    },
+    "metadata": {},
+    "fieldConfigList": [],
+    "ingestionConfig": {
+      "continueOnError": false,
+      "retryOnSegmentBuildPrecheckFailure": true,
+      "rowTimeValueCheck": false,
+      "segmentTimeValueCheck": true,
+      "ingestionExceptionLogRateLimitPerMin": 5,
+      "transformConfigs": [],
+      "complexTypeConfig": {
+        "fieldsToUnnest": [],
+        "delimiter": "__"
+      }
+    },
+    "isDimTable": false
+  }
+}
