@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.codecs.lucene912.Lucene912Codec;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
@@ -35,7 +36,7 @@ public class VectorIndexUtils {
   }
 
   static void cleanupVectorIndex(File segDir, String column) {
-    // Remove the lucene index file and potentially the docId mapping file.
+    // Remove the lucene HNSW index files and docId mapping file.
     File luceneIndexFile = new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneIndexFile);
     File luceneV99IndexFile = new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION);
@@ -56,12 +57,37 @@ public class VectorIndexUtils {
     // Remove the IVF_FLAT index file
     File ivfFlatIndexFile = new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(ivfFlatIndexFile);
+
+    // Remove IVF_PQ index file
+    File ivfPqIndexFile = new File(segDir, column + Indexes.VECTOR_IVFPQ_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(ivfPqIndexFile);
   }
 
   static boolean hasVectorIndex(File segDir, String column) {
     return new File(segDir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION).exists();
+        || new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_IVFPQ_INDEX_FILE_EXTENSION).exists();
+  }
+
+  /**
+   * Returns the backend type of an existing vector index on disk, or null if none exists.
+   */
+  @Nullable
+  public static String detectVectorIndexBackend(File segDir, String column) {
+    if (new File(segDir, column + Indexes.VECTOR_IVFPQ_INDEX_FILE_EXTENSION).exists()) {
+      return "IVF_PQ";
+    }
+    if (new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION).exists()) {
+      return "IVF_FLAT";
+    }
+    if (new File(segDir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION).exists()) {
+      return "HNSW";
+    }
+    return null;
   }
 
   public static VectorSimilarityFunction toSimilarityFunction(

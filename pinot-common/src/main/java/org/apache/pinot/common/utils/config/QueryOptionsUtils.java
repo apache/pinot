@@ -680,4 +680,22 @@ public class QueryOptionsUtils {
     }
     return i;
   }
+
+  @Nullable
+  public static Integer getVectorNprobe(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.VECTOR_NPROBE);
+    if (value != null) {
+      return Integer.parseInt(value);
+    }
+    return null;
+  }
+
+  @Nullable
+  public static Boolean getVectorExactRerank(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK);
+    if (value != null) {
+      return Boolean.parseBoolean(value);
+    }
+    return null;
+  }
 }

@@ -291,6 +291,16 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         Files.copy(ivfFlatFile.toPath(), new File(v3Dir, ivfFlatFile.getName()).toPath());
       }
     }
+
+    // Copy IVF_PQ index files (single file per column)
+    String ivfPqSuffix = V1Constants.Indexes.VECTOR_IVFPQ_INDEX_FILE_EXTENSION;
+    File[] ivfPqFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(ivfPqSuffix));
+    if (ivfPqFiles != null) {
+      for (File ivfPqFile : ivfPqFiles) {
+        File v3IvfPqFile = new File(v3Dir, ivfPqFile.getName());
+        Files.copy(ivfPqFile.toPath(), v3IvfPqFile.toPath());
+      }
+    }
   }
 
   private void deleteStaleConversionDirectories(File segmentDirectory) {

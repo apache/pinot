@@ -29,6 +29,8 @@ package org.apache.pinot.segment.spi.index.creator;
  *       mutable and immutable segments.</li>
  *   <li>{@link #IVF_FLAT} - Inverted File with flat (uncompressed) vectors. Supported for
  *       immutable/offline segments only in phase 1.</li>
+ *   <li>{@link #IVF_PQ} - Inverted File with Product Quantization (compressed vectors).
+ *       Supported for immutable/offline segments only.</li>
  * </ul>
  */
 public enum VectorBackendType {
@@ -59,7 +61,20 @@ public enum VectorBackendType {
    *   <li>{@code minRowsForIndex} - minimum rows required to build the index</li>
    * </ul>
    */
-  IVF_FLAT("Inverted File with flat vectors");
+  IVF_FLAT("Inverted File with flat vectors"),
+
+  /**
+   * Inverted File with Product Quantization (compressed vectors).
+   *
+   * <p>Backend-specific properties:</p>
+   * <ul>
+   *   <li>{@code nlist} - number of Voronoi cells/clusters (default: 256)</li>
+   *   <li>{@code pqM} - number of sub-quantizers (must divide vectorDimension evenly)</li>
+   *   <li>{@code pqNbits} - number of bits per sub-quantizer code (1-8, default: 8)</li>
+   *   <li>{@code nprobe} - number of cells to probe at query time (default: 8)</li>
+   * </ul>
+   */
+  IVF_PQ("Inverted File with Product Quantization");
 
   private final String _description;
 
@@ -86,7 +101,7 @@ public enum VectorBackendType {
       return valueOf(value.toUpperCase());
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
-          "Unknown vector backend type: '" + value + "'. Supported types: HNSW, IVF_FLAT");
+          "Unknown vector backend type: '" + value + "'. Supported types: HNSW, IVF_FLAT, IVF_PQ");
     }
   }
 
