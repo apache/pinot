@@ -217,24 +217,36 @@ public class QueryThreadContext implements AutoCloseable {
     return new DecoratorExecutorService(executorService, onSubmit) {
       @Override
       protected <T> Callable<T> decorate(Callable<T> task) {
-        QueryThreadContext parentThreadContext = get();
-        return () -> {
-          try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
-              parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
-            return task.call();
-          }
-        };
+        // NOTE: When registerTaskForCancellation is false, the task may not come from query execution, in which case
+        //       the thread context might not be set up.
+        QueryThreadContext parentThreadContext = registerTaskForCancellation ? get() : getIfAvailable();
+        if (parentThreadContext != null) {
+          return () -> {
+            try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
+                parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
+              return task.call();
+            }
+          };
+        } else {
+          return task;
+        }
       }
 
       @Override
       protected Runnable decorate(Runnable task) {
-        QueryThreadContext parentThreadContext = get();
-        return () -> {
-          try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
-              parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
-            task.run();
-          }
-        };
+        // NOTE: When registerTaskForCancellation is false, the task may not come from query execution, in which case
+        //       the thread context might not be set up.
+        QueryThreadContext parentThreadContext = registerTaskForCancellation ? get() : getIfAvailable();
+        if (parentThreadContext != null) {
+          return () -> {
+            try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
+                parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
+              task.run();
+            }
+          };
+        } else {
+          return task;
+        }
       }
     };
   }
