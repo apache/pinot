@@ -104,6 +104,19 @@ public class FieldConfig extends BaseJsonConfig {
         timestampConfig, null, properties, null);
   }
 
+  /**
+   * Deprecated compatibility constructor retained for binary compatibility with callers that still construct
+   * {@link FieldConfig} directly with the enum-based compression codec.
+   */
+  @Deprecated
+  public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
+      @Nullable List<IndexType> indexTypes, @Nullable CompressionCodec compressionCodec,
+      @Nullable TimestampConfig timestampConfig, @Nullable JsonNode indexes,
+      @Nullable Map<String, String> properties, @Nullable JsonNode tierOverwrites) {
+    this(name, encodingType, indexType, indexTypes, CompressionCodecSpec.fromCompressionCodec(compressionCodec),
+        timestampConfig, indexes, properties, tierOverwrites);
+  }
+
   @JsonCreator
   public FieldConfig(@JsonProperty(value = "name", required = true) String name,
       @JsonProperty(value = "encodingType") EncodingType encodingType,

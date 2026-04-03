@@ -75,7 +75,7 @@ public class ForwardIndexConfig extends IndexConfig {
   }
 
   public static ForwardIndexConfig getDisabled() {
-    return new ForwardIndexConfig(true, null, null, null, null, null, null, null, null);
+    return new ForwardIndexConfig(true, (CompressionCodecSpec) null, null, null, null, null, null);
   }
 
   @JsonProperty("compressionCodec")
@@ -102,6 +102,20 @@ public class ForwardIndexConfig extends IndexConfig {
       @Nullable Map<String, Object> configs) {
     this(disabled, CompressionCodecSpec.fromCompressionCodec(compressionCodec), deriveNumDocsPerChunk,
         rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk, configs);
+  }
+
+  /**
+   * @deprecated Kept for binary compatibility with callers still constructing the config via legacy compression types.
+   */
+  @Deprecated
+  public ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
+      @Nullable ChunkCompressionType chunkCompressionType, @Nullable DictIdCompressionType dictIdCompressionType,
+      @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
+      @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk,
+      @Nullable Map<String, Object> configs) {
+    this(disabled, getActualCompressionCodecSpec(CompressionCodecSpec.fromCompressionCodec(compressionCodec),
+            chunkCompressionType, dictIdCompressionType), deriveNumDocsPerChunk, rawIndexWriterVersion,
+        targetMaxChunkSize, targetDocsPerChunk, configs);
   }
 
   private ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodecSpec compressionCodecSpec,
