@@ -1039,6 +1039,8 @@ public class ForwardIndexHandlerTest {
   public void testChangeCompressionLevelForSingleColumn()
       throws Exception {
     String column = RAW_LZ4_COLUMNS.get(0);
+    String metadataKey = V1Constants.MetadataKeys.Column.getKeyFor(column,
+        V1Constants.MetadataKeys.Column.FORWARD_INDEX_COMPRESSION_CODEC);
 
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
@@ -1054,9 +1056,7 @@ public class ForwardIndexHandlerTest {
     }
 
     PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(INDEX_DIR);
-    assertEquals(
-        metadataProperties.getString(V1Constants.MetadataKeys.Column.getKeyFor(column,
-            V1Constants.MetadataKeys.Column.FORWARD_INDEX_COMPRESSION_CODEC)), "LZ4(12)");
+    assertEquals(metadataProperties.getString(metadataKey), "LZ4(12)");
 
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
@@ -1065,6 +1065,33 @@ public class ForwardIndexHandlerTest {
 
       _fieldConfigMap.put(column, new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW)
           .withCompressionCodecSpec(CompressionCodecSpec.fromString("LZ4(12)")).build());
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertFalse(handler.needUpdateIndices(writer));
+    }
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(column, new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW)
+          .withCompressionCodecSpec(CompressionCodecSpec.fromString("LZ4")).build());
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertTrue(handler.needUpdateIndices(writer));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(INDEX_DIR);
+    assertNull(metadataProperties.getProperty(metadataKey));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(column, new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW)
+          .withCompressionCodecSpec(CompressionCodecSpec.fromString("LZ4")).build());
       ForwardIndexHandler handler = createForwardIndexHandler();
       assertFalse(handler.needUpdateIndices(writer));
     }

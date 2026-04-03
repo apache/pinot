@@ -676,7 +676,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   @Nullable
   private static String getForwardIndexCompressionCodecSpec(@Nullable ForwardIndexConfig forwardIndexConfig,
       boolean hasDictionary) {
-    if (hasDictionary || forwardIndexConfig == null || forwardIndexConfig.getCompressionCodecSpec() == null) {
+    if (hasDictionary || forwardIndexConfig == null || forwardIndexConfig.getCompressionCodecSpec() == null
+        || !forwardIndexConfig.getCompressionCodecSpec().hasLevel()) {
       return null;
     }
     return forwardIndexConfig.getCompressionCodecSpec().toConfigString();

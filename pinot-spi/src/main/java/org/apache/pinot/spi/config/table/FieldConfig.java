@@ -107,6 +107,8 @@ public class FieldConfig extends BaseJsonConfig {
   /**
    * Deprecated compatibility constructor retained for binary compatibility with callers that still construct
    * {@link FieldConfig} directly with the enum-based compression codec.
+   * Prefer {@link Builder} or the {@link CompressionCodecSpec}-based constructor for source callers, especially when
+   * the compression codec is unset, because {@code null} is ambiguous across the enum/spec overloads.
    */
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
