@@ -40,6 +40,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.memory.EmptyIndexBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
@@ -204,6 +205,9 @@ public class ColumnMinMaxValueGenerator {
     DataType storedType = dataType.getStoredType();
     boolean isSingleValue = columnMetadata.isSingleValue();
     PinotDataBuffer rawIndexBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.forward());
+    if (rawIndexBuffer instanceof EmptyIndexBuffer) {
+      return;
+    }
     try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.getInstance()
         .createIndexReader(rawIndexBuffer, columnMetadata);
         ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
