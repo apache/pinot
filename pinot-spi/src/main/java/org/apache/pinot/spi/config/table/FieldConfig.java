@@ -107,6 +107,8 @@ public class FieldConfig extends BaseJsonConfig {
   /**
    * Deprecated compatibility constructor retained for binary compatibility with callers that still construct
    * {@link FieldConfig} directly with the enum-based compression codec.
+   * Prefer {@link Builder} or the {@link CompressionCodecSpec}-based constructor for source callers, especially when
+   * the compression codec is unset, because {@code null} is ambiguous across the enum/spec overloads.
    */
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
@@ -118,7 +120,20 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   @JsonCreator
-  public FieldConfig(@JsonProperty(value = "name", required = true) String name,
+  public static FieldConfig fromJson(@JsonProperty(value = "name", required = true) String name,
+      @JsonProperty(value = "encodingType") EncodingType encodingType,
+      @JsonProperty(value = "indexType") @Nullable IndexType indexType,
+      @JsonProperty(value = "indexTypes") @Nullable List<IndexType> indexTypes,
+      @JsonProperty(value = "compressionCodec") @Nullable CompressionCodecSpec compressionCodecSpec,
+      @JsonProperty(value = "timestampConfig") @Nullable TimestampConfig timestampConfig,
+      @JsonProperty(value = "indexes") @Nullable JsonNode indexes,
+      @JsonProperty(value = "properties") @Nullable Map<String, String> properties,
+      @JsonProperty(value = "tierOverwrites") @Nullable JsonNode tierOverwrites) {
+    return new FieldConfig(name, encodingType, indexType, indexTypes, compressionCodecSpec, timestampConfig, indexes,
+        properties, tierOverwrites);
+  }
+
+  private FieldConfig(@JsonProperty(value = "name", required = true) String name,
       @JsonProperty(value = "encodingType") EncodingType encodingType,
       @JsonProperty(value = "indexType") @Nullable IndexType indexType,
       @JsonProperty(value = "indexTypes") @Nullable List<IndexType> indexTypes,

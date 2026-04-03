@@ -341,8 +341,8 @@ public abstract class BaseTransformFunctionTest {
     ObjectNode indexNode = JsonNodeFactory.instance.objectNode();
     indexNode.put("json", jsonIndexProps);
     FieldConfig jsonFieldConfig =
-        new FieldConfig(JSON_STRING_SV_COLUMN, FieldConfig.EncodingType.DICTIONARY, null, null, null, null, indexNode,
-            null, null);
+        new FieldConfig.Builder(JSON_STRING_SV_COLUMN).withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+            .withIndexes(indexNode).build();
     fieldConfigList.add(jsonFieldConfig);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN)

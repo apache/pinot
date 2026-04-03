@@ -280,10 +280,11 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       writeToForwardIndex(dictionary, context);
 
       // Setup and return the metadata properties to update
+      Map<String, String> metadataProperties = new HashMap<>();
       if (_dictionaryEnabled) {
-        return Map.of();
+        metadataProperties.put(getKeyFor(_columnName, FORWARD_INDEX_COMPRESSION_CODEC), null);
+        return metadataProperties;
       } else {
-        Map<String, String> metadataProperties = new HashMap<>();
         metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false));
         metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
         BaseSegmentCreator.addForwardIndexCompressionCodecInfo(metadataProperties, _columnName, _forwardIndexConfig,
@@ -378,7 +379,9 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       metadataProperties.put(getKeyFor(_columnName, MAX_MULTI_VALUE_ELEMENTS),
           String.valueOf(maxNumberOfMultiValues[0]));
       metadataProperties.put(getKeyFor(_columnName, TOTAL_NUMBER_OF_ENTRIES), String.valueOf(_nextValueId));
-      if (!_dictionaryEnabled) {
+      if (_dictionaryEnabled) {
+        metadataProperties.put(getKeyFor(_columnName, FORWARD_INDEX_COMPRESSION_CODEC), null);
+      } else {
         metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false));
         metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
         BaseSegmentCreator.addForwardIndexCompressionCodecInfo(metadataProperties, _columnName, _forwardIndexConfig,

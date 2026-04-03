@@ -91,8 +91,9 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
 
       // Create FieldConfig with the index configuration
       return List.of(
-          new FieldConfig(DOMAIN_NAMES_COL, EncodingType.DICTIONARY, null, null, null, null, indexes, null, null),
-          new FieldConfig(URL_COL, EncodingType.DICTIONARY, null, null, null, null, indexes, null, null));
+          new FieldConfig.Builder(DOMAIN_NAMES_COL).withEncodingType(EncodingType.DICTIONARY).withIndexes(indexes)
+              .build(),
+          new FieldConfig.Builder(URL_COL).withEncodingType(EncodingType.DICTIONARY).withIndexes(indexes).build());
     } catch (Exception e) {
       throw new RuntimeException("Failed to create field configs", e);
     }

@@ -24,6 +24,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -57,7 +59,32 @@ public class CompressionCodecSpecTest {
   }
 
   @Test
+  public void testSpecUtilitiesAndCapabilities() {
+    assertNull(CompressionCodecSpec.fromCompressionCodec(null));
+
+    CompressionCodecSpec snappySpec = CompressionCodecSpec.fromCompressionCodec(CompressionCodec.SNAPPY);
+    assertEquals(snappySpec.toString(), "SNAPPY");
+    assertFalse(snappySpec.hasLevel());
+    assertNull(snappySpec.getLevel());
+
+    assertTrue(CompressionCodecCapabilities.supportsLevel(CompressionCodec.ZSTANDARD));
+    assertFalse(CompressionCodecCapabilities.supportsLevel(CompressionCodec.SNAPPY));
+    assertEquals(CompressionCodecCapabilities.getMinLevel(CompressionCodec.GZIP), Integer.valueOf(0));
+    assertEquals(CompressionCodecCapabilities.getMaxLevel(CompressionCodec.LZ4), Integer.valueOf(17));
+    assertNull(CompressionCodecCapabilities.getMinLevel(CompressionCodec.PASS_THROUGH));
+    assertNull(CompressionCodecCapabilities.getMaxLevel(CompressionCodec.PASS_THROUGH));
+  }
+
+  @Test
   public void testRejectsInvalidSpecs() {
+    IllegalArgumentException nullSpec =
+        expectThrows(IllegalArgumentException.class, () -> CompressionCodecSpecParser.parse(null));
+    assertTrue(nullSpec.getMessage().contains("must not be null"));
+
+    IllegalArgumentException emptySpec =
+        expectThrows(IllegalArgumentException.class, () -> CompressionCodecSpecParser.parse("   "));
+    assertTrue(emptySpec.getMessage().contains("must not be empty"));
+
     IllegalArgumentException emptyLevel =
         expectThrows(IllegalArgumentException.class, () -> CompressionCodecSpecParser.parse("ZSTD()"));
     assertTrue(emptyLevel.getMessage().contains("non-empty integer"));
@@ -77,5 +104,17 @@ public class CompressionCodecSpecTest {
     IllegalArgumentException outOfRange =
         expectThrows(IllegalArgumentException.class, () -> CompressionCodecSpecParser.parse("LZ4(18)"));
     assertTrue(outOfRange.getMessage().contains("out of range"));
+
+    IllegalArgumentException malformed =
+        expectThrows(IllegalArgumentException.class, () -> CompressionCodecSpecParser.parse("ZSTD(3))"));
+    assertTrue(malformed.getMessage().contains("Expected CODEC or CODEC(level)"));
+
+    IllegalArgumentException invalidCodecToken =
+        expectThrows(IllegalArgumentException.class, () -> CompressionCodecSpecParser.parse("ZSTD-(3)"));
+    assertTrue(invalidCodecToken.getMessage().contains("Expected CODEC or CODEC(level)"));
+
+    IllegalArgumentException unknownAlias =
+        expectThrows(IllegalArgumentException.class, () -> CompressionCodecCapabilities.canonicalizeAlias("unknown"));
+    assertTrue(unknownAlias.getMessage().contains("Unknown compression codec 'UNKNOWN'"));
   }
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.spi.config.table.CompressionCodecSpec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -131,5 +132,72 @@ public class ForwardIndexConfigTest {
 
     assertEquals(config.getCompressionCodec(), FieldConfig.CompressionCodec.GZIP);
     assertEquals(config.getChunkCompressionType(), ChunkCompressionType.GZIP);
+  }
+
+  @Test
+  public void withLegacyDictIdCompressionType()
+      throws JsonProcessingException {
+    String confStr = "{\"dictIdCompressionType\": \"MV_ENTRY_DICT\"}";
+    ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
+
+    assertEquals(config.getCompressionCodec(), FieldConfig.CompressionCodec.MV_ENTRY_DICT);
+    assertEquals(config.getCompressionCodecSpec(), CompressionCodecSpec.fromString("MV_ENTRY_DICT"));
+    assertEquals(config.getDictIdCompressionType(), DictIdCompressionType.MV_ENTRY_DICT);
+    assertNull(config.getChunkCompressionType());
+  }
+
+  @Test
+  public void testDisabledAndLegacyCompatibilityHelpers() {
+    ForwardIndexConfig disabled = ForwardIndexConfig.getDisabled();
+    assertTrue(disabled.isDisabled());
+    assertNull(disabled.getCompressionCodec());
+    assertNull(disabled.getCompressionCodecSpec());
+
+    assertEquals(ForwardIndexConfig.getActualCompressionCodecSpec(null, ChunkCompressionType.GZIP, null),
+        CompressionCodecSpec.fromString("GZIP"));
+    IllegalArgumentException mixedCompressionFields = expectThrows(IllegalArgumentException.class,
+        () -> ForwardIndexConfig.getActualCompressionCodecSpec(CompressionCodecSpec.fromString("ZSTD(3)"),
+            ChunkCompressionType.SNAPPY, null));
+    assertTrue(mixedCompressionFields.getMessage().contains("must not be used together"));
+
+    IllegalArgumentException invalidCombination = expectThrows(IllegalArgumentException.class,
+        () -> ForwardIndexConfig.getActualCompressionCodec(null, ChunkCompressionType.SNAPPY,
+            DictIdCompressionType.MV_ENTRY_DICT));
+    assertTrue(invalidCombination.getMessage().contains("should not be used together"));
+  }
+
+  @Test
+  public void withMixedCompressionCodecFields()
+      throws JsonProcessingException {
+    String confStr = "{\"compressionCodec\": \"zstd(3)\", \"chunkCompressionType\": \"SNAPPY\"}";
+
+    JsonProcessingException mixedCompressionFields = expectThrows(JsonProcessingException.class,
+        () -> JsonUtils.stringToObject(confStr, ForwardIndexConfig.class));
+    assertTrue(mixedCompressionFields.getMessage().contains("must not be used together"));
+  }
+
+  @Test
+  public void testBuilderPreservesParameterizedSpecAcrossLegacyUpdates() {
+    ForwardIndexConfig preserved = new ForwardIndexConfig.Builder()
+        .withCompressionCodecSpec(CompressionCodecSpec.fromString("LZ4(12)"))
+        .withCompressionType(ChunkCompressionType.LZ4_LENGTH_PREFIXED)
+        .build();
+    assertEquals(preserved.getCompressionCodec(), FieldConfig.CompressionCodec.LZ4);
+    assertEquals(preserved.getCompressionCodecSpec(), CompressionCodecSpec.fromString("LZ4(12)"));
+    assertEquals(preserved.getChunkCompressionType(), ChunkCompressionType.LZ4);
+
+    ForwardIndexConfig replaced = new ForwardIndexConfig.Builder()
+        .withCompressionCodecSpec(CompressionCodecSpec.fromString("LZ4(12)"))
+        .withCompressionType(ChunkCompressionType.SNAPPY)
+        .build();
+    assertEquals(replaced.getCompressionCodec(), FieldConfig.CompressionCodec.SNAPPY);
+    assertEquals(replaced.getCompressionCodecSpec(), CompressionCodecSpec.fromString("SNAPPY"));
+
+    ForwardIndexConfig dictConfig = new ForwardIndexConfig.Builder()
+        .withDictIdCompressionType(DictIdCompressionType.MV_ENTRY_DICT)
+        .build();
+    assertEquals(dictConfig.getCompressionCodec(), FieldConfig.CompressionCodec.MV_ENTRY_DICT);
+    assertEquals(dictConfig.getCompressionCodecSpec(), CompressionCodecSpec.fromString("MV_ENTRY_DICT"));
+    assertEquals(dictConfig.getDictIdCompressionType(), DictIdCompressionType.MV_ENTRY_DICT);
   }
 }

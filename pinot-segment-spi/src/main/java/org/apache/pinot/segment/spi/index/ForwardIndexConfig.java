@@ -181,7 +181,7 @@ public class ForwardIndexConfig extends IndexConfig {
   }
 
   @JsonCreator
-  public ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
+  public static ForwardIndexConfig fromJson(@JsonProperty("disabled") @Nullable Boolean disabled,
       @JsonProperty("compressionCodec") @Nullable CompressionCodecSpec compressionCodecSpec,
       @Deprecated @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
       @Deprecated @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType,
@@ -190,18 +190,28 @@ public class ForwardIndexConfig extends IndexConfig {
       @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
       @JsonProperty("targetDocsPerChunk") @Nullable Integer targetDocsPerChunk,
       @JsonProperty("configs") @Nullable Map<String, Object> configs) {
-    this(disabled, getActualCompressionCodecSpec(compressionCodecSpec, chunkCompressionType, dictIdCompressionType),
+    return new ForwardIndexConfig(disabled,
+        getActualCompressionCodecSpec(compressionCodecSpec, chunkCompressionType, dictIdCompressionType),
         deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk, configs);
   }
 
   @Nullable
   public static CompressionCodecSpec getActualCompressionCodecSpec(@Nullable CompressionCodecSpec compressionCodecSpec,
       @Nullable ChunkCompressionType chunkCompressionType, @Nullable DictIdCompressionType dictIdCompressionType) {
+    validateCompressionCodecInputs(compressionCodecSpec, chunkCompressionType, dictIdCompressionType);
     if (compressionCodecSpec != null) {
       return compressionCodecSpec;
     }
     CompressionCodec compressionCodec = getActualCompressionCodec(null, chunkCompressionType, dictIdCompressionType);
     return CompressionCodecSpec.fromCompressionCodec(compressionCodec);
+  }
+
+  private static void validateCompressionCodecInputs(@Nullable CompressionCodecSpec compressionCodecSpec,
+      @Nullable ChunkCompressionType chunkCompressionType, @Nullable DictIdCompressionType dictIdCompressionType) {
+    if (compressionCodecSpec != null && (chunkCompressionType != null || dictIdCompressionType != null)) {
+      throw new IllegalArgumentException(
+          "compressionCodec must not be used together with deprecated chunkCompressionType or dictIdCompressionType");
+    }
   }
 
   public static CompressionCodec getActualCompressionCodec(@Nullable CompressionCodec compressionCodec,
