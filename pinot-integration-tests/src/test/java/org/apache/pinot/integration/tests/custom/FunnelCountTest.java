@@ -325,8 +325,6 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   // ---------- with WHERE filter ----------
-  // Uses user_id range so both segments contribute rows (avoids server-side NPE
-  // when a filter eliminates all rows from a segment).
   // WHERE user_id <= 7 → users 1-6 from segment 1, user 7 from segment 2
   // Expected: view=7, cart=6, checkout=4, purchase=3
   private static final long[] EXPECTED_FILTERED = {7, 6, 4, 3};
@@ -347,5 +345,53 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode rows = getRows(postQuery(filteredQuery(settings)));
     assertEquals(rows.size(), 1);
     assertStepCounts(rows.get(0).get(0), EXPECTED_FILTERED);
+  }
+
+  // ---------- WHERE filter eliminates one segment entirely ----------
+  // WHERE user_id >= 7 → segment 1 (users 1-6) has zero matching rows,
+  // segment 2 (users 7-12) contributes all rows. Tests that merging a
+  // null-path intermediate result with real data produces correct counts.
+  // Expected: view=6, cart=5, checkout=3, purchase=1
+  private static final long[] EXPECTED_ONE_SEGMENT = {6, 5, 3, 1};
+
+  private String oneSegmentFilteredQuery(String settings) {
+    return overallQuery(settings) + " WHERE " + USER_ID_COL + " >= 7";
+  }
+
+  @Test(dataProvider = "allStrategies")
+  public void testFilterEliminesOneSegment(String settings)
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(oneSegmentFilteredQuery(settings)));
+    assertOverallResult(rows, EXPECTED_ONE_SEGMENT);
+  }
+
+  // ---------- WHERE clause filters out ALL rows ----------
+
+  private static final long[] EXPECTED_ALL_FILTERED = {0, 0, 0, 0};
+
+  private String emptyResultQuery(String settings) {
+    return overallQuery(settings) + " WHERE " + USER_ID_COL + " > 100";
+  }
+
+  private String emptyResultGroupByQuery(String settings) {
+    return String.format("SELECT %s, %s FROM %s WHERE %s > 100 GROUP BY %s ORDER BY %s",
+        CATEGORY_COL, funnelCountAggregation(settings), TABLE_NAME, USER_ID_COL, CATEGORY_COL, CATEGORY_COL);
+  }
+
+  @Test(dataProvider = "allStrategies")
+  public void testEmptyResultOverall(String settings)
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(emptyResultQuery(settings)));
+    assertOverallResult(rows, EXPECTED_ALL_FILTERED);
+  }
+
+  @Test(dataProvider = "allStrategies")
+  public void testEmptyResultGroupBy(String settings)
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(emptyResultGroupByQuery(settings)));
+    assertEquals(rows.size(), 0, "Expected zero groups when all rows are filtered");
   }
 }

@@ -35,6 +35,13 @@ class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIds
 
   @Override
   public List<RoaringBitmap> extractIntermediateResult(DictIdsWrapper dictIdsWrapper) {
+    if (dictIdsWrapper == null) {
+      List<RoaringBitmap> result = new ArrayList<>(_numSteps);
+      for (int i = 0; i < _numSteps; i++) {
+        result.add(new RoaringBitmap());
+      }
+      return result;
+    }
     Dictionary dictionary = dictIdsWrapper._dictionary;
     List<RoaringBitmap> result = new ArrayList<>(_numSteps);
     for (RoaringBitmap dictIdBitmap : dictIdsWrapper._stepsBitmaps) {
