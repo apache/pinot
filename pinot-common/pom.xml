@@ -32,6 +32,7 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <thrift.bin.path>/usr/local/bin/thrift</thrift.bin.path>
+    <jdk.version>11</jdk.version>
   </properties>
 
   <build>
