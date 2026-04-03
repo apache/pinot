@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.CompressionCodecSpec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -219,6 +220,28 @@ public class IndexLoadingConfigTest {
     assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), 4);
     assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), "100K");
     assertEquals(forwardIndexConfig.getTargetDocsPerChunk(), 100);
+
+    //@formatter:off
+    col1CfgStr = "{"
+        + "  \"name\": \"col1\","
+        + "  \"encodingType\": \"RAW\","
+        + "  \"indexes\": {"
+        + "    \"forward\": {"
+        + "      \"compressionCodec\": \"zstd(3)\""
+        + "    }"
+        + "  }"
+        + "}";
+    //@formatter:on
+    col1Cfg = JsonUtils.stringToObject(col1CfgStr, FieldConfig.class);
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setFieldConfigList(List.of(col1Cfg)).build();
+    indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    indexConfigs = indexLoadingConfig.getFieldIndexConfig("col1");
+    assertNotNull(indexConfigs);
+    forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
+    assertEquals(forwardIndexConfig.getCompressionCodec(), FieldConfig.CompressionCodec.ZSTANDARD);
+    assertEquals(forwardIndexConfig.getCompressionCodecSpec(),
+        CompressionCodecSpec.of(FieldConfig.CompressionCodec.ZSTANDARD, 3));
 
     // Check disabled settings
     //@formatter:off

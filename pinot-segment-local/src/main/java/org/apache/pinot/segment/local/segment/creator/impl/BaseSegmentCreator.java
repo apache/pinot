@@ -537,8 +537,12 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       ColumnIndexCreationInfo columnIndexCreationInfo = entry.getValue();
       SegmentDictionaryCreator dictionaryCreator = _colIndexes.get(column).getDictionaryCreator();
       int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerEntry() : 0;
+      FieldIndexConfigs fieldIndexConfigs = _config.getIndexConfigsByColName().get(column);
       addColumnMetadataInfo(properties, column, columnIndexCreationInfo, _totalDocs, _schema.getFieldSpecFor(column),
           dictionaryCreator != null, dictionaryElementSize);
+      addForwardIndexCompressionCodecInfo(properties, column,
+          fieldIndexConfigs != null ? fieldIndexConfigs.getConfig(StandardIndexes.forward()) : null,
+          dictionaryCreator != null);
     }
 
     SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();
@@ -645,6 +649,37 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     if (defaultNullValue != null) {
       properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
     }
+  }
+
+  /**
+   * Adds the canonical compression codec specification for explicit raw forward index compression settings.
+   */
+  public static void addForwardIndexCompressionCodecInfo(PropertiesConfiguration properties, String column,
+      @Nullable ForwardIndexConfig forwardIndexConfig, boolean hasDictionary) {
+    String compressionCodecSpec = getForwardIndexCompressionCodecSpec(forwardIndexConfig, hasDictionary);
+    if (compressionCodecSpec != null) {
+      properties.setProperty(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), compressionCodecSpec);
+    }
+  }
+
+  /**
+   * Adds the canonical compression codec specification for explicit raw forward index compression settings.
+   */
+  public static void addForwardIndexCompressionCodecInfo(Map<String, String> metadataProperties, String column,
+      @Nullable ForwardIndexConfig forwardIndexConfig, boolean hasDictionary) {
+    String compressionCodecSpec = getForwardIndexCompressionCodecSpec(forwardIndexConfig, hasDictionary);
+    if (compressionCodecSpec != null) {
+      metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), compressionCodecSpec);
+    }
+  }
+
+  @Nullable
+  private static String getForwardIndexCompressionCodecSpec(@Nullable ForwardIndexConfig forwardIndexConfig,
+      boolean hasDictionary) {
+    if (hasDictionary || forwardIndexConfig == null || forwardIndexConfig.getCompressionCodecSpec() == null) {
+      return null;
+    }
+    return forwardIndexConfig.getCompressionCodecSpec().toConfigString();
   }
 
   /**

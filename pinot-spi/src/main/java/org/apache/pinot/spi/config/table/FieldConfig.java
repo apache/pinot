@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
@@ -76,6 +77,8 @@ public class FieldConfig extends BaseJsonConfig {
   private final List<IndexType> _indexTypes;
   private final JsonNode _indexes;
   private final JsonNode _tierOverwrites;
+  @JsonProperty("compressionCodec")
+  private final CompressionCodecSpec _compressionCodecSpec;
   private final CompressionCodec _compressionCodec;
   private final Map<String, String> _properties;
   private final TimestampConfig _timestampConfig;
@@ -83,19 +86,22 @@ public class FieldConfig extends BaseJsonConfig {
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
       @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
-    this(name, encodingType, indexType, null, compressionCodec, null, null, properties, null);
+    this(name, encodingType, indexType, null, CompressionCodecSpec.fromCompressionCodec(compressionCodec), null, null,
+        properties, null);
   }
 
   public FieldConfig(String name, EncodingType encodingType, @Nullable List<IndexType> indexTypes,
       @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
-    this(name, encodingType, null, indexTypes, compressionCodec, null, null, properties, null);
+    this(name, encodingType, null, indexTypes, CompressionCodecSpec.fromCompressionCodec(compressionCodec), null, null,
+        properties, null);
   }
 
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
       @Nullable List<IndexType> indexTypes, @Nullable CompressionCodec compressionCodec,
       @Nullable TimestampConfig timestampConfig, @Nullable Map<String, String> properties) {
-    this(name, encodingType, indexType, indexTypes, compressionCodec, timestampConfig, null, properties, null);
+    this(name, encodingType, indexType, indexTypes, CompressionCodecSpec.fromCompressionCodec(compressionCodec),
+        timestampConfig, null, properties, null);
   }
 
   @JsonCreator
@@ -103,7 +109,7 @@ public class FieldConfig extends BaseJsonConfig {
       @JsonProperty(value = "encodingType") EncodingType encodingType,
       @JsonProperty(value = "indexType") @Nullable IndexType indexType,
       @JsonProperty(value = "indexTypes") @Nullable List<IndexType> indexTypes,
-      @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
+      @JsonProperty(value = "compressionCodec") @Nullable CompressionCodecSpec compressionCodecSpec,
       @JsonProperty(value = "timestampConfig") @Nullable TimestampConfig timestampConfig,
       @JsonProperty(value = "indexes") @Nullable JsonNode indexes,
       @JsonProperty(value = "properties") @Nullable Map<String, String> properties,
@@ -113,7 +119,8 @@ public class FieldConfig extends BaseJsonConfig {
     _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
     _indexTypes =
         indexTypes != null ? indexTypes : (indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
-    _compressionCodec = compressionCodec;
+    _compressionCodecSpec = compressionCodecSpec;
+    _compressionCodec = compressionCodecSpec != null ? compressionCodecSpec.getCodec() : null;
     _timestampConfig = timestampConfig;
     _properties = properties;
     _indexes = indexes == null ? NullNode.getInstance() : indexes;
@@ -198,8 +205,15 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   @Nullable
+  @JsonIgnore
   public CompressionCodec getCompressionCodec() {
     return _compressionCodec;
+  }
+
+  @Nullable
+  @JsonIgnore
+  public CompressionCodecSpec getCompressionCodecSpec() {
+    return _compressionCodecSpec;
   }
 
   @Nullable
@@ -217,6 +231,7 @@ public class FieldConfig extends BaseJsonConfig {
     private EncodingType _encodingType;
     private List<IndexType> _indexTypes;
     private JsonNode _indexes;
+    private CompressionCodecSpec _compressionCodecSpec;
     private CompressionCodec _compressionCodec;
     private Map<String, String> _properties;
     private TimestampConfig _timestampConfig;
@@ -231,6 +246,7 @@ public class FieldConfig extends BaseJsonConfig {
       _encodingType = other._encodingType;
       _indexTypes = other._indexTypes;
       _indexes = other._indexes;
+      _compressionCodecSpec = other._compressionCodecSpec;
       _compressionCodec = other._compressionCodec;
       _properties = other._properties;
       _timestampConfig = other._timestampConfig;
@@ -258,7 +274,14 @@ public class FieldConfig extends BaseJsonConfig {
     }
 
     public Builder withCompressionCodec(CompressionCodec compressionCodec) {
+      _compressionCodecSpec = CompressionCodecSpec.fromCompressionCodec(compressionCodec);
       _compressionCodec = compressionCodec;
+      return this;
+    }
+
+    public Builder withCompressionCodecSpec(CompressionCodecSpec compressionCodecSpec) {
+      _compressionCodecSpec = compressionCodecSpec;
+      _compressionCodec = compressionCodecSpec != null ? compressionCodecSpec.getCodec() : null;
       return this;
     }
 
@@ -278,8 +301,9 @@ public class FieldConfig extends BaseJsonConfig {
     }
 
     public FieldConfig build() {
-      return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig, _indexes,
-          _properties, _tierOverwrites);
+      return new FieldConfig(_name, _encodingType, null, _indexTypes,
+          _compressionCodecSpec != null ? _compressionCodecSpec : CompressionCodecSpec.fromCompressionCodec(
+              _compressionCodec), _timestampConfig, _indexes, _properties, _tierOverwrites);
     }
   }
 }
