@@ -31,7 +31,10 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
@@ -144,5 +147,71 @@ public class PinotAdminClientTest {
 
     String resp = _adminClient.getTableClient().deleteTable("tbl1_OFFLINE");
     assertEquals(new ObjectMapper().readTree(resp).get("status").asText(), "DELETED");
+  }
+
+  @Test
+  public void testGetAggregateMetadataUsesMetadataEndpoint()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("{\"columnIndexSizeMap\":{}}");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(mockResponse);
+
+    _adminClient.getTableClient().getAggregateMetadata("tbl1_OFFLINE", "Carrier,TailNum");
+
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS),
+        eq("/tables/tbl1/metadata?type=OFFLINE&columns=Carrier&columns=TailNum"), isNull(), eq(HEADERS));
+  }
+
+  @Test
+  public void testGetForceCommitJobStatusUsesPathParameter()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("{\"jobId\":\"job-123\"}");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(mockResponse);
+
+    _adminClient.getTableClient().getForceCommitJobStatus("job-123");
+
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/tables/forceCommitStatus/job-123"), isNull(),
+        eq(HEADERS));
+  }
+
+  @Test
+  public void testSegmentDownloadUsesControllerDownloadEndpoint()
+      throws Exception {
+    lenient().when(_mockTransport.executeGetBinary(anyString(), anyString(), any(), any()))
+        .thenReturn(new byte[]{1, 2, 3});
+
+    _adminClient.getSegmentClient().downloadSegment("tbl1_OFFLINE", "segmentA");
+
+    verify(_mockTransport).executeGetBinary(eq(CONTROLLER_ADDRESS), eq("/segments/tbl1/segmentA"),
+        isNull(), eq(HEADERS));
+  }
+
+  @Test
+  public void testFilteredSegmentsMetadataUsesRepeatedQueryParams()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("{}");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(mockResponse);
+
+    _adminClient.getSegmentClient()
+        .getSegmentsMetadata("tbl1", List.of("Carrier", "TailNum"), List.of("segmentA", "segmentB"), "OFFLINE");
+
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS),
+        eq("/segments/tbl1/metadata?type=OFFLINE&columns=Carrier&columns=TailNum&segments=segmentA&segments=segmentB"),
+        isNull(), eq(HEADERS));
+  }
+
+  @Test
+  public void testSegmentMetadataUsesRepeatedColumnQueryParams()
+      throws Exception {
+    JsonNode mockResponse = new ObjectMapper().readTree("{\"segment.total.docs\":\"10\"}");
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(mockResponse);
+
+    _adminClient.getSegmentClient().getSegmentMetadata("tbl1_OFFLINE", "segmentA", List.of("Carrier", "TailNum"));
+
+    verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS),
+        eq("/segments/tbl1_OFFLINE/segmentA/metadata?columns=Carrier&columns=TailNum"), isNull(), eq(HEADERS));
   }
 }

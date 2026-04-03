@@ -579,11 +579,13 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
 
   private void pauseConsumptionAndWait(String realtimeTableName)
       throws Exception {
-    getControllerRequestClient().pauseConsumption(realtimeTableName);
+    getOrCreateAdminClient().getTableClient().pauseConsumption(realtimeTableName);
     // After a successful pause no segments should remain in CONSUMING state
     TestUtils.waitForCondition(aVoid -> {
       try {
-        PauseStatusDetails details = getControllerRequestClient().getPauseStatusDetails(realtimeTableName);
+        PauseStatusDetails details = JsonUtils.stringToObject(
+            getOrCreateAdminClient().getTableClient().getPauseStatus(realtimeTableName),
+            PauseStatusDetails.class);
         return details != null && details.getPauseFlag()
             && (details.getConsumingSegments() == null || details.getConsumingSegments().isEmpty());
       } catch (Exception e) {
@@ -594,10 +596,12 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
 
   private void resumeConsumptionAndWait(String realtimeTableName)
       throws Exception {
-    getControllerRequestClient().resumeConsumption(realtimeTableName);
+    getOrCreateAdminClient().getTableClient().resumeConsumption(realtimeTableName, null);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        PauseStatusDetails details = getControllerRequestClient().getPauseStatusDetails(realtimeTableName);
+        PauseStatusDetails details = JsonUtils.stringToObject(
+            getOrCreateAdminClient().getTableClient().getPauseStatus(realtimeTableName),
+            PauseStatusDetails.class);
         return details != null && !details.getPauseFlag();
       } catch (Exception e) {
         return false;

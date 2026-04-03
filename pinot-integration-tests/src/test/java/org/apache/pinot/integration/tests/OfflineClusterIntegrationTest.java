@@ -54,6 +54,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
@@ -316,7 +317,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
-      throws IOException {
+      throws Exception {
     // Try to refresh all the segments again with force download from the controller URI.
     String reloadJob = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, forceDownload);
     TestUtils.waitForCondition(aVoid -> {
@@ -348,17 +349,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testInvalidTableConfig() {
+  public void testInvalidTableConfig()
+      throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("badTable").build();
     ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
     // Remove a mandatory field
     tableConfigJson.remove(TableConfig.VALIDATION_CONFIG_KEY);
     try {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfigJson.toString());
+      getOrCreateAdminClient().getTableClient().createTable(tableConfigJson.toString(), null);
       fail();
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Should get response code 400 (BAD_REQUEST)
-      assertTrue(e.getMessage().contains("Got error status code: 400"));
+      assertTrue(e.getMessage().contains("400"));
     }
   }
 
@@ -475,7 +477,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         TableNameBuilder.extractRawTableName(offlineTableName));
     parameters.add(tableNameParameter);
 
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getOrCreateAdminClient().getSegmentUploadUrl());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       // Refresh non-existing segment
       File segmentTarFile = segmentTarFiles[0];
@@ -1897,8 +1899,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Trigger reload and verify column count
     reloadAllSegments(TEST_EXTRA_COLUMNS_QUERY, false, numTotalDocs);
-    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    String segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 104);
@@ -1906,11 +1909,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 104);
 
     // Verify the index sizes
-    JsonNode columnIndexSizeMap = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(),
-                List.of("DivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDsString",
-                    "NewAddedRawDerivedStringDimension", "NewAddedRawDerivedMVIntDimension",
-                    "NewAddedDerivedNullString"))))
+    String aggregateMetadata = getOrCreateAdminClient().getTableClient()
+        .getAggregateMetadata(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()),
+            String.join(",", List.of("DivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDs",
+                "NewAddedDerivedDivAirportSeqIDsString", "NewAddedRawDerivedStringDimension",
+                "NewAddedRawDerivedMVIntDimension", "NewAddedDerivedNullString")));
+    JsonNode columnIndexSizeMap = JsonUtils.stringToJsonNode(aggregateMetadata)
         .get("columnIndexSizeMap");
     assertEquals(columnIndexSizeMap.size(), 6);
     JsonNode originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");
@@ -1965,8 +1969,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Trigger reload and verify column count
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
-    segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 75);
@@ -2290,8 +2295,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Trigger reload and verify column count doesn't change in query but changes in segment metadata
     reloadAllSegments(TEST_REGULAR_COLUMNS_QUERY, false, numTotalDocs);
     assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 79);
-    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    String segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 81);
@@ -2309,8 +2315,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     reloadAllSegments(TEST_REGULAR_COLUMNS_QUERY, false, numTotalDocs);
     assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 79);
-    segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 79);
@@ -3115,18 +3122,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void testInstanceDecommission()
       throws Exception {
     // Fetch all instances
-    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-    JsonNode instanceList = response.get("instances");
+    List<String> instanceList = getOrCreateAdminClient().getInstanceClient().listInstances();
     int numInstances = instanceList.size();
     // The total number of instances is equal to the sum of num brokers, num servers and 1 controller.
     assertEquals(numInstances, getNumBrokers() + getNumServers() + 1);
 
     // Try to delete a server that does not exist
-    String deleteInstanceRequest = _controllerRequestURLBuilder.forInstance("potato");
     try {
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance("potato");
       fail("Delete should have returned a failure status (404)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 404 status code
     }
 
@@ -3134,7 +3139,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String serverName = null;
     String brokerName = null;
     for (int i = 0; i < numInstances; i++) {
-      String instanceId = instanceList.get(i).asText();
+      String instanceId = instanceList.get(i);
       InstanceType instanceType = InstanceTypeUtils.getInstanceType(instanceId);
       if (instanceType == InstanceType.SERVER) {
         serverName = instanceId;
@@ -3144,11 +3149,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Try to delete a live server
-    deleteInstanceRequest = _controllerRequestURLBuilder.forInstance(serverName);
     try {
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance(serverName);
       fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 409 status code
     }
 
@@ -3157,9 +3161,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Try to delete a server whose information is still on the ideal state
     try {
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance(serverName);
       fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 409 status code
     }
 
@@ -3167,15 +3171,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     dropOfflineTable(getTableName());
 
     // Now, delete server should work
-    response = JsonUtils.stringToJsonNode(sendDeleteRequest(deleteInstanceRequest));
-    assertTrue(response.has("status"));
+    String deleteResponse = getOrCreateAdminClient().getInstanceClient().dropInstance(serverName);
+    assertNotNull(deleteResponse);
 
     // Try to delete a broker whose information is still live
     try {
-      deleteInstanceRequest = _controllerRequestURLBuilder.forInstance(brokerName);
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance(brokerName);
       fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 409 status code
     }
 
