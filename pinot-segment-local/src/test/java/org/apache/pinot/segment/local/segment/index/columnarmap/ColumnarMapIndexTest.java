@@ -858,19 +858,21 @@ public class ColumnarMapIndexTest {
       // getDistinctValuesForKey - color (sorted)
       String[] colorValues = reader.getDistinctValuesForKey("color");
       assertNotNull(colorValues);
-      assertEquals(colorValues.length, 3);
-      // Values should be sorted
-      assertEquals(colorValues[0], "blue");
-      assertEquals(colorValues[1], "green");
-      assertEquals(colorValues[2], "red");
+      assertEquals(colorValues.length, 4);
+      // Values should be sorted (includes default value "")
+      assertEquals(colorValues[0], "");
+      assertEquals(colorValues[1], "blue");
+      assertEquals(colorValues[2], "green");
+      assertEquals(colorValues[3], "red");
 
-      // getDistinctValuesForKey - size (sorted)
+      // getDistinctValuesForKey - size (sorted, includes default "0")
       String[] sizeValues = reader.getDistinctValuesForKey("size");
       assertNotNull(sizeValues);
-      assertEquals(sizeValues.length, 3);
-      assertEquals(sizeValues[0], "10");
-      assertEquals(sizeValues[1], "20");
-      assertEquals(sizeValues[2], "30");
+      assertEquals(sizeValues.length, 4);
+      assertEquals(sizeValues[0], "0");
+      assertEquals(sizeValues[1], "10");
+      assertEquals(sizeValues[2], "20");
+      assertEquals(sizeValues[3], "30");
     }
   }
 
@@ -967,10 +969,10 @@ public class ColumnarMapIndexTest {
           new ColumnarMapDataSource(buildColumnMetadata(fieldSpec, 3), reader).getKeyDataSource("status");
       assertNotNull(ds);
 
-      // Dictionary contains only actual values (no default value in sparse dictId)
+      // Dictionary contains actual values plus default: "", "active", "inactive" (sorted)
       org.apache.pinot.segment.spi.index.reader.Dictionary dict = ds.getDictionary();
       assertNotNull(dict, "Dictionary should be present when inverted index is available");
-      assertEquals(dict.length(), 2); // "active", "inactive"
+      assertEquals(dict.length(), 3); // "", "active", "inactive"
       assertTrue(dict.indexOf("active") >= 0);
       assertTrue(dict.indexOf("inactive") >= 0);
 
@@ -1053,11 +1055,12 @@ public class ColumnarMapIndexTest {
       ColumnarMapKeyDictionary dict = reader.getKeyDictionary("color");
       assertNotNull(dict, "Key dictionary should be available");
 
-      // Dictionary contains only actual values: "blue", "green", "red" (sorted, no default)
-      assertEquals(dict.length(), 3);
-      assertEquals(dict.get(0), "blue");
-      assertEquals(dict.get(1), "green");
-      assertEquals(dict.get(2), "red");
+      // Dictionary contains actual values plus default value: "", "blue", "green", "red" (sorted)
+      assertEquals(dict.length(), 4);
+      assertEquals(dict.get(0), "");
+      assertEquals(dict.get(1), "blue");
+      assertEquals(dict.get(2), "green");
+      assertEquals(dict.get(3), "red");
 
       // DictId forward index is sparse: 4 entries for docs 0,1,2,4 (doc 3 absent)
       int redId = dict.indexOf("red");
@@ -1123,7 +1126,10 @@ public class ColumnarMapIndexTest {
       assertEquals(dict.getStringValue(dictIdBuffer[0]), "active");
       assertEquals(dict.getStringValue(dictIdBuffer[1]), "inactive");
       assertEquals(dict.getStringValue(dictIdBuffer[2]), "active");
-      assertEquals(dictIdBuffer[3], Dictionary.NULL_VALUE_INDEX, "Absent doc should get NULL_VALUE_INDEX");
+      // Absent doc gets default value's dictId (not NULL_VALUE_INDEX)
+      int defaultDictId = dict.indexOf(ColumnarMapKeyDictionary.getDefaultValueString(FieldSpec.DataType.STRING));
+      assertTrue(defaultDictId >= 0, "Default value should be in dictionary");
+      assertEquals(dictIdBuffer[3], defaultDictId, "Absent doc should get default value dictId");
       assertEquals(dict.getStringValue(dictIdBuffer[4]), "pending");
 
       // Verify same dictIds for same values
@@ -1187,10 +1193,14 @@ public class ColumnarMapIndexTest {
       int[] dictIdBuffer = new int[5];
       fwd.readDictIds(sparseDocIds, 5, dictIdBuffer, null);
 
+      // Absent docs get default value's dictId
+      int defaultDictId = dict.indexOf(ColumnarMapKeyDictionary.getDefaultValueString(FieldSpec.DataType.STRING));
+      assertTrue(defaultDictId >= 0, "Default value should be in dictionary");
+
       assertEquals(dict.getStringValue(dictIdBuffer[0]), "red");    // doc 0 present
       assertEquals(dict.getStringValue(dictIdBuffer[1]), "green");  // doc 3 present
-      assertEquals(dictIdBuffer[2], Dictionary.NULL_VALUE_INDEX);   // doc 7 absent
-      assertEquals(dictIdBuffer[3], Dictionary.NULL_VALUE_INDEX);   // doc 15 absent
+      assertEquals(dictIdBuffer[2], defaultDictId);                 // doc 7 absent
+      assertEquals(dictIdBuffer[3], defaultDictId);                 // doc 15 absent
       assertEquals(dict.getStringValue(dictIdBuffer[4]), "blue");   // doc 19 present
 
       // Case 2: all docIds absent
@@ -1198,7 +1208,7 @@ public class ColumnarMapIndexTest {
       int[] absentBuffer = new int[5];
       fwd.readDictIds(absentDocIds, 5, absentBuffer, null);
       for (int i = 0; i < 5; i++) {
-        assertEquals(absentBuffer[i], Dictionary.NULL_VALUE_INDEX,
+        assertEquals(absentBuffer[i], defaultDictId,
             "Doc " + absentDocIds[i] + " should be absent");
       }
 

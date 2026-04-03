@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -406,7 +405,7 @@ public class OnHeapColumnarMapIndexCreator implements ColumnarMapIndexCreator {
           valueToDocIds = buildValueToDocIds(presence, values, storedType);
           cachedValueToDocIds.put(key, valueToDocIds);
 
-          byte[] dictIdFwdBytes = buildDictIdForwardIndex(valueToDocIds, storedType, presence);
+          byte[] dictIdFwdBytes = buildDictIdForwardIndex(valueToDocIds, storedType, presence, values);
           dictIdFwdOffset = currentOffset;
           dictIdFwdLength = dictIdFwdBytes.length;
           dos.write(dictIdFwdBytes);
@@ -572,7 +571,7 @@ public class OnHeapColumnarMapIndexCreator implements ColumnarMapIndexCreator {
   /// Uses presence bitmap rank to map docId → ordinal, same as the raw forward index.
   /// This preserves the space benefit of columnar_map by not wasting space on absent docs.
   private byte[] buildDictIdForwardIndex(TreeMap<String, RoaringBitmap> valueToDocIds,
-      DataType storedType, RoaringBitmap presence)
+      DataType storedType, RoaringBitmap presence, List<Object> valueList)
       throws IOException {
     // Ensure the default value is in the dictionary so absent docs can map to it at query time.
     // This matches Pinot's standard nullable column behavior where nulls get the default value's dictId.
@@ -591,23 +590,14 @@ public class OnHeapColumnarMapIndexCreator implements ColumnarMapIndexCreator {
     int numDocsForKey = (int) presence.getCardinality();
     int numBitsPerValue = PinotDataBitSet.getNumBitsPerValue(Math.max(distinctValues.length - 1, 0));
 
-    // Build sparse dictId array: one entry per doc that has the key, in bitmap iteration order
+    // Build sparse dictId array: one entry per doc that has the key, in bitmap iteration order.
+    // Use ordinal-indexed _values list for O(N) instead of brute-force O(N*K).
     int[] dictIdArray = new int[numDocsForKey];
-    int ordinal = 0;
-    for (int docId : presence) {
-      // Find which value this doc has by checking valueToDocIds bitmaps
-      boolean found = false;
-      for (Map.Entry<String, RoaringBitmap> entry : valueToDocIds.entrySet()) {
-        if (entry.getValue().contains(docId)) {
-          dictIdArray[ordinal] = valueToDictId.get(entry.getKey());
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        dictIdArray[ordinal] = 0;
-      }
-      ordinal++;
+    for (int ordinal = 0; ordinal < numDocsForKey; ordinal++) {
+      Object value = valueList.get(ordinal);
+      String strValue = storedType.toString(value);
+      Integer dictId = valueToDictId.get(strValue);
+      dictIdArray[ordinal] = dictId != null ? dictId : 0;
     }
 
     // Write bit-packed
@@ -635,32 +625,13 @@ public class OnHeapColumnarMapIndexCreator implements ColumnarMapIndexCreator {
 
   /**
    * Sorts string-encoded values using numeric comparison for numeric types,
-   * or lexicographic comparison for STRING/BYTES.
+   * Sorts dictionary values lexicographically, matching TreeMap order and the binary search
+   * comparator in ImmutableColumnarMapIndexReader.getDocsWithKeyValue (compareBytes).
+   * Using consistent lexicographic order ensures dictId assignment and inverted index
+   * ordering are aligned for all data types.
    */
   private static void sortValues(String[] values, DataType storedType) {
-    Comparator<String> cmp;
-    switch (storedType) {
-      case INT:
-        cmp = Comparator.comparingInt(Integer::parseInt);
-        break;
-      case LONG:
-        cmp = Comparator.comparingLong(Long::parseLong);
-        break;
-      case FLOAT:
-        cmp = (a, b) -> Float.compare(Float.parseFloat(a), Float.parseFloat(b));
-        break;
-      case DOUBLE:
-        cmp = Comparator.comparingDouble(Double::parseDouble);
-        break;
-      default:
-        cmp = null;
-        break;
-    }
-    if (cmp != null) {
-      java.util.Arrays.sort(values, cmp);
-    } else {
-      java.util.Arrays.sort(values);
-    }
+    java.util.Arrays.sort(values);
   }
 
   /// Builds the value dictionary section written after all per-key data.
@@ -690,7 +661,7 @@ public class OnHeapColumnarMapIndexCreator implements ColumnarMapIndexCreator {
       // Sort numerically for numeric types, lexicographically for strings
       sortValues(allValues, storedType);
 
-      int numBitsPerValue = PinotDataBitSet.getNumBitsPerValue(allValues.length - 1);
+      int numBitsPerValue = PinotDataBitSet.getNumBitsPerValue(Math.max(allValues.length - 1, 0));
       dos.writeInt(allValues.length);
       dos.writeInt(numBitsPerValue);
       for (String v : allValues) {

@@ -56,6 +56,7 @@ public class ColumnarMapKeyForwardIndexReader implements ForwardIndexReader<Forw
   @Nullable
   private final FixedBitIntReaderWriter _dictIdReader;
   private final ImmutableRoaringBitmap _presenceBitmap;
+  private final int _defaultDictId;
 
   public ColumnarMapKeyForwardIndexReader(ColumnarMapIndexReader columnarMapIndexReader, String key,
       DataType storedType) {

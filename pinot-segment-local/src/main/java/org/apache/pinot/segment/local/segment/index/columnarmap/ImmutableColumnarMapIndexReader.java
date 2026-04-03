@@ -88,6 +88,9 @@ public class ImmutableColumnarMapIndexReader implements ColumnarMapIndexReader {
   // Pre-built dictId readers for keys with dictionary encoding (indexed by keyId)
   private final FixedBitIntReaderWriter[] _dictIdReaders;
 
+  // Cached inverted index entry offsets per keyId (avoids O(numUnique) scan per query)
+  private final long[][] _invEntryOffsets;
+
   public ImmutableColumnarMapIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
       throws IOException {
     _dataBuffer = dataBuffer;
@@ -177,7 +180,7 @@ public class ImmutableColumnarMapIndexReader implements ColumnarMapIndexReader {
     if (_valueDictionarySectionOffset > 0) {
       long pos = _valueDictionarySectionOffset;
       for (int i = 0; i < _numKeys; i++) {
-        if (_dictIdFwdLengths[i] == 0) {
+        if (_dictIdFwdLengths[i] == 0 && _invLengths[i] == 0) {
           continue;
         }
         int numDistinctValues = dataBuffer.getInt(pos);
@@ -212,6 +215,26 @@ public class ImmutableColumnarMapIndexReader implements ColumnarMapIndexReader {
           PinotDataBuffer slice = _dataBuffer.view(offset, offset + _dictIdFwdLengths[i]);
           _dictIdReaders[i] = new FixedBitIntReaderWriter(slice, _numDocsPerKey[i], numBitsPerValue);
         }
+      }
+    }
+
+    // Pre-build inverted index entry offset tables for keys with inverted indexes.
+    // This avoids rebuilding the O(numUnique) offset table on every getDocsWithKeyValue() call.
+    _invEntryOffsets = new long[_numKeys][];
+    for (int i = 0; i < _numKeys; i++) {
+      if (_invLengths[i] > 0) {
+        long invBase = _perKeyDataSectionOffset + _invOffsets[i];
+        int numUnique = _dataBuffer.getInt(invBase);
+        long[] offsets = new long[numUnique];
+        long pos = invBase + 4;
+        for (int j = 0; j < numUnique; j++) {
+          offsets[j] = pos;
+          int vLen = _dataBuffer.getInt(pos);
+          pos += 4 + vLen;
+          int bLen = _dataBuffer.getInt(pos);
+          pos += 4 + bLen;
+        }
+        _invEntryOffsets[i] = offsets;
       }
     }
   }
@@ -426,20 +449,11 @@ public class ImmutableColumnarMapIndexReader implements ColumnarMapIndexReader {
     // Values are sorted (lexicographic for STRING, numeric order for numeric types via TreeMap),
     // so we first load all entry offsets, then binary search by value.
     byte[] valueBytes = valueStr.getBytes(StandardCharsets.UTF_8);
-    long invBase = _perKeyDataSectionOffset + _invOffsets[keyId];
-    int numUnique = _dataBuffer.getInt(invBase);
-
-    // Build an offset table for all entries so we can binary search by value
-    long[] entryOffsets = new long[numUnique];
-    long pos = invBase + 4;
-    for (int i = 0; i < numUnique; i++) {
-      entryOffsets[i] = pos;
-      int vLen = _dataBuffer.getInt(pos);
-      pos += 4 + vLen;
-
-      int bLen = _dataBuffer.getInt(pos);
-      pos += 4 + bLen;
+    long[] entryOffsets = _invEntryOffsets[keyId];
+    if (entryOffsets == null) {
+      return null;
     }
+    int numUnique = entryOffsets.length;
 
     // Binary search over the sorted inverted index entries.
     // The inverted index uses a TreeMap which sorts lexicographically for all types.
