@@ -55,6 +55,7 @@ import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.SystemTableBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
@@ -74,6 +75,7 @@ import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.systemtable.SystemTableRegistry;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -158,10 +160,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected HelixDataAccessor _helixDataAccessor;
   protected TableCache _tableCache;
+  protected SystemTableRegistry _systemTableRegistry;
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
   protected BrokerRoutingManager _routingManager;
   protected AccessControlFactory _accessControlFactory;
+  protected SystemTableBrokerRequestHandler _systemTableBrokerRequestHandler;
   protected BrokerRequestHandler _brokerRequestHandler;
   protected SqlQueryExecutor _sqlQueryExecutor;
   protected BrokerAdminApiApplication _brokerAdminApplication;
@@ -371,6 +375,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
     _tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
+    _systemTableRegistry = new SystemTableRegistry(_tableCache, _helixAdmin, _clusterName, _brokerConf);
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
@@ -493,9 +498,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _responseStore.init(responseStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, brokerId,
         _brokerMetrics, expirationTime);
 
+    _systemTableBrokerRequestHandler =
+        new SystemTableBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+            _accessControlFactory, _queryQuotaManager, _tableCache, _systemTableRegistry, _threadAccountant,
+            multiClusterRoutingContext, _spectatorHelixManager);
     _brokerRequestHandler =
-        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
-            timeSeriesRequestHandler, _responseStore);
+        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, _systemTableBrokerRequestHandler,
+            multiStageBrokerRequestHandler, timeSeriesRequestHandler, _responseStore);
     _brokerRequestHandler.start();
 
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
@@ -817,6 +826,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     } catch (IOException e) {
       LOGGER.error("Caught exception when shutting down PinotFsFactory", e);
     }
+    if (_systemTableRegistry != null) {
+      try {
+        _systemTableRegistry.close();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to close system table registry cleanly", e);
+      }
+    }
 
     LOGGER.info("Disconnecting spectator Helix manager");
     _spectatorHelixManager.disconnect();
@@ -867,7 +883,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected BrokerAdminApiApplication createBrokerAdminApp() {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
-            _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
+            _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _systemTableBrokerRequestHandler,
+            _spectatorHelixManager,
             _queryQuotaManager, _threadAccountant, _responseStore);
     brokerAdminApiApplication.register(
         new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _brokerMetrics));
