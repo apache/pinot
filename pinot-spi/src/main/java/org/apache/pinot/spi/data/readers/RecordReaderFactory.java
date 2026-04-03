@@ -57,6 +57,10 @@ public class RecordReaderFactory {
       "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReader";
   static final String DEFAULT_PROTO_RECORD_READER_CONFIG_CLASS =
       "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig";
+  static final String DEFAULT_ARROW_RECORD_READER_CLASS =
+      "org.apache.pinot.plugin.inputformat.arrow.ArrowRecordReader";
+  static final String DEFAULT_ARROW_RECORD_READER_CONFIG_CLASS =
+      "org.apache.pinot.plugin.inputformat.arrow.ArrowRecordReaderConfig";
 
   public static void register(String fileFormat, String recordReaderClassName, String recordReaderConfigClassName) {
     DEFAULT_RECORD_READER_CLASS_MAP.put(fileFormat.toUpperCase(), recordReaderClassName);
@@ -76,6 +80,7 @@ public class RecordReaderFactory {
     register(FileFormat.ORC, DEFAULT_ORC_RECORD_READER_CLASS, null);
     register(FileFormat.PARQUET, DEFAULT_PARQUET_RECORD_READER_CLASS, DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS);
     register(FileFormat.PROTO, DEFAULT_PROTO_RECORD_READER_CLASS, DEFAULT_PROTO_RECORD_READER_CONFIG_CLASS);
+    register(FileFormat.ARROW, DEFAULT_ARROW_RECORD_READER_CLASS, DEFAULT_ARROW_RECORD_READER_CONFIG_CLASS);
   }
 
   /**

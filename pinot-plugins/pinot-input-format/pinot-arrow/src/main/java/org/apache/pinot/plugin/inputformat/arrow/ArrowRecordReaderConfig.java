@@ -16,24 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data.readers;
+package org.apache.pinot.plugin.inputformat.arrow;
 
-public enum FileFormat {
-  AVRO, GZIPPED_AVRO, CSV, JSON, PINOT, THRIFT, PARQUET, ORC, PROTO, ARROW, OTHER;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
-  /**
-   * Converts an input format string to the corresponding FileFormat enum.
-   * Handles known aliases (e.g., "protobuf" -> PROTO).
-   *
-   * @param inputFormat the input format string (case-insensitive)
-   * @return the corresponding FileFormat
-   * @throws IllegalArgumentException if the format is unknown
-   */
-  public static FileFormat fromString(String inputFormat) {
-    // Handle known aliases (case-insensitive)
-    if ("protobuf".equalsIgnoreCase(inputFormat)) {
-      return PROTO;
-    }
-    return valueOf(inputFormat.toUpperCase());
+
+/**
+ * Config for {@link ArrowRecordReader}.
+ */
+public class ArrowRecordReaderConfig implements RecordReaderConfig {
+  public static final long DEFAULT_ALLOCATOR_LIMIT = 268435456L; // 256MB
+
+  private long _allocatorLimit = DEFAULT_ALLOCATOR_LIMIT;
+
+  public ArrowRecordReaderConfig() {
+  }
+
+  public long getAllocatorLimit() {
+    return _allocatorLimit;
+  }
+
+  public void setAllocatorLimit(long allocatorLimit) {
+    _allocatorLimit = allocatorLimit;
   }
 }

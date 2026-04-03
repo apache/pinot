@@ -25,13 +25,14 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.dictionary.DictionaryEncoder;
-import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.ipc.ArrowReader;
 import org.apache.arrow.vector.util.Text;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
@@ -45,16 +46,28 @@ import org.slf4j.LoggerFactory;
 public class ArrowToGenericRowConverter {
   private static final Logger logger = LoggerFactory.getLogger(ArrowToGenericRowConverter.class);
 
+  @Nullable
+  private final Set<String> _fieldsToRead;
+
   /** Default constructor that processes all fields from Arrow batch. */
   public ArrowToGenericRowConverter() {
-    logger.debug("ArrowToGenericRowConverter created for processing all fields");
+    this(null);
+  }
+
+  /**
+   * Constructor that processes only specified fields from Arrow batch.
+   *
+   * @param fieldsToRead Set of field names to read. If null or empty, reads all fields.
+   */
+  public ArrowToGenericRowConverter(@Nullable Set<String> fieldsToRead) {
+    _fieldsToRead = (fieldsToRead == null || fieldsToRead.isEmpty()) ? null : Set.copyOf(fieldsToRead);
   }
 
   /**
    * Converts an Arrow VectorSchemaRoot to a Pinot {@code GenericRow}. Processes ALL rows from the
    * Arrow batch and stores them as a list using MULTIPLE_RECORDS_KEY.
    *
-   * @param reader ArrowStreamReader containing the data
+   * @param reader ArrowReader containing the data
    * @param root Arrow VectorSchemaRoot containing the data
    * @param destination Optional destination {@code GenericRow}, will create new if null
    * @return {@code GenericRow} containing {@code List<GenericRow>} with all converted rows, or null
@@ -62,7 +75,7 @@ public class ArrowToGenericRowConverter {
    */
   @Nullable
   public GenericRow convert(
-      ArrowStreamReader reader, VectorSchemaRoot root, GenericRow destination) {
+      ArrowReader reader, VectorSchemaRoot root, GenericRow destination) {
     if (root == null) {
       logger.warn("Cannot convert null VectorSchemaRoot");
       return null;
@@ -100,15 +113,34 @@ public class ArrowToGenericRowConverter {
   /**
    * Converts a single row from Arrow VectorSchemaRoot.
    *
-   * @param reader ArrowStreamReader containing the data
+   * @param reader ArrowReader containing the data
    * @param root Arrow VectorSchemaRoot containing the data
    * @param rowIndex Index of the row to convert (0-based)
    * @return {@code GenericRow} with converted data, or null if row index is invalid
    */
   @Nullable
-  private GenericRow convertSingleRow(
-      ArrowStreamReader reader, VectorSchemaRoot root, int rowIndex) {
-    GenericRow row = new GenericRow();
+  public GenericRow convertSingleRow(
+      ArrowReader reader, VectorSchemaRoot root, int rowIndex) {
+    int rowCount = root.getRowCount();
+    if (rowIndex < 0 || rowIndex >= rowCount) {
+      logger.warn("Row index {} is out of bounds [0, {}) for Arrow batch", rowIndex, rowCount);
+      return null;
+    }
+    return convertSingleRow(reader, root, rowIndex, new GenericRow());
+  }
+
+  /**
+   * Converts a single row from Arrow VectorSchemaRoot into the given {@code GenericRow}.
+   *
+   * @param reader ArrowReader containing the data
+   * @param root Arrow VectorSchemaRoot containing the data
+   * @param rowIndex Index of the row to convert (0-based)
+   * @param reuse GenericRow to populate with converted data
+   * @return the populated {@code GenericRow}
+   */
+  public GenericRow convertSingleRow(
+      ArrowReader reader, VectorSchemaRoot root, int rowIndex, GenericRow reuse) {
+    reuse.clear();
     int convertedFields = 0;
 
     // Process all fields in the Arrow schema
@@ -117,6 +149,9 @@ public class ArrowToGenericRowConverter {
 
       FieldVector fieldVector = root.getFieldVectors().get(i);
       String fieldName = fieldVector.getField().getName();
+      if (_fieldsToRead != null && !_fieldsToRead.contains(fieldName)) {
+        continue;
+      }
       try {
         if (fieldVector.getField().getDictionary() != null) {
           long dictionaryId = fieldVector.getField().getDictionary().getId();
@@ -131,8 +166,10 @@ public class ArrowToGenericRowConverter {
         if (value != null) {
           // Convert Arrow-specific types to Pinot-compatible types
           Object pinotCompatibleValue = convertArrowTypeToPinotCompatible(value);
-          row.putValue(fieldName, pinotCompatibleValue);
+          reuse.putValue(fieldName, pinotCompatibleValue);
           convertedFields++;
+        } else {
+          reuse.putValue(fieldName, null);
         }
       } catch (Exception e) {
         logger.error("Error extracting value for field: {} at row {}", fieldName, rowIndex, e);
@@ -140,7 +177,7 @@ public class ArrowToGenericRowConverter {
     }
 
     logger.debug("Converted {} fields from Arrow row {} to GenericRow", convertedFields, rowIndex);
-    return row;
+    return reuse;
   }
 
   /**
