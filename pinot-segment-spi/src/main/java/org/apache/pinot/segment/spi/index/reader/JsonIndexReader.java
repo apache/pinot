@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.RoaringBitmap;
@@ -77,6 +78,19 @@ public interface JsonIndexReader extends IndexReader {
    * Converts the flattened docIds to real docIds using the map returned by getMatchingFlattenedDocsMap
    */
   void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> flattenedDocIdsMap);
+
+  /**
+   * Returns only the distinct value strings for the given key that match the optional filter, without materializing
+   * per-value posting list bitmaps or converting flattened doc IDs. This is significantly faster than
+   * {@link #getMatchingFlattenedDocsMap} followed by {@link #convertFlattenedDocIdsToDocIds} when only the distinct
+   * values are needed (e.g. fully-pushed-down DISTINCT queries).
+   *
+   * <p>The default implementation delegates to {@link #getMatchingFlattenedDocsMap} and returns its key set.
+   * Implementations should override for better performance.
+   */
+  default Set<String> getMatchingDistinctValues(String key, @Nullable String filterJsonString) {
+    return getMatchingFlattenedDocsMap(key, filterJsonString).keySet();
+  }
 
   /**
    * Returns true if the given JSON path is indexed and can be used for index-based operations

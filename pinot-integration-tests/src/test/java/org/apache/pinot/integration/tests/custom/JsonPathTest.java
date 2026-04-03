@@ -733,6 +733,251 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
         "JsonIndexDistinctOperator should throw for missing JSON path without defaultValue");
   }
 
+  // --- Same-path JSON_MATCH predicate tests (trigger getMatchingDistinctValues fast path) ---
+
+  /**
+   * Same-path REGEXP_LIKE: fully pushed down, single dict scan, no posting list reads.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctSamePathRegexpLike(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // REGEXP_LIKE on $.k1 matching a subset of values
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " WHERE JSON_MATCH(" + MY_MAP_STR_FIELD_NAME
+        + ", 'REGEXP_LIKE(\"$.k1\", ''value-k1-[0-9]'')')"
+        + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertFalse(baselineRows.isEmpty(), "REGEXP_LIKE should match single-digit k1 values");
+    Assert.assertEquals(optimizedRows, baselineRows,
+        "Same-path REGEXP_LIKE fast path should match baseline");
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L);
+    }
+  }
+
+  /**
+   * Same-path EQ: fully pushed down.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctSamePathEq(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " WHERE JSON_MATCH(" + MY_MAP_STR_FIELD_NAME
+        + ", '\"$.k1\" = ''value-k1-0''')"
+        + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertEquals(optimizedRows, baselineRows,
+        "Same-path EQ fast path should match baseline");
+    Assert.assertTrue(optimizedRows.contains("value-k1-0"));
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L);
+    }
+  }
+
+  /**
+   * Same-path NOT_EQ: fully pushed down.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctSamePathNotEq(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " WHERE JSON_MATCH(" + MY_MAP_STR_FIELD_NAME
+        + ", '\"$.k1\" != ''value-k1-0''')"
+        + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertEquals(optimizedRows, baselineRows,
+        "Same-path NOT_EQ fast path should match baseline");
+    Assert.assertFalse(optimizedRows.contains("value-k1-0"));
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L);
+    }
+  }
+
+  /**
+   * Same-path IN: fully pushed down.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctSamePathIn(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " WHERE JSON_MATCH(" + MY_MAP_STR_FIELD_NAME
+        + ", '\"$.k1\" IN (''value-k1-0'', ''value-k1-1'', ''value-k1-2'')')"
+        + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertEquals(optimizedRows, baselineRows,
+        "Same-path IN fast path should match baseline");
+    Assert.assertEquals(optimizedRows.size(), 3);
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L);
+    }
+  }
+
+  /**
+   * Same-path NOT_IN: fully pushed down.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctSamePathNotIn(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " WHERE JSON_MATCH(" + MY_MAP_STR_FIELD_NAME
+        + ", '\"$.k1\" NOT IN (''value-k1-0'', ''value-k1-1'')')"
+        + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertEquals(optimizedRows, baselineRows,
+        "Same-path NOT_IN fast path should match baseline");
+    Assert.assertFalse(optimizedRows.contains("value-k1-0"));
+    Assert.assertFalse(optimizedRows.contains("value-k1-1"));
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L);
+    }
+  }
+
+  /**
+   * Same-path IS NOT NULL: fully pushed down.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctSamePathIsNotNull(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " WHERE JSON_MATCH(" + MY_MAP_STR_FIELD_NAME + ", '\"$.k1\" IS NOT NULL')"
+        + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') LIMIT 10000";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertEquals(optimizedRows, baselineRows,
+        "Same-path IS NOT NULL fast path should match baseline");
+    Assert.assertEquals(optimizedRows.size(), NUM_DOCS_PER_SEGMENT,
+        "IS NOT NULL should return all values since every doc has $.k1");
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L);
+    }
+  }
+
+  /**
+   * Same-path REGEXP_LIKE with 4-arg form (defaultValue): fully pushed down fast path still works with defaults.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctSamePathRegexpLikeWithDefault(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME
+        + ", '$.k1', 'STRING', 'fallback') FROM "
+        + getTableName() + " WHERE JSON_MATCH(" + MY_MAP_STR_FIELD_NAME
+        + ", 'REGEXP_LIKE(\"$.k1\", ''value-k1-[0-9]'')')"
+        + " ORDER BY jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING', 'fallback') LIMIT 10000";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertEquals(optimizedRows, baselineRows,
+        "Same-path REGEXP_LIKE 4-arg fast path should match baseline");
+    // The default should NOT appear since the filter only matches docs that HAVE $.k1
+    Assert.assertFalse(optimizedRows.contains("fallback"),
+        "Same-path filter ensures all matching docs have the path, so no default should appear");
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L);
+    }
+  }
+
+  /**
+   * Same-path REGEXP_LIKE without ORDER BY: verify LIMIT is respected with fast path.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonIndexDistinctSamePathWithLimit(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT DISTINCT jsonExtractIndex(" + MY_MAP_STR_FIELD_NAME + ", '$.k1', 'STRING') FROM "
+        + getTableName() + " WHERE JSON_MATCH(" + MY_MAP_STR_FIELD_NAME
+        + ", '\"$.k1\" IS NOT NULL') LIMIT 5";
+
+    JsonNode baselineResponse = postQuery(query);
+    Assert.assertEquals(baselineResponse.get("exceptions").size(), 0);
+
+    JsonNode optimizedResponse = postQueryWithOptions(query, USE_INDEX_BASED_DISTINCT_OPERATOR + "=true");
+    Assert.assertEquals(optimizedResponse.get("exceptions").size(), 0);
+
+    List<String> baselineRows = extractOrderedDistinctValues(baselineResponse);
+    List<String> optimizedRows = extractOrderedDistinctValues(optimizedResponse);
+    Assert.assertEquals(optimizedRows.size(), 5, "LIMIT 5 should be respected by fast path");
+    Assert.assertEquals(baselineRows.size(), 5);
+
+    if (!useMultiStageQueryEngine) {
+      Assert.assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asLong(), 0L);
+    }
+  }
+
   private static List<String> extractOrderedDistinctValues(JsonNode response) {
     List<String> values = new ArrayList<>();
     JsonNode rows = response.get("resultTable").get("rows");
