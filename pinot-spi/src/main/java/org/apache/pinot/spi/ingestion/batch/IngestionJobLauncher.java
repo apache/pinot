@@ -105,28 +105,29 @@ public class IngestionJobLauncher {
     PinotIngestionJobType jobType = PinotIngestionJobType.fromString(spec.getJobType());
     switch (jobType) {
       case SegmentCreation:
-        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
+        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassNameNotNull());
         break;
       case SegmentTarPush:
-        kickoffIngestionJob(spec, executionFramework.getSegmentTarPushJobRunnerClassName());
+        kickoffIngestionJob(spec, executionFramework.getSegmentTarPushJobRunnerClassNameNotNull());
         break;
       case SegmentUriPush:
-        kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassName());
+        kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassNameNotNull());
         break;
       case SegmentMetadataPush:
-        kickoffIngestionJob(spec, executionFramework.getSegmentMetadataPushJobRunnerClassName());
+        kickoffIngestionJob(spec, executionFramework.getSegmentMetadataPushJobRunnerClassNameNotNull());
         break;
       case SegmentCreationAndTarPush:
-        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
-        kickoffIngestionJob(spec, executionFramework.getSegmentTarPushJobRunnerClassName());
+        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassNameNotNull());
+        kickoffIngestionJob(spec, executionFramework.getSegmentTarPushJobRunnerClassNameNotNull());
         break;
       case SegmentCreationAndUriPush:
-        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
-        kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassName());
+        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassNameNotNull());
+        kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassNameNotNull());
         break;
       case SegmentCreationAndMetadataPush:
-        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
-        kickoffIngestionJob(spec, executionFramework.getSegmentMetadataPushJobRunnerClassName());
+        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassNameNotNull());
+        kickoffIngestionJob(spec, executionFramework.getSegmentMetadataPushJobRunnerClassNameNotNull());
+
         break;
       default:
         LOGGER.error("Unsupported job type - {}. Support job types: {}", spec.getJobType(),
@@ -142,7 +143,7 @@ public class IngestionJobLauncher {
       ingestionJobRunner = PluginManager.get().createInstance(ingestionJobRunnerClassName);
     } catch (Exception e) {
       throw new RuntimeException(
-          "Failed to create IngestionJobRunner instance for class - " + ingestionJobRunnerClassName, e);
+              "Failed to create IngestionJobRunner instance for class - " + ingestionJobRunnerClassName, e);
     }
     ingestionJobRunner.init(spec);
     try {
