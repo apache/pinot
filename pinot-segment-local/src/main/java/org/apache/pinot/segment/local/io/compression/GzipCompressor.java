@@ -36,6 +36,10 @@ class GzipCompressor implements ChunkCompressor {
     _compressor = new Deflater();
   }
 
+  public GzipCompressor(int compressionLevel) {
+    _compressor = new Deflater(compressionLevel);
+  }
+
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {

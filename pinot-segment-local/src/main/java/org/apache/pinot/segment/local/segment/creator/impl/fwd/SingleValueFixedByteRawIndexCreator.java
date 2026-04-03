@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -49,8 +50,8 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.getDefaultRawWriterVersion(),
-        ForwardIndexConfig.getDefaultTargetDocsPerChunk());
+    this(baseIndexDir, compressionType, null, column, totalDocs, valueType,
+        ForwardIndexConfig.getDefaultRawWriterVersion(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
   /**
@@ -67,10 +68,16 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType, int writerVersion, int targetDocsPerChunk)
       throws IOException {
+    this(baseIndexDir, compressionType, null, column, totalDocs, valueType, writerVersion, targetDocsPerChunk);
+  }
+
+  public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
+      @Nullable Integer compressionLevel, String column, int totalDocs, DataType valueType, int writerVersion,
+      int targetDocsPerChunk)
+      throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-    _indexWriter =
-        new FixedByteChunkForwardIndexWriter(file, compressionType, totalDocs, targetDocsPerChunk, valueType.size(),
-            writerVersion);
+    _indexWriter = new FixedByteChunkForwardIndexWriter(file, compressionType, compressionLevel, totalDocs,
+        targetDocsPerChunk, valueType.size(), writerVersion);
     _valueType = valueType;
   }
 

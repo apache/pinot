@@ -20,6 +20,8 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.spi.config.table.CompressionCodecSpec;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
@@ -107,5 +109,27 @@ public class ForwardIndexConfigTest {
     assertEquals(config.getRawIndexWriterVersion(), 10, "Unexpected rawIndexWriterVersion");
     assertEquals(config.getTargetMaxChunkSizeBytes(), 512 * 1024, "Unexpected targetMaxChunkSizeBytes");
     assertEquals(config.getTargetDocsPerChunk(), 2000, "Unexpected defaultTargetDocsPerChunk");
+  }
+
+  @Test
+  public void withParameterizedCompressionCodec()
+      throws JsonProcessingException {
+    String confStr = "{\"compressionCodec\": \"zstd(3)\"}";
+    ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
+
+    assertEquals(config.getCompressionCodec(), FieldConfig.CompressionCodec.ZSTANDARD);
+    assertEquals(config.getCompressionCodecSpec(), CompressionCodecSpec.of(FieldConfig.CompressionCodec.ZSTANDARD, 3));
+    assertEquals(config.getChunkCompressionType(), ChunkCompressionType.ZSTANDARD);
+    assertEquals(config.toJsonNode().get("compressionCodec").asText(), "ZSTANDARD(3)");
+  }
+
+  @Test
+  public void withLegacyGzipChunkCompressionType()
+      throws JsonProcessingException {
+    String confStr = "{\"chunkCompressionType\": \"GZIP\"}";
+    ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
+
+    assertEquals(config.getCompressionCodec(), FieldConfig.CompressionCodec.GZIP);
+    assertEquals(config.getChunkCompressionType(), ChunkCompressionType.GZIP);
   }
 }

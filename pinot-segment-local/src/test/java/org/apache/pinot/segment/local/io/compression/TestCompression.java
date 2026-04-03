@@ -35,6 +35,7 @@ import org.testng.annotations.Test;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -181,6 +182,31 @@ public class TestCompression {
       decompressed.limit(decompressedSize);
       Assert.assertEquals(UTF_8.decode(decompressed).toString(), expected);
     }
+  }
+
+  @Test
+  public void testRoundtripWithExplicitCompressionLevels()
+      throws IOException {
+    byte[] input = "compression-level-roundtrip".repeat(256).getBytes(UTF_8);
+    ByteBuffer rawInput = ByteBuffer.allocateDirect(input.length);
+    rawInput.put(input);
+    rawInput.flip();
+
+    try (ChunkCompressor zstd = ChunkCompressorFactory.getCompressor(ChunkCompressionType.ZSTANDARD, 3, false);
+        ChunkCompressor gzip = ChunkCompressorFactory.getCompressor(ChunkCompressionType.GZIP, 6, false);
+        ChunkCompressor lz4 = ChunkCompressorFactory.getCompressor(ChunkCompressionType.LZ4, 12, true)) {
+      roundtrip(zstd, rawInput.slice());
+      roundtrip(gzip, rawInput.slice());
+      roundtrip(lz4, rawInput.slice());
+    }
+  }
+
+  @Test
+  public void testRejectsExplicitLevelsForUnsupportedCodecs() {
+    assertThrows(IllegalArgumentException.class,
+        () -> ChunkCompressorFactory.getCompressor(ChunkCompressionType.SNAPPY, 1, false));
+    assertThrows(IllegalArgumentException.class,
+        () -> ChunkCompressorFactory.getCompressor(ChunkCompressionType.PASS_THROUGH, 1, false));
   }
 
   private static void roundtrip(ChunkCompressor compressor, ByteBuffer rawInput)

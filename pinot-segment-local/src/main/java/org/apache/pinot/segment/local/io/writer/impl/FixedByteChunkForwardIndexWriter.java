@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.io.writer.impl;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
@@ -48,7 +49,13 @@ public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWrite
   public FixedByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, int sizeOfEntry, int writerVersion)
       throws IOException {
-    super(file, compressionType, totalDocs, normalizeDocsPerChunk(writerVersion, numDocsPerChunk),
+    this(file, compressionType, null, totalDocs, numDocsPerChunk, sizeOfEntry, writerVersion);
+  }
+
+  public FixedByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType,
+      @Nullable Integer compressionLevel, int totalDocs, int numDocsPerChunk, int sizeOfEntry, int writerVersion)
+      throws IOException {
+    super(file, compressionType, compressionLevel, totalDocs, normalizeDocsPerChunk(writerVersion, numDocsPerChunk),
         (long) sizeOfEntry * normalizeDocsPerChunk(writerVersion, numDocsPerChunk), sizeOfEntry, writerVersion, true);
     _chunkDataOffset = 0;
   }
