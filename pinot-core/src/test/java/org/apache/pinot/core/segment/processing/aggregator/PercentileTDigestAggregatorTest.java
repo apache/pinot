@@ -59,7 +59,7 @@ public class PercentileTDigestAggregatorTest {
     TDigest resultDigest = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(result);
     assertNotNull(resultDigest);
     assertEquals(resultDigest.size(), 200);
-    assertEquals(resultDigest.quantile(0.5), 99.5, 1.0);
+    assertEquals(resultDigest.quantile(0.5), 99.5, 1);
   }
 
   @Test
@@ -84,6 +84,56 @@ public class PercentileTDigestAggregatorTest {
     TDigest resultDigest = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(result);
     assertNotNull(resultDigest);
     assertEquals(resultDigest.size(), 100);
-    assertEquals(resultDigest.quantile(0.5), 49.5, 1.0);
+    assertEquals(resultDigest.quantile(0.5), 49.5, 1);
+  }
+
+  @Test
+  public void testAggregateWithBothEmptyBytes() {
+    byte[] empty1 = new byte[0];
+    byte[] empty2 = new byte[0];
+
+    Map<String, String> functionParameters = new HashMap<>();
+    byte[] result = (byte[]) _aggregator.aggregate(empty1, empty2, functionParameters);
+
+    // Should return a valid serialized empty TDigest, not crash
+    TDigest resultDigest = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(result);
+    assertNotNull(resultDigest);
+    assertEquals(resultDigest.size(), 0);
+  }
+
+  @Test
+  public void testAggregateWithFirstEmptyBytes() {
+    TDigest second = TDigest.createMergingDigest(100);
+    for (int i = 0; i < 50; i++) {
+      second.add(i);
+    }
+    byte[] empty = new byte[0];
+    byte[] value2 = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(second);
+
+    Map<String, String> functionParameters = new HashMap<>();
+    byte[] result = (byte[]) _aggregator.aggregate(empty, value2, functionParameters);
+
+    // Should return the non-empty side as-is
+    assertEquals(result, value2);
+    TDigest resultDigest = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(result);
+    assertEquals(resultDigest.size(), 50);
+  }
+
+  @Test
+  public void testAggregateWithSecondEmptyBytes() {
+    TDigest first = TDigest.createMergingDigest(100);
+    for (int i = 0; i < 50; i++) {
+      first.add(i);
+    }
+    byte[] value1 = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(first);
+    byte[] empty = new byte[0];
+
+    Map<String, String> functionParameters = new HashMap<>();
+    byte[] result = (byte[]) _aggregator.aggregate(value1, empty, functionParameters);
+
+    // Should return the non-empty side as-is
+    assertEquals(result, value1);
+    TDigest resultDigest = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(result);
+    assertEquals(resultDigest.size(), 50);
   }
 }

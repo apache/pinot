@@ -29,20 +29,35 @@ public class PercentileTDigestAggregator implements ValueAggregator {
 
   @Override
   public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
-    String compressionParam = functionParameters.get(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY);
+    byte[] bytes1 = (byte[]) value1;
+    byte[] bytes2 = (byte[]) value2;
 
-    int compression;
-    if (compressionParam != null) {
-      compression = Integer.parseInt(compressionParam);
-    } else {
-      compression = PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION;
+    // Empty byte arrays represent the default null value for BYTES columns.
+    // Deserializing byte[0] would throw BufferUnderflowException, so handle it explicitly.
+    if (bytes1.length == 0 && bytes2.length == 0) {
+      int compression = getCompression(functionParameters);
+      return ObjectSerDeUtils.TDIGEST_SER_DE.serialize(TDigest.createMergingDigest(compression));
+    }
+    if (bytes1.length == 0) {
+      return bytes2;
+    }
+    if (bytes2.length == 0) {
+      return bytes1;
     }
 
-    TDigest first = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize((byte[]) value1);
-    TDigest second = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize((byte[]) value2);
+    int compression = getCompression(functionParameters);
+    TDigest first = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes1);
+    TDigest second = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes2);
     TDigest merged = TDigest.createMergingDigest(compression);
     merged.add(first);
     merged.add(second);
     return ObjectSerDeUtils.TDIGEST_SER_DE.serialize(merged);
+  }
+
+  private int getCompression(Map<String, String> functionParameters) {
+    String compressionParam = functionParameters.get(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY);
+    return compressionParam != null
+        ? Integer.parseInt(compressionParam)
+        : PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION;
   }
 }

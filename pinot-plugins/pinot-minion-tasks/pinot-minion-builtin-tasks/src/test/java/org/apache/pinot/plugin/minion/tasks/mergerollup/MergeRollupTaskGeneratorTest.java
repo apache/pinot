@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;

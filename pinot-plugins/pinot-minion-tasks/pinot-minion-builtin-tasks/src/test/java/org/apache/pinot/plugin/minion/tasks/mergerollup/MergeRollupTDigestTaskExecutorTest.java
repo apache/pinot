@@ -28,8 +28,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -101,10 +101,10 @@ public class MergeRollupTDigestTaskExecutorTest {
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
     Mockito.when(helixPropertyStore
                     .get("/CONFIGS/TABLE/" + TABLE_NAME + "_OFFLINE", null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigUtils.toZNRecord(_tableConfig));
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(_tableConfig));
     Mockito.when(helixPropertyStore
                     .get("/SCHEMAS/" + TABLE_NAME, null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(_schema));
+        .thenReturn(SchemaSerDeUtils.toZNRecord(_schema));
     minionContext.setHelixPropertyStore(helixPropertyStore);
   }
 
@@ -136,28 +136,28 @@ public class MergeRollupTDigestTaskExecutorTest {
     TDigest digest1 = digests.get(GROUP_1);
     Assert.assertNotNull(digest1);
     Assert.assertEquals(digest1.size(), 300L);
-    Assert.assertEquals(digest1.quantile(0.0), 1.0, 1.0);      // P0 ~ 1
-    Assert.assertEquals(digest1.quantile(0.5), 150, 5.0);     // P50 ~ 150.5
-    Assert.assertEquals(digest1.quantile(0.99), 297.0, 5.0);    // P99 ~ 297
-    Assert.assertEquals(digest1.quantile(1.0), 300.0, 1.0);     // P100 ~ 300
+    Assert.assertEquals(digest1.quantile(0.0), 1, 1);      // P0 ~ 1
+    Assert.assertEquals(digest1.quantile(0.5), 150, 5);     // P50 ~ 150
+    Assert.assertEquals(digest1.quantile(0.99), 297, 5);    // P99 ~ 297
+    Assert.assertEquals(digest1.quantile(1.0), 300, 1);     // P100 ~ 300
 
     // group2: 300 values [500..799]
     TDigest digest2 = digests.get(GROUP_2);
     Assert.assertNotNull(digest2);
     Assert.assertEquals(digest2.size(), 300L);
-    Assert.assertEquals(digest2.quantile(0.0), 500.0, 1.0);       // P0 ~ 500
-    Assert.assertEquals(digest2.quantile(0.5), 649, 5.0);       // P50 ~ 649.5
-    Assert.assertEquals(digest2.quantile(0.99), 796.0, 5.0);      // P99 ~ 796
-    Assert.assertEquals(digest2.quantile(1.0), 799.0, 1.0);       // P100 ~ 799
+    Assert.assertEquals(digest2.quantile(0.0), 500, 1);       // P0 ~ 500
+    Assert.assertEquals(digest2.quantile(0.5), 649, 5);       // P50 ~ 649
+    Assert.assertEquals(digest2.quantile(0.99), 796, 5);      // P99 ~ 796
+    Assert.assertEquals(digest2.quantile(1.0), 799, 1);       // P100 ~ 799
 
     // group3: 200 values [1..200]
     TDigest digest3 = digests.get(GROUP_3);
     Assert.assertNotNull(digest3);
     Assert.assertEquals(digest3.size(), 200L);
-    Assert.assertEquals(digest3.quantile(0.0), 1.0, 1.0);           // P0 ~ 1
-    Assert.assertEquals(digest3.quantile(0.5), 100, 5.0);         // P50 ~ 100.5
-    Assert.assertEquals(digest3.quantile(0.99), 198.0, 5.0);        // P99 ~ 198
-    Assert.assertEquals(digest3.quantile(1.0), 200.0, 1.0);         // P100 ~ 200
+    Assert.assertEquals(digest3.quantile(0.0), 1, 1);           // P0 ~ 1
+    Assert.assertEquals(digest3.quantile(0.5), 100, 5);         // P50 ~ 100
+    Assert.assertEquals(digest3.quantile(0.99), 198, 5);        // P99 ~ 198
+    Assert.assertEquals(digest3.quantile(1.0), 200, 1);         // P100 ~ 200
   }
 
   /**
@@ -218,15 +218,15 @@ public class MergeRollupTDigestTaskExecutorTest {
     // With higher compression, quantile estimates should still be accurate
     TDigest digest1 = digests.get(GROUP_1);
     Assert.assertEquals(digest1.size(), 300L);
-    Assert.assertEquals(digest1.quantile(0.5), 150, 3.0);
+    Assert.assertEquals(digest1.quantile(0.5), 150, 3);
 
     TDigest digest2 = digests.get(GROUP_2);
     Assert.assertEquals(digest2.size(), 300L);
-    Assert.assertEquals(digest2.quantile(0.5), 649, 3.0);
+    Assert.assertEquals(digest2.quantile(0.5), 649, 3);
 
     TDigest digest3 = digests.get(GROUP_3);
     Assert.assertEquals(digest3.size(), 200L);
-    Assert.assertEquals(digest3.quantile(0.5), 100, 3.0);
+    Assert.assertEquals(digest3.quantile(0.5), 100, 3);
   }
 
   /**
@@ -262,19 +262,19 @@ public class MergeRollupTDigestTaskExecutorTest {
     // group1: 1000 values [1..1000], P50 ~ 500
     TDigest digest1 = digests.get(GROUP_1);
     Assert.assertEquals(digest1.size(), 1000L);
-    Assert.assertEquals(digest1.quantile(0.5), 500, 10.0);
-    Assert.assertEquals(digest1.quantile(0.0), 1.0, 1.0);
-    Assert.assertEquals(digest1.quantile(1.0), 1000.0, 1.0);
+    Assert.assertEquals(digest1.quantile(0.5), 500, 10);
+    Assert.assertEquals(digest1.quantile(0.0), 1, 1);
+    Assert.assertEquals(digest1.quantile(1.0), 1000, 1);
 
     // group2: 5001 values [5000..10000], P50 ~ 7500
     TDigest digest2 = digests.get(GROUP_2);
     Assert.assertEquals(digest2.size(), 5001L);
-    Assert.assertEquals(digest2.quantile(0.5), 7500.0, 50.0);
+    Assert.assertEquals(digest2.quantile(0.5), 7500, 50);
 
     // group3: 1000 values [1,11,21,...,9991], P50 ~ 5000
     TDigest digest3 = digests.get(GROUP_3);
     Assert.assertEquals(digest3.size(), 1000L);
-    Assert.assertEquals(digest3.quantile(0.5), 5000.0, 100.0);
+    Assert.assertEquals(digest3.quantile(0.5), 5000, 100);
   }
 
   /**
@@ -308,7 +308,7 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertNotNull(digest1);
     // The merged digest should contain the 100 values from the non-empty input
     Assert.assertEquals(digest1.size(), 100L);
-    Assert.assertEquals(digest1.quantile(0.5), 50, 2.0);
+    Assert.assertEquals(digest1.quantile(0.5), 50, 2);
   }
 
   /**
@@ -352,15 +352,15 @@ public class MergeRollupTDigestTaskExecutorTest {
     TDigest digest1 = digests.get(GROUP_1);
     Assert.assertNotNull(digest1);
     Assert.assertEquals(digest1.size(), 2L);
-    Assert.assertEquals(digest1.quantile(0.0), 42.0, 0.1);
-    Assert.assertEquals(digest1.quantile(1.0), 58.0, 0.1);
-    Assert.assertEquals(digest1.quantile(0.5), 50.0, 8.1);  // median of 42 and 58
+    Assert.assertEquals(digest1.quantile(0.0), 42, 0.1);
+    Assert.assertEquals(digest1.quantile(1.0), 58, 0.1);
+    Assert.assertEquals(digest1.quantile(0.5), 50, 8.1);  // median of 42 and 58
 
     // group2: 1 value (100)
     TDigest digest2 = digests.get(GROUP_2);
     Assert.assertNotNull(digest2);
     Assert.assertEquals(digest2.size(), 1L);
-    Assert.assertEquals(digest2.quantile(0.5), 100.0, 0.1);
+    Assert.assertEquals(digest2.quantile(0.5), 100, 0.1);
   }
 
   /**
@@ -411,22 +411,22 @@ public class MergeRollupTDigestTaskExecutorTest {
     TDigest digest1 = digests.get(GROUP_1);
     Assert.assertEquals(digest1.size(), 1000L);
     // P50 should be in the low range [1..10] since 90% of values are there
-    Assert.assertTrue(digest1.quantile(0.5) <= 10.0,
+    Assert.assertTrue(digest1.quantile(0.5) <= 10,
         "P50 should be in [1..10] since 90% of values are there, got: " + digest1.quantile(0.5));
     // P80 should still be in the low range (900 of 1000 are low)
-    Assert.assertTrue(digest1.quantile(0.80) <= 10.0,
+    Assert.assertTrue(digest1.quantile(0.80) <= 10,
         "P80 should be in [1..10], got: " + digest1.quantile(0.80));
     // P100 should be near 1099
-    Assert.assertEquals(digest1.quantile(1.0), 1099.0, 1.0);
+    Assert.assertEquals(digest1.quantile(1.0), 1099, 1);
 
     // group2: 1000 total, 90% are in [9000..9899]
     TDigest digest2 = digests.get(GROUP_2);
     Assert.assertEquals(digest2.size(), 1000L);
     // P50 should be in the high range since 90% of values are there
-    Assert.assertTrue(digest2.quantile(0.5) >= 9000.0,
+    Assert.assertTrue(digest2.quantile(0.5) >= 9000,
         "P50 should be >= 9000 since 90% of values are there, got: " + digest2.quantile(0.5));
     // P0 should be near 1
-    Assert.assertEquals(digest2.quantile(0.0), 1.0, 1.0);
+    Assert.assertEquals(digest2.quantile(0.0), 1, 1);
   }
 
   /**
