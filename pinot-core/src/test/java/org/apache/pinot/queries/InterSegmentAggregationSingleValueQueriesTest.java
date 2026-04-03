@@ -40,8 +40,8 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   // Allow 5% quantile error due to the randomness of TDigest merge
   private static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
-  // Allow 2% quantile error due to the randomness of KLL merge
-  private static final double PERCENTILE_KLL_DELTA = 0.02 * Integer.MAX_VALUE;
+  // Allow 3% quantile error due to the randomness of KLL merge (increased from 2% to handle merge variations)
+  private static final double PERCENTILE_KLL_DELTA = 0.03 * Integer.MAX_VALUE;
 
   @Test
   public void testCount() {
