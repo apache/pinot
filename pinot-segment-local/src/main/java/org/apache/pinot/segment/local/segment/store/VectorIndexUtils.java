@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswC
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 
 
 public class VectorIndexUtils {
@@ -75,16 +76,31 @@ public class VectorIndexUtils {
    */
   @Nullable
   public static String detectVectorIndexBackend(File segDir, String column) {
-    if (new File(segDir, column + Indexes.VECTOR_IVFPQ_INDEX_FILE_EXTENSION).exists()) {
+    // Check both the root directory and the V3 subdirectory
+    String result = detectBackendInDir(segDir, column);
+    if (result != null) {
+      return result;
+    }
+    // For V3 segments, files live under segDir/v3/
+    File v3Dir = SegmentDirectoryPaths.findSegmentDirectory(segDir);
+    if (v3Dir != null && !v3Dir.equals(segDir)) {
+      return detectBackendInDir(v3Dir, column);
+    }
+    return null;
+  }
+
+  @Nullable
+  private static String detectBackendInDir(File dir, String column) {
+    if (new File(dir, column + Indexes.VECTOR_IVFPQ_INDEX_FILE_EXTENSION).exists()) {
       return "IVF_PQ";
     }
-    if (new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION).exists()) {
+    if (new File(dir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION).exists()) {
       return "IVF_FLAT";
     }
-    if (new File(segDir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION).exists()) {
+    if (new File(dir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).exists()
+        || new File(dir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists()
+        || new File(dir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION).exists()
+        || new File(dir, column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION).exists()) {
       return "HNSW";
     }
     return null;

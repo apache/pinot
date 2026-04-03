@@ -199,11 +199,17 @@ public class IvfPqVectorIndexReader implements VectorIndexReader {
     int effectiveNprobe = resolveNprobe(searchParams);
     boolean exactRerank = resolveExactRerank(searchParams);
 
+    // For COSINE distance, normalize the query vector before probing/scoring.
+    // The index was built on normalized vectors, so probing and PQ ADC tables
+    // must operate in the same normalized space.
+    float[] searchVector = _distanceFunctionCode == IvfPqIndexFormat.DIST_COSINE
+        ? VectorDistanceUtil.normalize(queryVector) : queryVector;
+
     // For exact rerank, we generate more candidates to improve recall after reranking
     int candidateTopK = exactRerank ? topK * RERANK_CANDIDATE_MULTIPLIER : topK;
 
     // Step 1: Find closest coarse centroids
-    int[] probedLists = KMeans.findKNearest(queryVector, _coarseCentroids, _dimension, effectiveNprobe);
+    int[] probedLists = KMeans.findKNearest(searchVector, _coarseCentroids, _dimension, effectiveNprobe);
 
     // Step 2: Score candidates using PQ distances
     PriorityQueue<ScoredDoc> topKHeap = new PriorityQueue<>(candidateTopK + 1,
@@ -218,10 +224,10 @@ public class IvfPqVectorIndexReader implements VectorIndexReader {
         continue;
       }
 
-      // Build PQ distance tables for residual: query - coarseCentroid
+      // Build PQ distance tables for residual: searchVector - coarseCentroid
       float[] residualQuery = new float[_dimension];
       for (int d = 0; d < _dimension; d++) {
-        residualQuery[d] = queryVector[d] - _coarseCentroids[listIdx][d];
+        residualQuery[d] = searchVector[d] - _coarseCentroids[listIdx][d];
       }
       float[][] distTables = _pq.buildDistanceTables(residualQuery);
 

@@ -216,6 +216,11 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         .isSingleValueField()) {
       return null;
     }
+    // IVF_PQ does not support mutable/realtime segments. Return null so the
+    // consuming segment falls back to exact scan rather than silently using HNSW.
+    if ("IVF_PQ".equals(config.getVectorIndexType())) {
+      return null;
+    }
 
     VectorBackendType backendType = config.resolveBackendType();
     switch (backendType) {

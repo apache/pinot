@@ -101,7 +101,10 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
 
   @Override
   public void add(float[] document) {
-    _vectors.add(document);
+    // Clone the input array because callers (e.g., VectorIndexHandler) may reuse
+    // the same buffer across rows. Without cloning, all stored references would
+    // point to the last row's values, corrupting the index.
+    _vectors.add(document.clone());
     _docIds.add(_nextDocId++);
   }
 
@@ -118,8 +121,18 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
 
     Random random = new Random(_trainingSeed);
 
+    // Step 0: For COSINE distance, normalize all vectors before training/indexing.
+    // L2 distance on unit-normalized vectors is monotonically related to cosine distance,
+    // so L2-based centroid probing and PQ ADC tables produce correct cosine ranking.
+    // Original (unnormalized) vectors are still stored for exact rerank.
+    boolean isCosine = _distanceFunctionCode == IvfPqIndexFormat.DIST_COSINE;
+    float[][] indexVectors = new float[numVectors][];
+    for (int i = 0; i < numVectors; i++) {
+      indexVectors[i] = isCosine ? VectorDistanceUtil.normalize(_vectors.get(i)) : _vectors.get(i);
+    }
+
     // Step 1: Sample training vectors
-    float[][] trainingSample = sampleTrainingVectors(random);
+    float[][] trainingSample = sampleTrainingVectors(indexVectors, random);
     LOGGER.info("IVF_PQ training sample size: {}", trainingSample.length);
 
     // Step 2: Train coarse IVF centroids
@@ -131,7 +144,7 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
     int[] assignments = new int[numVectors];
     float[][] residuals = new float[numVectors][_dimension];
     for (int i = 0; i < numVectors; i++) {
-      float[] vec = _vectors.get(i);
+      float[] vec = indexVectors[i];
       assignments[i] = KMeans.findNearest(vec, coarseCentroids, _dimension);
       float[] centroid = coarseCentroids[assignments[i]];
       for (int d = 0; d < _dimension; d++) {
@@ -242,11 +255,11 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
     }
   }
 
-  private float[][] sampleTrainingVectors(Random random) {
-    int numVectors = _vectors.size();
+  private float[][] sampleTrainingVectors(float[][] vectors, Random random) {
+    int numVectors = vectors.length;
     int sampleSize = Math.min(_trainSampleSize, numVectors);
     if (sampleSize == numVectors) {
-      return _vectors.toArray(new float[0][]);
+      return vectors;
     }
 
     // Fisher-Yates shuffle on indices, take first sampleSize
@@ -263,7 +276,7 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
 
     float[][] sample = new float[sampleSize][];
     for (int i = 0; i < sampleSize; i++) {
-      sample[i] = _vectors.get(indices[i]);
+      sample[i] = vectors[indices[i]];
     }
     return sample;
   }

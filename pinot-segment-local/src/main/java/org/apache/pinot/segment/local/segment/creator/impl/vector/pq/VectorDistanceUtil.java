@@ -85,6 +85,24 @@ public final class VectorDistanceUtil {
   }
 
   /**
+   * Returns a unit-normalized copy of the vector.
+   */
+  public static float[] normalize(float[] vector) {
+    float norm = 0;
+    for (float v : vector) {
+      norm += v * v;
+    }
+    norm = (float) Math.sqrt(norm);
+    float[] result = new float[vector.length];
+    if (norm > 0) {
+      for (int i = 0; i < vector.length; i++) {
+        result[i] = vector[i] / norm;
+      }
+    }
+    return result;
+  }
+
+  /**
    * Negative inner product as distance (lower = higher similarity).
    */
   public static float negativeInnerProduct(float[] a, float[] b, int dim) {
