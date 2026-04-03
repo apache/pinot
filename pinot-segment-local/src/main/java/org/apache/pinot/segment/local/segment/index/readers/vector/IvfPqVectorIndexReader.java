@@ -28,44 +28,36 @@ import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.pq.IvfPqIndexFormat;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.pq.IvfPqVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.pq.KMeans;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.pq.ProductQuantizer;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.pq.VectorDistanceUtil;
+import org.apache.pinot.segment.spi.index.reader.NprobeAware;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Reader for IVF_PQ vector index. Loads the index file into memory-mapped buffers
+ * Reader for IVF_PQ vector index. Loads the compact index (no original vectors)
  * and performs approximate nearest-neighbor search using IVF + Product Quantization.
  *
- * <p>Supports runtime query options:
- * <ul>
- *   <li>{@code vectorNprobe} - number of coarse centroids to probe (overrides config default)</li>
- *   <li>{@code vectorExactRerank} - whether to rerank candidates using exact distances (default: true)</li>
- * </ul>
+ * <p>Exact rerank is handled by the operator layer via the forward index reader,
+ * not by this reader. This keeps the index file compact (only PQ codes + docIds).</p>
  *
  * <p>Search flow:
  * <ol>
  *   <li>Find the nprobe closest coarse centroids to the query vector</li>
- *   <li>Score all candidates in probed lists using approximate PQ distances</li>
- *   <li>If exact rerank is enabled, rerank using original vectors</li>
- *   <li>Return top-K candidates as doc IDs</li>
+ *   <li>Score all candidates in probed lists using approximate PQ distances (ADC)</li>
+ *   <li>Return top-K approximate candidates as doc IDs</li>
  * </ol>
  */
-public class IvfPqVectorIndexReader implements VectorIndexReader {
+public class IvfPqVectorIndexReader implements VectorIndexReader, NprobeAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfPqVectorIndexReader.class);
   private static final int DEFAULT_NPROBE = 8;
-  private static final boolean DEFAULT_EXACT_RERANK = true;
-  private static final int RERANK_CANDIDATE_MULTIPLIER = 4;
 
   private final String _column;
   private final int _dimension;
@@ -73,22 +65,21 @@ public class IvfPqVectorIndexReader implements VectorIndexReader {
   private final int _pqM;
   private final int _pqNbits;
   private final int _numVectors;
-  private final int _defaultNprobe;
   private final int _distanceFunctionCode;
 
   private final float[][] _coarseCentroids;
   private final ProductQuantizer _pq;
 
-  // Inverted lists
+  // Inverted lists: docIds and PQ codes per list
   private final int[][] _listDocIds;
   private final byte[][][] _listPqCodes;
-  private final float[][][] _listOriginalVectors;
 
+  private volatile int _nprobe;
   private final Closeable _closeHandle;
 
   public IvfPqVectorIndexReader(String column, File segmentDir, int numDocs, int nprobe) {
     _column = column;
-    _defaultNprobe = nprobe > 0 ? nprobe : DEFAULT_NPROBE;
+    _nprobe = nprobe > 0 ? nprobe : DEFAULT_NPROBE;
 
     File indexFile = findIndexFile(segmentDir);
     if (indexFile == null) {
@@ -124,14 +115,12 @@ public class IvfPqVectorIndexReader implements VectorIndexReader {
         _coarseCentroids = new float[0][];
         int safeDim = Math.max(_dimension, 1);
         int safeM = Math.max(_pqM, 1);
-        // Ensure safeDim is divisible by safeM for ProductQuantizer
         if (safeDim % safeM != 0) {
           safeM = 1;
         }
         _pq = new ProductQuantizer(safeDim, safeM, Math.max(_pqNbits, 1));
         _listDocIds = new int[0][];
         _listPqCodes = new byte[0][][];
-        _listOriginalVectors = new float[0][][];
         return;
       }
 
@@ -155,10 +144,9 @@ public class IvfPqVectorIndexReader implements VectorIndexReader {
       _pq = new ProductQuantizer(_dimension, _pqM, _pqNbits);
       _pq.setCodebooks(codebooks);
 
-      // Read inverted lists (docIds + PQ codes + original vectors)
+      // Read inverted lists (docIds + PQ codes only — no original vectors)
       _listDocIds = new int[_nlist][];
       _listPqCodes = new byte[_nlist][][];
-      _listOriginalVectors = new float[_nlist][][];
       for (int list = 0; list < _nlist; list++) {
         int listSize = buffer.getInt();
         _listDocIds[list] = new int[listSize];
@@ -168,12 +156,6 @@ public class IvfPqVectorIndexReader implements VectorIndexReader {
         _listPqCodes[list] = new byte[listSize][_pqM];
         for (int i = 0; i < listSize; i++) {
           buffer.get(_listPqCodes[list][i]);
-        }
-        _listOriginalVectors[list] = new float[listSize][_dimension];
-        for (int i = 0; i < listSize; i++) {
-          for (int d = 0; d < _dimension; d++) {
-            _listOriginalVectors[list][i][d] = buffer.getFloat();
-          }
         }
       }
 
@@ -186,33 +168,21 @@ public class IvfPqVectorIndexReader implements VectorIndexReader {
 
   @Override
   public MutableRoaringBitmap getDocIds(float[] queryVector, int topK) {
-    return (MutableRoaringBitmap) getDocIds(queryVector, topK, null);
-  }
-
-  @Override
-  public ImmutableRoaringBitmap getDocIds(float[] queryVector, int topK, @Nullable Map<String, String> searchParams) {
     if (_numVectors == 0 || _nlist == 0) {
       return new MutableRoaringBitmap();
     }
 
-    // Resolve runtime parameters
-    int effectiveNprobe = resolveNprobe(searchParams);
-    boolean exactRerank = resolveExactRerank(searchParams);
-
-    // For COSINE distance, normalize the query vector before probing/scoring.
-    // The index was built on normalized vectors, so probing and PQ ADC tables
-    // must operate in the same normalized space.
+    // For COSINE, normalize query to match the normalized index vectors
     float[] searchVector = _distanceFunctionCode == IvfPqIndexFormat.DIST_COSINE
         ? VectorDistanceUtil.normalize(queryVector) : queryVector;
 
-    // For exact rerank, we generate more candidates to improve recall after reranking
-    int candidateTopK = exactRerank ? topK * RERANK_CANDIDATE_MULTIPLIER : topK;
+    int effectiveNprobe = Math.min(_nprobe, _nlist);
 
     // Step 1: Find closest coarse centroids
     int[] probedLists = KMeans.findKNearest(searchVector, _coarseCentroids, _dimension, effectiveNprobe);
 
-    // Step 2: Score candidates using PQ distances
-    PriorityQueue<ScoredDoc> topKHeap = new PriorityQueue<>(candidateTopK + 1,
+    // Step 2: Score candidates using PQ ADC distances
+    PriorityQueue<ScoredDoc> topKHeap = new PriorityQueue<>(topK + 1,
         (a, b) -> Float.compare(b._score, a._score)); // max-heap
 
     for (int listIdx : probedLists) {
@@ -233,83 +203,29 @@ public class IvfPqVectorIndexReader implements VectorIndexReader {
 
       for (int i = 0; i < listSize; i++) {
         float approxDist = _pq.computeDistanceFromTables(distTables, _listPqCodes[listIdx][i]);
-        if (topKHeap.size() < candidateTopK) {
-          topKHeap.add(new ScoredDoc(_listDocIds[listIdx][i], approxDist, listIdx, i));
+        if (topKHeap.size() < topK) {
+          topKHeap.add(new ScoredDoc(_listDocIds[listIdx][i], approxDist));
         } else if (approxDist < topKHeap.peek()._score) {
           topKHeap.poll();
-          topKHeap.add(new ScoredDoc(_listDocIds[listIdx][i], approxDist, listIdx, i));
+          topKHeap.add(new ScoredDoc(_listDocIds[listIdx][i], approxDist));
         }
       }
     }
 
-    // Step 3: Exact rerank if enabled
-    if (exactRerank && !topKHeap.isEmpty()) {
-      return rerankAndCollect(queryVector, topKHeap, topK);
-    }
-
-    // Collect results into bitmap (no rerank, take top topK from candidates)
+    // Collect results into bitmap
     MutableRoaringBitmap result = new MutableRoaringBitmap();
-    if (topKHeap.size() <= topK) {
-      for (ScoredDoc doc : topKHeap) {
-        result.add(doc._docId);
-      }
-    } else {
-      // Need to take only the topK best from candidateTopK (already in heap)
-      // Drain heap into array, sort by score ascending, take topK
-      ScoredDoc[] candidates = topKHeap.toArray(new ScoredDoc[0]);
-      java.util.Arrays.sort(candidates, (a, b) -> Float.compare(a._score, b._score));
-      for (int i = 0; i < Math.min(topK, candidates.length); i++) {
-        result.add(candidates[i]._docId);
-      }
-    }
-    return result;
-  }
-
-  private ImmutableRoaringBitmap rerankAndCollect(float[] queryVector, PriorityQueue<ScoredDoc> candidates, int topK) {
-    // Rerank using exact L2 distances from original vectors
-    PriorityQueue<ScoredDoc> rerankHeap = new PriorityQueue<>(topK + 1,
-        (a, b) -> Float.compare(b._score, a._score)); // max-heap
-
-    for (ScoredDoc candidate : candidates) {
-      float[] originalVector = _listOriginalVectors[candidate._listIdx][candidate._posInList];
-      float exactDist = VectorDistanceUtil.computeDistance(queryVector, originalVector, _dimension,
-          _distanceFunctionCode);
-      if (rerankHeap.size() < topK) {
-        rerankHeap.add(new ScoredDoc(candidate._docId, exactDist, candidate._listIdx, candidate._posInList));
-      } else if (exactDist < rerankHeap.peek()._score) {
-        rerankHeap.poll();
-        rerankHeap.add(new ScoredDoc(candidate._docId, exactDist, candidate._listIdx, candidate._posInList));
-      }
-    }
-
-    MutableRoaringBitmap result = new MutableRoaringBitmap();
-    for (ScoredDoc doc : rerankHeap) {
+    for (ScoredDoc doc : topKHeap) {
       result.add(doc._docId);
     }
     return result;
   }
 
-  private int resolveNprobe(@Nullable Map<String, String> searchParams) {
-    if (searchParams != null) {
-      String nprobeStr = searchParams.get(QueryOptionKey.VECTOR_NPROBE);
-      if (nprobeStr != null) {
-        int nprobe = Integer.parseInt(nprobeStr);
-        if (nprobe > 0) {
-          return Math.min(nprobe, _nlist);
-        }
-      }
+  @Override
+  public void setNprobe(int nprobe) {
+    if (nprobe < 1) {
+      throw new IllegalArgumentException("nprobe must be >= 1, got: " + nprobe);
     }
-    return Math.min(_defaultNprobe, _nlist);
-  }
-
-  private boolean resolveExactRerank(@Nullable Map<String, String> searchParams) {
-    if (searchParams != null) {
-      String rerankStr = searchParams.get(QueryOptionKey.VECTOR_EXACT_RERANK);
-      if (rerankStr != null) {
-        return Boolean.parseBoolean(rerankStr);
-      }
-    }
-    return DEFAULT_EXACT_RERANK;
+    _nprobe = Math.min(nprobe, Math.max(_nlist, 1));
   }
 
   @Override
@@ -319,11 +235,10 @@ public class IvfPqVectorIndexReader implements VectorIndexReader {
     info.put("nlist", String.valueOf(_nlist));
     info.put("pqM", String.valueOf(_pqM));
     info.put("pqNbits", String.valueOf(_pqNbits));
-    info.put("nprobe", String.valueOf(_defaultNprobe));
+    info.put("nprobe", String.valueOf(_nprobe));
     info.put("numVectors", String.valueOf(_numVectors));
     info.put("dimension", String.valueOf(_dimension));
     info.put("distanceFunction", distanceFunctionName(_distanceFunctionCode));
-    info.put("exactRerank", String.valueOf(DEFAULT_EXACT_RERANK));
     return info;
   }
 
@@ -366,14 +281,10 @@ public class IvfPqVectorIndexReader implements VectorIndexReader {
   private static class ScoredDoc {
     final int _docId;
     final float _score;
-    final int _listIdx;
-    final int _posInList;
 
-    ScoredDoc(int docId, float score, int listIdx, int posInList) {
+    ScoredDoc(int docId, float score) {
       _docId = docId;
       _score = score;
-      _listIdx = listIdx;
-      _posInList = posInList;
     }
   }
 }

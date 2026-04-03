@@ -229,14 +229,6 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
         for (int idx : members) {
           dos.write(allCodes[idx]);
         }
-
-        // Write original vectors for exact rerank
-        for (int idx : members) {
-          float[] vec = _vectors.get(idx);
-          for (int d = 0; d < _dimension; d++) {
-            writeLittleEndianFloat(dos, vec[d]);
-          }
-        }
       }
     }
   }

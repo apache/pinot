@@ -45,7 +45,6 @@ package org.apache.pinot.segment.local.segment.creator.impl.vector.pq;
  *       listSize (4 bytes)     = number of vectors in this list
  *       docIds (int[listSize]) = Pinot document IDs
  *       pqCodes (byte[listSize][pqM]) = PQ codes for each vector
- *       originalVectors (float[listSize][dimension]) = original vectors for exact rerank
  * </pre>
  */
 public final class IvfPqIndexFormat {
