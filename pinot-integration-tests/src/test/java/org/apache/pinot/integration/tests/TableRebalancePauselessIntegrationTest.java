@@ -151,29 +151,34 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
           && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
           tableConfig.getRoutingConfig().getInstanceSelectorType())) {
         // test: move segments from tenantA to tenantB
-        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantB, true,
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true,
             FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
+        waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantB to tenantA with batch size
         rebalanceConfig.setBatchSizePerServer(1);
-        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantA, true,
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, true,
             FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
+        waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
         // committed
         rebalanceConfig.setIncludeConsuming(false);
-        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantB, false,
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false,
             FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
+        waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       } else {
         // test: move segments from tenantA to tenantB
-        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantB, true,
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true,
             FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
+        waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
 
         // test: move segment from tenantB to tenantA with includeConsuming = false, consuming segment should not be
         // committed
         rebalanceConfig.setIncludeConsuming(false);
-        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantA, false,
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, false,
             FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
+        waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       }
     } catch (Exception e) {
       Assert.fail("Caught exception during force commit test", e);
