@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.io.codec.transform.ChunkTransformFactory;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
@@ -34,6 +35,8 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeInd
 import org.apache.pinot.segment.local.segment.index.loader.ForwardIndexHandler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.codec.ChunkCodec;
+import org.apache.pinot.segment.spi.codec.ChunkCodecPipeline;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
@@ -109,7 +112,25 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
       FieldSpec fieldSpec) {
     String column = fieldSpec.getName();
     CompressionCodec compressionCodec = forwardIndexConfig.getCompressionCodec();
+    ChunkCodecPipeline codecPipeline = forwardIndexConfig.getCodecPipeline();
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
+
+    // Validate codec pipeline transform stages.
+    // Compression-only pipelines (e.g., [LZ4], [DELTA_LZ4]) don't restrict column types.
+    // Transform pipelines (e.g., [DELTA, ZSTANDARD], [XOR, LZ4]) require SV, fixed-width columns.
+    if (codecPipeline != null && codecPipeline.hasTransforms()) {
+      Preconditions.checkState(!dictionaryConfig.isEnabled(),
+          "codecPipeline with transforms is not applicable to dictionary encoded column: %s", column);
+      Preconditions.checkState(fieldSpec.isSingleValueField(),
+          "codecPipeline with transforms is only supported on single-value columns, not applicable to column: %s",
+          column);
+      // Delegate per-transform type validation to each transform class
+      FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+      for (ChunkCodec transformCodec : codecPipeline.getTransforms()) {
+        ChunkTransformFactory.getTransform(transformCodec).validateStoredType(storedType, column);
+      }
+    }
+
     if (dictionaryConfig.isEnabled()) {
       Preconditions.checkState(compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex(),
           "Compression codec: %s is not applicable to dictionary encoded column: %s", compressionCodec, column);
@@ -202,7 +223,16 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig) {
     ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder();
-    builder.withCompressionCodec(fieldConfig.getCompressionCodec());
+
+    // FieldConfig validates mutual exclusivity: only one of compressionCodec/codecPipeline can be set.
+    // ForwardIndexConfig auto-derives pipeline from compressionCodec when codecPipeline is null.
+    List<String> pipelineNames = fieldConfig.getCodecPipeline();
+    if (pipelineNames != null && !pipelineNames.isEmpty()) {
+      builder.withCodecPipeline(ChunkCodecPipeline.fromNames(pipelineNames));
+    } else {
+      builder.withCompressionCodec(fieldConfig.getCompressionCodec());
+    }
+
     Map<String, String> properties = fieldConfig.getProperties();
     if (properties != null) {
       builder.withLegacyProperties(properties);

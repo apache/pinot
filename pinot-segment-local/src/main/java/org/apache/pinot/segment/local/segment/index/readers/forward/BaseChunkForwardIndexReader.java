@@ -27,7 +27,10 @@ import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.segment.local.io.codec.compression.ChunkCompressorFactory;
+import org.apache.pinot.segment.local.io.codec.transform.ChunkTransformFactory;
+import org.apache.pinot.segment.spi.codec.ChunkCodec;
+import org.apache.pinot.segment.spi.codec.ChunkCodecPipeline;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -50,6 +53,8 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   protected final int _lengthOfLongestEntry;
   protected final boolean _isCompressed;
   protected final ChunkCompressionType _compressionType;
+  // Null for segments written with version < 7 (no pipeline support)
+  protected final ChunkCodecPipeline _codecPipeline;
   protected final ChunkDecompressor _chunkDecompressor;
   protected final PinotDataBuffer _dataHeader;
   protected final int _headerEntryChunkOffsetSize;
@@ -79,11 +84,41 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     headerOffset += Integer.BYTES;
 
     int dataHeaderStart = headerOffset;
-    if (version > 1) {
+    if (version == 7) {
+      // Version 7: codec pipeline header
+      _dataBuffer.getInt(headerOffset); // Total docs
+      headerOffset += Integer.BYTES;
+
+      int pipelineLength = _dataBuffer.getInt(headerOffset);
+      headerOffset += Integer.BYTES;
+
+      int[] codecValues = new int[pipelineLength];
+      for (int i = 0; i < pipelineLength; i++) {
+        codecValues[i] = _dataBuffer.getInt(headerOffset);
+        headerOffset += Integer.BYTES;
+      }
+      ChunkCodecPipeline pipeline = ChunkCodecPipeline.fromValues(codecValues);
+      _codecPipeline = pipeline;
+      _compressionType = pipeline.getChunkCompressionType();
+
+      int valueSizeInBytes = storedType.isFixedWidth() ? storedType.size() : 0;
+      if (pipeline.hasTransforms()) {
+        // Delegate per-transform type validation to each transform class
+        for (ChunkCodec transformCodec : pipeline.getTransforms()) {
+          ChunkTransformFactory.getTransform(transformCodec).validateStoredType(storedType, "unknown");
+        }
+      }
+      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(pipeline, valueSizeInBytes);
+      _isCompressed = !_compressionType.equals(ChunkCompressionType.PASS_THROUGH) || pipeline.hasTransforms();
+
+      dataHeaderStart = _dataBuffer.getInt(headerOffset);
+    } else if (version > 1) {
+      // Version 2-5: legacy single compression type
       _dataBuffer.getInt(headerOffset); // Total docs
       headerOffset += Integer.BYTES;
 
       _compressionType = ChunkCompressionType.valueOf(_dataBuffer.getInt(headerOffset));
+      _codecPipeline = null;
       _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_compressionType);
       _isCompressed = !_compressionType.equals(ChunkCompressionType.PASS_THROUGH);
 
@@ -92,6 +127,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     } else {
       _isCompressed = true;
       _compressionType = ChunkCompressionType.SNAPPY;
+      _codecPipeline = null;
       _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_compressionType);
     }
 
@@ -275,6 +311,11 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   @Override
   public ChunkCompressionType getCompressionType() {
     return _compressionType;
+  }
+
+  @Override
+  public ChunkCodecPipeline getCodecPipeline() {
+    return _codecPipeline;
   }
 
   @Override
