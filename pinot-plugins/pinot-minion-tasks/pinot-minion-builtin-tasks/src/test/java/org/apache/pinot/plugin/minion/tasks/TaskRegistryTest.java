@@ -27,6 +27,8 @@ import org.apache.pinot.plugin.minion.tasks.purge.PurgeTaskExecutorFactory;
 import org.apache.pinot.plugin.minion.tasks.purge.PurgeTaskGenerator;
 import org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskExecutorFactory;
 import org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskGenerator;
+import org.apache.pinot.plugin.minion.tasks.materializedview.MaterializedViewTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.materializedview.MaterializedViewTaskGenerator;
 import org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush.SegmentGenerationAndPushTaskExecutorFactory;
 import org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush.SegmentGenerationAndPushTaskGenerator;
 import org.testng.annotations.Test;
@@ -43,6 +45,7 @@ public class TaskRegistryTest {
     assertTrue(classes.contains(PurgeTaskGenerator.class));
     assertTrue(classes.contains(SegmentGenerationAndPushTaskGenerator.class));
     assertTrue(classes.contains(RealtimeToOfflineSegmentsTaskGenerator.class));
+    assertTrue(classes.contains(MaterializedViewTaskGenerator.class));
   }
 
   @Test
@@ -52,5 +55,6 @@ public class TaskRegistryTest {
     assertTrue(classes.contains(PurgeTaskExecutorFactory.class));
     assertTrue(classes.contains(SegmentGenerationAndPushTaskExecutorFactory.class));
     assertTrue(classes.contains(RealtimeToOfflineSegmentsTaskExecutorFactory.class));
+    assertTrue(classes.contains(MaterializedViewTaskExecutorFactory.class));
   }
 }
