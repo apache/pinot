@@ -862,7 +862,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
           segmentName, column);
       ColumnIndexCreationInfo creationInfo =
-          new ColumnIndexCreationInfo(statsCollector, true, useVarLength, false, fieldSpec.getDefaultNullValue());
+          new ColumnIndexCreationInfo(statsCollector, useVarLength, false, fieldSpec.getDefaultNullValue());
       IndexCreationContext context = IndexCreationContext.builder()
           .withIndexDir(indexDir)
           .withFieldSpec(fieldSpec)
