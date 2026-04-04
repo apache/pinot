@@ -29,10 +29,6 @@ on:
         description: "The branch/commit to check out to build Pinot image."
         default: "master"
         required: true
-      platform:
-        description: "The platform of the image to build, e.g. linux/amd64,linux/arm64"
-        default: "linux/amd64"
-        required: true
       dockerImageName:
         description: "The docker image name, default to 'apachepinot/pinot'."
         default: "apachepinot/pinot"
@@ -42,26 +38,63 @@ on:
         default: ""
 
 jobs:
+  generate-build-info:
+    name: Generate Build Info
+    runs-on: ubuntu-24.04
+    outputs:
+      commit-id: ${{ steps.generate-build-info.outputs.commit-id }}
+      tags: ${{ steps.generate-build-info.outputs.tags }}
+    steps:
+    - uses: actions/checkout@v5
+    - name: Generate Build Info
+      id: generate-build-info
+      env:
+        PINOT_GIT_URL: ${{ github.event.inputs.gitUrl }}
+        PINOT_BRANCH: ${{ github.event.inputs.commit }}
+        TAGS: ${{ github.event.inputs.tags }}
+      run: .github/workflows/scripts/docker/.pinot_build_info_gen.sh
   build-pinot-docker-image:
-    name: Build Pinot Docker Image
-    runs-on: ubuntu-latest
+    name: Build Pinot Docker Image on ${{ matrix.arch }}
+    needs: [ generate-build-info ]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        arch: [ "amd64", "arm64" ]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
     - name: Login to DockerHub
-      uses: docker/login-action@v4
+      uses: docker/login-action@v4.0.0
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - uses: docker/setup-qemu-action@v4
-      name: Set up QEMU
-    - uses: docker/setup-buildx-action@v4
-      name: Set up Docker Buildx
     - uses: actions/checkout@v5
     - name: Build and push the Docker image
       env:
         DOCKER_FILE_BASE_DIR: "docker/images/pinot"
         DOCKER_IMAGE_NAME: ${{ github.event.inputs.dockerImageName }}
-        BUILD_PLATFORM: ${{ github.event.inputs.platform }}
+        BUILD_PLATFORM: "linux/${{ matrix.arch }}"
         PINOT_GIT_URL: ${{ github.event.inputs.gitUrl }}
-        PINOT_BRANCH: ${{ github.event.inputs.commit }}
-        TAGS: ${{ github.event.inputs.tags }}
+        PINOT_BRANCH: "${{ needs.generate-build-info.outputs.commit-id }}"
+        TAGS: "${{ needs.generate-build-info.outputs.tags }}"
       run: .github/workflows/scripts/docker/.pinot_docker_image_build_and_push.sh
+  create-multi-arch-manifest:
+    name: Create Multi-Arch Manifest
+    needs: [ generate-build-info, build-pinot-docker-image ]
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Login to DockerHub
+      uses: docker/login-action@v4.0.0
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - uses: actions/checkout@v5
+    - name: Create Multi-Arch Manifest
+      env:
+        DOCKER_IMAGE_NAME: ${{ github.event.inputs.dockerImageName }}
+        TAGS: "${{ needs.generate-build-info.outputs.tags }}"
+        BUILD_PLATFORM: "linux/amd64,linux/arm64"
+      run: .github/workflows/scripts/docker/.pinot_docker_image_manifest_package.sh

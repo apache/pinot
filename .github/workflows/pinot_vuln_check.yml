@@ -37,8 +37,6 @@ jobs:
     name: Verify Docker Image
     runs-on: ubuntu-latest
     steps:
-      - uses: docker/setup-qemu-action@v4
-        name: Set up QEMU
       - uses: actions/checkout@v5
       - name: Build the Docker image
         env:
@@ -49,17 +47,15 @@ jobs:
           PINOT_SHA: ${{ github.sha }}
         run: .github/workflows/scripts/.pinot_vuln_check.sh
 
-      - name: Run Trivy vulnerability scanner (sarif)
-        uses: aquasecurity/trivy-action@master
+      - name: Run Anchore vulnerability scanner (sarif)
+        uses: anchore/scan-action@v7.4.0
+        id: scan
         with:
-          trivyignores: '.trivyignore'
-          image-ref: 'apachepinot/pinot:${{ github.sha }}'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          timeout: '10m'
-      - name: Upload Trivy scan results to GitHub Security tab
+          image: 'apachepinot/pinot:${{ github.sha }}'
+          severity-cutoff: 'high'
+          output-format: 'sarif'
+          fail-build: false
+      - name: Upload vulnerability scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: ${{ steps.scan.outputs.sarif }}
