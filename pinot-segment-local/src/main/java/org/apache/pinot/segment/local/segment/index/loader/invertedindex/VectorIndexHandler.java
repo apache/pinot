@@ -73,9 +73,11 @@ public class VectorIndexHandler extends BaseIndexHandler {
       // Check if the backend type changed (e.g., HNSW -> IVF_PQ or vice versa)
       VectorIndexConfig desiredConfig = _vectorConfigs.get(column);
       if (desiredConfig != null) {
-        String desiredBackend = desiredConfig.getVectorIndexType();
+        // Resolve desired backend: null/empty defaults to HNSW
+        String rawDesired = desiredConfig.getVectorIndexType();
+        String desiredBackend = (rawDesired == null || rawDesired.isEmpty()) ? "HNSW" : rawDesired.toUpperCase();
         String existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
-        if (desiredBackend != null && existingBackend != null && !desiredBackend.equals(existingBackend)) {
+        if (existingBackend != null && !desiredBackend.equalsIgnoreCase(existingBackend)) {
           LOGGER.info("Need to rebuild Vector index for segment: {}, column: {} (backend changed from {} to {})",
               segmentName, column, existingBackend, desiredBackend);
           return true;
@@ -109,9 +111,10 @@ public class VectorIndexHandler extends BaseIndexHandler {
       } else {
         // Check if backend type changed — if so, remove old index and rebuild
         VectorIndexConfig desiredConfig = _vectorConfigs.get(column);
-        String desiredBackend = desiredConfig != null ? desiredConfig.getVectorIndexType() : null;
+        String rawDesired = desiredConfig != null ? desiredConfig.getVectorIndexType() : null;
+        String desiredBackend = (rawDesired == null || rawDesired.isEmpty()) ? "HNSW" : rawDesired.toUpperCase();
         String existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
-        if (desiredBackend != null && existingBackend != null && !desiredBackend.equals(existingBackend)) {
+        if (existingBackend != null && !desiredBackend.equalsIgnoreCase(existingBackend)) {
           LOGGER.info("Rebuilding Vector index for segment: {}, column: {} (backend changed from {} to {})",
               segmentName, column, existingBackend, desiredBackend);
           segmentWriter.removeIndex(column, StandardIndexes.vector());

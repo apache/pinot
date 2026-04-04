@@ -172,8 +172,10 @@ public class IvfPqVectorIndexReader implements VectorIndexReader, NprobeAware {
       return new MutableRoaringBitmap();
     }
 
-    // For COSINE, normalize query to match the normalized index vectors
-    float[] searchVector = _distanceFunctionCode == IvfPqIndexFormat.DIST_COSINE
+    // For COSINE and INNER_PRODUCT, normalize query to match the normalized index vectors.
+    // L2 on unit-normalized vectors preserves both cosine and inner-product ranking.
+    float[] searchVector = (_distanceFunctionCode == IvfPqIndexFormat.DIST_COSINE
+        || _distanceFunctionCode == IvfPqIndexFormat.DIST_INNER_PRODUCT)
         ? VectorDistanceUtil.normalize(queryVector) : queryVector;
 
     int effectiveNprobe = Math.min(_nprobe, _nlist);

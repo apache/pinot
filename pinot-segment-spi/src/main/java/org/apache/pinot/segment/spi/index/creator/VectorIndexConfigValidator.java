@@ -188,18 +188,34 @@ public final class VectorIndexConfigValidator {
   private static void validateIvfPqProperties(VectorIndexConfig config, Map<String, String> properties) {
     validatePositiveIntProperty(properties, "nlist", "IVF_PQ nlist");
     validatePositiveIntProperty(properties, "nprobe", "IVF_PQ nprobe");
+    validatePositiveIntProperty(properties, "trainSampleSize", "IVF_PQ trainSampleSize");
+
+    // If both nlist and trainSampleSize are specified, trainSampleSize must be >= nlist
+    if (properties.containsKey("nlist") && properties.containsKey("trainSampleSize")) {
+      int nlist = Integer.parseInt(properties.get("nlist"));
+      int trainSampleSize = Integer.parseInt(properties.get("trainSampleSize"));
+      if (trainSampleSize < nlist) {
+        throw new IllegalArgumentException(
+            "IVF_PQ trainSampleSize (" + trainSampleSize + ") must be >= nlist (" + nlist + ")");
+      }
+    }
 
     int dimension = config.getVectorDimension();
+
+    // Validate pqM: if provided, check it; otherwise validate the implicit default (32)
+    int pqM;
     String pqMStr = properties.get("pqM");
     if (pqMStr != null) {
-      int pqM = Integer.parseInt(pqMStr);
+      pqM = Integer.parseInt(pqMStr);
       if (pqM <= 0) {
         throw new IllegalArgumentException("IVF_PQ pqM must be a positive integer, got: " + pqM);
       }
-      if (dimension > 0 && dimension % pqM != 0) {
-        throw new IllegalArgumentException(
-            "IVF_PQ pqM (" + pqM + ") must evenly divide vectorDimension (" + dimension + ")");
-      }
+    } else {
+      pqM = 32; // implicit default used by IvfPqVectorIndexCreator
+    }
+    if (dimension > 0 && dimension % pqM != 0) {
+      throw new IllegalArgumentException(
+          "IVF_PQ pqM (" + pqM + ") must evenly divide vectorDimension (" + dimension + ")");
     }
 
     String pqNbitsStr = properties.get("pqNbits");

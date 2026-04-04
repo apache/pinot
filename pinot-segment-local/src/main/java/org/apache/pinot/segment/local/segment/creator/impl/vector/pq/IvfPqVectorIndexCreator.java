@@ -121,14 +121,14 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
 
     Random random = new Random(_trainingSeed);
 
-    // Step 0: For COSINE distance, normalize all vectors before training/indexing.
-    // L2 distance on unit-normalized vectors is monotonically related to cosine distance,
-    // so L2-based centroid probing and PQ ADC tables produce correct cosine ranking.
-    // Original (unnormalized) vectors are still stored for exact rerank.
-    boolean isCosine = _distanceFunctionCode == IvfPqIndexFormat.DIST_COSINE;
+    // Step 0: For COSINE and INNER_PRODUCT distance, normalize all vectors before training/indexing.
+    // L2 distance on unit-normalized vectors preserves ranking for both cosine and inner-product,
+    // so L2-based centroid probing and PQ ADC tables produce correct ranking.
+    boolean needsNormalization = _distanceFunctionCode == IvfPqIndexFormat.DIST_COSINE
+        || _distanceFunctionCode == IvfPqIndexFormat.DIST_INNER_PRODUCT;
     float[][] indexVectors = new float[numVectors][];
     for (int i = 0; i < numVectors; i++) {
-      indexVectors[i] = isCosine ? VectorDistanceUtil.normalize(_vectors.get(i)) : _vectors.get(i);
+      indexVectors[i] = needsNormalization ? VectorDistanceUtil.normalize(_vectors.get(i)) : _vectors.get(i);
     }
 
     // Step 1: Sample training vectors
