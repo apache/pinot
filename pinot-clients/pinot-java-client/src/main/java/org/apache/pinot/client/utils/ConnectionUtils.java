@@ -28,6 +28,7 @@ import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -52,10 +53,25 @@ public class ConnectionUtils {
   }
 
   public static SSLContext getSSLContextFromProperties(Properties properties) {
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(
-        new PinotConfiguration(new MapConfiguration(properties)), PINOT_JAVA_TLS_PREFIX);
+    TlsConfig tlsConfig = getTlsConfigFromProperties(properties);
     TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
     return TlsUtils.getSslContext();
+  }
+
+  public static SSLContext createSSLContextFromProperties(Properties properties) {
+    TlsConfig tlsConfig = getTlsConfigFromProperties(properties);
+    if (!tlsConfig.isCustomized() && !tlsConfig.isInsecure()) {
+      try {
+        return SSLContext.getDefault();
+      } catch (Exception e) {
+        throw new IllegalStateException("Could not initialize default SSL support", e);
+      }
+    }
+    return RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig).getSslContext();
+  }
+
+  public static TlsConfig getTlsConfigFromProperties(Properties properties) {
+    return TlsUtils.extractTlsConfig(new PinotConfiguration(new MapConfiguration(properties)), PINOT_JAVA_TLS_PREFIX);
   }
 
 

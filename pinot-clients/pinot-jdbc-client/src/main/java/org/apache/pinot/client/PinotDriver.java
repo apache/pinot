@@ -39,7 +39,6 @@ import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.grpc.PinotGrpcConnection;
 import org.apache.pinot.client.utils.DriverUtils;
-import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.LoggerFactory;
 
@@ -103,8 +102,9 @@ public class PinotDriver implements Driver {
         pinotControllerTransportFactory.setScheme(info.getProperty(INFO_SCHEME));
         if (info.getProperty(INFO_SCHEME).contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
           if (_sslContext == null) {
-            factory.setSslContext(DriverUtils.getSSLContextFromJDBCProps(info));
-            pinotControllerTransportFactory.setSslContext(TlsUtils.getSslContext());
+            SSLContext sslContext = DriverUtils.getSSLContextFromJDBCProps(info);
+            factory.setSslContext(sslContext);
+            pinotControllerTransportFactory.setSslContext(sslContext);
           } else {
             factory.setSslContext(_sslContext);
             pinotControllerTransportFactory.setSslContext(_sslContext);

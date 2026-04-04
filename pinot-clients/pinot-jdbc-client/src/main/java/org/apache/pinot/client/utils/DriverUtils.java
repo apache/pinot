@@ -64,10 +64,13 @@ public class DriverUtils {
   }
 
   public static SSLContext getSSLContextFromJDBCProps(Properties properties) {
-    TlsConfig tlsConfig =
-        TlsUtils.extractTlsConfig(new PinotConfiguration(new MapConfiguration(properties)), PINOT_JDBC_TLS_PREFIX);
+    TlsConfig tlsConfig = getTlsConfigFromJDBCProps(properties);
     TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
     return TlsUtils.getSslContext();
+  }
+
+  public static TlsConfig getTlsConfigFromJDBCProps(Properties properties) {
+    return TlsUtils.extractTlsConfig(new PinotConfiguration(new MapConfiguration(properties)), PINOT_JDBC_TLS_PREFIX);
   }
 
   public static void handleAuth(Properties info, Map<String, String> headers)

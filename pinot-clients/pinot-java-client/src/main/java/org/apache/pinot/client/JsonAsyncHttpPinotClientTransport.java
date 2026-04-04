@@ -67,7 +67,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;
     Builder builder = Dsl.config();
-    SSL_CONTEXT_PROVIDER.configure(builder, null, TlsProtocols.defaultProtocols(false));
+    SSL_CONTEXT_PROVIDER.configure(builder, null, TlsProtocols.defaultProtocols(false), null);
     _httpClient =
         Dsl.asyncHttpClient(builder.setRequestTimeout(Duration.ofMillis(_brokerReadTimeout)).build());
     _useMultistageEngine = false;
@@ -76,6 +76,20 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
       boolean useMultistageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
       TlsProtocols tlsProtocols, @Nullable String appId) {
+    this(headers, scheme, extraOptionString, useMultistageEngine, sslContext, connectionTimeouts, tlsProtocols, appId,
+        null);
+  }
+
+  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
+      boolean useMultistageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
+      TlsProtocols tlsProtocols) {
+    this(headers, scheme, extraOptionString, useMultistageEngine, sslContext, connectionTimeouts, tlsProtocols, null,
+        null);
+  }
+
+  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
+      boolean useMultistageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
+      TlsProtocols tlsProtocols, @Nullable String appId, @Nullable String endpointIdentificationAlgorithm) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
@@ -83,7 +97,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     _useMultistageEngine = useMultistageEngine;
 
     Builder builder = Dsl.config();
-    SSL_CONTEXT_PROVIDER.configure(builder, sslContext, tlsProtocols);
+    SSL_CONTEXT_PROVIDER.configure(builder, sslContext, tlsProtocols, endpointIdentificationAlgorithm);
     builder.setRequestTimeout(Duration.ofMillis(_brokerReadTimeout))
         .setReadTimeout(Duration.ofMillis(connectionTimeouts.getReadTimeoutMs()))
         .setConnectTimeout(Duration.ofMillis(connectionTimeouts.getConnectTimeoutMs()))

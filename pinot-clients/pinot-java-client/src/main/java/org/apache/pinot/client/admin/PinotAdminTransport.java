@@ -30,7 +30,10 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLContext;
+import org.apache.pinot.client.SslContextProvider;
+import org.apache.pinot.client.SslContextProviderFactory;
 import org.apache.pinot.client.utils.ConnectionUtils;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
@@ -49,6 +52,7 @@ import org.slf4j.LoggerFactory;
 public class PinotAdminTransport implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdminTransport.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final SslContextProvider SSL_CONTEXT_PROVIDER = SslContextProviderFactory.create();
   public static final String ADMIN_TRANSPORT_REQUEST_TIMEOUT_MS = "pinot.admin.request.timeout.ms";
   public static final String ADMIN_TRANSPORT_SCHEME = "pinot.admin.scheme";
 
@@ -86,9 +90,9 @@ public class PinotAdminTransport implements AutoCloseable {
     // Configure SSL if needed
     if (CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(scheme)) {
       try {
-        SSLContext sslContext = SSLContext.getDefault();
-        builder.setSslContext(new io.netty.handler.ssl.JdkSslContext(sslContext, true,
-            io.netty.handler.ssl.ClientAuth.OPTIONAL));
+        TlsConfig tlsConfig = ConnectionUtils.getTlsConfigFromProperties(properties);
+        SSLContext sslContext = ConnectionUtils.createSSLContextFromProperties(properties);
+        SSL_CONTEXT_PROVIDER.configure(builder, sslContext, null, tlsConfig.getEndpointIdentificationAlgorithm());
       } catch (Exception e) {
         LOGGER.warn("Failed to configure SSL context, proceeding without SSL", e);
       }
