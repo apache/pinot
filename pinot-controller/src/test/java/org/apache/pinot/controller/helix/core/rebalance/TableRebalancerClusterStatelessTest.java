@@ -394,7 +394,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
           new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 0, 0, 0, false, null);
       tableConfig.setInstanceAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
           new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false)));
-      _helixResourceManager.updateTableConfig(tableConfig);
+      _helixResourceManager.updateTableConfig(tableConfig, false);
 
       // Try dry-run summary mode
       // No need to reassign instances because instances should be automatically assigned when updating the table config
@@ -491,7 +491,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
       // Update the table config to use non-replica-group based assignment
       tableConfig.setInstanceAssignmentConfigMap(null);
-      _helixResourceManager.updateTableConfig(tableConfig);
+      _helixResourceManager.updateTableConfig(tableConfig, false);
 
       // Try dry-run summary mode without reassignment to ensure that existing instance partitions are used
       // no movement should occur
@@ -988,7 +988,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     tableConfig.getIndexingConfig()
         .setStreamConfigs(
             FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(newNumPartitions).getStreamConfigsMap());
-    _helixResourceManager.updateTableConfig(tableConfig);
+    _helixResourceManager.updateTableConfig(tableConfig, false);
 
     // Add segments for the new partitions
     for (int i = numPartitions; i < newNumPartitions; i++) {
@@ -1526,7 +1526,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_B_NAME + "_OFFLINE", null, null),
         new TierConfig(TIER_FIXED_NAME, TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, fixedTierSegments,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, NO_TIER_NAME + "_OFFLINE", null, null)));
-    _helixResourceManager.updateTableConfig(tableConfig);
+    _helixResourceManager.updateTableConfig(tableConfig, false);
 
     // Try dry-run summary mode, some moves should occur
     rebalanceConfig = new RebalanceConfig();
@@ -1700,7 +1700,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     tableConfig.setTierConfigsList(Lists.newArrayList(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "0d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, "replicaAssignment" + TIER_A_NAME + "_OFFLINE", null, null)));
-    _helixResourceManager.updateTableConfig(tableConfig);
+    _helixResourceManager.updateTableConfig(tableConfig, false);
 
     // Try dry-run summary mode
     rebalanceConfig = new RebalanceConfig();
@@ -1769,7 +1769,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 0, 0, 0, false, null);
     tableConfig.setInstanceAssignmentConfigMap(Collections.singletonMap(TIER_A_NAME,
         new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false)));
-    _helixResourceManager.updateTableConfig(tableConfig);
+    _helixResourceManager.updateTableConfig(tableConfig, false);
 
     // Try dry-run summary mode
     rebalanceConfig = new RebalanceConfig();
@@ -2129,7 +2129,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 1, 0, 0, false, null), null, false);
 
     tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
-    _helixResourceManager.updateTableConfig(tableConfig);
+    _helixResourceManager.updateTableConfig(tableConfig, false);
 
     // Try dry-run summary mode
     rebalanceConfig = new RebalanceConfig();

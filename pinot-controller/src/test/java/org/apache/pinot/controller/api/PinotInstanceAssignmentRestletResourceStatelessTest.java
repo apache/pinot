@@ -124,7 +124,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
         new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
     offlineTableConfig.setInstanceAssignmentConfigMap(
         Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(), offlineInstanceAssignmentConfig));
-    _helixResourceManager.setExistingTableConfig(offlineTableConfig);
+    _helixResourceManager.setExistingTableConfig(offlineTableConfig, -1, false);
 
     // OFFLINE instance partitions should be generated
     Map<String, InstancePartitions> instancePartitionsMap = getInstancePartitionsMap();
@@ -142,7 +142,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
         new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
     realtimeTableConfig.setInstanceAssignmentConfigMap(
         Collections.singletonMap(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig));
-    _helixResourceManager.setExistingTableConfig(realtimeTableConfig);
+    _helixResourceManager.setExistingTableConfig(realtimeTableConfig, -1, false);
 
     // CONSUMING instance partitions should be generated
     instancePartitionsMap = getInstancePartitionsMap();
@@ -172,7 +172,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     instanceAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.toString(), offlineInstanceAssignmentConfig);
     instanceAssignmentConfigMap.put(TIER_NAME, tierInstanceAssignmentConfig);
     offlineTableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
-    _helixResourceManager.setExistingTableConfig(offlineTableConfig);
+    _helixResourceManager.setExistingTableConfig(offlineTableConfig, -1, false);
 
     // tier instance partitions should be generated
     Map<String, InstancePartitions> tierInstancePartitionsMap = getInstancePartitionsMap();
@@ -188,7 +188,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
       put(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig);
       put(InstancePartitionsType.COMPLETED.toString(), offlineInstanceAssignmentConfig);
     }});
-    _helixResourceManager.setExistingTableConfig(realtimeTableConfig);
+    _helixResourceManager.setExistingTableConfig(realtimeTableConfig, -1, false);
 
     // COMPLETED instance partitions should be generated
     instancePartitionsMap = getInstancePartitionsMap();
