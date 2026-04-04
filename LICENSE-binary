@@ -223,7 +223,7 @@ com.fasterxml.jackson.jaxrs:jackson-jaxrs-base:2.21.1
 com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:2.21.1
 com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.21.1
 com.fasterxml.jackson.module:jackson-module-parameter-names:2.21.1
-com.fasterxml.jackson.module:jackson-module-scala_2.12:2.21.1
+com.fasterxml.jackson.module:jackson-module-scala_2.13:2.21.1
 com.fasterxml.woodstox:woodstox-core:7.1.1
 com.github.ben-manes.caffeine:caffeine:2.9.3
 com.github.erosb:everit-json-schema:1.14.6
@@ -279,7 +279,7 @@ com.squareup.wire:wire-schema-jvm:5.1.0
 com.squareup:javapoet:1.13.0
 com.squareup:kotlinpoet-jvm:1.18.1
 com.tdunning:t-digest:3.2
-com.typesafe.scala-logging:scala-logging_2.12:3.9.5
+com.typesafe.scala-logging:scala-logging_2.13:3.9.5
 com.uber:h3:4.4.0
 com.yammer.metrics:metrics-core:2.2.0
 com.yscope.clp:clp-ffi:0.4.7
@@ -459,7 +459,7 @@ org.apache.kafka:kafka-storage-api:3.9.2
 org.apache.kafka:kafka-storage:3.9.2
 org.apache.kafka:kafka-tools-api:3.9.2
 org.apache.kafka:kafka-transaction-coordinator:3.9.2
-org.apache.kafka:kafka_2.12:3.9.2
+org.apache.kafka:kafka_2.13:3.9.2
 org.apache.kerby:kerb-core:2.1.1
 org.apache.kerby:kerb-crypto:2.1.1
 org.apache.kerby:kerb-util:2.1.1
@@ -493,8 +493,8 @@ org.apache.pulsar:bouncy-castle-bc:4.0.9
 org.apache.pulsar:pulsar-client-admin-api:4.0.9
 org.apache.pulsar:pulsar-client-api:4.0.9
 org.apache.pulsar:pulsar-client:4.0.9
-org.apache.spark:spark-launcher_2.12:3.5.8
-org.apache.spark:spark-tags_2.12:3.5.8
+org.apache.spark:spark-launcher_2.13:3.5.8
+org.apache.spark:spark-tags_2.13:3.5.8
 org.apache.thrift:libthrift:0.22.0
 org.apache.yetus:audience-annotations:0.15.1
 org.apache.zookeeper:zookeeper-jute:3.9.5
@@ -532,10 +532,10 @@ org.locationtech.proj4j:proj4j:1.2.2
 org.lz4:lz4-java:1.8.0
 org.quartz-scheduler:quartz:2.5.2
 org.roaringbitmap:RoaringBitmap:1.6.12
-org.scala-lang.modules:scala-collection-compat_2.12:2.10.0
-org.scala-lang.modules:scala-java8-compat_2.12:1.0.2
-org.scala-lang:scala-library:2.12.20
-org.scala-lang:scala-reflect:2.12.20
+org.scala-lang.modules:scala-collection-compat_2.13:2.10.0
+org.scala-lang.modules:scala-java8-compat_2.13:1.0.2
+org.scala-lang:scala-library:2.13.18
+org.scala-lang:scala-reflect:2.13.18
 org.slf4j:jcl-over-slf4j:2.0.17
 org.webjars:swagger-ui:5.32.0
 org.xerial.snappy:snappy-java:1.1.10.8

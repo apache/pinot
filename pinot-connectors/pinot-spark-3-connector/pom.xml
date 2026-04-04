@@ -80,7 +80,7 @@
       </properties>
     </profile>
     <profile>
-      <id>scala-2.12</id>
+      <id>scala-build</id>
       <activation>
         <activeByDefault>true</activeByDefault>
       </activation>

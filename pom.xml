@@ -266,9 +266,10 @@
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
     <!-- Configuration for Scala -->
-    <scala.version>2.12.20</scala.version>
+    <scala-2.12.version>2.12.20</scala-2.12.version>
     <scala-2.13.version>2.13.18</scala-2.13.version>
-    <scala.compat.version>2.12</scala.compat.version>
+    <scala.version>${scala-2.13.version}</scala.version>
+    <scala.compat.version>2.13</scala.compat.version>
 
     <!-- For Dependency Verifier module -->
     <enforcer-api.version>3.6.2</enforcer-api.version>
@@ -538,13 +539,13 @@
     </profile>
 
     <profile>
-      <id>scala-2.13</id>
+      <id>scala-2.12</id>
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <scala.version>2.13.16</scala.version>
-        <scala.compat.version>2.13</scala.compat.version>
+        <scala.version>${scala-2.12.version}</scala.version>
+        <scala.compat.version>2.12</scala.compat.version>
       </properties>
     </profile>
   </profiles>
@@ -2114,7 +2115,7 @@
       </dependency>
       <dependency>
         <groupId>com.twitter</groupId>
-        <artifactId>chill_2.12</artifactId>
+        <artifactId>chill_${scala.compat.version}</artifactId>
         <version>${chill.version}</version>
       </dependency>
       <!-- Used by Spark and quartz -->

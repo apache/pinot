@@ -51,15 +51,7 @@ class PinotDataSourceWriteOptionsTest extends BaseTest {
       Array("col7", "col8")
     )
 
-    pinotDataSourceWriteOptions.tableName shouldEqual expected.tableName
-    pinotDataSourceWriteOptions.segmentNameFormat shouldEqual expected.segmentNameFormat
-    pinotDataSourceWriteOptions.savePath shouldEqual expected.savePath
-    pinotDataSourceWriteOptions.timeColumnName shouldEqual expected.timeColumnName
-    pinotDataSourceWriteOptions.invertedIndexColumns shouldEqual expected.invertedIndexColumns.deep
-    pinotDataSourceWriteOptions.noDictionaryColumns shouldEqual expected.noDictionaryColumns.deep
-    pinotDataSourceWriteOptions.bloomFilterColumns shouldEqual expected.bloomFilterColumns.deep
-    pinotDataSourceWriteOptions.rangeIndexColumns shouldEqual expected.rangeIndexColumns.deep
-
+    assertWriteOptions(pinotDataSourceWriteOptions, expected)
   }
 
   test("Should throw exception if `table` option is missing") {
@@ -121,6 +113,19 @@ class PinotDataSourceWriteOptionsTest extends BaseTest {
       Array.empty
     )
 
-    pinotDataSourceWriteOptions shouldEqual expected
+    assertWriteOptions(pinotDataSourceWriteOptions, expected)
+  }
+
+  private def assertWriteOptions(actual: PinotDataSourceWriteOptions, expected: PinotDataSourceWriteOptions): Unit = {
+    actual.tableName shouldEqual expected.tableName
+    actual.segmentNameFormat shouldEqual expected.segmentNameFormat
+    actual.savePath shouldEqual expected.savePath
+    actual.timeColumnName shouldEqual expected.timeColumnName
+    actual.timeFormat shouldEqual expected.timeFormat
+    actual.timeGranularity shouldEqual expected.timeGranularity
+    actual.invertedIndexColumns.toSeq shouldEqual expected.invertedIndexColumns.toSeq
+    actual.noDictionaryColumns.toSeq shouldEqual expected.noDictionaryColumns.toSeq
+    actual.bloomFilterColumns.toSeq shouldEqual expected.bloomFilterColumns.toSeq
+    actual.rangeIndexColumns.toSeq shouldEqual expected.rangeIndexColumns.toSeq
   }
 }
