@@ -55,10 +55,10 @@ class PinotDataSourceWriteOptionsTest extends BaseTest {
     pinotDataSourceWriteOptions.segmentNameFormat shouldEqual expected.segmentNameFormat
     pinotDataSourceWriteOptions.savePath shouldEqual expected.savePath
     pinotDataSourceWriteOptions.timeColumnName shouldEqual expected.timeColumnName
-    pinotDataSourceWriteOptions.invertedIndexColumns shouldEqual expected.invertedIndexColumns.deep
-    pinotDataSourceWriteOptions.noDictionaryColumns shouldEqual expected.noDictionaryColumns.deep
-    pinotDataSourceWriteOptions.bloomFilterColumns shouldEqual expected.bloomFilterColumns.deep
-    pinotDataSourceWriteOptions.rangeIndexColumns shouldEqual expected.rangeIndexColumns.deep
+    pinotDataSourceWriteOptions.invertedIndexColumns.toSeq shouldEqual expected.invertedIndexColumns.toSeq
+    pinotDataSourceWriteOptions.noDictionaryColumns.toSeq shouldEqual expected.noDictionaryColumns.toSeq
+    pinotDataSourceWriteOptions.bloomFilterColumns.toSeq shouldEqual expected.bloomFilterColumns.toSeq
+    pinotDataSourceWriteOptions.rangeIndexColumns.toSeq shouldEqual expected.rangeIndexColumns.toSeq
 
   }
 

@@ -83,9 +83,9 @@
       <scope>test</scope>
     </dependency>
     <!--
-      VERSION OVERRIDE EXCEPTION: scala-library uses ${scala-2.13.version} instead of the root-managed
-      ${scala.version} (2.12). Confluent's kafka-json-schema-serializer transitively depends on
-      Scala 2.13, so this test dependency must align with Scala 2.13 to avoid binary incompatibility.
+      VERSION OVERRIDE EXCEPTION: Confluent's kafka-json-schema-serializer transitively depends on
+      Scala 2.13, so this test dependency stays pinned to ${scala-2.13.version} even when Pinot is
+      built with -Pscala-2.12.
     -->
     <dependency>
       <groupId>org.scala-lang</groupId>
