@@ -124,6 +124,11 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
+  public int getLengthOfShortestElement() {
+    return _minLength;
+  }
+
+  @Override
   public int getLengthOfLargestElement() {
     return _maxLength;
   }

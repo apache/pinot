@@ -26,11 +26,11 @@ import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
-import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -88,7 +88,7 @@ public interface SegmentCreator extends Closeable, Serializable {
    *                      When null, all documents in the segment will be processed.
    */
   default void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
-      @Nullable ThreadSafeMutableRoaringBitmap validDocIds)
+      @Nullable RoaringBitmap validDocIds)
       throws IOException {
     // Default implementation ignores validDocIds for backward compatibility
     indexColumn(columnName, sortedDocIds, segment);

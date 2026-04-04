@@ -35,13 +35,13 @@ import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
-import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -133,7 +133,7 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
    */
   @Override
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
-      @Nullable ThreadSafeMutableRoaringBitmap validDocIds)
+      @Nullable RoaringBitmap validDocIds)
       throws IOException {
     // Iterate over each value in the column
     int numDocs = segment.getSegmentMetadata().getTotalDocs();

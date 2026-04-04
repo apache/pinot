@@ -33,7 +33,7 @@ import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.ExceptionUtils;
-import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
+import org.apache.pinot.segment.local.realtime.converter.stats.MutableSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.ColumnarSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -54,7 +54,6 @@ import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
-import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -69,6 +68,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 /**
@@ -221,9 +221,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       }
 
       // Optimization for realtime segment conversion
-      if (dataSource instanceof RealtimeSegmentSegmentCreationDataSource) {
+      if (dataSource instanceof MutableSegmentCreationDataSource) {
         _config.setRealtimeConversion(true);
-        _config.setConsumerDir(((RealtimeSegmentSegmentCreationDataSource) dataSource).getConsumerDir());
+        _config.setConsumerDir(((MutableSegmentCreationDataSource) dataSource).getConsumerDir());
       }
 
       // For stats collection
@@ -410,7 +410,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  public void buildByColumn(IndexSegment indexSegment, ThreadSafeMutableRoaringBitmap validDocIds)
+  public void buildByColumn(IndexSegment indexSegment, RoaringBitmap validDocIds)
       throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");

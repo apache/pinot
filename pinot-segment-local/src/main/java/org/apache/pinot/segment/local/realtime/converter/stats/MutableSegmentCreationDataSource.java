@@ -20,49 +20,38 @@ package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import java.io.File;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
-import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
  * Segment creation data source that is based on an in-memory realtime segment.
  */
-public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreationDataSource {
+public class MutableSegmentCreationDataSource implements SegmentCreationDataSource {
   private final MutableSegment _mutableSegment;
   private final RecordReader _recordReader;
   private final int[] _sortedDocIds;
   @Nullable
   private final String _sortedColumn;
-  private final ThreadSafeMutableRoaringBitmap _validDocIdsSnapshot;
+  private final RoaringBitmap _validDocIds;
 
-  public RealtimeSegmentSegmentCreationDataSource(MutableSegment mutableSegment,
-      PinotSegmentRecordReader recordReader, @Nullable String sortedColumn) {
-    _mutableSegment = mutableSegment;
-    _recordReader = recordReader;
-    _sortedDocIds = recordReader.getSortedDocIds();
-    _sortedColumn = sortedColumn;
-    _validDocIdsSnapshot = null;
-  }
-
-  public RealtimeSegmentSegmentCreationDataSource(MutableSegment mutableSegment, RecordReader recordReader,
-      @Nullable int[] sortedDocIds, @Nullable String sortedColumn,
-      @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot) {
+  public MutableSegmentCreationDataSource(MutableSegment mutableSegment, RecordReader recordReader,
+      @Nullable int[] sortedDocIds, @Nullable String sortedColumn, @Nullable RoaringBitmap validDocIds) {
     _mutableSegment = mutableSegment;
     _recordReader = recordReader;
     _sortedDocIds = sortedDocIds;
     _sortedColumn = sortedColumn;
-    _validDocIdsSnapshot = validDocIdsSnapshot;
+    _validDocIds = validDocIds;
   }
 
   @Override
   public SegmentPreIndexStatsContainer gatherStats(StatsCollectorConfig statsCollectorConfig) {
-    return new RealtimeSegmentStatsContainer(_mutableSegment, _sortedDocIds, _sortedColumn, statsCollectorConfig,
-        _recordReader, _validDocIdsSnapshot);
+    return new RealtimeSegmentStatsContainer(_mutableSegment, _sortedDocIds, _sortedColumn, _validDocIds,
+        statsCollectorConfig);
   }
 
   @Override

@@ -21,21 +21,26 @@ package org.apache.pinot.segment.spi.creator;
 import java.io.Serializable;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 /**
  * An interface to read the column statistics from statistics collectors.
+ *
+ * TODO: Unify the behavior for unapplicable stats, e.g. maxRowLength for single-value or fixed-width type.
  */
 public interface ColumnStatistics extends Serializable {
   /**
    * @return Minimum value of the column
    */
+  @Nullable
   Object getMinValue();
 
   /**
    * @return Maximum value of the column
    */
+  @Nullable
   Object getMaxValue();
 
   /**
@@ -90,11 +95,14 @@ public interface ColumnStatistics extends Serializable {
     return -1;
   }
 
+  @Nullable
   PartitionFunction getPartitionFunction();
 
   int getNumPartitions();
 
+  @Nullable
   Map<String, String> getPartitionFunctionConfig();
 
+  @Nullable
   Set<Integer> getPartitions();
 }
