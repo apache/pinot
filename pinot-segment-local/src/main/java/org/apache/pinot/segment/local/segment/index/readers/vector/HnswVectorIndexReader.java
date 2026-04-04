@@ -23,6 +23,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -123,6 +125,11 @@ public class HnswVectorIndexReader implements VectorIndexReader {
    * we release the vector index
    * @throws IOException
    */
+  @Override
+  public Map<String, String> getIndexDebugInfo() {
+    return Collections.singletonMap("backend", "HNSW");
+  }
+
   @Override
   public void close()
       throws IOException {

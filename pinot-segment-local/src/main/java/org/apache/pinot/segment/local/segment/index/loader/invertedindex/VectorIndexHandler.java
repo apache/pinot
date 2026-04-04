@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -62,11 +63,25 @@ public class VectorIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_vectorConfigs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.vector());
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing Vector index from segment: {}, column: {}", segmentName, column);
         return true;
+      }
+      // Check if the backend type changed (e.g., HNSW -> IVF_PQ or vice versa)
+      VectorIndexConfig desiredConfig = _vectorConfigs.get(column);
+      if (desiredConfig != null) {
+        // Resolve desired backend: null/empty defaults to HNSW
+        String rawDesired = desiredConfig.getVectorIndexType();
+        String desiredBackend = (rawDesired == null || rawDesired.isEmpty()) ? "HNSW" : rawDesired.toUpperCase();
+        String existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
+        if (existingBackend != null && !desiredBackend.equalsIgnoreCase(existingBackend)) {
+          LOGGER.info("Need to rebuild Vector index for segment: {}, column: {} (backend changed from {} to {})",
+              segmentName, column, existingBackend, desiredBackend);
+          return true;
+        }
       }
     }
     // Check if any new index need to be added.
@@ -84,14 +99,27 @@ public class VectorIndexHandler extends BaseIndexHandler {
   public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
     Set<String> columnsToAddIdx = new HashSet<>(_vectorConfigs.keySet());
-    // Remove indices not set in table config any more
+    // Remove indices not set in table config any more, or where backend changed
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.vector());
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing Vector index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.vector());
         LOGGER.info("Removed existing Vector index from segment: {}, column: {}", segmentName, column);
+      } else {
+        // Check if backend type changed — if so, remove old index and rebuild
+        VectorIndexConfig desiredConfig = _vectorConfigs.get(column);
+        String rawDesired = desiredConfig != null ? desiredConfig.getVectorIndexType() : null;
+        String desiredBackend = (rawDesired == null || rawDesired.isEmpty()) ? "HNSW" : rawDesired.toUpperCase();
+        String existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
+        if (existingBackend != null && !desiredBackend.equalsIgnoreCase(existingBackend)) {
+          LOGGER.info("Rebuilding Vector index for segment: {}, column: {} (backend changed from {} to {})",
+              segmentName, column, existingBackend, desiredBackend);
+          segmentWriter.removeIndex(column, StandardIndexes.vector());
+          columnsToAddIdx.add(column); // Re-add so it gets rebuilt below
+        }
       }
     }
     for (String column : columnsToAddIdx) {

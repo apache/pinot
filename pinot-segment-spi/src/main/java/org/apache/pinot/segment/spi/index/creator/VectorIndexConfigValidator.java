@@ -49,6 +49,10 @@ public final class VectorIndexConfigValidator {
   static final Set<String> IVF_FLAT_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Arrays.asList("nlist", "trainSampleSize", "trainingSeed", "minRowsForIndex")));
 
+  // IVF_PQ-specific property keys
+  static final Set<String> IVF_PQ_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
+      Arrays.asList("nlist", "pqM", "pqNbits", "nprobe", "trainSampleSize", "trainingSeed")));
+
   // Common property keys that appear in the properties map (legacy format stores common fields there too)
   private static final Set<String> COMMON_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Arrays.asList("vectorIndexType", "vectorDimension", "vectorDistanceFunction", "version")));
@@ -121,6 +125,10 @@ public final class VectorIndexConfigValidator {
         validateNoForeignProperties(properties, HNSW_PROPERTIES, "IVF_FLAT", "HNSW");
         validateIvfFlatProperties(properties);
         break;
+      case IVF_PQ:
+        validateNoForeignProperties(properties, HNSW_PROPERTIES, "IVF_PQ", "HNSW");
+        validateIvfPqProperties(config, properties);
+        break;
       default:
         throw new IllegalArgumentException("Unsupported vector backend type: " + backendType);
     }
@@ -170,6 +178,51 @@ public final class VectorIndexConfigValidator {
       if (trainSampleSize < nlist) {
         throw new IllegalArgumentException(
             "IVF_FLAT trainSampleSize (" + trainSampleSize + ") must be >= nlist (" + nlist + ")");
+      }
+    }
+  }
+
+  /**
+   * Validates IVF_PQ-specific property values.
+   */
+  private static void validateIvfPqProperties(VectorIndexConfig config, Map<String, String> properties) {
+    validatePositiveIntProperty(properties, "nlist", "IVF_PQ nlist");
+    validatePositiveIntProperty(properties, "nprobe", "IVF_PQ nprobe");
+    validatePositiveIntProperty(properties, "trainSampleSize", "IVF_PQ trainSampleSize");
+
+    // If both nlist and trainSampleSize are specified, trainSampleSize must be >= nlist
+    if (properties.containsKey("nlist") && properties.containsKey("trainSampleSize")) {
+      int nlist = Integer.parseInt(properties.get("nlist"));
+      int trainSampleSize = Integer.parseInt(properties.get("trainSampleSize"));
+      if (trainSampleSize < nlist) {
+        throw new IllegalArgumentException(
+            "IVF_PQ trainSampleSize (" + trainSampleSize + ") must be >= nlist (" + nlist + ")");
+      }
+    }
+
+    int dimension = config.getVectorDimension();
+
+    // Validate pqM: if provided, check it; otherwise validate the implicit default (32)
+    int pqM;
+    String pqMStr = properties.get("pqM");
+    if (pqMStr != null) {
+      pqM = Integer.parseInt(pqMStr);
+      if (pqM <= 0) {
+        throw new IllegalArgumentException("IVF_PQ pqM must be a positive integer, got: " + pqM);
+      }
+    } else {
+      pqM = 32; // implicit default used by IvfPqVectorIndexCreator
+    }
+    if (dimension > 0 && dimension % pqM != 0) {
+      throw new IllegalArgumentException(
+          "IVF_PQ pqM (" + pqM + ") must evenly divide vectorDimension (" + dimension + ")");
+    }
+
+    String pqNbitsStr = properties.get("pqNbits");
+    if (pqNbitsStr != null) {
+      int pqNbits = Integer.parseInt(pqNbitsStr);
+      if (pqNbits < 1 || pqNbits > 8) {
+        throw new IllegalArgumentException("IVF_PQ pqNbits must be between 1 and 8, got: " + pqNbits);
       }
     }
   }

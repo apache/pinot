@@ -22,6 +22,7 @@ import com.google.common.base.CaseFormat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
@@ -44,7 +45,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Operator for vector similarity search using an ANN index (HNSW or IVF_FLAT).
+ * Operator for vector similarity search using an ANN index (HNSW, IVF_FLAT, or IVF_PQ).
  *
  * <p>This operator supports backend-neutral vector search with the following capabilities:</p>
  * <ul>
@@ -136,12 +137,27 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
   @Override
   public String toExplainString() {
-    return EXPLAIN_NAME + "(indexLookUp:vector_index"
-        + ", operator:" + _predicate.getType()
-        + ", vector identifier:" + _predicate.getLhs().getIdentifier()
-        + ", vector literal:" + Arrays.toString(_predicate.getValue())
-        + ", topK to search:" + _predicate.getTopK()
-        + ')';
+    Map<String, String> debugInfo = _vectorIndexReader.getIndexDebugInfo();
+    StringBuilder sb = new StringBuilder();
+    sb.append(EXPLAIN_NAME);
+    sb.append("(indexLookUp:vector_index");
+    sb.append(", operator:").append(_predicate.getType());
+    sb.append(", vector identifier:").append(_predicate.getLhs().getIdentifier());
+    sb.append(", vector literal:").append(Arrays.toString(_predicate.getValue()));
+    sb.append(", topK to search:").append(_predicate.getTopK());
+    if (!debugInfo.isEmpty()) {
+      sb.append(", backend:").append(debugInfo.getOrDefault("backend", "UNKNOWN"));
+      String nprobe = debugInfo.get("nprobe");
+      if (nprobe != null) {
+        sb.append(", nprobe:").append(nprobe);
+      }
+      String rerank = debugInfo.get("exactRerank");
+      if (rerank != null) {
+        sb.append(", exactRerank:").append(rerank);
+      }
+    }
+    sb.append(')');
+    return sb.toString();
   }
 
   @Override
@@ -159,6 +175,14 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     attributeBuilder.putLongIdempotent("topKtoSearch", _predicate.getTopK());
     if (_searchParams.isExactRerank()) {
       attributeBuilder.putString("exactRerank", "true");
+    }
+    Map<String, String> debugInfo = _vectorIndexReader.getIndexDebugInfo();
+    if (!debugInfo.isEmpty()) {
+      attributeBuilder.putString("backend", debugInfo.getOrDefault("backend", "UNKNOWN"));
+      String nprobe = debugInfo.get("nprobe");
+      if (nprobe != null) {
+        attributeBuilder.putString("nprobe", nprobe);
+      }
     }
   }
 
@@ -201,11 +225,11 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
    * Configures backend-specific search parameters on the reader if it supports them.
    */
   private void configureBackendParams(String column) {
-    // Set nprobe on IVF_FLAT readers
+    // Set nprobe on IVF readers (IVF_FLAT and IVF_PQ)
     if (_vectorIndexReader instanceof NprobeAware) {
       int nprobe = _searchParams.getNprobe();
       ((NprobeAware) _vectorIndexReader).setNprobe(nprobe);
-      LOGGER.debug("Set nprobe={} on IVF_FLAT reader for column: {}", nprobe, column);
+      LOGGER.debug("Set nprobe={} on IVF reader for column: {}", nprobe, column);
     }
   }
 
@@ -253,8 +277,12 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
    * Returns a human-readable name for the backend (for logging).
    */
   private String getBackendName() {
+    Map<String, String> debugInfo = _vectorIndexReader.getIndexDebugInfo();
+    if (!debugInfo.isEmpty()) {
+      return debugInfo.getOrDefault("backend", "UNKNOWN");
+    }
     if (_vectorIndexReader instanceof NprobeAware) {
-      return "IVF_FLAT";
+      return "IVF";
     }
     return "HNSW";
   }

@@ -26,9 +26,11 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.realtime.impl.vector.MutableVectorIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.pq.IvfPqVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.VectorIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.vector.IvfPqVectorIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -64,6 +66,7 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>{@link VectorBackendType#HNSW} - Lucene-based HNSW graph index (mutable and immutable segments)</li>
  *   <li>{@link VectorBackendType#IVF_FLAT} - Inverted file with flat vectors (immutable segments only)</li>
+ *   <li>{@link VectorBackendType#IVF_PQ} - Inverted file with product quantization (immutable segments only)</li>
  * </ul>
  *
  * <p>If the {@code vectorIndexType} field is absent in the config, it defaults to HNSW for
@@ -99,8 +102,10 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
       // Resolve the backend type (defaults to HNSW if not specified)
       VectorBackendType backendType = vectorIndexConfig.resolveBackendType();
-      Preconditions.checkState(backendType == VectorBackendType.HNSW || backendType == VectorBackendType.IVF_FLAT,
-          "Unsupported vector index type: %s for column: %s. Supported types: HNSW, IVF_FLAT",
+      Preconditions.checkState(
+          backendType == VectorBackendType.HNSW || backendType == VectorBackendType.IVF_FLAT
+              || backendType == VectorBackendType.IVF_PQ,
+          "Unsupported vector index type: %s for column: %s. Supported types: HNSW, IVF_FLAT, IVF_PQ",
           vectorIndexConfig.getVectorIndexType(), column);
 
       // Run backend-aware property validation
@@ -133,6 +138,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         return new HnswVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
       case IVF_FLAT:
         return new IvfFlatVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
+      case IVF_PQ:
+        return new IvfPqVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
       default:
         throw new IllegalStateException("Unsupported vector backend type: " + backendType);
     }
@@ -154,7 +161,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
     return List.of(V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_V99_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_V912_INDEX_FILE_EXTENSION,
-        V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+        V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_IVFPQ_INDEX_FILE_EXTENSION);
   }
 
   /**
@@ -184,6 +192,14 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
           return new HnswVectorIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
         case IVF_FLAT:
           return new IvfFlatVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
+        case IVF_PQ: {
+          int nprobe = 8;
+          Map<String, String> props = indexConfig.getProperties();
+          if (props != null && props.containsKey("nprobe")) {
+            nprobe = Integer.parseInt(props.get("nprobe"));
+          }
+          return new IvfPqVectorIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), nprobe);
+        }
         default:
           throw new IllegalStateException("Unsupported vector backend type: " + backendType);
       }
@@ -200,6 +216,11 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         .isSingleValueField()) {
       return null;
     }
+    // IVF_PQ does not support mutable/realtime segments. Return null so the
+    // consuming segment falls back to exact scan rather than silently using HNSW.
+    if ("IVF_PQ".equals(config.getVectorIndexType())) {
+      return null;
+    }
 
     VectorBackendType backendType = config.resolveBackendType();
     switch (backendType) {
@@ -208,6 +229,13 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
       case IVF_FLAT:
         // IVF_FLAT does not support mutable indexes in phase 1.
         LOGGER.warn("IVF_FLAT vector index does not support mutable/realtime segments. "
+            + "No vector index will be built for column: {} in segment: {}. "
+            + "Queries will fall back to exact scan.",
+            context.getFieldSpec().getName(), context.getSegmentName());
+        return null;
+      case IVF_PQ:
+        // IVF_PQ does not support mutable indexes.
+        LOGGER.warn("IVF_PQ vector index does not support mutable/realtime segments. "
             + "No vector index will be built for column: {} in segment: {}. "
             + "Queries will fall back to exact scan.",
             context.getFieldSpec().getName(), context.getSegmentName());

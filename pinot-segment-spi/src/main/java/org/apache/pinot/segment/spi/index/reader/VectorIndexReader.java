@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import java.util.Collections;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -33,4 +36,25 @@ public interface VectorIndexReader extends IndexReader {
    * @return bitmap of top k closest vectors
    */
   ImmutableRoaringBitmap getDocIds(float[] vector, int topK);
+
+  /**
+   * Returns the bitmap of top k closest vectors with runtime search parameters.
+   * Default implementation ignores searchParams and delegates to {@link #getDocIds(float[], int)}.
+   *
+   * @param vector vector to search
+   * @param topK number of closest vectors to return
+   * @param searchParams runtime search parameters (e.g., vectorNprobe, vectorExactRerank)
+   * @return bitmap of top k closest vectors
+   */
+  default ImmutableRoaringBitmap getDocIds(float[] vector, int topK, @Nullable Map<String, String> searchParams) {
+    return getDocIds(vector, topK);
+  }
+
+  /**
+   * Returns metadata about the index backend for explain/debug purposes.
+   * Default implementation returns an empty map.
+   */
+  default Map<String, String> getIndexDebugInfo() {
+    return Collections.emptyMap();
+  }
 }
