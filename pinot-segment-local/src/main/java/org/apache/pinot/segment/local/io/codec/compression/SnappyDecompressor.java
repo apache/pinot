@@ -16,40 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.compression;
+package org.apache.pinot.segment.local.io.codec.compression;
 
-import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.xerial.snappy.Snappy;
 
 
 /**
- * Implementation of {@link ChunkDecompressor} using Zstandard(Zstd) decompression algorithm.
- * Zstd.decompress(destinationBuffer, sourceBuffer)
- * Compresses the data in buffer 'srcBuf' using default compression level
+ * Implementation of {@link ChunkDecompressor} using Snappy.
  */
-class ZstandardDecompressor implements ChunkDecompressor {
+class SnappyDecompressor implements ChunkDecompressor {
 
-  static final ZstandardDecompressor INSTANCE = new ZstandardDecompressor();
+  static final SnappyDecompressor INSTANCE = new SnappyDecompressor();
 
-  private ZstandardDecompressor() {
+  private SnappyDecompressor() {
   }
 
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
-    int decompressedSize = Zstd.decompress(decompressedOutput, compressedInput);
-    // When the decompress method returns successfully,
-    // dstBuf's position() will be set to its current position() plus the decompressed size of the data.
-    // and srcBuf's position() will be set to its limit()
-    // Flip operation Make the destination ByteBuffer(decompressedOutput) ready for read by setting the position to 0
-    decompressedOutput.flip();
-    return decompressedSize;
+    return Snappy.uncompress(compressedInput, decompressedOutput);
   }
 
   @Override
-  public int decompressedLength(ByteBuffer compressedInput) {
-    return (int) Zstd.decompressedSize(compressedInput);
+  public int decompressedLength(ByteBuffer compressedInput)
+      throws IOException {
+    return Snappy.uncompressedLength(compressedInput);
   }
 }

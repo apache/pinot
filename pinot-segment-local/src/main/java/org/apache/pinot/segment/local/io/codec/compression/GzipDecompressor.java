@@ -16,35 +16,49 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.compression;
+package org.apache.pinot.segment.local.io.codec.compression;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.zip.DataFormatException;
+import java.util.zip.Inflater;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
 /**
- * A pass-through implementation of {@link ChunkDecompressor}, that simply returns the input data without
- * performing any de-compression. This is useful for cases where cost of de-compression out-weighs the benefits
- * of compression.
+ * Implementation of {@link ChunkDecompressor} using GZIP decompression algorithm.
  */
-class PassThroughDecompressor implements ChunkDecompressor {
+class GzipDecompressor implements ChunkDecompressor {
 
-  static final PassThroughDecompressor INSTANCE = new PassThroughDecompressor();
+  private final Inflater _decompressor;
 
-  private PassThroughDecompressor() {
+  public GzipDecompressor() {
+    _decompressor = new Inflater();
   }
 
   @Override
-  public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput) {
-    decompressedOutput.put(compressedInput);
-
-    // Flip the output ByteBuffer for reading.
+  public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
+      throws IOException {
+    _decompressor.reset();
+    _decompressor.setInput(compressedInput);
+    try {
+      _decompressor.inflate(decompressedOutput);
+    } catch (DataFormatException e) {
+      throw new IOException(e);
+    }
     decompressedOutput.flip();
-    return decompressedOutput.limit();
+    return (int) _decompressor.getBytesWritten();
   }
 
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
-    return compressedInput.limit();
+    int offset = compressedInput.limit() - Integer.BYTES;
+    return offset > -1 ? compressedInput.getInt(offset) : -1;
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    _decompressor.end();
   }
 }

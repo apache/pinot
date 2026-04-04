@@ -28,6 +28,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -112,6 +113,20 @@ public class CLPEncodingRealtimeTest extends CustomDataQueryClusterIntegrationTe
     fieldConfigs.add(new FieldConfig.Builder("logLine").withEncodingType(FieldConfig.EncodingType.RAW)
         .withCompressionCodec(_selectedCompressionCodec).build());
     return fieldConfigs;
+  }
+
+  @Override
+  public void setUp()
+      throws Exception {
+    LOGGER.warn("Setting up integration test class: {}", getClass().getSimpleName());
+    initControllerRequestURLBuilder();
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+
+    setUpTable();
+
+    // CLP segment conversion can be slow in CI; use a longer timeout than the default 60s.
+    waitForAllDocsLoaded(600_000);
+    LOGGER.warn("Finished setting up integration test class: {}", getClass().getSimpleName());
   }
 
   @Override

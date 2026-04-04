@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.codec.ChunkCodecPipeline;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
@@ -63,6 +64,15 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    */
   @Nullable
   default ChunkCompressionType getCompressionType() {
+    return null;
+  }
+
+  /**
+   * Returns the codec pipeline, or {@code null} if the segment was not written with a pipeline.
+   * Only valid for version 7+ RAW forward index columns.
+   */
+  @Nullable
+  default ChunkCodecPipeline getCodecPipeline() {
     return null;
   }
 

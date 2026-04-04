@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedB
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import org.apache.pinot.segment.spi.codec.ChunkCodecPipeline;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -86,19 +87,41 @@ public class ForwardIndexCreatorFactory {
       if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_LZ4) {
         return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.LZ4);
       }
+      ChunkCodecPipeline codecPipeline = indexConfig.getCodecPipeline();
       ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
-      if (chunkCompressionType == null) {
+      if (chunkCompressionType == null && codecPipeline == null) {
         chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
       }
       boolean deriveNumDocsPerChunk = indexConfig.isDeriveNumDocsPerChunk();
       int writerVersion = indexConfig.getRawIndexWriterVersion();
       int targetMaxChunkSize = indexConfig.getTargetMaxChunkSizeBytes();
       int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
+
+      // Auto-bump writer version to 7 when pipeline has transforms
+      if (codecPipeline != null && codecPipeline.hasTransforms() && writerVersion < 7) {
+        writerVersion = 7;
+      }
+
       if (fieldSpec.isSingleValueField()) {
+        // Use pipeline path for fixed-width SV columns when pipeline has transforms (requires V7)
+        if (codecPipeline != null && codecPipeline.hasTransforms() && storedType.isFixedWidth()) {
+          return new SingleValueFixedByteRawIndexCreator(indexDir,
+              codecPipeline.getChunkCompressionType(), codecPipeline, columnName, numTotalDocs,
+              storedType, writerVersion, targetDocsPerChunk);
+        }
+        // For compression-only pipelines and non-fixed-width types, use the legacy path
+        // (avoids requiring V7 for simple compression changes)
+        if (chunkCompressionType == null && codecPipeline != null) {
+          chunkCompressionType = codecPipeline.getChunkCompressionType();
+        }
         return getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
             context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
             targetDocsPerChunk);
       } else {
+        // For MV columns, pipeline is not supported — derive compression type from pipeline if needed
+        if (chunkCompressionType == null && codecPipeline != null) {
+          chunkCompressionType = codecPipeline.getChunkCompressionType();
+        }
         return getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
             context.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
             context.getMaxRowLengthInBytes(), targetMaxChunkSize, targetDocsPerChunk);

@@ -25,7 +25,10 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.io.codec.compression.ChunkCompressorFactory;
+import org.apache.pinot.segment.spi.codec.ChunkCodec;
+import org.apache.pinot.segment.spi.codec.ChunkCodecPipeline;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.slf4j.Logger;
@@ -36,6 +39,22 @@ import org.slf4j.LoggerFactory;
  * Base implementation for chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains fixed
  * number of docs.
  *
+ * <p>Forward index file format versions:
+ * <ul>
+ *   <li>V1 — implicit Snappy compression, no explicit compression field in header.</li>
+ *   <li>V2 — added explicit compression type in header; chunk offsets stored as int.</li>
+ *   <li>V3 — chunk offsets stored as long (supports &gt;2 GB data sections).</li>
+ *   <li>V4 — fixed-width only; added derive-num-docs-per-chunk support
+ *       (also the base for VarByte V4 writers).</li>
+ *   <li>V5 — fixed-width only; similar to V4
+ *       (also the base for VarByte V5 writers).</li>
+ *   <li>V6 — variable-byte only ({@link VarByteChunkForwardIndexWriterV6}); delta-encodes chunk
+ *       header (individual entry sizes instead of cumulative offsets) for better compression.</li>
+ *   <li>V7 — fixed-width only; codec pipeline header replaces single compression type with a
+ *       pipeline length and array of {@link ChunkCodec} values.
+ *       Supports pre-compression transforms (DELTA, DOUBLE_DELTA, XOR).</li>
+ * </ul>
+ *
  * <p>The layout of the file is as follows:
  * <ul>
  *   <li>Header Section
@@ -45,7 +64,8 @@ import org.slf4j.LoggerFactory;
  *     <li>Number of docs per chunk (int)</li>
  *     <li>Size of entry in bytes (int)</li>
  *     <li>Total number of docs (int)</li>
- *     <li>Compression type enum value (int)</li>
+ *     <li>For V2–V5: compression type enum value (int)</li>
+ *     <li>For V7: pipeline length (int) followed by N codec enum values (int each)</li>
  *     <li>Start offset of data header (int)</li>
  *     <li>Data header (start offsets for all chunks)
  *     <ul>
@@ -88,15 +108,55 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   protected BaseChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, long chunkSize, int sizeOfEntry, int version, boolean fixed)
       throws IOException {
-    Preconditions.checkArgument(version == 2 || version == 3 || (fixed && version >= 4),
+    this(file, compressionType, null, sizeOfEntry, totalDocs, numDocsPerChunk, chunkSize, sizeOfEntry, version, fixed);
+  }
+
+  /**
+   * Constructor with optional codec pipeline support.
+   *
+   * @param file Data file to write into
+   * @param compressionType Type of compression (used when pipeline is null)
+   * @param codecPipeline Optional codec pipeline; when non-null, requires version 7
+   * @param valueSizeInBytes Size of each typed value (4 for INT, 8 for LONG); used by pipeline transforms
+   * @param totalDocs Total docs to write
+   * @param numDocsPerChunk Number of docs per data chunk
+   * @param chunkSize Size of chunk
+   * @param sizeOfEntry Size of entry (in bytes)
+   * @param version version of File
+   * @param fixed if the data type is fixed width
+   */
+  protected BaseChunkForwardIndexWriter(File file, ChunkCompressionType compressionType,
+      @Nullable ChunkCodecPipeline codecPipeline, int valueSizeInBytes, int totalDocs,
+      int numDocsPerChunk, long chunkSize, int sizeOfEntry, int version, boolean fixed)
+      throws IOException {
+    boolean hasPipeline = codecPipeline != null;
+    Preconditions.checkArgument(
+        version == 2 || version == 3 || version == 6
+            || (fixed && (version == 4 || version == 5 || version == 7)),
         "Illegal version: %s for %s bytes values", version, fixed ? "fixed" : "variable");
+    if (hasPipeline) {
+      Preconditions.checkArgument(version == 7, "codecPipeline requires writer version 7, got: %s", version);
+    }
+    if (version == 7) {
+      Preconditions.checkArgument(hasPipeline,
+          "Writer version 7 requires a non-null codecPipeline (version 7 header layout is pipeline-only)");
+    }
+    if (hasPipeline && codecPipeline.hasTransforms()) {
+      Preconditions.checkArgument(valueSizeInBytes == Integer.BYTES || valueSizeInBytes == Long.BYTES,
+          "Codec pipeline transforms require valueSizeInBytes to be 4 (INT/FLOAT) or 8 (LONG/DOUBLE), got: %s",
+          valueSizeInBytes);
+    }
     Preconditions.checkArgument(chunkSize <= Integer.MAX_VALUE, "Chunk size limited to 2GB");
     _chunkSize = (int) chunkSize;
-    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
+    if (hasPipeline) {
+      _chunkCompressor = ChunkCompressorFactory.getCompressor(codecPipeline, valueSizeInBytes);
+    } else {
+      _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
+    }
     _headerEntryChunkOffsetSize = version == 2 ? Integer.BYTES : Long.BYTES;
-    _dataOffset = writeHeader(compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, version);
+    _dataOffset = writeHeader(compressionType, codecPipeline, totalDocs, numDocsPerChunk, sizeOfEntry, version);
     _chunkBuffer = ByteBuffer.allocateDirect(_chunkSize);
-    int maxCompressedChunkSize = _chunkCompressor.maxCompressedSize(_chunkSize); // may exceed original chunk size
+    int maxCompressedChunkSize = _chunkCompressor.maxCompressedSize(_chunkSize);
     _compressedBuffer = ByteBuffer.allocateDirect(maxCompressedChunkSize);
     _dataFile = new RandomAccessFile(file, "rw").getChannel();
   }
@@ -127,36 +187,52 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
    * @param version Version of file
    * @return Size of header
    */
-  private int writeHeader(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk, int sizeOfEntry,
-      int version) {
+  /**
+   * Writes the header for the forward index file.
+   *
+   * <p>For version ≤ 5, the header layout is:
+   * [version][numChunks][numDocsPerChunk][sizeOfEntry][totalDocs][compressionType][dataHeaderStart]
+   *
+   * <p>For version 7 (codec pipeline), the header layout is:
+   * [version][numChunks][numDocsPerChunk][sizeOfEntry][totalDocs][pipelineLength][codec0]...[codecN-1][dataHeaderStart]
+   */
+  private int writeHeader(ChunkCompressionType compressionType, @Nullable ChunkCodecPipeline codecPipeline,
+      int totalDocs, int numDocsPerChunk, int sizeOfEntry, int version) {
     int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
-    int headerSize = (7 * Integer.BYTES) + (numChunks * _headerEntryChunkOffsetSize);
+
+    // Calculate fixed header size based on version
+    int fixedHeaderInts;
+    if (version == 7 && codecPipeline != null) {
+      // version + numChunks + numDocsPerChunk + sizeOfEntry + totalDocs + pipelineLength + N codec ints +
+      // dataHeaderStart
+      fixedHeaderInts = 6 + codecPipeline.size() + 1;
+    } else {
+      // version + numChunks + numDocsPerChunk + sizeOfEntry + totalDocs + compressionType + dataHeaderStart
+      fixedHeaderInts = 7;
+    }
+    int headerSize = (fixedHeaderInts * Integer.BYTES) + (numChunks * _headerEntryChunkOffsetSize);
 
     _header = ByteBuffer.allocateDirect(headerSize);
 
-    int offset = 0;
     _header.putInt(version);
-    offset += Integer.BYTES;
-
     _header.putInt(numChunks);
-    offset += Integer.BYTES;
-
     _header.putInt(numDocsPerChunk);
-    offset += Integer.BYTES;
-
     _header.putInt(sizeOfEntry);
-    offset += Integer.BYTES;
-
-    // Write total number of docs.
     _header.putInt(totalDocs);
-    offset += Integer.BYTES;
 
-    // Write the compressor type
-    _header.putInt(compressionType.getValue());
-    offset += Integer.BYTES;
+    if (version == 7 && codecPipeline != null) {
+      // Write pipeline: length + codec values
+      _header.putInt(codecPipeline.size());
+      for (ChunkCodec codec : codecPipeline.getStages()) {
+        _header.putInt(codec.getValue());
+      }
+    } else {
+      // Legacy: single compression type
+      _header.putInt(compressionType.getValue());
+    }
 
-    // Start of chunk offsets.
-    int dataHeaderStart = offset + Integer.BYTES;
+    // dataHeaderStart = current position + sizeof(int) for the dataHeaderStart field itself
+    int dataHeaderStart = _header.position() + Integer.BYTES;
     _header.putInt(dataHeaderStart);
 
     return headerSize;
