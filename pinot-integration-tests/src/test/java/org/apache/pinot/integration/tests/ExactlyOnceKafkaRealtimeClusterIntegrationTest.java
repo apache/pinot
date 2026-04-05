@@ -53,7 +53,7 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
   private static final Logger LOGGER = LoggerFactory.getLogger(ExactlyOnceKafkaRealtimeClusterIntegrationTest.class);
   private static final int REALTIME_TABLE_CONFIG_RETRY_COUNT = 5;
   private static final long REALTIME_TABLE_CONFIG_RETRY_WAIT_MS = 1_000L;
-  private static final long KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS = 30_000L;
+  private static final long KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS = 60_000L;
 
   @Override
   public void addTableConfig(TableConfig tableConfig)
@@ -61,11 +61,14 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     for (int attempt = 1; attempt <= REALTIME_TABLE_CONFIG_RETRY_COUNT; attempt++) {
       try {
         super.addTableConfig(tableConfig);
+        LOGGER.info("Successfully added table config on attempt {}", attempt);
         return;
       } catch (IOException e) {
         if (!isRetryableRealtimePartitionMetadataError(e) || attempt == REALTIME_TABLE_CONFIG_RETRY_COUNT) {
+          LOGGER.error("Failed to add table config on attempt {} of {}", attempt, REALTIME_TABLE_CONFIG_RETRY_COUNT, e);
           throw e;
         }
+        LOGGER.warn("Attempt {} failed with retryable error, waiting for Kafka metadata and retrying...", attempt, e);
         waitForKafkaTopicMetadataReadyForConsumer(getKafkaTopic(), getNumKafkaPartitions());
         try {
           Thread.sleep(REALTIME_TABLE_CONFIG_RETRY_WAIT_MS);
@@ -300,6 +303,11 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     TestUtils.waitForCondition(aVoid -> isKafkaTopicMetadataReadyForConsumer(topic, expectedPartitions), 200L,
         KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS,
         "Kafka topic '" + topic + "' metadata is not visible to consumers");
+    // For transactional consumers, verify metadata is visible with read_committed isolation level too
+    TestUtils.waitForCondition(
+        aVoid -> isKafkaTopicMetadataReadyForConsumer(topic, expectedPartitions, "read_committed"),
+        200L, KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS,
+        "Kafka topic '" + topic + "' metadata is not visible to read_committed consumers");
   }
 
   private boolean isKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions) {
@@ -308,6 +316,24 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "pinot-kafka-topic-ready-" + UUID.randomUUID());
     consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
     consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+    consumerProps.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    consumerProps.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(consumerProps)) {
+      List<PartitionInfo> partitionInfos = consumer.partitionsFor(topic, Duration.ofSeconds(5));
+      return partitionInfos != null && partitionInfos.size() >= expectedPartitions;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private boolean isKafkaTopicMetadataReadyForConsumer(String topic, int expectedPartitions, String isolationLevel) {
+    Properties consumerProps = new Properties();
+    consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    String groupId = "pinot-kafka-topic-ready-" + isolationLevel + "-" + UUID.randomUUID();
+    consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+    consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+    consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+    consumerProps.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, isolationLevel);
     consumerProps.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
     consumerProps.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
     try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(consumerProps)) {
