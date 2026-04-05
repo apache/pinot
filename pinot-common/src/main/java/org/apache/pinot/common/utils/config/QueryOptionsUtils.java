@@ -172,11 +172,23 @@ public class QueryOptionsUtils {
   }
 
   /**
-   * When true, use JsonIndexDistinctOperator for SELECT DISTINCT jsonExtractIndex(...) when applicable.
+   * When true, use index-based distinct operators when applicable:
+   * {@link org.apache.pinot.core.operator.query.JsonIndexDistinctOperator} for JSON columns and
+   * {@link org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator} for dictionary + inverted index columns.
    * Set via query option useIndexBasedDistinctOperator=true.
    */
   public static boolean isUseIndexBasedDistinctOperator(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR));
+  }
+
+  /**
+   * Returns the cost ratio for the inverted-index-based distinct heuristic, or null if not set.
+   * The inverted index path is chosen when dictionaryCardinality * costRatio <= filteredDocCount.
+   */
+  @Nullable
+  public static Double getInvertedIndexDistinctCostRatio(Map<String, String> queryOptions) {
+    return checkedParseDoublePositive(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO,
+        queryOptions.get(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO));
   }
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
@@ -588,6 +600,25 @@ public class QueryOptionsUtils {
   private static IllegalArgumentException intParseException(String optionName, String optionValue, int minValue) {
     return new IllegalArgumentException(
         String.format("%s must be a number between %d and 2^31-1, got: %s", optionName, minValue, optionValue));
+  }
+
+  @Nullable
+  private static Double checkedParseDoublePositive(String optionName, @Nullable String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    double value;
+    try {
+      value = Double.parseDouble(optionValue.trim());
+    } catch (NumberFormatException nfe) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a positive number, got: %s", optionName, optionValue));
+    }
+    if (!Double.isFinite(value) || value <= 0) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a positive number, got: %s", optionName, optionValue));
+    }
+    return value;
   }
 
   @Nullable

@@ -19,6 +19,8 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.Arrays;
+import javax.annotation.Nullable;
+import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
@@ -26,6 +28,9 @@ import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
+import org.apache.pinot.segment.spi.Constants;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
@@ -34,6 +39,8 @@ import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   protected final int _numDocs;
   protected final boolean _nullHandlingEnabled;
+  @Nullable
+  private FilteredDocIds _filteredDocIds;
 
   public BaseFilterOperator(int numDocs, boolean nullHandlingEnabled) {
     _numDocs = numDocs;
@@ -80,6 +87,61 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
    */
   public BitmapCollection getBitmaps() {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Exact filtered docIds for the operator. {@code null} indicates match-all.
+   */
+  public static final class FilteredDocIds {
+    @Nullable
+    private final ImmutableRoaringBitmap _docIds;
+    private final long _numEntriesScannedInFilter;
+
+    private FilteredDocIds(@Nullable ImmutableRoaringBitmap docIds, long numEntriesScannedInFilter) {
+      _docIds = docIds;
+      _numEntriesScannedInFilter = numEntriesScannedInFilter;
+    }
+
+    @Nullable
+    public ImmutableRoaringBitmap getDocIds() {
+      return _docIds;
+    }
+
+    public long getNumEntriesScannedInFilter() {
+      return _numEntriesScannedInFilter;
+    }
+  }
+
+  /**
+   * Returns the exact filtered docIds for the operator. Implementations that cannot produce a bitmap directly are
+   * materialized once through the filter operator itself so callers can reuse the same primitive.
+   */
+  public FilteredDocIds getFilteredDocIds() {
+    if (_filteredDocIds != null) {
+      return _filteredDocIds;
+    }
+
+    if (isResultMatchingAll()) {
+      _filteredDocIds = new FilteredDocIds(null, 0L);
+    } else if (isResultEmpty()) {
+      _filteredDocIds = new FilteredDocIds(new MutableRoaringBitmap(), 0L);
+    } else if (canProduceBitmaps()) {
+      _filteredDocIds = new FilteredDocIds(getBitmaps().reduce(), 0L);
+    } else {
+      FilterBlock filterBlock = nextBlock();
+      BlockDocIdSet blockDocIdSet = filterBlock.getBlockDocIdSet();
+      BlockDocIdSet nonScanBlockDocIdSet = filterBlock.getNonScanFilterBLockDocIdSet();
+      MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+      BlockDocIdIterator iterator = nonScanBlockDocIdSet.iterator();
+      int docId;
+      while ((docId = iterator.next()) != Constants.EOF) {
+        bitmap.add(docId);
+      }
+      // Compact the materialized bitmap so repeated downstream set operations remain efficient.
+      bitmap.runOptimize();
+      _filteredDocIds = new FilteredDocIds(bitmap, blockDocIdSet.getNumEntriesScannedInFilter());
+    }
+    return _filteredDocIds;
   }
 
   @Override
