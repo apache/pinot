@@ -19,9 +19,12 @@
 package org.apache.pinot.client.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +82,23 @@ public class PinotSchemaAdminClient {
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/schemas/" + schemaName, null, _headers);
     return response.toString();
+  }
+
+  /**
+   * Gets a specific schema as a typed object.
+   *
+   * @param schemaName Name of the schema
+   * @return Schema object
+   * @throws PinotAdminException If the request fails or the response cannot be parsed
+   */
+  public Schema getSchemaObject(String schemaName)
+      throws PinotAdminException {
+    JsonNode response = _transport.executeGet(_controllerAddress, "/schemas/" + schemaName, null, _headers);
+    try {
+      return JsonUtils.jsonNodeToObject(response, Schema.class);
+    } catch (IOException e) {
+      throw new PinotAdminException("Failed to parse schema response for " + schemaName, e);
+    }
   }
 
   /**

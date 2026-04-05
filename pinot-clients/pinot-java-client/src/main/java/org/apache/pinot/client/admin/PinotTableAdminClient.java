@@ -19,10 +19,14 @@
 package org.apache.pinot.client.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,6 +87,38 @@ public class PinotTableAdminClient {
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tables/" + tableName, null, _headers);
     return response.toString();
+  }
+
+  /**
+   * Gets the configuration for a specific table as a typed object.
+   *
+   * @param tableName Name of the table without type suffix
+   * @param tableType Table type to fetch
+   * @return Table configuration object
+   * @throws PinotAdminException If the request fails or the response cannot be parsed
+   */
+  public TableConfig getTableConfig(String tableName, TableType tableType)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("type", tableType.name());
+    JsonNode response = _transport.executeGet(_controllerAddress, "/tables/" + tableName, queryParams, _headers);
+    // Prefer a typed child node if present (backward compatible with responses that return both OFFLINE/REALTIME).
+    JsonNode tableConfigNode = response.get(tableType.toString());
+    if (tableConfigNode == null || tableConfigNode.isNull()) {
+      // Fall back to treating the entire response as the table config when the controller returns only the requested
+      // type.
+      tableConfigNode = response;
+    }
+    if (tableConfigNode == null || tableConfigNode.isNull()) {
+      throw new PinotAdminException(
+          String.format("Table config for %s with type %s was not found in controller response", tableName, tableType));
+    }
+    try {
+      return JsonUtils.jsonNodeToObject(tableConfigNode, TableConfig.class);
+    } catch (IOException e) {
+      throw new PinotAdminException(
+          String.format("Failed to parse table config for %s with type %s", tableName, tableType), e);
+    }
   }
 
   /**

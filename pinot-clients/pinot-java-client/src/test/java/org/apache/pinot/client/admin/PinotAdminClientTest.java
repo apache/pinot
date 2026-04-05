@@ -23,6 +23,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -96,6 +101,22 @@ public class PinotAdminClientTest {
   }
 
   @Test
+  public void testGetTypedTableConfig()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("tbl1").build();
+    String jsonResponse = "{\"OFFLINE\":" + tableConfig.toJsonString() + "}";
+    JsonNode mockResponse = new ObjectMapper().readTree(jsonResponse);
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(mockResponse);
+
+    TableConfig cfg = _adminClient.getTableClient().getTableConfig("tbl1", TableType.OFFLINE);
+
+    assertNotNull(cfg);
+    assertEquals(cfg.getTableName(), "tbl1_OFFLINE");
+    assertEquals(cfg.getTableType(), TableType.OFFLINE);
+  }
+
+  @Test
   public void testListSchemas()
       throws Exception {
     String jsonResponse = "{\"schemas\": [\"sch1\", \"sch2\"]}";
@@ -107,6 +128,22 @@ public class PinotAdminClientTest {
     assertNotNull(schemas);
     assertEquals(schemas.size(), 2);
     assertEquals(schemas.get(1), "sch2");
+  }
+
+  @Test
+  public void testGetTypedSchema()
+      throws Exception {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName("sch1").addSingleValueDimension("id", FieldSpec.DataType.INT).build();
+    JsonNode mockResponse = new ObjectMapper().readTree(schema.toSingleLineJsonString());
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(mockResponse);
+
+    Schema schemaObject = _adminClient.getSchemaClient().getSchemaObject("sch1");
+
+    assertNotNull(schemaObject);
+    assertEquals(schemaObject.getSchemaName(), "sch1");
+    assertEquals(schemaObject.getDimensionNames(), List.of("id"));
   }
 
   @Test

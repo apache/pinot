@@ -36,11 +36,23 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-controller</artifactId>
+      <artifactId>pinot-java-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-writer-file-based</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-uploader-default</artifactId>
     </dependency>
 
     <dependency>
@@ -59,6 +71,11 @@
     </dependency>
 
     <!-- Test Dependencies -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-controller</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-integration-test-base</artifactId>
