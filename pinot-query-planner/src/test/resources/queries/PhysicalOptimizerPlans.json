@@ -951,6 +951,109 @@
       }
     ]
   },
+  "physical_opt_boolean_column_filters": {
+    "queries": [
+      {
+        "description": "Bare boolean column as filter predicate",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col5",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject(col1=[$0])",
+          "\n    PhysicalFilter(condition=[$4])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "NOT of a bare boolean column",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1 FROM a WHERE NOT col5",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject(col1=[$0])",
+          "\n    PhysicalFilter(condition=[NOT($4)])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Boolean column in AND with another predicate",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col5 AND col1 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject(col1=[$0])",
+          "\n    PhysicalFilter(condition=[AND($4, =($0, _UTF-8'foo'))])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Boolean column in OR with another predicate",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col5 OR col1 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject(col1=[$0])",
+          "\n    PhysicalFilter(condition=[OR($4, =($0, _UTF-8'foo'))])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "NOT boolean column combined with AND",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1 FROM a WHERE NOT col5 AND col3 > 0",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject(col1=[$0])",
+          "\n    PhysicalFilter(condition=[AND(>($2, 0), NOT($4))])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Boolean column filter with aggregation",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT COUNT(*) FROM a WHERE col5 GROUP BY col1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject(EXPR$0=[$1])",
+          "\n    PhysicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n      PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n        PhysicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n          PhysicalFilter(condition=[$4])",
+          "\n            PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "col5 = true is simplified to bare boolean by Calcite",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col5 = true",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject(col1=[$0])",
+          "\n    PhysicalFilter(condition=[$4])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "col5 = false is simplified to NOT by Calcite",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col5 = false",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject(col1=[$0])",
+          "\n    PhysicalFilter(condition=[NOT($4)])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
+  },
   "physical_opt_window_functions": {
     "queries": [
       {
