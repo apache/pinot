@@ -102,6 +102,16 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Returns the number of documents per chunk for chunk-based forward index readers. Returns 0 if chunk information is
+   * not available (e.g., non-chunk-based readers or uncompressed readers). This is used to optimize binary search on
+   * sorted raw columns by enabling two-level search: coarse search at chunk boundaries followed by fine search within
+   * the target chunk, minimizing chunk decompressions.
+   */
+  default int getNumDocsPerChunk() {
+    return 0;
+  }
+
+  /**
    * DICTIONARY-ENCODED INDEX APIs
    */
 
