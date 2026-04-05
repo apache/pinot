@@ -49,8 +49,11 @@ import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.io.codec.transform.ChunkTransformFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.codec.ChunkCodec;
+import org.apache.pinot.segment.spi.codec.ChunkCodecPipeline;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
@@ -2174,22 +2177,39 @@ public final class TableConfigUtils {
   }
 
   private static void validateGorillaCompressionCodecIfPresent(FieldConfig fieldConfig, FieldSpec fieldSpec) {
-    if (fieldConfig.getCompressionCodec() == null) {
-      return;
+    // Validate legacy compressionCodec DELTA/DELTADELTA constraints
+    if (fieldConfig.getCompressionCodec() != null) {
+      switch (fieldConfig.getCompressionCodec()) {
+        case DELTA:
+        case DELTADELTA:
+          Preconditions.checkState(fieldSpec.isSingleValueField(),
+              "Compression codec %s can only be used on single-value columns, found multi-value column: %s",
+              fieldConfig.getCompressionCodec(), fieldConfig.getName());
+          DataType storedType = fieldSpec.getDataType().getStoredType();
+          Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
+              "Compression codec %s can only be used on INT/LONG data types, found %s for column: %s",
+              fieldConfig.getCompressionCodec(), storedType, fieldConfig.getName());
+          break;
+        default:
+          // no-op for other codecs
+      }
     }
-    switch (fieldConfig.getCompressionCodec()) {
-      case DELTA:
-      case DELTADELTA:
+
+    // Validate codecPipeline: parse the full pipeline upfront so invalid/misspelled names fail fast,
+    // then delegate per-transform type validation to each transform class.
+    List<String> codecPipeline = fieldConfig.getCodecPipeline();
+    if (codecPipeline != null && !codecPipeline.isEmpty()) {
+      ChunkCodecPipeline pipeline = ChunkCodecPipeline.fromNames(codecPipeline);
+      if (pipeline.hasTransforms()) {
         Preconditions.checkState(fieldSpec.isSingleValueField(),
-            "Compression codec %s can only be used on single-value columns, found multi-value column: %s",
-            fieldConfig.getCompressionCodec(), fieldConfig.getName());
+            "codecPipeline with transforms can only be used on single-value columns, "
+                + "found multi-value column: %s", fieldConfig.getName());
         DataType storedType = fieldSpec.getDataType().getStoredType();
-        Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
-            "Compression codec %s can only be used on INT/LONG data types, found %s for column: %s",
-            fieldConfig.getCompressionCodec(), storedType, fieldConfig.getName());
-        break;
-      default:
-        // no-op for other codecs
+        for (ChunkCodec transformCodec : pipeline.getTransforms()) {
+          ChunkTransformFactory.getTransform(transformCodec)
+              .validateStoredType(storedType, fieldConfig.getName());
+        }
+      }
     }
   }
 }

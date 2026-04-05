@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.compression;
+package org.apache.pinot.segment.local.io.codec.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -28,7 +28,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class DeltaDeltaCompressionTest {
+public class DeltaCompressionTest {
 
   @Test
   public void testRoundTripEmpty()
@@ -40,17 +40,22 @@ public class DeltaDeltaCompressionTest {
       input.putLong(v);
     }
     input.flip();
+    int numLongs = input.remaining() / Long.BYTES;
+    assertEquals(numLongs, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTADELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
-      compressor.compress(input.slice(), compressed);
+      assertEquals(input.limit(), 0);
+      int compressedSize = compressor.compress(input.slice(), compressed);
+      assertEquals(compressedSize, 5);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTADELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
         int actualSize = decompressor.decompress(compressed, decompressed);
         assertEquals(actualSize, values.length * Long.BYTES);
 
+        decompressed.flip();
         for (long expected : values) {
           assertEquals(decompressed.getLong(), expected);
         }
@@ -61,20 +66,26 @@ public class DeltaDeltaCompressionTest {
   @Test
   public void testRoundTripSingleValue()
       throws IOException {
-    long[] values = new long[]{100L};
+    long[] values = new long[]{10L};
 
     ByteBuffer input = ByteBuffer.allocateDirect(values.length * Long.BYTES);
+
     for (long v : values) {
       input.putLong(v);
     }
     input.flip();
+    int numLongs = input.remaining() / Long.BYTES;
+    assertEquals(numLongs, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTADELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
-      compressor.compress(input.slice(), compressed);
+      assertEquals(input.limit(), 8);
+      int compressedSize = compressor.compress(input.slice(), compressed);
+      assertEquals(compressedSize, 13);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTADELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
+        assertEquals(decompressedSize, 8);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
         int actualSize = decompressor.decompress(compressed, decompressed);
         assertEquals(actualSize, values.length * Long.BYTES);
@@ -89,19 +100,22 @@ public class DeltaDeltaCompressionTest {
   @Test
   public void testRoundTripMultiValues()
       throws IOException {
-    long[] values = new long[]{100L, 105L, 111L, 118L, 126L, 135L, 145L, 156L, 168L};
+    long[] values = new long[]{10L, 12L, 15L, 21L, 30L, 30L, 31L, Long.MIN_VALUE + 10L, Long.MAX_VALUE - 10L};
 
     ByteBuffer input = ByteBuffer.allocateDirect(values.length * Long.BYTES);
+
     for (long v : values) {
       input.putLong(v);
     }
     input.flip();
+    int numLongs = input.remaining() / Long.BYTES;
+    assertEquals(numLongs, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTADELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
-      compressor.compress(input.slice(), compressed);
+      int compressedSize = compressor.compress(input.slice(), compressed);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTADELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
         int actualSize = decompressor.decompress(compressed, decompressed);
@@ -124,17 +138,22 @@ public class DeltaDeltaCompressionTest {
       input.putInt(v);
     }
     input.flip();
+    int numIntegers = input.remaining() / Integer.BYTES;
+    assertEquals(numIntegers, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTADELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
-      compressor.compress(input.slice(), compressed);
+      assertEquals(input.limit(), 0);
+      int compressedSize = compressor.compress(input.slice(), compressed);
+      assertEquals(compressedSize, 5);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTADELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
         int actualSize = decompressor.decompress(compressed, decompressed);
         assertEquals(actualSize, values.length * Integer.BYTES);
 
+        decompressed.flip();
         for (int expected : values) {
           assertEquals(decompressed.getInt(), expected);
         }
@@ -145,20 +164,26 @@ public class DeltaDeltaCompressionTest {
   @Test
   public void testRoundTripSingleValueInt()
       throws IOException {
-    int[] values = new int[]{100};
+    int[] values = new int[]{10};
 
     ByteBuffer input = ByteBuffer.allocateDirect(values.length * Integer.BYTES);
+
     for (int v : values) {
       input.putInt(v);
     }
     input.flip();
+    int numIntegers = input.remaining() / Integer.BYTES;
+    assertEquals(numIntegers, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTADELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
-      compressor.compress(input.slice(), compressed);
+      assertEquals(input.limit(), 4);
+      int compressedSize = compressor.compress(input.slice(), compressed);
+      assertEquals(compressedSize, 9);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTADELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
+        assertEquals(decompressedSize, 4);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
         int actualSize = decompressor.decompress(compressed, decompressed);
         assertEquals(actualSize, values.length * Integer.BYTES);
@@ -173,19 +198,22 @@ public class DeltaDeltaCompressionTest {
   @Test
   public void testRoundTripMultiValuesInt()
       throws IOException {
-    int[] values = new int[]{100, 105, 111, 118, 126, 135, 145, 156, 168};
+    int[] values = new int[]{10, 12, 15, 21, 30, 30, 31, Integer.MIN_VALUE + 10, Integer.MAX_VALUE - 10};
 
     ByteBuffer input = ByteBuffer.allocateDirect(values.length * Integer.BYTES);
+
     for (int v : values) {
       input.putInt(v);
     }
     input.flip();
+    int numIntegers = input.remaining() / Integer.BYTES;
+    assertEquals(numIntegers, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTADELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
       compressor.compress(input.slice(), compressed);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTADELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
         int actualSize = decompressor.decompress(compressed, decompressed);

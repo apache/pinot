@@ -16,8 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.compression;
+package org.apache.pinot.segment.local.io.codec.compression;
 
+import org.apache.pinot.segment.local.io.codec.PipelineChunkCompressor;
+import org.apache.pinot.segment.local.io.codec.PipelineChunkDecompressor;
+import org.apache.pinot.segment.spi.codec.ChunkCodecPipeline;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
@@ -117,5 +120,39 @@ public class ChunkCompressorFactory {
       default:
         throw new IllegalArgumentException("Illegal decompressor name " + compressionType);
     }
+  }
+
+  /**
+   * Returns a compressor for a codec pipeline. If the pipeline has transforms, returns a
+   * {@link PipelineChunkCompressor}; otherwise returns the plain compressor for the terminal codec.
+   * Legacy compound codecs (DELTA_LZ4, DOUBLE_DELTA_LZ4) are handled by their existing compressor
+   * implementations.
+   *
+   * @param pipeline the codec pipeline
+   * @param valueSizeInBytes size of each typed value (4 for INT, 8 for LONG); used by transforms
+   * @return compressor for the pipeline
+   */
+  public static ChunkCompressor getCompressor(ChunkCodecPipeline pipeline, int valueSizeInBytes) {
+    if (pipeline.hasTransforms()) {
+      return new PipelineChunkCompressor(pipeline, valueSizeInBytes);
+    }
+    return getCompressor(pipeline.getChunkCompressionType());
+  }
+
+  /**
+   * Returns a decompressor for a codec pipeline. If the pipeline has transforms, returns a
+   * {@link PipelineChunkDecompressor}; otherwise returns the plain decompressor for the terminal codec.
+   * Legacy compound codecs (DELTA_LZ4, DOUBLE_DELTA_LZ4) are handled by their existing decompressor
+   * implementations.
+   *
+   * @param pipeline the codec pipeline
+   * @param valueSizeInBytes size of each typed value (4 for INT, 8 for LONG); used by transforms
+   * @return decompressor for the pipeline
+   */
+  public static ChunkDecompressor getDecompressor(ChunkCodecPipeline pipeline, int valueSizeInBytes) {
+    if (pipeline.hasTransforms()) {
+      return new PipelineChunkDecompressor(pipeline, valueSizeInBytes);
+    }
+    return getDecompressor(pipeline.getChunkCompressionType());
   }
 }

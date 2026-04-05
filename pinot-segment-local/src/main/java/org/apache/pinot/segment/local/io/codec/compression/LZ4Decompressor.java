@@ -16,39 +16,40 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.compression;
+package org.apache.pinot.segment.local.io.codec.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import net.jpountz.lz4.LZ4DecompressorWithLength;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
 /**
- * Identical to {@code LZ4Decompressor} but can determine the length of
- * the decompressed output
+ * Implementation of {@link ChunkDecompressor} using LZ4 decompression algorithm.
+ * LZ4Factory.fastestInstance().safeDecompressor().decompress(sourceBuffer, destinationBuffer)
+ * Compresses the data in buffer 'sourceBuffer' using default compression level
  */
-class LZ4WithLengthDecompressor implements ChunkDecompressor {
+class LZ4Decompressor implements ChunkDecompressor {
 
-  static final LZ4WithLengthDecompressor INSTANCE = new LZ4WithLengthDecompressor();
+  static final LZ4Decompressor INSTANCE = new LZ4Decompressor();
 
-  private final LZ4DecompressorWithLength _decompressor;
-
-  private LZ4WithLengthDecompressor() {
-    // safeDecompressor is used to avoid reading past input buffer limit, which is not guaranteed with fastDecompressor
-    _decompressor = new LZ4DecompressorWithLength(LZ4Compressor.LZ4_FACTORY.safeDecompressor());
+  private LZ4Decompressor() {
   }
 
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
-    _decompressor.decompress(compressedInput, decompressedOutput);
+    // Safe Decompressor instance is used to avoid data loss
+    LZ4Compressor.LZ4_FACTORY.safeDecompressor().decompress(compressedInput, decompressedOutput);
+    // When the decompress method returns successfully,
+    // dstBuf's position() will be set to its current position() plus the decompressed size of the data.
+    // and srcBuf's position() will be set to its limit()
+    // Flip operation Make the destination ByteBuffer(decompressedOutput) ready for read by setting the position to 0
     decompressedOutput.flip();
     return decompressedOutput.limit();
   }
 
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
-    return LZ4DecompressorWithLength.getDecompressedLength(compressedInput);
+    return -1;
   }
 }

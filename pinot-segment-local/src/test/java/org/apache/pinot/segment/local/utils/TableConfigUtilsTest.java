@@ -1195,6 +1195,68 @@ public class TableConfigUtilsTest {
           "Compression codec DELTADELTA can only be used on single-value columns, found multi-value column: myCol2");
     }
 
+    // Validate codecPipeline with transforms on wrong data type (STRING)
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null,
+              Arrays.asList("DELTA", "ZSTANDARD"), null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for codecPipeline with DELTA transform on STRING column");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("does not support stored type STRING"),
+          "Expected per-transform type validation error, got: " + e.getMessage());
+    }
+
+    // Validate codecPipeline with transforms on MV column
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, null, null, null, null, null,
+              Arrays.asList("DELTA", "LZ4"), null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for codecPipeline with DELTA transform on MV column");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(),
+          "codecPipeline with transforms can only be used on single-value columns, "
+              + "found multi-value column: myCol2");
+    }
+
+    // Validate XOR transform on INT column fails (XOR only supports FLOAT/DOUBLE)
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, null, null, null, null, null,
+              Arrays.asList("XOR", "ZSTANDARD"), null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for codecPipeline with XOR transform on INT column");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("does not support stored type INT"),
+          "Expected XOR type validation error, got: " + e.getMessage());
+    }
+
+    // Validate codecPipeline with transforms on valid SV INT column passes
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, null, null, null, null, null,
+              Arrays.asList("DELTA", "ZSTANDARD"), null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("codecPipeline with DELTA transform on SV INT column should pass", e);
+    }
+
+    // Validate compression-only pipeline on STRING column passes (no transforms)
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null,
+              Arrays.asList("ZSTANDARD"), null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("Compression-only codecPipeline on STRING column should pass", e);
+    }
+
     try {
       FieldConfig fieldConfig =
           new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);

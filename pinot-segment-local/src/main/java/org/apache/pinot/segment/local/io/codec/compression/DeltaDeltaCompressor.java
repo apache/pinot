@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.compression;
+package org.apache.pinot.segment.local.io.codec.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -26,19 +26,32 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
 /**
- * Implementation of {@link ChunkCompressor} using delta compression with LZ4.
- * The delta values are further compressed using LZ4.
+ * A Delta of delta implementation of {@link ChunkCompressor}, that simply returns the input uncompressed data
+ * with performing delta of delta encoding. This is useful in cases where cost of de-compression out-weighs benefit of
+ * compression.
  */
-class DeltaCompressor implements ChunkCompressor {
+class DeltaDeltaCompressor implements ChunkCompressor {
 
-  static final DeltaCompressor INSTANCE = new DeltaCompressor();
+  static final DeltaDeltaCompressor INSTANCE = new DeltaDeltaCompressor();
   static final LZ4Factory LZ4_FACTORY = LZ4Factory.fastestInstance();
   private static final byte INT_FLAG = 0;
   private static final byte LONG_FLAG = 1;
 
-  private DeltaCompressor() {
+  private DeltaDeltaCompressor() {
   }
 
+  /**
+   * The compression works by:
+   * (1) Storing the first value as-is
+   * (2) Computing and storing the first delta (difference between second and first value)
+   * (3) For all subsequent values, storing the difference between consecutive deltas (delta of delta)
+   * (4) During decompression, the process is reversed to reconstruct the original values
+   *
+   * The following scenarios data will be benefited from delta of delta compression
+   * The data is sorted
+   * The differences between consecutive values are relatively constant
+   * The data consists of integers (it's specifically designed for integer sequences)
+   * */
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
@@ -50,16 +63,15 @@ class DeltaCompressor implements ChunkCompressor {
       throw new IOException("Invalid input size: must be multiple of 4 bytes for INT or 8 bytes for LONG");
     }
     if (remaining % Long.BYTES != 0) {
-      outCompressed.put(INT_FLAG);
       return compressForInt(inUncompressed, outCompressed, outStartPosition);
     }
-    outCompressed.put(LONG_FLAG);
     return compressForLong(inUncompressed, outCompressed, outStartPosition);
   }
 
-  private int compressForInt(ByteBuffer inUncompressed, ByteBuffer outCompressed, int outStartPosition)
+  private int compressForInt(ByteBuffer inUncompressed, ByteBuffer outCompressed, int startPosition)
       throws IOException {
-    // Count the number of long values to be compressed.
+    outCompressed.put(INT_FLAG);
+    // Get number of integers to compress
     int numIntegers = inUncompressed.remaining() / Integer.BYTES;
     if (numIntegers == 0) {
       outCompressed.putInt(0);
@@ -67,30 +79,39 @@ class DeltaCompressor implements ChunkCompressor {
       return 5; // 1 byte flag + 4 bytes for numIntegers
     }
 
-    // Store the number of integer values at the start
+    // Store number of Integers at the start
     outCompressed.putInt(numIntegers);
 
-    // Store the first value as-is
+    // Store first value as-is
     int prevValue = inUncompressed.getInt();
     outCompressed.putInt(prevValue);
 
     if (numIntegers == 1) {
       outCompressed.flip();
-      return outCompressed.limit() - outStartPosition;
+      return outCompressed.limit() - startPosition;
     }
 
     // Create temporary buffer for delta values before LZ4 compression
     ByteBuffer deltaBuffer = ByteBuffer.allocate((numIntegers - 1) * Integer.BYTES);
 
-    // Calculate deltas
-    for (int i = 1; i < numIntegers; i++) {
+    // Store first delta
+    int prevDelta = inUncompressed.getInt() - prevValue;
+    deltaBuffer.putInt(prevDelta);
+    prevValue += prevDelta;
+
+    // Calculate remaining deltas
+    for (int i = 2; i < numIntegers; i++) {
       int currentValue = inUncompressed.getInt();
-      int delta = currentValue - prevValue;
-      deltaBuffer.putInt(delta);
+      int currentDelta = currentValue - prevValue;
+      int deltaOfDelta = currentDelta - prevDelta;
+
+      deltaBuffer.putInt(deltaOfDelta);
+
       prevValue = currentValue;
+      prevDelta = currentDelta;
     }
 
-    // Prepare the delta buffer for reading
+    // Prepare delta buffer for reading
     deltaBuffer.flip();
 
     // Reserve space for compressed size
@@ -106,12 +127,13 @@ class DeltaCompressor implements ChunkCompressor {
 
     // Make buffer ready for reading
     outCompressed.flip();
-    return outCompressed.limit() - outStartPosition;
+    return outCompressed.limit() - startPosition;
   }
 
-  private int compressForLong(ByteBuffer inUncompressed, ByteBuffer outCompressed, int outStartPosition)
+  private int compressForLong(ByteBuffer inUncompressed, ByteBuffer outCompressed, int startPosition)
       throws IOException {
-    // Count the number of long values to be compressed.
+    outCompressed.put(LONG_FLAG);
+    // Get number of longs to compress
     int numLongs = inUncompressed.remaining() / Long.BYTES;
     if (numLongs == 0) {
       outCompressed.putInt(0);
@@ -119,30 +141,39 @@ class DeltaCompressor implements ChunkCompressor {
       return 5; // 1 byte flag + 4 bytes for numLongs
     }
 
-    // Store the number of long values at the start
+    // Store number of longs at the start
     outCompressed.putInt(numLongs);
 
-    // Store the first value as-is
+    // Store first value as-is
     long prevValue = inUncompressed.getLong();
     outCompressed.putLong(prevValue);
 
     if (numLongs == 1) {
       outCompressed.flip();
-      return outCompressed.limit() - outStartPosition;
+      return outCompressed.limit() - startPosition;
     }
 
     // Create temporary buffer for delta values before LZ4 compression
     ByteBuffer deltaBuffer = ByteBuffer.allocate((numLongs - 1) * Long.BYTES);
 
-    // Calculate deltas
-    for (int i = 1; i < numLongs; i++) {
+    // Store first delta
+    long prevDelta = inUncompressed.getLong() - prevValue;
+    deltaBuffer.putLong(prevDelta);
+    prevValue += prevDelta;
+
+    // Calculate remaining deltas
+    for (int i = 2; i < numLongs; i++) {
       long currentValue = inUncompressed.getLong();
-      long delta = currentValue - prevValue;
-      deltaBuffer.putLong(delta);
+      long currentDelta = currentValue - prevValue;
+      long deltaOfDelta = currentDelta - prevDelta;
+
+      deltaBuffer.putLong(deltaOfDelta);
+
       prevValue = currentValue;
+      prevDelta = currentDelta;
     }
 
-    // Prepare the delta buffer for reading
+    // Prepare delta buffer for reading
     deltaBuffer.flip();
 
     // Reserve space for compressed size
@@ -158,42 +189,43 @@ class DeltaCompressor implements ChunkCompressor {
 
     // Make buffer ready for reading
     outCompressed.flip();
-    return outCompressed.limit() - outStartPosition;
+    return outCompressed.limit() - startPosition;
   }
 
   @Override
   public int maxCompressedSize(int uncompressedSize) {
-    // Add 1 byte for type flag
-    int baseSize = 1;
+    // Add 1 byte for int or long flag
+    int flagSize = 1;
+
     if (uncompressedSize % Integer.BYTES != 0) {
       throw new IllegalArgumentException("Invalid input size: must be multiple of 4 bytes for INT or 8 bytes for LONG");
     }
     if (uncompressedSize % Long.BYTES != 0) {
       int numIntegers = uncompressedSize / Integer.BYTES;
       if (numIntegers == 0) {
-        return baseSize + 4; // flag + numIntegers
+        return flagSize + 4; // flag + num of Integers
       }
       if (numIntegers == 1) {
-        return baseSize + 8; // flag + numIntegers + one int value
+        return flagSize + 8; // flag + num of Integers + one integers value
       }
-      int deltaSize = (numIntegers - 1) * Long.BYTES;
-      return baseSize + 12 + LZ4_FACTORY.fastCompressor()
-          .maxCompressedLength(deltaSize); // flag + numIntegers + first int value + compressed size + compressed data
+      int deltaSize = (numIntegers - 1) * Integer.BYTES;
+      // flag + num of Longs + first value + compressed size + compressed delta
+      return flagSize + 12 + LZ4_FACTORY.fastCompressor().maxCompressedLength(deltaSize);
     }
     int numLongs = uncompressedSize / Long.BYTES;
     if (numLongs == 0) {
-      return baseSize + 4; // flag + numLongs
+      return flagSize + 4; // flag + num of Longs
     }
     if (numLongs == 1) {
-      return baseSize + 12; // flag + numLongs + one long value
+      return flagSize + 12; // flag + num of Longs + one long value
     }
     int deltaSize = (numLongs - 1) * Long.BYTES;
-    return baseSize + 16 + LZ4_FACTORY.fastCompressor()
-        .maxCompressedLength(deltaSize); // flag + numLongs + first value + compressed size + compressed data
+    // flag + num of Longs + first value + compressed size + compressed delta
+    return flagSize + 16 + LZ4_FACTORY.fastCompressor().maxCompressedLength(deltaSize);
   }
 
   @Override
   public ChunkCompressionType compressionType() {
-    return ChunkCompressionType.DELTA;
+    return ChunkCompressionType.DELTADELTA;
   }
 }

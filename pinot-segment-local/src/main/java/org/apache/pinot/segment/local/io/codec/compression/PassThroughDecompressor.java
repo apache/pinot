@@ -16,49 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.compression;
+package org.apache.pinot.segment.local.io.codec.compression;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.zip.DataFormatException;
-import java.util.zip.Inflater;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
 /**
- * Implementation of {@link ChunkDecompressor} using GZIP decompression algorithm.
+ * A pass-through implementation of {@link ChunkDecompressor}, that simply returns the input data without
+ * performing any de-compression. This is useful for cases where cost of de-compression out-weighs the benefits
+ * of compression.
  */
-class GzipDecompressor implements ChunkDecompressor {
+class PassThroughDecompressor implements ChunkDecompressor {
 
-  private final Inflater _decompressor;
+  static final PassThroughDecompressor INSTANCE = new PassThroughDecompressor();
 
-  public GzipDecompressor() {
-    _decompressor = new Inflater();
+  private PassThroughDecompressor() {
   }
 
   @Override
-  public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
-      throws IOException {
-    _decompressor.reset();
-    _decompressor.setInput(compressedInput);
-    try {
-      _decompressor.inflate(decompressedOutput);
-    } catch (DataFormatException e) {
-      throw new IOException(e);
-    }
+  public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput) {
+    decompressedOutput.put(compressedInput);
+
+    // Flip the output ByteBuffer for reading.
     decompressedOutput.flip();
-    return (int) _decompressor.getBytesWritten();
+    return decompressedOutput.limit();
   }
 
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
-    int offset = compressedInput.limit() - Integer.BYTES;
-    return offset > -1 ? compressedInput.getInt(offset) : -1;
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    _decompressor.end();
+    return compressedInput.limit();
   }
 }

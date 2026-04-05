@@ -16,54 +16,45 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.compression;
+package org.apache.pinot.segment.local.io.codec.compression;
 
+import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.zip.Deflater;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
 /**
- * Implementation of {@link ChunkCompressor} using GZIP compression algorithm.
+ * Implementation of {@link ChunkCompressor} using Zstandard(Zstd) compression algorithm.
+ * Zstd.compress(destinationBuffer, sourceBuffer)
  */
-class GzipCompressor implements ChunkCompressor {
+class ZstandardCompressor implements ChunkCompressor {
 
-  private final Deflater _compressor;
+  static final ZstandardCompressor INSTANCE = new ZstandardCompressor();
 
-  public GzipCompressor() {
-    _compressor = new Deflater();
+  private ZstandardCompressor() {
   }
 
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
-    _compressor.reset();
-    _compressor.setInput(inUncompressed);
-    _compressor.finish();
-    _compressor.deflate(outCompressed);
-    outCompressed.putInt((int) _compressor.getBytesRead()); // append uncompressed size
-    int size = outCompressed.position();
+    int compressedSize = Zstd.compress(outCompressed, inUncompressed);
+    // When the compress method returns successfully,
+    // dstBuf's position() will be set to its current position() plus the compressed size of the data.
+    // and srcBuf's position() will be set to its limit()
+    // Flip operation Make the destination ByteBuffer(outCompressed) ready for read by setting the position to 0
     outCompressed.flip();
-    return size;
+    return compressedSize;
   }
 
   @Override
   public int maxCompressedSize(int uncompressedSize) {
-    // https://github.com/luvit/zlib/blob/8de57bce969eb9dafc1f1f5c256ac608d0a73ec4/compress.c#L75
-    return uncompressedSize + (uncompressedSize >> 12) + (uncompressedSize >> 14) + (uncompressedSize >> 25) + 13
-        + Integer.BYTES;
+    return (int) Zstd.compressBound(uncompressedSize);
   }
 
   @Override
   public ChunkCompressionType compressionType() {
-    return ChunkCompressionType.GZIP;
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    _compressor.end();
+    return ChunkCompressionType.ZSTANDARD;
   }
 }

@@ -49,6 +49,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.codec.ChunkCodecPipeline;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
@@ -380,23 +381,37 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // The compression type for an existing segment can only be determined by reading the forward index header.
     ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
     ChunkCompressionType existingCompressionType;
+    ChunkCodecPipeline existingPipeline;
 
     // Get the forward index reader factory and create a reader
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
     try (ForwardIndexReader<?> fwdIndexReader = readerFactory.createIndexReader(segmentReader,
         _fieldIndexConfigs.get(column), existingColMetadata)) {
       existingCompressionType = fwdIndexReader.getCompressionType();
+      existingPipeline = fwdIndexReader.getCodecPipeline();
       Preconditions.checkState(existingCompressionType != null,
           "Existing compressionType cannot be null for raw forward index column=" + column);
     }
 
-    // Get the new compression type.
-    ChunkCompressionType newCompressionType =
-        _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).getChunkCompressionType();
+    ForwardIndexConfig newConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+    ChunkCodecPipeline newPipeline = newConfig.getCodecPipeline();
 
+    // newPipeline is non-null for all non-CLP RAW codecs (auto-derived from compressionCodec).
+    // Compare via pipeline when possible; fall back to compressionType for CLP codecs.
+    if (newPipeline != null) {
+      // For legacy segments (pre-V7), derive pipeline from their compressionType for comparison.
+      // e.g., existing DELTA segment → pipeline [DELTA_LZ4]; existing LZ4 segment → pipeline [LZ4].
+      if (existingPipeline == null) {
+        existingPipeline = ChunkCodecPipeline.fromCompressionType(existingCompressionType);
+      }
+      return !existingPipeline.equals(newPipeline);
+    }
+
+    // Neither has a pipeline (CLP codecs) — compare compression types directly.
     // Note that default compression type (PASS_THROUGH for metric and LZ4 for dimension) is not considered if the
     // compressionType is not explicitly provided in tableConfig. This is to avoid incorrectly rewriting all the
     // forward indexes during segmentReload when the default compressionType changes.
+    ChunkCompressionType newCompressionType = newConfig.getChunkCompressionType();
     return newCompressionType != null && existingCompressionType != newCompressionType;
   }
 

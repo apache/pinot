@@ -29,7 +29,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.segment.local.io.codec.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
