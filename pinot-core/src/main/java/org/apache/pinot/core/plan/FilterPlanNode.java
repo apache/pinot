@@ -46,6 +46,7 @@ import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
 import org.apache.pinot.core.operator.filter.VectorSearchParams;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
@@ -59,6 +60,8 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
@@ -372,21 +375,34 @@ public class FilterPlanNode implements PlanNode {
   private BaseFilterOperator constructVectorSimilarityOperator(DataSource dataSource,
       VectorSimilarityPredicate predicate, String column, int numDocs) {
     VectorIndexReader vectorIndex = dataSource.getVectorIndex();
+    VectorIndexConfig vectorIndexConfig = dataSource.getVectorIndexConfig();
     VectorSearchParams searchParams = VectorSearchParams.fromQueryOptions(_queryContext.getQueryOptions());
 
     if (vectorIndex != null) {
       // ANN index path: pass forward index reader only if rerank is enabled
       ForwardIndexReader<?> forwardIndexReader = null;
-      if (searchParams.isExactRerank()) {
+      VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
+      if (searchParams.isExactRerank(backendType)) {
         forwardIndexReader = dataSource.getForwardIndex();
       }
-      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader);
+      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
+          vectorIndexConfig);
     }
 
     // Exact scan fallback: no vector index on this segment
     ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
     Preconditions.checkState(forwardIndexReader != null,
         "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
-    return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs);
+    return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs, vectorIndexConfig,
+        getVectorFallbackReason(vectorIndexConfig));
+  }
+
+  private static String getVectorFallbackReason(@Nullable VectorIndexConfig vectorIndexConfig) {
+    if (vectorIndexConfig == null || vectorIndexConfig.isDisabled()) {
+      return "vector_index_missing";
+    }
+    return vectorIndexConfig.resolveBackendType().supportsMutableSegments()
+        ? "vector_index_missing"
+        : vectorIndexConfig.resolveBackendType().name().toLowerCase() + "_index_unavailable";
   }
 }

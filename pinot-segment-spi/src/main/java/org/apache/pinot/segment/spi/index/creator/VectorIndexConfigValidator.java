@@ -49,6 +49,16 @@ public final class VectorIndexConfigValidator {
   static final Set<String> IVF_FLAT_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Arrays.asList("nlist", "trainSampleSize", "trainingSeed", "minRowsForIndex")));
 
+  // IVF_PQ-specific property keys
+  static final Set<String> IVF_PQ_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
+      Arrays.asList("nlist", "pqM", "pqNbits", "trainSampleSize", "trainingSeed")));
+
+  private static final Set<String> IVF_FLAT_EXCLUSIVE_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
+      Collections.singletonList("minRowsForIndex")));
+
+  private static final Set<String> IVF_PQ_EXCLUSIVE_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
+      Arrays.asList("pqM", "pqNbits")));
+
   // Common property keys that appear in the properties map (legacy format stores common fields there too)
   private static final Set<String> COMMON_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Arrays.asList("vectorIndexType", "vectorDimension", "vectorDistanceFunction", "version")));
@@ -108,18 +118,28 @@ public final class VectorIndexConfigValidator {
    */
   private static void validateBackendSpecificProperties(VectorIndexConfig config, VectorBackendType backendType) {
     Map<String, String> properties = config.getProperties();
+    if (backendType == VectorBackendType.IVF_PQ) {
+      validateRequiredProperties(properties, IVF_PQ_PROPERTIES, "IVF_PQ");
+    }
     if (properties == null || properties.isEmpty()) {
       return;
     }
 
     switch (backendType) {
       case HNSW:
-        validateNoForeignProperties(properties, IVF_FLAT_PROPERTIES, "HNSW", "IVF_FLAT");
+        validateNoForeignProperties(properties, union(IVF_FLAT_PROPERTIES, IVF_PQ_PROPERTIES), "HNSW",
+            "IVF backends");
         validateHnswProperties(properties);
         break;
       case IVF_FLAT:
-        validateNoForeignProperties(properties, HNSW_PROPERTIES, "IVF_FLAT", "HNSW");
+        validateNoForeignProperties(properties, union(HNSW_PROPERTIES, IVF_PQ_EXCLUSIVE_PROPERTIES), "IVF_FLAT",
+            "other backends");
         validateIvfFlatProperties(properties);
+        break;
+      case IVF_PQ:
+        validateNoForeignProperties(properties, union(HNSW_PROPERTIES, IVF_FLAT_EXCLUSIVE_PROPERTIES), "IVF_PQ",
+            "other backends");
+        validateIvfPqProperties(properties, config.getVectorDimension());
         break;
       default:
         throw new IllegalArgumentException("Unsupported vector backend type: " + backendType);
@@ -174,22 +194,36 @@ public final class VectorIndexConfigValidator {
     }
   }
 
+  private static void validateIvfPqProperties(Map<String, String> properties, int vectorDimension) {
+    validatePositiveIntProperty(properties, "nlist", "IVF_PQ nlist");
+    validatePositiveIntProperty(properties, "pqM", "IVF_PQ pqM");
+    validatePositiveIntProperty(properties, "pqNbits", "IVF_PQ pqNbits");
+    validatePositiveIntProperty(properties, "trainSampleSize", "IVF_PQ trainSampleSize");
+
+    Integer pqM = parsePositiveIntProperty(properties, "pqM", "IVF_PQ pqM");
+    Integer pqNbits = parsePositiveIntProperty(properties, "pqNbits", "IVF_PQ pqNbits");
+    Integer nlist = parsePositiveIntProperty(properties, "nlist", "IVF_PQ nlist");
+    Integer trainSampleSize = parsePositiveIntProperty(properties, "trainSampleSize", "IVF_PQ trainSampleSize");
+
+    if (pqM != null && vectorDimension % pqM != 0) {
+      throw new IllegalArgumentException(
+          "IVF_PQ pqM (" + pqM + ") must evenly divide vectorDimension (" + vectorDimension + ")");
+    }
+    if (pqNbits != null && pqNbits != 4 && pqNbits != 6 && pqNbits != 8) {
+      throw new IllegalArgumentException(
+          "IVF_PQ pqNbits must be one of [4, 6, 8], got: " + pqNbits);
+    }
+    if (nlist != null && trainSampleSize != null && trainSampleSize < nlist) {
+      throw new IllegalArgumentException(
+          "IVF_PQ trainSampleSize (" + trainSampleSize + ") must be >= nlist (" + nlist + ")");
+    }
+  }
+
   /**
    * Validates that an optional property, if present, is a positive integer.
    */
   private static void validatePositiveIntProperty(Map<String, String> properties, String key, String displayName) {
-    String value = properties.get(key);
-    if (value == null) {
-      return;
-    }
-    try {
-      int intValue = Integer.parseInt(value);
-      if (intValue <= 0) {
-        throw new IllegalArgumentException(displayName + " must be a positive integer, got: " + intValue);
-      }
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(displayName + " must be a valid integer, got: '" + value + "'");
-    }
+    parsePositiveIntProperty(properties, key, displayName);
   }
 
   /**
@@ -207,6 +241,44 @@ public final class VectorIndexConfigValidator {
       }
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(displayName + " must be a valid number, got: '" + value + "'");
+    }
+  }
+
+  private static Integer parsePositiveIntProperty(Map<String, String> properties, String key, String displayName) {
+    String value = properties.get(key);
+    if (value == null) {
+      return null;
+    }
+    try {
+      int intValue = Integer.parseInt(value);
+      if (intValue <= 0) {
+        throw new IllegalArgumentException(displayName + " must be a positive integer, got: " + intValue);
+      }
+      return intValue;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(displayName + " must be a valid integer, got: '" + value + "'");
+    }
+  }
+
+  private static Set<String> union(Set<String> left, Set<String> right) {
+    HashSet<String> union = new HashSet<>(left);
+    union.addAll(right);
+    return union;
+  }
+
+  private static void validateRequiredProperties(Map<String, String> properties, Set<String> requiredProperties,
+      String backendType) {
+    if (properties == null) {
+      throw new IllegalArgumentException(backendType + " properties are required");
+    }
+    for (String requiredProperty : requiredProperties) {
+      if ("trainingSeed".equals(requiredProperty)) {
+        continue;
+      }
+      if (!properties.containsKey(requiredProperty)) {
+        throw new IllegalArgumentException(
+            backendType + " property '" + requiredProperty + "' is required");
+      }
     }
   }
 }

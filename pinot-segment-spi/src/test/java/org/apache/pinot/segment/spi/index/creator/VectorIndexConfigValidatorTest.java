@@ -42,14 +42,12 @@ public class VectorIndexConfigValidatorTest {
   public void testBackwardCompatConfigWithoutVectorIndexTypeDefaultsToHnsw() {
     // Existing configs may not have vectorIndexType at all. They must default to HNSW.
     Map<String, String> properties = new HashMap<>();
-    properties.put("vectorIndexType", "HNSW");
     properties.put("vectorDimension", "1536");
+    properties.put("vectorDistanceFunction", "COSINE");
 
     VectorIndexConfig config = new VectorIndexConfig(properties);
-    // Simulate an old-style config where vectorIndexType might be set only in properties
-    config.setVectorIndexType(null);
-
     VectorBackendType backendType = VectorIndexConfigValidator.resolveBackendType(config);
+    org.testng.Assert.assertNull(config.getVectorIndexType());
     assertEquals(backendType, VectorBackendType.HNSW);
   }
 
@@ -157,12 +155,59 @@ public class VectorIndexConfigValidatorTest {
     VectorIndexConfigValidator.validate(config);
   }
 
+  @Test
+  public void testValidIvfPqConfig() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_PQ");
+    properties.put("vectorDimension", "768");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("nlist", "128");
+    properties.put("pqM", "32");
+    properties.put("pqNbits", "8");
+    properties.put("trainSampleSize", "10000");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+    assertEquals(config.resolveBackendType(), VectorBackendType.IVF_PQ);
+  }
+
+  @Test
+  public void testValidIvfPqConfigWithTrainingSeed() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_PQ");
+    properties.put("vectorDimension", "512");
+    properties.put("vectorDistanceFunction", "INNER_PRODUCT");
+    properties.put("nlist", "64");
+    properties.put("pqM", "16");
+    properties.put("pqNbits", "6");
+    properties.put("trainSampleSize", "4096");
+    properties.put("trainingSeed", "42");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*IVF_PQ property 'pqM' is required.*")
+  public void testRejectIvfPqConfigMissingRequiredProperty() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_PQ");
+    properties.put("vectorDimension", "768");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("nlist", "128");
+    properties.put("pqNbits", "8");
+    properties.put("trainSampleSize", "10000");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+  }
+
   // ============================================================
   // Cross-backend property rejection tests
   // ============================================================
 
   @Test(expectedExceptions = IllegalArgumentException.class,
-      expectedExceptionsMessageRegExp = ".*nlist.*IVF_FLAT.*cannot be used with vectorIndexType HNSW.*")
+      expectedExceptionsMessageRegExp = ".*nlist.*cannot be used with vectorIndexType HNSW.*")
   public void testRejectIvfFlatPropertiesOnHnswConfig() {
     Map<String, String> properties = new HashMap<>();
     properties.put("vectorIndexType", "HNSW");
@@ -175,7 +220,7 @@ public class VectorIndexConfigValidatorTest {
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class,
-      expectedExceptionsMessageRegExp = ".*trainSampleSize.*IVF_FLAT.*cannot be used with vectorIndexType HNSW.*")
+      expectedExceptionsMessageRegExp = ".*trainSampleSize.*cannot be used with vectorIndexType HNSW.*")
   public void testRejectTrainSampleSizeOnHnswConfig() {
     Map<String, String> properties = new HashMap<>();
     properties.put("vectorIndexType", "HNSW");
@@ -188,7 +233,7 @@ public class VectorIndexConfigValidatorTest {
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class,
-      expectedExceptionsMessageRegExp = ".*maxCon.*HNSW.*cannot be used with vectorIndexType IVF_FLAT.*")
+      expectedExceptionsMessageRegExp = ".*maxCon.*cannot be used with vectorIndexType IVF_FLAT.*")
   public void testRejectHnswPropertiesOnIvfFlatConfig() {
     Map<String, String> properties = new HashMap<>();
     properties.put("vectorIndexType", "IVF_FLAT");
@@ -201,13 +246,26 @@ public class VectorIndexConfigValidatorTest {
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class,
-      expectedExceptionsMessageRegExp = ".*beamWidth.*HNSW.*cannot be used with vectorIndexType IVF_FLAT.*")
+      expectedExceptionsMessageRegExp = ".*beamWidth.*cannot be used with vectorIndexType IVF_FLAT.*")
   public void testRejectBeamWidthOnIvfFlatConfig() {
     Map<String, String> properties = new HashMap<>();
     properties.put("vectorIndexType", "IVF_FLAT");
     properties.put("vectorDimension", "768");
     properties.put("vectorDistanceFunction", "COSINE");
     properties.put("beamWidth", "200");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*pqM.*cannot be used with vectorIndexType HNSW.*")
+  public void testRejectIvfPqPropertyOnHnswConfig() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "768");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("pqM", "16");
 
     VectorIndexConfig config = new VectorIndexConfig(properties);
     VectorIndexConfigValidator.validate(config);
@@ -310,6 +368,54 @@ public class VectorIndexConfigValidatorTest {
     VectorIndexConfigValidator.validate(config);
   }
 
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*pqM.*divide vectorDimension.*")
+  public void testRejectIvfPqPqMThatDoesNotDivideDimension() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_PQ");
+    properties.put("vectorDimension", "770");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("nlist", "128");
+    properties.put("pqM", "32");
+    properties.put("pqNbits", "8");
+    properties.put("trainSampleSize", "10000");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*pqNbits must be one of \\[4, 6, 8\\].*")
+  public void testRejectIvfPqUnsupportedPqNbits() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_PQ");
+    properties.put("vectorDimension", "768");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("nlist", "128");
+    properties.put("pqM", "32");
+    properties.put("pqNbits", "7");
+    properties.put("trainSampleSize", "10000");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*IVF_PQ trainSampleSize \\(100\\) must be >= nlist \\(256\\).*")
+  public void testRejectIvfPqTrainSampleSizeLessThanNlist() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_PQ");
+    properties.put("vectorDimension", "768");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("nlist", "256");
+    properties.put("pqM", "32");
+    properties.put("pqNbits", "8");
+    properties.put("trainSampleSize", "100");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+  }
+
   // ============================================================
   // Distance function tests
   // ============================================================
@@ -326,6 +432,14 @@ public class VectorIndexConfigValidatorTest {
   public void testL2DistanceFunctionForIvfFlat() {
     VectorIndexConfig config = new VectorIndexConfig(false, "IVF_FLAT", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.L2, null);
+    VectorIndexConfigValidator.validate(config);
+  }
+
+  @Test
+  public void testL2DistanceFunctionForIvfPq() {
+    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 768, 1,
+        VectorIndexConfig.VectorDistanceFunction.L2,
+        Map.of("nlist", "128", "pqM", "32", "pqNbits", "8", "trainSampleSize", "10000"));
     VectorIndexConfigValidator.validate(config);
   }
 
@@ -359,6 +473,13 @@ public class VectorIndexConfigValidatorTest {
   }
 
   @Test
+  public void testResolveBackendTypeExplicitIvfPq() {
+    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 768, 1,
+        VectorIndexConfig.VectorDistanceFunction.COSINE, null);
+    assertEquals(config.resolveBackendType(), VectorBackendType.IVF_PQ);
+  }
+
+  @Test
   public void testResolveBackendTypeCaseInsensitive() {
     VectorIndexConfig config = new VectorIndexConfig(false, "hnsw", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
@@ -367,6 +488,10 @@ public class VectorIndexConfigValidatorTest {
     VectorIndexConfig config2 = new VectorIndexConfig(false, "ivf_flat", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     assertEquals(config2.resolveBackendType(), VectorBackendType.IVF_FLAT);
+
+    VectorIndexConfig config3 = new VectorIndexConfig(false, "ivf_pq", 768, 1,
+        VectorIndexConfig.VectorDistanceFunction.COSINE, null);
+    assertEquals(config3.resolveBackendType(), VectorBackendType.IVF_PQ);
   }
 
   @Test
@@ -423,6 +548,22 @@ public class VectorIndexConfigValidatorTest {
     VectorIndexConfigValidator.validate(config);
   }
 
+  @Test
+  public void testLegacyPropertiesMapIvfPq() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_PQ");
+    properties.put("vectorDimension", "768");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("nlist", "128");
+    properties.put("pqM", "32");
+    properties.put("pqNbits", "8");
+    properties.put("trainSampleSize", "10000");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    assertEquals(config.resolveBackendType(), VectorBackendType.IVF_PQ);
+    VectorIndexConfigValidator.validate(config);
+  }
+
   // ============================================================
   // JSON deserialization backward compatibility
   // ============================================================
@@ -465,6 +606,29 @@ public class VectorIndexConfigValidatorTest {
         org.apache.pinot.spi.utils.JsonUtils.stringToObject(confStr, VectorIndexConfig.class);
 
     assertEquals(config.resolveBackendType(), VectorBackendType.IVF_FLAT);
+    VectorIndexConfigValidator.validate(config);
+  }
+
+  @Test
+  public void testJsonConfigWithExplicitIvfPq()
+      throws Exception {
+    String confStr = "{"
+        + "\"disabled\": false,"
+        + "\"vectorIndexType\": \"IVF_PQ\","
+        + "\"vectorDimension\": 768,"
+        + "\"version\": 1,"
+        + "\"vectorDistanceFunction\": \"COSINE\","
+        + "\"properties\": {"
+        + "  \"nlist\": \"128\","
+        + "  \"pqM\": \"32\","
+        + "  \"pqNbits\": \"8\","
+        + "  \"trainSampleSize\": \"10000\""
+        + "}"
+        + "}";
+    VectorIndexConfig config =
+        org.apache.pinot.spi.utils.JsonUtils.stringToObject(confStr, VectorIndexConfig.class);
+
+    assertEquals(config.resolveBackendType(), VectorBackendType.IVF_PQ);
     VectorIndexConfigValidator.validate(config);
   }
 }

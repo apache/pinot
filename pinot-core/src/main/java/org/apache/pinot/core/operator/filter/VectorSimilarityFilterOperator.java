@@ -29,6 +29,8 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
@@ -69,6 +71,12 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
   private final VectorSimilarityPredicate _predicate;
   private final VectorSearchParams _searchParams;
   private final ForwardIndexReader<?> _forwardIndexReader;
+  @Nullable
+  private final VectorIndexConfig _vectorIndexConfig;
+  private final boolean _requestedExactRerank;
+  private final VectorExplainContext _vectorExplainContext;
+  private volatile int _annCandidateCount;
+  private volatile int _rerankedCandidateCount;
   private ImmutableRoaringBitmap _matches;
 
   /**
@@ -77,7 +85,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
    */
   public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
       int numDocs) {
-    this(vectorIndexReader, predicate, numDocs, VectorSearchParams.DEFAULT, null);
+    this(vectorIndexReader, predicate, numDocs, VectorSearchParams.DEFAULT, null, null);
   }
 
   /**
@@ -91,11 +99,30 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
    */
   public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
       int numDocs, VectorSearchParams searchParams, @Nullable ForwardIndexReader<?> forwardIndexReader) {
+    this(vectorIndexReader, predicate, numDocs, searchParams, forwardIndexReader, null);
+  }
+
+  public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
+      int numDocs, VectorSearchParams searchParams, @Nullable ForwardIndexReader<?> forwardIndexReader,
+      @Nullable VectorIndexConfig vectorIndexConfig) {
     super(numDocs, false);
     _vectorIndexReader = vectorIndexReader;
     _predicate = predicate;
     _searchParams = searchParams;
     _forwardIndexReader = forwardIndexReader;
+    _vectorIndexConfig = vectorIndexConfig;
+    VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
+    _requestedExactRerank = searchParams.isExactRerank(backendType);
+    boolean effectiveExactRerank = _requestedExactRerank && forwardIndexReader != null;
+    int effectiveSearchCount = effectiveExactRerank
+        ? searchParams.getEffectiveMaxCandidates(predicate.getTopK(), numDocs)
+        : predicate.getTopK();
+    _vectorExplainContext = new VectorExplainContext(backendType,
+        VectorDistanceUtils.resolveDistanceFunction(vectorIndexConfig),
+        backendType.supportsNprobe() ? searchParams.getNprobe() : 0, effectiveExactRerank, effectiveSearchCount,
+        null);
+    _annCandidateCount = -1;
+    _rerankedCandidateCount = -1;
     _matches = null;
   }
 
@@ -136,9 +163,15 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
   @Override
   public String toExplainString() {
+    VectorExplainContext explainContext = _vectorExplainContext;
     return EXPLAIN_NAME + "(indexLookUp:vector_index"
         + ", operator:" + _predicate.getType()
         + ", vector identifier:" + _predicate.getLhs().getIdentifier()
+        + ", backend:" + explainContext.getBackendType()
+        + ", distanceFunction:" + explainContext.getDistanceFunction()
+        + ", effectiveNprobe:" + explainContext.getEffectiveNprobe()
+        + ", effectiveExactRerank:" + explainContext.isEffectiveExactRerank()
+        + ", effectiveCandidateCount:" + explainContext.getEffectiveSearchCount()
         + ", vector literal:" + Arrays.toString(_predicate.getValue())
         + ", topK to search:" + _predicate.getTopK()
         + ')';
@@ -151,14 +184,23 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    VectorExplainContext explainContext = _vectorExplainContext;
     super.explainAttributes(attributeBuilder);
     attributeBuilder.putString("indexLookUp", "vector_index");
     attributeBuilder.putString("operator", _predicate.getType().name());
     attributeBuilder.putString("vectorIdentifier", _predicate.getLhs().getIdentifier());
+    attributeBuilder.putString("backend", explainContext.getBackendType().name());
+    attributeBuilder.putString("distanceFunction", explainContext.getDistanceFunction().name());
+    attributeBuilder.putLongIdempotent("effectiveNprobe", explainContext.getEffectiveNprobe());
+    attributeBuilder.putBool("effectiveExactRerank", explainContext.isEffectiveExactRerank());
+    attributeBuilder.putLongIdempotent("effectiveCandidateCount", explainContext.getEffectiveSearchCount());
     attributeBuilder.putString("vectorLiteral", Arrays.toString(_predicate.getValue()));
     attributeBuilder.putLongIdempotent("topKtoSearch", _predicate.getTopK());
-    if (_searchParams.isExactRerank()) {
-      attributeBuilder.putString("exactRerank", "true");
+    if (_annCandidateCount >= 0) {
+      attributeBuilder.putLong("annCandidateCount", _annCandidateCount);
+    }
+    if (_rerankedCandidateCount >= 0) {
+      attributeBuilder.putLong("rerankedCandidateCount", _rerankedCandidateCount);
     }
   }
 
@@ -168,32 +210,38 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
   private ImmutableRoaringBitmap executeSearch() {
     String column = _predicate.getLhs().getIdentifier();
     float[] queryVector = _predicate.getValue();
-    int topK = _predicate.getTopK();
+    VectorExplainContext explainContext = _vectorExplainContext;
 
     // 1. Configure backend-specific parameters via interfaces
     configureBackendParams(column);
 
     // 2. Determine effective search count (higher if rerank is enabled)
-    int searchCount = topK;
-    if (_searchParams.isExactRerank()) {
-      searchCount = _searchParams.getEffectiveMaxCandidates(topK);
-    }
+    int searchCount = explainContext.getEffectiveSearchCount();
 
     // 3. Execute ANN search
     ImmutableRoaringBitmap annResults = _vectorIndexReader.getDocIds(queryVector, searchCount);
     int annCandidateCount = annResults.getCardinality();
+    _annCandidateCount = annCandidateCount;
 
-    LOGGER.debug("Vector search on column: {}, backend: {}, topK: {}, searchCount: {}, annCandidates: {}",
-        column, getBackendName(), topK, searchCount, annCandidateCount);
+    LOGGER.debug("Vector search on column: {}, backend: {}, distanceFunction: {}, topK: {}, searchCount: {}, "
+            + "annCandidates: {}, exactRerank: {}",
+        column, explainContext.getBackendType(), explainContext.getDistanceFunction(), _predicate.getTopK(),
+        searchCount, annCandidateCount, explainContext.isEffectiveExactRerank());
+
+    if (_requestedExactRerank && !explainContext.isEffectiveExactRerank()) {
+      LOGGER.warn("Vector exact rerank was requested on column: {} but no forward index reader is available. "
+              + "Using ANN topK results only.",
+          column);
+    }
 
     // 4. Apply exact rerank if requested
-    if (_searchParams.isExactRerank() && _forwardIndexReader != null && annCandidateCount > 0) {
-      ImmutableRoaringBitmap reranked = applyExactRerank(annResults, queryVector, topK, column);
+    if (explainContext.isEffectiveExactRerank() && _forwardIndexReader != null && annCandidateCount > 0) {
+      ImmutableRoaringBitmap reranked = applyExactRerank(annResults, queryVector, _predicate.getTopK(), column);
+      _rerankedCandidateCount = reranked.getCardinality();
       LOGGER.debug("Exact rerank on column: {}, candidates: {} -> final: {}",
           column, annCandidateCount, reranked.getCardinality());
       return reranked;
     }
-
     return annResults;
   }
 
@@ -201,11 +249,10 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
    * Configures backend-specific search parameters on the reader if it supports them.
    */
   private void configureBackendParams(String column) {
-    // Set nprobe on IVF_FLAT readers
     if (_vectorIndexReader instanceof NprobeAware) {
       int nprobe = _searchParams.getNprobe();
       ((NprobeAware) _vectorIndexReader).setNprobe(nprobe);
-      LOGGER.debug("Set nprobe={} on IVF_FLAT reader for column: {}", nprobe, column);
+      LOGGER.debug("Set nprobe={} on {} reader for column: {}", nprobe, getBackendName(), column);
     }
   }
 
@@ -228,9 +275,8 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
         if (docVector == null || docVector.length == 0) {
           continue;
         }
-        // TODO: derive distance function from segment's vector index config instead of hardcoding L2.
-        //  Currently correct for EUCLIDEAN/L2; may produce suboptimal rerank ordering for COSINE/DOT_PRODUCT.
-        float distance = ExactVectorScanFilterOperator.computeL2SquaredDistance(queryVector, docVector);
+        float distance = VectorDistanceUtils.computeDistance(queryVector, docVector,
+            _vectorExplainContext.getDistanceFunction());
         if (maxHeap.size() < topK) {
           maxHeap.add(new DocDistance(docId, distance));
         } else if (distance < maxHeap.peek()._distance) {
@@ -253,10 +299,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
    * Returns a human-readable name for the backend (for logging).
    */
   private String getBackendName() {
-    if (_vectorIndexReader instanceof NprobeAware) {
-      return "IVF_FLAT";
-    }
-    return "HNSW";
+    return VectorDistanceUtils.resolveBackendType(_vectorIndexConfig).name();
   }
 
   private void record(ImmutableRoaringBitmap matches) {

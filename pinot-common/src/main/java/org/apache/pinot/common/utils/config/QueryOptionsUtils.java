@@ -659,6 +659,12 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK));
   }
 
+  @Nullable
+  public static Boolean getVectorExactRerank(Map<String, String> queryOptions) {
+    String exactRerank = queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK);
+    return exactRerank != null ? Boolean.parseBoolean(exactRerank) : null;
+  }
+
   /**
    * Returns the maximum number of ANN candidates for vector search, or {@code null} if not set.
    */
