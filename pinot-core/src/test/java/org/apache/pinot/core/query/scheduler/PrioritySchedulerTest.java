@@ -235,6 +235,32 @@ public class PrioritySchedulerTest {
     scheduler.stop();
   }
 
+  @Test
+  public void testResizeUpdatesSemaphoreIncrease() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(ResourceManager.QUERY_RUNNER_CONFIG_KEY, 4);
+    properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, 8);
+    TestPriorityScheduler scheduler = TestPriorityScheduler.create(new PinotConfiguration(properties));
+    assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), 4);
+
+    scheduler.getResourceManager().resizeThreadPools(8, 16);
+    assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), 8);
+    scheduler.stop();
+  }
+
+  @Test
+  public void testResizeUpdatesSemaphoreDecrease() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(ResourceManager.QUERY_RUNNER_CONFIG_KEY, 8);
+    properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, 16);
+    TestPriorityScheduler scheduler = TestPriorityScheduler.create(new PinotConfiguration(properties));
+    assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), 8);
+
+    scheduler.getResourceManager().resizeThreadPools(4, 8);
+    assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), 4);
+    scheduler.stop();
+  }
+
   static class TestPriorityScheduler extends PriorityScheduler {
     static TestSchedulerGroupFactory _groupFactory;
     static LongAccumulator _latestQueryTime;
@@ -261,7 +287,8 @@ public class PrioritySchedulerTest {
       return create(new PinotConfiguration());
     }
 
-    ResourceManager getResourceManager() {
+    @Override
+    public ResourceManager getResourceManager() {
       return _resourceManager;
     }
 
