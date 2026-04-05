@@ -18,10 +18,17 @@
  */
 package org.apache.pinot.core.plan;
 
+import org.apache.pinot.common.cache.SegmentQueryCache;
+import org.apache.pinot.common.cache.SegmentQueryCacheFactory;
+import org.apache.pinot.core.operator.CachedBitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.utils.QueryCacheUtils;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class DocIdSetPlanNode implements PlanNode {
@@ -43,6 +50,25 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public DocIdSetOperator run() {
-    return new DocIdSetOperator(_filterOperator, _maxDocPerCall);
+    SegmentQueryCache queryCache = SegmentQueryCacheFactory.get(_queryContext.getTableName());
+    MutableRoaringBitmap bitmap = null;
+    SegmentQueryCache.QueryCacheUpdater queryCacheUpdater = null;
+    if (queryCache != null && _queryContext.getFilter() != null
+        && !(_segmentContext.getIndexSegment() instanceof MutableSegment)) {
+      if (QueryCacheUtils.isExpensiveFilter(_queryContext.getFilter())) {
+        SegmentQueryCache.SegmentKey segmentKey =
+            new SegmentQueryCache.SegmentKey(_segmentContext.getIndexSegment().getSegmentName(),
+                _queryContext.getFilter());
+        Object cachedValue = queryCache.get(segmentKey);
+        if (cachedValue instanceof ImmutableRoaringBitmap) {
+          return new CachedBitmapDocIdSetOperator((ImmutableRoaringBitmap) cachedValue, _maxDocPerCall);
+        }
+        bitmap = new MutableRoaringBitmap();
+        queryCacheUpdater = new SegmentQueryCache.QueryCacheUpdater(queryCache, segmentKey);
+      }
+    }
+    return new DocIdSetOperator(
+        _filterOperator != null ? _filterOperator : new FilterPlanNode(_segmentContext, _queryContext).run(),
+        _maxDocPerCall, bitmap, queryCacheUpdater);
   }
 }

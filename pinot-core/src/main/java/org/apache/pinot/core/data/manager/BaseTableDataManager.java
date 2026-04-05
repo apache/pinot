@@ -52,6 +52,8 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.cache.SegmentQueryCache;
+import org.apache.pinot.common.cache.SegmentQueryCacheFactory;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -106,6 +108,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.CacheConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -166,6 +169,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Caches the latest TableConfig and Schema pair. The cache should not be modified.
   protected volatile Pair<TableConfig, Schema> _cachedTableConfigAndSchema;
 
+  // Query Cache Configs
+  protected CacheConfig _cacheConfig;
+
   protected volatile boolean _shutDown;
   protected volatile boolean _isDeleted;
 
@@ -219,6 +225,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
         .build();
     _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
+    boolean queryCacheEnabled = instanceDataManagerConfig.getConfig() != null && Boolean.parseBoolean(
+        instanceDataManagerConfig.getConfig()
+            .getProperty(CommonConstants.QueryCacheConfigs.QUERY_CACHE_ENABLED,
+                String.valueOf(CommonConstants.QueryCacheConfigs.DEFAULT_QUERY_CACHE_ENABLED)));
+    if (queryCacheEnabled && tableConfig.getQueryConfig() != null
+        && tableConfig.getQueryConfig().getCacheConfig() != null) {
+      _cacheConfig = tableConfig.getQueryConfig().getCacheConfig();
+    } else {
+      _cacheConfig = new CacheConfig(false, null, 0, 0);
+    }
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
@@ -259,7 +275,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Async segment refresh is {}!", _enableAsyncSegmentRefresh ? "enabled" : "disabled");
 
     doInit();
-
+    initQueryCache();
     _logger.info("Initialized table data manager with data directory: {}", _tableDataDir);
   }
 
@@ -292,6 +308,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
     _logger.info("Shutting down table data manager");
     _shutDown = true;
+    destroyQueryCache();
     doShutdown();
     _logger.info("Shut down table data manager");
   }
@@ -369,6 +386,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Added new immutable segment: {}", segmentName);
     } else {
       _logger.info("Replaced immutable segment: {}", segmentName);
+      invalidateSegmentCache(segmentName);
       oldSegmentManager.offload();
       releaseSegment(oldSegmentManager);
     }
@@ -580,6 +598,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected void doOffloadSegment(String segmentName) {
     SegmentDataManager segmentDataManager = unregisterSegment(segmentName);
     if (segmentDataManager != null) {
+      invalidateSegmentCache(segmentName);
       segmentDataManager.offload();
       releaseSegment(segmentDataManager);
       _logger.info("Offloaded segment: {}", segmentName);
@@ -1841,5 +1860,29 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Nullable
   public String getPeerDownloadScheme() {
     return _peerDownloadScheme;
+  }
+
+  protected void initQueryCache() {
+    if (_cacheConfig.isEnabled()) {
+      SegmentQueryCacheFactory.createQueryCache(_tableNameWithType, _cacheConfig);
+    }
+  }
+
+  /**
+   * Removes the query cache for this table. Should be called during table shutdown to prevent memory leaks.
+   */
+  protected void destroyQueryCache() {
+    SegmentQueryCacheFactory.removeQueryCache(_tableNameWithType);
+  }
+
+  /**
+   * Invalidates cached entries for the given segment. Called when a segment is replaced or offloaded
+   * to ensure stale cached bitmaps are not served.
+   */
+  private void invalidateSegmentCache(String segmentName) {
+    SegmentQueryCache queryCache = SegmentQueryCacheFactory.get(_tableNameWithType);
+    if (queryCache != null) {
+      queryCache.invalidateCacheForSegment(segmentName);
+    }
   }
 }
