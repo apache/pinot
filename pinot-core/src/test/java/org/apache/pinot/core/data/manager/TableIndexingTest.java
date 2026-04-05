@@ -472,8 +472,8 @@ public class TableIndexingTest {
           throw new IllegalArgumentException("Unexpected index type " + indexType);
       }
 
-      config =
-          new FieldConfig(field.getName(), encoding, null, indexTypes, null, tstmpConfig, indexes, properties, null);
+      config = new FieldConfig.Builder(field.getName()).withEncodingType(encoding).withIndexTypes(indexTypes)
+          .withTimestampConfig(tstmpConfig).withIndexes(indexes).withProperties(properties).build();
 
       tableConfig.getFieldConfigList().add(config);
 
