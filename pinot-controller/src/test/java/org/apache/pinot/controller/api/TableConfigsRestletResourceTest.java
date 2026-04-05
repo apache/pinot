@@ -731,6 +731,84 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
   }
 
   @Test
+  public void testTuneConfig()
+      throws IOException {
+    String tuneConfigUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsTune();
+
+    String tableName = "testTune";
+    TableConfigs tableConfigs;
+
+    // invalid json
+    try {
+      tableConfigs = new TableConfigs(tableName, createDummySchema(tableName), createOfflineTableConfig(tableName),
+          createRealtimeTableConfig(tableName));
+      sendPostRequest(tuneConfigUrl, tableConfigs.toPrettyJsonString().replace("\"offline\"", "offline\""));
+      fail("Tune of a TableConfigs with invalid json string should have failed");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // null table configs
+    try {
+      tableConfigs = new TableConfigs(tableName, createDummySchema(tableName), null, null);
+      sendPostRequest(tuneConfigUrl, tableConfigs.toPrettyJsonString());
+      fail("Tune of a TableConfigs with null offline and realtime tableConfig should have failed");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // replicas are bumped up to min replicas
+    String tableName1 = "testTuneReplicas";
+    TableConfig replicaTestOfflineTableConfig = createOfflineTableConfig(tableName1);
+    TableConfig replicaTestRealtimeTableConfig = createRealtimeTableConfig(tableName1);
+    replicaTestOfflineTableConfig.getValidationConfig().setReplication("1");
+    replicaTestRealtimeTableConfig.getValidationConfig().setReplication("1");
+    tableConfigs = new TableConfigs(tableName1, createDummySchema(tableName1), replicaTestOfflineTableConfig,
+        replicaTestRealtimeTableConfig);
+    String response = sendPostRequest(tuneConfigUrl, tableConfigs.toPrettyJsonString());
+    TableConfigs tuned = JsonUtils.stringToObject(response, TableConfigs.class);
+    Assert.assertEquals(tuned.getOffline().getReplication(), DEFAULT_MIN_NUM_REPLICAS);
+    Assert.assertEquals(tuned.getRealtime().getReplication(), DEFAULT_MIN_NUM_REPLICAS);
+
+    // dim table storage quota is capped
+    String tableName2 = "testTuneQuota";
+    TableConfig offlineDimTableConfig = createOfflineDimTableConfig(tableName2);
+    tableConfigs = new TableConfigs(tableName2, createDummySchemaWithPrimaryKey(tableName2), offlineDimTableConfig,
+        null);
+    response = sendPostRequest(tuneConfigUrl, tableConfigs.toPrettyJsonString());
+    tuned = JsonUtils.stringToObject(response, TableConfigs.class);
+    Assert.assertEquals(tuned.getOffline().getQuotaConfig().getStorage(),
+        DEFAULT_INSTANCE.getControllerConfig().getDimTableMaxSize());
+
+    // tuner configs are applied
+    String tableName3 = "testTuneTunerConfig";
+    Schema schema3 = createDummySchema(tableName3);
+    tableConfigs = new TableConfigs(tableName3, schema3, createOfflineTunerTableConfig(tableName3),
+        createRealtimeTunerTableConfig(tableName3));
+    response = sendPostRequest(tuneConfigUrl, tableConfigs.toPrettyJsonString());
+    tuned = JsonUtils.stringToObject(response, TableConfigs.class);
+    Assert.assertTrue(tuned.getOffline().getIndexingConfig().getInvertedIndexColumns()
+        .containsAll(schema3.getDimensionNames()));
+    Assert.assertTrue(tuned.getOffline().getIndexingConfig().getNoDictionaryColumns()
+        .containsAll(schema3.getMetricNames()));
+    Assert.assertTrue(tuned.getRealtime().getIndexingConfig().getInvertedIndexColumns()
+        .containsAll(schema3.getDimensionNames()));
+    Assert.assertTrue(tuned.getRealtime().getIndexingConfig().getNoDictionaryColumns()
+        .containsAll(schema3.getMetricNames()));
+
+    // response includes unrecognizedProperties
+    String tableName4 = "testTuneUnrecognized";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName4);
+    tableConfigs = new TableConfigs(tableName4, createDummySchema(tableName4), offlineTableConfig, null);
+    ObjectNode tableConfigsJson = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
+    tableConfigsJson.put("illegalKey1", 1);
+    response = sendPostRequest(tuneConfigUrl, tableConfigsJson.toPrettyString());
+    JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+    Assert.assertTrue(responseJson.has("unrecognizedProperties"));
+    Assert.assertTrue(responseJson.get("unrecognizedProperties").has("/illegalKey1"));
+  }
+
+  @Test
   public void testValidateConfigWithClusterValidationSkipTypes()
       throws IOException {
     String validateConfigUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsValidate();

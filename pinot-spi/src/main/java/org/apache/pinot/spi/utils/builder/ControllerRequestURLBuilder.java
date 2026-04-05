@@ -409,6 +409,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tableConfigs", "validate");
   }
 
+  public String forTableConfigsTune() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", "tune");
+  }
+
   public String forSegmentReload(String tableName, String segmentName, boolean forceDownload) {
     return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName),
         "reload?forceDownload=" + forceDownload);
