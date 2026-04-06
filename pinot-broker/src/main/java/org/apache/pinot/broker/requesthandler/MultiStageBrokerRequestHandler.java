@@ -202,8 +202,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   /**
-   * Best-effort warmup of the Calcite compile pipeline before serving traffic. Reduces but does
-   * not guarantee that cold-start compilation times won't breach the timeout limit enforced in #14946.
+   * Best-effort warmup of the Calcite compile pipeline at broker startup. Running a trivial compile
+   * early ensures that JVM class-loading and Calcite initialization costs are paid before real
+   * queries arrive, so that the first MSE queries do not fail due to tight per-query timeout
+   * constraints.
    */
   private void warmupCompile() {
     try {
@@ -212,14 +214,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       long startMs = System.currentTimeMillis();
       LOGGER.info("MSE startup warmup: compiling query");
       ExecutorService exec = Executors.newSingleThreadExecutor();
-      try {
-        exec.submit(() -> warmupEnv.compile("SELECT 1")).get(30, TimeUnit.SECONDS);
+      try (var compiled = exec.submit(() -> warmupEnv.compile("SELECT 1")).get(5, TimeUnit.SECONDS)) {
+        // result discarded; compile call is for JVM warmup only
       } finally {
         exec.shutdownNow();
       }
       LOGGER.info("MSE startup warmup completed in {}ms", System.currentTimeMillis() - startMs);
     } catch (Exception e) {
-      LOGGER.error("MSE broker startup warmup failed", e);
+      LOGGER.warn("MSE broker startup warmup failed", e);
     }
   }
 
