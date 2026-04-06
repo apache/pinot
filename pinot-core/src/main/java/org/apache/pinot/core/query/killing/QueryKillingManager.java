@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
  *
  * The default factory is {@link ScanEntriesThresholdStrategy.Factory}, which reads
  * scan thresholds from {@link QueryMonitorConfig}. Custom factories can be configured
- * via {@code accounting.scan.based.killing.strategy.factory.class.name}.</p>
+ * via {@code accounting.scan.based.killing.strategy.factory.class.name}.
  *
  */
 public class QueryKillingManager {
