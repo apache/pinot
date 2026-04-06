@@ -212,7 +212,7 @@
     <tyrus-standalone-client.version>2.2.2</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
 
-    <spark3.version>3.5.8</spark3.version>
+    <spark3.version>4.1.1</spark3.version>
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.1.1</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
