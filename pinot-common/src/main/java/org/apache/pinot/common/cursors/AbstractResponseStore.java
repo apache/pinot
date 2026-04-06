@@ -29,9 +29,12 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public abstract class AbstractResponseStore implements ResponseStore {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractResponseStore.class);
 
   protected String _brokerHost;
   protected int _brokerPort;
@@ -233,9 +236,18 @@ public abstract class AbstractResponseStore implements ResponseStore {
       return false;
     }
 
-    long bytesWritten = readResponse(requestId).getBytesWritten();
+    // Read bytesWritten for metrics tracking. The response may be deleted concurrently between exists() and
+    // readResponse() (TOCTOU race), so handle that gracefully.
+    long bytesWritten = 0;
+    try {
+      bytesWritten = readResponse(requestId).getBytesWritten();
+    } catch (Exception e) {
+      LOGGER.debug("Could not read response metadata for requestId={} (may have been deleted concurrently)",
+          requestId, e);
+    }
+
     boolean isSucceeded = deleteResponseImpl(requestId);
-    if (isSucceeded) {
+    if (isSucceeded && bytesWritten > 0) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten * -1);
     }
     return isSucceeded;
