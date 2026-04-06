@@ -367,7 +367,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("totalDocs").asInt(), 200000);
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "187068486");
+    Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "4144790759");
     Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
   }
 
@@ -393,9 +393,9 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
     Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
+    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "4144790759");
     Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
-    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4514731);
+    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4515491);
     Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
 
@@ -432,9 +432,9 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
     Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
+    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "4144790759");
     Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT_WITH_DELETE");
-    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4514731);
+    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4515491);
     Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
 
@@ -570,7 +570,7 @@ public class TablesResourceTest extends BaseResourceTest {
     FileUtils.writeByteArrayToFile(queryableDocIdsSnapshotFile,
         RoaringBitmapUtils.serialize(queryableDocIds.getMutableRoaringBitmap()));
 
-    String expectedSegmentCrc = "187068486";
+    String expectedSegmentCrc = "4144790759";
 
     // Check no type (default should be validDocIdsSnapshot)
     ValidDocIdsBitmapResponse response = _webTarget.path(snapshotPath).request().get(ValidDocIdsBitmapResponse.class);
@@ -643,7 +643,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
     Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
+    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "4144790759");
     Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT_WITH_DELETE");
   }
 
@@ -667,7 +667,7 @@ public class TablesResourceTest extends BaseResourceTest {
         .get(ValidDocIdsBitmapResponse.class);
 
     Assert.assertNotNull(response);
-    Assert.assertEquals(response.getSegmentCrc(), "187068486");
+    Assert.assertEquals(response.getSegmentCrc(), "4144790759");
     Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
     Assert.assertEquals(response.getValidDocIdsType(), ValidDocIdsType.SNAPSHOT_WITH_DELETE);
     Assert.assertNotNull(response.getBitmap());

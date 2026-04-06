@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -85,8 +87,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public boolean hasIndexFor(String column, IndexType<?, ?, ?> type) {
-    File indexFile = getFileFor(column, type);
-    return indexFile.exists();
+    return getReadableFilesFor(column, type).stream().anyMatch(File::exists);
   }
 
   @Override
@@ -106,7 +107,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     } else if (indexType == StandardIndexes.vector()) {
       VectorIndexUtils.cleanupVectorIndex(_segmentDirectory, columnName);
     } else {
-      getFilesFor(columnName, indexType).forEach(FileUtils::deleteQuietly);
+      getReadableFilesFor(columnName, indexType).forEach(FileUtils::deleteQuietly);
     }
   }
 
@@ -130,7 +131,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       return _indexBuffers.get(key);
     }
 
-    File file = getFileFor(key._name, key._type);
+    File file = getReadableFileFor(key._name, key._type);
     if (!file.exists()) {
       throw new RuntimeException(
           "Could not find index for column: " + key._name + ", type: " + key._type + ", segment: " + _segmentDirectory
@@ -166,10 +167,48 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
         .orElse(candidates.get(0));
   }
 
+  private File getReadableFileFor(String column, IndexType<?, ?, ?> indexType) {
+    List<File> candidates = getReadableFilesFor(column, indexType);
+    if (candidates.isEmpty()) {
+      throw new RuntimeException("No file candidates for index " + indexType + " and column " + column);
+    }
+
+    return candidates.stream()
+        .filter(File::exists)
+        .findAny()
+        .orElse(candidates.get(0));
+  }
+
   private List<File> getFilesFor(String column, IndexType<?, ?, ?> indexType) {
     return indexType.getFileExtensions(_segmentMetadata.getColumnMetadataFor(column)).stream()
         .map(fileExtension -> new File(_segmentDirectory, column + fileExtension))
         .collect(Collectors.toList());
+  }
+
+  private List<File> getReadableFilesFor(String column, IndexType<?, ?, ?> indexType) {
+    if (indexType != StandardIndexes.forward()) {
+      return getFilesFor(column, indexType);
+    }
+
+    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+    if (columnMetadata.isSingleValue()) {
+      if (!columnMetadata.hasDictionary()) {
+        return List.of(new File(_segmentDirectory,
+            column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION));
+      }
+      if (columnMetadata.isSorted()) {
+        return List.of(new File(_segmentDirectory,
+            column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION));
+      }
+      return List.of(new File(_segmentDirectory, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION),
+          new File(_segmentDirectory, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION));
+    }
+    if (!columnMetadata.hasDictionary()) {
+      return List.of(new File(_segmentDirectory,
+          column + V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION));
+    }
+    return List.of(new File(_segmentDirectory, column + V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION),
+        new File(_segmentDirectory, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION));
   }
 
   private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context)

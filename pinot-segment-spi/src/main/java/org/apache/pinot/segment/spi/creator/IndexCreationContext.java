@@ -20,7 +20,9 @@ package org.apache.pinot.segment.spi.creator;
 
 import java.io.File;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -34,6 +36,17 @@ import org.apache.pinot.spi.data.FieldSpec;
  * index type lies with the caller.
  */
 public interface IndexCreationContext {
+
+  /**
+   * Forward index encoding for the current column.
+   *
+   * This is intentionally separate from dictionary presence because a column may need a dictionary for secondary
+   * indexes while still using a raw forward index.
+   */
+  enum ForwardIndexEncoding {
+    RAW,
+    DICTIONARY
+  }
 
   FieldSpec getFieldSpec();
 
@@ -56,6 +69,8 @@ public interface IndexCreationContext {
   int getTotalDocs();
 
   boolean hasDictionary();
+
+  ForwardIndexEncoding getForwardIndexEncoding();
 
   Comparable<?> getMinValue();
 
@@ -117,6 +132,12 @@ public interface IndexCreationContext {
 
   boolean isContinueOnError();
 
+  /**
+   * Returns the {@link ForwardIndexConfig} for this column, or {@code null} if not set.
+   */
+  @Nullable
+  ForwardIndexConfig getForwardIndexConfig();
+
   final class Builder {
     private ColumnStatistics _columnStatistics;
     private File _indexDir;
@@ -130,6 +151,7 @@ public interface IndexCreationContext {
     private int _totalNumberOfEntries;
     private int _totalDocs;
     private boolean _hasDictionary = true;
+    private ForwardIndexEncoding _forwardIndexEncoding = ForwardIndexEncoding.DICTIONARY;
     private Comparable<?> _minValue;
     private Comparable<?> _maxValue;
     private boolean _forwardIndexDisabled;
@@ -143,6 +165,7 @@ public interface IndexCreationContext {
     private int[] _mutableToImmutableDocIdMap;
     private String _tableNameWithType;
     private boolean _continueOnError;
+    private ForwardIndexConfig _forwardIndexConfig;
 
     public Builder withColumnStatistics(ColumnStatistics columnStatistics) {
       _columnStatistics = columnStatistics;
@@ -176,6 +199,7 @@ public interface IndexCreationContext {
           .withTotalNumberOfEntries(columnMetadata.getTotalNumberOfEntries())
           .withTotalDocs(columnMetadata.getTotalDocs())
           .withDictionary(columnMetadata.hasDictionary())
+          .withForwardIndexEncoding(columnMetadata.getForwardIndexEncoding())
           .withMinValue(columnMetadata.getMinValue())
           .withMaxValue(columnMetadata.getMaxValue())
           .withMaxNumberOfMultiValueElements(columnMetadata.getMaxNumberOfMultiValues());
@@ -236,6 +260,11 @@ public interface IndexCreationContext {
       return this;
     }
 
+    public Builder withForwardIndexEncoding(ForwardIndexEncoding forwardIndexEncoding) {
+      _forwardIndexEncoding = Objects.requireNonNull(forwardIndexEncoding);
+      return this;
+    }
+
     public Builder withMinValue(Comparable<?> minValue) {
       _minValue = minValue;
       return this;
@@ -286,13 +315,19 @@ public interface IndexCreationContext {
       return this;
     }
 
+    public Builder withForwardIndexConfig(ForwardIndexConfig forwardIndexConfig) {
+      _forwardIndexConfig = forwardIndexConfig;
+      return this;
+    }
+
     public Common build() {
       return new Common(Objects.requireNonNull(_indexDir), _lengthOfLongestEntry, _maxNumberOfMultiValueElements,
           _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
-          _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled,
+          _totalNumberOfEntries, _totalDocs, _hasDictionary, _forwardIndexEncoding, _minValue, _maxValue,
+          _forwardIndexDisabled,
           _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose, _columnStatistics,
           _realtimeConversion, _consumerDir, _mutableSegmentCompacted, _mutableToImmutableDocIdMap, _tableNameWithType,
-          _continueOnError);
+          _continueOnError, _forwardIndexConfig);
     }
 
     public Builder withSortedUniqueElementsArray(Object sortedUniqueElementsArray) {
@@ -317,6 +352,7 @@ public interface IndexCreationContext {
     private final int _totalNumberOfEntries;
     private final int _totalDocs;
     private final boolean _hasDictionary;
+    private final ForwardIndexEncoding _forwardIndexEncoding;
     private final Comparable<?> _minValue;
     private final Comparable<?> _maxValue;
     private final boolean _forwardIndexDisabled;
@@ -331,14 +367,16 @@ public interface IndexCreationContext {
     private final int[] _mutableToImmutableDocIdMap;
     private final String _tableNameWithType;
     private final boolean _continueOnError;
+    private final ForwardIndexConfig _forwardIndexConfig;
 
     private Common(File indexDir, int lengthOfLongestEntry, int maxNumberOfMultiValueElements, int maxRowLengthInBytes,
         boolean onHeap, FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries, int totalDocs,
-        boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue, boolean forwardIndexDisabled,
+        boolean hasDictionary, ForwardIndexEncoding forwardIndexEncoding, Comparable<?> minValue,
+        Comparable<?> maxValue, boolean forwardIndexDisabled,
         Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength, boolean textCommitOnClose,
         ColumnStatistics columnStatistics, boolean realtimeConversion, File consumerDir,
         boolean mutableSegmentCompacted, int[] mutableToImmutableDocIdMap, String tableNameWithType,
-        boolean continueOnError) {
+        boolean continueOnError, ForwardIndexConfig forwardIndexConfig) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
@@ -350,6 +388,7 @@ public interface IndexCreationContext {
       _totalNumberOfEntries = totalNumberOfEntries;
       _totalDocs = totalDocs;
       _hasDictionary = hasDictionary;
+      _forwardIndexEncoding = forwardIndexEncoding;
       _minValue = minValue;
       _maxValue = maxValue;
       _forwardIndexDisabled = forwardIndexDisabled;
@@ -364,6 +403,7 @@ public interface IndexCreationContext {
       _mutableToImmutableDocIdMap = mutableToImmutableDocIdMap;
       _tableNameWithType = tableNameWithType;
       _continueOnError = continueOnError;
+      _forwardIndexConfig = forwardIndexConfig;
     }
 
     public FieldSpec getFieldSpec() {
@@ -408,6 +448,11 @@ public interface IndexCreationContext {
 
     public boolean hasDictionary() {
       return _hasDictionary;
+    }
+
+    @Override
+    public ForwardIndexEncoding getForwardIndexEncoding() {
+      return _forwardIndexEncoding;
     }
 
     @Override
@@ -478,6 +523,12 @@ public interface IndexCreationContext {
     @Override
     public boolean isContinueOnError() {
       return _continueOnError;
+    }
+
+    @Nullable
+    @Override
+    public ForwardIndexConfig getForwardIndexConfig() {
+      return _forwardIndexConfig;
     }
   }
 }

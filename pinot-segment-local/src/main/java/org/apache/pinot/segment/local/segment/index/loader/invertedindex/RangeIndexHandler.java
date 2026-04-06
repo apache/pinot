@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -37,11 +38,13 @@ import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -167,17 +170,24 @@ public class RangeIndexHandler extends BaseIndexHandler {
         _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
-      if (columnMetadata.isSingleValue()) {
-        // Single-value column
-        for (int i = 0; i < numDocs; i++) {
-          rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
+      if (forwardIndexReader.isDictionaryEncoded()) {
+        if (columnMetadata.isSingleValue()) {
+          // Single-value column
+          for (int i = 0; i < numDocs; i++) {
+            rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
+          }
+        } else {
+          // Multi-value column
+          int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+          for (int i = 0; i < numDocs; i++) {
+            int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
+            rangeIndexCreator.add(dictIds, length);
+          }
         }
       } else {
-        // Multi-value column
-        int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-        for (int i = 0; i < numDocs; i++) {
-          int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-          rangeIndexCreator.add(dictIds, length);
+        try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
+          addRawValuesToDictionaryBasedRangeIndex(rangeIndexCreator, forwardIndexReader, readerContext, dictionary,
+              columnMetadata, numDocs);
         }
       }
       rangeIndexCreator.seal();
@@ -271,5 +281,126 @@ public class RangeIndexHandler extends BaseIndexHandler {
     RangeIndexConfig config = _fieldIndexConfigs.get(columnMetadata.getColumnName())
         .getConfig(StandardIndexes.range());
     return StandardIndexes.range().createIndexCreator(context, config);
+  }
+
+  private void addRawValuesToDictionaryBasedRangeIndex(CombinedInvertedIndexCreator rangeIndexCreator,
+      ForwardIndexReader forwardIndexReader, ForwardIndexReaderContext readerContext, Dictionary dictionary,
+      ColumnMetadata columnMetadata, int numDocs) {
+    switch (columnMetadata.getDataType().getStoredType()) {
+      case INT:
+        if (columnMetadata.isSingleValue()) {
+          for (int i = 0; i < numDocs; i++) {
+            int value = forwardIndexReader.getInt(i, readerContext);
+            rangeIndexCreator.addInt(value, dictionary.indexOf(value));
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            int[] values = forwardIndexReader.getIntMV(i, readerContext);
+            int[] dictIds = new int[values.length];
+            for (int j = 0; j < values.length; j++) {
+              dictIds[j] = dictionary.indexOf(values[j]);
+            }
+            rangeIndexCreator.addIntMV(values, dictIds);
+          }
+        }
+        return;
+      case LONG:
+        if (columnMetadata.isSingleValue()) {
+          for (int i = 0; i < numDocs; i++) {
+            long value = forwardIndexReader.getLong(i, readerContext);
+            rangeIndexCreator.addLong(value, dictionary.indexOf(value));
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            long[] values = forwardIndexReader.getLongMV(i, readerContext);
+            int[] dictIds = new int[values.length];
+            for (int j = 0; j < values.length; j++) {
+              dictIds[j] = dictionary.indexOf(values[j]);
+            }
+            rangeIndexCreator.addLongMV(values, dictIds);
+          }
+        }
+        return;
+      case FLOAT:
+        if (columnMetadata.isSingleValue()) {
+          for (int i = 0; i < numDocs; i++) {
+            float value = forwardIndexReader.getFloat(i, readerContext);
+            rangeIndexCreator.addFloat(value, dictionary.indexOf(value));
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            float[] values = forwardIndexReader.getFloatMV(i, readerContext);
+            int[] dictIds = new int[values.length];
+            for (int j = 0; j < values.length; j++) {
+              dictIds[j] = dictionary.indexOf(values[j]);
+            }
+            rangeIndexCreator.addFloatMV(values, dictIds);
+          }
+        }
+        return;
+      case DOUBLE:
+        if (columnMetadata.isSingleValue()) {
+          for (int i = 0; i < numDocs; i++) {
+            double value = forwardIndexReader.getDouble(i, readerContext);
+            rangeIndexCreator.addDouble(value, dictionary.indexOf(value));
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            double[] values = forwardIndexReader.getDoubleMV(i, readerContext);
+            int[] dictIds = new int[values.length];
+            for (int j = 0; j < values.length; j++) {
+              dictIds[j] = dictionary.indexOf(values[j]);
+            }
+            rangeIndexCreator.addDoubleMV(values, dictIds);
+          }
+        }
+        return;
+      case BIG_DECIMAL:
+        if (!columnMetadata.isSingleValue()) {
+          throw new IllegalStateException("BigDecimal range index not supported for multi-value column: "
+              + columnMetadata.getColumnName());
+        }
+        for (int i = 0; i < numDocs; i++) {
+          java.math.BigDecimal value = forwardIndexReader.getBigDecimal(i, readerContext);
+          rangeIndexCreator.add(value, dictionary.indexOf(value));
+        }
+        return;
+      case STRING:
+        if (columnMetadata.isSingleValue()) {
+          for (int i = 0; i < numDocs; i++) {
+            String value = forwardIndexReader.getString(i, readerContext);
+            rangeIndexCreator.addString(value, dictionary.indexOf(value));
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            String[] values = forwardIndexReader.getStringMV(i, readerContext);
+            int[] dictIds = new int[values.length];
+            for (int j = 0; j < values.length; j++) {
+              dictIds[j] = dictionary.indexOf(values[j]);
+            }
+            rangeIndexCreator.addStringMV(values, dictIds);
+          }
+        }
+        return;
+      case BYTES:
+        if (columnMetadata.isSingleValue()) {
+          for (int i = 0; i < numDocs; i++) {
+            byte[] value = forwardIndexReader.getBytes(i, readerContext);
+            rangeIndexCreator.addBytes(value, dictionary.indexOf(new ByteArray(value)));
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            byte[][] values = forwardIndexReader.getBytesMV(i, readerContext);
+            int[] dictIds = new int[values.length];
+            for (int j = 0; j < values.length; j++) {
+              dictIds[j] = dictionary.indexOf(new ByteArray(values[j]));
+            }
+            rangeIndexCreator.addBytesMV(values, dictIds);
+          }
+        }
+        return;
+      default:
+        throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType());
+    }
   }
 }

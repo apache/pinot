@@ -44,6 +44,7 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -119,6 +120,11 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig) {
     return new IFSTIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
+    return true;
   }
 
   @Override
