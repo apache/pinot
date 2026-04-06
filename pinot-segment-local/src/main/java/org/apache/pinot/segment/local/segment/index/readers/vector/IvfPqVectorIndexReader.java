@@ -314,26 +314,27 @@ public class IvfPqVectorIndexReader implements VectorIndexReader, NprobeAware {
     info.put("pqM", _pqM);
     info.put("pqNbits", _pqNbits);
     info.put("distanceFunction", _distanceFunction.name());
-    info.put("trainSampleSize", _trainSampleSize);
+    info.put("requestedTrainSampleSize", _trainSampleSize);
+    info.put("effectiveTrainSampleSize", Math.min(_trainSampleSize, _numVectors));
     info.put("trainingSeed", _trainingSeed);
-    info.put("effectiveNprobe", getNprobe());
-    info.put("codebookSize", 1 << _pqNbits);
+    info.put("effectiveNprobe", _nlist > 0 ? getNprobe() : 0);
+    info.put("codebookSize", _numVectors > 0 ? (1 << _pqNbits) : 0);
     info.put("subvectorLengths", Arrays.toString(_subvectorLengths));
 
     // Per-list cardinality stats
-    int minListSize = Integer.MAX_VALUE;
-    int maxListSize = 0;
-    int emptyLists = 0;
-    for (int[] docIds : _listDocIds) {
-      int size = docIds.length;
-      if (size == 0) {
-        emptyLists++;
-      }
-      minListSize = Math.min(minListSize, size);
-      maxListSize = Math.max(maxListSize, size);
-    }
     if (_nlist > 0) {
-      info.put("avgDocsPerList", _numVectors > 0 ? (double) _numVectors / _nlist : 0.0);
+      int minListSize = Integer.MAX_VALUE;
+      int maxListSize = 0;
+      int emptyLists = 0;
+      for (int[] docIds : _listDocIds) {
+        int size = docIds.length;
+        if (size == 0) {
+          emptyLists++;
+        }
+        minListSize = Math.min(minListSize, size);
+        maxListSize = Math.max(maxListSize, size);
+      }
+      info.put("avgDocsPerList", (double) _numVectors / _nlist);
       info.put("minListSize", minListSize == Integer.MAX_VALUE ? 0 : minListSize);
       info.put("maxListSize", maxListSize);
       info.put("emptyLists", emptyLists);

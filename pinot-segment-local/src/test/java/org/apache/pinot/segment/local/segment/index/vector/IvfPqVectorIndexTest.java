@@ -567,6 +567,9 @@ public class IvfPqVectorIndexTest {
       Assert.assertEquals(info.get("pqM"), pqM);
       Assert.assertEquals(info.get("pqNbits"), pqNbits);
       Assert.assertEquals(info.get("distanceFunction"), "EUCLIDEAN");
+      int requested = (int) info.get("requestedTrainSampleSize");
+      Assert.assertEquals(info.get("effectiveTrainSampleSize"),
+          Math.min(vectors.length, requested));
       Assert.assertEquals(info.get("codebookSize"), 256);
       Assert.assertNotNull(info.get("effectiveNprobe"));
       Assert.assertNotNull(info.get("avgDocsPerList"));
