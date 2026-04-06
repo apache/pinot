@@ -210,10 +210,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       ImmutableQueryEnvironment.Config warmupConf = getQueryEnvConf(null, Map.of(), -1L);
       QueryEnvironment warmupEnv = new QueryEnvironment(warmupConf, _multiClusterRoutingContext);
       long startMs = System.currentTimeMillis();
-      _queryCompileExecutor.submit(() -> warmupEnv.compile("SELECT 1")).get(30, TimeUnit.SECONDS);
+      LOGGER.info("MSE startup warmup: compiling query");
+      warmupEnv.compile("SELECT 1");
       LOGGER.info("MSE startup warmup completed in {}ms", System.currentTimeMillis() - startMs);
     } catch (Exception e) {
-      LOGGER.warn("MSE broker startup warmup failed", e);
+      LOGGER.error("MSE broker startup warmup failed", e);
     }
   }
 
