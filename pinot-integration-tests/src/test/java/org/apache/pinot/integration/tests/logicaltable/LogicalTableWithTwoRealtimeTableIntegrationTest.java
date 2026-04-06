@@ -133,7 +133,7 @@ public class LogicalTableWithTwoRealtimeTableIntegrationTest extends BaseLogical
   public void testQueryTimeOut()
       throws Exception {
     String starQuery = "SELECT * from " + getLogicalTableName();
-    QueryConfig queryConfig = new QueryConfig(1L, null, null, null, null, null);
+    QueryConfig queryConfig = new QueryConfig(1L, null, null, null, null, null, null, null, null);
     var logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
@@ -148,7 +148,7 @@ public class LogicalTableWithTwoRealtimeTableIntegrationTest extends BaseLogical
     }
 
     // Query succeeds with a high limit.
-    queryConfig = new QueryConfig(1000000L, null, null, null, null, null);
+    queryConfig = new QueryConfig(1000000L, null, null, null, null, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
@@ -156,7 +156,7 @@ public class LogicalTableWithTwoRealtimeTableIntegrationTest extends BaseLogical
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
 
     // Reset to null.
-    queryConfig = new QueryConfig(null, null, null, null, null, null);
+    queryConfig = new QueryConfig(null, null, null, null, null, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);

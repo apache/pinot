@@ -78,7 +78,7 @@ public class DefaultLogicalTableConfigSerDeTest {
       throws Exception {
     QuotaConfig quotaConfig = new QuotaConfig(null, "200.00");
     QueryConfig queryConfig =
-        new QueryConfig(3000L, false, true, Collections.singletonMap("func(a)", "b"), null, null);
+        new QueryConfig(3000L, false, true, Collections.singletonMap("func(a)", "b"), null, null, null, null, null);
     Map<String, Object> params = new HashMap<>();
     params.put("key", "value");
     TimeBoundaryConfig timeBoundaryConfig = new TimeBoundaryConfig("MIN", params);
