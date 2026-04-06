@@ -171,15 +171,6 @@ public class DictionaryIndexType
     return !context.isFixedLength();
   }
 
-  public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
-      DataType storedType, ColumnStatistics columnProfile) {
-    if (varLengthDictColumns.contains(columnName)) {
-      return true;
-    }
-
-    return shouldUseVarLengthDictionary(storedType, columnProfile);
-  }
-
   public static boolean shouldUseVarLengthDictionary(DataType storedType, ColumnStatistics profile) {
     if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL) {
       return !profile.isFixedLength();
