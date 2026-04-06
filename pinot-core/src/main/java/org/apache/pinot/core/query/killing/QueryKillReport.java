@@ -22,12 +22,7 @@ import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
 /**
- * Immutable snapshot of a query-kill event.
- *
- * <p>Created at the moment a query is killed for exceeding a scan threshold.
- * The constructor immediately snapshots all mutable {@link LongAdder} values
- * from the live {@link QueryScanCostContext} so that subsequent mutations to
- * that context do not affect this report.
+ * Immutable snapshot of a query-kill event
  */
 public final class QueryKillReport {
   private final String _queryId;
