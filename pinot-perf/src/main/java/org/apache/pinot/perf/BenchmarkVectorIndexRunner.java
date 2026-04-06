@@ -41,7 +41,7 @@ public final class BenchmarkVectorIndexRunner {
   }
 
   /**
-   * Validates exact scan recall, IVF_FLAT recall at various nprobe, and prints results.
+   * Validates exact scan recall, IVF_FLAT recall at various nprobe, and IVF_PQ when available.
    */
   public static void main(String[] args)
       throws Exception {
@@ -100,6 +100,46 @@ public final class BenchmarkVectorIndexRunner {
       }
     } finally {
       FileUtils.deleteQuietly(ivfDir);
+    }
+
+    // Optional IVF_PQ validation, gated on backend availability.
+    String ivfPqCreator = "org.apache.pinot.segment.local.segment.index.vector.IvfPqVectorIndexCreator";
+    String ivfPqReader = "org.apache.pinot.segment.local.segment.index.readers.vector.IvfPqVectorIndexReader";
+    if (BenchmarkVectorIndex.isClassAvailable(ivfPqCreator) && BenchmarkVectorIndex.isClassAvailable(ivfPqReader)) {
+      int pqM = 16;
+      int pqNbits = 8;
+      VectorIndexConfig pqConfig =
+          BenchmarkVectorIndex.createIvfPqConfig(dim, corpus.length, nlist, pqM, pqNbits, distFunc);
+      File pqDir = Files.createTempDirectory("bench_validate_pq_").toFile();
+      try {
+        BenchmarkVectorIndex.buildVectorIndexReflectively(ivfPqCreator, pqDir, corpus, pqConfig);
+
+        for (int nprobe : new int[]{1, 4, 8, 16, 32, 64}) {
+          try (BenchmarkVectorIndex.ReflectiveVectorReader reader = BenchmarkVectorIndex.openReflectiveVectorReader(
+              ivfPqReader, pqDir, corpus.length, pqConfig)) {
+            reader.setNprobe(nprobe);
+
+            double recall = 0;
+            for (int q = 0; q < queries.length; q++) {
+              Set<Integer> r = BenchmarkVectorIndex.bitmapToSet(reader.getDocIds(queries[q], 10));
+              recall += BenchmarkVectorIndex.computeRecall(gt10[q], r);
+            }
+            recall /= queries.length;
+
+            long[] latencies = BenchmarkVectorIndex.measureReflectiveLatencies(reader, queries, 10);
+            Arrays.sort(latencies);
+
+            out.printf("IVF_PQ nlist=%d nprobe=%d pqM=%d pqNbits=%d  recall@10=%.4f  p50=%.1fus  p99=%.1fus%n",
+                nlist, nprobe, pqM, pqNbits, recall,
+                BenchmarkVectorIndex.percentile(latencies, 50) / 1000.0,
+                BenchmarkVectorIndex.percentile(latencies, 99) / 1000.0);
+          }
+        }
+      } finally {
+        FileUtils.deleteQuietly(pqDir);
+      }
+    } else {
+      out.println("IVF_PQ validation skipped: backend classes are not available in this checkout");
     }
 
     out.println("Validation complete.");

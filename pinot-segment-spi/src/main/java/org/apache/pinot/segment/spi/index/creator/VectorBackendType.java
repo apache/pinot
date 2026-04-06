@@ -29,6 +29,8 @@ package org.apache.pinot.segment.spi.index.creator;
  *       mutable and immutable segments.</li>
  *   <li>{@link #IVF_FLAT} - Inverted File with flat (uncompressed) vectors. Supported for
  *       immutable/offline segments only in phase 1.</li>
+ *   <li>{@link #IVF_PQ} - Inverted File with product-quantized vectors. Supported for
+ *       immutable/offline segments only in phase 2.</li>
  * </ul>
  */
 public enum VectorBackendType {
@@ -59,7 +61,21 @@ public enum VectorBackendType {
    *   <li>{@code minRowsForIndex} - minimum rows required to build the index</li>
    * </ul>
    */
-  IVF_FLAT("Inverted File with flat vectors");
+  IVF_FLAT("Inverted File with flat vectors"),
+
+  /**
+   * Inverted File with product-quantized vectors.
+   *
+   * <p>Backend-specific properties:</p>
+   * <ul>
+   *   <li>{@code nlist} - number of Voronoi cells/clusters</li>
+   *   <li>{@code pqM} - number of PQ sub-quantizers</li>
+   *   <li>{@code pqNbits} - bits per PQ codebook entry</li>
+   *   <li>{@code trainSampleSize} - number of vectors sampled for training</li>
+   *   <li>{@code trainingSeed} - random seed for reproducible training</li>
+   * </ul>
+   */
+  IVF_PQ("Inverted File with product-quantized vectors");
 
   private final String _description;
 
@@ -69,6 +85,18 @@ public enum VectorBackendType {
 
   public String getDescription() {
     return _description;
+  }
+
+  public boolean supportsMutableSegments() {
+    return this == HNSW;
+  }
+
+  public boolean supportsNprobe() {
+    return this == IVF_FLAT || this == IVF_PQ;
+  }
+
+  public boolean defaultExactRerankEnabled() {
+    return this == IVF_PQ;
   }
 
   /**
@@ -86,7 +114,7 @@ public enum VectorBackendType {
       return valueOf(value.toUpperCase());
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
-          "Unknown vector backend type: '" + value + "'. Supported types: HNSW, IVF_FLAT");
+          "Unknown vector backend type: '" + value + "'. Supported types: HNSW, IVF_FLAT, IVF_PQ");
     }
   }
 

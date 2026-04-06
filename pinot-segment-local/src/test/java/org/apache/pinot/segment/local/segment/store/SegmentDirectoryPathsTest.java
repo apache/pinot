@@ -19,9 +19,11 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -63,6 +65,33 @@ public class SegmentDirectoryPathsTest {
 
       FileUtils.forceDelete(v1File);
       Assert.assertNull(SegmentDirectoryPaths.findMetadataFile(indexDir));
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  @Test
+  public void testFindVectorIndexFileUsesConfiguredBackend()
+      throws Exception {
+    File indexDir = new File(SegmentDirectoryPaths.class.toString() + "_vector");
+    FileUtils.deleteQuietly(indexDir);
+    try {
+      Assert.assertTrue(indexDir.mkdirs());
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      Assert.assertTrue(v3Dir.mkdir());
+
+      File hnswFile = new File(v3Dir, "embedding" + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+      File ivfPqFile = new File(v3Dir, "embedding" + V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+      FileUtils.touch(hnswFile);
+      FileUtils.touch(ivfPqFile);
+
+      VectorIndexConfig ivfPqConfig = new VectorIndexConfig(false, "IVF_PQ", 16, 1,
+          VectorIndexConfig.VectorDistanceFunction.COSINE,
+          Map.of("nlist", "4", "pqM", "4", "pqNbits", "8", "trainSampleSize", "16"));
+
+      Assert.assertEquals(SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, "embedding"), hnswFile);
+      Assert.assertEquals(SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, "embedding", ivfPqConfig),
+          ivfPqFile);
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }

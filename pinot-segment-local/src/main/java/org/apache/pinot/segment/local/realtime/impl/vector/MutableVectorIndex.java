@@ -38,6 +38,7 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLucene
 import org.apache.pinot.segment.local.segment.creator.impl.vector.XKnnFloatVectorField;
 import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.VectorIndexConfigProvider;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
@@ -51,7 +52,7 @@ import org.slf4j.LoggerFactory;
  * Since there is no good mutable vector index implementation for topK search, we just do brute force search.
  * <p>This class is thread-safe for single writer multiple readers.
  */
-public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
+public class MutableVectorIndex implements VectorIndexReader, MutableIndex, VectorIndexConfigProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableVectorIndex.class);
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
       RealtimeLuceneTextIndexSearcherPool.getInstance();
@@ -59,6 +60,7 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
   public static final long DEFAULT_COMMIT_INTERVAL_MS = 10_000L;
   public static final long DEFAULT_COMMIT_DOCS = 1000L;
   private final int _vectorDimension;
+  private final VectorIndexConfig _vectorIndexConfig;
   private final VectorSimilarityFunction _vectorSimilarityFunction;
   private final IndexWriter _indexWriter;
   private final String _vectorColumn;
@@ -74,6 +76,7 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
 
   public MutableVectorIndex(String segmentName, String vectorColumn, VectorIndexConfig vectorIndexConfig) {
     _vectorColumn = vectorColumn;
+    _vectorIndexConfig = vectorIndexConfig;
     _vectorDimension = vectorIndexConfig.getVectorDimension();
     _segmentName = segmentName;
     _commitIntervalMs = Long.parseLong(
@@ -145,6 +148,11 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
       throw new RuntimeException("Failed while searching vector index for segment " + _segmentName
           + " column " + _vectorColumn, e);
     }
+  }
+
+  @Override
+  public VectorIndexConfig getVectorIndexConfig() {
+    return _vectorIndexConfig;
   }
 
   private MutableRoaringBitmap executeVectorSearch(float[] vector, int topK) throws IOException {

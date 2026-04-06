@@ -87,6 +87,8 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.VectorIndexConfigProvider;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
@@ -390,7 +392,8 @@ public class MutableSegmentImpl implements MutableSegment {
         nullValueVector = null;
       }
 
-      Map<IndexType, MutableIndex> mutableIndexes = new HashMap<>();
+      Map<IndexType, MutableIndex> mutableIndexes =
+          new MutableIndexes(indexConfigs.getConfig(StandardIndexes.vector()));
       for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
         if (!specialIndexes.contains(indexType)) {
           addMutableIndex(mutableIndexes, indexType, context, indexConfigs);
@@ -1707,6 +1710,22 @@ public class MutableSegmentImpl implements MutableSegment {
       _mutableIndexes.forEach(closer::accept);
       closer.accept(StandardIndexes.dictionary(), _dictionary);
       closer.accept(StandardIndexes.nullValueVector(), _nullValueVector);
+    }
+  }
+
+  private static final class MutableIndexes extends HashMap<IndexType, MutableIndex>
+      implements VectorIndexConfigProvider {
+    @Nullable
+    private final VectorIndexConfig _vectorIndexConfig;
+
+    private MutableIndexes(@Nullable VectorIndexConfig vectorIndexConfig) {
+      _vectorIndexConfig = vectorIndexConfig != null && vectorIndexConfig.isEnabled() ? vectorIndexConfig : null;
+    }
+
+    @Nullable
+    @Override
+    public VectorIndexConfig getVectorIndexConfig() {
+      return _vectorIndexConfig;
     }
   }
 }

@@ -916,8 +916,8 @@ public class CommonConstants {
 
         // Vector search query options
 
-        /** Number of inverted-list probes for IVF_FLAT vector index. Higher values improve recall
-         *  at the cost of latency. Only relevant when the segment's vector index uses IVF_FLAT. */
+        /** Number of inverted-list probes for IVF-based vector indexes. Higher values improve recall
+         *  at the cost of latency. Only relevant when the segment's vector index uses IVF_FLAT or IVF_PQ. */
         public static final String VECTOR_NPROBE = "vectorNprobe";
 
         /** When true, ANN results are re-scored using exact distance from the forward index and

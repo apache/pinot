@@ -25,6 +25,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
@@ -52,9 +54,8 @@ import org.slf4j.LoggerFactory;
  *
  * <h3>Thread safety</h3>
  * <p>This class is thread-safe for concurrent reads. The loaded index data is immutable
- * after construction. The only mutable state is {@code _nprobe}, which is volatile to
- * allow query-time tuning from another thread. However, the typical pattern is
- * single-threaded: set nprobe, then call getDocIds.</p>
+ * after construction. Query-scoped {@code nprobe} overrides are stored in a {@link ThreadLocal}
+ * so concurrent queries cannot overwrite each other's search parameters.</p>
  */
 public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfFlatVectorIndexReader.class);
@@ -71,9 +72,10 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
   private final int[][] _listDocIds;
   private final float[][][] _listVectors;
   private final String _column;
+  private final int _defaultNprobe;
 
-  /** Number of centroids to probe during search. */
-  private volatile int _nprobe;
+  /** Query-scoped nprobe override. Falls back to {@link #_defaultNprobe} when unset. */
+  private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
 
   /**
    * Opens and loads an IVF_FLAT index from disk.
@@ -89,7 +91,7 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
     // Initialize nprobe to the default; query-time tuning should use NprobeAware#setNprobe.
     int configuredNprobe = DEFAULT_NPROBE;
 
-    File indexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, column);
+    File indexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, column, config);
     if (indexFile == null || !indexFile.exists()) {
       throw new IllegalStateException(
           "Failed to find IVF_FLAT index file for column: " + column + " in dir: " + indexDir
@@ -119,10 +121,7 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
       _distanceFunction = allFunctions[distanceFunctionOrdinal];
 
       // Clamp nprobe to valid range
-      _nprobe = Math.min(configuredNprobe, _nlist);
-      if (_nprobe <= 0) {
-        _nprobe = Math.min(DEFAULT_NPROBE, _nlist);
-      }
+      _defaultNprobe = Math.min(configuredNprobe, _nlist);
 
       // --- Centroids ---
       _centroids = new float[_nlist][_dimension];
@@ -153,7 +152,7 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
       // We skip reading the offset table and footer since we read sequentially
 
       LOGGER.info("Loaded IVF_FLAT index for column: {}: {} vectors, {} centroids, dim={}, nprobe={}, distance={}",
-          column, _numVectors, _nlist, _dimension, _nprobe, _distanceFunction);
+          column, _numVectors, _nlist, _dimension, getNprobe(), _distanceFunction);
     } catch (IOException e) {
       throw new RuntimeException(
           "Failed to load IVF_FLAT index for column: " + column + " from file: " + indexFile, e);
@@ -170,7 +169,7 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
       return new MutableRoaringBitmap();
     }
 
-    int effectiveNprobe = Math.min(_nprobe, _nlist);
+    int effectiveNprobe = Math.min(getNprobe(), _nlist);
 
     // Step 1: Find the nprobe closest centroids
     int[] probeCentroids = findClosestCentroids(searchQuery, effectiveNprobe);
@@ -210,29 +209,35 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
    *
    * @param nprobe number of centroids to probe (clamped to [1, nlist])
    *
-   * <p><b>Thread-safety note:</b> This method mutates a volatile field on the shared reader instance.
-   * In Pinot's query execution model, nprobe is set once per query before calling getDocIds(),
-   * and each query runs on a single thread per segment. A future improvement could pass nprobe
-   * as a parameter to getDocIds() to eliminate any cross-query visibility concern.</p>
+   * <p><b>Thread-safety note:</b> The override is stored in a thread-local so concurrent queries can
+   * tune nprobe independently on the same reader instance.</p>
    */
+  @Override
   public void setNprobe(int nprobe) {
     if (nprobe < 1) {
       throw new IllegalArgumentException("nprobe must be >= 1, got: " + nprobe);
     }
-    _nprobe = Math.min(nprobe, _nlist);
+    _nprobeOverride.set(Math.min(nprobe, _nlist));
+  }
+
+  @Override
+  public void clearNprobe() {
+    _nprobeOverride.remove();
   }
 
   /**
    * Returns the current nprobe setting.
    */
   public int getNprobe() {
-    return _nprobe;
+    Integer nprobeOverride = _nprobeOverride.get();
+    return nprobeOverride != null ? nprobeOverride
+        : (_defaultNprobe > 0 ? _defaultNprobe : Math.min(DEFAULT_NPROBE, _nlist));
   }
 
   @Override
   public void close()
       throws IOException {
-    // No resources to release -- all data is in Java heap arrays
+    clearNprobe();
   }
 
   // -----------------------------------------------------------------------
@@ -298,6 +303,37 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
   // -----------------------------------------------------------------------
   // Accessors for testing and introspection
   // -----------------------------------------------------------------------
+
+  @Override
+  public Map<String, Object> getIndexDebugInfo() {
+    Map<String, Object> info = new LinkedHashMap<>();
+    info.put("backend", "IVF_FLAT");
+    info.put("column", _column);
+    info.put("dimension", _dimension);
+    info.put("numVectors", _numVectors);
+    info.put("nlist", _nlist);
+    info.put("distanceFunction", _distanceFunction.name());
+    info.put("effectiveNprobe", getNprobe());
+
+    int minListSize = Integer.MAX_VALUE;
+    int maxListSize = 0;
+    int emptyLists = 0;
+    for (int[] docIds : _listDocIds) {
+      int size = docIds.length;
+      if (size == 0) {
+        emptyLists++;
+      }
+      minListSize = Math.min(minListSize, size);
+      maxListSize = Math.max(maxListSize, size);
+    }
+    if (_nlist > 0) {
+      info.put("avgDocsPerList", _numVectors > 0 ? (double) _numVectors / _nlist : 0.0);
+      info.put("minListSize", minListSize == Integer.MAX_VALUE ? 0 : minListSize);
+      info.put("maxListSize", maxListSize);
+      info.put("emptyLists", emptyLists);
+    }
+    return info;
+  }
 
   @VisibleForTesting
   public int getDimension() {
