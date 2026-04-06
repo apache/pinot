@@ -17,10 +17,10 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
 
 
 /**

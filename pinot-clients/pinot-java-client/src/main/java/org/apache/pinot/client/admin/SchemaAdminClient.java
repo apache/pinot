@@ -19,9 +19,12 @@
 package org.apache.pinot.client.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,19 +32,17 @@ import org.slf4j.LoggerFactory;
 /**
  * Client for schema administration operations.
  * Provides methods to create, update, delete, and manage Pinot schemas.
+ *
+ * This client exposes two complementary getters:
+ * - getSchema(schemaName): returns the raw JSON string for callers that need to persist or forward the JSON
+ * - getSchemaObject(schemaName): returns a typed Schema object for callers that want to work with the model
  */
-public class PinotSchemaAdminClient {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSchemaAdminClient.class);
+public class SchemaAdminClient extends BaseServiceAdminClient {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SchemaAdminClient.class);
 
-  private final PinotAdminTransport _transport;
-  private final String _controllerAddress;
-  private final Map<String, String> _headers;
-
-  public PinotSchemaAdminClient(PinotAdminTransport transport, String controllerAddress,
+  public SchemaAdminClient(PinotAdminTransport transport, String controllerAddress,
       Map<String, String> headers) {
-    _transport = transport;
-    _controllerAddress = controllerAddress;
-    _headers = headers;
+    super(transport, controllerAddress, headers);
   }
 
   /**
@@ -69,7 +70,7 @@ public class PinotSchemaAdminClient {
   }
 
   /**
-   * Gets a specific schema by name.
+   * Gets a specific schema as a JSON string.
    *
    * @param schemaName Name of the schema
    * @return Schema configuration as JSON string
@@ -79,6 +80,22 @@ public class PinotSchemaAdminClient {
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/schemas/" + schemaName, null, _headers);
     return response.toString();
+  }
+
+  /**
+   * Gets a specific schema as a typed object.
+   * Prefer this method when you want to work with the Schema model directly.
+   * Use {@link #getSchema(String)} if you need the raw JSON.
+   *
+   * @param schemaName Name of the schema
+   * @return Pinot Schema object
+   * @throws PinotAdminException If the request fails
+   * @throws IOException If the response cannot be parsed as a Schema
+   */
+  public Schema getSchemaObject(String schemaName)
+      throws PinotAdminException, IOException {
+    JsonNode response = _transport.executeGet(_controllerAddress, "/schemas/" + schemaName, null, _headers);
+    return Schema.fromString(response.toString());
   }
 
   /**
@@ -105,7 +122,17 @@ public class PinotSchemaAdminClient {
    */
   public String updateSchema(String schemaName, String schemaConfig, boolean reloadTables)
       throws PinotAdminException {
-    Map<String, String> queryParams = Map.of("reloadTables", String.valueOf(reloadTables));
+    return updateSchema(schemaName, schemaConfig, reloadTables, false);
+  }
+
+  /**
+   * Updates an existing schema with optional reload and force controls.
+   */
+  public String updateSchema(String schemaName, String schemaConfig, boolean reloadTables, boolean force)
+      throws PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("reload", String.valueOf(reloadTables));
+    queryParams.put("force", String.valueOf(force));
 
     JsonNode response = _transport.executePut(_controllerAddress, "/schemas/" + schemaName, schemaConfig,
         queryParams, _headers);
@@ -133,12 +160,27 @@ public class PinotSchemaAdminClient {
    * @return Success response
    * @throws PinotAdminException If the request fails
    */
-  public String createSchema(String schemaConfig, boolean force)
+  public String createSchema(String schemaConfig, boolean override, boolean force)
       throws PinotAdminException {
-    Map<String, String> queryParams = Map.of("force", String.valueOf(force));
+    Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("override", String.valueOf(override));
+    queryParams.put("force", String.valueOf(force));
 
     JsonNode response = _transport.executePost(_controllerAddress, "/schemas", schemaConfig, queryParams, _headers);
     return response.toString();
+  }
+
+  /**
+   * Creates a new schema.
+   *
+   * @param schemaConfig Schema configuration as JSON string
+   * @param force Whether to force creation even if schema exists
+   * @return Success response
+   * @throws PinotAdminException If the request fails
+   */
+  public String createSchema(String schemaConfig, boolean force)
+      throws PinotAdminException {
+    return createSchema(schemaConfig, true, force);
   }
 
   /**
@@ -150,7 +192,7 @@ public class PinotSchemaAdminClient {
    */
   public String createSchema(String schemaConfig)
       throws PinotAdminException {
-    return createSchema(schemaConfig, false);
+    return createSchema(schemaConfig, true, false);
   }
 
   /**
@@ -205,7 +247,7 @@ public class PinotSchemaAdminClient {
   }
 
   /**
-   * Gets a specific schema by name (async).
+   * Gets a specific schema by name (async) and returns the raw JSON string.
    */
   public CompletableFuture<String> getSchemaAsync(String schemaName) {
     return _transport.executeGetAsync(_controllerAddress, "/schemas/" + schemaName, null, _headers)

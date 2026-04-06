@@ -428,7 +428,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
    */
   @Test
   public void testBrokerResourceValidationManagerRepairsLogicalTable()
-      throws IOException {
+      throws Exception {
     // Add logical table (same broker tenant as physical table)
     Schema logicalTableSchema = createSchema();
     logicalTableSchema.setSchemaName(getLogicalTableName());

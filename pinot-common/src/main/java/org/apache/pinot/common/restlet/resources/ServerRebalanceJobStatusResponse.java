@@ -16,10 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
+package org.apache.pinot.common.restlet.resources;
 
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 
 
 public class ServerRebalanceJobStatusResponse {

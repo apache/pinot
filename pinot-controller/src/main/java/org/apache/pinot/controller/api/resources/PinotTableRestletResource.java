@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -85,6 +84,10 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.restlet.resources.BatchConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -105,8 +108,6 @@ import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
@@ -1275,6 +1276,57 @@ public class PinotTableRestletResource {
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("/tables/{tableNameWithType}/aggregateMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the aggregate metadata of all segments for a table (deprecated endpoint)",
+      notes = "Deprecated endpoint. Use /tables/{tableName}/metadata instead.")
+  public String getTableAggregateMetadataDeprecated(
+      @ApiParam(value = "Name of the table with type suffix", required = true) @PathParam("tableNameWithType")
+      String tableNameWithType,
+      @ApiParam(value = "Comma separated list of columns") @QueryParam("columns") @Nullable String columns,
+      @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableNameWithType);
+    String existingTableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableNameWithType, null, LOGGER).get(0);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(existingTableNameWithType);
+    if (tableType == TableType.REALTIME) {
+      throw new ControllerApplicationException(LOGGER, "Table type : " + tableType + " not yet supported.",
+          Response.Status.NOT_IMPLEMENTED);
+    }
+
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(existingTableNameWithType);
+    int numReplica = tableConfig == null ? 1 : tableConfig.getReplication();
+
+    List<String> columnsList = List.of();
+    if (StringUtils.isNotBlank(columns)) {
+      String[] splitColumns = StringUtils.split(columns, ',');
+      if (splitColumns != null && splitColumns.length > 0) {
+        List<String> parsedColumns = new ArrayList<>(splitColumns.length);
+        for (String column : splitColumns) {
+          String trimmedColumn = StringUtils.trimToNull(column);
+          if (trimmedColumn != null) {
+            parsedColumns.add(trimmedColumn);
+          }
+        }
+        columnsList = parsedColumns;
+      }
+    }
+
+    try {
+      JsonNode segmentsMetadataJson =
+          getAggregateMetadataFromServer(existingTableNameWithType, columnsList, numReplica);
+      return JsonUtils.objectToPrettyString(segmentsMetadataJson);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, ioe);
+    }
   }
 
   @GET

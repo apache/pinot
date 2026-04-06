@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import groovy.lang.IntRange;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -35,6 +34,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -53,9 +53,11 @@ import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
@@ -63,6 +65,7 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -96,11 +99,28 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   private int _externalControllerPort;
   private int _internalBrokerPort;
   private int _externalBrokerPort;
+  private javax.net.ssl.SSLContext _sslContext;
 
   @BeforeClass
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    java.security.KeyStore keyStore = java.security.KeyStore.getInstance(PKCS_12);
+    try (java.io.InputStream ksStream =
+        new java.io.FileInputStream(new File(Objects.requireNonNull(TLS_STORE_PKCS_12).toURI()))) {
+      keyStore.load(ksStream, PASSWORD_CHAR);
+    }
+    java.security.KeyStore trustStore = java.security.KeyStore.getInstance(PKCS_12);
+    try (java.io.InputStream tsStream =
+        new java.io.FileInputStream(new File(Objects.requireNonNull(TLS_STORE_PKCS_12).toURI()))) {
+      trustStore.load(tsStream, PASSWORD_CHAR);
+    }
+    _sslContext = org.apache.hc.core5.ssl.SSLContexts.custom()
+        .loadKeyMaterial(keyStore, PASSWORD_CHAR)
+        .loadTrustMaterial(trustStore, null)
+        .build();
+    TlsUtils.setSslContext(_sslContext);
+    _httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, _sslContext);
 
     startZk();
     startController();
@@ -256,6 +276,16 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
+  protected javax.net.ssl.SSLContext getControllerTransportSslContext() {
+    return _sslContext;
+  }
+
+  @Override
+  protected Map<String, String> getControllerRequestClientHeaders() {
+    return AUTH_HEADER;
+  }
+
+  @Override
   protected TableTaskConfig getTaskConfig() {
     Map<String, String> prop = new HashMap<>();
     prop.put("bucketTimePeriod", "30d");
@@ -266,26 +296,33 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   public void addSchema(Schema schema)
       throws IOException {
-    SimpleHttpResponse response =
-        sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
-            AUTH_HEADER);
-    Assert.assertEquals(response.getStatusCode(), 200);
+    try {
+      getOrCreateAdminClient().getSchemaClient().createSchema(schema.toSingleLineJsonString());
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), null);
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
   protected void createLogicalTable()
       throws IOException {
     LogicalTableConfig logicalTableConfig = createLogicalTableConfig();
-    sendPostRequest(
-        _controllerRequestURLBuilder.forLogicalTableCreate(),
-        logicalTableConfig.toSingleLineJsonString(),
-        AUTH_HEADER);
+    try {
+      getOrCreateAdminClient().getLogicalTableClient()
+          .createLogicalTable(logicalTableConfig.toSingleLineJsonString(), AUTH_HEADER);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
@@ -305,23 +342,33 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   public void dropLogicalTable(String logicalTableName)
       throws IOException {
-    sendDeleteRequest(_controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName), AUTH_HEADER);
+    try {
+      getOrCreateAdminClient().getLogicalTableClient().deleteLogicalTable(logicalTableName, AUTH_HEADER);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
   public void dropOfflineTable(String tableName)
       throws IOException {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)),
-        AUTH_HEADER);
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   @Override
   public void dropRealtimeTable(String tableName)
       throws IOException {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
-        AUTH_HEADER);
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
   }
 
   @Test
@@ -499,8 +546,12 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test(expectedExceptions = IOException.class)
   public void testUnauthenticatedFailure()
       throws IOException {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType("mytable")));
+    HttpDelete request = new HttpDelete(
+        "https://localhost:" + _externalControllerPort + "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(
+            getTableName()));
+    try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
+      client.execute(request);
+    }
   }
 
   @Test
@@ -516,13 +567,15 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
     // wait for offline segments
     JsonNode offlineSegments = TestUtils.waitForResult(() -> {
-      JsonNode segmentSets = JsonUtils.stringToJsonNode(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
-      JsonNode currentOfflineSegments =
-          new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
-              .map(s -> s.get("OFFLINE")).findFirst().get();
-      Assert.assertFalse(currentOfflineSegments.isEmpty());
-      return currentOfflineSegments;
+      try {
+        List<String> segments =
+            getOrCreateAdminClient().getSegmentClient().listSegments(getTableName(), TableType.OFFLINE.name(), false);
+        JsonNode node = JsonUtils.objectToJsonNode(segments);
+        Assert.assertFalse(segments.isEmpty());
+        return node;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }, 30000);
 
     // Verify constant row count
@@ -532,9 +585,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     // download and sanity-check size of offline segment(s)
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
-      Assert.assertTrue(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
-              > 200000); // download segment
+      byte[] bytes = getOrCreateAdminClient().getSegmentClient().downloadSegment(getTableName(), segment);
+      Assert.assertTrue(bytes.length > 200000);
     }
   }
 

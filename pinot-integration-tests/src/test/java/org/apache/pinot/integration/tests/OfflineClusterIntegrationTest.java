@@ -55,9 +55,11 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -317,7 +319,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
-      throws IOException {
+      throws Exception {
     // Try to refresh all the segments again with force download from the controller URI.
     String reloadJob = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, forceDownload);
     TestUtils.waitForCondition(aVoid -> {
@@ -349,17 +351,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testInvalidTableConfig() {
+  public void testInvalidTableConfig()
+      throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("badTable").build();
     ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
     // Remove a mandatory field
     tableConfigJson.remove(TableConfig.VALIDATION_CONFIG_KEY);
     try {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfigJson.toString());
+      getOrCreateAdminClient().getTableClient().createTable(tableConfigJson.toString(), null);
       fail();
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Should get response code 400 (BAD_REQUEST)
-      assertTrue(e.getMessage().contains("Got error status code: 400"));
+      assertTrue(e.getMessage().contains("400"));
     }
   }
 
@@ -476,7 +479,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         TableNameBuilder.extractRawTableName(offlineTableName));
     parameters.add(tableNameParameter);
 
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getOrCreateAdminClient().getSegmentUploadUrl());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       // Refresh non-existing segment
       File segmentTarFile = segmentTarFiles[0];
@@ -1939,8 +1942,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Trigger reload and verify column count
     reloadAllSegments(TEST_EXTRA_COLUMNS_QUERY, false, numTotalDocs);
-    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    String segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 104);
@@ -1948,41 +1952,41 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 104);
 
     // Verify the index sizes
-    JsonNode columnIndexSizeMap = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(),
-                List.of("DivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDsString",
-                    "NewAddedRawDerivedStringDimension", "NewAddedRawDerivedMVIntDimension",
-                    "NewAddedDerivedNullString"))))
-        .get("columnIndexSizeMap");
+    TableMetadataInfo aggregateMetadata = getOrCreateAdminClient().getTableClient()
+        .getAggregateMetadata(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()),
+            String.join(",", List.of("DivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDs",
+                "NewAddedDerivedDivAirportSeqIDsString", "NewAddedRawDerivedStringDimension",
+                "NewAddedRawDerivedMVIntDimension", "NewAddedDerivedNullString")));
+    Map<String, Map<String, Double>> columnIndexSizeMap = aggregateMetadata.getColumnIndexSizeMap();
     assertEquals(columnIndexSizeMap.size(), 6);
-    JsonNode originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");
-    JsonNode derivedColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDs");
-    JsonNode derivedStringColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDsString");
-    JsonNode derivedRawStringColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedStringDimension");
-    JsonNode derivedRawMVIntColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedMVIntDimension");
-    JsonNode derivedNullStringColumnIndex = columnIndexSizeMap.get("NewAddedDerivedNullString");
+    Map<String, Double> originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");
+    Map<String, Double> derivedColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDs");
+    Map<String, Double> derivedStringColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDsString");
+    Map<String, Double> derivedRawStringColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedStringDimension");
+    Map<String, Double> derivedRawMVIntColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedMVIntDimension");
+    Map<String, Double> derivedNullStringColumnIndex = columnIndexSizeMap.get("NewAddedDerivedNullString");
 
     // Derived int column should have the same dictionary size as the original column
-    double originalColumnDictionarySize = originalColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble();
-    assertEquals(derivedColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble(), originalColumnDictionarySize);
+    double originalColumnDictionarySize = originalColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID);
+    assertEquals(derivedColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID), originalColumnDictionarySize);
 
     // Derived string column should have larger dictionary size than the original column
     assertTrue(
-        derivedStringColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble() > originalColumnDictionarySize);
+        derivedStringColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID) > originalColumnDictionarySize);
 
     // Both derived columns should have smaller forward index size than the original column because of compression
-    double derivedColumnForwardIndexSize = derivedColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble();
-    assertTrue(derivedColumnForwardIndexSize < originalColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble());
-    assertEquals(derivedStringColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble(),
+    double derivedColumnForwardIndexSize = derivedColumnIndexSizes.get(StandardIndexes.FORWARD_ID);
+    assertTrue(derivedColumnForwardIndexSize < originalColumnIndexSizes.get(StandardIndexes.FORWARD_ID));
+    assertEquals(derivedStringColumnIndexSizes.get(StandardIndexes.FORWARD_ID),
         derivedColumnForwardIndexSize);
 
-    assertTrue(derivedRawStringColumnIndex.has(StandardIndexes.FORWARD_ID));
-    assertFalse(derivedRawStringColumnIndex.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(derivedRawStringColumnIndex.containsKey(StandardIndexes.FORWARD_ID));
+    assertFalse(derivedRawStringColumnIndex.containsKey(StandardIndexes.DICTIONARY_ID));
 
-    assertTrue(derivedRawMVIntColumnIndex.has(StandardIndexes.FORWARD_ID));
-    assertFalse(derivedRawMVIntColumnIndex.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(derivedRawMVIntColumnIndex.containsKey(StandardIndexes.FORWARD_ID));
+    assertFalse(derivedRawMVIntColumnIndex.containsKey(StandardIndexes.DICTIONARY_ID));
 
-    assertTrue(derivedNullStringColumnIndex.has(StandardIndexes.NULL_VALUE_VECTOR_ID));
+    assertTrue(derivedNullStringColumnIndex.containsKey(StandardIndexes.NULL_VALUE_VECTOR_ID));
 
     testNewAddedColumns();
     testRegexpLikeOnNewAddedColumns();
@@ -2007,8 +2011,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Trigger reload and verify column count
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
-    segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 75);
@@ -2332,8 +2337,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Trigger reload and verify column count doesn't change in query but changes in segment metadata
     reloadAllSegments(TEST_REGULAR_COLUMNS_QUERY, false, numTotalDocs);
     assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 79);
-    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    String segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 81);
@@ -2351,8 +2357,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     reloadAllSegments(TEST_REGULAR_COLUMNS_QUERY, false, numTotalDocs);
     assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 79);
-    segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    segmentsMetadataResponse = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentsMetadata(getTableName(), List.of("*"), null, TableType.OFFLINE.toString());
+    segmentsMetadata = JsonUtils.stringToJsonNode(segmentsMetadataResponse);
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 79);
@@ -3157,18 +3164,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void testInstanceDecommission()
       throws Exception {
     // Fetch all instances
-    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-    JsonNode instanceList = response.get("instances");
+    List<String> instanceList = getOrCreateAdminClient().getInstanceClient().listInstances();
     int numInstances = instanceList.size();
     // The total number of instances is equal to the sum of num brokers, num servers and 1 controller.
     assertEquals(numInstances, getNumBrokers() + getNumServers() + 1);
 
     // Try to delete a server that does not exist
-    String deleteInstanceRequest = _controllerRequestURLBuilder.forInstance("potato");
     try {
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance("potato");
       fail("Delete should have returned a failure status (404)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 404 status code
     }
 
@@ -3176,7 +3181,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String serverName = null;
     String brokerName = null;
     for (int i = 0; i < numInstances; i++) {
-      String instanceId = instanceList.get(i).asText();
+      String instanceId = instanceList.get(i);
       InstanceType instanceType = InstanceTypeUtils.getInstanceType(instanceId);
       if (instanceType == InstanceType.SERVER) {
         serverName = instanceId;
@@ -3186,11 +3191,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Try to delete a live server
-    deleteInstanceRequest = _controllerRequestURLBuilder.forInstance(serverName);
     try {
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance(serverName);
       fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 409 status code
     }
 
@@ -3199,9 +3203,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Try to delete a server whose information is still on the ideal state
     try {
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance(serverName);
       fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 409 status code
     }
 
@@ -3209,15 +3213,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     dropOfflineTable(getTableName());
 
     // Now, delete server should work
-    response = JsonUtils.stringToJsonNode(sendDeleteRequest(deleteInstanceRequest));
-    assertTrue(response.has("status"));
+    String deleteResponse = getOrCreateAdminClient().getInstanceClient().dropInstance(serverName);
+    assertNotNull(deleteResponse);
 
     // Try to delete a broker whose information is still live
     try {
-      deleteInstanceRequest = _controllerRequestURLBuilder.forInstance(brokerName);
-      sendDeleteRequest(deleteInstanceRequest);
+      getOrCreateAdminClient().getInstanceClient().dropInstance(brokerName);
       fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
+    } catch (PinotAdminException e) {
       // Expected exception on 409 status code
     }
 
@@ -3802,8 +3805,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testIndexMetadataAPI()
       throws Exception {
     TableIndexMetadataResponse tableIndexMetadataResponse =
-        JsonUtils.stringToObject(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/indexes?type=OFFLINE"),
-            TableIndexMetadataResponse.class);
+        getOrCreateAdminClient().getTableClient().getTableIndexes(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()));
 
     getInvertedIndexColumns().forEach(column -> {
       Assert.assertEquals(
@@ -3832,45 +3835,54 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   public void testAggregateMetadataAPI()
-      throws IOException {
-    JsonNode oneSVColumnResponse = JsonUtils.stringToJsonNode(
-        sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DestCityMarketID"));
+      throws Exception {
+    JsonNode oneSVColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "DestCityMarketID"));
     // DestCityMarketID is a SV column
     validateMetadataResponse(oneSVColumnResponse, 1, 0);
 
-    JsonNode oneMVColumnResponse = JsonUtils.stringToJsonNode(
-        sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DivLongestGTimes"));
+    JsonNode oneMVColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "DivLongestGTimes"));
     // DivLongestGTimes is a MV column
     validateMetadataResponse(oneMVColumnResponse, 1, 1);
 
-    JsonNode threeSVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
-        + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
+    JsonNode threeSVColumnsResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()),
+            "DivActualElapsedTime,CRSElapsedTime,OriginStateName"));
     validateMetadataResponse(threeSVColumnsResponse, 3, 0);
 
-    JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
-        + "/tables/mytable/metadata?columns=DivLongestGTimes&columns=DivWheelsOns&columns=DivAirports"));
+    JsonNode threeMVColumnsResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()),
+            "DivLongestGTimes,DivWheelsOns,DivAirports"));
     validateMetadataResponse(threeMVColumnsResponse, 3, 3);
 
-    JsonNode zeroColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata"));
+    JsonNode zeroColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), null));
     validateMetadataResponse(zeroColumnResponse, 0, 0);
 
-    JsonNode starColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=*"));
+    JsonNode starColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "*"));
     validateMetadataResponse(starColumnResponse, 83, 10);
 
-    JsonNode starEncodedColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=%2A"));
+    JsonNode starEncodedColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "*"));
     validateMetadataResponse(starEncodedColumnResponse, 83, 10);
 
-    JsonNode starWithExtraColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "CRSElapsedTime&columns=*&columns=OriginStateName"));
+    JsonNode starWithExtraColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "CRSElapsedTime,*,OriginStateName"));
     validateMetadataResponse(starWithExtraColumnResponse, 83, 10);
 
-    JsonNode starWithExtraEncodedColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
-            + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
+    JsonNode starWithExtraEncodedColumnResponse = JsonUtils.objectToJsonNode(
+        getOrCreateAdminClient().getTableClient().getAggregateMetadata(
+            TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "CRSElapsedTime,*,OriginStateName"));
     validateMetadataResponse(starWithExtraEncodedColumnResponse, 83, 10);
   }
 

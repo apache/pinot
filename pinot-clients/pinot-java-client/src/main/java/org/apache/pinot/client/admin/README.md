@@ -40,12 +40,12 @@ The admin client consists of:
 1. **PinotAdminClient**: Main entry point that provides access to all service clients
 2. **PinotAdminTransport**: HTTP transport layer for communicating with the controller
 3. **Service Clients**:
-    - `PinotTableAdminClient`: Table operations (CRUD, status, metadata)
-    - `PinotSchemaAdminClient`: Schema operations (CRUD, validation)
-    - `PinotInstanceAdminClient`: Instance operations (CRUD, state management)
-    - `PinotSegmentAdminClient`: Segment operations (query, management)
-    - `PinotTenantAdminClient`: Tenant operations (CRUD, configuration)
-    - `PinotTaskAdminClient`: Task management operations
+    - `TableAdminClient`: Table operations (CRUD, status, metadata)
+    - `SchemaAdminClient`: Schema operations (CRUD, validation)
+    - `InstanceAdminClient`: Instance operations (CRUD, state management)
+    - `SegmentAdminClient`: Segment operations (query, management)
+    - `TenantAdminClient`: Tenant operations (CRUD, configuration)
+    - `TaskAdminClient`: Task management operations
 4. **Exception Classes**: Specialized exceptions for different error types
 5. **Authentication Utilities**: Support for various authentication methods
 
@@ -123,7 +123,7 @@ try {
 ### Table Operations
 
 ```java
-PinotTableAdminClient tableClient = adminClient.getTableClient();
+TableAdminClient tableClient = adminClient.getTableClient();
 
 // List tables with filters
 List<String> tables = tableClient.listTables("offline", null, "name");
@@ -144,13 +144,16 @@ String rebalanceResult = tableClient.rebalanceTable("myTable", true, "default", 
 ### Schema Operations
 
 ```java
-PinotSchemaAdminClient schemaClient = adminClient.getSchemaClient();
+SchemaAdminClient schemaClient = adminClient.getSchemaClient();
 
 // List all schemas
 List<String> schemas = schemaClient.listSchemaNames();
 
-// Get schema configuration
+// Get schema configuration as JSON
 String schema = schemaClient.getSchema("mySchema");
+
+// Get a typed Schema object
+Schema schemaObject = schemaClient.getSchemaObject("mySchema");
 
 // Create a new schema
 String createResult = schemaClient.createSchema(schemaConfigJson);
@@ -162,7 +165,7 @@ String validation = schemaClient.validateSchema(schemaConfigJson);
 ### Instance Operations
 
 ```java
-PinotInstanceAdminClient instanceClient = adminClient.getInstanceClient();
+InstanceAdminClient instanceClient = adminClient.getInstanceClient();
 
 // List all instances
 List<String> instances = instanceClient.listInstances();
@@ -180,7 +183,7 @@ String updateResult = instanceClient.updateInstance("Server_192.168.1.1_8098", c
 ### Segment Operations
 
 ```java
-PinotSegmentAdminClient segmentClient = adminClient.getSegmentClient();
+SegmentAdminClient segmentClient = adminClient.getSegmentClient();
 
 // List segments for a table
 List<String> segments = segmentClient.listSegments("myTable_OFFLINE", false);
@@ -195,7 +198,7 @@ String deleteResult = segmentClient.deleteSegment("myTable_OFFLINE", "segmentNam
 ### Tenant Operations
 
 ```java
-PinotTenantAdminClient tenantClient = adminClient.getTenantClient();
+TenantAdminClient tenantClient = adminClient.getTenantClient();
 
 // List all tenants
 List<String> tenants = tenantClient.listTenants();
@@ -213,7 +216,7 @@ String rebalanceResult = tenantClient.rebalanceTenant("myTenant", 2, null, null,
 ### Task Operations
 
 ```java
-PinotTaskAdminClient taskClient = adminClient.getTaskClient();
+TaskAdminClient taskClient = adminClient.getTaskClient();
 
 // List task types
 Set<String> taskTypes = taskClient.listTaskTypes();

@@ -20,11 +20,11 @@ package org.apache.pinot.controller.helix.core.util;
 
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.TableRebalanceProgressStats;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;

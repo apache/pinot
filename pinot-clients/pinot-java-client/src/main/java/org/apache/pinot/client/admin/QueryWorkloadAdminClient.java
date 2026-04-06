@@ -1,0 +1,72 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.client.admin;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import java.util.Map;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
+
+/**
+ * Client for query workload administration operations.
+ */
+public class QueryWorkloadAdminClient extends BaseServiceAdminClient {
+
+  public QueryWorkloadAdminClient(PinotAdminTransport transport, String controllerAddress,
+      Map<String, String> headers) {
+    super(transport, controllerAddress, headers);
+  }
+
+  public String updateQueryWorkloadConfig(String configJson)
+      throws PinotAdminException {
+    JsonNode response = _transport.executePost(_controllerAddress, "/queryWorkloadConfigs", configJson, null,
+        _headers);
+    return response.toString();
+  }
+
+  public String deleteQueryWorkloadConfig(String config)
+      throws PinotAdminException {
+    JsonNode response = _transport.executeDelete(_controllerAddress, "/queryWorkloadConfigs/" + config, null,
+        _headers);
+    return response.toString();
+  }
+
+  /**
+   * Gets a query workload config as a JSON string.
+   */
+  public String getQueryWorkloadConfig(String config)
+      throws PinotAdminException {
+    JsonNode response = _transport.executeGet(_controllerAddress, "/queryWorkloadConfigs/" + config, null, _headers);
+    return response.toString();
+  }
+
+  /**
+   * Gets a query workload config as a typed object.
+   */
+  public QueryWorkloadConfig getQueryWorkloadConfigObject(String config)
+      throws PinotAdminException {
+    JsonNode response = _transport.executeGet(_controllerAddress, "/queryWorkloadConfigs/" + config, null, _headers);
+    try {
+      return JsonUtils.jsonNodeToObject(response, QueryWorkloadConfig.class);
+    } catch (IOException e) {
+      throw new PinotAdminException("Failed to deserialize query workload config: " + config, e);
+    }
+  }
+}

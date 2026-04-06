@@ -54,6 +54,10 @@
       <groupId>com.101tec</groupId>
       <artifactId>zkclient</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents.client5</groupId>
+      <artifactId>httpclient5</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.mockito</groupId>

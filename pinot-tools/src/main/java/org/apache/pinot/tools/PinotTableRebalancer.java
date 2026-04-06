@@ -20,9 +20,9 @@ package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.testng.annotations.AfterMethod;
@@ -69,7 +70,6 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     startController(configuration);
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
-    _controllerRequestURLBuilder = getControllerRequestURLBuilder();
     // create schema for logical table
     addDummySchema(LOGICAL_TABLE_NAME);
   }
@@ -77,9 +77,8 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
   @AfterMethod
   private void tearDown() {
     cleanup();
-    String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(LOGICAL_TABLE_NAME);
     try {
-      ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, AUTH_HEADER);
+      deleteLogicalTable(LOGICAL_TABLE_NAME, AUTH_HEADER);
     } catch (Exception e) {
       // ignore
     }
@@ -104,11 +103,6 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
 
     setup(properties);
 
-    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
-    String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(LOGICAL_TABLE_NAME);
-    String updateLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableUpdate(LOGICAL_TABLE_NAME);
-    String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(LOGICAL_TABLE_NAME);
-
     List<String> physicalTableNames = List.of("test_table_1");
     List<String> physicalTablesWithType = createHybridTables(physicalTableNames);
     LogicalTableConfig logicalTableConfig;
@@ -116,13 +110,12 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     // create logical table
     try {
       logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
-      String resp =
-          ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      String resp = createLogicalTable(logicalTableConfig, getHeaders());
       if (permissions.contains("create")) {
         assertEquals(resp,
             "{\"unrecognizedProperties\":{},\"status\":\"" + LOGICAL_TABLE_NAME
                 + " logical table successfully added.\"}");
-        verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
+        verifyLogicalTableExists(LOGICAL_TABLE_NAME, logicalTableConfig);
       } else {
         fail("Logical Table POST request should have failed");
       }
@@ -134,14 +127,12 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     try {
       physicalTablesWithType.addAll(createHybridTables(List.of("test_table_2")));
       logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
-      String respUpdate = ControllerTest.sendPutRequest(
-          updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders()
-      );
+      String respUpdate = updateLogicalTable(logicalTableConfig, getHeaders());
       if (permissions.contains("update")) {
         assertEquals(respUpdate,
             "{\"unrecognizedProperties\":{},\"status\":\"" + LOGICAL_TABLE_NAME
                 + " logical table successfully updated.\"}");
-        verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
+        verifyLogicalTableExists(LOGICAL_TABLE_NAME, logicalTableConfig);
       } else {
         fail("Logical Table POST request should have failed");
       }
@@ -151,7 +142,7 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
 
     // delete logical table
     try {
-      String respDelete = ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, getHeaders());
+      String respDelete = deleteLogicalTable(LOGICAL_TABLE_NAME, getHeaders());
       if (permissions.contains("delete")) {
         assertEquals(respDelete, "{\"status\":\"" + LOGICAL_TABLE_NAME + " logical table successfully deleted.\"}");
       } else {
@@ -162,10 +153,63 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     }
   }
 
-  private void verifyLogicalTableExists(String logicalTableNamesGet, LogicalTableConfig logicalTableConfig)
+  private String createLogicalTable(LogicalTableConfig logicalTableConfig, Map<String, String> headers)
       throws IOException {
-    String respGet = ControllerTest.sendGetRequest(logicalTableNamesGet, getHeaders());
-    LogicalTableConfig remoteTable = LogicalTableConfig.fromString(respGet);
+    try {
+      return getOrCreateAdminClient().getLogicalTableClient()
+          .createLogicalTable(logicalTableConfig.toSingleLineJsonString(), headers);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw wrapRuntimeException(e);
+    }
+  }
+
+  private String updateLogicalTable(LogicalTableConfig logicalTableConfig, Map<String, String> headers)
+      throws IOException {
+    try {
+      return getOrCreateAdminClient().getLogicalTableClient()
+          .updateLogicalTable(logicalTableConfig.getTableName(), logicalTableConfig.toSingleLineJsonString(), headers);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw wrapRuntimeException(e);
+    }
+  }
+
+  private String deleteLogicalTable(String logicalTableName, Map<String, String> headers)
+      throws IOException {
+    try {
+      return getOrCreateAdminClient().getLogicalTableClient().deleteLogicalTable(logicalTableName, headers);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw wrapRuntimeException(e);
+    }
+  }
+
+  private String getLogicalTable(String logicalTableName, Map<String, String> headers)
+      throws IOException {
+    try {
+      return getOrCreateAdminClient().getLogicalTableClient().getLogicalTable(logicalTableName, headers);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw wrapRuntimeException(e);
+    }
+  }
+
+  private void verifyLogicalTableExists(String logicalTableName, LogicalTableConfig logicalTableConfig)
+      throws IOException {
+    LogicalTableConfig remoteTable;
+    try {
+      remoteTable = getOrCreateAdminClient().getLogicalTableClient()
+          .getLogicalTableConfig(logicalTableName, getHeaders());
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw wrapRuntimeException(e);
+    }
     assertEquals(remoteTable, logicalTableConfig);
   }
 }

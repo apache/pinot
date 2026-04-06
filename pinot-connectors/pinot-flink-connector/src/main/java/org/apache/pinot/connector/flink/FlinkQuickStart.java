@@ -30,14 +30,11 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.Row;
-import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
-import org.apache.pinot.connector.flink.http.PinotConnectionUtils;
 import org.apache.pinot.connector.flink.sink.PinotSinkFunction;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 
 
 /**
@@ -50,7 +47,7 @@ public final class FlinkQuickStart {
   public static final RowTypeInfo TEST_TYPE_INFO =
       new RowTypeInfo(new TypeInformation[]{Types.FLOAT, Types.FLOAT, Types.STRING, Types.STRING},
           new String[]{"lon", "lat", "address", "name"});
-  private static final String DEFAULT_CONTROLLER_URL = "http://localhost:9000";
+  private static final String DEFAULT_CONTROLLER_ADDRESS = "localhost:9000";
 
   private static List<Row> loadData()
       throws IOException {
@@ -79,12 +76,11 @@ public final class FlinkQuickStart {
     execEnv.setParallelism(2);
     DataStream<Row> srcDs = execEnv.fromCollection(data).returns(TEST_TYPE_INFO).keyBy(r -> r.getField(0));
 
-    HttpClient httpClient = HttpClient.getInstance();
-    ControllerRequestClient client = new ControllerRequestClient(
-        ControllerRequestURLBuilder.baseUrl(DEFAULT_CONTROLLER_URL), httpClient);
-    Schema schema = PinotConnectionUtils.getSchema(client, "starbucksStores");
-    TableConfig tableConfig = PinotConnectionUtils.getTableConfig(client, "starbucksStores", "OFFLINE");
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema));
-    execEnv.execute();
+    try (PinotAdminClient client = new PinotAdminClient(DEFAULT_CONTROLLER_ADDRESS)) {
+      Schema schema = client.getSchemaClient().getSchemaObject("starbucksStores");
+      TableConfig tableConfig = client.getTableClient().getTableConfigObject("starbucksStores", "OFFLINE");
+      srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema));
+      execEnv.execute();
+    }
   }
 }

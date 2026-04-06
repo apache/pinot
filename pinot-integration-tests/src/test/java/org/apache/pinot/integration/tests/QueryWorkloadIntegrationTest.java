@@ -59,6 +59,12 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   protected void overrideBrokerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
+    try {
+      configuration.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
+          org.apache.pinot.spi.utils.NetUtils.findOpenPort());
+    } catch (java.io.IOException e) {
+      throw new RuntimeException("Failed to allocate mailbox port", e);
+    }
   }
 
   @Override
@@ -142,10 +148,12 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
     QueryWorkloadConfig queryWorkloadConfig = new QueryWorkloadConfig("testWorkload", List.of(nodeConfig));
     try {
-      getControllerRequestClient().updateQueryWorkloadConfig(queryWorkloadConfig);
+      getOrCreateAdminClient().getQueryWorkloadClient()
+          .updateQueryWorkloadConfig(JsonUtils.objectToString(queryWorkloadConfig));
       TestUtils.waitForCondition(aVoid -> {
         try {
-          QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig("testWorkload");
+          QueryWorkloadConfig retrievedConfig =
+              getOrCreateAdminClient().getQueryWorkloadClient().getQueryWorkloadConfigObject("testWorkload");
           return retrievedConfig != null && retrievedConfig.equals(queryWorkloadConfig);
         } catch (Exception e) {
           throw new RuntimeException(e);
@@ -161,7 +169,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
         testServerQueryWorkloadEndpoints(serverInstance, "testWorkload", expectedCpuCostNs, expectedMemoryCostBytes);
       }
     } finally {
-      getControllerRequestClient().deleteQueryWorkloadConfig("testWorkload");
+      getOrCreateAdminClient().getQueryWorkloadClient().deleteQueryWorkloadConfig("testWorkload");
     }
   }
 
@@ -196,8 +204,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
    */
   private Set<String> getServerInstancesForTable(String tableName) throws Exception {
     // Use the controller API to get server instances for the specific table
-    String url = _controllerRequestURLBuilder.forTableGetServerInstances(tableName);
-    String response = sendGetRequest(url);
+    String response = getOrCreateAdminClient().getTableClient().getTableInstances(tableName, "server");
 
     // Parse the JSON response to extract server instance names
     JsonNode responseJson = JsonUtils.stringToJsonNode(response);
