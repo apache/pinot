@@ -87,6 +87,7 @@ public class RebalanceResult {
     return _description;
   }
 
+  @Nullable
   @JsonProperty
   public Map<InstancePartitionsType, InstancePartitions> getInstanceAssignment() {
     return _instanceAssignment;
