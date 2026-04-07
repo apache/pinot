@@ -16,30 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function.scalar.bit;
+package org.apache.pinot.common.function.scalar.bitwise;
 
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
- * Polymorphic bitwise NOT scalar function.
+ * Polymorphic bitwise arithmetic right shift scalar function.
  *
  * <p>This implementation is stateless and thread-safe.
  */
 @ScalarFunction
-public class BitNotScalarFunction extends PolymorphicUnaryIntegralScalarFunction {
+public class BitShiftRightScalarFunction extends PolymorphicShiftScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;
   private static final FunctionInfo LONG_FUNCTION_INFO;
 
   static {
     try {
       INT_FUNCTION_INFO =
-          new FunctionInfo(BitNotScalarFunction.class.getMethod("intBitNot", int.class), BitNotScalarFunction.class,
-              false);
+          new FunctionInfo(BitShiftRightScalarFunction.class.getMethod("intBitShiftRight", int.class, int.class),
+              BitShiftRightScalarFunction.class, false);
       LONG_FUNCTION_INFO =
-          new FunctionInfo(BitNotScalarFunction.class.getMethod("longBitNot", long.class), BitNotScalarFunction.class,
-              false);
+          new FunctionInfo(BitShiftRightScalarFunction.class.getMethod("longBitShiftRight", long.class, int.class),
+              BitShiftRightScalarFunction.class, false);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
@@ -47,7 +47,7 @@ public class BitNotScalarFunction extends PolymorphicUnaryIntegralScalarFunction
 
   @Override
   public String getName() {
-    return "bitNot";
+    return "bitShiftRight";
   }
 
   @Override
@@ -60,11 +60,11 @@ public class BitNotScalarFunction extends PolymorphicUnaryIntegralScalarFunction
     return LONG_FUNCTION_INFO;
   }
 
-  public static int intBitNot(int value) {
-    return ~value;
+  public static int intBitShiftRight(int value, int shift) {
+    return value >> shift;
   }
 
-  public static long longBitNot(long value) {
-    return ~value;
+  public static long longBitShiftRight(long value, int shift) {
+    return value >> shift;
   }
 }

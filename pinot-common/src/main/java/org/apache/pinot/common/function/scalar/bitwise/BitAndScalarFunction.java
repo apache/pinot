@@ -16,28 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function.scalar.bit;
+package org.apache.pinot.common.function.scalar.bitwise;
 
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
- * Polymorphic bitwise OR scalar function.
+ * Polymorphic bitwise AND scalar function.
  *
  * <p>This implementation is stateless and thread-safe.
  */
 @ScalarFunction
-public class BitOrScalarFunction extends PolymorphicBinaryIntegralScalarFunction {
+public class BitAndScalarFunction extends PolymorphicBinaryIntegralScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;
   private static final FunctionInfo LONG_FUNCTION_INFO;
 
   static {
     try {
-      INT_FUNCTION_INFO = new FunctionInfo(BitOrScalarFunction.class.getMethod("intBitOr", int.class, int.class),
-          BitOrScalarFunction.class, false);
-      LONG_FUNCTION_INFO = new FunctionInfo(BitOrScalarFunction.class.getMethod("longBitOr", long.class, long.class),
-          BitOrScalarFunction.class, false);
+      INT_FUNCTION_INFO =
+          new FunctionInfo(BitAndScalarFunction.class.getMethod("intBitAnd", int.class, int.class),
+              BitAndScalarFunction.class, false);
+      LONG_FUNCTION_INFO =
+          new FunctionInfo(BitAndScalarFunction.class.getMethod("longBitAnd", long.class, long.class),
+              BitAndScalarFunction.class, false);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
@@ -45,7 +47,7 @@ public class BitOrScalarFunction extends PolymorphicBinaryIntegralScalarFunction
 
   @Override
   public String getName() {
-    return "bitOr";
+    return "bitAnd";
   }
 
   @Override
@@ -58,11 +60,11 @@ public class BitOrScalarFunction extends PolymorphicBinaryIntegralScalarFunction
     return LONG_FUNCTION_INFO;
   }
 
-  public static int intBitOr(int left, int right) {
-    return left | right;
+  public static int intBitAnd(int left, int right) {
+    return left & right;
   }
 
-  public static long longBitOr(long left, long right) {
-    return left | right;
+  public static long longBitAnd(long left, long right) {
+    return left & right;
   }
 }

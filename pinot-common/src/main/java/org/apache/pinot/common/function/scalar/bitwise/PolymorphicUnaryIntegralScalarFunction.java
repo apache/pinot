@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function.scalar.bit;
+package org.apache.pinot.common.function.scalar.bitwise;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
@@ -26,27 +26,23 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
 /**
- * Base class for polymorphic integral shift scalar functions.
+ * Base class for polymorphic unary integral scalar functions.
  *
  * <p>Implementations are stateless and thread-safe.
  */
-abstract class PolymorphicShiftScalarFunction implements PinotScalarFunction {
+abstract class PolymorphicUnaryIntegralScalarFunction implements PinotScalarFunction {
 
   @Nullable
   @Override
   public FunctionInfo getFunctionInfo(ColumnDataType[] argumentTypes) {
-    if (argumentTypes.length != 2) {
+    if (argumentTypes.length != 1) {
       return null;
     }
-    ColumnDataType valueType = argumentTypes[0].getStoredType();
-    ColumnDataType shiftType = argumentTypes[1].getStoredType();
-    if (!BitFunctionUtils.isIntegral(shiftType)) {
-      return null;
-    }
-    if (valueType == ColumnDataType.INT) {
+    ColumnDataType argumentType = argumentTypes[0].getStoredType();
+    if (argumentType == ColumnDataType.INT) {
       return intFunctionInfo();
     }
-    if (valueType == ColumnDataType.LONG) {
+    if (argumentType == ColumnDataType.LONG) {
       return longFunctionInfo();
     }
     return null;
@@ -55,12 +51,12 @@ abstract class PolymorphicShiftScalarFunction implements PinotScalarFunction {
   @Nullable
   @Override
   public FunctionInfo getFunctionInfo(int numArguments) {
-    return numArguments == 2 ? longFunctionInfo() : null;
+    return numArguments == 1 ? longFunctionInfo() : null;
   }
 
   @Override
   public PinotSqlFunction toPinotSqlFunction() {
-    return BitFunctionUtils.shiftSqlFunction(getName());
+    return BitFunctionUtils.unaryIntegralSqlFunction(getName());
   }
 
   protected abstract FunctionInfo intFunctionInfo();

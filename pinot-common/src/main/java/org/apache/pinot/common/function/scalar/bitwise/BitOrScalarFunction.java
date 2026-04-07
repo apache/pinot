@@ -16,30 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function.scalar.bit;
+package org.apache.pinot.common.function.scalar.bitwise;
 
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
- * Polymorphic bitwise arithmetic right shift scalar function.
+ * Polymorphic bitwise OR scalar function.
  *
  * <p>This implementation is stateless and thread-safe.
  */
 @ScalarFunction
-public class BitShiftRightScalarFunction extends PolymorphicShiftScalarFunction {
+public class BitOrScalarFunction extends PolymorphicBinaryIntegralScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;
   private static final FunctionInfo LONG_FUNCTION_INFO;
 
   static {
     try {
-      INT_FUNCTION_INFO =
-          new FunctionInfo(BitShiftRightScalarFunction.class.getMethod("intBitShiftRight", int.class, int.class),
-              BitShiftRightScalarFunction.class, false);
-      LONG_FUNCTION_INFO =
-          new FunctionInfo(BitShiftRightScalarFunction.class.getMethod("longBitShiftRight", long.class, int.class),
-              BitShiftRightScalarFunction.class, false);
+      INT_FUNCTION_INFO = new FunctionInfo(BitOrScalarFunction.class.getMethod("intBitOr", int.class, int.class),
+          BitOrScalarFunction.class, false);
+      LONG_FUNCTION_INFO = new FunctionInfo(BitOrScalarFunction.class.getMethod("longBitOr", long.class, long.class),
+          BitOrScalarFunction.class, false);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
@@ -47,7 +45,7 @@ public class BitShiftRightScalarFunction extends PolymorphicShiftScalarFunction 
 
   @Override
   public String getName() {
-    return "bitShiftRight";
+    return "bitOr";
   }
 
   @Override
@@ -60,11 +58,11 @@ public class BitShiftRightScalarFunction extends PolymorphicShiftScalarFunction 
     return LONG_FUNCTION_INFO;
   }
 
-  public static int intBitShiftRight(int value, int shift) {
-    return value >> shift;
+  public static int intBitOr(int left, int right) {
+    return left | right;
   }
 
-  public static long longBitShiftRight(long value, int shift) {
-    return value >> shift;
+  public static long longBitOr(long left, long right) {
+    return left | right;
   }
 }

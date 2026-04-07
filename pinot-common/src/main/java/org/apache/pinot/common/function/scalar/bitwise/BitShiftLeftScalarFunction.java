@@ -16,30 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function.scalar.bit;
+package org.apache.pinot.common.function.scalar.bitwise;
 
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
- * Polymorphic bitwise AND scalar function.
+ * Polymorphic bitwise left shift scalar function.
  *
  * <p>This implementation is stateless and thread-safe.
  */
 @ScalarFunction
-public class BitAndScalarFunction extends PolymorphicBinaryIntegralScalarFunction {
+public class BitShiftLeftScalarFunction extends PolymorphicShiftScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;
   private static final FunctionInfo LONG_FUNCTION_INFO;
 
   static {
     try {
       INT_FUNCTION_INFO =
-          new FunctionInfo(BitAndScalarFunction.class.getMethod("intBitAnd", int.class, int.class),
-              BitAndScalarFunction.class, false);
+          new FunctionInfo(BitShiftLeftScalarFunction.class.getMethod("intBitShiftLeft", int.class, int.class),
+              BitShiftLeftScalarFunction.class, false);
       LONG_FUNCTION_INFO =
-          new FunctionInfo(BitAndScalarFunction.class.getMethod("longBitAnd", long.class, long.class),
-              BitAndScalarFunction.class, false);
+          new FunctionInfo(BitShiftLeftScalarFunction.class.getMethod("longBitShiftLeft", long.class, int.class),
+              BitShiftLeftScalarFunction.class, false);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
@@ -47,7 +47,7 @@ public class BitAndScalarFunction extends PolymorphicBinaryIntegralScalarFunctio
 
   @Override
   public String getName() {
-    return "bitAnd";
+    return "bitShiftLeft";
   }
 
   @Override
@@ -60,11 +60,11 @@ public class BitAndScalarFunction extends PolymorphicBinaryIntegralScalarFunctio
     return LONG_FUNCTION_INFO;
   }
 
-  public static int intBitAnd(int left, int right) {
-    return left & right;
+  public static int intBitShiftLeft(int value, int shift) {
+    return value << shift;
   }
 
-  public static long longBitAnd(long left, long right) {
-    return left & right;
+  public static long longBitShiftLeft(long value, int shift) {
+    return value << shift;
   }
 }

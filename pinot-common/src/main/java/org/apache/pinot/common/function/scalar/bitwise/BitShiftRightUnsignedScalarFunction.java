@@ -16,30 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function.scalar.bit;
+package org.apache.pinot.common.function.scalar.bitwise;
 
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
- * Polymorphic bitwise left shift scalar function.
+ * Polymorphic bitwise logical right shift scalar function.
  *
  * <p>This implementation is stateless and thread-safe.
  */
-@ScalarFunction
-public class BitShiftLeftScalarFunction extends PolymorphicShiftScalarFunction {
+@ScalarFunction(names = {"bitShiftRightUnsigned", "bitShiftRightLogical"})
+public class BitShiftRightUnsignedScalarFunction extends PolymorphicShiftScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;
   private static final FunctionInfo LONG_FUNCTION_INFO;
 
   static {
     try {
-      INT_FUNCTION_INFO =
-          new FunctionInfo(BitShiftLeftScalarFunction.class.getMethod("intBitShiftLeft", int.class, int.class),
-              BitShiftLeftScalarFunction.class, false);
-      LONG_FUNCTION_INFO =
-          new FunctionInfo(BitShiftLeftScalarFunction.class.getMethod("longBitShiftLeft", long.class, int.class),
-              BitShiftLeftScalarFunction.class, false);
+      INT_FUNCTION_INFO = new FunctionInfo(
+          BitShiftRightUnsignedScalarFunction.class.getMethod("intBitShiftRightUnsigned", int.class, int.class),
+          BitShiftRightUnsignedScalarFunction.class, false);
+      LONG_FUNCTION_INFO = new FunctionInfo(
+          BitShiftRightUnsignedScalarFunction.class.getMethod("longBitShiftRightUnsigned", long.class, int.class),
+          BitShiftRightUnsignedScalarFunction.class, false);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
@@ -47,7 +47,7 @@ public class BitShiftLeftScalarFunction extends PolymorphicShiftScalarFunction {
 
   @Override
   public String getName() {
-    return "bitShiftLeft";
+    return "bitShiftRightUnsigned";
   }
 
   @Override
@@ -60,11 +60,11 @@ public class BitShiftLeftScalarFunction extends PolymorphicShiftScalarFunction {
     return LONG_FUNCTION_INFO;
   }
 
-  public static int intBitShiftLeft(int value, int shift) {
-    return value << shift;
+  public static int intBitShiftRightUnsigned(int value, int shift) {
+    return value >>> shift;
   }
 
-  public static long longBitShiftLeft(long value, int shift) {
-    return value << shift;
+  public static long longBitShiftRightUnsigned(long value, int shift) {
+    return value >>> shift;
   }
 }
