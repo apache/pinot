@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorInde
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.VectorIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.vector.IvfOnDiskVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfPqVectorIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -104,8 +105,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
       VectorBackendType backendType = vectorIndexConfig.resolveBackendType();
       Preconditions.checkState(
           backendType == VectorBackendType.HNSW || backendType == VectorBackendType.IVF_FLAT
-              || backendType == VectorBackendType.IVF_PQ,
-          "Unsupported vector index type: %s for column: %s. Supported types: HNSW, IVF_FLAT, IVF_PQ",
+              || backendType == VectorBackendType.IVF_PQ || backendType == VectorBackendType.IVF_ON_DISK,
+          "Unsupported vector index type: %s for column: %s. Supported types: HNSW, IVF_FLAT, IVF_PQ, IVF_ON_DISK",
           vectorIndexConfig.getVectorIndexType(), column);
 
       // Run backend-aware property validation
@@ -140,6 +141,9 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         return new IvfFlatVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
       case IVF_PQ:
         return new IvfPqVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
+      case IVF_ON_DISK:
+        // IVF_ON_DISK uses IVF_FLAT file format at build time; the mmap reader loads it at query time
+        return new IvfFlatVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
       default:
         throw new IllegalStateException("Unsupported vector backend type: " + backendType);
     }
@@ -208,6 +212,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
           return new IvfFlatVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
         case IVF_PQ:
           return new IvfPqVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
+        case IVF_ON_DISK:
+          return new IvfOnDiskVectorIndexReader(metadata.getColumnName(), segmentDir, indexConfig);
         default:
           throw new IllegalStateException("Unsupported vector backend type: " + backendType);
       }
@@ -231,6 +237,7 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         return new MutableVectorIndex(context.getSegmentName(), context.getFieldSpec().getName(), config);
       case IVF_FLAT:
       case IVF_PQ:
+      case IVF_ON_DISK:
         LOGGER.warn("{} vector index does not support mutable/realtime segments. "
             + "No vector index will be built for column: {} in segment: {}. "
             + "Queries will fall back to exact scan.",

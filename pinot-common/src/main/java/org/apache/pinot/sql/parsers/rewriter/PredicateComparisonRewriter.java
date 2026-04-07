@@ -148,6 +148,25 @@ public class PredicateComparisonRewriter implements QueryRewriter {
           }
           break;
         }
+        case VECTOR_SIMILARITY_RADIUS: {
+          Preconditions.checkArgument(operands.size() >= 2 && operands.size() <= 3,
+              "For %s predicate, the number of operands must be at either 2 or 3, got: %s", filterKind, expression);
+          if ((operands.get(1).getFunctionCall() != null && !operands.get(1).getFunctionCall().getOperator()
+              .equalsIgnoreCase("arrayvalueconstructor"))
+              || (operands.get(1).getLiteral() != null && !operands.get(1).getLiteral().isSetFloatArrayValue()
+                  && !operands.get(1).getLiteral().isSetDoubleArrayValue())) {
+            throw new SqlCompilationException(
+                String.format("For %s predicate, the second operand must be a float/double array literal, got: %s",
+                    filterKind,
+                    expression));
+          }
+          if (operands.size() == 3 && operands.get(2).getLiteral() == null) {
+            throw new SqlCompilationException(
+                String.format("For %s predicate, the third operand must be a literal, got: %s", filterKind,
+                    expression));
+          }
+          break;
+        }
         default:
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
