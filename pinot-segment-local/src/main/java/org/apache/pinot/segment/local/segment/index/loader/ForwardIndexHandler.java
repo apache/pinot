@@ -51,7 +51,6 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
-import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -861,12 +860,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
           segmentName, column);
-      ColumnIndexCreationInfo creationInfo =
-          new ColumnIndexCreationInfo(statsCollector, useVarLength, false, fieldSpec.getDefaultNullValue());
       IndexCreationContext context = IndexCreationContext.builder()
           .withIndexDir(indexDir)
           .withFieldSpec(fieldSpec)
-          .withColumnIndexCreationInfo(creationInfo)
+          .withColumnStatistics(statsCollector)
           .withTotalDocs(numDocs)
           .withDictionary(true)
           .withTableNameWithType(_tableConfig.getTableName())

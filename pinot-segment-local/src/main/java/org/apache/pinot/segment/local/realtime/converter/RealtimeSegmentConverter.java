@@ -83,6 +83,9 @@ public class RealtimeSegmentConverter {
   public void build(@Nullable SegmentVersion segmentVersion, @Nullable ServerMetrics serverMetrics)
       throws Exception {
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
+    genConfig.setInstanceType(InstanceType.SERVER);
+    genConfig.setRealtimeConversion(true);
+    genConfig.setConsumerDir(_realtimeSegmentImpl.getConsumerDir());
 
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -128,6 +131,7 @@ public class RealtimeSegmentConverter {
         throw new IllegalStateException("Cannot use CompactedPinotSegmentRecordReader without valid document IDs. "
             + "Segment may be corrupted.");
       }
+      genConfig.setMutableSegmentCompacted(true);
       // Use CompactedPinotSegmentRecordReader to remove obsolete/invalidated records
       try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(validDocIds)) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
@@ -138,6 +142,16 @@ public class RealtimeSegmentConverter {
       // Use regular PinotSegmentRecordReader (existing behavior)
       try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
+        // Calculate a mapping from mutable docId to immutable docId when both sorting and reusing mutable text index
+        // are enabled
+        if (sortedDocIds != null && _realtimeSegmentImpl.hasColumnWithReuseMutableTextIndex()) {
+          int numDocs = sortedDocIds.length;
+          int[] mutableToImmutableDocIdMap = new int[numDocs];
+          for (int i = 0; i < numDocs; i++) {
+            mutableToImmutableDocIdMap[sortedDocIds[i]] = i;
+          }
+          genConfig.setMutableToImmutableDocIdMap(mutableToImmutableDocIdMap);
+        }
         buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, sortedColumn, null);
       }
     }
@@ -203,7 +217,7 @@ public class RealtimeSegmentConverter {
     MutableSegmentCreationDataSource dataSource =
         new MutableSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds, sortedColumn,
             validDocIds);
-    driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName), InstanceType.SERVER);
+    driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName));
 
     if (!_enableColumnMajor) {
       driver.build();

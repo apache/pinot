@@ -85,11 +85,11 @@ public class PurgeTaskExecutorTest {
     GenericRowRecordReader genericRowRecordReader = new GenericRowRecordReader(rows);
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.MINION);
     config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
-
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, genericRowRecordReader, InstanceType.MINION);
+    driver.init(config, genericRowRecordReader);
     driver.build();
     _originalIndexDir = new File(ORIGINAL_SEGMENT_DIR, SEGMENT_NAME);
 
