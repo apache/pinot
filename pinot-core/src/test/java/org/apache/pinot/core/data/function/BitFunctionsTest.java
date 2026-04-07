@@ -57,10 +57,25 @@ public class BitFunctionsTest {
     inputs.add(new Object[]{"bitOr(lhs, rhs)", Lists.newArrayList("lhs", "rhs"), bitwiseRow, 14L});
     inputs.add(new Object[]{"bitXor(lhs, rhs)", Lists.newArrayList("lhs", "rhs"), bitwiseRow, 12L});
 
+    GenericRow intBitwiseRow = new GenericRow();
+    intBitwiseRow.putValue("lhs", 6);
+    intBitwiseRow.putValue("rhs", 3);
+    inputs.add(new Object[]{"bitAnd(lhs, rhs)", Lists.newArrayList("lhs", "rhs"), intBitwiseRow, 2});
+    inputs.add(new Object[]{"bitOr(lhs, rhs)", Lists.newArrayList("lhs", "rhs"), intBitwiseRow, 7});
+    inputs.add(new Object[]{"bitXor(lhs, rhs)", Lists.newArrayList("lhs", "rhs"), intBitwiseRow, 5});
+
     GenericRow unaryRow = new GenericRow();
     unaryRow.putValue("value", 6);
-    inputs.add(new Object[]{"bitNot(value)", Lists.newArrayList("value"), unaryRow, -7L});
+    inputs.add(new Object[]{"bitNot(value)", Lists.newArrayList("value"), unaryRow, -7});
     inputs.add(new Object[]{"bitMask(value)", Lists.newArrayList("value"), unaryRow, 64L});
+
+    GenericRow highBitMaskRow = new GenericRow();
+    highBitMaskRow.putValue("value", 40);
+    inputs.add(new Object[]{"bitMask(value)", Lists.newArrayList("value"), highBitMaskRow, 1L << 40});
+
+    GenericRow outOfRangeMaskRow = new GenericRow();
+    outOfRangeMaskRow.putValue("value", 64);
+    inputs.add(new Object[]{"bitMask(value)", Lists.newArrayList("value"), outOfRangeMaskRow, 0L});
 
     GenericRow shiftRow = new GenericRow();
     shiftRow.putValue("value", -8L);
@@ -73,6 +88,28 @@ public class BitFunctionsTest {
         4611686018427387902L});
     inputs.add(new Object[]{"bitExtract(value, shift)", Lists.newArrayList("value", "shift"), shiftRow, 0});
     inputs.add(new Object[]{"extractBit(value, shift)", Lists.newArrayList("value", "shift"), shiftRow, 0});
+
+    GenericRow intShiftRow = new GenericRow();
+    intShiftRow.putValue("value", -8);
+    intShiftRow.putValue("shift", 2);
+    inputs.add(new Object[]{"bitShiftLeft(value, shift)", Lists.newArrayList("value", "shift"), intShiftRow, -32});
+    inputs.add(new Object[]{"bitShiftRight(value, shift)", Lists.newArrayList("value", "shift"), intShiftRow, -2});
+    inputs.add(new Object[]{"bitShiftRightUnsigned(value, shift)", Lists.newArrayList("value", "shift"), intShiftRow,
+        1073741822});
+    inputs.add(new Object[]{"bitShiftRightLogical(value, shift)", Lists.newArrayList("value", "shift"), intShiftRow,
+        1073741822});
+    inputs.add(new Object[]{"bitExtract(value, shift)", Lists.newArrayList("value", "shift"), intShiftRow, 0});
+
+    GenericRow highBitExtractRow = new GenericRow();
+    highBitExtractRow.putValue("value", 1L << 40);
+    highBitExtractRow.putValue("shift", 40);
+    inputs.add(new Object[]{"bitExtract(value, shift)", Lists.newArrayList("value", "shift"), highBitExtractRow, 1});
+
+    GenericRow outOfRangeExtractRow = new GenericRow();
+    outOfRangeExtractRow.putValue("value", 1L);
+    outOfRangeExtractRow.putValue("shift", 64);
+    inputs.add(
+        new Object[]{"extractBit(value, shift)", Lists.newArrayList("value", "shift"), outOfRangeExtractRow, 0});
 
     return inputs.toArray(new Object[0][]);
   }

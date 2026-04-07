@@ -21,14 +21,18 @@ package org.apache.pinot.segment.local.function;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -89,16 +93,15 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
             }
             return new ArrayConstantExecutionNode(values);
           default:
-            FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
-            if (functionInfo == null) {
-              if (FunctionRegistry.contains(canonicalName)) {
-                throw new IllegalStateException(
-                    String.format("Unsupported function: %s with %d arguments", functionName, numArguments));
-              } else {
-                throw new IllegalStateException(String.format("Unsupported function: %s", functionName));
-              }
+            if (!FunctionRegistry.contains(canonicalName)) {
+              throw new IllegalStateException(String.format("Unsupported function: %s", functionName));
             }
-            return new FunctionExecutionNode(functionInfo, childNodes);
+            if (!FunctionRegistry.supportsArgumentCount(canonicalName, numArguments)) {
+              throw new IllegalStateException(
+                  String.format("Unsupported function: %s with %d arguments", functionName, numArguments));
+            }
+            return new FunctionExecutionNode(functionName, canonicalName,
+                FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments), childNodes);
         }
       default:
         throw new IllegalStateException();
@@ -249,14 +252,19 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   }
 
   private static class FunctionExecutionNode implements ExecutableNode {
-    final FunctionInvoker _functionInvoker;
-    final FunctionInfo _functionInfo;
+    final String _functionName;
+    final String _canonicalName;
+    final ResolvedFunction _fallbackFunction;
     final ExecutableNode[] _argumentNodes;
     final Object[] _arguments;
+    final Map<ArgumentTypesKey, ResolvedFunction> _resolvedFunctionCache = new HashMap<>();
+    ResolvedFunction _lastResolvedFunction;
 
-    FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentNodes) {
-      _functionInvoker = new FunctionInvoker(functionInfo);
-      _functionInfo = functionInfo;
+    FunctionExecutionNode(String functionName, String canonicalName, FunctionInfo functionInfo,
+        ExecutableNode[] argumentNodes) {
+      _functionName = functionName;
+      _canonicalName = canonicalName;
+      _fallbackFunction = functionInfo != null ? new ResolvedFunction(functionInfo) : null;
       _argumentNodes = argumentNodes;
       _arguments = new Object[_argumentNodes.length];
     }
@@ -264,24 +272,10 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(GenericRow row) {
       try {
-        int numArguments = _argumentNodes.length;
-        for (int i = 0; i < numArguments; i++) {
+        for (int i = 0; i < _argumentNodes.length; i++) {
           _arguments[i] = _argumentNodes[i].execute(row);
         }
-        if (!_functionInfo.hasNullableParameters()) {
-          // Preserve null values during ingestion transformation if function is an inbuilt
-          // scalar function that cannot handle nulls, and invoked with null parameter(s).
-          for (Object argument : _arguments) {
-            if (argument == null) {
-              return null;
-            }
-          }
-        }
-        if (_functionInvoker.getMethod().isVarArgs()) {
-          return _functionInvoker.invoke(new Object[]{_arguments});
-        }
-        _functionInvoker.convertTypes(_arguments);
-        return _functionInvoker.invoke(_arguments);
+        return invokeResolvedFunction();
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while executing function: " + this + ": " + e.getMessage(), e);
       }
@@ -290,32 +284,132 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(Object[] values) {
       try {
-        int numArguments = _argumentNodes.length;
-        for (int i = 0; i < numArguments; i++) {
+        for (int i = 0; i < _argumentNodes.length; i++) {
           _arguments[i] = _argumentNodes[i].execute(values);
         }
-        if (!_functionInfo.hasNullableParameters()) {
-          // Preserve null values during ingestion transformation if function is an inbuilt
-          // scalar function that cannot handle nulls, and invoked with null parameter(s).
-          for (Object argument : _arguments) {
-            if (argument == null) {
-              return null;
-            }
-          }
-        }
-        if (_functionInvoker.getMethod().isVarArgs()) {
-          return _functionInvoker.invoke(new Object[]{_arguments});
-        }
-        _functionInvoker.convertTypes(_arguments);
-        return _functionInvoker.invoke(_arguments);
+        return invokeResolvedFunction();
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while executing function: " + this + ": " + e.getMessage(), e);
       }
     }
 
+    private Object invokeResolvedFunction() {
+      ResolvedFunction resolvedFunction = resolveFunction();
+      if (resolvedFunction == null) {
+        if (hasNullArgument()) {
+          return null;
+        }
+        throw new IllegalStateException(String.format("Unsupported function: %s with argument types: %s",
+            _functionName, Arrays.toString(getArgumentTypeNames())));
+      }
+      if (!resolvedFunction._functionInfo.hasNullableParameters() && hasNullArgument()) {
+        return null;
+      }
+      if (resolvedFunction._functionInvoker.getMethod().isVarArgs()) {
+        return resolvedFunction._functionInvoker.invoke(new Object[]{_arguments});
+      }
+      resolvedFunction._functionInvoker.convertTypes(_arguments);
+      return resolvedFunction._functionInvoker.invoke(_arguments);
+    }
+
+    private boolean hasNullArgument() {
+      for (Object argument : _arguments) {
+        if (argument == null) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    private String[] getArgumentTypeNames() {
+      String[] argumentTypeNames = new String[_arguments.length];
+      for (int i = 0; i < _arguments.length; i++) {
+        Object argument = _arguments[i];
+        argumentTypeNames[i] = argument != null ? argument.getClass().getSimpleName() : "null";
+      }
+      return argumentTypeNames;
+    }
+
+    private ResolvedFunction resolveFunction() {
+      if (_fallbackFunction != null) {
+        return _fallbackFunction;
+      }
+      ColumnDataType[] argumentTypes = getArgumentTypes();
+      if (argumentTypes != null) {
+        ArgumentTypesKey argumentTypesKey = new ArgumentTypesKey(argumentTypes);
+        ResolvedFunction resolvedFunction = _resolvedFunctionCache.get(argumentTypesKey);
+        if (resolvedFunction == null) {
+          FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(_canonicalName, argumentTypes);
+          if (functionInfo != null) {
+            resolvedFunction = new ResolvedFunction(functionInfo);
+            _resolvedFunctionCache.put(argumentTypesKey, resolvedFunction);
+          }
+        }
+        if (resolvedFunction != null) {
+          _lastResolvedFunction = resolvedFunction;
+          return resolvedFunction;
+        }
+      }
+      if (_lastResolvedFunction != null) {
+        return _lastResolvedFunction;
+      }
+      return null;
+    }
+
+    private ColumnDataType[] getArgumentTypes() {
+      ColumnDataType[] argumentTypes = new ColumnDataType[_arguments.length];
+      for (int i = 0; i < _arguments.length; i++) {
+        Object argument = _arguments[i];
+        if (argument == null) {
+          return null;
+        }
+        ColumnDataType argumentType = FunctionUtils.getColumnDataType(argument.getClass());
+        if (argumentType == null) {
+          return null;
+        }
+        argumentTypes[i] = argumentType;
+      }
+      return argumentTypes;
+    }
+
     @Override
     public String toString() {
-      return _functionInvoker.getMethod().getName() + '(' + StringUtils.join(_argumentNodes, ',') + ')';
+      return _functionName + '(' + StringUtils.join(_argumentNodes, ',') + ')';
+    }
+  }
+
+  private static class ResolvedFunction {
+    final FunctionInfo _functionInfo;
+    final FunctionInvoker _functionInvoker;
+
+    ResolvedFunction(FunctionInfo functionInfo) {
+      _functionInfo = functionInfo;
+      _functionInvoker = new FunctionInvoker(functionInfo);
+    }
+  }
+
+  private static class ArgumentTypesKey {
+    final ColumnDataType[] _argumentTypes;
+
+    ArgumentTypesKey(ColumnDataType[] argumentTypes) {
+      _argumentTypes = argumentTypes.clone();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ArgumentTypesKey)) {
+        return false;
+      }
+      ArgumentTypesKey that = (ArgumentTypesKey) other;
+      return Arrays.equals(_argumentTypes, that._argumentTypes);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.hashCode(_argumentTypes);
     }
   }
 

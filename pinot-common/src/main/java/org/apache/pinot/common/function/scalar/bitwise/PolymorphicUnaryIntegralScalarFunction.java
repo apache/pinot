@@ -51,7 +51,12 @@ abstract class PolymorphicUnaryIntegralScalarFunction implements PinotScalarFunc
   @Nullable
   @Override
   public FunctionInfo getFunctionInfo(int numArguments) {
-    return numArguments == 1 ? longFunctionInfo() : null;
+    return null;
+  }
+
+  @Override
+  public boolean supportsArgumentCount(int numArguments) {
+    return numArguments == 1;
   }
 
   @Override

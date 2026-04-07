@@ -93,6 +93,13 @@ public interface PinotScalarFunction {
   @Nullable
   FunctionInfo getFunctionInfo(int numArguments);
 
+  /**
+   * Returns {@code true} if the function supports the given number of arguments.
+   */
+  default boolean supportsArgumentCount(int numArguments) {
+    return getFunctionInfo(numArguments) != null;
+  }
+
   static PinotScalarFunction fromMethod(Method method, boolean isVarArg, boolean supportNullArgs,
       @Nullable String... names) {
     int numArguments = isVarArg ? FunctionRegistry.VAR_ARG_KEY : method.getParameterCount();

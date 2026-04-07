@@ -236,6 +236,22 @@ public class InbuiltFunctionEvaluatorTest {
     }
   }
 
+  @Test
+  public void testPolymorphicBitwiseFunctionsResolveByRuntimeArgumentType() {
+    GenericRow intRow = new GenericRow();
+    intRow.putValue("value", 6);
+    intRow.putValue("rhs", 3);
+    intRow.putValue("shift", 2);
+    assertEquals(new InbuiltFunctionEvaluator("bitNot(value)").evaluate(intRow), -7);
+    assertEquals(new InbuiltFunctionEvaluator("bitAnd(value, rhs)").evaluate(intRow), 2);
+    assertEquals(new InbuiltFunctionEvaluator("bitShiftRightUnsigned(value, shift)").evaluate(intRow), 1);
+
+    GenericRow longRow = new GenericRow();
+    longRow.putValue("value", 1L << 40);
+    longRow.putValue("shift", 40);
+    assertEquals(new InbuiltFunctionEvaluator("bitExtract(value, shift)").evaluate(longRow), 1);
+  }
+
   @SuppressWarnings("unused")
   public static class MyFunc {
     String _baseString = "";

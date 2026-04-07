@@ -52,6 +52,11 @@ final class BitFunctionUtils {
         OperandTypes.family(List.of(SqlTypeFamily.INTEGER)));
   }
 
+  static PinotSqlFunction maskSqlFunction(String name) {
+    return new PinotSqlFunction(name, opBinding -> createTypeWithOperandNullability(opBinding, SqlTypeName.BIGINT),
+        OperandTypes.family(List.of(SqlTypeFamily.INTEGER)));
+  }
+
   static PinotSqlFunction shiftSqlFunction(String name) {
     return new PinotSqlFunction(name, opBinding -> sameAsOperand(opBinding, 0),
         OperandTypes.family(List.of(SqlTypeFamily.INTEGER, SqlTypeFamily.INTEGER)));
@@ -60,6 +65,14 @@ final class BitFunctionUtils {
   static PinotSqlFunction extractSqlFunction(String name) {
     return new PinotSqlFunction(name, BitFunctionUtils::integerType,
         OperandTypes.family(List.of(SqlTypeFamily.INTEGER, SqlTypeFamily.INTEGER)));
+  }
+
+  static boolean isBitIndexInRange(int bit, int width) {
+    return bit >= 0 && bit < width;
+  }
+
+  static boolean isBitIndexInRange(long bit, int width) {
+    return bit >= 0 && bit < width;
   }
 
   private static RelDataType widerIntegralType(SqlOperatorBinding opBinding, int firstIndex, int secondIndex) {

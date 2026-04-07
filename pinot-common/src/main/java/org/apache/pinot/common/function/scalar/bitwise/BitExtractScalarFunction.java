@@ -76,14 +76,25 @@ public class BitExtractScalarFunction implements PinotScalarFunction {
   @Nullable
   @Override
   public FunctionInfo getFunctionInfo(int numArguments) {
-    return numArguments == 2 ? LONG_FUNCTION_INFO : null;
+    return null;
+  }
+
+  @Override
+  public boolean supportsArgumentCount(int numArguments) {
+    return numArguments == 2;
   }
 
   public static int intBitExtract(int value, int bit) {
+    if (!BitFunctionUtils.isBitIndexInRange(bit, Integer.SIZE)) {
+      return 0;
+    }
     return (value >>> bit) & 1;
   }
 
   public static int longBitExtract(long value, int bit) {
+    if (!BitFunctionUtils.isBitIndexInRange(bit, Long.SIZE)) {
+      return 0;
+    }
     return (int) ((value >>> bit) & 1L);
   }
 }

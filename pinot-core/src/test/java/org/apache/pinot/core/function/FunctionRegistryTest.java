@@ -111,7 +111,7 @@ public class FunctionRegistryTest {
         FunctionRegistry.lookupFunctionInfo("bitmask", new ColumnDataType[]{ColumnDataType.INT});
     assertNotNull(intBitMask);
     assertEquals(intBitMask.getMethod().getName(), "intBitMask");
-    assertEquals(intBitMask.getMethod().getReturnType(), int.class);
+    assertEquals(intBitMask.getMethod().getReturnType(), long.class);
 
     FunctionInfo longBitMask =
         FunctionRegistry.lookupFunctionInfo("bitmask", new ColumnDataType[]{ColumnDataType.LONG});
@@ -130,5 +130,12 @@ public class FunctionRegistryTest {
     assertNotNull(longBitExtract);
     assertEquals(longBitExtract.getMethod().getName(), "longBitExtract");
     assertEquals(longBitExtract.getMethod().getReturnType(), int.class);
+
+    assertTrue(FunctionRegistry.supportsArgumentCount("bitmask", 1));
+    assertNull(FunctionRegistry.lookupFunctionInfo("bitmask", 1));
+    assertTrue(FunctionRegistry.supportsArgumentCount("bitand", 2));
+    assertNull(FunctionRegistry.lookupFunctionInfo("bitand", 2));
+    assertTrue(FunctionRegistry.supportsArgumentCount("bitextract", 2));
+    assertNull(FunctionRegistry.lookupFunctionInfo("bitextract", 2));
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function.scalar.bitwise;
 
 import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -50,6 +51,11 @@ public class BitMaskScalarFunction extends PolymorphicUnaryIntegralScalarFunctio
   }
 
   @Override
+  public PinotSqlFunction toPinotSqlFunction() {
+    return BitFunctionUtils.maskSqlFunction(getName());
+  }
+
+  @Override
   protected FunctionInfo intFunctionInfo() {
     return INT_FUNCTION_INFO;
   }
@@ -59,11 +65,11 @@ public class BitMaskScalarFunction extends PolymorphicUnaryIntegralScalarFunctio
     return LONG_FUNCTION_INFO;
   }
 
-  public static int intBitMask(int bit) {
-    return 1 << bit;
+  public static long intBitMask(int bit) {
+    return BitFunctionUtils.isBitIndexInRange(bit, Long.SIZE) ? 1L << bit : 0L;
   }
 
   public static long longBitMask(long bit) {
-    return 1L << (int) bit;
+    return BitFunctionUtils.isBitIndexInRange(bit, Long.SIZE) ? 1L << (int) bit : 0L;
   }
 }
