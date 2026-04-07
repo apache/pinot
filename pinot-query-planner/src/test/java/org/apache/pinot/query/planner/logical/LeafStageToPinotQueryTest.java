@@ -42,10 +42,20 @@ public class LeafStageToPinotQueryTest {
   }
 
   @Test
-  public void testLiteralFilterReturnsNull() {
+  public void testLiteralTrueFilterReturnsNull() {
     Expression literalExpr = RequestUtils.getLiteralExpression(true);
     assertNull(LeafStageToPinotQuery.ensureFilterIsFunctionExpression(literalExpr),
-        "Literal filter should return null (drop filter)");
+        "Literal true filter should return null (no filter constraint)");
+  }
+
+  @Test
+  public void testLiteralFalseFilterReturnsAlwaysFalse() {
+    Expression literalExpr = RequestUtils.getLiteralExpression(false);
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(literalExpr);
+
+    assertNotNull(result, "Literal false should return always-false predicate, not null");
+    assertAlwaysFalseExpression(result);
   }
 
   @Test
@@ -136,21 +146,61 @@ public class LeafStageToPinotQueryTest {
   }
 
   @Test
-  public void testAndWithAllLiteralsReturnsNull() {
-    assertCompoundWithAllLiteralsReturnsNull("AND");
+  public void testAndWithAllTrueLiteralsReturnsNull() {
+    // AND(LITERAL(true), LITERAL(true)) → both drop → null
+    Expression compoundExpr = makeCompound("AND",
+        RequestUtils.getLiteralExpression(true), RequestUtils.getLiteralExpression(true));
+
+    assertNull(LeafStageToPinotQuery.ensureFilterIsFunctionExpression(compoundExpr));
   }
 
   @Test
-  public void testOrWithAllLiteralsReturnsNull() {
-    assertCompoundWithAllLiteralsReturnsNull("OR");
-  }
-
-  private void assertCompoundWithAllLiteralsReturnsNull(String op) {
-    // OP(LITERAL, LITERAL) → null
-    Expression compoundExpr = makeCompound(op,
-        RequestUtils.getLiteralExpression(true), RequestUtils.getLiteralExpression(false));
+  public void testOrWithAllTrueLiteralsReturnsNull() {
+    // OR(LITERAL(true), LITERAL(true)) → both drop → null
+    Expression compoundExpr = makeCompound("OR",
+        RequestUtils.getLiteralExpression(true), RequestUtils.getLiteralExpression(true));
 
     assertNull(LeafStageToPinotQuery.ensureFilterIsFunctionExpression(compoundExpr));
+  }
+
+  @Test
+  public void testAndWithTrueAndFalseLiteralsUnwrapsToAlwaysFalse() {
+    // AND(LITERAL(true), LITERAL(false)) → true drops, false → EQUALS(0,1) → unwrap
+    Expression compoundExpr = makeCompound("AND",
+        RequestUtils.getLiteralExpression(true), RequestUtils.getLiteralExpression(false));
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(compoundExpr);
+
+    assertNotNull(result);
+    assertAlwaysFalseExpression(result);
+  }
+
+  @Test
+  public void testOrWithTrueAndFalseLiteralsUnwrapsToAlwaysFalse() {
+    // OR(LITERAL(true), LITERAL(false)) → true drops, false → EQUALS(0,1) → unwrap
+    Expression compoundExpr = makeCompound("OR",
+        RequestUtils.getLiteralExpression(true), RequestUtils.getLiteralExpression(false));
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(compoundExpr);
+
+    assertNotNull(result);
+    assertAlwaysFalseExpression(result);
+  }
+
+  @Test
+  public void testAndWithLiteralFalseAndFunctionPreservesBoth() {
+    // AND(LITERAL(false), EQUALS(col, 'val')) → AND(EQUALS(0,1), EQUALS(col, 'val'))
+    Expression compoundExpr = makeCompound("AND",
+        RequestUtils.getLiteralExpression(false), makeEquals("col", "val"));
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(compoundExpr);
+
+    assertNotNull(result);
+    assertEquals(result.getFunctionCall().getOperator(), "AND");
+    List<Expression> operands = result.getFunctionCall().getOperands();
+    assertEquals(operands.size(), 2);
+    assertAlwaysFalseExpression(operands.get(0));
+    assertEquals(operands.get(1).getFunctionCall().getOperator(), "EQUALS");
   }
 
   @Test
@@ -200,11 +250,24 @@ public class LeafStageToPinotQueryTest {
   }
 
   @Test
-  public void testNotWithLiteralReturnsNull() {
+  public void testNotWithLiteralTrueReturnsNull() {
     // NOT(LITERAL(true)) → null
     Expression notExpr = makeCompound("NOT", RequestUtils.getLiteralExpression(true));
 
     assertNull(LeafStageToPinotQuery.ensureFilterIsFunctionExpression(notExpr));
+  }
+
+  @Test
+  public void testNotWithLiteralFalseReturnsNotAlwaysFalse() {
+    // NOT(LITERAL(false)) → NOT(EQUALS(0, 1))
+    Expression notExpr = makeCompound("NOT", RequestUtils.getLiteralExpression(false));
+
+    Expression result = LeafStageToPinotQuery.ensureFilterIsFunctionExpression(notExpr);
+
+    assertNotNull(result);
+    assertEquals(result.getFunctionCall().getOperator(), "NOT");
+    assertEquals(result.getFunctionCall().getOperands().size(), 1);
+    assertAlwaysFalseExpression(result.getFunctionCall().getOperands().get(0));
   }
 
   @Test
@@ -263,6 +326,15 @@ public class LeafStageToPinotQueryTest {
   }
 
   // --- Helpers ---
+
+  private static void assertAlwaysFalseExpression(Expression expr) {
+    assertNotNull(expr.getFunctionCall(), "Expected FUNCTION expression");
+    assertEquals(expr.getFunctionCall().getOperator(), "EQUALS");
+    List<Expression> operands = expr.getFunctionCall().getOperands();
+    assertEquals(operands.size(), 2);
+    assertNotNull(operands.get(0).getLiteral(), "First operand should be literal 0");
+    assertNotNull(operands.get(1).getLiteral(), "Second operand should be literal 1");
+  }
 
   private static Expression makeEquals(String column, String value) {
     Function equalsFunc = new Function("EQUALS");

@@ -113,7 +113,8 @@ public class LeafStageToPinotQuery {
    * When the V2 physical optimizer passes filters through Calcite's RelNode tree, certain expression types
    * (REINTERPRET on bare boolean columns, constant-folded SEARCH) produce IDENTIFIER or LITERAL Expression
    * objects with null functionCall. Segment pruners assume all filter expressions are FUNCTION type and NPE
-   * on these. This method wraps bare IDENTIFIERs as EQUALS(col, true) and drops LITERAL expressions.
+   * on these. This method wraps bare IDENTIFIERs as EQUALS(col, true), converts LITERAL false to an
+   * always-false predicate EQUALS(0, 1), and drops LITERAL true expressions (null = no filter).
    * For AND/OR/NOT nodes, operands are recursively fixed.
    * <p>
    * Note: This method mutates the input expression's operand lists in-place for AND/OR/NOT nodes.
@@ -169,9 +170,19 @@ public class LeafStageToPinotQuery {
       return wrapped;
     }
     // LITERAL expression (constant-folded predicate, e.g., TRUE/FALSE).
-    // In practice, Calcite's optimizer already strips unreachable branches (e.g., `WHERE col = 1 AND false`
-    // becomes `WHERE false`, and `WHERE col = 1 AND true` becomes `WHERE col = 1`), so LITERAL expressions
-    // reaching here are rare edge cases. They don't constrain routing — return null to skip pruning.
+    // Treat LITERAL false as an always-false predicate that pruners can process so they
+    // don't unnecessarily scan everything.
+    if (expression.getLiteral() != null && expression.getLiteral().isSetBoolValue()
+        && !expression.getLiteral().getBoolValue()) {
+      Function alwaysFalse = new Function(FilterKind.EQUALS.name());
+      alwaysFalse.setOperands(new ArrayList<>(List.of(
+          RequestUtils.getLiteralExpression(0),
+          RequestUtils.getLiteralExpression(1))));
+      Expression wrapped = new Expression(ExpressionType.FUNCTION);
+      wrapped.setFunctionCall(alwaysFalse);
+      return wrapped;
+    }
+    // LITERAL true or non-boolean literals have no filter constraint so we skip pruning
     return null;
   }
 }
