@@ -294,7 +294,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     }
 
     private Object invokeResolvedFunction() {
-      ResolvedFunction resolvedFunction = resolveFunction();
+      // Use the function resolved by name/arity when available to avoid per-row runtime type inference.
+      ResolvedFunction resolvedFunction = _fallbackFunction;
+      if (resolvedFunction == null) {
+        resolvedFunction = resolveFunction();
+      }
       if (resolvedFunction == null) {
         if (hasNullArgument()) {
           return null;
@@ -330,10 +334,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       return argumentTypeNames;
     }
 
+    /**
+     * Resolves the function by runtime argument types. Only called for polymorphic functions where
+     * {@code _fallbackFunction} is null.
+     */
     private ResolvedFunction resolveFunction() {
-      if (_fallbackFunction != null) {
-        return _fallbackFunction;
-      }
       ColumnDataType[] argumentTypes = getArgumentTypes();
       if (argumentTypes != null) {
         ArgumentTypesKey argumentTypesKey = new ArgumentTypesKey(argumentTypes);
@@ -349,11 +354,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           _lastResolvedFunction = resolvedFunction;
           return resolvedFunction;
         }
+        // Argument types are known but no overload matched — return null to fail fast
+        return null;
       }
-      if (_lastResolvedFunction != null) {
-        return _lastResolvedFunction;
-      }
-      return null;
+      // Argument types could not be determined (null/unknown values) — reuse last successful resolution
+      return _lastResolvedFunction;
     }
 
     private ColumnDataType[] getArgumentTypes() {
