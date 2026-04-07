@@ -160,11 +160,11 @@ public class BitwiseFunctionsIntegrationTest extends CustomDataQueryClusterInteg
     JsonNode response = postQuery(query);
     JsonNode row = getOnlyRow(response, 12);
 
-    assertColumnTypes(response, "INT", "LONG", "INT", "LONG", "INT", "LONG", "INT", "LONG", "INT", "LONG", "INT",
+    assertColumnTypes(response, "INT", "LONG", "LONG", "LONG", "INT", "LONG", "INT", "LONG", "INT", "LONG", "INT",
         "INT");
     assertEquals(row.get(0).asInt(), 7);
     assertEquals(row.get(1).asLong(), 7L);
-    assertEquals(row.get(2).asInt(), 4);
+    assertEquals(row.get(2).asLong(), 4L);
     assertEquals(row.get(3).asLong(), 4L);
     assertEquals(row.get(4).asInt(), -32);
     assertEquals(row.get(5).asLong(), -32L);
@@ -186,9 +186,9 @@ public class BitwiseFunctionsIntegrationTest extends CustomDataQueryClusterInteg
     JsonNode response = postQuery(query);
     JsonNode row = getOnlyRow(response, 3);
 
-    assertColumnTypes(response, "INT", "INT", "LONG");
+    assertColumnTypes(response, "INT", "LONG", "LONG");
     assertEquals(row.get(0).asInt(), 0);
-    assertEquals(row.get(1).asInt(), 2);
+    assertEquals(row.get(1).asLong(), 2L);
     assertEquals(row.get(2).asLong(), 2L);
   }
 
