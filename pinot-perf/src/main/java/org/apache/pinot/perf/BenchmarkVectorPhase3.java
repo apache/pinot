@@ -73,12 +73,14 @@ public final class BenchmarkVectorPhase3 {
     }
 
     // 3. Threshold scan baseline
-    for (float threshold : new float[]{50.0f, 100.0f, 200.0f}) {
+    // For 128-dim Gaussian vectors, L2 squared distances are ~256 on average.
+    // Use thresholds that produce meaningful result counts.
+    for (float threshold : new float[]{200.0f, 240.0f, 260.0f}) {
       benchmarkThresholdScan(corpus, queries, threshold, distFunc);
     }
 
     // 4. Filtered threshold scan
-    for (float threshold : new float[]{100.0f}) {
+    for (float threshold : new float[]{240.0f}) {
       for (double selectivity : new double[]{0.1, 0.5}) {
         boolean[] selectiveFilter = generateSelectiveFilter(n, selectivity, SEED + 3000);
         benchmarkFilteredThresholdScan(corpus, queries, threshold, distFunc, selectiveFilter, selectivity);
