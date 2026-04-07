@@ -715,7 +715,7 @@ public class QueryOptionsUtils {
       return null;
     }
     try {
-      float value = Float.parseFloat(threshold);
+      float value = Float.parseFloat(threshold.trim());
       if (Float.isNaN(value) || Float.isInfinite(value)) {
         throw new IllegalArgumentException(
             QueryOptionKey.VECTOR_DISTANCE_THRESHOLD + " must be a finite number, got: " + threshold);

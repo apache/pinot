@@ -67,8 +67,10 @@ public enum VectorExecutionMode {
 
   /**
    * Metadata filter applied first to produce a candidate set, then vector search on the
-   * filtered subset. Used when the backend supports filter-aware search, or when filter
-   * selectivity is highly restrictive and exact scan of the filtered subset is practical.
+   * filtered subset.
+   *
+   * <p><b>Not currently selectable.</b> Reserved for future backends that declare
+   * {@code supportsFilterAwareSearch=true}. No current backend supports this mode.</p>
    */
   FILTER_THEN_ANN("Metadata filter, then ANN search on filtered subset"),
 

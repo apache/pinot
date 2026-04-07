@@ -392,6 +392,9 @@ public class FilterPlanNode implements PlanNode {
       VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
       if (searchParams.isExactRerank(backendType) || searchParams.hasDistanceThreshold()) {
         forwardIndexReader = dataSource.getForwardIndex();
+        Preconditions.checkState(!searchParams.hasDistanceThreshold() || forwardIndexReader != null,
+            "Cannot apply vectorDistanceThreshold on column: %s -- forward index required for threshold refinement",
+            column);
       }
       return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
           vectorIndexConfig, hasMetadataFilter);

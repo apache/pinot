@@ -291,11 +291,11 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       // (ExactVectorScanFilterOperator handles threshold correctly via brute-force scan).
       // Increase vectorMaxCandidates to improve recall at the cost of latency.
       if (_hasThresholdPredicate && _forwardIndexReader == null) {
-        LOGGER.warn("Vector distance threshold was requested on column: {} but no forward index reader is available. "
-                + "Returning raw ANN top-K results without threshold refinement.",
-            column);
+        throw new IllegalStateException(
+            "Vector distance threshold was requested on column: " + column
+                + " but no forward index reader is available to apply threshold refinement");
       }
-      if (_hasThresholdPredicate && _forwardIndexReader != null && annCandidateCount > 0) {
+      if (_hasThresholdPredicate && annCandidateCount > 0) {
         ImmutableRoaringBitmap thresholded = applyThresholdRefinement(
             annResults, queryVector, _distanceThreshold, column);
         _rerankedCandidateCount = thresholded.getCardinality();
