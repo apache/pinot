@@ -19,12 +19,15 @@
 package org.apache.pinot.core.function;
 
 import java.util.EnumSet;
+import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.sql.FilterKind;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -88,5 +91,44 @@ public class FunctionRegistryTest {
     assertNull(FunctionRegistry.lookupFunctionInfo("testscalarfunction", 2));
     assertNull(FunctionRegistry.lookupFunctionInfo("testfunc1", 1));
     assertNull(FunctionRegistry.lookupFunctionInfo("testfunc2", 1));
+  }
+
+  @Test
+  public void testBitFunctionPolymorphism() {
+    FunctionInfo intBitAnd =
+        FunctionRegistry.lookupFunctionInfo("bitand", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    assertNotNull(intBitAnd);
+    assertEquals(intBitAnd.getMethod().getName(), "intBitAnd");
+    assertEquals(intBitAnd.getMethod().getReturnType(), int.class);
+
+    FunctionInfo longBitAnd =
+        FunctionRegistry.lookupFunctionInfo("bitand", new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.INT});
+    assertNotNull(longBitAnd);
+    assertEquals(longBitAnd.getMethod().getName(), "longBitAnd");
+    assertEquals(longBitAnd.getMethod().getReturnType(), long.class);
+
+    FunctionInfo intBitMask =
+        FunctionRegistry.lookupFunctionInfo("bitmask", new ColumnDataType[]{ColumnDataType.INT});
+    assertNotNull(intBitMask);
+    assertEquals(intBitMask.getMethod().getName(), "intBitMask");
+    assertEquals(intBitMask.getMethod().getReturnType(), int.class);
+
+    FunctionInfo longBitMask =
+        FunctionRegistry.lookupFunctionInfo("bitmask", new ColumnDataType[]{ColumnDataType.LONG});
+    assertNotNull(longBitMask);
+    assertEquals(longBitMask.getMethod().getName(), "longBitMask");
+    assertEquals(longBitMask.getMethod().getReturnType(), long.class);
+
+    FunctionInfo intBitExtract = FunctionRegistry.lookupFunctionInfo("bitextract",
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    assertNotNull(intBitExtract);
+    assertEquals(intBitExtract.getMethod().getName(), "intBitExtract");
+    assertEquals(intBitExtract.getMethod().getReturnType(), int.class);
+
+    FunctionInfo longBitExtract = FunctionRegistry.lookupFunctionInfo("bitextract",
+        new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.LONG});
+    assertNotNull(longBitExtract);
+    assertEquals(longBitExtract.getMethod().getName(), "longBitExtract");
+    assertEquals(longBitExtract.getMethod().getReturnType(), int.class);
   }
 }
