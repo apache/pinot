@@ -205,14 +205,6 @@ public class FunctionRegistry {
   }
 
   /**
-   * Returns {@code true} if the given canonical name is registered with the given number of arguments.
-   */
-  public static boolean supportsArgumentCount(String canonicalName, int numArguments) {
-    PinotScalarFunction function = FUNCTION_MAP.get(canonicalName);
-    return function != null && function.supportsArgumentCount(numArguments);
-  }
-
-  /**
    * @deprecated For performance concern, use {@link #contains(String)} instead to avoid invoking
    *             {@link #canonicalize(String)} multiple times.
    */

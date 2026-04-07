@@ -131,11 +131,17 @@ public class FunctionRegistryTest {
     assertEquals(longBitExtract.getMethod().getName(), "longBitExtract");
     assertEquals(longBitExtract.getMethod().getReturnType(), int.class);
 
-    assertTrue(FunctionRegistry.supportsArgumentCount("bitmask", 1));
-    assertNull(FunctionRegistry.lookupFunctionInfo("bitmask", 1));
-    assertTrue(FunctionRegistry.supportsArgumentCount("bitand", 2));
-    assertNull(FunctionRegistry.lookupFunctionInfo("bitand", 2));
-    assertTrue(FunctionRegistry.supportsArgumentCount("bitextract", 2));
-    assertNull(FunctionRegistry.lookupFunctionInfo("bitextract", 2));
+    // Arity-only lookup returns the LONG overload as a safe fallback
+    FunctionInfo bitmaskByArity = FunctionRegistry.lookupFunctionInfo("bitmask", 1);
+    assertNotNull(bitmaskByArity);
+    assertEquals(bitmaskByArity.getMethod().getName(), "longBitMask");
+
+    FunctionInfo bitandByArity = FunctionRegistry.lookupFunctionInfo("bitand", 2);
+    assertNotNull(bitandByArity);
+    assertEquals(bitandByArity.getMethod().getName(), "longBitAnd");
+
+    FunctionInfo bitextractByArity = FunctionRegistry.lookupFunctionInfo("bitextract", 2);
+    assertNotNull(bitextractByArity);
+    assertEquals(bitextractByArity.getMethod().getName(), "longBitExtract");
   }
 }

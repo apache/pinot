@@ -55,12 +55,8 @@ abstract class PolymorphicShiftScalarFunction implements PinotScalarFunction {
   @Nullable
   @Override
   public FunctionInfo getFunctionInfo(int numArguments) {
-    return null;
-  }
-
-  @Override
-  public boolean supportsArgumentCount(int numArguments) {
-    return numArguments == 2;
+    // LONG overload is a safe fallback — INT inputs widen to LONG losslessly via convertTypes.
+    return numArguments == 2 ? longFunctionInfo() : null;
   }
 
   @Override

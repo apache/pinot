@@ -237,14 +237,16 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
-  public void testPolymorphicBitwiseFunctionsResolveByRuntimeArgumentType() {
+  public void testPolymorphicBitwiseFunctions() {
+    // Ingestion evaluator resolves by arity, which returns the LONG overload.
+    // INT inputs are widened to LONG via convertTypes, so results are LONG.
     GenericRow intRow = new GenericRow();
     intRow.putValue("value", 6);
     intRow.putValue("rhs", 3);
     intRow.putValue("shift", 2);
-    assertEquals(new InbuiltFunctionEvaluator("bitNot(value)").evaluate(intRow), -7);
-    assertEquals(new InbuiltFunctionEvaluator("bitAnd(value, rhs)").evaluate(intRow), 2);
-    assertEquals(new InbuiltFunctionEvaluator("bitShiftRightUnsigned(value, shift)").evaluate(intRow), 1);
+    assertEquals(new InbuiltFunctionEvaluator("bitNot(value)").evaluate(intRow), -7L);
+    assertEquals(new InbuiltFunctionEvaluator("bitAnd(value, rhs)").evaluate(intRow), 2L);
+    assertEquals(new InbuiltFunctionEvaluator("bitShiftRightUnsigned(value, shift)").evaluate(intRow), 1L);
 
     GenericRow longRow = new GenericRow();
     longRow.putValue("value", 1L << 40);
