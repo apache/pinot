@@ -256,7 +256,7 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     LOGGER.debug("Exact threshold scan on column: {} returned {} results from {} docs (threshold={})",
         _column, result.getCardinality(), _numDocs, _distanceThreshold);
 
-    return result;
+    return result.toImmutableRoaringBitmap();
   }
 
   /**

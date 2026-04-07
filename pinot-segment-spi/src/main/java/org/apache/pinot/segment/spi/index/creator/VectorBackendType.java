@@ -98,7 +98,9 @@ public enum VectorBackendType {
   }
 
   private VectorBackendCapabilities buildCapabilities() {
-    switch (this.name()) {
+    // Use name() rather than enum constants because this runs during enum construction
+    // before constants are fully initialized.
+    switch (name()) {
       case "HNSW":
         return new VectorBackendCapabilities.Builder()
             .supportsTopKAnn(true)

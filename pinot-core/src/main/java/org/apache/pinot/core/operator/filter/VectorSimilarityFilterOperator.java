@@ -338,6 +338,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
   private ImmutableRoaringBitmap applyThresholdRefinement(ImmutableRoaringBitmap annResults, float[] queryVector,
       float threshold, String column) {
     MutableRoaringBitmap result = new MutableRoaringBitmap();
+    VectorExplainContext explainContext = _vectorExplainContext;
     ForwardIndexReader rawReader = _forwardIndexReader;
     try (ForwardIndexReaderContext context = rawReader.createContext()) {
       org.roaringbitmap.IntIterator it = annResults.getIntIterator();
@@ -348,7 +349,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
           continue;
         }
         float distance = VectorDistanceUtils.computeDistance(queryVector, docVector,
-            _vectorExplainContext.getDistanceFunction());
+            explainContext.getDistanceFunction());
         if (distance <= threshold) {
           result.add(docId);
         }
