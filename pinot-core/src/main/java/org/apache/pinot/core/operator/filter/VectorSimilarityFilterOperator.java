@@ -284,6 +284,11 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       }
 
       // 4. Apply threshold refinement if distance threshold is set
+      if (_hasThresholdPredicate && _forwardIndexReader == null) {
+        LOGGER.warn("Vector distance threshold was requested on column: {} but no forward index reader is available. "
+                + "Returning raw ANN top-K results without threshold refinement.",
+            column);
+      }
       if (_hasThresholdPredicate && _forwardIndexReader != null && annCandidateCount > 0) {
         ImmutableRoaringBitmap thresholded = applyThresholdRefinement(
             annResults, queryVector, _distanceThreshold, column);
