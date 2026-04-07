@@ -151,4 +151,63 @@ public class QuerySchedulerThreadPoolConfigChangeListenerTest {
 
     verify(resourceManager, never()).resizeThreadPools(anyInt(), anyInt());
   }
+
+  @Test
+  public void testOnChangeDeletedRunnerKeyRevertsToDefault() {
+    ResourceManager resourceManager = mock(ResourceManager.class);
+    when(resourceManager.getNumQueryRunnerThreads()).thenReturn(32);
+    when(resourceManager.getNumQueryWorkerThreads()).thenReturn(8);
+
+    QuerySchedulerThreadPoolConfigChangeListener listener =
+        new QuerySchedulerThreadPoolConfigChangeListener(resourceManager);
+
+    Map<String, String> clusterConfigs = new HashMap<>();
+
+    Set<String> changedConfigs = Set.of(
+        QuerySchedulerThreadPoolConfigChangeListener.QUERY_RUNNER_THREADS_KEY);
+
+    listener.onChange(changedConfigs, clusterConfigs);
+
+    verify(resourceManager).resizeThreadPools(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS, 8);
+  }
+
+  @Test
+  public void testOnChangeDeletedWorkerKeyRevertsToDefault() {
+    ResourceManager resourceManager = mock(ResourceManager.class);
+    when(resourceManager.getNumQueryRunnerThreads()).thenReturn(4);
+    when(resourceManager.getNumQueryWorkerThreads()).thenReturn(64);
+
+    QuerySchedulerThreadPoolConfigChangeListener listener =
+        new QuerySchedulerThreadPoolConfigChangeListener(resourceManager);
+
+    Map<String, String> clusterConfigs = new HashMap<>();
+
+    Set<String> changedConfigs = Set.of(
+        QuerySchedulerThreadPoolConfigChangeListener.QUERY_WORKER_THREADS_KEY);
+
+    listener.onChange(changedConfigs, clusterConfigs);
+
+    verify(resourceManager).resizeThreadPools(4, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+  }
+
+  @Test
+  public void testOnChangeBothKeysDeletedRevertToDefaults() {
+    ResourceManager resourceManager = mock(ResourceManager.class);
+    when(resourceManager.getNumQueryRunnerThreads()).thenReturn(32);
+    when(resourceManager.getNumQueryWorkerThreads()).thenReturn(64);
+
+    QuerySchedulerThreadPoolConfigChangeListener listener =
+        new QuerySchedulerThreadPoolConfigChangeListener(resourceManager);
+
+    Map<String, String> clusterConfigs = new HashMap<>();
+
+    Set<String> changedConfigs = Set.of(
+        QuerySchedulerThreadPoolConfigChangeListener.QUERY_RUNNER_THREADS_KEY,
+        QuerySchedulerThreadPoolConfigChangeListener.QUERY_WORKER_THREADS_KEY);
+
+    listener.onChange(changedConfigs, clusterConfigs);
+
+    verify(resourceManager).resizeThreadPools(
+        ResourceManager.DEFAULT_QUERY_RUNNER_THREADS, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+  }
 }

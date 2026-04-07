@@ -55,25 +55,37 @@ public class QuerySchedulerThreadPoolConfigChangeListener implements PinotCluste
     int newRunnerThreads = _resourceManager.getNumQueryRunnerThreads();
     int newWorkerThreads = _resourceManager.getNumQueryWorkerThreads();
 
-    if (changedConfigs.contains(QUERY_RUNNER_THREADS_KEY) && clusterConfigs.containsKey(QUERY_RUNNER_THREADS_KEY)) {
-      try {
-        newRunnerThreads = Integer.parseInt(clusterConfigs.get(QUERY_RUNNER_THREADS_KEY));
-      } catch (NumberFormatException e) {
-        LOGGER.error("Invalid value for {}: '{}'. Keeping current value: {}",
-            QUERY_RUNNER_THREADS_KEY, clusterConfigs.get(QUERY_RUNNER_THREADS_KEY),
-            _resourceManager.getNumQueryRunnerThreads(), e);
-        return;
+    if (changedConfigs.contains(QUERY_RUNNER_THREADS_KEY)) {
+      if (clusterConfigs.containsKey(QUERY_RUNNER_THREADS_KEY)) {
+        try {
+          newRunnerThreads = Integer.parseInt(clusterConfigs.get(QUERY_RUNNER_THREADS_KEY));
+        } catch (NumberFormatException e) {
+          LOGGER.error("Invalid value for {}: '{}'. Keeping current value: {}",
+              QUERY_RUNNER_THREADS_KEY, clusterConfigs.get(QUERY_RUNNER_THREADS_KEY),
+              _resourceManager.getNumQueryRunnerThreads(), e);
+          return;
+        }
+      } else {
+        newRunnerThreads = ResourceManager.DEFAULT_QUERY_RUNNER_THREADS;
+        LOGGER.info("Key '{}' was removed from cluster config. Reverting to system default: {}",
+            QUERY_RUNNER_THREADS_KEY, newRunnerThreads);
       }
     }
 
-    if (changedConfigs.contains(QUERY_WORKER_THREADS_KEY) && clusterConfigs.containsKey(QUERY_WORKER_THREADS_KEY)) {
-      try {
-        newWorkerThreads = Integer.parseInt(clusterConfigs.get(QUERY_WORKER_THREADS_KEY));
-      } catch (NumberFormatException e) {
-        LOGGER.error("Invalid value for {}: '{}'. Keeping current value: {}",
-            QUERY_WORKER_THREADS_KEY, clusterConfigs.get(QUERY_WORKER_THREADS_KEY),
-            _resourceManager.getNumQueryWorkerThreads(), e);
-        return;
+    if (changedConfigs.contains(QUERY_WORKER_THREADS_KEY)) {
+      if (clusterConfigs.containsKey(QUERY_WORKER_THREADS_KEY)) {
+        try {
+          newWorkerThreads = Integer.parseInt(clusterConfigs.get(QUERY_WORKER_THREADS_KEY));
+        } catch (NumberFormatException e) {
+          LOGGER.error("Invalid value for {}: '{}'. Keeping current value: {}",
+              QUERY_WORKER_THREADS_KEY, clusterConfigs.get(QUERY_WORKER_THREADS_KEY),
+              _resourceManager.getNumQueryWorkerThreads(), e);
+          return;
+        }
+      } else {
+        newWorkerThreads = ResourceManager.DEFAULT_QUERY_WORKER_THREADS;
+        LOGGER.info("Key '{}' was removed from cluster config. Reverting to system default: {}",
+            QUERY_WORKER_THREADS_KEY, newWorkerThreads);
       }
     }
 
