@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.pinot.segment.local.segment.index.map.MapIndexReaderWrapper;
+import org.apache.pinot.segment.local.segment.index.map.MapKeyIndexReader;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
@@ -554,5 +555,15 @@ public class MapColumnPreIndexStatsCollectorTest {
   @Test
   public void testGetStoredTypeIsAlwaysMap() {
     assertEquals(mapReaderWithValueType(FieldSpec.DataType.STRING).getStoredType(), FieldSpec.DataType.MAP);
+  }
+  
+  @Test
+  public void testMapKeyIndexReaderGetStoredTypeReturnsStoredType() {
+    assertEquals(new MapKeyIndexReader(mock(ForwardIndexReader.class), "k",
+        new DimensionFieldSpec("k", FieldSpec.DataType.BOOLEAN, true)).getStoredType(), FieldSpec.DataType.INT);
+    assertEquals(new MapKeyIndexReader(mock(ForwardIndexReader.class), "k",
+        new DimensionFieldSpec("k", FieldSpec.DataType.TIMESTAMP, true)).getStoredType(), FieldSpec.DataType.LONG);
+    assertEquals(new MapKeyIndexReader(mock(ForwardIndexReader.class), "k",
+        new DimensionFieldSpec("k", FieldSpec.DataType.JSON, true)).getStoredType(), FieldSpec.DataType.STRING);
   }
 }
