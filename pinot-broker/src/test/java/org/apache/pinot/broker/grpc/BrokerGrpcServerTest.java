@@ -58,6 +58,8 @@ public class BrokerGrpcServerTest {
   private BrokerRequestHandler _brokerRequestHandler;
   @Mock
   private BrokerMetrics _brokerMetrics;
+  @Mock
+  private SqlQueryExecutor _sqlQueryExecutor;
 
   private BrokerGrpcServer _brokerGrpcServer;
   private int _grpcPort;
@@ -75,7 +77,8 @@ public class BrokerGrpcServerTest {
     // Create config with gRPC port so server is created
     PinotConfiguration config = new PinotConfiguration();
     config.setProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, _grpcPort);
-    _brokerGrpcServer = new BrokerGrpcServer(config, "testBroker", _brokerMetrics, _brokerRequestHandler);
+    _brokerGrpcServer =
+        new BrokerGrpcServer(config, "testBroker", _brokerMetrics, _brokerRequestHandler, _sqlQueryExecutor);
   }
 
   @AfterMethod
