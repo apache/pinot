@@ -46,6 +46,8 @@ public final class VectorSearchParams {
   private final Boolean _exactRerankOverride;
   private final int _maxCandidates;
   private final boolean _maxCandidatesExplicit;
+  private final float _distanceThreshold;
+  private final boolean _hasDistanceThreshold;
 
   /**
    * Constructs search params from raw query option values.
@@ -57,10 +59,26 @@ public final class VectorSearchParams {
    */
   public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
       @Nullable Integer maxCandidates) {
+    this(nprobe, exactRerankOverride, maxCandidates, null);
+  }
+
+  /**
+   * Constructs search params from raw query option values.
+   *
+   * @param nprobe number of IVF probes, or null for default
+   * @param exactRerankOverride whether to re-score ANN candidates with exact distance, or null to use the backend
+   *                           default
+   * @param maxCandidates max candidates before final top-K, or null for default (topK * 10)
+   * @param distanceThreshold distance threshold for radius search, or null for top-K mode
+   */
+  public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
+      @Nullable Integer maxCandidates, @Nullable Float distanceThreshold) {
     _nprobe = nprobe != null ? nprobe : DEFAULT_NPROBE;
     _exactRerankOverride = exactRerankOverride;
     _maxCandidates = maxCandidates != null ? maxCandidates : 0;
     _maxCandidatesExplicit = maxCandidates != null;
+    _distanceThreshold = distanceThreshold != null ? distanceThreshold : Float.NaN;
+    _hasDistanceThreshold = distanceThreshold != null;
   }
 
   /**
@@ -78,12 +96,13 @@ public final class VectorSearchParams {
     Integer nprobe = QueryOptionsUtils.getVectorNprobe(queryOptions);
     Boolean exactRerank = QueryOptionsUtils.getVectorExactRerank(queryOptions);
     Integer maxCandidates = QueryOptionsUtils.getVectorMaxCandidates(queryOptions);
+    Float distanceThreshold = QueryOptionsUtils.getVectorDistanceThreshold(queryOptions);
 
-    if (nprobe == null && exactRerank == null && maxCandidates == null) {
+    if (nprobe == null && exactRerank == null && maxCandidates == null && distanceThreshold == null) {
       return DEFAULT;
     }
 
-    return new VectorSearchParams(nprobe, exactRerank, maxCandidates);
+    return new VectorSearchParams(nprobe, exactRerank, maxCandidates, distanceThreshold);
   }
 
   /**
@@ -131,10 +150,26 @@ public final class VectorSearchParams {
     return _maxCandidatesExplicit;
   }
 
+  /**
+   * Returns the distance threshold for radius/threshold search, or NaN if not set.
+   */
+  public float getDistanceThreshold() {
+    return _distanceThreshold;
+  }
+
+  /**
+   * Returns true if a distance threshold is set, indicating radius/threshold search mode.
+   */
+  public boolean hasDistanceThreshold() {
+    return _hasDistanceThreshold;
+  }
+
   @Override
   public String toString() {
     return "VectorSearchParams{nprobe=" + _nprobe + ", exactRerank="
         + (_exactRerankOverride != null ? _exactRerankOverride : "backend_default")
-        + ", maxCandidates=" + (_maxCandidatesExplicit ? _maxCandidates : "default(topK*10)") + '}';
+        + ", maxCandidates=" + (_maxCandidatesExplicit ? _maxCandidates : "default(topK*10)")
+        + (_hasDistanceThreshold ? ", distanceThreshold=" + _distanceThreshold : "")
+        + '}';
   }
 }

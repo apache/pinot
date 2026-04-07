@@ -20,15 +20,20 @@ package org.apache.pinot.core.operator.filter;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
+import org.apache.pinot.segment.spi.index.creator.VectorExecutionMode;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
 /**
  * Runtime-visible vector metadata for explain and debug output.
+ *
+ * <p>Includes the {@link VectorExecutionMode} so that explain output makes the execution
+ * strategy explicit and understandable.</p>
  */
 public final class VectorExplainContext {
   private final VectorBackendType _backendType;
   private final VectorIndexConfig.VectorDistanceFunction _distanceFunction;
+  private final VectorExecutionMode _executionMode;
   private final int _effectiveNprobe;
   private final boolean _effectiveExactRerank;
   private final int _effectiveSearchCount;
@@ -38,8 +43,17 @@ public final class VectorExplainContext {
   public VectorExplainContext(VectorBackendType backendType,
       VectorIndexConfig.VectorDistanceFunction distanceFunction, int effectiveNprobe, boolean effectiveExactRerank,
       int effectiveSearchCount, @Nullable String fallbackReason) {
+    this(backendType, distanceFunction, null, effectiveNprobe, effectiveExactRerank, effectiveSearchCount,
+        fallbackReason);
+  }
+
+  public VectorExplainContext(VectorBackendType backendType,
+      VectorIndexConfig.VectorDistanceFunction distanceFunction, @Nullable VectorExecutionMode executionMode,
+      int effectiveNprobe, boolean effectiveExactRerank, int effectiveSearchCount,
+      @Nullable String fallbackReason) {
     _backendType = backendType;
     _distanceFunction = distanceFunction;
+    _executionMode = executionMode;
     _effectiveNprobe = effectiveNprobe;
     _effectiveExactRerank = effectiveExactRerank;
     _effectiveSearchCount = effectiveSearchCount;
@@ -52,6 +66,14 @@ public final class VectorExplainContext {
 
   public VectorIndexConfig.VectorDistanceFunction getDistanceFunction() {
     return _distanceFunction;
+  }
+
+  /**
+   * Returns the execution mode selected for this query, or null if not yet determined.
+   */
+  @Nullable
+  public VectorExecutionMode getExecutionMode() {
+    return _executionMode;
   }
 
   public int getEffectiveNprobe() {

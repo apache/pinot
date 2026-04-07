@@ -155,4 +155,45 @@ public class VectorSearchParamsTest {
     VectorSearchParams params = new VectorSearchParams(null, false, null);
     Assert.assertFalse(params.isExactRerank(VectorBackendType.IVF_PQ));
   }
+
+  @Test
+  public void testDistanceThresholdFromQueryOptions() {
+    Map<String, String> opts = new HashMap<>();
+    opts.put(QueryOptionKey.VECTOR_DISTANCE_THRESHOLD, "0.5");
+    VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
+    Assert.assertTrue(params.hasDistanceThreshold());
+    Assert.assertEquals(params.getDistanceThreshold(), 0.5f);
+  }
+
+  @Test
+  public void testNoDistanceThresholdByDefault() {
+    VectorSearchParams params = VectorSearchParams.DEFAULT;
+    Assert.assertFalse(params.hasDistanceThreshold());
+    Assert.assertTrue(Float.isNaN(params.getDistanceThreshold()));
+  }
+
+  @Test
+  public void testDistanceThresholdToString() {
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.3f);
+    String s = params.toString();
+    Assert.assertTrue(s.contains("distanceThreshold=0.3"));
+  }
+
+  @Test
+  public void testDistanceThresholdDirectConstructor() {
+    VectorSearchParams params = new VectorSearchParams(4, null, null, 1.5f);
+    Assert.assertTrue(params.hasDistanceThreshold());
+    Assert.assertEquals(params.getDistanceThreshold(), 1.5f);
+    Assert.assertEquals(params.getNprobe(), 4);
+  }
+
+  @Test
+  public void testNegativeDistanceThresholdForDotProduct() {
+    // Negative thresholds are valid for dot-product distance (negated dot product)
+    Map<String, String> opts = new HashMap<>();
+    opts.put(QueryOptionKey.VECTOR_DISTANCE_THRESHOLD, "-0.8");
+    VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
+    Assert.assertTrue(params.hasDistanceThreshold());
+    Assert.assertEquals(params.getDistanceThreshold(), -0.8f);
+  }
 }

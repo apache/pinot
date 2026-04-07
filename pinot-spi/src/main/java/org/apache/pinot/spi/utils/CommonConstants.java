@@ -927,6 +927,11 @@ public class CommonConstants {
         /** Maximum number of ANN candidates to retrieve before applying exact rerank or final
          *  top-K selection. Defaults to topK * 10 if not set. */
         public static final String VECTOR_MAX_CANDIDATES = "vectorMaxCandidates";
+
+        /** Distance threshold for vector radius/threshold search. When set, the query returns
+         *  all vectors within this distance rather than a fixed top-K. ANN candidate generation
+         *  is used followed by exact threshold refinement. */
+        public static final String VECTOR_DISTANCE_THRESHOLD = "vectorDistanceThreshold";
       }
 
       public static class QueryOptionValue {

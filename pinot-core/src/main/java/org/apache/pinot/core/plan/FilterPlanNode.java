@@ -222,8 +222,17 @@ public class FilterPlanNode implements PlanNode {
       case AND:
         childFilters = filter.getChildren();
         childFilterOperators = new ArrayList<>(childFilters.size());
+        // Detect vector + metadata filter AND pattern for execution mode reporting
+        boolean hasVectorChild = hasVectorSimilarityChild(childFilters);
+        boolean hasMetadataFilter = hasVectorChild && childFilters.size() > 1;
         for (FilterContext childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, numDocs);
+          BaseFilterOperator childFilterOperator;
+          if (hasMetadataFilter && isVectorSimilarityFilter(childFilter)) {
+            // Pass filtered context so vector operator reports correct execution mode
+            childFilterOperator = constructFilteredVectorOperator(childFilter, numDocs);
+          } else {
+            childFilterOperator = constructPhysicalOperator(childFilter, numDocs);
+          }
           if (childFilterOperator.isResultEmpty()) {
             // Return empty filter operator if any of the child filter operator's result is empty
             return EmptyFilterOperator.getInstance();
@@ -330,7 +339,7 @@ public class FilterPlanNode implements PlanNode {
               return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, numDocs);
             case VECTOR_SIMILARITY:
               return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
-                  numDocs);
+                  numDocs, false);
             case IS_NULL: {
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {
@@ -371,22 +380,24 @@ public class FilterPlanNode implements PlanNode {
    *   <li>If no vector index exists, fall back to {@link ExactVectorScanFilterOperator} which
    *       performs brute-force scan of the forward index.</li>
    * </ol>
+   *
+   * @param hasMetadataFilter true if this vector predicate is combined with metadata filters (AND)
    */
   private BaseFilterOperator constructVectorSimilarityOperator(DataSource dataSource,
-      VectorSimilarityPredicate predicate, String column, int numDocs) {
+      VectorSimilarityPredicate predicate, String column, int numDocs, boolean hasMetadataFilter) {
     VectorIndexReader vectorIndex = dataSource.getVectorIndex();
     VectorIndexConfig vectorIndexConfig = dataSource.getVectorIndexConfig();
     VectorSearchParams searchParams = VectorSearchParams.fromQueryOptions(_queryContext.getQueryOptions());
 
     if (vectorIndex != null) {
-      // ANN index path: pass forward index reader only if rerank is enabled
+      // ANN index path: pass forward index reader if rerank or threshold search requires exact distances
       ForwardIndexReader<?> forwardIndexReader = null;
       VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
-      if (searchParams.isExactRerank(backendType)) {
+      if (searchParams.isExactRerank(backendType) || searchParams.hasDistanceThreshold()) {
         forwardIndexReader = dataSource.getForwardIndex();
       }
       return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
-          vectorIndexConfig);
+          vectorIndexConfig, hasMetadataFilter);
     }
 
     // Exact scan fallback: no vector index on this segment
@@ -394,7 +405,40 @@ public class FilterPlanNode implements PlanNode {
     Preconditions.checkState(forwardIndexReader != null,
         "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
     return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs, vectorIndexConfig,
-        getVectorFallbackReason(vectorIndexConfig));
+        getVectorFallbackReason(vectorIndexConfig), searchParams);
+  }
+
+  /**
+   * Constructs a vector operator for a VECTOR_SIMILARITY predicate that is part of an AND
+   * with metadata filters. This sets the hasMetadataFilter flag so the operator reports
+   * the correct filtered ANN execution mode.
+   */
+  private BaseFilterOperator constructFilteredVectorOperator(FilterContext filter, int numDocs) {
+    Predicate predicate = filter.getPredicate();
+    String column = predicate.getLhs().getIdentifier();
+    DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
+    return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
+        numDocs, true);
+  }
+
+  /**
+   * Returns true if any child filter is a VECTOR_SIMILARITY predicate.
+   */
+  private static boolean hasVectorSimilarityChild(List<FilterContext> childFilters) {
+    for (FilterContext child : childFilters) {
+      if (isVectorSimilarityFilter(child)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Returns true if the filter is a VECTOR_SIMILARITY predicate.
+   */
+  private static boolean isVectorSimilarityFilter(FilterContext filter) {
+    return filter.getType() == FilterContext.Type.PREDICATE
+        && filter.getPredicate().getType() == Predicate.Type.VECTOR_SIMILARITY;
   }
 
   private static String getVectorFallbackReason(@Nullable VectorIndexConfig vectorIndexConfig) {
