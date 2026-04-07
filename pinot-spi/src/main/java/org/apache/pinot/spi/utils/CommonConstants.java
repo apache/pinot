@@ -1070,6 +1070,16 @@ public class CommonConstants {
       public static final String CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE =
           CONFIG_PREFIX + ".stats.manager.threadpool.size";
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
+
+      // Determines whether routing stats are exported as broker metrics (gauges) on a periodic basis.
+      public static final String CONFIG_OF_ENABLE_STATS_METRIC_EXPORT =
+          CONFIG_PREFIX + ".enable.stats.metric.export";
+      public static final boolean DEFAULT_ENABLE_STATS_METRIC_EXPORT = false;
+
+      // Interval in milliseconds at which routing stats are exported as broker metrics.
+      public static final String CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS =
+          CONFIG_PREFIX + ".stats.metric.export.interval.ms";
+      public static final long DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS = 10 * 1000;
     }
 
     public static class Grpc {
