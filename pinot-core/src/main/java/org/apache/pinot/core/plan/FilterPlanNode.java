@@ -222,12 +222,9 @@ public class FilterPlanNode implements PlanNode {
       case AND:
         childFilters = filter.getChildren();
         childFilterOperators = new ArrayList<>(childFilters.size());
-        // Detect vector + metadata filter AND pattern for execution mode reporting
-        boolean hasVectorChild = hasVectorSimilarityChild(childFilters);
-        boolean hasMetadataFilter = hasVectorChild && childFilters.size() > 1;
         for (FilterContext childFilter : childFilters) {
           BaseFilterOperator childFilterOperator;
-          if (hasMetadataFilter && isVectorSimilarityFilter(childFilter)) {
+          if (isVectorSimilarityFilter(childFilter) && childFilters.size() > 1) {
             // Pass filtered context so vector operator reports correct execution mode
             childFilterOperator = constructFilteredVectorOperator(childFilter, numDocs);
           } else {
@@ -419,18 +416,6 @@ public class FilterPlanNode implements PlanNode {
     DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
     return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
         numDocs, true);
-  }
-
-  /**
-   * Returns true if any child filter is a VECTOR_SIMILARITY predicate.
-   */
-  private static boolean hasVectorSimilarityChild(List<FilterContext> childFilters) {
-    for (FilterContext child : childFilters) {
-      if (isVectorSimilarityFilter(child)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /**
