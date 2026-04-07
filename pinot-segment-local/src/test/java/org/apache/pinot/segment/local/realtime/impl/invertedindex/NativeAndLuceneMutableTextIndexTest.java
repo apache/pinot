@@ -26,8 +26,11 @@ import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -46,6 +49,7 @@ public class NativeAndLuceneMutableTextIndexTest {
 
   private RealtimeLuceneTextIndex _realtimeLuceneMVTextIndex;
   private NativeMutableTextIndex _nativeMutableMVTextIndex;
+  private QueryThreadContext _queryThreadContext;
 
   private String[] getTextData() {
     return new String[]{"Prince Andrew kept looking with an amused smile from Pierre",
@@ -109,6 +113,19 @@ public class NativeAndLuceneMutableTextIndexTest {
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  @BeforeMethod
+  public void setUpMethod() {
+    _queryThreadContext = QueryThreadContext.openForSseTest();
+  }
+
+  @AfterMethod
+  public void tearDownMethod() {
+    if (_queryThreadContext != null) {
+      _queryThreadContext.close();
+      _queryThreadContext = null;
     }
   }
 
