@@ -38,6 +38,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -55,7 +56,9 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
   private static final String VECTORS_L2_DIST = "vectorsL2Dist";
   private static final String VECTOR_ZERO_L1_DIST = "vectorZeroL1Dist";
   private static final String VECTOR_ZERO_L2_DIST = "vectorZeroL2Dist";
+  private static final String CATEGORY = "category";
   private static final int VECTOR_DIM_SIZE = 512;
+  private static final int NUM_CATEGORIES = 5;
 
   @Override
   protected long getCountStarResult() {
@@ -208,6 +211,85 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  /**
+   * Tests filtered ANN: VECTOR_SIMILARITY combined with a metadata filter.
+   * All returned rows must match the filter predicate and be ordered by distance.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAnn(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    int topK = 5;
+    String queryVector = "ARRAY[1.1" + StringUtils.repeat(", 1.1", VECTOR_DIM_SIZE - 1) + "]";
+    String targetCategory = "cat_0";
+
+    String filteredQuery = String.format(
+        "SELECT cosineDistance(%s, %s) AS dist, %s FROM %s "
+            + "WHERE vectorSimilarity(%s, %s, %d) AND %s = '%s' "
+            + "ORDER BY dist ASC LIMIT %d",
+        VECTOR_1, queryVector, CATEGORY, getTableName(),
+        VECTOR_1, queryVector, topK * 10, CATEGORY, targetCategory, topK);
+
+    JsonNode result = postQuery(filteredQuery);
+    JsonNode rows = result.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Filtered ANN should return results");
+
+    double prevDist = -1;
+    for (int i = 0; i < rows.size(); i++) {
+      double dist = rows.get(i).get(0).asDouble();
+      String cat = rows.get(i).get(1).asText();
+      assertEquals(cat, targetCategory, "All results must match the filter");
+      assertTrue(dist >= prevDist, "Results must be ordered by distance");
+      prevDist = dist;
+    }
+  }
+
+  /**
+   * Tests that filtered ANN returns fewer or equal results compared to unfiltered ANN.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAnnReducesResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    int topK = 20;
+    String queryVector = "ARRAY[1.1" + StringUtils.repeat(", 1.1", VECTOR_DIM_SIZE - 1) + "]";
+
+    String unfilteredQuery = String.format(
+        "SELECT count(*) FROM %s WHERE vectorSimilarity(%s, %s, %d)",
+        getTableName(), VECTOR_1, queryVector, topK);
+    String filteredQuery = String.format(
+        "SELECT count(*) FROM %s WHERE vectorSimilarity(%s, %s, %d) AND %s = 'cat_0'",
+        getTableName(), VECTOR_1, queryVector, topK, CATEGORY);
+
+    long unfilteredCount = postQuery(unfilteredQuery).get("resultTable").get("rows").get(0).get(0).asLong();
+    long filteredCount = postQuery(filteredQuery).get("resultTable").get("rows").get(0).get(0).asLong();
+
+    assertTrue(filteredCount <= unfilteredCount,
+        "Filtered (" + filteredCount + ") should be <= unfiltered (" + unfilteredCount + ")");
+    assertTrue(filteredCount > 0, "Filtered ANN should return at least 1 result");
+  }
+
+  /**
+   * Tests that EXPLAIN output includes execution mode for vector queries.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testExplainShowsExecutionMode(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String queryVector = "ARRAY[1.1" + StringUtils.repeat(", 1.1", VECTOR_DIM_SIZE - 1) + "]";
+
+    String explainQuery = String.format(
+        "set explainAskingServers=true; EXPLAIN PLAN FOR "
+            + "SELECT cosineDistance(%s, %s) AS dist FROM %s "
+            + "WHERE vectorSimilarity(%s, %s, %d) ORDER BY dist ASC LIMIT %d",
+        VECTOR_1, queryVector, getTableName(), VECTOR_1, queryVector, 5, 5);
+
+    JsonNode result = postQuery(explainQuery);
+    String explain = result.get("resultTable").toString();
+    assertTrue(explain.contains("executionMode"),
+        "EXPLAIN should contain executionMode: " + explain);
+  }
+
   @Override
   public String getTableName() {
     return DEFAULT_TABLE_NAME;
@@ -245,6 +327,7 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
         .addSingleValueDimension(VECTORS_L2_DIST, FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension(VECTOR_ZERO_L1_DIST, FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension(VECTOR_ZERO_L2_DIST, FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension(CATEGORY, FieldSpec.DataType.STRING)
         .build();
   }
 
@@ -286,6 +369,9 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
             null, null),
         new org.apache.avro.Schema.Field(VECTOR_ZERO_L2_DIST,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE),
+            null, null),
+        new org.apache.avro.Schema.Field(CATEGORY,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
             null, null)
     ));
 
@@ -310,6 +396,7 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
         record.put(VECTORS_L2_DIST, VectorFunctions.l2Distance(vector1, vector2));
         record.put(VECTOR_ZERO_L1_DIST, VectorFunctions.l1Distance(vector1, zeroVector));
         record.put(VECTOR_ZERO_L2_DIST, VectorFunctions.l2Distance(vector1, zeroVector));
+        record.put(CATEGORY, "cat_" + (i % NUM_CATEGORIES));
 
         // add avro record to file
         writers.get(i % getNumAvroFiles()).append(record);

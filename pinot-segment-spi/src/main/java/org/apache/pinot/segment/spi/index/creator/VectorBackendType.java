@@ -78,13 +78,59 @@ public enum VectorBackendType {
   IVF_PQ("Inverted File with product-quantized vectors");
 
   private final String _description;
+  private final VectorBackendCapabilities _capabilities;
 
   VectorBackendType(String description) {
     _description = description;
+    _capabilities = buildCapabilities();
   }
 
   public String getDescription() {
     return _description;
+  }
+
+  /**
+   * Returns the query-time capabilities of this backend.
+   * Used by the runtime to select execution modes without backend-specific branching.
+   */
+  public VectorBackendCapabilities getCapabilities() {
+    return _capabilities;
+  }
+
+  private VectorBackendCapabilities buildCapabilities() {
+    // Use name() rather than enum constants because this runs during enum construction
+    // before constants are fully initialized.
+    switch (name()) {
+      case "HNSW":
+        return new VectorBackendCapabilities.Builder()
+            .supportsTopKAnn(true)
+            .supportsFilterAwareSearch(false)
+            .supportsApproximateRadius(false)
+            .supportsExactRerank(true)
+            .supportsRuntimeSearchParams(false)
+            .build();
+      case "IVF_FLAT":
+        return new VectorBackendCapabilities.Builder()
+            .supportsTopKAnn(true)
+            .supportsFilterAwareSearch(false)
+            .supportsApproximateRadius(false)
+            .supportsExactRerank(true)
+            .supportsRuntimeSearchParams(true)
+            .build();
+      case "IVF_PQ":
+        return new VectorBackendCapabilities.Builder()
+            .supportsTopKAnn(true)
+            .supportsFilterAwareSearch(false)
+            .supportsApproximateRadius(false)
+            .supportsExactRerank(true)
+            .supportsRuntimeSearchParams(true)
+            .build();
+      default:
+        return new VectorBackendCapabilities.Builder()
+            .supportsTopKAnn(true)
+            .supportsExactRerank(true)
+            .build();
+    }
   }
 
   public boolean supportsMutableSegments() {

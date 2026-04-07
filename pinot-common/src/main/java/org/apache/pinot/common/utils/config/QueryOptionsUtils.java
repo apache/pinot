@@ -705,6 +705,30 @@ public class QueryOptionsUtils {
     return checkedParseIntPositive(QueryOptionKey.VECTOR_MAX_CANDIDATES, maxCandidates);
   }
 
+  /**
+   * Returns the distance threshold for vector radius/threshold search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Float getVectorDistanceThreshold(Map<String, String> queryOptions) {
+    String threshold = queryOptions.get(QueryOptionKey.VECTOR_DISTANCE_THRESHOLD);
+    if (threshold == null) {
+      return null;
+    }
+    try {
+      float value = Float.parseFloat(threshold.trim());
+      if (Float.isNaN(value) || Float.isInfinite(value)) {
+        throw new IllegalArgumentException(
+            QueryOptionKey.VECTOR_DISTANCE_THRESHOLD + " must be a finite number, got: " + threshold);
+      }
+      // Negative thresholds are valid for dot-product/inner-product distance functions
+      // where VectorDistanceUtils.computeDistance returns negated dot product.
+      return value;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          QueryOptionKey.VECTOR_DISTANCE_THRESHOLD + " must be a valid number, got: " + threshold);
+    }
+  }
+
   public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
     String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
     if (sortExchangeCopyThreshold != null) {

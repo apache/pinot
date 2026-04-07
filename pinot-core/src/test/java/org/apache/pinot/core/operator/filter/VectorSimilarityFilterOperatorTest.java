@@ -392,6 +392,153 @@ public class VectorSimilarityFilterOperatorTest {
     Assert.assertTrue(result.contains(0), "Configured cosine rerank should keep the cosine-identical vector");
   }
 
+  @Test
+  public void testFilteredAnnReportsCorrectExecutionMode() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+    annResult.add(1);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
+
+    // Without metadata filter: ANN_TOP_K
+    VectorSimilarityFilterOperator noFilter = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, VectorSearchParams.DEFAULT, null, null, false);
+    String explainNoFilter = noFilter.toExplainString();
+    Assert.assertTrue(explainNoFilter.contains("executionMode:ANN_TOP_K"),
+        "Expected ANN_TOP_K but got: " + explainNoFilter);
+
+    // With metadata filter: ANN_THEN_FILTER
+    VectorSimilarityFilterOperator withFilter = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, VectorSearchParams.DEFAULT, null, null, true);
+    String explainWithFilter = withFilter.toExplainString();
+    Assert.assertTrue(explainWithFilter.contains("executionMode:ANN_THEN_FILTER"),
+        "Expected ANN_THEN_FILTER but got: " + explainWithFilter);
+  }
+
+  @Test
+  public void testFilteredAnnWithRerankReportsCorrectMode() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(new float[][]{{1.0f, 0.0f}});
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, new VectorSearchParams(null, true, null), mockForward, null, true);
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("executionMode:ANN_THEN_FILTER_THEN_RERANK"),
+        "Expected ANN_THEN_FILTER_THEN_RERANK but got: " + explain);
+  }
+
+  @Test
+  public void testThresholdSearchReturnsOnlyWithinDistance() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+    annResult.add(1);
+    annResult.add(2);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    // Doc 0: exact distance 0.0 (same vector) -> within threshold 0.5
+    // Doc 1: exact distance 2.0 (L2 squared to [0,1]) -> outside threshold 0.5
+    // Doc 2: exact distance 0.01 (L2 squared to [0.9,0.1]) -> within threshold 0.5
+    float[][] vectors = {
+        {1.0f, 0.0f},
+        {0.0f, 1.0f},
+        {0.9f, 0.1f},
+    };
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(vectors);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
+
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, params, mockForward,
+        createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN), false);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertTrue(result.contains(0), "Doc 0 should be within threshold");
+    Assert.assertFalse(result.contains(1), "Doc 1 should be outside threshold");
+    Assert.assertTrue(result.contains(2), "Doc 2 should be within threshold");
+  }
+
+  @Test
+  public void testThresholdSearchReportsCorrectExecutionMode() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
+
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, params, null, null, false);
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("executionMode:ANN_THRESHOLD_SCAN"),
+        "Expected ANN_THRESHOLD_SCAN but got: " + explain);
+  }
+
+  @Test
+  public void testThresholdWithFilterReportsCorrectMode() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
+
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, params, null, null, true);
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("executionMode:ANN_THRESHOLD_THEN_FILTER"),
+        "Expected ANN_THRESHOLD_THEN_FILTER but got: " + explain);
+  }
+
+  @Test
+  public void testFilteredAnnDoesNotOverfetch() {
+    // Filtered ANN should NOT over-fetch: vectorSimilarity(col, q, 5) must return at most 5 docs.
+    // The metadata filter (bitmap AND) reduces this set further.
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(queryVector, 5)).thenReturn(annResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 5);
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, VectorSearchParams.DEFAULT, null, null, true);
+    operator.getBitmaps();
+    // Verify topK is used as-is (no over-fetch)
+    verify(mockReader).getDocIds(queryVector, 5);
+  }
+
   /**
    * Interface combining VectorIndexReader and NprobeAware for mocking IVF_FLAT readers.
    */
