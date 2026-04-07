@@ -174,7 +174,7 @@ public class QueryKillingManager {
         return;
       }
 
-      LOGGER.warn("Query Killed: {}", report.toInternalLogMessage());
+      LOGGER.warn("Query Killed in enforce mode: {}", report.toInternalLogMessage());
       executionContext.terminate(queryStrategy.getErrorCode(), report.toCustomerMessage());
       _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN, 1);
     } catch (Exception e) {

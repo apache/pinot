@@ -52,11 +52,10 @@ public class QueryKillingManagerTest {
     _serverMetrics = mock(ServerMetrics.class);
   }
 
-  private QueryMonitorConfig buildConfig(boolean enabled, boolean logOnly, long maxEntriesInFilter,
+  private QueryMonitorConfig buildConfig(String mode, long maxEntriesInFilter,
       long maxDocsScanned) {
     Map<String, Object> props = new HashMap<>();
-    props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_ENABLED, enabled);
-    props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_LOG_ONLY, logOnly);
+    props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, mode);
     props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER,
         maxEntriesInFilter);
     props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED, maxDocsScanned);
@@ -69,7 +68,7 @@ public class QueryKillingManagerTest {
 
   @Test
   public void testInitBuildsStrategyFromConfig() {
-    QueryMonitorConfig config = buildConfig(true, false, 100L, Long.MAX_VALUE);
+    QueryMonitorConfig config = buildConfig("enforce", 100L, Long.MAX_VALUE);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -81,7 +80,7 @@ public class QueryKillingManagerTest {
   @Test
   public void testInitWithNoThresholdsLogsWarningAndReturnsNullStrategy() {
     // All thresholds are MAX_VALUE — factory should return null
-    QueryMonitorConfig config = buildConfig(true, false, Long.MAX_VALUE, Long.MAX_VALUE);
+    QueryMonitorConfig config = buildConfig("enforce", Long.MAX_VALUE, Long.MAX_VALUE);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -92,7 +91,7 @@ public class QueryKillingManagerTest {
 
   @Test
   public void testInitWithDisabledReturnsNullStrategy() {
-    QueryMonitorConfig config = buildConfig(false, false, 100L, 100L);
+    QueryMonitorConfig config = buildConfig("disabled", 100L, 100L);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -105,7 +104,7 @@ public class QueryKillingManagerTest {
 
   @Test
   public void testDisabledDoesNotKill() {
-    QueryMonitorConfig config = buildConfig(false, false, 100L, 100L);
+    QueryMonitorConfig config = buildConfig("disabled", 100L, 100L);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -120,7 +119,7 @@ public class QueryKillingManagerTest {
 
   @Test
   public void testEnabledKillsWhenThresholdExceeded() {
-    QueryMonitorConfig config = buildConfig(true, false, 100L, Long.MAX_VALUE);
+    QueryMonitorConfig config = buildConfig("enforce", 100L, Long.MAX_VALUE);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -136,7 +135,7 @@ public class QueryKillingManagerTest {
 
   @Test
   public void testLogOnlyDoesNotKill() {
-    QueryMonitorConfig config = buildConfig(true, true, 100L, Long.MAX_VALUE);
+    QueryMonitorConfig config = buildConfig("logOnly", 100L, Long.MAX_VALUE);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -151,7 +150,7 @@ public class QueryKillingManagerTest {
 
   @Test
   public void testBelowThresholdDoesNotKill() {
-    QueryMonitorConfig config = buildConfig(true, false, 1000L, Long.MAX_VALUE);
+    QueryMonitorConfig config = buildConfig("enforce", 1000L, Long.MAX_VALUE);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -166,7 +165,7 @@ public class QueryKillingManagerTest {
 
   @Test
   public void testAlreadyTerminatedSkipsEvaluation() {
-    QueryMonitorConfig config = buildConfig(true, false, 100L, Long.MAX_VALUE);
+    QueryMonitorConfig config = buildConfig("enforce", 100L, Long.MAX_VALUE);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -183,7 +182,7 @@ public class QueryKillingManagerTest {
 
   @Test
   public void testDocsScannedThreshold() {
-    QueryMonitorConfig config = buildConfig(true, false, Long.MAX_VALUE, 100L);
+    QueryMonitorConfig config = buildConfig("enforce", Long.MAX_VALUE, 100L);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -200,7 +199,7 @@ public class QueryKillingManagerTest {
 
   @Test
   public void testTableOverrideRaisesThreshold() {
-    QueryMonitorConfig config = buildConfig(true, false, 100L, Long.MAX_VALUE);
+    QueryMonitorConfig config = buildConfig("enforce", 100L, Long.MAX_VALUE);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -217,7 +216,7 @@ public class QueryKillingManagerTest {
 
   @Test
   public void testTableOverrideLowersThreshold() {
-    QueryMonitorConfig config = buildConfig(true, false, 1000L, Long.MAX_VALUE);
+    QueryMonitorConfig config = buildConfig("enforce", 1000L, Long.MAX_VALUE);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
@@ -238,7 +237,8 @@ public class QueryKillingManagerTest {
   public void testCustomFactoryClassFromConfig() {
     // Configure a custom factory class name
     Map<String, Object> props = new HashMap<>();
-    props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_ENABLED, true);
+    props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE,
+        CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_ENFORCE);
     props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME,
         AlwaysKillStrategyFactory.class.getName());
     PinotConfiguration pinotConfig = new PinotConfiguration(props);
@@ -261,7 +261,8 @@ public class QueryKillingManagerTest {
   @Test
   public void testInvalidFactoryClassFallsBackGracefully() {
     Map<String, Object> props = new HashMap<>();
-    props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_ENABLED, true);
+    props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE,
+        CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_ENFORCE);
     props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME,
         "com.nonexistent.FakeFactory");
     props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, 100L);
@@ -281,14 +282,14 @@ public class QueryKillingManagerTest {
   @Test
   public void testRebuildStrategyPicksUpConfigChanges() {
     // Start with no thresholds
-    QueryMonitorConfig config1 = buildConfig(true, false, Long.MAX_VALUE, Long.MAX_VALUE);
+    QueryMonitorConfig config1 = buildConfig("enforce", Long.MAX_VALUE, Long.MAX_VALUE);
     AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config1);
     QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
     manager.rebuildStrategy();
     assertNull(manager.getActiveStrategy(), "No thresholds = no strategy");
 
     // Update config with thresholds
-    QueryMonitorConfig config2 = buildConfig(true, false, 100L, Long.MAX_VALUE);
+    QueryMonitorConfig config2 = buildConfig("enforce", 100L, Long.MAX_VALUE);
     configRef.set(config2);
     manager.rebuildStrategy();
     assertNotNull(manager.getActiveStrategy(), "After config update, strategy should be built");

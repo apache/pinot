@@ -1785,11 +1785,11 @@ public class CommonConstants {
     public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 0.0;
 
     // Scan-based query killing
-    public static final String CONFIG_OF_SCAN_BASED_KILLING_ENABLED = "accounting.scan.based.killing.enabled";
-    public static final boolean DEFAULT_SCAN_BASED_KILLING_ENABLED = false;
-
-    public static final String CONFIG_OF_SCAN_BASED_KILLING_LOG_ONLY = "accounting.scan.based.killing.log.only";
-    public static final boolean DEFAULT_SCAN_BASED_KILLING_LOG_ONLY = false;
+    public static final String SCAN_BASED_KILLING_MODE_DISABLED = "disabled";
+    public static final String SCAN_BASED_KILLING_MODE_LOG_ONLY = "logOnly";
+    public static final String SCAN_BASED_KILLING_MODE_ENFORCE = "enforce";
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MODE = "accounting.scan.based.killing.mode";
+    public static final String DEFAULT_SCAN_BASED_KILLING_MODE = SCAN_BASED_KILLING_MODE_DISABLED;
 
     public static final String CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME =
         "accounting.scan.based.killing.strategy.factory.class.name";
