@@ -26,6 +26,14 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
+/**
+ * Extracts intermediate bitmap results for cross-segment merging.
+ *
+ * <p>The bitmap strategy stores entities as 32-bit hash codes in a {@link RoaringBitmap}. This is inherently
+ * approximate for non-INT single-key columns (STRING, LONG, FLOAT, DOUBLE use {@code hashCode()}) and for all
+ * multi-key composite keys. Hash collisions can cause two distinct entities to be treated as one, leading to
+ * incorrect funnel step counts. For exact results, use the {@code 'set'} or {@code 'theta_sketch'} strategy.
+ */
 class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWrapper, List<RoaringBitmap>> {
   protected final int _numSteps;
 
@@ -42,12 +50,30 @@ class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIds
       }
       return result;
     }
-    Dictionary dictionary = dictIdsWrapper._dictionary;
     List<RoaringBitmap> result = new ArrayList<>(_numSteps);
-    for (RoaringBitmap dictIdBitmap : dictIdsWrapper._stepsBitmaps) {
-      result.add(convertToValueBitmap(dictionary, dictIdBitmap));
+    if (dictIdsWrapper.isMultiKey()) {
+      for (RoaringBitmap compositeIdBitmap : dictIdsWrapper._stepsBitmaps) {
+        result.add(convertCompositeToValueBitmap(dictIdsWrapper, compositeIdBitmap));
+      }
+    } else {
+      Dictionary dictionary = dictIdsWrapper._dictionaries[0];
+      for (RoaringBitmap dictIdBitmap : dictIdsWrapper._stepsBitmaps) {
+        result.add(convertToValueBitmap(dictionary, dictIdBitmap));
+      }
     }
     return result;
+  }
+
+  private RoaringBitmap convertCompositeToValueBitmap(DictIdsWrapper wrapper, RoaringBitmap compositeIdBitmap) {
+    RoaringBitmap valueBitmap = new RoaringBitmap();
+    PeekableIntIterator iterator = compositeIdBitmap.getIntIterator();
+    int numKeys = wrapper._dictionaries.length;
+    int[] dictIds = new int[numKeys];
+    while (iterator.hasNext()) {
+      wrapper.reverseDictIds(iterator.next(), dictIds);
+      valueBitmap.add(DictIdsWrapper.toCompositeString(wrapper._dictionaries, dictIds).hashCode());
+    }
+    return valueBitmap;
   }
 
   /**

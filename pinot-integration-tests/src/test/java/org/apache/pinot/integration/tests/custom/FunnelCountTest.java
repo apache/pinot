@@ -46,8 +46,8 @@ import static org.testng.Assert.assertNotNull;
  *
  * <p>Each segment contains multiple category values (electronics, clothing, home) to
  * exercise GROUP BY across categories within a single segment. Users 3 and 9 are
- * "cross-category" — their funnel actions span two categories, which is specifically
- * designed to support future "hold constant columns" feature testing.
+ * "cross-category" — their funnel actions span two categories, which specifically
+ * tests the multi-key correlate-by feature.
  *
  * <h3>Test data layout (2 segments)</h3>
  * <pre>
@@ -93,10 +93,17 @@ import static org.testng.Assert.assertNotNull;
  *
  * <h3>Expected funnel counts</h3>
  * <pre>
- * Overall:       [12, 10, 6, 3]
- * clothing:      [ 4,  4, 2, 2]
- * electronics:   [ 5,  4, 2, 1]
- * home:          [ 3,  2, 0, 0]
+ * Single-key CORRELATE_BY(user_id):
+ *   Overall:       [12, 10, 6, 3]
+ *   clothing:      [ 4,  4, 2, 2]
+ *   electronics:   [ 5,  4, 2, 1]
+ *   home:          [ 3,  2, 0, 0]
+ *
+ * Multi-key CORRELATE_BY(user_id, category):
+ *   Overall:       [12, 10, 4, 3]   (step 3 drops from 6→4: users 3,9 cross-category)
+ *   clothing:      [ 4,  4, 2, 2]   (same — grouping already separates by category)
+ *   electronics:   [ 5,  4, 2, 1]   (same)
+ *   home:          [ 3,  2, 0, 0]   (same)
  * </pre>
  */
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -117,6 +124,11 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
   private static final long[] EXPECTED_ELECTRONICS = {5, 4, 2, 1};
   private static final long[] EXPECTED_CLOTHING = {4, 4, 2, 2};
   private static final long[] EXPECTED_HOME = {3, 2, 0, 0};
+
+  // Multi-key: CORRELATE_BY(user_id, category)
+  // Cross-category users 3 and 9 no longer complete checkout within a single category.
+  private static final long[] EXPECTED_MULTI_KEY_OVERALL = {12, 10, 4, 3};
+  private static final long[] EXPECTED_MULTI_KEY_FILTERED = {7, 6, 3, 3};
 
   @Override
   protected long getCountStarResult() {
@@ -222,6 +234,14 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
         + "%7$s)", ACTION_COL, VIEW, CART, CHECKOUT, PURCHASE, USER_ID_COL, settingsClause);
   }
 
+  private String funnelCountMultiKeyAggregation(String settings) {
+    String settingsClause = (settings == null) ? "" : ", SETTINGS(" + settings + ")";
+    return String.format("FUNNEL_COUNT("
+        + "STEPS(%1$s = '%2$s', %1$s = '%3$s', %1$s = '%4$s', %1$s = '%5$s'), "
+        + "CORRELATE_BY(%6$s, %7$s)"
+        + "%8$s)", ACTION_COL, VIEW, CART, CHECKOUT, PURCHASE, USER_ID_COL, CATEGORY_COL, settingsClause);
+  }
+
   private String overallQuery(String settings) {
     return String.format("SELECT %s FROM %s", funnelCountAggregation(settings), TABLE_NAME);
   }
@@ -229,6 +249,15 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
   private String groupByQuery(String settings) {
     return String.format("SELECT %s, %s FROM %s GROUP BY %s ORDER BY %s",
         CATEGORY_COL, funnelCountAggregation(settings), TABLE_NAME, CATEGORY_COL, CATEGORY_COL);
+  }
+
+  private String overallMultiKeyQuery(String settings) {
+    return String.format("SELECT %s FROM %s", funnelCountMultiKeyAggregation(settings), TABLE_NAME);
+  }
+
+  private String groupByMultiKeyQuery(String settings) {
+    return String.format("SELECT %s, %s FROM %s GROUP BY %s ORDER BY %s",
+        CATEGORY_COL, funnelCountMultiKeyAggregation(settings), TABLE_NAME, CATEGORY_COL, CATEGORY_COL);
   }
 
   // ---------- assertion helpers ----------
@@ -275,6 +304,8 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
         {"'partitioned'"}, {"'partitioned', 'theta_sketch'"}, {"'partitioned', 'sorted'"}
     };
   }
+
+  // ===================== Single-key tests =====================
 
   @Test(dataProvider = "allStrategies")
   public void testOverall(String settings)
@@ -338,7 +369,7 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
     return new Object[][]{{null}, {"'partitioned'"}, {"'partitioned', 'sorted'"}};
   }
 
-  @Test(dataProvider = "filteredStrategies")
+  @Test(dataProvider = "allStrategies")
   public void testWithFilter(String settings)
       throws Exception {
     setUseMultiStageQueryEngine(false);
@@ -393,5 +424,38 @@ public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
     setUseMultiStageQueryEngine(false);
     JsonNode rows = getRows(postQuery(emptyResultGroupByQuery(settings)));
     assertEquals(rows.size(), 0, "Expected zero groups when all rows are filtered");
+  }
+
+  // ===================== Multi-key CORRELATE_BY tests =====================
+
+  @Test(dataProvider = "allStrategies")
+  public void testMultiKeyOverall(String settings)
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(overallMultiKeyQuery(settings)));
+    assertOverallResult(rows, EXPECTED_MULTI_KEY_OVERALL);
+  }
+
+  @Test(dataProvider = "allStrategies")
+  public void testMultiKeyGroupBy(String settings)
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(groupByMultiKeyQuery(settings)));
+    // Group-by category with CORRELATE_BY(user_id, category) produces the same results
+    // as single-key because grouping already separates rows by category.
+    assertGroupByResult(rows);
+  }
+
+  private String filteredMultiKeyQuery(String settings) {
+    return overallMultiKeyQuery(settings) + " WHERE " + USER_ID_COL + " <= 7";
+  }
+
+  @Test(dataProvider = "filteredStrategies")
+  public void testMultiKeyWithFilter(String settings)
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode rows = getRows(postQuery(filteredMultiKeyQuery(settings)));
+    assertEquals(rows.size(), 1);
+    assertStepCounts(rows.get(0).get(0), EXPECTED_MULTI_KEY_FILTERED);
   }
 }
