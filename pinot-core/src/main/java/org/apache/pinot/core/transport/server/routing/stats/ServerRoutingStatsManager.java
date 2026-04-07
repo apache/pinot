@@ -23,16 +23,19 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector;
 import org.slf4j.Logger;
@@ -45,7 +48,7 @@ import org.slf4j.LoggerFactory;
  *  Server Selection feature (when enabled). The stats are maintained at the broker and are updated when a query is
  *  submitted to a server and when a server responds after processing a query.
  */
-public class ServerRoutingStatsManager {
+public class ServerRoutingStatsManager implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerRoutingStatsManager.class);
 
   private final PinotConfiguration _config;
@@ -65,6 +68,8 @@ public class ServerRoutingStatsManager {
   private double _avgInitializationVal;
   private int _hybridScoreExponent;
   private boolean _enableStatsMetricExport;
+  private long _statsMetricExportIntervalMs;
+  private volatile ScheduledFuture<?> _metricExportFuture;
 
   public ServerRoutingStatsManager(PinotConfiguration pinotConfig, BrokerMetrics brokerMetrics) {
     _config = pinotConfig;
@@ -104,12 +109,42 @@ public class ServerRoutingStatsManager {
 
     _enableStatsMetricExport = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT,
         AdaptiveServerSelector.DEFAULT_ENABLE_STATS_METRIC_EXPORT);
-    if (_enableStatsMetricExport) {
-      long intervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
-          AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
-      _periodicTaskExecutor.scheduleAtFixedRate(this::exportStatsAsMetrics, intervalMs, intervalMs,
-          TimeUnit.MILLISECONDS);
-      LOGGER.info("Adaptive server routing stats metric export enabled with interval {}ms.", intervalMs);
+    _statsMetricExportIntervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
+        AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+    _metricExportFuture = _periodicTaskExecutor.scheduleAtFixedRate(this::exportStatsAsMetrics,
+        _statsMetricExportIntervalMs, _statsMetricExportIntervalMs, TimeUnit.MILLISECONDS);
+    LOGGER.info("Adaptive server routing stats metric export scheduled with interval {}ms (enabled={}).",
+        _statsMetricExportIntervalMs, _enableStatsMetricExport);
+  }
+
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT)) {
+      String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT);
+      if (value != null) {
+        _enableStatsMetricExport = Boolean.parseBoolean(value);
+      } else {
+        // Key was removed from cluster config — fall back to the static broker config value.
+        _enableStatsMetricExport = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT,
+            AdaptiveServerSelector.DEFAULT_ENABLE_STATS_METRIC_EXPORT);
+      }
+      LOGGER.info("Updated enableStatsMetricExport to {} from cluster config.", _enableStatsMetricExport);
+      if (!_enableStatsMetricExport) {
+        removeAllServerStatsGauges();
+      }
+    }
+    if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS)) {
+      String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
+      long newIntervalMs = value != null ? Long.parseLong(value)
+          : _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
+              AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+      if (newIntervalMs != _statsMetricExportIntervalMs) {
+        _statsMetricExportIntervalMs = newIntervalMs;
+        _metricExportFuture.cancel(false);
+        _metricExportFuture = _periodicTaskExecutor.scheduleAtFixedRate(this::exportStatsAsMetrics,
+            newIntervalMs, newIntervalMs, TimeUnit.MILLISECONDS);
+        LOGGER.info("Rescheduled adaptive server routing stats metric export with new interval {}ms.", newIntervalMs);
+      }
     }
   }
 
@@ -398,12 +433,28 @@ public class ServerRoutingStatsManager {
     }
   }
 
+  private void removeAllServerStatsGauges() {
+    if (_serverQueryStatsMap == null) {
+      return;
+    }
+    for (String serverInstanceId : _serverQueryStatsMap.keySet()) {
+      String serverTag = "server." + serverInstanceId;
+      _brokerMetrics.removeGauge(BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS.getGaugeName() + "." + serverTag);
+      _brokerMetrics.removeGauge(BrokerGauge.ADAPTIVE_SERVER_LATENCY_EMA.getGaugeName() + "." + serverTag);
+      _brokerMetrics.removeGauge(BrokerGauge.ADAPTIVE_SERVER_HYBRID_SCORE.getGaugeName() + "." + serverTag);
+    }
+    LOGGER.info("Removed adaptive server routing stats gauges for {} servers.", _serverQueryStatsMap.size());
+  }
+
   private void recordQueueSizeMetrics() {
     int queueSize = getQueueSize();
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ROUTING_STATS_MANAGER_QUEUE_SIZE, queueSize);
   }
 
   private void exportStatsAsMetrics() {
+    if (!_enableStatsMetricExport) {
+      return;
+    }
     try {
       for (Map.Entry<String, ServerRoutingStatsEntry> entry : _serverQueryStatsMap.entrySet()) {
         String serverInstanceId = entry.getKey();
