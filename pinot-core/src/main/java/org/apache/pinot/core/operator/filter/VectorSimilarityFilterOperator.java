@@ -68,8 +68,6 @@ import org.slf4j.LoggerFactory;
 public class VectorSimilarityFilterOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(VectorSimilarityFilterOperator.class);
   private static final String EXPLAIN_NAME = "VECTOR_SIMILARITY_INDEX";
-  /** Default over-fetch factor for filtered ANN queries to compensate for post-filter loss. */
-  static final int FILTERED_OVERFETCH_FACTOR = 2;
 
   private final VectorIndexReader _vectorIndexReader;
   private final VectorSimilarityPredicate _predicate;
@@ -156,9 +154,11 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       baseSearchCount = searchParams.getEffectiveMaxCandidates(predicate.getTopK(), numDocs);
     } else if (_effectiveExactRerank) {
       baseSearchCount = searchParams.getEffectiveMaxCandidates(predicate.getTopK(), numDocs);
-    } else if (hasMetadataFilter && !searchParams.isMaxCandidatesExplicit()) {
-      baseSearchCount = Math.min(predicate.getTopK() * FILTERED_OVERFETCH_FACTOR, numDocs);
     } else {
+      // For plain top-K and filtered queries (no rerank, no threshold), always ask
+      // the ANN index for exactly topK candidates. Over-fetching would change the
+      // predicate semantics: vectorSimilarity(col, q, 10) must return at most 10 docs.
+      // The metadata filter (bitmap AND) reduces this set further, which is correct.
       baseSearchCount = predicate.getTopK();
     }
     _effectiveSearchCount = baseSearchCount;
@@ -283,7 +283,13 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
             column);
       }
 
-      // 4. Apply threshold refinement if distance threshold is set
+      // 4. Apply threshold refinement if distance threshold is set.
+      // NOTE: This is approximate threshold search. The ANN index generates a candidate pool
+      // (controlled by vectorMaxCandidates, default topK*10), and only those candidates are
+      // checked against the threshold. Vectors within the threshold but outside the ANN candidate
+      // pool will be missed. For exact threshold search, use a table without a vector index
+      // (ExactVectorScanFilterOperator handles threshold correctly via brute-force scan).
+      // Increase vectorMaxCandidates to improve recall at the cost of latency.
       if (_hasThresholdPredicate && _forwardIndexReader == null) {
         LOGGER.warn("Vector distance threshold was requested on column: {} but no forward index reader is available. "
                 + "Returning raw ANN top-K results without threshold refinement.",
@@ -293,7 +299,8 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
         ImmutableRoaringBitmap thresholded = applyThresholdRefinement(
             annResults, queryVector, _distanceThreshold, column);
         _rerankedCandidateCount = thresholded.getCardinality();
-        LOGGER.debug("Threshold refinement on column: {}, threshold: {}, candidates: {} -> final: {}",
+        LOGGER.debug("Approximate threshold refinement on column: {}, threshold: {}, "
+                + "annCandidates: {} -> thresholded: {} (recall limited by candidate pool size)",
             column, _distanceThreshold, annCandidateCount, thresholded.getCardinality());
         return thresholded;
       }

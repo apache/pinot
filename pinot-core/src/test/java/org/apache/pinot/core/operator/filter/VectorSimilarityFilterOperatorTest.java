@@ -519,14 +519,15 @@ public class VectorSimilarityFilterOperatorTest {
   }
 
   @Test
-  public void testFilteredAnnOverfetchesCandidates() {
+  public void testFilteredAnnDoesNotOverfetch() {
+    // Filtered ANN should NOT over-fetch: vectorSimilarity(col, q, 5) must return at most 5 docs.
+    // The metadata filter (bitmap AND) reduces this set further.
     MutableRoaringBitmap annResult = new MutableRoaringBitmap();
     annResult.add(0);
 
     VectorIndexReader mockReader = mock(VectorIndexReader.class);
     float[] queryVector = {1.0f, 0.0f};
-    // With hasMetadataFilter=true and topK=5, expect searchCount = 5 * FILTERED_OVERFETCH_FACTOR = 10
-    when(mockReader.getDocIds(queryVector, 10)).thenReturn(annResult);
+    when(mockReader.getDocIds(queryVector, 5)).thenReturn(annResult);
 
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 5);
@@ -534,8 +535,8 @@ public class VectorSimilarityFilterOperatorTest {
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, VectorSearchParams.DEFAULT, null, null, true);
     operator.getBitmaps();
-    // Verify the over-fetched count was used
-    verify(mockReader).getDocIds(queryVector, 10);
+    // Verify topK is used as-is (no over-fetch)
+    verify(mockReader).getDocIds(queryVector, 5);
   }
 
   /**

@@ -89,18 +89,16 @@ public class VectorCompoundQueryTest {
 
   @Test
   public void testFilterPlusTopKOperator() {
-    // Simulates: WHERE VECTOR_SIMILARITY(col, vec, 3) AND metadata_col = 'x'
-    // The vector operator should over-fetch and report ANN_THEN_FILTER mode
+    // Simulates: WHERE VECTOR_SIMILARITY(col, vec, 2) AND metadata_col = 'x'
+    // The vector operator returns exactly topK docs; bitmap AND with metadata filter
+    // reduces further. No over-fetch: vectorSimilarity(col, q, 2) returns at most 2.
     MutableRoaringBitmap annResult = new MutableRoaringBitmap();
     annResult.add(0);
     annResult.add(1);
-    annResult.add(2);
-    annResult.add(3);
 
     VectorIndexReader mockReader = mock(VectorIndexReader.class);
     float[] queryVector = {1.0f, 0.0f};
-    // With hasMetadataFilter=true and topK=2, expect over-fetch to topK * 2 = 4
-    when(mockReader.getDocIds(queryVector, 4)).thenReturn(annResult);
+    when(mockReader.getDocIds(queryVector, 2)).thenReturn(annResult);
 
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
@@ -109,9 +107,7 @@ public class VectorCompoundQueryTest {
         mockReader, predicate, 100, VectorSearchParams.DEFAULT, null, null, true);
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
-    // The ANN returns 4 candidates; after bitmap AND with metadata filter (simulated separately),
-    // only matching docs survive. The operator itself returns the over-fetched ANN results.
-    Assert.assertEquals(result.getCardinality(), 4);
+    Assert.assertEquals(result.getCardinality(), 2);
 
     String explain = operator.toExplainString();
     Assert.assertTrue(explain.contains("executionMode:ANN_THEN_FILTER"));
