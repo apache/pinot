@@ -64,8 +64,6 @@ pinot-integration-tests/src/test/resources/udf-test-results/*.md
 
 tmp/
 
-# Claude Code / Anthropic
-.claude/
 
 # OpenAI / Codex / ChatGPT-style tools
 .codex/

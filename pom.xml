@@ -2799,6 +2799,9 @@
                 <exclude>**/.classpath</exclude>
                 <exclude>.externalToolBuilders/**</exclude>
 
+                <!-- Knowledge base (not source code) -->
+                <exclude>kb/**</exclude>
+
                 <!-- GenAI Config files -->
                 <exclude>.claude/**</exclude>
                 <exclude>.codex/**</exclude>
@@ -2917,6 +2920,9 @@
             <exclude>**/.project</exclude>
             <exclude>**/.classpath</exclude>
             <exclude>.externalToolBuilders/**</exclude>
+
+            <!-- Knowledge base (not source code) -->
+            <exclude>kb/**</exclude>
 
             <!-- GenAI Config files -->
             <exclude>.claude/**</exclude>
