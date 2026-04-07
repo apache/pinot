@@ -263,7 +263,20 @@ public abstract class IndexedTable extends BaseTable {
 
   @Override
   public Iterator<Record> iterator() {
+    if (_topRecords == null) {
+      return _lookupMap.values().iterator();
+    }
     return _topRecords.iterator();
+  }
+
+
+  /**
+   * Absorbs the resize/trim statistics from another {@link IndexedTable} into this table.
+   * Call this after merging tables to ensure resize metrics are accurately reported.
+   */
+  public void absorbTrimStats(IndexedTable other) {
+    _numResizes += other._numResizes;
+    _resizeTimeNs += other._resizeTimeNs;
   }
 
   public int getNumResizes() {
