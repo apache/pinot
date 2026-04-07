@@ -224,7 +224,7 @@ public class FilterPlanNode implements PlanNode {
         childFilterOperators = new ArrayList<>(childFilters.size());
         for (FilterContext childFilter : childFilters) {
           BaseFilterOperator childFilterOperator;
-          if (isVectorSimilarityFilter(childFilter) && childFilters.size() > 1) {
+          if (isVectorSimilarityFilter(childFilter) && hasNonVectorSibling(childFilters)) {
             // Pass filtered context so vector operator reports correct execution mode
             childFilterOperator = constructFilteredVectorOperator(childFilter, numDocs);
           } else {
@@ -416,6 +416,19 @@ public class FilterPlanNode implements PlanNode {
     DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
     return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
         numDocs, true);
+  }
+
+  /**
+   * Returns true if the child list contains at least one non-VECTOR_SIMILARITY predicate
+   * (i.e., a real metadata filter sibling).
+   */
+  private static boolean hasNonVectorSibling(List<FilterContext> childFilters) {
+    for (FilterContext child : childFilters) {
+      if (!isVectorSimilarityFilter(child)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

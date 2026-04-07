@@ -150,10 +150,10 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     // Default over-fetch factor is 2x topK for filtered queries without explicit maxCandidates.
     // For threshold queries, use a larger candidate pool since we need distance refinement.
     int baseSearchCount;
-    if (_hasThresholdPredicate && !searchParams.isMaxCandidatesExplicit()) {
+    if (_hasThresholdPredicate) {
       // Threshold queries need a larger candidate pool for exact distance refinement.
-      // Use topK * 10 by default, similar to rerank mode.
-      baseSearchCount = Math.min(predicate.getTopK() * 10, numDocs);
+      // Honor explicit vectorMaxCandidates; otherwise default to topK * 10.
+      baseSearchCount = searchParams.getEffectiveMaxCandidates(predicate.getTopK(), numDocs);
     } else if (_effectiveExactRerank) {
       baseSearchCount = searchParams.getEffectiveMaxCandidates(predicate.getTopK(), numDocs);
     } else if (hasMetadataFilter && !searchParams.isMaxCandidatesExplicit()) {
@@ -408,8 +408,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
   private void refreshExplainContext(@Nullable String fallbackReason) {
     VectorExecutionMode executionMode = VectorQueryExecutionContext.selectExecutionMode(
-        true, _hasMetadataFilter, _hasThresholdPredicate, _effectiveExactRerank,
-        _backendType.getCapabilities());
+        true, _hasMetadataFilter, _hasThresholdPredicate, _effectiveExactRerank);
     _vectorExplainContext = new VectorExplainContext(_backendType, _distanceFunction, executionMode,
         resolveEffectiveNprobe(_backendType, _searchParams, _vectorIndexReader.getIndexDebugInfo()),
         _effectiveExactRerank, _effectiveSearchCount, fallbackReason);

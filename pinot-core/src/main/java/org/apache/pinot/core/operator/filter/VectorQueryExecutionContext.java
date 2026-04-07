@@ -124,7 +124,7 @@ public final class VectorQueryExecutionContext {
   }
 
   /**
-   * Selects the execution mode for a vector query based on backend capabilities and query shape.
+   * Selects the execution mode for a vector query based on query shape.
    *
    * <p>This is the centralized decision point. The rules are conservative and explicit:</p>
    * <ol>
@@ -138,8 +138,7 @@ public final class VectorQueryExecutionContext {
    * </ol>
    */
   public static VectorExecutionMode selectExecutionMode(boolean hasVectorIndex,
-      boolean hasMetadataFilter, boolean hasThresholdPredicate, boolean exactRerank,
-      @Nullable VectorBackendCapabilities capabilities) {
+      boolean hasMetadataFilter, boolean hasThresholdPredicate, boolean exactRerank) {
     if (!hasVectorIndex) {
       return VectorExecutionMode.EXACT_SCAN;
     }

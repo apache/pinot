@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.filter;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
-import org.apache.pinot.segment.spi.index.creator.VectorBackendCapabilities;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorExecutionMode;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -53,42 +52,36 @@ public class VectorCompoundQueryTest {
 
   @Test
   public void testFilterPlusTopKSelectsAnnThenFilter() {
-    VectorBackendCapabilities caps = VectorBackendType.HNSW.getCapabilities();
     VectorExecutionMode mode = VectorQueryExecutionContext.selectExecutionMode(
-        true, true, false, false, caps);
+        true, true, false, false);
     Assert.assertEquals(mode, VectorExecutionMode.ANN_THEN_FILTER);
   }
 
   @Test
   public void testFilterPlusTopKWithRerankSelectsAnnThenFilterThenRerank() {
-    VectorBackendCapabilities caps = VectorBackendType.IVF_PQ.getCapabilities();
     VectorExecutionMode mode = VectorQueryExecutionContext.selectExecutionMode(
-        true, true, false, true, caps);
+        true, true, false, true);
     Assert.assertEquals(mode, VectorExecutionMode.ANN_THEN_FILTER_THEN_RERANK);
   }
 
   @Test
   public void testFilterPlusThresholdSelectsAnnThresholdThenFilter() {
-    VectorBackendCapabilities caps = VectorBackendType.HNSW.getCapabilities();
     VectorExecutionMode mode = VectorQueryExecutionContext.selectExecutionMode(
-        true, true, true, false, caps);
+        true, true, true, false);
     Assert.assertEquals(mode, VectorExecutionMode.ANN_THRESHOLD_THEN_FILTER);
   }
 
   @Test
   public void testThresholdAloneSelectsAnnThresholdScan() {
-    VectorBackendCapabilities caps = VectorBackendType.IVF_FLAT.getCapabilities();
     VectorExecutionMode mode = VectorQueryExecutionContext.selectExecutionMode(
-        true, false, true, false, caps);
+        true, false, true, false);
     Assert.assertEquals(mode, VectorExecutionMode.ANN_THRESHOLD_SCAN);
   }
 
   @Test
   public void testFilterPlusThresholdPlusRerankPrioritizesThreshold() {
-    // When threshold is set, it takes priority over rerank semantics
-    VectorBackendCapabilities caps = VectorBackendType.IVF_PQ.getCapabilities();
     VectorExecutionMode mode = VectorQueryExecutionContext.selectExecutionMode(
-        true, true, true, true, caps);
+        true, true, true, true);
     Assert.assertEquals(mode, VectorExecutionMode.ANN_THRESHOLD_THEN_FILTER);
   }
 

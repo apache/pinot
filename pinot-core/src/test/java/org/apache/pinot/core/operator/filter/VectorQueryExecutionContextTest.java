@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import org.apache.pinot.segment.spi.index.creator.VectorBackendCapabilities;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorExecutionMode;
 import org.testng.annotations.Test;
@@ -40,62 +39,56 @@ public class VectorQueryExecutionContextTest {
   @Test
   public void testSelectModeNoVectorIndex() {
     assertEquals(
-        VectorQueryExecutionContext.selectExecutionMode(false, false, false, false, null),
+        VectorQueryExecutionContext.selectExecutionMode(false, false, false, false),
         VectorExecutionMode.EXACT_SCAN);
   }
 
   @Test
   public void testSelectModeNoVectorIndexWithFilter() {
     assertEquals(
-        VectorQueryExecutionContext.selectExecutionMode(false, true, false, false, null),
+        VectorQueryExecutionContext.selectExecutionMode(false, true, false, false),
         VectorExecutionMode.EXACT_SCAN);
   }
 
   @Test
   public void testSelectModePlainTopK() {
-    VectorBackendCapabilities caps = VectorBackendType.HNSW.getCapabilities();
     assertEquals(
-        VectorQueryExecutionContext.selectExecutionMode(true, false, false, false, caps),
+        VectorQueryExecutionContext.selectExecutionMode(true, false, false, false),
         VectorExecutionMode.ANN_TOP_K);
   }
 
   @Test
   public void testSelectModeTopKWithRerank() {
-    VectorBackendCapabilities caps = VectorBackendType.IVF_PQ.getCapabilities();
     assertEquals(
-        VectorQueryExecutionContext.selectExecutionMode(true, false, false, true, caps),
+        VectorQueryExecutionContext.selectExecutionMode(true, false, false, true),
         VectorExecutionMode.ANN_TOP_K_WITH_RERANK);
   }
 
   @Test
   public void testSelectModeAnnThenFilter() {
-    VectorBackendCapabilities caps = VectorBackendType.HNSW.getCapabilities();
     assertEquals(
-        VectorQueryExecutionContext.selectExecutionMode(true, true, false, false, caps),
+        VectorQueryExecutionContext.selectExecutionMode(true, true, false, false),
         VectorExecutionMode.ANN_THEN_FILTER);
   }
 
   @Test
   public void testSelectModeAnnThenFilterThenRerank() {
-    VectorBackendCapabilities caps = VectorBackendType.IVF_PQ.getCapabilities();
     assertEquals(
-        VectorQueryExecutionContext.selectExecutionMode(true, true, false, true, caps),
+        VectorQueryExecutionContext.selectExecutionMode(true, true, false, true),
         VectorExecutionMode.ANN_THEN_FILTER_THEN_RERANK);
   }
 
   @Test
   public void testSelectModeThresholdScan() {
-    VectorBackendCapabilities caps = VectorBackendType.HNSW.getCapabilities();
     assertEquals(
-        VectorQueryExecutionContext.selectExecutionMode(true, false, true, false, caps),
+        VectorQueryExecutionContext.selectExecutionMode(true, false, true, false),
         VectorExecutionMode.ANN_THRESHOLD_SCAN);
   }
 
   @Test
   public void testSelectModeThresholdThenFilter() {
-    VectorBackendCapabilities caps = VectorBackendType.HNSW.getCapabilities();
     assertEquals(
-        VectorQueryExecutionContext.selectExecutionMode(true, true, true, false, caps),
+        VectorQueryExecutionContext.selectExecutionMode(true, true, true, false),
         VectorExecutionMode.ANN_THRESHOLD_THEN_FILTER);
   }
 
@@ -195,18 +188,16 @@ public class VectorQueryExecutionContextTest {
   @Test
   public void testThresholdTakesPriorityOverFilter() {
     // When both threshold and filter are present, threshold mode wins
-    VectorBackendCapabilities caps = VectorBackendType.HNSW.getCapabilities();
     VectorExecutionMode mode = VectorQueryExecutionContext.selectExecutionMode(
-        true, true, true, true, caps);
+        true, true, true, true);
     assertEquals(mode, VectorExecutionMode.ANN_THRESHOLD_THEN_FILTER);
   }
 
   @Test
   public void testNoIndexAlwaysFallsBackToExactScan() {
     // Even with threshold, filter, and rerank, no index means exact scan
-    VectorBackendCapabilities caps = VectorBackendType.HNSW.getCapabilities();
     VectorExecutionMode mode = VectorQueryExecutionContext.selectExecutionMode(
-        false, true, true, true, caps);
+        false, true, true, true);
     assertEquals(mode, VectorExecutionMode.EXACT_SCAN);
   }
 }

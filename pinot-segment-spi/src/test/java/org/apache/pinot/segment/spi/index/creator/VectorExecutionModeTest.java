@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -88,8 +87,15 @@ public class VectorExecutionModeTest {
   }
 
   @Test
-  public void testModeCount() {
-    assertEquals(VectorExecutionMode.values().length, 8,
-        "Phase 3 defines exactly 8 execution modes");
+  public void testExpectedModesExist() {
+    // Verify all Phase 3 modes are present (extensible: new modes don't break this test)
+    assertNotNull(VectorExecutionMode.valueOf("ANN_TOP_K"));
+    assertNotNull(VectorExecutionMode.valueOf("ANN_TOP_K_WITH_RERANK"));
+    assertNotNull(VectorExecutionMode.valueOf("ANN_THEN_FILTER"));
+    assertNotNull(VectorExecutionMode.valueOf("ANN_THEN_FILTER_THEN_RERANK"));
+    assertNotNull(VectorExecutionMode.valueOf("FILTER_THEN_ANN"));
+    assertNotNull(VectorExecutionMode.valueOf("ANN_THRESHOLD_SCAN"));
+    assertNotNull(VectorExecutionMode.valueOf("ANN_THRESHOLD_THEN_FILTER"));
+    assertNotNull(VectorExecutionMode.valueOf("EXACT_SCAN"));
   }
 }

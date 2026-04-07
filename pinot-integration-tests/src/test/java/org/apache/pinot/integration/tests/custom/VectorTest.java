@@ -286,8 +286,8 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
 
     JsonNode result = postQuery(explainQuery);
     String explain = result.get("resultTable").toString();
-    assertTrue(explain.contains("executionMode") || explain.contains("VECTOR_SIMILARITY"),
-        "EXPLAIN should contain execution mode info: " + explain);
+    assertTrue(explain.contains("executionMode"),
+        "EXPLAIN should contain executionMode: " + explain);
   }
 
   @Override
