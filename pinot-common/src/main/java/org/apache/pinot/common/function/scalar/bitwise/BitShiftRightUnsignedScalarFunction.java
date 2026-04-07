@@ -28,7 +28,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
  * <p>This implementation is stateless and thread-safe.
  */
 @ScalarFunction(names = {"bitShiftRightUnsigned", "bitShiftRightLogical"})
-public class BitShiftRightUnsignedScalarFunction extends PolymorphicShiftScalarFunction {
+public class BitShiftRightUnsignedScalarFunction extends BaseShiftScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;
   private static final FunctionInfo LONG_FUNCTION_INFO;
 

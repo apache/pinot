@@ -28,7 +28,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
  * <p>This implementation is stateless and thread-safe.
  */
 @ScalarFunction
-public class BitNotScalarFunction extends PolymorphicUnaryIntegralScalarFunction {
+public class BitNotScalarFunction extends BaseUnaryIntegralScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;
   private static final FunctionInfo LONG_FUNCTION_INFO;
 

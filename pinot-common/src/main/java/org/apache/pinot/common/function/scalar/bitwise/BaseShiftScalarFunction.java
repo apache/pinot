@@ -30,7 +30,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
  *
  * <p>Implementations are stateless and thread-safe.
  */
-abstract class PolymorphicShiftScalarFunction implements PinotScalarFunction {
+abstract class BaseShiftScalarFunction implements PinotScalarFunction {
 
   @Nullable
   @Override

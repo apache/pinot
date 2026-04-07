@@ -26,23 +26,24 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
 /**
- * Base class for polymorphic unary integral scalar functions.
+ * Base class for polymorphic binary integral scalar functions.
  *
  * <p>Implementations are stateless and thread-safe.
  */
-abstract class PolymorphicUnaryIntegralScalarFunction implements PinotScalarFunction {
+abstract class BaseBinaryIntegralScalarFunction implements PinotScalarFunction {
 
   @Nullable
   @Override
   public FunctionInfo getFunctionInfo(ColumnDataType[] argumentTypes) {
-    if (argumentTypes.length != 1) {
+    if (argumentTypes.length != 2) {
       return null;
     }
-    ColumnDataType argumentType = argumentTypes[0].getStoredType();
-    if (argumentType == ColumnDataType.INT) {
+    ColumnDataType leftType = argumentTypes[0].getStoredType();
+    ColumnDataType rightType = argumentTypes[1].getStoredType();
+    if (leftType == ColumnDataType.INT && rightType == ColumnDataType.INT) {
       return intFunctionInfo();
     }
-    if (argumentType == ColumnDataType.LONG) {
+    if (BitFunctionUtils.isIntegral(leftType) && BitFunctionUtils.isIntegral(rightType)) {
       return longFunctionInfo();
     }
     return null;
@@ -52,12 +53,12 @@ abstract class PolymorphicUnaryIntegralScalarFunction implements PinotScalarFunc
   @Override
   public FunctionInfo getFunctionInfo(int numArguments) {
     // LONG overload is a safe fallback — INT inputs widen to LONG losslessly via convertTypes.
-    return numArguments == 1 ? longFunctionInfo() : null;
+    return numArguments == 2 ? longFunctionInfo() : null;
   }
 
   @Override
   public PinotSqlFunction toPinotSqlFunction() {
-    return BitFunctionUtils.unaryIntegralSqlFunction(getName());
+    return BitFunctionUtils.binaryIntegralSqlFunction(getName());
   }
 
   protected abstract FunctionInfo intFunctionInfo();
