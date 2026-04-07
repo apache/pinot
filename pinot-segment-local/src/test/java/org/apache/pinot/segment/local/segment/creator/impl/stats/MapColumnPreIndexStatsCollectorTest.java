@@ -556,7 +556,7 @@ public class MapColumnPreIndexStatsCollectorTest {
   public void testGetStoredTypeIsAlwaysMap() {
     assertEquals(mapReaderWithValueType(FieldSpec.DataType.STRING).getStoredType(), FieldSpec.DataType.MAP);
   }
-  
+
   @Test
   public void testMapKeyIndexReaderGetStoredTypeReturnsStoredType() {
     assertEquals(new MapKeyIndexReader(mock(ForwardIndexReader.class), "k",
