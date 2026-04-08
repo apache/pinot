@@ -39,6 +39,7 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
   private Map<String, String> _headers = new HashMap<>();
   private String _scheme = CommonConstants.HTTP_PROTOCOL;
   private SSLContext _sslContext = null;
+  private String _endpointIdentificationAlgorithm = "";
   private boolean _tlsV10Enabled = false;
   private int _readTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
   private int _connectTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
@@ -53,7 +54,7 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
         ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs, _handshakeTimeoutMs);
     TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
     return new JsonAsyncHttpPinotClientTransport(_headers, _scheme, _extraOptionString, _useMultistageEngine,
-        _sslContext, connectionTimeouts, tlsProtocols, _appId);
+        _sslContext, connectionTimeouts, tlsProtocols, _appId, _endpointIdentificationAlgorithm);
   }
 
   public Map<String, String> getHeaders() {
@@ -80,6 +81,10 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
     _sslContext = sslContext;
   }
 
+  public void setEndpointIdentificationAlgorithm(String endpointIdentificationAlgorithm) {
+    _endpointIdentificationAlgorithm = endpointIdentificationAlgorithm;
+  }
+
   public JsonAsyncHttpPinotClientTransportFactory withConnectionProperties(Properties properties) {
     if (_headers == null || _headers.isEmpty()) {
       _headers = ConnectionUtils.getHeadersFromProperties(properties);
@@ -90,8 +95,14 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
       _scheme = scheme;
     }
 
-    if (_sslContext == null && _scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
-      _sslContext = ConnectionUtils.getSSLContextFromProperties(properties);
+    if (_scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
+      _endpointIdentificationAlgorithm =
+          ConnectionUtils.getTlsConfigFromProperties(properties).getEndpointIdentificationAlgorithm();
+      if (_sslContext == null) {
+        _sslContext = ConnectionUtils.getSSLContextFromProperties(properties);
+      }
+    } else {
+      _endpointIdentificationAlgorithm = "";
     }
 
     _readTimeoutMs = Integer.parseInt(properties.getProperty("brokerReadTimeoutMs", DEFAULT_BROKER_READ_TIMEOUT_MS));

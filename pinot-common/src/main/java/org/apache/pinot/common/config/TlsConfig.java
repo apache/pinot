@@ -43,6 +43,8 @@ public class TlsConfig {
   // Allowed TLS protocols (optional, if not set uses default)
   @Nullable
   private String[] _allowedProtocols = null;
+  @Nullable
+  private String _endpointIdentificationAlgorithm = null;
 
   public TlsConfig() {
     // left blank
@@ -61,6 +63,7 @@ public class TlsConfig {
     _allowedProtocols = tlsConfig._allowedProtocols != null
         ? Arrays.copyOf(tlsConfig._allowedProtocols, tlsConfig._allowedProtocols.length)
         : null;
+    _endpointIdentificationAlgorithm = tlsConfig._endpointIdentificationAlgorithm;
   }
 
   public boolean isClientAuthEnabled() {
@@ -150,6 +153,15 @@ public class TlsConfig {
         : null;
   }
 
+  @Nullable
+  public String getEndpointIdentificationAlgorithm() {
+    return _endpointIdentificationAlgorithm;
+  }
+
+  public void setEndpointIdentificationAlgorithm(@Nullable String endpointIdentificationAlgorithm) {
+    _endpointIdentificationAlgorithm = endpointIdentificationAlgorithm;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -168,13 +180,14 @@ public class TlsConfig {
         && Objects.equals(_trustStorePath, tlsConfig._trustStorePath)
         && Objects.equals(_trustStorePassword, tlsConfig._trustStorePassword)
         && Objects.equals(_sslProvider, tlsConfig._sslProvider)
+        && Objects.equals(_endpointIdentificationAlgorithm, tlsConfig._endpointIdentificationAlgorithm)
         && Arrays.equals(_allowedProtocols, tlsConfig._allowedProtocols);
   }
 
   @Override
   public int hashCode() {
     int result = Objects.hash(_clientAuthEnabled, _keyStoreType, _keyStorePath, _keyStorePassword, _trustStoreType,
-        _trustStorePath, _trustStorePassword, _sslProvider, _insecure);
+        _trustStorePath, _trustStorePassword, _sslProvider, _insecure, _endpointIdentificationAlgorithm);
     result = 31 * result + Arrays.hashCode(_allowedProtocols);
     return result;
   }

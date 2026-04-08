@@ -73,6 +73,7 @@ public final class TlsUtils {
   private static final String FILE_SCHEME_PREFIX_WITHOUT_SLASH = FILE_SCHEME + ":";
   private static final String INSECURE = "insecure";
   private static final String PROTOCOLS = "protocols";
+  private static final String ENDPOINT_IDENTIFICATION_ALGORITHM = "endpointIdentificationAlgorithm";
 
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
   private static final Set<String> LOGGED_TLS_DIAGNOSTICS_KEYS = ConcurrentHashMap.newKeySet();
@@ -122,6 +123,8 @@ public final class TlsUtils {
         pinotConfig.getProperty(key(namespace, SSL_PROVIDER), defaultConfig.getSslProvider()));
     tlsConfig.setInsecure(
         pinotConfig.getProperty(key(namespace, INSECURE), defaultConfig.isInsecure()));
+    tlsConfig.setEndpointIdentificationAlgorithm(pinotConfig.getProperty(
+        key(namespace, ENDPOINT_IDENTIFICATION_ALGORITHM), defaultConfig.getEndpointIdentificationAlgorithm()));
 
     // Read allowed TLS protocols from config (e.g., "TLSv1.2,TLSv1.3")
     String protocolsConfig = pinotConfig.getProperty(key(namespace, PROTOCOLS));

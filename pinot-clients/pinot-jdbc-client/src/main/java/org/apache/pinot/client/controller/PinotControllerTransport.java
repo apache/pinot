@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.client.controller;
 
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
@@ -31,6 +29,8 @@ import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.client.ConnectionTimeouts;
 import org.apache.pinot.client.PinotClientException;
+import org.apache.pinot.client.SslContextProvider;
+import org.apache.pinot.client.SslContextProviderFactory;
 import org.apache.pinot.client.TlsProtocols;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.client.controller.response.SchemaResponse;
@@ -47,20 +47,30 @@ import org.slf4j.LoggerFactory;
 public class PinotControllerTransport {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotControllerTransport.class);
+  private static final SslContextProvider SSL_CONTEXT_PROVIDER = SslContextProviderFactory.create();
 
   Map<String, String> _headers;
   private final String _scheme;
   private final AsyncHttpClient _httpClient;
 
   public PinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
+      ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols) {
+    this(headers, scheme, sslContext, connectionTimeouts, tlsProtocols, null, null);
+  }
+
+  public PinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
       ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols, @Nullable String appId) {
+    this(headers, scheme, sslContext, connectionTimeouts, tlsProtocols, appId, null);
+  }
+
+  public PinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
+      ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols, @Nullable String appId,
+      @Nullable String endpointIdentificationAlgorithm) {
     _headers = headers;
     _scheme = scheme;
 
     DefaultAsyncHttpClientConfig.Builder builder = Dsl.config();
-    if (sslContext != null) {
-      builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
-    }
+    SSL_CONTEXT_PROVIDER.configure(builder, sslContext, tlsProtocols, endpointIdentificationAlgorithm);
 
     builder.setReadTimeout(Duration.ofMillis(connectionTimeouts.getReadTimeoutMs()))
         .setConnectTimeout(Duration.ofMillis(connectionTimeouts.getConnectTimeoutMs()))

@@ -54,6 +54,7 @@ import org.slf4j.LoggerFactory;
  */
 public class QueryServer {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
+  private static final long CHANNEL_SHUTDOWN_TIMEOUT_MS = 5_000L;
   private final int _port;
   private final TlsConfig _tlsConfig;
 
@@ -63,6 +64,7 @@ public class QueryServer {
   private final ChannelHandler _instanceRequestHandler;
   private ServerSocketChannel _channel;
   private final ConcurrentHashMap<SocketChannel, Boolean> _allChannels = new ConcurrentHashMap<>();
+  private volatile boolean _shuttingDown;
 
 
   /**
@@ -136,6 +138,7 @@ public class QueryServer {
 
       _channel = (ServerSocketChannel) serverBootstrap.group(_bossGroup, _workerGroup).channel(_channelClass)
           .option(ChannelOption.SO_BACKLOG, 128)
+          .option(ChannelOption.SO_REUSEADDR, true)
           .childOption(ChannelOption.SO_KEEPALIVE, true)
           .option(ChannelOption.ALLOCATOR, bufAllocatorWithLimits)
           .childOption(ChannelOption.ALLOCATOR, bufAllocatorWithLimits)
@@ -144,6 +147,10 @@ public class QueryServer {
             protected void initChannel(SocketChannel ch) {
               _allChannels.put(ch, true);
               ch.closeFuture().addListener(f -> _allChannels.remove(ch));
+              if (_shuttingDown) {
+                ch.close();
+                return;
+              }
 
               ch.pipeline()
                   .addLast(ChannelHandlerFactory.getDirectOOMHandler(null, null, null, _allChannels, _channel));
@@ -167,13 +174,44 @@ public class QueryServer {
   }
 
   public void shutDown() {
+    _shuttingDown = true;
     try {
-      _channel.close().sync();
+      if (_channel != null) {
+        _channel.close().sync();
+      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     } finally {
-      _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
-      _bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+      closeAcceptedChannels();
+      _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS).syncUninterruptibly();
+      _bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS).syncUninterruptibly();
+    }
+  }
+
+  private void closeAcceptedChannels() {
+    long deadlineMs = System.currentTimeMillis() + CHANNEL_SHUTDOWN_TIMEOUT_MS;
+    while (!_allChannels.isEmpty() && System.currentTimeMillis() < deadlineMs) {
+      SocketChannel[] channels = _allChannels.keySet().toArray(new SocketChannel[0]);
+      if (channels.length == 0) {
+        break;
+      }
+      closeAcceptedChannelSnapshot(channels, deadlineMs);
+    }
+    if (!_allChannels.isEmpty()) {
+      LOGGER.warn("Timed out waiting for {} client channels to close during shutdown", _allChannels.size());
+    }
+  }
+
+  @VisibleForTesting
+  void closeAcceptedChannelSnapshot(SocketChannel[] channels, long deadlineMs) {
+    for (SocketChannel ch : channels) {
+      ch.close();
+    }
+    for (SocketChannel ch : channels) {
+      long remainingMs = Math.max(1L, deadlineMs - System.currentTimeMillis());
+      if (!ch.closeFuture().awaitUninterruptibly(remainingMs)) {
+        LOGGER.warn("Timed out waiting for client channel to close during shutdown: {}", ch);
+      }
     }
   }
 
