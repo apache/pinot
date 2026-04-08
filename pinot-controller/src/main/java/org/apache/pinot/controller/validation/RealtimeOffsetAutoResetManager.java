@@ -191,6 +191,7 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
   protected void nonLeaderCleanup(List<String> tableNamesWithType) {
     for (String tableNameWithType : tableNamesWithType) {
       _tableTopicsUnderBackfill.remove(tableNameWithType);
+      _tableBackfillTopics.remove(tableNameWithType);
       _tableToHandler.remove(tableNameWithType);
     }
   }
@@ -214,13 +215,11 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
     try {
       Class<?> clazz = Class.forName(className);
       if (!RealtimeOffsetAutoResetHandler.class.isAssignableFrom(clazz)) {
-        String exceptionMessage = "Custom analyzer must be a child of "
-            + RealtimeOffsetAutoResetHandler.class.getCanonicalName();
-        throw new ReflectiveOperationException(exceptionMessage);
+        throw new ReflectiveOperationException("Custom handler must implement "
+            + RealtimeOffsetAutoResetHandler.class.getCanonicalName());
       }
-      handler = (RealtimeOffsetAutoResetHandler) clazz.getConstructor(
-          PinotLLCRealtimeSegmentManager.class, PinotHelixResourceManager.class).newInstance(
-          _llcRealtimeSegmentManager, _pinotHelixResourceManager);
+      handler = (RealtimeOffsetAutoResetHandler) clazz.getConstructor().newInstance();
+      handler.init(_llcRealtimeSegmentManager, _pinotHelixResourceManager);
       _tableToHandler.put(tableConfig.getTableName(), handler);
       return handler;
     } catch (Exception e) {
