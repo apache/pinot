@@ -759,6 +759,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
+  public ExecutorService getSegmentReloadRefreshExecutor() {
+    return _segmentReloadRefreshExecutor;
+  }
+
+  @Override
   public boolean isDeleted() {
     return _isDeleted;
   }

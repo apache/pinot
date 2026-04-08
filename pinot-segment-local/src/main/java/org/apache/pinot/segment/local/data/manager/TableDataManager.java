@@ -298,6 +298,12 @@ public interface TableDataManager {
   ExecutorService getSegmentPreloadExecutor();
 
   /**
+   * Returns the executor used for segment reload and refresh operations.
+   * Can be used to submit work that should run with the same concurrency controls as segment reloads.
+   */
+  ExecutorService getSegmentReloadRefreshExecutor();
+
+  /**
    * Add error related to segment, if any. The implementation
    * is expected to cache last 'N' errors for the table, related to
    * segment transitions.
