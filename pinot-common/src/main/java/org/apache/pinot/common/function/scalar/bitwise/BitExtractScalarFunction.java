@@ -39,10 +39,10 @@ public class BitExtractScalarFunction implements PinotScalarFunction {
   static {
     try {
       INT_FUNCTION_INFO =
-          new FunctionInfo(BitExtractScalarFunction.class.getMethod("intBitExtract", int.class, int.class),
+          new FunctionInfo(BitExtractScalarFunction.class.getMethod("intBitExtract", int.class, long.class),
               BitExtractScalarFunction.class, false);
       LONG_FUNCTION_INFO =
-          new FunctionInfo(BitExtractScalarFunction.class.getMethod("longBitExtract", long.class, int.class),
+          new FunctionInfo(BitExtractScalarFunction.class.getMethod("longBitExtract", long.class, long.class),
               BitExtractScalarFunction.class, false);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
@@ -80,17 +80,17 @@ public class BitExtractScalarFunction implements PinotScalarFunction {
     return numArguments == 2 ? LONG_FUNCTION_INFO : null;
   }
 
-  public static int intBitExtract(int value, int bit) {
+  public static int intBitExtract(int value, long bit) {
     if (!BitFunctionUtils.isBitIndexInRange(bit, Integer.SIZE)) {
       return 0;
     }
-    return (value >>> bit) & 1;
+    return (value >>> (int) bit) & 1;
   }
 
-  public static int longBitExtract(long value, int bit) {
+  public static int longBitExtract(long value, long bit) {
     if (!BitFunctionUtils.isBitIndexInRange(bit, Long.SIZE)) {
       return 0;
     }
-    return (int) ((value >>> bit) & 1L);
+    return (int) ((value >>> (int) bit) & 1L);
   }
 }
