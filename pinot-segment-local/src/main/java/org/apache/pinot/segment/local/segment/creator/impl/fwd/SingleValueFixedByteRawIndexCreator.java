@@ -68,9 +68,11 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
       int totalDocs, DataType valueType, int writerVersion, int targetDocsPerChunk)
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+    // Fixed-byte chunk writer supports up to version 5; cap higher versions (e.g. V6 which is variable-byte only)
+    int fixedByteWriterVersion = Math.min(writerVersion, 5);
     _indexWriter =
         new FixedByteChunkForwardIndexWriter(file, compressionType, totalDocs, targetDocsPerChunk, valueType.size(),
-            writerVersion);
+            fixedByteWriterVersion);
     _valueType = valueType;
   }
 
