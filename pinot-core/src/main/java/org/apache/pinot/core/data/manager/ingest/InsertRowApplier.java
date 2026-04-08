@@ -101,13 +101,29 @@ public class InsertRowApplier {
     }
 
     List<GenericRow> rows = GenericRowSerializer.deserializeRows(data);
-    LOGGER.info("Applied {} rows for statement {} partition {} seq {}", rows.size(), statementId, partitionId,
+    LOGGER.info("Deserialized {} rows for statement {} partition {} seq {}", rows.size(), statementId, partitionId,
         sequenceNo);
 
-    // Record that this batch has been applied
-    markApplied(applyKey);
+    // Note: do NOT mark as applied here. The caller must invoke confirmApplied() after
+    // successfully indexing the rows. Marking before indexing would cause data loss if
+    // indexing fails — the batch would be permanently skipped on subsequent recovery.
 
     return rows;
+  }
+
+  /**
+   * Confirms that a batch has been successfully indexed and should not be replayed again.
+   * Must be called by the caller after the rows returned by {@link #apply} have been
+   * successfully indexed into the mutable segment.
+   *
+   * @param statementId the statement identifier
+   * @param partitionId the partition identifier
+   * @param sequenceNo the sequence number
+   */
+  public void confirmApplied(String statementId, int partitionId, long sequenceNo) {
+    String applyKey = statementId + ":" + partitionId + ":" + sequenceNo;
+    markApplied(applyKey);
+    LOGGER.info("Confirmed apply for statement {} partition {} seq {}", statementId, partitionId, sequenceNo);
   }
 
   /**

@@ -178,6 +178,7 @@ public class InsertStatementCoordinator {
     // 3. Validate consistency mode — only WAIT_FOR_ACCEPT is supported in v1
     if (request.getConsistencyMode() != null
         && request.getConsistencyMode() != InsertConsistencyMode.WAIT_FOR_ACCEPT) {
+      releaseRequestIdOnFailure(tableNameWithType, request.getRequestId());
       return errorResult(request.getStatementId(), "UNSUPPORTED_CONSISTENCY_MODE",
           "Only WAIT_FOR_ACCEPT consistency mode is supported in this version. "
               + "Received: " + request.getConsistencyMode());
@@ -187,6 +188,7 @@ public class InsertStatementCoordinator {
     String executorType = request.getInsertType().name();
     InsertExecutor executor = _executors.get(executorType);
     if (executor == null) {
+      releaseRequestIdOnFailure(tableNameWithType, request.getRequestId());
       return errorResult(request.getStatementId(), "NO_EXECUTOR",
           "No InsertExecutor registered for type: " + executorType);
     }
@@ -199,6 +201,7 @@ public class InsertStatementCoordinator {
             InsertStatementState.ACCEPTED, now, now, Collections.emptyList(), null, null);
 
     if (!_statementStore.createStatement(manifest)) {
+      releaseRequestIdOnFailure(tableNameWithType, request.getRequestId());
       return errorResult(request.getStatementId(), "STORE_ERROR", "Failed to persist statement manifest in ZooKeeper");
     }
 
@@ -233,6 +236,7 @@ public class InsertStatementCoordinator {
 
         if (resultState == InsertStatementState.ABORTED) {
           _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_ABORTED, 1);
+          releaseRequestIdOnFailure(tableNameWithType, request.getRequestId());
         } else if (resultState == InsertStatementState.VISIBLE) {
           _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_VISIBLE, 1);
           _controllerMetrics.setValueOfGlobalGauge(
@@ -248,6 +252,7 @@ public class InsertStatementCoordinator {
       manifest.setErrorMessage("Executor error: " + e.getMessage());
       _statementStore.updateStatement(manifest);
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_ABORTED, 1);
+      releaseRequestIdOnFailure(tableNameWithType, request.getRequestId());
       return errorResult(request.getStatementId(), "EXECUTOR_ERROR", "Executor failed: " + e.getMessage());
     }
   }
@@ -730,6 +735,16 @@ public class InsertStatementCoordinator {
       } catch (Exception e) {
         LOGGER.warn("Executor abort failed during cleanup for statementId={}", manifest.getStatementId(), e);
       }
+    }
+  }
+
+  /**
+   * Releases a requestId reservation when the submission fails, so the client can retry.
+   * No-op if requestId is null.
+   */
+  private void releaseRequestIdOnFailure(@Nullable String tableNameWithType, @Nullable String requestId) {
+    if (requestId != null && tableNameWithType != null) {
+      _statementStore.releaseRequestId(tableNameWithType, requestId);
     }
   }
 

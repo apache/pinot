@@ -62,6 +62,7 @@ public class FileInsertExecutor implements InsertExecutor {
   static final String INPUT_DIR_URI = "inputDirURI";
   static final String STATEMENT_ID_KEY = "insert.statementId";
   static final String LINEAGE_ENTRY_ID_KEY = "insert.lineageEntryId";
+  static final String SKIP_PUSH_KEY = "insert.skipPush";
 
   private final PinotHelixResourceManager _resourceManager;
   private final PinotTaskManager _taskManager;
@@ -409,6 +410,10 @@ public class FileInsertExecutor implements InsertExecutor {
     if (lineageEntryId != null) {
       taskConfigs.put(LINEAGE_ENTRY_ID_KEY, lineageEntryId);
     }
+    // Tell the Minion task to skip the push step. The INSERT INTO flow manages segment
+    // visibility via the replacement protocol (startReplaceSegments/endReplaceSegments)
+    // in completeFileInsert(), so the task must not register segments directly.
+    taskConfigs.put(SKIP_PUSH_KEY, "true");
     return taskConfigs;
   }
 

@@ -213,9 +213,15 @@ public class InsertRecoveryManager {
         LOGGER.info("Replaying visible statement (idempotent): {}", statementId);
         if (replayCommittedStatement(statementId, rowApplyCallback)) {
           _recoveryReplayedCount++;
+          // Only clean up prepared data after successful replay. If replay failed (e.g.,
+          // partition dir missing or I/O error), keep the data so a subsequent recovery
+          // attempt can retry rather than permanently losing the rows.
+          _preparedStore.cleanup(statementId);
+        } else {
+          LOGGER.warn("VISIBLE statement {} replay incomplete — keeping prepared data for next recovery",
+              statementId);
+          _recoveryFailedCount++;
         }
-        // Even if replay found nothing new, clean up the prepared data
-        _preparedStore.cleanup(statementId);
         break;
 
       case ABORTED:
@@ -297,6 +303,8 @@ public class InsertRecoveryManager {
         List<GenericRow> rows = _rowApplier.apply(statementId, partitionId, 0);
         if (rows != null && !rows.isEmpty()) {
           rowApplyCallback.apply(statementId, partitionId, rows);
+          // Only mark as applied AFTER successful indexing to avoid data loss
+          _rowApplier.confirmApplied(statementId, partitionId, 0);
           applied = true;
         } else if (rows == null) {
           // null means already applied in a previous recovery — treat as success
