@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.controller.helix.core.ingest;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -81,16 +84,14 @@ public class FileInsertExecutorTest {
         .setTableName("testTable")
         .build();
     mockTableConfig(TABLE_NAME, tableConfig);
-    mockStartReplaceSegments();
     mockCreateTask();
 
     InsertRequest request = buildFileInsertRequest(TABLE_NAME, FILE_URI);
     InsertResult result = _executor.execute(request);
 
     assertEquals(result.getState(), InsertStatementState.ACCEPTED);
-    assertNotNull(_executor.getLineageEntryId(request.getStatementId()));
-    verify(_resourceManager).startReplaceSegments(
-        eq(TABLE_NAME), anyList(), anyList(), anyBoolean(), anyMap());
+    // Lineage entry is no longer created at execute time — it is deferred to completeFileInsert
+    assertNull(_executor.getLineageEntryId(request.getStatementId()));
     verify(_taskManager).createTask(eq("SegmentGenerationAndPushTask"), eq(TABLE_NAME),
         anyString(), anyMap());
   }
@@ -103,7 +104,6 @@ public class FileInsertExecutorTest {
         .setTableName("testTable")
         .build();
     mockTableConfig(REALTIME_TABLE, tableConfig);
-    mockStartReplaceSegments();
     mockCreateTask();
 
     InsertRequest request = buildFileInsertRequest(REALTIME_TABLE, FILE_URI);
@@ -209,14 +209,13 @@ public class FileInsertExecutorTest {
   }
 
   @Test
-  public void testAbortCleansUpSegments()
+  public void testAbortBeforeCompletion()
       throws Exception {
-    // First execute to create state
+    // First execute to create state (no lineage entry yet — deferred to complete)
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("testTable")
         .build();
     mockTableConfig(TABLE_NAME, tableConfig);
-    mockStartReplaceSegments();
     mockCreateTask();
 
     InsertRequest request = buildFileInsertRequest(TABLE_NAME, FILE_URI);
@@ -225,15 +224,38 @@ public class FileInsertExecutorTest {
 
     String statementId = request.getStatementId();
 
-    // Now abort
+    // Abort before completion — no lineage entry was created so no revert needed
     InsertResult abortResult = _executor.abort(statementId);
     assertEquals(abortResult.getState(), InsertStatementState.ABORTED);
-
-    // Verify revertReplaceSegments was called
-    verify(_resourceManager).revertReplaceSegments(eq(TABLE_NAME), eq(LINEAGE_ENTRY_ID), eq(false), any());
-
-    // Verify lineage entry is removed
     assertNull(_executor.getLineageEntryId(statementId));
+  }
+
+  @Test
+  public void testCompleteFileInsertStartsAndEndsReplacement()
+      throws Exception {
+    // Execute to create manifest
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+    mockTableConfig(TABLE_NAME, tableConfig);
+    mockCreateTask();
+
+    InsertRequest request = buildFileInsertRequest(TABLE_NAME, FILE_URI);
+    _executor.execute(request);
+
+    // Mock startReplaceSegments for the completion phase
+    mockStartReplaceSegments();
+
+    // Complete the insert with known segment names
+    List<String> segmentNames = Arrays.asList("seg1", "seg2");
+    InsertResult result = _executor.completeFileInsert(request.getStatementId(), segmentNames);
+
+    assertEquals(result.getState(), InsertStatementState.VISIBLE);
+    // Verify startReplaceSegments was called with the actual segment names
+    verify(_resourceManager).startReplaceSegments(
+        eq(TABLE_NAME), eq(Collections.emptyList()), eq(segmentNames), anyBoolean(), anyMap());
+    // Verify endReplaceSegments was called
+    verify(_resourceManager).endReplaceSegments(eq(TABLE_NAME), eq(LINEAGE_ENTRY_ID), any());
   }
 
   @Test
@@ -251,16 +273,24 @@ public class FileInsertExecutorTest {
   }
 
   @Test
-  public void testExecuteStartReplaceSegmentsFails() {
+  public void testCompleteStartReplaceSegmentsFails()
+      throws Exception {
+    // Execute to create manifest
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("testTable")
         .build();
     mockTableConfig(TABLE_NAME, tableConfig);
+    mockCreateTask();
+
+    InsertRequest request = buildFileInsertRequest(TABLE_NAME, FILE_URI);
+    _executor.execute(request);
+
+    // Mock startReplaceSegments to fail during completion
     when(_resourceManager.startReplaceSegments(anyString(), anyList(), anyList(), anyBoolean(), anyMap()))
         .thenThrow(new RuntimeException("ZK connection lost"));
 
-    InsertRequest request = buildFileInsertRequest(TABLE_NAME, FILE_URI);
-    InsertResult result = _executor.execute(request);
+    List<String> segmentNames = Arrays.asList("seg1");
+    InsertResult result = _executor.completeFileInsert(request.getStatementId(), segmentNames);
 
     assertEquals(result.getState(), InsertStatementState.ABORTED);
     assertEquals(result.getErrorCode(), "SEGMENT_REPLACE_FAILED");
@@ -273,7 +303,6 @@ public class FileInsertExecutorTest {
         .setTableName("testTable")
         .build();
     mockTableConfig(TABLE_NAME, tableConfig);
-    mockStartReplaceSegments();
     when(_taskManager.createTask(anyString(), anyString(), anyString(), anyMap()))
         .thenThrow(new Exception("Minion not available"));
 
@@ -282,9 +311,7 @@ public class FileInsertExecutorTest {
 
     assertEquals(result.getState(), InsertStatementState.ABORTED);
     assertEquals(result.getErrorCode(), "TASK_SCHEDULE_FAILED");
-
-    // Verify revert was called
-    verify(_resourceManager).revertReplaceSegments(eq(TABLE_NAME), eq(LINEAGE_ENTRY_ID), eq(false), any());
+    // No lineage entry to revert since startReplaceSegments is deferred to completion
   }
 
   @Test

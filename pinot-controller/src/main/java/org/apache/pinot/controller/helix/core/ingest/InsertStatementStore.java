@@ -49,7 +49,9 @@ public class InsertStatementStore {
   private static final Logger LOGGER = LoggerFactory.getLogger(InsertStatementStore.class);
 
   private static final String INSERT_STATEMENTS_PREFIX = "/INSERT_STATEMENTS";
+  private static final String REQUEST_IDS_PREFIX = "/INSERT_REQUEST_IDS";
   private static final String MANIFEST_FIELD = "manifest";
+  private static final String STATEMENT_ID_FIELD = "statementId";
 
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
@@ -160,6 +162,65 @@ public class InsertStatementStore {
   }
 
   /**
+   * Atomically reserves a requestId for a given table. If the requestId is already reserved,
+   * returns the existing statementId. Otherwise, creates a ZK node to reserve the mapping.
+   *
+   * <p>This uses ZK's atomic {@code create} to prevent two concurrent retries from both
+   * creating statements for the same requestId.
+   *
+   * @param tableNameWithType the table name with type
+   * @param requestId         the client-supplied request ID for idempotency
+   * @param statementId       the statement ID to associate with this request
+   * @return null if the reservation succeeded (this caller wins), or the existing statementId
+   *         if already reserved by a prior request
+   */
+  @Nullable
+  public String reserveRequestId(String tableNameWithType, String requestId, String statementId) {
+    String path = REQUEST_IDS_PREFIX + "/" + tableNameWithType + "/" + requestId;
+    try {
+      ZNRecord record = new ZNRecord(requestId);
+      record.setSimpleField(STATEMENT_ID_FIELD, statementId);
+      boolean created = _propertyStore.create(path, record, AccessOption.PERSISTENT);
+      if (created) {
+        return null;  // This caller wins the reservation
+      }
+      // Node already exists — read the existing statementId
+      ZNRecord existing = _propertyStore.get(path, null, AccessOption.PERSISTENT);
+      if (existing != null) {
+        return existing.getSimpleField(STATEMENT_ID_FIELD);
+      }
+      return null;
+    } catch (Exception e) {
+      // If create failed because node exists, read the existing entry
+      try {
+        ZNRecord existing = _propertyStore.get(path, null, AccessOption.PERSISTENT);
+        if (existing != null) {
+          return existing.getSimpleField(STATEMENT_ID_FIELD);
+        }
+      } catch (Exception readEx) {
+        LOGGER.error("Failed to read existing requestId reservation for requestId={}", requestId, readEx);
+      }
+      LOGGER.error("Failed to reserve requestId={} for statementId={}", requestId, statementId, e);
+      return null;
+    }
+  }
+
+  /**
+   * Removes a requestId reservation. Called when a statement is GC'd or aborted.
+   */
+  public void releaseRequestId(String tableNameWithType, String requestId) {
+    if (requestId == null) {
+      return;
+    }
+    String path = REQUEST_IDS_PREFIX + "/" + tableNameWithType + "/" + requestId;
+    try {
+      _propertyStore.remove(path, AccessOption.PERSISTENT);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to release requestId reservation for requestId={}", requestId, e);
+    }
+  }
+
+  /**
    * Finds a statement by requestId across all statements for a table.
    * Used for idempotency checks.
    *
@@ -167,6 +228,24 @@ public class InsertStatementStore {
    */
   @Nullable
   public InsertStatementManifest findByRequestId(String tableNameWithType, String requestId) {
+    // First check the atomic reservation index
+    String path = REQUEST_IDS_PREFIX + "/" + tableNameWithType + "/" + requestId;
+    try {
+      ZNRecord record = _propertyStore.get(path, null, AccessOption.PERSISTENT);
+      if (record != null) {
+        String statementId = record.getSimpleField(STATEMENT_ID_FIELD);
+        if (statementId != null) {
+          InsertStatementManifest manifest = getStatement(tableNameWithType, statementId);
+          if (manifest != null) {
+            return manifest;
+          }
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.debug("Failed to lookup requestId reservation for requestId={}", requestId, e);
+    }
+
+    // Fallback: scan manifests (for backward compatibility with pre-existing manifests)
     List<InsertStatementManifest> manifests = listStatements(tableNameWithType);
     for (InsertStatementManifest manifest : manifests) {
       if (requestId.equals(manifest.getRequestId())) {

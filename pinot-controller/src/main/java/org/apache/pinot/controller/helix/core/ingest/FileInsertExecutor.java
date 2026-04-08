@@ -136,30 +136,12 @@ public class FileInsertExecutor implements InsertExecutor {
     );
     _manifests.put(statementId, manifest);
 
-    // 6. Start segment replacement protocol
-    String lineageEntryId;
+    // 6. Schedule Minion SegmentGenerationAndPushTask.
+    // Note: segment replacement protocol (startReplaceSegments/endReplaceSegments) is deferred
+    // to completeFileInsert() when the final segment names are known. Starting replacement with
+    // an empty segmentsTo list would cause endReplaceSegments to reject the actual segments.
     try {
-      lineageEntryId = _resourceManager.startReplaceSegments(
-          tableNameWithType,
-          Collections.emptyList(),  // segmentsFrom: empty for new file insert (append)
-          Collections.emptyList(),  // segmentsTo: not known yet; Minion will determine
-          false,
-          buildCustomMap(statementId)
-      );
-      _lineageEntries.put(statementId, lineageEntryId);
-      manifest.setLineageEntryId(lineageEntryId);
-      LOGGER.info("Started segment replacement for statement {} with lineage entry {}", statementId, lineageEntryId);
-    } catch (Exception e) {
-      LOGGER.error("Failed to start segment replacement for statement {}", statementId, e);
-      manifest.setState(InsertStatementState.ABORTED);
-      manifest.setErrorMessage("Failed to start segment replacement: " + e.getMessage());
-      return buildErrorResult(statementId, InsertStatementState.ABORTED,
-          "Failed to start segment replacement: " + e.getMessage(), "SEGMENT_REPLACE_FAILED");
-    }
-
-    // 7. Schedule Minion SegmentGenerationAndPushTask
-    try {
-      Map<String, String> taskConfigs = buildTaskConfigs(fileUri, statementId, lineageEntryId, request.getOptions());
+      Map<String, String> taskConfigs = buildTaskConfigs(fileUri, statementId, null, request.getOptions());
       Map<String, String> taskResult = _taskManager.createTask(
           TASK_TYPE,
           tableNameWithType,
@@ -171,9 +153,6 @@ public class FileInsertExecutor implements InsertExecutor {
       LOGGER.error("Failed to schedule Minion task for statement {}", statementId, e);
       manifest.setState(InsertStatementState.ABORTED);
       manifest.setErrorMessage("Failed to schedule Minion task: " + e.getMessage());
-
-      // Best-effort revert of the lineage entry
-      revertLineageEntry(tableNameWithType, lineageEntryId, statementId);
 
       return buildErrorResult(statementId, InsertStatementState.ABORTED,
           "Failed to schedule Minion task: " + e.getMessage(), "TASK_SCHEDULE_FAILED");
@@ -215,20 +194,35 @@ public class FileInsertExecutor implements InsertExecutor {
           "Unknown statement: " + statementId, "STATEMENT_NOT_FOUND");
     }
 
-    // Try in-memory lineage map first, then fall back to the ZK-persisted lineage entry ID
-    String lineageEntryId = _lineageEntries.get(statementId);
-    if (lineageEntryId == null) {
-      lineageEntryId = manifest.getLineageEntryId();
-    }
-    if (lineageEntryId == null) {
-      return buildErrorResult(statementId, InsertStatementState.ABORTED,
-          "No lineage entry found for statement: " + statementId, "LINEAGE_NOT_FOUND");
-    }
-
     String tableNameWithType = manifest.getTableNameWithType();
     LOGGER.info("Completing file insert statement {} for table {} with segments {}",
         statementId, tableNameWithType, segmentNames);
 
+    // Start the segment replacement protocol now that the exact segment names are known.
+    // This avoids the problem of starting with an empty segmentsTo list, which would cause
+    // endReplaceSegments to reject the actual segments during validation.
+    String lineageEntryId;
+    try {
+      lineageEntryId = _resourceManager.startReplaceSegments(
+          tableNameWithType,
+          Collections.emptyList(),  // segmentsFrom: empty for append
+          segmentNames,             // segmentsTo: the exact segments produced by the Minion task
+          false,
+          buildCustomMap(statementId)
+      );
+      _lineageEntries.put(statementId, lineageEntryId);
+      manifest.setLineageEntryId(lineageEntryId);
+      LOGGER.info("Started segment replacement for statement {} with lineage entry {} and segments {}",
+          statementId, lineageEntryId, segmentNames);
+    } catch (Exception e) {
+      LOGGER.error("Failed to start segment replacement for statement {}", statementId, e);
+      manifest.setState(InsertStatementState.ABORTED);
+      manifest.setErrorMessage("Failed to start segment replacement: " + e.getMessage());
+      return buildErrorResult(statementId, InsertStatementState.ABORTED,
+          "Failed to start segment replacement: " + e.getMessage(), "SEGMENT_REPLACE_FAILED");
+    }
+
+    // Finalize the replacement to make segments visible
     try {
       EndReplaceSegmentsRequest endRequest = new EndReplaceSegmentsRequest(segmentNames);
       _resourceManager.endReplaceSegments(tableNameWithType, lineageEntryId, endRequest);
@@ -236,6 +230,10 @@ public class FileInsertExecutor implements InsertExecutor {
       LOGGER.error("Failed to end segment replacement for statement {}", statementId, e);
       manifest.setState(InsertStatementState.ABORTED);
       manifest.setErrorMessage("Failed to finalize segment replacement: " + e.getMessage());
+
+      // Best-effort revert of the lineage entry we just created
+      revertLineageEntry(tableNameWithType, lineageEntryId, statementId);
+
       return buildErrorResult(statementId, InsertStatementState.ABORTED,
           "Failed to finalize segment replacement: " + e.getMessage(), "SEGMENT_REPLACE_FAILED");
     }
@@ -400,15 +398,17 @@ public class FileInsertExecutor implements InsertExecutor {
   /**
    * Builds the task configuration map for the Minion SegmentGenerationAndPushTask.
    */
-  private Map<String, String> buildTaskConfigs(String fileUri, String statementId, String lineageEntryId,
-      Map<String, String> requestOptions) {
+  private Map<String, String> buildTaskConfigs(String fileUri, String statementId,
+      @Nullable String lineageEntryId, Map<String, String> requestOptions) {
     Map<String, String> taskConfigs = new HashMap<>();
     if (requestOptions != null) {
       taskConfigs.putAll(requestOptions);
     }
     taskConfigs.put(INPUT_DIR_URI, fileUri);
     taskConfigs.put(STATEMENT_ID_KEY, statementId);
-    taskConfigs.put(LINEAGE_ENTRY_ID_KEY, lineageEntryId);
+    if (lineageEntryId != null) {
+      taskConfigs.put(LINEAGE_ENTRY_ID_KEY, lineageEntryId);
+    }
     return taskConfigs;
   }
 

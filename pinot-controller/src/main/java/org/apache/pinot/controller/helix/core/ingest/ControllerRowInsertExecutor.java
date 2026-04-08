@@ -119,16 +119,16 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
     // 4. Split rows by partition to produce correctly partitioned segments
     Map<Integer, List<GenericRow>> partitionedRows = partitionRows(rows, tableConfig);
 
-    // 5. Build one segment per partition and upload
+    // 5. Build all segments first (staging phase), then upload all atomically.
+    // If any build fails, no segments have been uploaded yet so nothing to roll back.
+    // If upload fails partway through, we roll back already-uploaded segments.
     File workingDir = null;
     try {
-      ControllerFilePathProvider pathProvider = ControllerFilePathProvider.getInstance();
-      String uniqueSuffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-      workingDir = new File(pathProvider.getFileUploadTempDir(),
-          WORKING_DIR_PREFIX + tableNameWithType + "_" + uniqueSuffix);
+      workingDir = createWorkingDir(tableNameWithType);
       FileUtils.forceMkdir(workingDir);
 
-      List<String> allSegmentNames = new ArrayList<>();
+      // Phase 1: Build all segments locally without uploading
+      List<StagedSegment> stagedSegments = new ArrayList<>();
 
       for (Map.Entry<Integer, List<GenericRow>> entry : partitionedRows.entrySet()) {
         int partitionId = entry.getKey();
@@ -158,22 +158,42 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
         File segmentTarFile = new File(segmentTarDir, segmentName + ".tar.gz");
         TarCompressionUtils.createCompressedTarFile(segmentOutputDir, segmentTarFile);
 
-        uploadSegment(tableNameWithType, tableConfig, segmentOutputDir, segmentTarFile, segmentName);
-        allSegmentNames.add(segmentName);
+        stagedSegments.add(new StagedSegment(segmentName, segmentOutputDir, segmentTarFile, partitionRows.size(),
+            partitionId));
 
-        LOGGER.info("Built and uploaded segment {} ({} rows, partition {})",
-            segmentName, partitionRows.size(), partitionId);
+        LOGGER.info("Staged segment {} ({} rows, partition {})", segmentName, partitionRows.size(), partitionId);
+      }
+
+      // Phase 2: Upload all staged segments. Track what was uploaded for rollback on failure.
+      List<String> uploadedSegmentNames = new ArrayList<>();
+      try {
+        for (StagedSegment staged : stagedSegments) {
+          uploadSegment(tableNameWithType, tableConfig, staged._segmentDir, staged._tarFile, staged._segmentName);
+          uploadedSegmentNames.add(staged._segmentName);
+          LOGGER.info("Uploaded segment {} ({} rows, partition {})",
+              staged._segmentName, staged._rowCount, staged._partitionId);
+        }
+      } catch (Exception uploadEx) {
+        LOGGER.error("Failed to upload segment during row insert for statement {} on table {}. "
+            + "Rolling back {} already-uploaded segments.", statementId, tableNameWithType,
+            uploadedSegmentNames.size(), uploadEx);
+        rollbackUploadedSegments(tableNameWithType, uploadedSegmentNames);
+        return buildErrorResult(statementId,
+            "Failed to upload segment (rolled back " + uploadedSegmentNames.size() + " segments): "
+                + uploadEx.getMessage(),
+            "SEGMENT_UPLOAD_FAILED");
       }
 
       return new InsertResult.Builder()
           .setStatementId(statementId)
           .setState(InsertStatementState.VISIBLE)
-          .setMessage("Successfully inserted " + rows.size() + " rows as " + allSegmentNames.size() + " segment(s)")
-          .setSegmentNames(allSegmentNames)
+          .setMessage("Successfully inserted " + rows.size() + " rows as " + uploadedSegmentNames.size()
+              + " segment(s)")
+          .setSegmentNames(uploadedSegmentNames)
           .build();
     } catch (Exception e) {
       LOGGER.error("Failed to execute row insert for statement {} on table {}", statementId, tableNameWithType, e);
-      return buildErrorResult(statementId, "Failed to build and upload segment: " + e.getMessage(),
+      return buildErrorResult(statementId, "Failed to build segment: " + e.getMessage(),
           "SEGMENT_BUILD_FAILED");
     } finally {
       FileUtils.deleteQuietly(workingDir);
@@ -241,10 +261,20 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
   }
 
   /**
-   * Uploads the segment tar file to the controller deep store and registers it in ZooKeeper
-   * via the resource manager.
+   * Creates the temporary working directory for segment build. Package-private for test overriding.
    */
-  private void uploadSegment(String tableNameWithType, TableConfig tableConfig, File segmentDir, File segmentTarFile,
+  File createWorkingDir(String tableNameWithType) {
+    ControllerFilePathProvider pathProvider = ControllerFilePathProvider.getInstance();
+    String uniqueSuffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+    return new File(pathProvider.getFileUploadTempDir(),
+        WORKING_DIR_PREFIX + tableNameWithType + "_" + uniqueSuffix);
+  }
+
+  /**
+   * Uploads the segment tar file to the controller deep store and registers it in ZooKeeper
+   * via the resource manager. Package-private for test overriding.
+   */
+  void uploadSegment(String tableNameWithType, TableConfig tableConfig, File segmentDir, File segmentTarFile,
       String segmentName)
       throws Exception {
     ControllerFilePathProvider pathProvider = ControllerFilePathProvider.getInstance();
@@ -289,6 +319,41 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
       return TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     }
     return TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+  }
+
+  /**
+   * Best-effort rollback of segments that were already uploaded to deep store and registered
+   * in ZooKeeper. Removes segments from ZK and attempts to delete from deep store.
+   */
+  private void rollbackUploadedSegments(String tableNameWithType, List<String> segmentNames) {
+    for (String segmentName : segmentNames) {
+      try {
+        _resourceManager.deleteSegment(tableNameWithType, segmentName);
+        LOGGER.info("Rolled back segment {} from table {}", segmentName, tableNameWithType);
+      } catch (Exception e) {
+        LOGGER.error("Failed to rollback segment {} from table {}. Manual cleanup may be required.",
+            segmentName, tableNameWithType, e);
+      }
+    }
+  }
+
+  /**
+   * Holds a locally-built segment that is ready for upload but has not been published yet.
+   */
+  private static class StagedSegment {
+    final String _segmentName;
+    final File _segmentDir;
+    final File _tarFile;
+    final int _rowCount;
+    final int _partitionId;
+
+    StagedSegment(String segmentName, File segmentDir, File tarFile, int rowCount, int partitionId) {
+      _segmentName = segmentName;
+      _segmentDir = segmentDir;
+      _tarFile = tarFile;
+      _rowCount = rowCount;
+      _partitionId = partitionId;
+    }
   }
 
   /**

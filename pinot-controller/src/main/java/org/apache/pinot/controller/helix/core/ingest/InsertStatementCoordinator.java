@@ -160,11 +160,18 @@ public class InsertStatementCoordinator {
       return errorResult(request.getStatementId(), "TABLE_RESOLUTION_ERROR", e.getMessage());
     }
 
-    // 2. Idempotency check
+    // 2. Idempotency check — atomic reservation via ZK to prevent concurrent retries from
+    //    both creating statements for the same requestId
     if (request.getRequestId() != null) {
-      InsertStatementManifest existing = _statementStore.findByRequestId(tableNameWithType, request.getRequestId());
-      if (existing != null) {
-        return handleIdempotency(request, existing);
+      String existingStatementId = _statementStore.reserveRequestId(
+          tableNameWithType, request.getRequestId(), request.getStatementId());
+      if (existingStatementId != null) {
+        // Another request already reserved this requestId — look up the manifest
+        InsertStatementManifest existing = _statementStore.getStatement(tableNameWithType, existingStatementId);
+        if (existing != null) {
+          return handleIdempotency(request, existing);
+        }
+        // Reservation exists but manifest is gone (GC'd) — proceed as new request
       }
     }
 
@@ -645,6 +652,7 @@ public class InsertStatementCoordinator {
           if (age > _visibleRetentionMs) {
             LOGGER.info("GC'ing completed statement {} for table {} (visible for {}ms)",
                 manifest.getStatementId(), tableNameWithType, age);
+            _statementStore.releaseRequestId(tableNameWithType, manifest.getRequestId());
             _statementStore.deleteStatement(tableNameWithType, manifest.getStatementId());
             _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_GC, 1);
             changedCount++;
@@ -655,6 +663,7 @@ public class InsertStatementCoordinator {
           if (age > _visibleRetentionMs) {
             LOGGER.info("GC'ing aborted statement {} for table {} (aborted for {}ms)",
                 manifest.getStatementId(), tableNameWithType, age);
+            _statementStore.releaseRequestId(tableNameWithType, manifest.getRequestId());
             _statementStore.deleteStatement(tableNameWithType, manifest.getStatementId());
             _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_GC, 1);
             changedCount++;

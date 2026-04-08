@@ -21,6 +21,11 @@ package org.apache.pinot.controller.helix.core.ingest;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
@@ -36,7 +41,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -117,7 +124,10 @@ public class InsertStatementCoordinatorTest {
         "stmt-existing", "req-1", "hash-abc", "testTable_OFFLINE",
         InsertType.ROW, InsertStatementState.ACCEPTED, System.currentTimeMillis(),
         System.currentTimeMillis(), Collections.emptyList(), null, null);
-    when(_statementStore.findByRequestId("testTable_OFFLINE", "req-1")).thenReturn(existing);
+    // Atomic reservation returns existing statementId (someone already reserved this requestId)
+    when(_statementStore.reserveRequestId("testTable_OFFLINE", "req-1", "stmt-2"))
+        .thenReturn("stmt-existing");
+    when(_statementStore.getStatement("testTable_OFFLINE", "stmt-existing")).thenReturn(existing);
 
     InsertRequest request = new InsertRequest.Builder()
         .setStatementId("stmt-2")
@@ -144,7 +154,10 @@ public class InsertStatementCoordinatorTest {
         "stmt-existing", "req-1", "hash-abc", "testTable_OFFLINE",
         InsertType.ROW, InsertStatementState.ACCEPTED, System.currentTimeMillis(),
         System.currentTimeMillis(), Collections.emptyList(), null, null);
-    when(_statementStore.findByRequestId("testTable_OFFLINE", "req-1")).thenReturn(existing);
+    // Atomic reservation returns existing statementId
+    when(_statementStore.reserveRequestId("testTable_OFFLINE", "req-1", "stmt-2"))
+        .thenReturn("stmt-existing");
+    when(_statementStore.getStatement("testTable_OFFLINE", "stmt-existing")).thenReturn(existing);
 
     InsertRequest request = new InsertRequest.Builder()
         .setStatementId("stmt-2")
@@ -409,5 +422,88 @@ public class InsertStatementCoordinatorTest {
     when(_helixResourceManager.hasTable("myTable_OFFLINE")).thenReturn(false);
 
     _coordinator.resolveTableName("myTable_OFFLINE", null);
+  }
+
+  /**
+   * Verifies that concurrent retries with the same requestId result in exactly one execution.
+   * The atomic reservation in ZK ensures only the first caller proceeds; all others get the
+   * idempotent result.
+   */
+  @Test
+  public void testConcurrentRetriesOnlyOneExecutes()
+      throws Exception {
+    // Setup: table exists
+    when(_helixResourceManager.hasOfflineTable("testTable")).thenReturn(true);
+    when(_helixResourceManager.hasRealtimeTable("testTable")).thenReturn(false);
+
+    // Track how many times the executor is actually called
+    AtomicInteger executorCallCount = new AtomicInteger(0);
+
+    // The existing manifest that the idempotent path returns
+    InsertStatementManifest existingManifest = new InsertStatementManifest(
+        "stmt-winner", "req-concurrent", "hash-1", "testTable_OFFLINE",
+        InsertType.ROW, InsertStatementState.ACCEPTED, System.currentTimeMillis(),
+        System.currentTimeMillis(), Collections.emptyList(), null, null);
+
+    // Simulate atomic reservation: first call wins (returns null), subsequent calls lose
+    // (return the winning statementId)
+    AtomicInteger reserveCallCount = new AtomicInteger(0);
+    when(_statementStore.reserveRequestId(eq("testTable_OFFLINE"), eq("req-concurrent"), anyString()))
+        .thenAnswer(inv -> {
+          int callNum = reserveCallCount.incrementAndGet();
+          if (callNum == 1) {
+            return null;  // First caller wins
+          }
+          return "stmt-winner";  // All others see the existing reservation
+        });
+    when(_statementStore.getStatement("testTable_OFFLINE", "stmt-winner")).thenReturn(existingManifest);
+    when(_statementStore.createStatement(any())).thenReturn(true);
+
+    InsertResult executorResult = new InsertResult.Builder()
+        .setStatementId("stmt-winner")
+        .setState(InsertStatementState.ACCEPTED)
+        .build();
+    when(_mockExecutor.execute(any())).thenAnswer(inv -> {
+      executorCallCount.incrementAndGet();
+      return executorResult;
+    });
+
+    // Launch concurrent submissions
+    int numThreads = 5;
+    ExecutorService pool = Executors.newFixedThreadPool(numThreads);
+    CyclicBarrier barrier = new CyclicBarrier(numThreads);
+
+    List<Future<InsertResult>> futures = new java.util.ArrayList<>();
+    for (int i = 0; i < numThreads; i++) {
+      final int idx = i;
+      futures.add(pool.submit(() -> {
+        barrier.await();
+        InsertRequest request = new InsertRequest.Builder()
+            .setStatementId("stmt-" + idx)
+            .setRequestId("req-concurrent")
+            .setPayloadHash("hash-1")
+            .setTableName("testTable")
+            .setInsertType(InsertType.ROW)
+            .setRows(Collections.emptyList())
+            .build();
+        return _coordinator.submitInsert(request);
+      }));
+    }
+
+    // Collect results
+    int acceptedCount = 0;
+    for (Future<InsertResult> future : futures) {
+      InsertResult result = future.get();
+      assertNotNull(result);
+      // All results should be ACCEPTED (either the winner's result or the idempotent echo)
+      assertEquals(result.getState(), InsertStatementState.ACCEPTED);
+      acceptedCount++;
+    }
+
+    pool.shutdown();
+
+    assertEquals(acceptedCount, numThreads);
+    // Only one thread should have reached the executor
+    assertEquals(executorCallCount.get(), 1, "Exactly one execution should occur for concurrent retries");
   }
 }
