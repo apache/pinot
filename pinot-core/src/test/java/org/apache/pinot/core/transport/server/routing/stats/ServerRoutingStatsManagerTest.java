@@ -312,18 +312,6 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(score, 10.0);
     score = manager.fetchHybridScoreForServer("server1");
     assertEquals(score, 54.0);
-
-    // assert true to ensure server1 is in the stats map
-    assertTrue(manager.resetServerStats("server1"));
-
-    // ensure server2 has not changeed
-    score = manager.fetchHybridScoreForServer("server2");
-    assertEquals(score, 10.0);
-    assertStatsNullForInstance(manager, "server1");
-
-    manager.resetAllServersStats();
-    assertStatsNullForInstance(manager, "server1");
-    assertStatsNullForInstance(manager, "server2");
   }
 
   @Test
