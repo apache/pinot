@@ -58,4 +58,28 @@ public interface CustomFilterOperatorFactory {
    */
   BaseFilterOperator createFilterOperator(IndexSegment indexSegment, QueryContext queryContext,
       Predicate predicate, DataSource dataSource, int numDocs);
+
+  /**
+   * Creates a filter operator with metadata filter awareness. Called when this custom predicate
+   * appears inside an AND with other non-custom filters (metadata filters).
+   *
+   * <p>Some predicates (e.g., VECTOR_SIMILARITY) adjust their behavior when combined with
+   * metadata filters — for example, over-fetching ANN candidates to compensate for post-filter
+   * reduction. Override this method to support that pattern.
+   *
+   * <p>The default implementation ignores the {@code hasMetadataFilter} flag and delegates to
+   * {@link #createFilterOperator(IndexSegment, QueryContext, Predicate, DataSource, int)}.
+   *
+   * @param indexSegment the segment to filter
+   * @param queryContext the query context
+   * @param predicate the custom predicate
+   * @param dataSource the data source for the predicate's column (null if LHS is a function)
+   * @param numDocs the number of documents in the segment
+   * @param hasMetadataFilter true if this predicate is combined with metadata filters in an AND
+   * @return a filter operator that evaluates this predicate
+   */
+  default BaseFilterOperator createFilterOperator(IndexSegment indexSegment, QueryContext queryContext,
+      Predicate predicate, DataSource dataSource, int numDocs, boolean hasMetadataFilter) {
+    return createFilterOperator(indexSegment, queryContext, predicate, dataSource, numDocs);
+  }
 }

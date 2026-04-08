@@ -49,6 +49,7 @@
     <module>pinot-environment</module>
     <module>assembly-descriptor</module>
     <module>pinot-timeseries-lang</module>
+    <module>pinot-vector</module>
   </modules>
 
   <dependencies>

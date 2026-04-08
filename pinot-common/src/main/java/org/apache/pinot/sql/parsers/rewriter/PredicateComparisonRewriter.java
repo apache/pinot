@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.filter.FilterPredicatePlugin;
@@ -131,31 +130,6 @@ public class PredicateComparisonRewriter implements QueryRewriter {
             break;
           }
           break;
-        case VECTOR_SIMILARITY: {
-          Preconditions.checkArgument(operands.size() >= 2 && operands.size() <= 3,
-              "For %s predicate, the number of operands must be at either 2 or 3, got: %s", filterKind, expression);
-          /*
-           * Array Literal could be either:
-           * 1. a function of type 'ARRAYVALUECONSTRUCTOR' with operands of float/double
-           * 2. a float/double array literals
-           * Also check in {@link org.apache.pinot.sql.parsers.CalciteSqlParser#validateFilter(Expression)}}
-           */
-          if ((operands.get(1).getFunctionCall() != null && !operands.get(1).getFunctionCall().getOperator()
-              .equalsIgnoreCase("arrayvalueconstructor"))
-              || (operands.get(1).getLiteral() != null && !operands.get(1).getLiteral().isSetFloatArrayValue()
-                  && !operands.get(1).getLiteral().isSetDoubleArrayValue())) {
-            throw new SqlCompilationException(
-                String.format("For %s predicate, the second operand must be a float/double array literal, got: %s",
-                    filterKind,
-                    expression));
-          }
-          if (operands.size() == 3 && operands.get(2).getLiteral() == null) {
-            throw new SqlCompilationException(
-                String.format("For %s predicate, the third operand must be a literal, got: %s", filterKind,
-                    expression));
-          }
-          break;
-        }
         default:
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {

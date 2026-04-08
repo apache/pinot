@@ -294,9 +294,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
       new PinotSqlFunction("JSON_MATCH", ReturnTypes.BOOLEAN,
           OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
               i -> i == 2)),
-      new PinotSqlFunction("VECTOR_SIMILARITY", ReturnTypes.BOOLEAN,
-          OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER), i -> i == 2)),
-
       // Placeholder for special functions to handle MV
       // NOTE:
       // ARRAY_TO_MV is not deterministic.

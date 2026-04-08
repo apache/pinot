@@ -33,12 +33,10 @@ import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
-import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
-import org.apache.pinot.core.operator.filter.ExactVectorScanFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
@@ -47,9 +45,6 @@ import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
-import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
-import org.apache.pinot.core.operator.filter.VectorSearchParams;
-import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.custom.CustomFilterOperatorFactory;
 import org.apache.pinot.core.operator.filter.custom.CustomFilterOperatorRegistry;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
@@ -63,14 +58,10 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
-import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
-import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -225,11 +216,12 @@ public class FilterPlanNode implements PlanNode {
       case AND:
         childFilters = filter.getChildren();
         childFilterOperators = new ArrayList<>(childFilters.size());
+        boolean hasNonCustomSibling = hasNonCustomPredicateSibling(childFilters);
         for (FilterContext childFilter : childFilters) {
           BaseFilterOperator childFilterOperator;
-          if (isVectorSimilarityFilter(childFilter) && hasNonVectorSibling(childFilters)) {
-            // Pass filtered context so vector operator reports correct execution mode
-            childFilterOperator = constructFilteredVectorOperator(childFilter, numDocs);
+          if (hasNonCustomSibling && isCustomPredicateFilter(childFilter)) {
+            // Pass metadata filter context so custom operator can adjust behavior (e.g., over-fetch)
+            childFilterOperator = constructFilteredCustomOperator(childFilter, numDocs);
           } else {
             childFilterOperator = constructPhysicalOperator(childFilter, numDocs);
           }
@@ -345,9 +337,6 @@ public class FilterPlanNode implements PlanNode {
               Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
                   column);
               return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, numDocs);
-            case VECTOR_SIMILARITY:
-              return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
-                  numDocs, false);
             case IS_NULL: {
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {
@@ -388,66 +377,28 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
-   * Constructs the appropriate vector similarity filter operator based on index availability.
-   *
-   * <p>Decision tree:</p>
-   * <ol>
-   *   <li>If the segment has a vector index for the column, use {@link VectorSimilarityFilterOperator}
-   *       with query options (nprobe, rerank, maxCandidates).</li>
-   *   <li>If no vector index exists, fall back to {@link ExactVectorScanFilterOperator} which
-   *       performs brute-force scan of the forward index.</li>
-   * </ol>
-   *
-   * @param hasMetadataFilter true if this vector predicate is combined with metadata filters (AND)
+   * Constructs a custom filter operator for a CUSTOM predicate that is part of an AND
+   * with metadata filters. Calls the factory's metadata-filter-aware overload.
    */
-  private BaseFilterOperator constructVectorSimilarityOperator(DataSource dataSource,
-      VectorSimilarityPredicate predicate, String column, int numDocs, boolean hasMetadataFilter) {
-    VectorIndexReader vectorIndex = dataSource.getVectorIndex();
-    VectorIndexConfig vectorIndexConfig = dataSource.getVectorIndexConfig();
-    VectorSearchParams searchParams = VectorSearchParams.fromQueryOptions(_queryContext.getQueryOptions());
-
-    if (vectorIndex != null) {
-      // ANN index path: pass forward index reader if rerank or threshold search requires exact distances
-      ForwardIndexReader<?> forwardIndexReader = null;
-      VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
-      if (searchParams.isExactRerank(backendType) || searchParams.hasDistanceThreshold()) {
-        forwardIndexReader = dataSource.getForwardIndex();
-        Preconditions.checkState(!searchParams.hasDistanceThreshold() || forwardIndexReader != null,
-            "Cannot apply vectorDistanceThreshold on column: %s -- forward index required for threshold refinement",
-            column);
-      }
-      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
-          vectorIndexConfig, hasMetadataFilter);
-    }
-
-    // Exact scan fallback: no vector index on this segment
-    ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
-    Preconditions.checkState(forwardIndexReader != null,
-        "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
-    return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs, vectorIndexConfig,
-        getVectorFallbackReason(vectorIndexConfig), searchParams);
-  }
-
-  /**
-   * Constructs a vector operator for a VECTOR_SIMILARITY predicate that is part of an AND
-   * with metadata filters. This sets the hasMetadataFilter flag so the operator reports
-   * the correct filtered ANN execution mode.
-   */
-  private BaseFilterOperator constructFilteredVectorOperator(FilterContext filter, int numDocs) {
+  private BaseFilterOperator constructFilteredCustomOperator(FilterContext filter, int numDocs) {
     Predicate predicate = filter.getPredicate();
-    String column = predicate.getLhs().getIdentifier();
-    DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
-    return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
-        numDocs, true);
+    CustomPredicate customPredicate = (CustomPredicate) predicate;
+    CustomFilterOperatorFactory factory = CustomFilterOperatorRegistry.get(customPredicate.getCustomTypeName());
+    Preconditions.checkState(factory != null,
+        "No CustomFilterOperatorFactory registered for custom predicate: %s",
+        customPredicate.getCustomTypeName());
+    ExpressionContext lhs = predicate.getLhs();
+    DataSource dataSource = lhs.getType() == ExpressionContext.Type.IDENTIFIER
+        ? _indexSegment.getDataSource(lhs.getIdentifier(), _queryContext.getSchema()) : null;
+    return factory.createFilterOperator(_indexSegment, _queryContext, predicate, dataSource, numDocs, true);
   }
 
   /**
-   * Returns true if the child list contains at least one non-VECTOR_SIMILARITY predicate
-   * (i.e., a real metadata filter sibling).
+   * Returns true if the child list contains at least one non-CUSTOM predicate filter.
    */
-  private static boolean hasNonVectorSibling(List<FilterContext> childFilters) {
+  private static boolean hasNonCustomPredicateSibling(List<FilterContext> childFilters) {
     for (FilterContext child : childFilters) {
-      if (!isVectorSimilarityFilter(child)) {
+      if (!isCustomPredicateFilter(child)) {
         return true;
       }
     }
@@ -455,19 +406,10 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
-   * Returns true if the filter is a VECTOR_SIMILARITY predicate.
+   * Returns true if the filter is a CUSTOM predicate.
    */
-  private static boolean isVectorSimilarityFilter(FilterContext filter) {
+  private static boolean isCustomPredicateFilter(FilterContext filter) {
     return filter.getType() == FilterContext.Type.PREDICATE
-        && filter.getPredicate().getType() == Predicate.Type.VECTOR_SIMILARITY;
-  }
-
-  private static String getVectorFallbackReason(@Nullable VectorIndexConfig vectorIndexConfig) {
-    if (vectorIndexConfig == null || vectorIndexConfig.isDisabled()) {
-      return "vector_index_missing";
-    }
-    return vectorIndexConfig.resolveBackendType().supportsMutableSegments()
-        ? "vector_index_missing"
-        : vectorIndexConfig.resolveBackendType().name().toLowerCase() + "_index_unavailable";
+        && filter.getPredicate().getType() == Predicate.Type.CUSTOM;
   }
 }

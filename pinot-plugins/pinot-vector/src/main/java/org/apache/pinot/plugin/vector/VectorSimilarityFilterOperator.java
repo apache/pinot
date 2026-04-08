@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.filter;
+package org.apache.pinot.plugin.vector;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
@@ -25,11 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.BitmapCollection;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorExecutionMode;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;

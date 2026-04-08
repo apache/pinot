@@ -16,11 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.request.context.predicate;
+package org.apache.pinot.plugin.vector;
 
 import java.util.Arrays;
 import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.predicate.CustomPredicate;
 
 
 /**
@@ -34,20 +35,15 @@ import org.apache.pinot.common.request.context.ExpressionContext;
  *   "topK": 10
  *   }
  */
-public class VectorSimilarityPredicate extends BasePredicate {
+public class VectorSimilarityPredicate extends CustomPredicate {
   public static final int DEFAULT_TOP_K = 10;
   private final float[] _value;
   private final int _topK;
 
   public VectorSimilarityPredicate(ExpressionContext lhs, float[] value, int topK) {
-    super(lhs);
+    super(lhs, "VECTOR_SIMILARITY");
     _value = value;
     _topK = topK;
-  }
-
-  @Override
-  public Type getType() {
-    return Type.VECTOR_SIMILARITY;
   }
 
   public float[] getValue() {

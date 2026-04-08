@@ -277,34 +277,6 @@ public class CalciteSqlParser {
       // Delegate validation to the custom filter predicate plugin
       FilterPredicatePlugin plugin = FilterPredicateRegistry.get(operator);
       plugin.validateFilterExpression(filterExpression.getFunctionCall().getOperands());
-    } else if (operator.equals(FilterKind.VECTOR_SIMILARITY.name())) {
-      Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
-      if (!vectorIdentifier.isSetIdentifier()) {
-        throw new IllegalStateException("The first argument of VECTOR_SIMILARITY must be an identifier of float array, "
-            + "the signature is VECTOR_SIMILARITY(float[], float[], int).");
-      }
-      Expression vectorLiteral = filterExpression.getFunctionCall().getOperands().get(1);
-      /*
-       * Array Literal could be either:
-       * 1. a function of type 'ARRAYVALUECONSTRUCTOR' with operands of float/double
-       * 2. a float/double array literals
-       * Also check in
-       * {@link org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter#updateFunctionExpression(Expression)}
-       */
-      if ((vectorLiteral.isSetFunctionCall() && !vectorLiteral.getFunctionCall().getOperator().equalsIgnoreCase(
-          "arrayvalueconstructor"))
-          || (vectorLiteral.isSetLiteral() && !vectorLiteral.getLiteral().isSetFloatArrayValue()
-          && !vectorLiteral.getLiteral().isSetDoubleArrayValue())) {
-        throw new IllegalStateException("The second argument of VECTOR_SIMILARITY must be a float/double array "
-            + "literal, the signature is VECTOR_SIMILARITY(float[], float[], int)");
-      }
-      if (filterExpression.getFunctionCall().getOperands().size() == 3) {
-        Expression topK = filterExpression.getFunctionCall().getOperands().get(2);
-        if (!topK.isSetLiteral()) {
-          throw new IllegalStateException("The third argument of VECTOR_SIMILARITY must be an integer literal, "
-              + "the signature is VECTOR_SIMILARITY(float[], float[], int)");
-        }
-      }
     } else {
       List<Expression> operands = filterExpression.getFunctionCall().getOperands();
       for (int i = 1; i < operands.size(); i++) {

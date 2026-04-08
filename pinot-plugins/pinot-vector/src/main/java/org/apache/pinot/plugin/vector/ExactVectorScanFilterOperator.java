@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.filter;
+package org.apache.pinot.plugin.vector;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
@@ -24,11 +24,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.BitmapCollection;
 import org.apache.pinot.segment.spi.index.creator.VectorExecutionMode;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -261,8 +262,9 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
 
   /**
    * Computes the squared L2 (Euclidean) distance between two vectors.
-   * Delegates to {@link VectorFunctions#euclideanDistance(float[], float[])} which returns
-   * the sum of squared differences (no sqrt), sufficient for ranking.
+   * Delegates to
+   * {@link VectorDistanceUtils#computeDistance}
+   * which returns the sum of squared differences (no sqrt), sufficient for ranking.
    */
   static float computeL2SquaredDistance(float[] a, float[] b) {
     return VectorDistanceUtils.computeDistance(a, b, VectorIndexConfig.VectorDistanceFunction.L2);

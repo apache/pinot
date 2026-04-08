@@ -39,7 +39,6 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
-import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -134,6 +133,17 @@ public class RequestContextUtils {
 
   private static FilterContext getFilterInner(Function thriftFunction) {
     String functionOperator = thriftFunction.getOperator();
+
+    // Check if this is a custom filter predicate registered via plugin
+    FilterPredicatePlugin thriftCustomPlugin = FilterPredicateRegistry.get(functionOperator);
+    if (thriftCustomPlugin != null) {
+      List<Expression> ops = thriftFunction.getOperands();
+      List<ExpressionContext> exprOps = new ArrayList<>(ops.size());
+      for (Expression op : ops) {
+        exprOps.add(getExpression(op));
+      }
+      return FilterContext.forPredicate(thriftCustomPlugin.createPredicate(exprOps));
+    }
 
     // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
     if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
@@ -262,14 +272,6 @@ public class RequestContextUtils {
         return FilterContext.forPredicate(
             new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1)),
                     operands.size() == 3 ? getStringValue(operands.get(2)) : null));
-      case VECTOR_SIMILARITY:
-        ExpressionContext lhs = getExpression(operands.get(0));
-        float[] vectorValue = getVectorValue(operands.get(1));
-        int topK = VectorSimilarityPredicate.DEFAULT_TOP_K;
-        if (operands.size() == 3) {
-          topK = operands.get(2).getLiteral().getIntValue();
-        }
-        return FilterContext.forPredicate(new VectorSimilarityPredicate(lhs, vectorValue, topK));
       case IS_NULL:
         return FilterContext.forPredicate(new IsNullPredicate(getExpression(operands.get(0))));
       case IS_NOT_NULL:
@@ -451,13 +453,6 @@ public class RequestContextUtils {
       case JSON_MATCH:
           return FilterContext.forPredicate(new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1)),
                   operands.size() == 3?getStringValue(operands.get(2)): null));
-      case VECTOR_SIMILARITY:
-        int topK = VectorSimilarityPredicate.DEFAULT_TOP_K;
-        if (operands.size() == 3) {
-          topK = (int) operands.get(2).getLiteral().getLongValue();
-        }
-        return FilterContext.forPredicate(
-            new VectorSimilarityPredicate(operands.get(0), getVectorValue(operands.get(1)), topK));
       case IS_NULL:
         return FilterContext.forPredicate(new IsNullPredicate(operands.get(0)));
       case IS_NOT_NULL:
