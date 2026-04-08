@@ -51,6 +51,8 @@ import org.apache.calcite.sql.type.SqlTypeTransforms;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
 import org.apache.calcite.util.Optionality;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.filter.FilterPredicatePlugin;
+import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -369,6 +371,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
     registerAggregateFunctions(operatorMap);
     registerTransformFunctions(operatorMap);
     registerScalarFunctions(operatorMap);
+    registerCustomFilterPredicates(operatorMap);
 
     _operatorMap = Map.copyOf(operatorMap);
     _operatorList = List.copyOf(operatorMap.values());
@@ -427,6 +430,42 @@ public class PinotOperatorTable implements SqlOperatorTable {
         continue;
       }
       operatorMap.put(canonicalName, sqlFunction);
+    }
+  }
+
+  private void registerCustomFilterPredicates(Map<String, SqlOperator> operatorMap) {
+    for (FilterPredicatePlugin plugin : FilterPredicateRegistry.getAllPlugins()) {
+      String canonicalName = FunctionRegistry.canonicalize(plugin.name());
+      if (operatorMap.containsKey(canonicalName)) {
+        continue;
+      }
+      List<SqlTypeFamily> typeFamilies = new java.util.ArrayList<>();
+      for (FilterPredicatePlugin.OperandType operandType : plugin.getOperandTypes()) {
+        typeFamilies.add(toSqlTypeFamily(operandType));
+      }
+      List<Integer> optionalIndices = plugin.getOptionalOperandIndices();
+      PinotSqlFunction sqlFunction = new PinotSqlFunction(plugin.name(), ReturnTypes.BOOLEAN,
+          OperandTypes.family(typeFamilies, optionalIndices::contains));
+      operatorMap.put(canonicalName, sqlFunction);
+    }
+  }
+
+  private static SqlTypeFamily toSqlTypeFamily(FilterPredicatePlugin.OperandType operandType) {
+    switch (operandType) {
+      case STRING:
+        return SqlTypeFamily.CHARACTER;
+      case INTEGER:
+        return SqlTypeFamily.INTEGER;
+      case NUMERIC:
+        return SqlTypeFamily.NUMERIC;
+      case ARRAY:
+        return SqlTypeFamily.ARRAY;
+      case BOOLEAN:
+        return SqlTypeFamily.BOOLEAN;
+      case ANY:
+        return SqlTypeFamily.ANY;
+      default:
+        throw new IllegalArgumentException("Unknown OperandType: " + operandType);
     }
   }
 

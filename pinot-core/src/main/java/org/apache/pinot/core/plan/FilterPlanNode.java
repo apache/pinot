@@ -28,6 +28,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.predicate.CustomPredicate;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
@@ -54,6 +55,8 @@ import org.apache.pinot.core.operator.filter.VectorSearchMode;
 import org.apache.pinot.core.operator.filter.VectorSearchParams;
 import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
+import org.apache.pinot.core.operator.filter.custom.CustomFilterOperatorFactory;
+import org.apache.pinot.core.operator.filter.custom.CustomFilterOperatorRegistry;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.IFSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -278,6 +281,14 @@ public class FilterPlanNode implements PlanNode {
             return new H3InclusionIndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else if (canApplyMapFilter(predicate)) {
             return new MapFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
+          } else if (predicate.getType() == Predicate.Type.CUSTOM) {
+            CustomPredicate customPredicate = (CustomPredicate) predicate;
+            CustomFilterOperatorFactory factory =
+                CustomFilterOperatorRegistry.get(customPredicate.getCustomTypeName());
+            Preconditions.checkState(factory != null,
+                "No CustomFilterOperatorFactory registered for custom predicate: %s",
+                customPredicate.getCustomTypeName());
+            return factory.createFilterOperator(_indexSegment, _queryContext, predicate, null, numDocs);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (TEXT_MATCH)
             return new ExpressionFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
@@ -365,6 +376,15 @@ public class FilterPlanNode implements PlanNode {
               } else {
                 return new MatchAllFilterOperator(numDocs);
               }
+            }
+            case CUSTOM: {
+              CustomPredicate customPredicate = (CustomPredicate) predicate;
+              CustomFilterOperatorFactory factory =
+                  CustomFilterOperatorRegistry.get(customPredicate.getCustomTypeName());
+              Preconditions.checkState(factory != null,
+                  "No CustomFilterOperatorFactory registered for custom predicate: %s",
+                  customPredicate.getCustomTypeName());
+              return factory.createFilterOperator(_indexSegment, _queryContext, predicate, dataSource, numDocs);
             }
             default:
               predicateEvaluator =
