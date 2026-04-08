@@ -3258,7 +3258,7 @@ public class PinotHelixResourceManager {
   }
 
   /// Sends table config refresh message to brokers.
-  private void sendTableConfigRefreshMessage(String tableNameWithType) {
+  public void sendTableConfigRefreshMessage(String tableNameWithType) {
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     TableConfigRefreshMessage message = new TableConfigRefreshMessage(tableNameWithType);
     int numMessagesSent =
@@ -3272,7 +3272,7 @@ public class PinotHelixResourceManager {
   }
 
   /// Sends table config and schema refresh message to servers.
-  private void sendTableConfigSchemaRefreshMessage(String tableNameWithType) {
+  public void sendTableConfigSchemaRefreshMessage(String tableNameWithType) {
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     TableConfigSchemaRefreshMessage message = new TableConfigSchemaRefreshMessage(tableNameWithType);
     int numMessagesSent = MessagingServiceUtils.send(messagingService, message, tableNameWithType);
@@ -3283,7 +3283,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void sendLogicalTableConfigRefreshMessage(String logicalTableName) {
+  public void sendLogicalTableConfigRefreshMessage(String logicalTableName) {
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     LogicalTableConfigRefreshMessage message = new LogicalTableConfigRefreshMessage(logicalTableName);
     int numMessagesSent =
@@ -3296,7 +3296,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void sendApplicationQpsQuotaRefreshMessage(String appName) {
+  public void sendApplicationQpsQuotaRefreshMessage(String appName) {
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     ApplicationQpsQuotaRefreshMessage message = new ApplicationQpsQuotaRefreshMessage(appName);
     int numMessagesSent = MessagingServiceUtils.send(messagingService, message, Helix.BROKER_RESOURCE_INSTANCE);
@@ -3308,7 +3308,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void sendDatabaseConfigRefreshMessage(String databaseName) {
+  public void sendDatabaseConfigRefreshMessage(String databaseName) {
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     DatabaseConfigRefreshMessage message = new DatabaseConfigRefreshMessage(databaseName);
     int numMessagesSent = MessagingServiceUtils.send(messagingService, message, Helix.BROKER_RESOURCE_INSTANCE);
@@ -3320,7 +3320,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void sendRoutingTableRebuildMessage(String tableNameWithType) {
+  public void sendRoutingTableRebuildMessage(String tableNameWithType) {
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     RoutingTableRebuildMessage message = new RoutingTableRebuildMessage(tableNameWithType);
     int numMessagesSent =
