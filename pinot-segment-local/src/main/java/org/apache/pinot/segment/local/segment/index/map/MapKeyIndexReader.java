@@ -53,7 +53,7 @@ public class MapKeyIndexReader implements ForwardIndexReader {
 
   @Override
   public FieldSpec.DataType getStoredType() {
-    return _keyFieldSpec.getDataType();
+    return _keyFieldSpec.getDataType().getStoredType();
   }
 
   @Override
