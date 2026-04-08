@@ -229,6 +229,35 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     return context;
   }
 
+  @Test
+  public void testNullPathChangedFallsBackToFullScan() {
+    // Simulate a CALLBACK notification where pathChanged is null (defensive null-check).
+    // This should trigger a full scan rather than NPE on pathChanged.substring().
+    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
+        .thenReturn(Arrays.asList(SELF_INSTANCE_ID, OTHER_SERVER_ID));
+
+    // First: server is shutting down, delivered via a normal callback
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
+    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
+
+    // Second: server completes startup, but this time pathChanged is null
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextWithNullPath());
+
+    // Should have done a full scan and detected the transition
+    verify(_mailboxService).resetConnectBackoff(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
+  private NotificationContext createCallbackContextWithNullPath() {
+    NotificationContext context = new NotificationContext(_helixManager);
+    context.setType(NotificationContext.Type.CALLBACK);
+    // pathChanged is not set, so getPathChanged() returns null
+    return context;
+  }
+
   private NotificationContext createInitContext() {
     NotificationContext context = new NotificationContext(_helixManager);
     context.setType(NotificationContext.Type.INIT);
