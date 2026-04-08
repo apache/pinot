@@ -1,0 +1,66 @@
+{
+  "bitwise_functions": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "shiftCol", "type": "INT"}
+        ],
+        "inputs": [
+          [6, 10, 1],
+          [-8, 3, 2],
+          [0, -1, 3],
+          [0, 1099511627776, 40],
+          [1, 1, 64]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test basic bitwise binary functions",
+        "sql": "SELECT bitAnd(intCol, longCol), bitOr(intCol, longCol), bitXor(intCol, longCol) FROM {numTbl}",
+        "outputs": [
+          [2, 14, 12],
+          [0, -5, -5],
+          [0, -1, -1],
+          [0, 1099511627776, 1099511627776],
+          [1, 1, 0]
+        ]
+      },
+      {
+        "description": "test underscore aliases via canonicalization",
+        "sql": "SELECT bit_and(intCol, longCol), bit_or(intCol, longCol), bit_xor(intCol, longCol) FROM {numTbl}",
+        "outputs": [
+          [2, 14, 12],
+          [0, -5, -5],
+          [0, -1, -1],
+          [0, 1099511627776, 1099511627776],
+          [1, 1, 0]
+        ]
+      },
+      {
+        "description": "test unary and shift bit functions",
+        "sql": "SELECT bitNot(intCol), bitShiftLeft(intCol, shiftCol), bitShiftRight(intCol, shiftCol), bitShiftRightUnsigned(intCol, shiftCol), bitShiftRightLogical(intCol, shiftCol) FROM {numTbl}",
+        "outputs": [
+          [-7, 12, 3, 3, 3],
+          [7, -32, -2, 1073741822, 1073741822],
+          [-1, 0, 0, 0, 0],
+          [-1, 0, 0, 0, 0],
+          [-2, 1, 1, 1, 1]
+        ]
+      },
+      {
+        "description": "test bit mask and bit extraction functions",
+        "sql": "SELECT bitMask(shiftCol), bitExtract(longCol, shiftCol), extractBit(longCol, shiftCol) FROM {numTbl}",
+        "outputs": [
+          [2, 1, 1],
+          [4, 0, 0],
+          [8, 1, 1],
+          [1099511627776, 1, 1],
+          [0, 0, 0]
+        ]
+      }
+    ]
+  }
+}
