@@ -117,12 +117,13 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     final String tenantA = tableConfig.getTenantConfig().getServer();
     final String tenantB = tenantA + "_new";
 
-    BaseServerStarter serverStarter0 = startOneServer(0);
-    BaseServerStarter serverStarter1 = startOneServer(1);
+    final int baseServerIndex = _serverStarters.size();
+    BaseServerStarter serverStarter0 = startOneServer(baseServerIndex);
+    BaseServerStarter serverStarter1 = startOneServer(baseServerIndex + 1);
     createServerTenant(tenantA, 0, 2);
 
-    BaseServerStarter serverStarter2 = startOneServer(2);
-    BaseServerStarter serverStarter3 = startOneServer(3);
+    BaseServerStarter serverStarter2 = startOneServer(baseServerIndex + 2);
+    BaseServerStarter serverStarter3 = startOneServer(baseServerIndex + 3);
     createServerTenant(tenantB, 0, 2);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     try {
