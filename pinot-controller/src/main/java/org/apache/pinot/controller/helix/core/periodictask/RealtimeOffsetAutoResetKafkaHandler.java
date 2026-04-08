@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -34,7 +34,6 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * Base class for handling offset auto reset with multi-topic ingestion.
  * The handler would request Kafka Ecosystem APIs to replicate the skipped offsets and
@@ -43,22 +42,18 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOffsetAutoResetHandler {
 
-  protected PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
-  protected PinotHelixResourceManager _pinotHelixResourceManager;
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeOffsetAutoResetKafkaHandler.class);
   private static final String STREAM_TYPE = "kafka";
 
-  public RealtimeOffsetAutoResetKafkaHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-      PinotHelixResourceManager pinotHelixResourceManager) {
-    init(llcRealtimeSegmentManager, pinotHelixResourceManager);
-  }
+  protected PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
+  protected PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Override
-    public void init(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-        PinotHelixResourceManager pinotHelixResourceManager) {
-      _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
-      _pinotHelixResourceManager = pinotHelixResourceManager;
-    }
+  public void init(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
+      PinotHelixResourceManager pinotHelixResourceManager) {
+    _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
+    _pinotHelixResourceManager = pinotHelixResourceManager;
+  }
 
   /**
    * Trigger the job to backfill the skipped interval due to offset auto reset.
@@ -66,17 +61,14 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
    * @return true if successfully started the backfill job and its ingestion
    */
   @Override
-  public boolean triggerBackfillJob(
-      String tableNameWithType, StreamConfig streamConfig, String topicName, int partitionId, long fromOffset,
-      long toOffset) {
-    // Trigger the data replication and get the new topic's stream config.
+  public boolean triggerBackfillJob(String tableNameWithType, StreamConfig streamConfig, String topicName,
+      int partitionId, long fromOffset, long toOffset) {
     Map<String, String> newTopicStreamConfig = triggerDataReplicationAndGetTopicInfo(
         tableNameWithType, streamConfig, topicName, partitionId, fromOffset, toOffset);
     if (newTopicStreamConfig == null) {
       return false;
     }
     try {
-        // Add the new topic to the table config.
       TableConfig currentTableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       addNewTopicToTableConfig(newTopicStreamConfig, currentTableConfig);
       _pinotHelixResourceManager.setExistingTableConfig(currentTableConfig);
@@ -91,11 +83,11 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
    * Override this method to trigger Kafka Ecosystem APIs and replicate skipped offsets to the new topic.
    * Then refer to the lagged topic's StreamConfig and return the new topic's stream config map.
    */
-  protected abstract Map<String, String> triggerDataReplicationAndGetTopicInfo(
-      String tableNameWithType, StreamConfig streamConfig, String topicName, int partitionId, long fromOffset,
-      long toOffset);
+  protected abstract Map<String, String> triggerDataReplicationAndGetTopicInfo(String tableNameWithType,
+      StreamConfig streamConfig, String topicName, int partitionId, long fromOffset, long toOffset);
 
-  public abstract void ensureBackfillJobsRunning(String tableNameWithType, List<String> topicNames);
+  @Override
+  public abstract void ensureBackfillJobsRunning(String tableNameWithType, Collection<String> topicNames);
 
   /**
    * Cleanup completed backfill jobs by checking if the topic is complete.
@@ -105,6 +97,7 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
    * @param topicNames The collection of topic names to check for completion
    * @return Collection of cleaned up topic names
    */
+  @Override
   public Collection<String> cleanupCompletedBackfillJobs(String tableNameWithType, Collection<String> topicNames) {
     Collection<String> cleanedUpTopics = new ArrayList<>();
     for (String topicName : topicNames) {
