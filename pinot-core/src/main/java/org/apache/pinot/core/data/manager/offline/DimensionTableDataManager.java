@@ -77,7 +77,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
   };
 
-  private DimensionTableDataManager() {
+  protected DimensionTableDataManager() {
   }
 
   /**
