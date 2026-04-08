@@ -48,6 +48,7 @@
     <module>pinot-environment</module>
     <module>assembly-descriptor</module>
     <module>pinot-timeseries-lang</module>
+    <module>pinot-filter-predicate-example</module>
   </modules>
 
   <dependencies>
