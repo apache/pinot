@@ -3272,7 +3272,7 @@ public class PinotHelixResourceManager {
   }
 
   /// Sends table config and schema refresh message to servers.
-  private void sendTableConfigSchemaRefreshMessage(String tableNameWithType) {
+  protected void sendTableConfigSchemaRefreshMessage(String tableNameWithType) {
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     TableConfigSchemaRefreshMessage message = new TableConfigSchemaRefreshMessage(tableNameWithType);
     int numMessagesSent = MessagingServiceUtils.send(messagingService, message, tableNameWithType);
