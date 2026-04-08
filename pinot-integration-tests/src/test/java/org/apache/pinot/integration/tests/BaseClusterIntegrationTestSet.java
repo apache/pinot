@@ -27,6 +27,7 @@ import java.net.URL;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
@@ -950,7 +951,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         httpResponse = getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null);
         TableViews.TableView externalView =
             JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
-        return idealState._realtime.equals(externalView._realtime) && idealState._offline.equals(externalView._offline);
+        return Objects.equals(idealState._realtime, externalView._realtime)
+            && Objects.equals(idealState._offline, externalView._offline);
       } catch (Exception e) {
         Assert.fail("Caught exception while waiting for table EV and IS to converge", e);
         return null;
