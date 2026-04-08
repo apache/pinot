@@ -105,15 +105,33 @@ public class VectorSimilarityPlugin implements FilterPredicatePlugin {
   }
 
   private static float[] getVectorValue(ExpressionContext expressionContext) {
-    if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
+    // Handle literal float/double arrays (e.g., from Thrift deserialization)
+    if (expressionContext.getType() == ExpressionContext.Type.LITERAL) {
+      Object value = expressionContext.getLiteral().getValue();
+      if (value instanceof float[]) {
+        return (float[]) value;
+      }
+      if (value instanceof double[]) {
+        double[] doubles = (double[]) value;
+        float[] floats = new float[doubles.length];
+        for (int i = 0; i < doubles.length; i++) {
+          floats[i] = (float) doubles[i];
+        }
+        return floats;
+      }
       throw new IllegalArgumentException(
-          "The second argument of VECTOR_SIMILARITY must be a float array (ARRAYVALUECONSTRUCTOR)");
+          "The second argument of VECTOR_SIMILARITY must be a float/double array literal, got: " + value.getClass());
     }
-    List<ExpressionContext> arguments = expressionContext.getFunction().getArguments();
-    float[] vector = new float[arguments.size()];
-    for (int i = 0; i < arguments.size(); i++) {
-      vector[i] = Float.parseFloat(arguments.get(i).getLiteral().getValue().toString());
+    // Handle ARRAYVALUECONSTRUCTOR function (e.g., from SQL parser)
+    if (expressionContext.getType() == ExpressionContext.Type.FUNCTION) {
+      List<ExpressionContext> arguments = expressionContext.getFunction().getArguments();
+      float[] vector = new float[arguments.size()];
+      for (int i = 0; i < arguments.size(); i++) {
+        vector[i] = Float.parseFloat(arguments.get(i).getLiteral().getValue().toString());
+      }
+      return vector;
     }
-    return vector;
+    throw new IllegalArgumentException(
+        "The second argument of VECTOR_SIMILARITY must be a float array literal or ARRAYVALUECONSTRUCTOR");
   }
 }
