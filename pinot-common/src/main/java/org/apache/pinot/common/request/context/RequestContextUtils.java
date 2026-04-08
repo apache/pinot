@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
+import org.apache.pinot.common.filter.FilterPredicatePlugin;
+import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -320,6 +322,13 @@ public class RequestContextUtils {
 
   private static FilterContext getFilterInner(FunctionContext filterFunction) {
     String functionOperator = filterFunction.getFunctionName().toUpperCase();
+
+    // Check if this is a custom filter predicate registered via plugin
+    FilterPredicatePlugin customPlugin = FilterPredicateRegistry.get(functionOperator);
+    if (customPlugin != null) {
+      List<ExpressionContext> operands = filterFunction.getArguments();
+      return FilterContext.forPredicate(customPlugin.createPredicate(operands));
+    }
 
     // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
     if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {

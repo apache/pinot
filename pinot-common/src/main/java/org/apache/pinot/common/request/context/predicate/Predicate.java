@@ -38,7 +38,13 @@ public interface Predicate {
     JSON_MATCH,
     IS_NULL,
     IS_NOT_NULL(true),
-    VECTOR_SIMILARITY;
+    VECTOR_SIMILARITY,
+    /**
+     * Sentinel type for custom filter predicates registered via the plugin system.
+     * When a predicate has this type, cast it to {@link CustomPredicate} to obtain the
+     * custom type name, which is used to look up the corresponding filter operator factory.
+     */
+    CUSTOM;
 
     private final boolean _exclusive;
 

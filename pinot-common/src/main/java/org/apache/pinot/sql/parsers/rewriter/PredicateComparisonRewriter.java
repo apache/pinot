@@ -21,6 +21,8 @@ package org.apache.pinot.sql.parsers.rewriter;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
+import org.apache.pinot.common.filter.FilterPredicatePlugin;
+import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -82,7 +84,13 @@ public class PredicateComparisonRewriter implements QueryRewriter {
     String functionOperator = function.getOperator();
 
     if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
-      // If the function is not of FilterKind, we have to rewrite the function.
+      // Check if this is a custom filter predicate registered via plugin
+      FilterPredicatePlugin customPlugin = FilterPredicateRegistry.get(functionOperator);
+      if (customPlugin != null) {
+        customPlugin.rewriteExpression(function.getOperands());
+        return expression;
+      }
+      // If the function is not of FilterKind and not a custom predicate, we have to rewrite the function.
       // Example: A query like "select col1 from table where startsWith(col1, 'myStr') AND col2 > 10;" should be
       //          rewritten to "select col1 from table where startsWith(col1, 'myStr') = true AND col2 > 10;".
       expression = convertPredicateToEqualsBooleanExpression(expression);
