@@ -51,7 +51,8 @@ abstract class BaseUnaryIntegralScalarFunction implements PinotScalarFunction {
   @Nullable
   @Override
   public FunctionInfo getFunctionInfo(int numArguments) {
-    // LONG overload is a safe fallback — INT inputs widen to LONG losslessly via convertTypes.
+    // LONG overload as fallback for arity-only resolution (e.g. ingestion transforms).
+    // INT inputs are sign-extended to LONG, which preserves values but uses 64-bit semantics.
     return numArguments == 1 ? longFunctionInfo() : null;
   }
 
