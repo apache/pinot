@@ -25,9 +25,6 @@ import java.io.Serializable;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
-import org.apache.pinot.spi.config.instance.InstanceType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.roaringbitmap.RoaringBitmap;
@@ -40,21 +37,9 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public interface SegmentCreator extends Closeable, Serializable {
 
-  /**
-   * Initializes the segment creation.
-   *
-   * @param segmentCreationSpec
-   * @param indexCreationInfoMap
-   * @param schema
-   * @param outDir
-   * @param immutableToMutableIdMap
-   * @param instanceType - Instance type that's used to select the metrics for observability
-   * TODO - Move instanceType to SegmentGeneratorConfig and avoid passing it here
-   * @throws Exception
-   */
-  void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
-      @Nullable int[] immutableToMutableIdMap, @Nullable InstanceType instanceType)
+  /// Initializes the segment creation.
+  void init(SegmentGeneratorConfig config, int totalDocs, TreeMap<String, ColumnStatistics> columnStatisticsMap,
+      File outDir)
       throws Exception;
 
   /**

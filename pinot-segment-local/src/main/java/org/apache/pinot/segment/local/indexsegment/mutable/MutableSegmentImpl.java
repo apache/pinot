@@ -196,6 +196,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
   private volatile long _minimumIngestionLagMs = Long.MAX_VALUE;
 
+  private final boolean _hasColumnWithReuseMutableTextIndex;
+
   // multi-column text index fields
   private final MultiColumnRealtimeLuceneTextIndex _multiColumnTextIndex;
   private final Object2IntOpenHashMap _multiColumnPos;
@@ -302,6 +304,7 @@ public class MutableSegmentImpl implements MutableSegment {
             StandardIndexes.nullValueVector()); // null value vector implements other contract
 
     // Initialize for each column
+    boolean hasColumnWithReuseMutableTextIndex = false;
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
 
@@ -409,15 +412,18 @@ public class MutableSegmentImpl implements MutableSegment {
       // If the raw value is provided, use it for the forward/dictionary index of this column by wrapping the
       // already created MutableIndex with a SameValue implementation. This optimization can only be done when
       // the mutable index is being reused
-      Object rawValueForTextIndex = indexConfigs.getConfig(StandardIndexes.text()).getRawValueForTextIndex();
       boolean reuseMutableIndex = indexConfigs.getConfig(StandardIndexes.text()).isReuseMutableIndex();
-      if (rawValueForTextIndex != null && reuseMutableIndex) {
-        if (dictionary == null) {
-          MutableIndex forwardIndex = mutableIndexes.get(StandardIndexes.forward());
-          mutableIndexes.put(StandardIndexes.forward(),
-              new SameValueMutableForwardIndex(rawValueForTextIndex, (MutableForwardIndex) forwardIndex));
-        } else {
-          dictionary = new SameValueMutableDictionary(rawValueForTextIndex, dictionary);
+      if (reuseMutableIndex) {
+        hasColumnWithReuseMutableTextIndex = true;
+        Object rawValueForTextIndex = indexConfigs.getConfig(StandardIndexes.text()).getRawValueForTextIndex();
+        if (rawValueForTextIndex != null) {
+          if (dictionary == null) {
+            MutableIndex forwardIndex = mutableIndexes.get(StandardIndexes.forward());
+            mutableIndexes.put(StandardIndexes.forward(),
+                new SameValueMutableForwardIndex(rawValueForTextIndex, (MutableForwardIndex) forwardIndex));
+          } else {
+            dictionary = new SameValueMutableDictionary(rawValueForTextIndex, dictionary);
+          }
         }
       }
 
@@ -425,6 +431,7 @@ public class MutableSegmentImpl implements MutableSegment {
           new IndexContainer(fieldSpec, partitionFunction, partitions, new ValuesInfo(), mutableIndexes, dictionary,
               nullValueVector, sourceColumn, valueAggregator));
     }
+    _hasColumnWithReuseMutableTextIndex = hasColumnWithReuseMutableTextIndex;
 
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
     _dedupTimeColumn =
@@ -1575,6 +1582,11 @@ public class MutableSegmentImpl implements MutableSegment {
 
   public boolean canAddMore() {
     return !_indexCapacityThresholdBreached;
+  }
+
+  /// Returns `true` when any column has re-use mutable text index enabled.
+  public boolean hasColumnWithReuseMutableTextIndex() {
+    return _hasColumnWithReuseMutableTextIndex;
   }
 
   // NOTE: Okay for single-writer

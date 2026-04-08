@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import java.util.Map;
 import java.util.Set;
@@ -81,8 +80,9 @@ public class MutableSegmentImplTest {
 
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
+    config.setInstanceType(InstanceType.SERVER);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, InstanceType.SERVER);
+    driver.init(config);
     driver.build();
     _immutableSegment = ImmutableSegmentLoader.load(new File(TEMP_DIR, driver.getSegmentName()), ReadMode.mmap);
 
@@ -132,8 +132,7 @@ public class MutableSegmentImplTest {
   }
 
   @Test
-  public void testDataSourceForSVColumns()
-      throws IOException {
+  public void testDataSourceForSVColumns() {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
@@ -168,8 +167,7 @@ public class MutableSegmentImplTest {
   }
 
   @Test
-  public void testDataSourceForMVColumns()
-      throws IOException {
+  public void testDataSourceForMVColumns() {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();

@@ -19,26 +19,15 @@
 package org.apache.pinot.segment.local.segment.creator.impl;
 
 import com.fasterxml.jackson.core.JsonParseException;
-import com.google.common.collect.Maps;
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.IndexCreator;
-import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
-import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.FieldType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.roaringbitmap.RoaringBitmap;
@@ -49,27 +38,7 @@ import org.roaringbitmap.RoaringBitmap;
  */
 // TODO: check resource leaks
 public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
-  private int _docIdCounter;
-
-  @Override
-  public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
-      @Nullable int[] immutableToMutableIdMap, @Nullable InstanceType instanceType)
-      throws Exception {
-    _docIdCounter = 0;
-    Map<String, ColumnIndexCreators> colIndexes = Maps.newHashMapWithExpectedSize(
-        segmentCreationSpec.getIndexConfigsByColName().size());
-    initializeCommon(segmentCreationSpec, segmentIndexCreationInfo, indexCreationInfoMap,
-        schema, outDir, colIndexes, immutableToMutableIdMap, instanceType);
-  }
-
-  /**
-   * @deprecated use {@link ForwardIndexType#getDefaultCompressionType(FieldType)} instead
-   */
-  @Deprecated
-  public static ChunkCompressionType getDefaultCompressionType(FieldType fieldType) {
-    return ForwardIndexType.getDefaultCompressionType(fieldType);
-  }
+  private int _nextDocId;
 
   @Override
   public void indexRow(GenericRow row)
@@ -100,12 +69,12 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
       // If row has null value for given column name, add to null value vector
       if (colIndexes.getNullValueVectorCreator() != null) {
         if (row.isNullValue(columnName)) {
-          colIndexes.getNullValueVectorCreator().setNull(_docIdCounter);
+          colIndexes.getNullValueVectorCreator().setNull(_nextDocId);
         }
       }
     }
 
-    _docIdCounter++;
+    _nextDocId++;
   }
 
   /**

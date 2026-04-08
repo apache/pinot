@@ -44,9 +44,9 @@ public interface ColumnStatistics extends Serializable {
   Object getMaxValue();
 
   /**
-   *
    * @return An array of elements that has the unique values for this column, sorted order.
    */
+  @Nullable
   Object getUniqueValuesSet();
 
   /**

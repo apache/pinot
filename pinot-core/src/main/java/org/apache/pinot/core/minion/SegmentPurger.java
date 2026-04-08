@@ -109,7 +109,7 @@ public class SegmentPurger {
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       purgeRecordReader.rewind();
-      driver.init(_segmentGeneratorConfig, purgeRecordReader, InstanceType.MINION);
+      driver.init(_segmentGeneratorConfig, purgeRecordReader);
       driver.build();
     }
 
@@ -122,6 +122,7 @@ public class SegmentPurger {
   @VisibleForTesting
   void initSegmentGeneratorConfig(String segmentName) {
     _segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
+    _segmentGeneratorConfig.setInstanceType(InstanceType.MINION);
     _segmentGeneratorConfig.setOutDir(_workingDir.getPath());
 
     if (_segmentGeneratorCustomConfigs != null && StringUtils.isNotEmpty(

@@ -105,8 +105,8 @@ public class LuceneTextIndexBufferIntegrationTest {
         .build();
 
     // Create the Lucene text index creator
-    try (LuceneTextIndexCreator creator = new LuceneTextIndexCreator(COLUMN_NAME, _tempDir, true, false, null, null,
-        true, textIndexConfig)) {
+    try (LuceneTextIndexCreator creator = new LuceneTextIndexCreator(COLUMN_NAME, _tempDir, true, false, null, false,
+        null, true, textIndexConfig)) {
 
       // Add documents to the index
       for (int docId = 0; docId < _documents.size(); docId++) {

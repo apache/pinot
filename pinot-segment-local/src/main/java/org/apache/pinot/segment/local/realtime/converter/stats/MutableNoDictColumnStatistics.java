@@ -63,6 +63,7 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     return _dataSourceMetadata.getMaxValue();
   }
 
+  @Nullable
   @Override
   public Object getUniqueValuesSet() {
     return null;
