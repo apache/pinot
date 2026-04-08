@@ -584,21 +584,40 @@ Avoid adding extra network round-trips to successful queries. Error/cancel paths
 Only construct new strings when data actually changed. Check StringBuilder length before constructing.
 - Trigger: Any PR with string manipulation in frequently-called code
 
+**C4.18 — Prefer primitive arrays over boxed arrays in hot paths**
+Using `Integer[]`, `Double[]`, `Long[]`, etc. introduces boxing/unboxing overhead and additional heap pressure. Use `int[]`, `double[]`, `long[]` in aggregation, scanning, and vectorized execution paths to avoid unboxing cost, reduce GC pressure, and improve cache locality.
+- Trigger: Any PR using boxed arrays in query execution, aggregation, or data ingestion hot paths
+
+```java
+// BAD: Boxed array — auto-boxing/unboxing on every iteration, extra heap allocation per element
+Double[] aggregates = new Double[numGroups];
+for (int i = 0; i < numDocs; i++) {
+  aggregates[groupIds[i]] += values[i]; // unbox, add, box on every iteration
+}
+```
+```java
+// GOOD: Primitive array — no boxing overhead, better cache locality
+double[] aggregates = new double[numGroups];
+for (int i = 0; i < numDocs; i++) {
+  aggregates[groupIds[i]] += values[i]; // pure primitive operations
+}
+```
+
 ### MINOR
 
-**C4.18 — Use simplest collection type**
+**C4.19 — Use simplest collection type**
 List over SortedSet for small fixed collections. Prefer Java std lib over Guava.
 - Trigger: Any PR choosing collection types
 
-**C4.19 — Return null for "no match" instead of returning input unchanged**
+**C4.20 — Return null for "no match" instead of returning input unchanged**
 Avoids unnecessary comparison in caller.
 - Trigger: Any PR with transform methods that may no-op
 
-**C4.20 — Prefer deadline-based cancellation over simple interruptibility**
+**C4.21 — Prefer deadline-based cancellation over simple interruptibility**
 Deadlines compose better in distributed systems. Propagate caller deadlines.
 - Trigger: Any PR adding timeout/cancellation logic
 
-**C4.21 — Use mathematical invariants as cheap state indicators**
+**C4.22 — Use mathematical invariants as cheap state indicators**
 Prefer derived checks over explicit flags updated per document.
 - Trigger: Any PR tracking min/max or aggregation state
 
@@ -1163,9 +1182,9 @@ Approve the immediate fix while deferring broader design to separate threads.
 | 1. Configuration & Backward Compat | 5 | 7 | 4 | 16 |
 | 2. State Management & Concurrency | 6 | 7 | 3 | 16 |
 | 3. Code Architecture & Module Design | 5 | 11 | 8 | 24 |
-| 4. Performance & Efficiency | 2 | 15 | 4 | 21 |
+| 4. Performance & Efficiency | 2 | 16 | 4 | 22 |
 | 5. Correctness & Safety | 9 | 16 | 3 | 28 |
 | 6. Testing Strategies | 2 | 7 | 8 | 17 |
 | 7. Naming & API Design | 1 | 9 | 10 | 20 |
 | 8. Process & Scope | 2 | 10 | 8 | 20 |
-| **Total** | **32** | **82** | **48** | **162** |
+| **Total** | **32** | **83** | **48** | **163** |
