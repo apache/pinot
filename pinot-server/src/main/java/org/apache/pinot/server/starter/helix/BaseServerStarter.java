@@ -61,6 +61,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -85,6 +86,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.data.manager.realtime.ServerRateLimitConfigChangeListener;
 import org.apache.pinot.core.instance.context.ServerContext;
+import org.apache.pinot.core.operator.filter.custom.CustomFilterOperatorRegistry;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerThreadPoolConfigChangeListener;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -842,6 +844,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _adminApiApplication = createServerAdminApp();
     _adminApiApplication.start(_listenerConfigs);
 
+    // Init custom filter predicate plugins
+    LOGGER.info("Initializing FilterPredicateRegistry");
+    FilterPredicateRegistry.init();
+    // Init custom filter operator factories
+    LOGGER.info("Initializing CustomFilterOperatorRegistry");
+    CustomFilterOperatorRegistry.init();
     // Init QueryRewriterFactory
     LOGGER.info("Initializing QueryRewriterFactory");
     QueryRewriterFactory.init(_serverConf.getProperty(Server.CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES));

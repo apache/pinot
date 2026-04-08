@@ -66,6 +66,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -576,6 +577,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     initSegmentFetcherFactory();
     initPinotCrypterFactory();
 
+    LOGGER.info("Initializing FilterPredicateRegistry");
+    FilterPredicateRegistry.init();
     LOGGER.info("Initializing QueryRewriterFactory");
     QueryRewriterFactory.init(
         _config.getProperty(CommonConstants.Controller.CONFIG_OF_CONTROLLER_QUERY_REWRITER_CLASS_NAMES));

@@ -52,6 +52,8 @@ import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.filter.FilterPredicatePlugin;
+import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -271,6 +273,10 @@ public class CalciteSqlParser {
       for (Expression filter : filterExpression.getFunctionCall().getOperands()) {
         validateFilter(filter);
       }
+    } else if (FilterPredicateRegistry.isRegistered(operator)) {
+      // Delegate validation to the custom filter predicate plugin
+      FilterPredicatePlugin plugin = FilterPredicateRegistry.get(operator);
+      plugin.validateFilterExpression(filterExpression.getFunctionCall().getOperands());
     } else if (operator.equals(FilterKind.VECTOR_SIMILARITY.name())) {
       Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
       if (!vectorIdentifier.isSetIdentifier()) {
