@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.controller.api;
 
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.HttpEntity;
-import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -58,16 +52,9 @@ public class PinotFileUploadTest {
   @Test
   public void testUploadBogusData()
       throws Exception {
-    try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-      HttpPost httpPost = new HttpPost(TEST_INSTANCE.getControllerRequestURLBuilder().forDataFileUpload());
-      HttpEntity entity = new StringEntity("blah");
-      httpPost.setEntity(entity);
-      try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
-        int statusCode = response.getCode();
-
-        assertTrue(statusCode >= 400 && statusCode < 500, "Status code = " + statusCode);
-      }
-    }
+    String uploadUrl = TEST_INSTANCE.getAdminClient().getSegmentUploadUrl();
+    int statusCode = TEST_INSTANCE.getAdminClient().getFileIngestClient().postString(uploadUrl, "blah");
+    assertTrue(statusCode >= 400 && statusCode < 500, "Status code = " + statusCode);
   }
 
   @AfterClass

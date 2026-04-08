@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.dto;
+package org.apache.pinot.common.restlet.resources;
 
 import java.util.List;
 import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;

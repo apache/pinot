@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -93,11 +92,11 @@ public class TableViews {
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
-  public static class TableView {
-    @JsonProperty("OFFLINE")
-    public Map<String, Map<String, String>> _offline;
-    @JsonProperty("REALTIME")
-    public Map<String, Map<String, String>> _realtime;
+  /**
+   * @deprecated Use {@link org.apache.pinot.common.restlet.resources.TableView} directly.
+   */
+  @Deprecated
+  public static class TableView extends org.apache.pinot.common.restlet.resources.TableView {
   }
 
   @GET
@@ -334,6 +333,7 @@ public class TableViews {
     if (tableView._offline == null && tableView._realtime == null) {
       throw new ControllerApplicationException(LOGGER, "Table not found", Response.Status.NOT_FOUND);
     }
+
     return tableView;
   }
 

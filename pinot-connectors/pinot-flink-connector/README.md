@@ -36,9 +36,9 @@ ControllerRequestClient client = new ControllerRequestClient(
 ControllerRequestURLBuilder.baseUrl(DEFAULT_CONTROLLER_URL), httpClient);
 
 // fetch Pinot schema
-Schema schema = PinotConnectionUtils.getSchema(client, "starbucksStores");
+Schema schema = client.getSchemaClient().getSchemaObject("starbucksStores");
 // fetch Pinot table config
-TableConfig tableConfig = PinotConnectionUtils.getTableConfig(client, "starbucksStores", "OFFLINE");
+TableConfig tableConfig = client.getTableClient().getTableConfigObject("starbucksStores", "OFFLINE");
 // create Flink Pinot Sink
 srcDs.addSink(new PinotSinkFunction<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema));
 execEnv.execute();
@@ -57,9 +57,9 @@ ControllerRequestClient client = new ControllerRequestClient(
 ControllerRequestURLBuilder.baseUrl(DEFAULT_CONTROLLER_URL), httpClient);
 
 // fetch Pinot schema
-Schema schema = PinotConnectionUtils.getSchema(client, "starbucksStores");
+Schema schema = client.getSchemaClient().getSchemaObject("starbucksStores");
 // fetch Pinot table config
-TableConfig tableConfig = PinotConnectionUtils.getTableConfig(client, "starbucksStores", "REALTIME");
+TableConfig tableConfig = client.getTableClient().getTableConfigObject("starbucksStores", "REALTIME");
 
 // create Flink Pinot Sink (partition it same as the realtime stream(e.g. kafka) in case of upsert tables)
 srcDs.partitionCustom((Partitioner<Integer>) (key, partitions) -> key % partitions, r -> (Integer) r.getField("primaryKey"))

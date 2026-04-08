@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;

@@ -157,8 +157,8 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
     addSchema(new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("id", FieldSpec.DataType.INT)
         .addSingleValueDimension("name", FieldSpec.DataType.STRING).build());
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toString(),
-        BasicAuthTestUtils.AUTH_HEADER);
+    getOrCreateAdminClient().getTableClient()
+        .createTable(tableConfig.toJsonString(), null, BasicAuthTestUtils.AUTH_HEADER);
   }
 
   private int prepInputFiles(File inputDir, int fileNum, int rowsPerFile)

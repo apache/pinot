@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.rebalance;
+package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
@@ -280,7 +280,7 @@ public class TableRebalanceProgressStats {
     public double _percentSegmentsToRebalance;
     public int _replicasToRebalance;
 
-    RebalanceStateStats() {
+    public RebalanceStateStats() {
       _segmentsMissing = 0;
       _segmentsToRebalance = 0;
       _replicasToRebalance = 0;
@@ -331,7 +331,7 @@ public class TableRebalanceProgressStats {
     @JsonProperty("startTimeMs")
     public long _startTimeMs;
 
-    RebalanceProgressStats() {
+    public RebalanceProgressStats() {
       _totalSegmentsToBeAdded = 0;
       _totalSegmentsToBeDeleted = 0;
       _totalRemainingSegmentsToBeAdded = 0;
@@ -351,7 +351,7 @@ public class TableRebalanceProgressStats {
       _startTimeMs = 0;
     }
 
-    RebalanceProgressStats(RebalanceProgressStats other) {
+    public RebalanceProgressStats(RebalanceProgressStats other) {
       _totalSegmentsToBeAdded = other._totalSegmentsToBeAdded;
       _totalSegmentsToBeDeleted = other._totalSegmentsToBeDeleted;
       _totalRemainingSegmentsToBeAdded = other._totalRemainingSegmentsToBeAdded;

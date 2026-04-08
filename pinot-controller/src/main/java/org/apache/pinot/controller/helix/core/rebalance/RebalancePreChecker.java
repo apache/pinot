@@ -17,10 +17,12 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalancePreCheckerResult;
+import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;

@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-
 import com.google.common.collect.Lists;
 import it.unimi.dsi.fastutil.ints.IntIntPair;
 import java.util.ArrayList;
@@ -37,6 +36,10 @@ import java.util.stream.Collectors;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalancePreCheckerResult;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;

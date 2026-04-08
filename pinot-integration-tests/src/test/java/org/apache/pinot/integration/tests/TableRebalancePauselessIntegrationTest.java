@@ -19,17 +19,15 @@
 package org.apache.pinot.integration.tests;
 
 import java.util.Map;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -133,8 +131,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       rebalanceConfig.setIncludeConsuming(true);
       rebalanceConfig.setMinAvailableReplicas(0);
 
-      String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-      RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      RebalanceResult rebalanceResult = triggerTableRebalance(rebalanceConfig, TableType.REALTIME);
       RebalanceSummaryResult summary = rebalanceResult.getRebalanceSummaryResult();
       assertEquals(
           summary.getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
@@ -195,11 +192,9 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       rebalanceConfig.setIncludeConsuming(true);
       // notice that this could get an HTTP 409 CONFLICT, when the test failed due to the timeout waiting on the table
       // to converge, and try to rebalance again here. So we need to cancel the original job first.
-      sendDeleteRequest(
-          StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
-              + "?type=" + tableConfig.getTableType().toString());
-      String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-      RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      getOrCreateAdminClient().getRebalanceClient()
+          .cancelRebalance(getTableName(), tableConfig.getTableType().toString());
+      RebalanceResult rebalanceResult = triggerTableRebalance(rebalanceConfig, TableType.REALTIME);
       waitForRebalanceToComplete(rebalanceResult.getJobId(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       waitForTableEVISConverge(getTableName(), FORCE_COMMIT_REBALANCE_TIMEOUT_MS);
       serverStarter0.stop();
