@@ -114,7 +114,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
       boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
     if (isSingleValue && storedType.isFixedWidth()) {
-      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION
+      return version >= FixedBytePower2ChunkSVForwardIndexReader.VERSION
           ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
           : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
     }
