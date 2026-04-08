@@ -239,7 +239,8 @@ public class InbuiltFunctionEvaluatorTest {
   @Test
   public void testPolymorphicBitwiseFunctions() {
     // Ingestion evaluator resolves by arity, which returns the LONG overload.
-    // INT inputs are widened to LONG via convertTypes, so results are LONG.
+    // INT inputs are widened to LONG via convertTypes, so results use 64-bit semantics.
+    // Return type depends on the method: most return long, but bitExtract returns int.
     GenericRow intRow = new GenericRow();
     intRow.putValue("value", 6);
     intRow.putValue("rhs", 3);
