@@ -207,19 +207,10 @@ public class MutableColumnarMapIndexImpl implements MutableIndex, ColumnarMapInd
     }
   }
 
-  @Nullable
   @Override
   public DataType getKeyValueType(String key) {
     DataType type = _keyTypes.get(key);
-    if (type != null) {
-      return type;
-    }
-    _lock.readLock().lock();
-    try {
-      return _presenceBitmaps.containsKey(key) ? _defaultValueType : null;
-    } finally {
-      _lock.readLock().unlock();
-    }
+    return type != null ? type : _defaultValueType;
   }
 
   @Override

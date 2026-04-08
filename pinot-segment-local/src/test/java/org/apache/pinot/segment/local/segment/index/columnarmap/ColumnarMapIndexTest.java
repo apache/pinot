@@ -1386,4 +1386,49 @@ public class ColumnarMapIndexTest {
       }
     };
   }
+
+  /// Verifies that {@link ColumnarMapDataSource#getKeyDataSource(String)} returns a valid
+  /// DataSource for keys not yet ingested into a mutable (consuming) segment, rather than
+  /// returning null and causing an NPE in {@code ItemTransformFunction.init()}.
+  @Test
+  public void testMutableKeyDataSourceForUnseenKey()
+      throws IOException {
+    Map<String, FieldSpec.DataType> keyTypes = new HashMap<>();
+    keyTypes.put("status", FieldSpec.DataType.STRING);
+    keyTypes.put("count", FieldSpec.DataType.INT);
+
+    ComplexFieldSpec fieldSpec = buildMapFieldSpec(COLUMN_NAME);
+    ColumnarMapIndexConfig config = new ColumnarMapIndexConfig(true, null, true, null, 100);
+
+    try (MutableColumnarMapIndexImpl mutableIndex = new MutableColumnarMapIndexImpl(
+        buildMutableContext(fieldSpec), config, keyTypes, FieldSpec.DataType.STRING)) {
+
+      // Only ingest docs with "status" — "count" is never seen
+      mutableIndex.add(Map.of("status", "active"), -1, 0);
+      mutableIndex.add(Map.of("status", "inactive"), -1, 1);
+
+      ColumnarMapDataSource mapDS = new ColumnarMapDataSource(fieldSpec, 2, mutableIndex);
+
+      // Key with data — should work as before
+      org.apache.pinot.segment.spi.datasource.DataSource statusDS = mapDS.getKeyDataSource("status");
+      assertNotNull(statusDS, "DataSource for ingested key should not be null");
+      assertEquals(statusDS.getDataSourceMetadata().getDataType(), FieldSpec.DataType.STRING);
+
+      // Key with explicit type but no docs ingested — must not return null
+      org.apache.pinot.segment.spi.datasource.DataSource countDS = mapDS.getKeyDataSource("count");
+      assertNotNull(countDS, "DataSource for unseen key with explicit type should not be null");
+      assertEquals(countDS.getDataSourceMetadata().getDataType(), FieldSpec.DataType.INT);
+
+      // Completely unknown key — gets default type, must not return null
+      org.apache.pinot.segment.spi.datasource.DataSource unknownDS = mapDS.getKeyDataSource("never_heard_of");
+      assertNotNull(unknownDS, "DataSource for unknown key should not be null (uses default type)");
+      assertEquals(unknownDS.getDataSourceMetadata().getDataType(), FieldSpec.DataType.STRING);
+
+      // Forward index should return default values for all docs on unseen keys
+      org.apache.pinot.segment.spi.index.reader.ForwardIndexReader<?> fwd = countDS.getForwardIndex();
+      assertNotNull(fwd);
+      assertEquals(fwd.getString(0, null), "");
+      assertEquals(fwd.getString(1, null), "");
+    }
+  }
 }
