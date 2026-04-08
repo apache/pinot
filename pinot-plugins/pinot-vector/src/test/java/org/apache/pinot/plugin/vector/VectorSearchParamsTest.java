@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.filter;
+package org.apache.pinot.plugin.vector;
 
 import java.util.Collections;
 import java.util.HashMap;
