@@ -235,12 +235,16 @@ public class ControllerRowInsertExecutorTest {
     assertEquals(result.getState(), InsertStatementState.ABORTED);
     assertEquals(result.getErrorCode(), "SEGMENT_UPLOAD_FAILED");
     assertNotNull(result.getMessage());
-    assertTrue(result.getMessage().contains("rolled back 1 segments"),
+    // Both segments are tracked for rollback: the first was uploaded successfully,
+    // the second was tracked before upload but failed during upload.
+    assertTrue(result.getMessage().contains("rolled back 2 segments"),
         "Error message should indicate rollback count: " + result.getMessage());
 
-    // The first segment was uploaded successfully then rolled back
-    assertEquals(uploadedNames.size(), 1, "Exactly one segment should have been uploaded before failure");
-    verify(_resourceManager, times(1)).deleteSegment(eq(TABLE_NAME), eq(uploadedNames.get(0)));
+    // The first segment was uploaded successfully then rolled back;
+    // the second segment failed upload but its deep store copy (if any) is also cleaned up.
+    assertEquals(uploadedNames.size(), 1, "Exactly one segment should have completed upload before failure");
+    // deleteSegment called for both tracked segments
+    verify(_resourceManager, times(2)).deleteSegment(eq(TABLE_NAME), anyString());
   }
 
   /**

@@ -166,13 +166,16 @@ public class InsertStatementStore {
    * returns the existing statementId. Otherwise, creates a ZK node to reserve the mapping.
    *
    * <p>This uses ZK's atomic {@code create} to prevent two concurrent retries from both
-   * creating statements for the same requestId.
+   * creating statements for the same requestId. If the reservation cannot be reliably
+   * determined (ZK failure), throws an exception to fail closed rather than allowing
+   * duplicate executions.
    *
    * @param tableNameWithType the table name with type
    * @param requestId         the client-supplied request ID for idempotency
    * @param statementId       the statement ID to associate with this request
    * @return null if the reservation succeeded (this caller wins), or the existing statementId
    *         if already reserved by a prior request
+   * @throws RuntimeException if the reservation state cannot be determined due to ZK failure
    */
   @Nullable
   public String reserveRequestId(String tableNameWithType, String requestId, String statementId) {
@@ -189,9 +192,12 @@ public class InsertStatementStore {
       if (existing != null) {
         return existing.getSimpleField(STATEMENT_ID_FIELD);
       }
-      return null;
+      // create returned false but node not readable — fail closed
+      throw new RuntimeException("RequestId reservation in indeterminate state for requestId=" + requestId);
+    } catch (RuntimeException e) {
+      throw e;
     } catch (Exception e) {
-      // If create failed because node exists, read the existing entry
+      // ZK create failed — try to read to distinguish "already exists" from "ZK down"
       try {
         ZNRecord existing = _propertyStore.get(path, null, AccessOption.PERSISTENT);
         if (existing != null) {
@@ -200,8 +206,10 @@ public class InsertStatementStore {
       } catch (Exception readEx) {
         LOGGER.error("Failed to read existing requestId reservation for requestId={}", requestId, readEx);
       }
-      LOGGER.error("Failed to reserve requestId={} for statementId={}", requestId, statementId, e);
-      return null;
+      // Cannot determine reservation state — fail closed to prevent duplicate execution
+      throw new RuntimeException(
+          "Failed to reserve requestId=" + requestId + " for statementId=" + statementId
+              + "; failing closed to prevent duplicate execution", e);
     }
   }
 

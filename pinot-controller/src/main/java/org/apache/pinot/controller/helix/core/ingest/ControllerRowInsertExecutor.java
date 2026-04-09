@@ -168,8 +168,10 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
       List<String> uploadedSegmentNames = new ArrayList<>();
       try {
         for (StagedSegment staged : stagedSegments) {
-          uploadSegment(tableNameWithType, tableConfig, staged._segmentDir, staged._tarFile, staged._segmentName);
+          // Track the segment name BEFORE upload so that if uploadSegment() copies to deep
+          // store but fails during ZK registration, rollback can still clean up the orphan.
           uploadedSegmentNames.add(staged._segmentName);
+          uploadSegment(tableNameWithType, tableConfig, staged._segmentDir, staged._tarFile, staged._segmentName);
           LOGGER.info("Uploaded segment {} ({} rows, partition {})",
               staged._segmentName, staged._rowCount, staged._partitionId);
         }
@@ -254,7 +256,10 @@ public class ControllerRowInsertExecutor implements InsertExecutor {
     Map<Integer, List<GenericRow>> partitioned = new HashMap<>();
     for (GenericRow row : rows) {
       Object value = row.getValue(partitionColumn);
-      int partition = (value != null) ? partitionFunction.getPartition(String.valueOf(value)) : 0;
+      // Use empty string for null values to match server-side partition routing behavior,
+      // which hashes "" through the partition function rather than defaulting to partition 0.
+      String partitionValue = (value != null) ? String.valueOf(value) : "";
+      int partition = partitionFunction.getPartition(partitionValue);
       partitioned.computeIfAbsent(partition, k -> new ArrayList<>()).add(row);
     }
     return partitioned;

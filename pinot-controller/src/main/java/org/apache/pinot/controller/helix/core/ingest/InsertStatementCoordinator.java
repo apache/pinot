@@ -161,10 +161,17 @@ public class InsertStatementCoordinator {
     }
 
     // 2. Idempotency check — atomic reservation via ZK to prevent concurrent retries from
-    //    both creating statements for the same requestId
+    //    both creating statements for the same requestId. Fails closed on ZK errors.
     if (request.getRequestId() != null) {
-      String existingStatementId = _statementStore.reserveRequestId(
-          tableNameWithType, request.getRequestId(), request.getStatementId());
+      String existingStatementId;
+      try {
+        existingStatementId = _statementStore.reserveRequestId(
+            tableNameWithType, request.getRequestId(), request.getStatementId());
+      } catch (RuntimeException e) {
+        LOGGER.error("RequestId reservation failed for requestId={}", request.getRequestId(), e);
+        return errorResult(request.getStatementId(), "IDEMPOTENCY_ERROR",
+            "Cannot verify idempotency due to ZK failure: " + e.getMessage());
+      }
       if (existingStatementId != null) {
         // Another request already reserved this requestId — look up the manifest
         InsertStatementManifest existing = _statementStore.getStatement(tableNameWithType, existingStatementId);
@@ -232,7 +239,20 @@ public class InsertStatementCoordinator {
         if (executorResult.getSegmentNames() != null && !executorResult.getSegmentNames().isEmpty()) {
           manifest.setSegmentNames(executorResult.getSegmentNames());
         }
-        _statementStore.updateStatement(manifest);
+        if (!_statementStore.updateStatement(manifest)) {
+          // ZK state diverges from actual — log prominently so operators can investigate.
+          // For VISIBLE results, the segments are already queryable but ZK still shows ACCEPTED,
+          // which means the cleanup sweep may incorrectly abort them later.
+          LOGGER.error("Failed to persist state {} for statementId={} to ZK. "
+                  + "Manifest may be stale; cleanup sweep could incorrectly abort this statement.",
+              resultState, request.getStatementId());
+          if (resultState == InsertStatementState.VISIBLE || resultState == InsertStatementState.COMMITTED) {
+            // Return error to the client so they know the state is uncertain
+            releaseRequestIdOnFailure(tableNameWithType, request.getRequestId());
+            return errorResult(request.getStatementId(), "STATE_PERSIST_ERROR",
+                "Statement executed but ZK state update failed. Segments may be visible but state is uncertain.");
+          }
+        }
 
         if (resultState == InsertStatementState.ABORTED) {
           _controllerMetrics.addMeteredGlobalValue(ControllerMeter.INSERT_STATEMENTS_ABORTED, 1);
