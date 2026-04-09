@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
@@ -61,11 +60,18 @@ import org.apache.pinot.sql.parsers.parser.SqlShowTables;
 
 /**
  * SqlQueryExecutor executes all SQL queries including DQL, DML, DCL, DDL.
- *
  */
 public class SqlQueryExecutor {
+  // Controller URL cached to avoid ZK reads on every metadata query.
+  // Refreshed after TTL expires or after a failed request.
+  private static final long CONTROLLER_URL_CACHE_TTL_MS = 30_000L;
+
   private final String _controllerUrl;
   private final HelixManager _helixManager;
+
+  // Guarded by synchronized(this) when _helixManager != null
+  private volatile String _cachedControllerUrl;
+  private volatile long _cachedControllerUrlExpiry;
 
   /**
    * Fetch the lead controller from helix, HA is not guaranteed.
@@ -83,6 +89,27 @@ public class SqlQueryExecutor {
   public SqlQueryExecutor(String controllerUrl) {
     _controllerUrl = controllerUrl;
     _helixManager = null;
+  }
+
+  /**
+   * Returns the controller base URL, using a cached value when possible to avoid ZK reads on each metadata query.
+   * Falls back to a fresh ZK lookup when the cached value is expired or invalidated after a request failure.
+   */
+  private synchronized String resolveControllerUrl() {
+    if (_helixManager == null) {
+      return _controllerUrl;
+    }
+    long now = System.currentTimeMillis();
+    if (_cachedControllerUrl == null || now >= _cachedControllerUrlExpiry) {
+      _cachedControllerUrl = getControllerBaseUrl(_helixManager);
+      _cachedControllerUrlExpiry = now + CONTROLLER_URL_CACHE_TTL_MS;
+    }
+    return _cachedControllerUrl;
+  }
+
+  /** Invalidates the cached controller URL so the next call re-fetches from ZK. */
+  private synchronized void invalidateControllerUrlCache() {
+    _cachedControllerUrl = null;
   }
 
   private static String getControllerBaseUrl(HelixManager helixManager) {
@@ -152,7 +179,9 @@ public class SqlQueryExecutor {
           buildMetadataResult(sqlNodeAndOptions.getSqlNode(), sqlNodeAndOptions.getOptions(), requestHeaders);
       result.setResultTable(resultTable);
     } catch (Exception e) {
-      result.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
+      result.addException(
+          new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getClass().getSimpleName() + ": "
+              + (e.getMessage() != null ? e.getMessage() : "(no message)")));
     }
     return result;
   }
@@ -189,7 +218,10 @@ public class SqlQueryExecutor {
 
   private ResultTable toSingleStringColumnResult(String columnName, List<String> values) {
     DataSchema dataSchema = new DataSchema(new String[]{columnName}, new ColumnDataType[]{ColumnDataType.STRING});
-    List<Object[]> rows = values.stream().map(value -> new Object[]{value}).collect(Collectors.toList());
+    List<Object[]> rows = new ArrayList<>(values.size());
+    for (String value : values) {
+      rows.add(new Object[]{value});
+    }
     return new ResultTable(dataSchema, rows);
   }
 
@@ -237,11 +269,12 @@ public class SqlQueryExecutor {
     if (names.isEmpty()) {
       return names;
     }
-    return names.stream()
-        .map(name -> DatabaseUtils.isPartOfDatabase(name, database)
-            ? DatabaseUtils.removeDatabasePrefix(name, database)
-            : name)
-        .collect(Collectors.toList());
+    List<String> result = new ArrayList<>(names.size());
+    for (String name : names) {
+      result.add(DatabaseUtils.isPartOfDatabase(name, database)
+          ? DatabaseUtils.removeDatabasePrefix(name, database) : name);
+    }
+    return result;
   }
 
   private List<String> applyLikeFilter(List<String> values, @Nullable String likePattern) {
@@ -249,7 +282,13 @@ public class SqlQueryExecutor {
       return values;
     }
     Pattern pattern = buildLikeRegex(likePattern);
-    return values.stream().filter(value -> pattern.matcher(value).matches()).collect(Collectors.toList());
+    List<String> result = new ArrayList<>();
+    for (String value : values) {
+      if (pattern.matcher(value).matches()) {
+        result.add(value);
+      }
+    }
+    return result;
   }
 
   private Pattern buildLikeRegex(String likePattern) {
@@ -280,10 +319,9 @@ public class SqlQueryExecutor {
       throws IOException {
     try (PinotAdminClient adminClient = createAdminClient(headers)) {
       return adminClient.getDatabaseClient().listDatabaseNames();
-    } catch (IOException e) {
-      throw e;
     } catch (Exception e) {
-      throw new IOException("Failed to fetch databases from controller", e);
+      invalidateControllerUrlCache();
+      throw e instanceof IOException ? (IOException) e : new IOException("Failed to fetch databases from controller", e);
     }
   }
 
@@ -293,10 +331,9 @@ public class SqlQueryExecutor {
     requestHeaders.put(CommonConstants.DATABASE, database);
     try (PinotAdminClient adminClient = createAdminClient(requestHeaders)) {
       return adminClient.getTableClient().listTables(null, null, null);
-    } catch (IOException e) {
-      throw e;
     } catch (Exception e) {
-      throw new IOException("Failed to fetch tables from controller", e);
+      invalidateControllerUrlCache();
+      throw e instanceof IOException ? (IOException) e : new IOException("Failed to fetch tables from controller", e);
     }
   }
 
@@ -306,10 +343,9 @@ public class SqlQueryExecutor {
     requestHeaders.put(CommonConstants.DATABASE, database);
     try (PinotAdminClient adminClient = createAdminClient(requestHeaders)) {
       return adminClient.getSchemaClient().listSchemaNames();
-    } catch (IOException e) {
-      throw e;
     } catch (Exception e) {
-      throw new IOException("Failed to fetch schemas from controller", e);
+      invalidateControllerUrlCache();
+      throw e instanceof IOException ? (IOException) e : new IOException("Failed to fetch schemas from controller", e);
     }
   }
 
@@ -346,7 +382,7 @@ public class SqlQueryExecutor {
 
   private PinotAdminClient createAdminClient(Map<String, String> headers)
       throws IOException {
-    String baseUrl = _helixManager != null ? getControllerBaseUrl(_helixManager) : _controllerUrl;
+    String baseUrl = resolveControllerUrl();
     if (StringUtils.isBlank(baseUrl)) {
       throw new IOException("Controller URL is not configured for metadata query");
     }
@@ -358,6 +394,11 @@ public class SqlQueryExecutor {
     return new PinotAdminClient(controllerEndpoint._controllerAddress, properties, headers);
   }
 
+  /**
+   * Returns a case-insensitive copy of the given headers map.
+   * All downstream lookups (e.g. {@link #getHeaderValue}) rely on the case-insensitive ordering
+   * of the returned TreeMap, so the map type must not be changed.
+   */
   private Map<String, String> copyHeaders(@Nullable Map<String, String> headers) {
     Map<String, String> requestHeaders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     if (headers != null && !headers.isEmpty()) {

@@ -365,6 +365,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     JsonNode response = postQuery("SHOW TABLES");
     assertTrue(response.get("exceptions").isEmpty(), response.toString());
+
+    // Validate result schema column name
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "tableName");
+
     List<String> showTables = new ArrayList<>();
     response.get("resultTable").get("rows").forEach(row -> showTables.add(row.get(0).asText()));
     Collections.sort(showTables);
@@ -373,6 +377,60 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       List<String> adminTables = adminClient.getTableClient().listTables(null, null, null);
       Collections.sort(adminTables);
       assertEquals(showTables, adminTables);
+    }
+
+    // SHOW TABLES FROM <database> should return the same results as SHOW TABLES in the default database
+    JsonNode responseFromDb = postQuery("SHOW TABLES FROM " + CommonConstants.DEFAULT_DATABASE);
+    assertTrue(responseFromDb.get("exceptions").isEmpty(), responseFromDb.toString());
+    List<String> showTablesFromDb = new ArrayList<>();
+    responseFromDb.get("resultTable").get("rows").forEach(row -> showTablesFromDb.add(row.get(0).asText()));
+    Collections.sort(showTablesFromDb);
+    assertEquals(showTablesFromDb, showTables);
+  }
+
+  @Test
+  public void testShowDatabasesIncludesDefault()
+      throws Exception {
+    JsonNode response = postQuery("SHOW DATABASES");
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+
+    // Validate result schema column name
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "databaseName");
+
+    List<String> databases = new ArrayList<>();
+    response.get("resultTable").get("rows").forEach(row -> databases.add(row.get(0).asText()));
+    assertTrue(databases.contains(CommonConstants.DEFAULT_DATABASE),
+        "SHOW DATABASES should include '" + CommonConstants.DEFAULT_DATABASE + "', got: " + databases);
+  }
+
+  @Test
+  public void testShowSchemasMatchesPinotAdminClient()
+      throws Exception {
+    JsonNode response = postQuery("SHOW SCHEMAS");
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+
+    // Validate result schema column name
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "schemaName");
+
+    List<String> showSchemas = new ArrayList<>();
+    response.get("resultTable").get("rows").forEach(row -> showSchemas.add(row.get(0).asText()));
+    Collections.sort(showSchemas);
+
+    try (PinotAdminClient adminClient = new PinotAdminClient("127.0.0.1:" + getControllerPort())) {
+      List<String> adminSchemas = adminClient.getSchemaClient().listSchemaNames();
+      Collections.sort(adminSchemas);
+      assertEquals(showSchemas, adminSchemas);
+    }
+
+    // SHOW SCHEMAS LIKE 'pattern' should return a subset that matches
+    String schemaName = getTableName(); // schemas are named after tables in test setup
+    JsonNode likeResponse = postQuery("SHOW SCHEMAS LIKE '" + schemaName.charAt(0) + "%'");
+    assertTrue(likeResponse.get("exceptions").isEmpty(), likeResponse.toString());
+    List<String> likeSchemas = new ArrayList<>();
+    likeResponse.get("resultTable").get("rows").forEach(row -> likeSchemas.add(row.get(0).asText()));
+    for (String schema : likeSchemas) {
+      assertTrue(schema.toLowerCase().startsWith(String.valueOf(schemaName.charAt(0)).toLowerCase()),
+          "Schema '" + schema + "' should match LIKE pattern");
     }
   }
 
