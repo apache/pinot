@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("rawtypes")
 public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
-  public static final String ALGORITHM = "DEFAULT";
+  public static final String ALGORITHM = "CONCURRENT";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
