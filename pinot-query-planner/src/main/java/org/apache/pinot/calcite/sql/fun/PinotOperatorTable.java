@@ -20,6 +20,7 @@ package org.apache.pinot.calcite.sql.fun;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -439,7 +440,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
       if (operatorMap.containsKey(canonicalName)) {
         continue;
       }
-      List<SqlTypeFamily> typeFamilies = new java.util.ArrayList<>();
+      List<SqlTypeFamily> typeFamilies = new ArrayList<>();
       for (FilterPredicatePlugin.OperandType operandType : plugin.getOperandTypes()) {
         typeFamilies.add(toSqlTypeFamily(operandType));
       }

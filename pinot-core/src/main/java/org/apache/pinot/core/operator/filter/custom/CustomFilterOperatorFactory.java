@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.custom;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -52,12 +53,14 @@ public interface CustomFilterOperatorFactory {
    * @param indexSegment the segment to filter
    * @param queryContext the query context
    * @param predicate the custom predicate (can be cast to the plugin's specific CustomPredicate subclass)
-   * @param dataSource the data source for the predicate's column (null if predicate LHS is a function)
+   * @param dataSource the data source for the predicate's column, or {@code null} if the predicate
+   *                   LHS is a function expression rather than a column identifier. Implementations
+   *                   must handle null if they wish to support function-based predicates.
    * @param numDocs the number of documents in the segment
    * @return a filter operator that evaluates this predicate
    */
   BaseFilterOperator createFilterOperator(IndexSegment indexSegment, QueryContext queryContext,
-      Predicate predicate, DataSource dataSource, int numDocs);
+      Predicate predicate, @Nullable DataSource dataSource, int numDocs);
 
   /**
    * Creates a filter operator with metadata filter awareness. Called when this custom predicate
@@ -79,7 +82,7 @@ public interface CustomFilterOperatorFactory {
    * @return a filter operator that evaluates this predicate
    */
   default BaseFilterOperator createFilterOperator(IndexSegment indexSegment, QueryContext queryContext,
-      Predicate predicate, DataSource dataSource, int numDocs, boolean hasMetadataFilter) {
+      Predicate predicate, @Nullable DataSource dataSource, int numDocs, boolean hasMetadataFilter) {
     return createFilterOperator(indexSegment, queryContext, predicate, dataSource, numDocs);
   }
 }
