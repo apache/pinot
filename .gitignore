@@ -64,8 +64,21 @@ pinot-integration-tests/src/test/resources/udf-test-results/*.md
 
 tmp/
 
-# Claude Code / Anthropic
-.claude/
+
+# Claude Code (Anthropic best practices)
+# Ignore everything in .claude/ by default, then whitelist shared files.
+# This prevents personal settings, memory, and other local files from being committed.
+# See: https://docs.anthropic.com/en/docs/claude-code/overview
+.claude/*
+!.claude/CLAUDE.md
+!.claude/settings.json
+!.claude/rules/
+!.claude/skills/
+!.claude/commands/
+!.claude/agents/
+!.claude/output-styles/
+!.claude/agent-memory/
+**/CLAUDE.local.md
 
 # OpenAI / Codex / ChatGPT-style tools
 .codex/
