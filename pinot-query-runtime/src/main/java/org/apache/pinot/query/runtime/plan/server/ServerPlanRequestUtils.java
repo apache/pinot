@@ -60,6 +60,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter;
@@ -412,7 +413,11 @@ public class ServerPlanRequestUtils {
         }
         Arrays.sort(arrBytes);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          expressions.add(RequestUtils.getLiteralExpression(arrBytes[rowIdx].getBytes()));
+          if (columnDataType == DataSchema.ColumnDataType.UUID) {
+            expressions.add(RequestUtils.getLiteralExpression(UuidUtils.toString(arrBytes[rowIdx])));
+          } else {
+            expressions.add(RequestUtils.getLiteralExpression(arrBytes[rowIdx].getBytes()));
+          }
         }
         break;
       default:

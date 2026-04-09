@@ -40,6 +40,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -50,6 +51,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -302,6 +304,12 @@ public class DataSchema {
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
       }
     },
+    UUID(BYTES, NullValuePlaceHolder.INTERNAL_UUID_BYTES) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.UUID);
+      }
+    },
     OBJECT(null) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
@@ -452,6 +460,8 @@ public class DataSchema {
           return DataType.STRING;
         case JSON:
           return DataType.JSON;
+        case UUID:
+          return DataType.UUID;
         case BYTES:
         case BYTES_ARRAY:
           return DataType.BYTES;
@@ -490,6 +500,8 @@ public class DataSchema {
           return ((boolean) value) ? 1 : 0;
         case TIMESTAMP:
           return ((Timestamp) value).getTime();
+        case UUID:
+          return new ByteArray(UuidUtils.toBytes(value));
         case BYTES:
           return new ByteArray((byte[]) value);
         case BOOLEAN_ARRAY:
@@ -504,6 +516,9 @@ public class DataSchema {
           }
           if (value instanceof Timestamp) {
             return ((Timestamp) value).getTime();
+          }
+          if (value instanceof UUID) {
+            return new ByteArray(UuidUtils.toBytes((UUID) value));
           }
           if (value instanceof byte[]) {
             return new ByteArray((byte[]) value);
@@ -538,6 +553,8 @@ public class DataSchema {
           return ((int) value) == 1;
         case TIMESTAMP:
           return new Timestamp((long) value);
+        case UUID:
+          return UuidUtils.toUUID((ByteArray) value);
         case BYTES:
           return ((ByteArray) value).getBytes();
         case BOOLEAN_ARRAY:
@@ -569,6 +586,8 @@ public class DataSchema {
           return ((int) value) == 1;
         case TIMESTAMP:
           return new Timestamp((long) value);
+        case UUID:
+          return UuidUtils.toUUID((ByteArray) value);
         case STRING:
         case JSON:
           return value.toString();
@@ -609,6 +628,8 @@ public class DataSchema {
         case TIMESTAMP:
           assert value instanceof Timestamp;
           return value.toString();
+        case UUID:
+          return formatUuid(value);
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
         case TIMESTAMP_ARRAY:
@@ -639,6 +660,8 @@ public class DataSchema {
           return ((int) value) == 1;
         case TIMESTAMP:
           return new Timestamp((long) value).toString();
+        case UUID:
+          return UuidUtils.toString((ByteArray) value);
         case STRING:
         case JSON:
           return value.toString();
@@ -844,6 +867,8 @@ public class DataSchema {
           return STRING;
         case JSON:
           return JSON;
+        case UUID:
+          return UUID;
         case BYTES:
           return BYTES;
         case MAP:
@@ -876,6 +901,19 @@ public class DataSchema {
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }
+    }
+
+    private static String formatUuid(Object value) {
+      if (value instanceof UUID) {
+        return ((UUID) value).toString();
+      }
+      if (value instanceof byte[]) {
+        return UuidUtils.toString((byte[]) value);
+      }
+      if (value instanceof ByteArray) {
+        return UuidUtils.toString((ByteArray) value);
+      }
+      return UuidUtils.toString(UuidUtils.toBytes(value));
     }
 
     public abstract RelDataType toType(RelDataTypeFactory typeFactory);

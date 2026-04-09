@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.parsers.ParserUtils;
 
 
@@ -146,6 +147,8 @@ public class CalciteRexExpressionParser {
     ColumnDataType dataType = literal.getDataType();
     if (dataType == ColumnDataType.BOOLEAN) {
       value = BooleanUtils.isTrueInternalValue(value);
+    } else if (dataType == ColumnDataType.UUID) {
+      value = UuidUtils.toString((ByteArray) value);
     } else if (dataType == ColumnDataType.BYTES) {
       value = ((ByteArray) value).getBytes();
     }

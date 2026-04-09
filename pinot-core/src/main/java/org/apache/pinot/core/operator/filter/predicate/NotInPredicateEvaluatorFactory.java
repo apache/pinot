@@ -150,6 +150,14 @@ public class NotInPredicateEvaluatorFactory {
         }
         return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
+      case UUID: {
+        ByteArray[] uuidValues = notInPredicate.getUuidValues();
+        Set<ByteArray> nonMatchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(uuidValues.length));
+        for (ByteArray value : uuidValues) {
+          nonMatchingValues.add(value);
+        }
+        return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues, DataType.UUID);
+      }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -447,10 +455,17 @@ public class NotInPredicateEvaluatorFactory {
 
   private static final class BytesRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
     final Set<ByteArray> _nonMatchingValues;
+    final DataType _dataType;
 
     BytesRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Set<ByteArray> nonMatchingValues) {
+      this(notInPredicate, nonMatchingValues, DataType.BYTES);
+    }
+
+    BytesRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Set<ByteArray> nonMatchingValues,
+        DataType dataType) {
       super(notInPredicate);
       _nonMatchingValues = nonMatchingValues;
+      _dataType = dataType;
     }
 
     @Override
@@ -460,7 +475,7 @@ public class NotInPredicateEvaluatorFactory {
 
     @Override
     public DataType getDataType() {
-      return DataType.BYTES;
+      return _dataType;
     }
 
     @Override

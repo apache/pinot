@@ -27,8 +27,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MultiValueVisitor;
 import org.apache.pinot.spi.data.SingleValueVisitor;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -80,6 +82,8 @@ public class NotEqualsPredicateEvaluatorFactory {
         return new StringRawValueBasedNeqPredicateEvaluator(notEqPredicate, value);
       case BYTES:
         return new BytesRawValueBasedNeqPredicateEvaluator(notEqPredicate, BytesUtils.toBytes(value));
+      case UUID:
+        return new BytesRawValueBasedNeqPredicateEvaluator(notEqPredicate, UuidUtils.toBytes(value), DataType.UUID);
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -90,8 +94,12 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     DictionaryBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, Dictionary dictionary, DataType dataType) {
       super(notEqPredicate, dictionary);
-      String predicateValue = PredicateUtils.getStoredValue(notEqPredicate.getValue(), dataType);
-      _nonMatchingDictId = dictionary.indexOf(predicateValue);
+      if (dataType == DataType.UUID) {
+        _nonMatchingDictId = dictionary.indexOf(new ByteArray(UuidUtils.toBytes(notEqPredicate.getValue())));
+      } else {
+        String predicateValue = PredicateUtils.getStoredValue(notEqPredicate.getValue(), dataType);
+        _nonMatchingDictId = dictionary.indexOf(predicateValue);
+      }
       if (_nonMatchingDictId >= 0) {
         _nonMatchingDictIds = new int[]{_nonMatchingDictId};
         if (dictionary.length() == 1) {
@@ -378,10 +386,17 @@ public class NotEqualsPredicateEvaluatorFactory {
 
   private static final class BytesRawValueBasedNeqPredicateEvaluator extends NeqRawPredicateEvaluator {
     final byte[] _nonMatchingValue;
+    final DataType _dataType;
 
     BytesRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, byte[] nonMatchingValue) {
+      this(notEqPredicate, nonMatchingValue, DataType.BYTES);
+    }
+
+    BytesRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, byte[] nonMatchingValue,
+        DataType dataType) {
       super(notEqPredicate);
       _nonMatchingValue = nonMatchingValue;
+      _dataType = dataType;
     }
 
     @Override
@@ -391,7 +406,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     @Override
     public DataType getDataType() {
-      return DataType.BYTES;
+      return _dataType;
     }
 
     @Override

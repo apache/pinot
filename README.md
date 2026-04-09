@@ -187,5 +187,35 @@ Check out [Pinot documentation](https://docs.pinot.apache.org/) for a complete d
 - [Pinot Architecture](https://docs.pinot.apache.org/basics/architecture)
 - [Pinot Query Language](https://docs.pinot.apache.org/users/user-guide-query/pinot-query-language)
 
+### UUID Logical Type
+
+Pinot supports a logical `UUID` type for single-value columns. In v1, Pinot stores `UUID` values using the existing
+16-byte `BYTES` representation, while schema definitions and query results use canonical lowercase RFC 4122 strings.
+
+Schema example:
+```json
+{
+  "schemaName": "events",
+  "dimensionFieldSpecs": [
+    {
+      "name": "eventId",
+      "dataType": "UUID"
+    }
+  ]
+}
+```
+
+Query example:
+```sql
+SELECT eventId
+FROM events
+WHERE eventId = CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID)
+```
+
+Migration notes:
+- Existing `BYTES` columns keep returning hex strings. Pinot only renders canonical UUID strings for columns declared as `UUID`.
+- Existing `STRING` or `BYTES` UUID data can be migrated to `UUID` columns without a segment or wire format change in v1.
+- Multi-value UUID columns are not supported in v1.
+
 ## License
 Apache Pinot is under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)

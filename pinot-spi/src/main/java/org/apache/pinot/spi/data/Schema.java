@@ -132,6 +132,7 @@ public final class Schema implements Serializable {
           case TIMESTAMP:
           case STRING:
           case JSON:
+          case UUID:
           case BYTES:
             break;
           default:
@@ -621,6 +622,9 @@ public final class Schema implements Serializable {
       String fieldName = fieldSpec.getName();
       try {
         validate(fieldType, dataType);
+        if (dataType == DataType.UUID && !fieldSpec.isSingleValueField()) {
+          throw new IllegalStateException("UUID data type only supports single-value fields");
+        }
       } catch (IllegalStateException e) {
         throw new IllegalStateException(e.getMessage() + ": " + fieldName);
       }

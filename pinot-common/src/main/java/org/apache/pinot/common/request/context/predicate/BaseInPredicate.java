@@ -25,6 +25,7 @@ import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -42,6 +43,7 @@ public abstract class BaseInPredicate extends BasePredicate {
   private int[] _booleanValues;
   private long[] _timestampValues;
   private ByteArray[] _bytesValues;
+  private ByteArray[] _uuidValues;
 
   public BaseInPredicate(ExpressionContext lhs, List<String> values) {
     super(lhs);
@@ -154,5 +156,18 @@ public abstract class BaseInPredicate extends BasePredicate {
       _bytesValues = bigDecimalValues;
     }
     return bigDecimalValues;
+  }
+
+  public ByteArray[] getUuidValues() {
+    ByteArray[] uuidValues = _uuidValues;
+    if (uuidValues == null) {
+      int numValues = _values.size();
+      uuidValues = new ByteArray[numValues];
+      for (int i = 0; i < numValues; i++) {
+        uuidValues[i] = new ByteArray(UuidUtils.toBytes(_values.get(i)));
+      }
+      _uuidValues = uuidValues;
+    }
+    return uuidValues;
   }
 }

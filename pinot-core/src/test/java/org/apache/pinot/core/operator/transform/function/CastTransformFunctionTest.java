@@ -24,7 +24,9 @@ import java.util.Arrays;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -35,6 +37,8 @@ import static org.testng.Assert.assertTrue;
 
 
 public class CastTransformFunctionTest extends BaseTransformFunctionTest {
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
+
   @Test
   public void testCastTransformFunction() {
     ExpressionContext expression =
@@ -170,6 +174,22 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
   }
 
   @Test
+  public void testCastTransformFunctionUUID() {
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("CAST('%s' AS UUID)", UUID_VALUE));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof CastTransformFunction);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.UUID);
+
+    byte[][] bytesValues = transformFunction.transformToBytesValuesSV(_projectionBlock);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    byte[] expectedBytes = UuidUtils.toBytes(UUID_VALUE);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(bytesValues[i], expectedBytes);
+      Assert.assertEquals(stringValues[i], UUID_VALUE);
+    }
+  }
+
+  @Test
   public void testCastTransformFunctionMV() {
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("CAST(%s AS LONG)", STRING_LONG_MV_COLUMN));
@@ -255,6 +275,26 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
       expectedArraySums[i] = Arrays.stream(afterCast[i]).sum();
     }
     testTransformFunction(transformFunction, expectedArraySums);
+  }
+
+  @Test
+  public void testCastTransformFunctionUUIDRejectsInvalidLiteral() {
+    ExpressionContext expression = RequestContextUtils.getExpression("CAST('not-a-uuid' AS UUID)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+
+    IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
+        () -> transformFunction.transformToBytesValuesSV(_projectionBlock));
+    Assert.assertTrue(exception.getMessage().contains("Invalid UUID"));
+  }
+
+  @Test
+  public void testCastTransformFunctionUUIDRejectsMVSource() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("CAST(%s AS UUID)", STRING_MV_COLUMN));
+    BadQueryRequestException exception = Assert.expectThrows(BadQueryRequestException.class,
+        () -> TransformFunctionFactory.get(expression, _dataSourceMap));
+    Assert.assertTrue(exception.getMessage().contains("Cannot cast from MV to UUID"));
   }
 
   @Test

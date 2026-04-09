@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.plan.RelOptCluster;
@@ -51,6 +52,7 @@ import org.apache.calcite.util.TimestampString;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -148,6 +150,9 @@ public class RexExpressionUtils {
         ByteString byteString = new ByteString(bytes);
         return rexBuilder.makeBinaryLiteral(byteString);
       }
+      case UUID:
+        assert value != null;
+        return rexBuilder.makeUuidLiteral(UuidUtils.toUUID((ByteArray) value));
       case BOOLEAN_ARRAY:
       case BYTES_ARRAY:
       case DOUBLE_ARRAY:
@@ -272,6 +277,19 @@ public class RexExpressionUtils {
         break;
       case BYTES:
         value = new ByteArray(((ByteString) value).getBytes());
+        break;
+      case UUID:
+        if (value instanceof UUID) {
+          value = new ByteArray(UuidUtils.toBytes((UUID) value));
+        } else if (value instanceof ByteString) {
+          value = new ByteArray(UuidUtils.toBytes(((ByteString) value).getBytes()));
+        } else if (value instanceof NlsString) {
+          value = new ByteArray(UuidUtils.toBytes(((NlsString) value).getValue()));
+        } else if (value instanceof String) {
+          value = new ByteArray(UuidUtils.toBytes((String) value));
+        } else {
+          throw new IllegalStateException("Unsupported value type for UUID: " + value.getClass().getName());
+        }
         break;
       default:
         throw new IllegalStateException("Unsupported ColumnDataType: " + dataType);

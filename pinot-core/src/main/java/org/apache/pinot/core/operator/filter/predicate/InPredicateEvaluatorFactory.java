@@ -150,6 +150,14 @@ public class InPredicateEvaluatorFactory {
         }
         return new BytesRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
+      case UUID: {
+        ByteArray[] uuidValues = inPredicate.getUuidValues();
+        Set<ByteArray> matchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(uuidValues.length));
+        for (ByteArray value : uuidValues) {
+          matchingValues.add(value);
+        }
+        return new BytesRawValueBasedInPredicateEvaluator(inPredicate, matchingValues, DataType.UUID);
+      }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -446,10 +454,16 @@ public class InPredicateEvaluatorFactory {
 
   private static final class BytesRawValueBasedInPredicateEvaluator extends InRawPredicateEvaluator {
     final Set<ByteArray> _matchingValues;
+    final DataType _dataType;
 
     BytesRawValueBasedInPredicateEvaluator(InPredicate inPredicate, Set<ByteArray> matchingValues) {
+      this(inPredicate, matchingValues, DataType.BYTES);
+    }
+
+    BytesRawValueBasedInPredicateEvaluator(InPredicate inPredicate, Set<ByteArray> matchingValues, DataType dataType) {
       super(inPredicate);
       _matchingValues = matchingValues;
+      _dataType = dataType;
     }
 
     @Override
@@ -459,7 +473,7 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public DataType getDataType() {
-      return DataType.BYTES;
+      return _dataType;
     }
 
     @Override
