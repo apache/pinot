@@ -208,12 +208,18 @@ public class RealtimeOffsetAutoResetManagerTest {
 
   @Test
   public void testNonLeaderCleanup() {
-    List<String> tableNames = Arrays.asList(REALTIME_TABLE_NAME, OFFLINE_TABLE_NAME);
+    // Populate a handler for the realtime table
+    TableConfig tableConfig = createTableConfigWithValidHandlerClass();
+    RealtimeOffsetAutoResetManager.Context context = _realtimeOffsetAutoResetManager.preprocess(new Properties());
+    when(_pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    _realtimeOffsetAutoResetManager.processTable(REALTIME_TABLE_NAME, context);
+    Assert.assertNotNull(_realtimeOffsetAutoResetManager.getTableHandler(REALTIME_TABLE_NAME));
 
+    // nonLeaderCleanup should remove the handler and all state for those tables
+    List<String> tableNames = Arrays.asList(REALTIME_TABLE_NAME, OFFLINE_TABLE_NAME);
     _realtimeOffsetAutoResetManager.nonLeaderCleanup(tableNames);
 
-    // The cleanup should remove the tables from internal maps
-    // This is tested indirectly by verifying the method completes without exception
+    Assert.assertNull(_realtimeOffsetAutoResetManager.getTableHandler(REALTIME_TABLE_NAME));
   }
 
   @Test
@@ -305,9 +311,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     public PinotHelixResourceManager _pinotHelixResourceManager;
     public boolean _triggedBackfillJob = false;
 
-    public TestRealtimeOffsetAutoResetHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-        PinotHelixResourceManager pinotHelixResourceManager) {
-      init(llcRealtimeSegmentManager, pinotHelixResourceManager);
+    public TestRealtimeOffsetAutoResetHandler() {
     }
 
     @Override

@@ -99,8 +99,6 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
       String tableNameWithType, StreamConfig streamConfig, String topicName, int partitionId, long fromOffset,
       long toOffset);
 
-  public abstract void ensureBackfillJobsRunning(String tableNameWithType, Collection<String> topicNames);
-
   /**
    * Cleanup completed backfill jobs by checking if the topic is complete.
    * If it is complete, pause the topic consumption.
