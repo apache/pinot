@@ -282,6 +282,8 @@ public class FilterPlanNode implements PlanNode {
           } else if (canApplyMapFilter(predicate)) {
             return new MapFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
           } else if (predicate.getType() == Predicate.Type.CUSTOM) {
+            Preconditions.checkState(predicate instanceof CustomPredicate,
+                "Predicate of type CUSTOM must extend CustomPredicate, got: %s", predicate.getClass().getName());
             CustomPredicate customPredicate = (CustomPredicate) predicate;
             CustomFilterOperatorFactory factory =
                 CustomFilterOperatorRegistry.get(customPredicate.getCustomTypeName());
@@ -378,6 +380,8 @@ public class FilterPlanNode implements PlanNode {
               }
             }
             case CUSTOM: {
+              Preconditions.checkState(predicate instanceof CustomPredicate,
+                  "Predicate of type CUSTOM must extend CustomPredicate, got: %s", predicate.getClass().getName());
               CustomPredicate customPredicate = (CustomPredicate) predicate;
               CustomFilterOperatorFactory factory =
                   CustomFilterOperatorRegistry.get(customPredicate.getCustomTypeName());

@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.operator.filter.custom;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,14 +41,19 @@ import org.slf4j.LoggerFactory;
 public class CustomFilterOperatorRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(CustomFilterOperatorRegistry.class);
   private static final Map<String, CustomFilterOperatorFactory> REGISTRY = new ConcurrentHashMap<>();
+  private static final AtomicBoolean INITIALIZED = new AtomicBoolean(false);
 
   private CustomFilterOperatorRegistry() {
   }
 
   /**
    * Discovers and registers all {@link CustomFilterOperatorFactory} implementations via ServiceLoader.
+   * Safe to call multiple times; subsequent calls after the first are no-ops.
    */
   public static void init() {
+    if (!INITIALIZED.compareAndSet(false, true)) {
+      return;
+    }
     ServiceLoader<CustomFilterOperatorFactory> loader = ServiceLoader.load(CustomFilterOperatorFactory.class);
     for (CustomFilterOperatorFactory factory : loader) {
       register(factory);
@@ -60,7 +67,7 @@ public class CustomFilterOperatorRegistry {
    * @throws IllegalStateException if a different factory is already registered for the same predicate name
    */
   public static void register(CustomFilterOperatorFactory factory) {
-    String name = factory.predicateName().toUpperCase();
+    String name = factory.predicateName().toUpperCase(Locale.ROOT);
     CustomFilterOperatorFactory existing = REGISTRY.putIfAbsent(name, factory);
     if (existing != null && existing != factory) {
       throw new IllegalStateException(
@@ -75,14 +82,14 @@ public class CustomFilterOperatorRegistry {
    */
   @Nullable
   public static CustomFilterOperatorFactory get(String predicateName) {
-    return REGISTRY.get(predicateName.toUpperCase());
+    return REGISTRY.get(predicateName.toUpperCase(Locale.ROOT));
   }
 
   /**
    * Returns true if a factory is registered for the given predicate name.
    */
   public static boolean isRegistered(String predicateName) {
-    return REGISTRY.containsKey(predicateName.toUpperCase());
+    return REGISTRY.containsKey(predicateName.toUpperCase(Locale.ROOT));
   }
 
   /**
@@ -90,5 +97,6 @@ public class CustomFilterOperatorRegistry {
    */
   public static void clear() {
     REGISTRY.clear();
+    INITIALIZED.set(false);
   }
 }
