@@ -19,9 +19,11 @@
 package org.apache.pinot.common.filter;
 
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,15 +47,19 @@ import org.slf4j.LoggerFactory;
 public class FilterPredicateRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterPredicateRegistry.class);
   private static final Map<String, FilterPredicatePlugin> REGISTRY = new ConcurrentHashMap<>();
+  private static final AtomicBoolean INITIALIZED = new AtomicBoolean(false);
 
   private FilterPredicateRegistry() {
   }
 
   /**
    * Discovers and registers all {@link FilterPredicatePlugin} implementations found via ServiceLoader.
-   * Safe to call multiple times; duplicate registrations for the same name are logged and skipped.
+   * Safe to call multiple times; subsequent calls after the first are no-ops.
    */
   public static void init() {
+    if (!INITIALIZED.compareAndSet(false, true)) {
+      return;
+    }
     ServiceLoader<FilterPredicatePlugin> loader = ServiceLoader.load(FilterPredicatePlugin.class);
     for (FilterPredicatePlugin plugin : loader) {
       register(plugin);
@@ -67,7 +73,7 @@ public class FilterPredicateRegistry {
    * @throws IllegalStateException if a different plugin is already registered with the same name
    */
   public static void register(FilterPredicatePlugin plugin) {
-    String name = plugin.name().toUpperCase();
+    String name = plugin.name().toUpperCase(Locale.ROOT);
     FilterPredicatePlugin existing = REGISTRY.putIfAbsent(name, plugin);
     if (existing != null && existing != plugin) {
       throw new IllegalStateException(
@@ -82,14 +88,14 @@ public class FilterPredicateRegistry {
    */
   @Nullable
   public static FilterPredicatePlugin get(String name) {
-    return REGISTRY.get(name.toUpperCase());
+    return REGISTRY.get(name.toUpperCase(Locale.ROOT));
   }
 
   /**
    * Returns true if a custom filter predicate plugin is registered for the given name.
    */
   public static boolean isRegistered(String name) {
-    return REGISTRY.containsKey(name.toUpperCase());
+    return REGISTRY.containsKey(name.toUpperCase(Locale.ROOT));
   }
 
   /**
@@ -104,5 +110,6 @@ public class FilterPredicateRegistry {
    */
   public static void clear() {
     REGISTRY.clear();
+    INITIALIZED.set(false);
   }
 }
