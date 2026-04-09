@@ -2967,12 +2967,7 @@ public class PinotHelixResourceManager {
   }
 
   public Map<String, Pair<Integer, String>> reloadSegments(String tableNameWithType, boolean forceDownload,
-      Map<String, List<String>> instanceToSegmentsMap) {
-    return reloadSegments(tableNameWithType, forceDownload, instanceToSegmentsMap, null);
-  }
-
-  public Map<String, Pair<Integer, String>> reloadSegments(String tableNameWithType, boolean forceDownload,
-      Map<String, List<String>> instanceToSegmentsMap, @Nullable String reloadJobId) {
+      Map<String, List<String>> instanceToSegmentsMap, String reloadJobId) {
     LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and instanceToSegmentsMap: {}",
         tableNameWithType, forceDownload, instanceToSegmentsMap);
 

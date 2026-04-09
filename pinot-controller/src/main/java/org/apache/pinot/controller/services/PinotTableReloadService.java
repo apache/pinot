@@ -359,36 +359,40 @@ public class PinotTableReloadService {
   private Map<String, Map<String, String>> reloadSegmentsForTable(String tableNameWithType, boolean forceDownload,
       Map<String, List<String>> instanceToSegmentsMap) {
     long startTimeMs = System.currentTimeMillis();
+    // Use a single shared job ID across all instances so the logical reload operation can be tracked
+    // via a single ZK entry, consistent with the time-range reload path.
+    String reloadJobId = UUID.randomUUID().toString();
     Map<String, Pair<Integer, String>> instanceMsgInfoMap =
-        _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, instanceToSegmentsMap);
+        _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, instanceToSegmentsMap, reloadJobId);
+    int totalNumReloadMsgSent = instanceMsgInfoMap.values().stream().mapToInt(Pair::getLeft).sum();
     Map<String, Map<String, String>> instanceMsgData = new HashMap<>();
     for (Map.Entry<String, Pair<Integer, String>> instanceMsgInfo : instanceMsgInfoMap.entrySet()) {
       String instance = instanceMsgInfo.getKey();
-      Pair<Integer, String> msgInfo = instanceMsgInfo.getValue();
-      int numReloadMsgSent = msgInfo.getLeft();
+      int numReloadMsgSent = instanceMsgInfo.getValue().getLeft();
       if (numReloadMsgSent <= 0) {
         continue;
       }
       Map<String, String> tableReloadMeta = new HashMap<>();
       tableReloadMeta.put("numMessagesSent", String.valueOf(numReloadMsgSent));
-      tableReloadMeta.put("reloadJobId", msgInfo.getRight());
+      tableReloadMeta.put("reloadJobId", reloadJobId);
       instanceMsgData.put(instance, tableReloadMeta);
-      // Store in ZK
+    }
+    if (totalNumReloadMsgSent > 0) {
+      // Store a single ZK entry for the entire job (all instances share the same reloadJobId).
+      List<String> allSegments = instanceToSegmentsMap.values().stream()
+          .flatMap(List::stream).distinct().sorted().collect(Collectors.toList());
+      String segmentNamesStr = StringUtils.join(allSegments, SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
       try {
-        String segmentNames =
-            StringUtils.join(instanceToSegmentsMap.get(instance), SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
-        if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentNames, instance,
-            msgInfo.getRight(), startTimeMs, numReloadMsgSent)) {
-          tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
+        if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentNamesStr, null,
+            reloadJobId, startTimeMs, totalNumReloadMsgSent)) {
+          instanceMsgData.values().forEach(meta -> meta.put("reloadJobMetaZKStorageStatus", "SUCCESS"));
         } else {
-          tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
-          LOG.error("Failed to add batch reload job meta into zookeeper for table: {} targeted instance: {}",
-              tableNameWithType, instance);
+          instanceMsgData.values().forEach(meta -> meta.put("reloadJobMetaZKStorageStatus", "FAILED"));
+          LOG.error("Failed to add batch reload job meta into zookeeper for table: {}", tableNameWithType);
         }
       } catch (Exception e) {
-        tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
-        LOG.error("Failed to add batch reload job meta into zookeeper for table: {} targeted instance: {}",
-            tableNameWithType, instance, e);
+        instanceMsgData.values().forEach(meta -> meta.put("reloadJobMetaZKStorageStatus", "FAILED"));
+        LOG.error("Failed to add batch reload job meta into zookeeper for table: {}", tableNameWithType, e);
       }
     }
     return instanceMsgData;
