@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.avro.LogicalTypes;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -130,5 +131,32 @@ public class AvroUtilsTest {
             .addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
             .addDateTime("hoursSinceEpoch", DataType.LONG, "EPOCH|HOURS", "1:HOURS").build();
     assertEquals(inferredPinotSchema, expectedSchema);
+  }
+
+  @Test
+  public void testGetPinotSchemaFromAvroSchemaWithUuidLogicalType() {
+    org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("uuidRecord", null, null, false);
+    org.apache.avro.Schema uuidSchema =
+        LogicalTypes.uuid().addToSchema(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING));
+    avroSchema.setFields(Lists.newArrayList(
+        new org.apache.avro.Schema.Field("uuidCol", uuidSchema, null, null)
+    ));
+
+    Schema inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, null, null);
+
+    Schema expectedSchema =
+        new Schema.SchemaBuilder().addSingleValueDimension("uuidCol", DataType.UUID).build();
+    assertEquals(inferredPinotSchema, expectedSchema);
+  }
+
+  @Test
+  public void testGetAvroSchemaFromPinotSchemaWithUuidLogicalType() {
+    Schema pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("uuidCol", DataType.UUID).build();
+
+    org.apache.avro.Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema);
+    org.apache.avro.Schema fieldSchema = avroSchema.getField("uuidCol").schema();
+
+    assertEquals(fieldSchema.getType(), org.apache.avro.Schema.Type.STRING);
+    assertEquals(fieldSchema.getLogicalType().getName(), "uuid");
   }
 }

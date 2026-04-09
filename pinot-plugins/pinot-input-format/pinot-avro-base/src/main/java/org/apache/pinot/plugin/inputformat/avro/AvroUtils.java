@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
 import org.apache.avro.Conversions;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
@@ -55,10 +56,10 @@ public class AvroUtils {
     GENERIC_DATA.addLogicalTypeConversion(new Conversions.BigDecimalConversion());
     // Decimal with scale and precision. Deserialized as BigDecimal, serialized as bytes.
     GENERIC_DATA.addLogicalTypeConversion(new Conversions.DecimalConversion());
-    // TODO: Other interesting standard conversions we may want to add. First we need to make sure that we support
-    //  the corresponding data types in Pinot (ie can we read UUIDs or Instant?).
     // UUID is deserialized as java.util.UUID, serialized as string.
-    //GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
+    GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
+    // TODO: Other interesting standard conversions we may want to add. First we need to make sure that we support
+    //  the corresponding data types in Pinot (ie can we read Instant?).
     // Instant is deserialized as java.time.Instant, serialized as long (epoch millis).
     //GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMillisConversion());
   }
@@ -177,6 +178,16 @@ public class AvroUtils {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
 
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
+      if (fieldSpec.getDataType() == DataType.UUID) {
+        org.apache.avro.Schema uuidSchema = LogicalTypes.uuid().addToSchema(org.apache.avro.Schema.create(
+            org.apache.avro.Schema.Type.STRING));
+        if (fieldSpec.isSingleValueField()) {
+          fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type(uuidSchema).noDefault();
+        } else {
+          fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items(uuidSchema).noDefault();
+        }
+        continue;
+      }
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (fieldSpec.isSingleValueField()) {
         switch (storedType) {
@@ -262,11 +273,10 @@ public class AvroUtils {
   public static DataType extractFieldDataType(Field field) {
     try {
       org.apache.avro.Schema fieldSchema = extractSupportedSchema(field.schema());
-      org.apache.avro.Schema.Type fieldType = fieldSchema.getType();
-      if (fieldType == org.apache.avro.Schema.Type.ARRAY) {
-        return AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()).getType());
+      if (fieldSchema.getType() == org.apache.avro.Schema.Type.ARRAY) {
+        return AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()));
       } else {
-        return AvroSchemaUtil.valueOf(fieldType);
+        return AvroSchemaUtil.valueOf(fieldSchema);
       }
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while extracting data type from field: " + field.name(), e);
@@ -342,7 +352,7 @@ public class AvroUtils {
               timeUnit, collectionNotUnnestedToJson);
         } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE
             && AvroSchemaUtil.isPrimitiveType(elementType.getType())) {
-          addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType.getType()), path, false, fieldTypeMap,
+          addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType), path, false, fieldTypeMap,
               timeUnit);
         } else if (shallConvertToJson(collectionNotUnnestedToJson, elementType)) {
           addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
@@ -350,7 +360,7 @@ public class AvroUtils {
         // do not include the node for other cases
         break;
       default:
-        DataType dataType = AvroSchemaUtil.valueOf(fieldType);
+        DataType dataType = AvroSchemaUtil.valueOf(fieldSchema);
         addFieldToPinotSchema(pinotSchema, dataType, path, true, fieldTypeMap, timeUnit);
         break;
     }

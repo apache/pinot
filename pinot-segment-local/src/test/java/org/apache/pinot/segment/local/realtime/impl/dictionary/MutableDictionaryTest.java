@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
@@ -154,6 +155,24 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
+  @Test
+  public void testUuidMutableDictionaryCanonicalStringLookup() {
+    String uuid1 = "550e8400-e29b-41d4-a716-446655440000";
+    String uuid2 = "550e8400-e29b-41d4-a716-446655440001";
+    ByteArray bytes1 = new ByteArray(UuidUtils.toBytes(uuid1));
+    ByteArray bytes2 = new ByteArray(UuidUtils.toBytes(uuid2));
+
+    try (MutableDictionary onHeap = new BytesOnHeapMutableDictionary(FieldSpec.DataType.UUID);
+        MutableDictionary offHeap =
+            new BytesOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "uuidColumn", 16,
+                FieldSpec.DataType.UUID)) {
+      assertUuidDictionaryBehavior(onHeap, uuid1, uuid2, bytes1, bytes2);
+      assertUuidDictionaryBehavior(offHeap, uuid1, uuid2, bytes1, bytes2);
+    } catch (Throwable t) {
+      Assert.fail("Failed with random seed: " + RANDOM_SEED, t);
+    }
+  }
+
   private void testMutableDictionary(MutableDictionary dictionary, FieldSpec.DataType dataType) {
     Map<Object, Integer> valueToDictId = new HashMap<>();
     int numEntries = 0;
@@ -206,6 +225,20 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
 
     Assert.assertEquals(dictionary.getDictIdsInRange(expectedMin.toString(), expectedMax.toString(), true, true).size(),
         dictionary.length());
+  }
+
+  private static void assertUuidDictionaryBehavior(MutableDictionary dictionary, String uuid1, String uuid2,
+      ByteArray bytes1, ByteArray bytes2) {
+    Assert.assertEquals(dictionary.index(bytes1.getBytes()), 0);
+    Assert.assertEquals(dictionary.index(bytes2.getBytes()), 1);
+    Assert.assertEquals(dictionary.indexOf(uuid1), 0);
+    Assert.assertEquals(dictionary.indexOf(uuid2), 1);
+    Assert.assertEquals(dictionary.indexOf(bytes1), 0);
+    Assert.assertEquals(dictionary.indexOf(bytes2), 1);
+    Assert.assertEquals(dictionary.getStringValue(0), uuid1);
+    Assert.assertEquals(dictionary.getStringValue(1), uuid2);
+    Assert.assertEquals(dictionary.getMinVal(), bytes1);
+    Assert.assertEquals(dictionary.getMaxVal(), bytes2);
   }
 
   private MutableDictionary makeOffHeapDictionary(int estCardinality, int maxOverflowSize,

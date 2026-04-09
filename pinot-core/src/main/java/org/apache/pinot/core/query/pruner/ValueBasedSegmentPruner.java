@@ -236,7 +236,7 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
       public boolean mightBeContained(BloomFilterReader bloomFilter) {
         if (!_hashed) {
           GuavaBloomFilterReaderUtils.Hash128AsLongs hash128AsLongs =
-              GuavaBloomFilterReaderUtils.hashAsLongs(_comparableValue.toString());
+              GuavaBloomFilterReaderUtils.hashAsLongs(_dt.toString(_comparableValue));
           _hash1 = hash128AsLongs.getHash1();
           _hash2 = hash128AsLongs.getHash2();
           _hashed = true;

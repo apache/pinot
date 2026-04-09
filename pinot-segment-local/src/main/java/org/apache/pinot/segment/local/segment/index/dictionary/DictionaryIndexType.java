@@ -335,8 +335,8 @@ public class DictionaryIndexType
             : new StringDictionary(dataBuffer, length, numBytesPerValue);
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();
-        return loadOnHeap ? new OnHeapBytesDictionary(dataBuffer, length, numBytesPerValue, byteInterner)
-            : new BytesDictionary(dataBuffer, length, numBytesPerValue);
+        return loadOnHeap ? new OnHeapBytesDictionary(dataBuffer, length, numBytesPerValue, byteInterner,
+            metadata.getDataType()) : new BytesDictionary(dataBuffer, length, numBytesPerValue, metadata.getDataType());
       default:
         throw new IllegalStateException("Unsupported data type for dictionary: " + dataType);
     }
@@ -476,7 +476,8 @@ public class DictionaryIndexType
     }
     String column = context.getFieldSpec().getName();
     String segmentName = context.getSegmentName();
-    DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+    DataType dataType = context.getFieldSpec().getDataType();
+    DataType storedType = dataType.getStoredType();
     int dictionaryColumnSize;
     if (storedType.isFixedWidth()) {
       dictionaryColumnSize = storedType.size();
@@ -490,7 +491,7 @@ public class DictionaryIndexType
     int estimatedCardinality = (int) (context.getEstimatedCardinality() * 1.21);
     String dictionaryAllocationContext =
         IndexUtil.buildAllocationContext(segmentName, column, V1Constants.Dict.FILE_EXTENSION);
-    return MutableDictionaryFactory.getMutableDictionary(storedType, context.isOffHeap(), context.getMemoryManager(),
+    return MutableDictionaryFactory.getMutableDictionary(dataType, context.isOffHeap(), context.getMemoryManager(),
         dictionaryColumnSize, Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
   }
 

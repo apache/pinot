@@ -82,6 +82,21 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
+  protected List<String> getInvertedIndexColumns() {
+    return List.of(UUID_FROM_BYTES_COLUMN);
+  }
+
+  @Override
+  protected List<String> getNoDictionaryColumns() {
+    return List.of(UUID_FROM_BYTES_COLUMN);
+  }
+
+  @Override
+  protected List<String> getBloomFilterColumns() {
+    return List.of(UUID_FROM_STRING_COLUMN, UUID_FROM_BYTES_COLUMN);
+  }
+
+  @Override
   public Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(ID_COLUMN, FieldSpec.DataType.INT)

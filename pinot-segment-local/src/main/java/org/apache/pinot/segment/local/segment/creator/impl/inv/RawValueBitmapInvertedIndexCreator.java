@@ -33,9 +33,8 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.creator.RawValueBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 /**
@@ -161,7 +160,7 @@ public class RawValueBitmapInvertedIndexCreator implements RawValueBasedInverted
   public void add(byte[] value) {
     if (value != null) {
       _maxLength = Math.max(_maxLength, value.length);
-      addValue(value);
+      addValue(new ByteArray(value));
     }
   }
 
@@ -172,17 +171,99 @@ public class RawValueBitmapInvertedIndexCreator implements RawValueBasedInverted
         _maxLength = Math.max(_maxLength, values[i].length);
       }
     }
-    addValues(values, length);
+    ByteArray[] wrappedValues = new ByteArray[length];
+    for (int i = 0; i < length; i++) {
+      wrappedValues[i] = values[i] != null ? new ByteArray(values[i]) : null;
+    }
+    addValues(wrappedValues, length);
   }
 
   @Override
   public void add(Object value, int dictId)
       throws IOException {
+    if (value == null) {
+      _nextDocId++;
+      return;
+    }
+    switch (_dataType.getStoredType()) {
+      case INT:
+        add((Integer) value);
+        break;
+      case LONG:
+        add((Long) value);
+        break;
+      case FLOAT:
+        add((Float) value);
+        break;
+      case DOUBLE:
+        add((Double) value);
+        break;
+      case STRING:
+        add((String) value);
+        break;
+      case BYTES:
+        if (value instanceof ByteArray) {
+          add(((ByteArray) value).getBytes());
+        } else {
+          add((byte[]) value);
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unsupported data type for raw inverted index: " + _dataType);
+    }
   }
 
   @Override
   public void add(Object[] values, @Nullable int[] dictIds)
       throws IOException {
+    switch (_dataType.getStoredType()) {
+      case INT:
+        int[] intValues = new int[values.length];
+        for (int i = 0; i < values.length; i++) {
+          intValues[i] = (Integer) values[i];
+        }
+        add(intValues, values.length);
+        break;
+      case LONG:
+        long[] longValues = new long[values.length];
+        for (int i = 0; i < values.length; i++) {
+          longValues[i] = (Long) values[i];
+        }
+        add(longValues, values.length);
+        break;
+      case FLOAT:
+        float[] floatValues = new float[values.length];
+        for (int i = 0; i < values.length; i++) {
+          floatValues[i] = (Float) values[i];
+        }
+        add(floatValues, values.length);
+        break;
+      case DOUBLE:
+        double[] doubleValues = new double[values.length];
+        for (int i = 0; i < values.length; i++) {
+          doubleValues[i] = (Double) values[i];
+        }
+        add(doubleValues, values.length);
+        break;
+      case STRING:
+        String[] stringValues = new String[values.length];
+        for (int i = 0; i < values.length; i++) {
+          stringValues[i] = (String) values[i];
+        }
+        add(stringValues, values.length);
+        break;
+      case BYTES:
+        byte[][] bytesValues = new byte[values.length][];
+        for (int i = 0; i < values.length; i++) {
+          Object value = values[i];
+          bytesValues[i] = value == null ? null
+              : value instanceof ByteArray ? ((ByteArray) value).getBytes() : (byte[]) value;
+        }
+        add(bytesValues, values.length);
+        break;
+      default:
+        throw new IllegalStateException("Unsupported data type for raw inverted index: " + _dataType);
+    }
   }
 
   private void addValue(Object value) {
@@ -208,108 +289,117 @@ public class RawValueBitmapInvertedIndexCreator implements RawValueBasedInverted
       return;
     }
 
-    // Create dictionary from unique values
-    boolean useVarLengthDictionary = _dataType == DataType.STRING;
-    FieldSpec fieldSpec = new DimensionFieldSpec(_columnName, _dataType, true);
-    _dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, new File(_indexFile.getParent()),
-        useVarLengthDictionary);
+    File temporaryDictionaryFile = File.createTempFile(_columnName + ".raw-inv-dict-", ".tmp",
+        _indexFile.getParentFile());
+    try {
+      // Create dictionary from unique values.
+      // This dictionary is only embedded inside the raw-value bitmap index and must not be persisted as a segment
+      // dictionary file, otherwise later reloads will mis-detect the column as dictionary-encoded.
+      boolean useVarLengthDictionary = _dataType.getStoredType() == DataType.STRING;
+      _dictionaryCreator =
+          new SegmentDictionaryCreator(_columnName, _dataType.getStoredType(), temporaryDictionaryFile,
+              useVarLengthDictionary);
 
-    // Convert values to type-specific array
-    Object[] rawValues = _valueToDocIds.keySet().toArray();
-    int numValues = rawValues.length;
-    Object typedValues;
-    switch (_dataType.getStoredType()) {
-      case INT:
-        int[] intValues = new int[numValues];
-        for (int i = 0; i < numValues; i++) {
-          intValues[i] = (Integer) rawValues[i];
-        }
-        typedValues = intValues;
-        break;
-      case LONG:
-        long[] longValues = new long[numValues];
-        for (int i = 0; i < numValues; i++) {
-          longValues[i] = (Long) rawValues[i];
-        }
-        typedValues = longValues;
-        break;
-      case FLOAT:
-        float[] floatValues = new float[numValues];
-        for (int i = 0; i < numValues; i++) {
-          floatValues[i] = (Float) rawValues[i];
-        }
-        typedValues = floatValues;
-        break;
-      case DOUBLE:
-        double[] doubleValues = new double[numValues];
-        for (int i = 0; i < numValues; i++) {
-          doubleValues[i] = (Double) rawValues[i];
-        }
-        typedValues = doubleValues;
-        break;
-      case STRING:
-        String[] stringValues = new String[numValues];
-        for (int i = 0; i < numValues; i++) {
-          stringValues[i] = (String) rawValues[i];
-        }
-        typedValues = stringValues;
-        break;
-      case BYTES:
-        byte[][] bytesValues = new byte[numValues][];
-        for (int i = 0; i < numValues; i++) {
-          bytesValues[i] = (byte[]) rawValues[i];
-        }
-        typedValues = bytesValues;
-        break;
-      default:
-        throw new IllegalStateException("Unsupported data type: " + _dataType);
-    }
-    _dictionaryCreator.build(typedValues);
+      // Convert values to type-specific array
+      Object[] rawValues = _valueToDocIds.keySet().toArray();
+      int numValues = rawValues.length;
+      Object typedValues;
+      switch (_dataType.getStoredType()) {
+        case INT:
+          int[] intValues = new int[numValues];
+          for (int i = 0; i < numValues; i++) {
+            intValues[i] = (Integer) rawValues[i];
+          }
+          typedValues = intValues;
+          break;
+        case LONG:
+          long[] longValues = new long[numValues];
+          for (int i = 0; i < numValues; i++) {
+            longValues[i] = (Long) rawValues[i];
+          }
+          typedValues = longValues;
+          break;
+        case FLOAT:
+          float[] floatValues = new float[numValues];
+          for (int i = 0; i < numValues; i++) {
+            floatValues[i] = (Float) rawValues[i];
+          }
+          typedValues = floatValues;
+          break;
+        case DOUBLE:
+          double[] doubleValues = new double[numValues];
+          for (int i = 0; i < numValues; i++) {
+            doubleValues[i] = (Double) rawValues[i];
+          }
+          typedValues = doubleValues;
+          break;
+        case STRING:
+          String[] stringValues = new String[numValues];
+          for (int i = 0; i < numValues; i++) {
+            stringValues[i] = (String) rawValues[i];
+          }
+          typedValues = stringValues;
+          break;
+        case BYTES:
+          ByteArray[] bytesValues = new ByteArray[numValues];
+          for (int i = 0; i < numValues; i++) {
+            bytesValues[i] = (ByteArray) rawValues[i];
+          }
+          typedValues = bytesValues;
+          break;
+        default:
+          throw new IllegalStateException("Unsupported data type: " + _dataType);
+      }
+      _dictionaryCreator.build(typedValues);
 
-    // Write header placeholder
-    ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH).order(ByteOrder.BIG_ENDIAN);
-    headerBuffer.putInt(VERSION);
-    headerBuffer.putInt(numValues);
-    headerBuffer.putInt(_maxLength);
-    headerBuffer.putLong(0L); // dictionaryOffset placeholder
-    headerBuffer.putLong(0L); // dictionaryLength placeholder
-    headerBuffer.putLong(0L); // invertedIndexOffset placeholder
-    headerBuffer.putLong(0L); // invertedIndexLength placeholder
-    try (FileOutputStream outputStream = new FileOutputStream(_indexFile)) {
-      outputStream.write(headerBuffer.array());
-    }
+      // Write header placeholder
+      ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH).order(ByteOrder.BIG_ENDIAN);
+      headerBuffer.putInt(VERSION);
+      headerBuffer.putInt(numValues);
+      headerBuffer.putInt(_maxLength);
+      headerBuffer.putLong(0L); // dictionaryOffset placeholder
+      headerBuffer.putLong(0L); // dictionaryLength placeholder
+      headerBuffer.putLong(0L); // invertedIndexOffset placeholder
+      headerBuffer.putLong(0L); // invertedIndexLength placeholder
+      try (FileOutputStream outputStream = new FileOutputStream(_indexFile)) {
+        outputStream.write(headerBuffer.array());
+      }
 
-    // Write dictionary
-    long dictionaryOffset = HEADER_LENGTH;
-    File dictionaryFile = _dictionaryCreator.getDictionaryFile();
-    long dictionaryLength = dictionaryFile.length();
-    FileUtils.writeByteArrayToFile(_indexFile, FileUtils.readFileToByteArray(dictionaryFile), true);
+      // Write dictionary
+      long dictionaryOffset = HEADER_LENGTH;
+      File dictionaryFile = _dictionaryCreator.getDictionaryFile();
+      long dictionaryLength = dictionaryFile.length();
+      FileUtils.writeByteArrayToFile(_indexFile, FileUtils.readFileToByteArray(dictionaryFile), true);
 
-    // Write inverted index
-    long invertedIndexOffset = dictionaryOffset + dictionaryLength;
-    try (FileChannel channel = new RandomAccessFile(_indexFile, "rw").getChannel()) {
-      channel.position(invertedIndexOffset);
-      try (BitmapInvertedIndexWriter writer = new BitmapInvertedIndexWriter(channel, numValues, false)) {
-        for (Object value : rawValues) {
-          writer.add(_valueToDocIds.get(value).toRoaringBitmap());
+      // Write inverted index
+      long invertedIndexOffset = dictionaryOffset + dictionaryLength;
+      try (FileChannel channel = new RandomAccessFile(_indexFile, "rw").getChannel()) {
+        channel.position(invertedIndexOffset);
+        try (BitmapInvertedIndexWriter writer = new BitmapInvertedIndexWriter(channel, numValues, false)) {
+          for (Object value : rawValues) {
+            writer.add(_valueToDocIds.get(value).toRoaringBitmap());
+          }
         }
       }
-    }
-    long invertedIndexLength = _indexFile.length() - invertedIndexOffset;
+      long invertedIndexLength = _indexFile.length() - invertedIndexOffset;
 
-    // Update header with actual offsets and lengths
-    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(_indexFile, false, 0, HEADER_LENGTH, ByteOrder.BIG_ENDIAN,
-        getClass().getSimpleName())) {
-      buffer.putInt(0, VERSION);
-      buffer.putInt(4, numValues);
-      buffer.putInt(8, _maxLength);
-      buffer.putLong(12, dictionaryOffset);
-      buffer.putLong(20, dictionaryLength);
-      buffer.putLong(28, invertedIndexOffset);
-      buffer.putLong(36, invertedIndexLength);
-    }
+      // Update header with actual offsets and lengths
+      try (PinotDataBuffer buffer =
+          PinotDataBuffer.mapFile(_indexFile, false, 0, HEADER_LENGTH, ByteOrder.BIG_ENDIAN,
+              getClass().getSimpleName())) {
+        buffer.putInt(0, VERSION);
+        buffer.putInt(4, numValues);
+        buffer.putInt(8, _maxLength);
+        buffer.putLong(12, dictionaryOffset);
+        buffer.putLong(20, dictionaryLength);
+        buffer.putLong(28, invertedIndexOffset);
+        buffer.putLong(36, invertedIndexLength);
+      }
 
-    _isClosed = true;
+      _isClosed = true;
+    } finally {
+      FileUtils.deleteQuietly(temporaryDictionaryFile);
+    }
   }
 
   @Override

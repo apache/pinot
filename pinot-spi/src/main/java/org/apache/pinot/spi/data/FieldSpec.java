@@ -412,13 +412,19 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       if (defaultNullValue instanceof String) {
         _stringDefaultNullValue = (String) defaultNullValue;
       } else {
-        _stringDefaultNullValue =
-            _dataType != null ? _dataType.toString(defaultNullValue) : getStringValue(defaultNullValue);
+        _stringDefaultNullValue = getStringDefaultNullValue(defaultNullValue);
       }
     }
     if (_dataType != null) {
       _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
     }
+  }
+
+  private String getStringDefaultNullValue(Object defaultNullValue) {
+    if (_dataType == DataType.UUID) {
+      return _dataType.toString(defaultNullValue);
+    }
+    return getStringValue(defaultNullValue);
   }
 
   public static Object getDefaultNullValue(FieldType fieldType, DataType dataType,

@@ -181,6 +181,11 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), BigDecimal.ZERO);
 
+    // Single-value BigDecimal type dimension field with numeric default null value.
+    fieldSpec1 = new DimensionFieldSpec("bigDecimalDimension", BIG_DECIMAL, true, -1);
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), new BigDecimal("-1"));
+    Assert.assertEquals(fieldSpec1.getDefaultNullValueString(), "-1");
+
     // Metric field with default null value for byte column.
     fieldSpec1 = new MetricFieldSpec();
     fieldSpec1.setName("byteMetric");
@@ -203,6 +208,11 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     assertThat((byte[]) fieldSpec1.getDefaultNullValue()).isEqualTo(UuidUtils.toBytes(UUID_VALUE));
     Assert.assertEquals(fieldSpec1.getDefaultNullValueString(), UUID_VALUE);
+
+    FieldSpec uuidBytesFieldSpec =
+        new DimensionFieldSpec("uuidBytesDimension", UUID, true, UuidUtils.toBytes(UUID_VALUE));
+    assertThat((byte[]) uuidBytesFieldSpec.getDefaultNullValue()).isEqualTo(UuidUtils.toBytes(UUID_VALUE));
+    Assert.assertEquals(uuidBytesFieldSpec.getDefaultNullValueString(), UUID_VALUE);
 
     FieldSpec defaultUuidFieldSpec = new DimensionFieldSpec("defaultUuidDimension", UUID, true);
     assertThat((byte[]) defaultUuidFieldSpec.getDefaultNullValue()).isEqualTo(UuidUtils.NIL_UUID_BYTES);

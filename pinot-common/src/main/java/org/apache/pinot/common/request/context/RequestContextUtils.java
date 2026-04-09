@@ -42,12 +42,16 @@ import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusP
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
 public class RequestContextUtils {
+  private static final String UNSUPPORTED_RHS_MESSAGE =
+      "Pinot does not support column or function on the right-hand side of the predicate";
+
   private RequestContextUtils() {
   }
 
@@ -218,23 +222,23 @@ public class RequestContextUtils {
       case GREATER_THAN:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), false, getStringValue(operands.get(1)), false,
-                RangePredicate.UNBOUNDED, new LiteralContext(operands.get(1).getLiteral()).getType()));
+                RangePredicate.UNBOUNDED, getLiteralType(operands.get(1))));
       case GREATER_THAN_OR_EQUAL:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), false,
-                RangePredicate.UNBOUNDED, new LiteralContext(operands.get(1).getLiteral()).getType()));
+                RangePredicate.UNBOUNDED, getLiteralType(operands.get(1))));
       case LESS_THAN:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, false,
-                getStringValue(operands.get(1)), new LiteralContext(operands.get(1).getLiteral()).getType()));
+                getStringValue(operands.get(1)), getLiteralType(operands.get(1))));
       case LESS_THAN_OR_EQUAL:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, true,
-                getStringValue(operands.get(1)), new LiteralContext(operands.get(1).getLiteral()).getType()));
+                getStringValue(operands.get(1)), getLiteralType(operands.get(1))));
       case BETWEEN:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), true,
-                getStringValue(operands.get(2)), new LiteralContext(operands.get(1).getLiteral()).getType()));
+                getStringValue(operands.get(2)), getLiteralType(operands.get(1))));
       case RANGE:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -288,12 +292,7 @@ public class RequestContextUtils {
   }
 
   public static String getStringValue(Expression thriftExpression) {
-    Literal literal = thriftExpression.getLiteral();
-    if (literal == null) {
-      throw new BadQueryRequestException(
-          "Pinot does not support column or function on the right-hand side of the predicate");
-    }
-    return RequestUtils.getLiteralString(literal);
+    return evaluateLiteralValue(thriftExpression).getStringValue();
   }
 
   /**
@@ -412,23 +411,23 @@ public class RequestContextUtils {
       case GREATER_THAN:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), false, getStringValue(operands.get(1)), false, RangePredicate.UNBOUNDED,
-                operands.get(1).getLiteral().getType()));
+                getLiteralType(operands.get(1))));
       case GREATER_THAN_OR_EQUAL:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), false, RangePredicate.UNBOUNDED,
-                operands.get(1).getLiteral().getType()));
+                getLiteralType(operands.get(1))));
       case LESS_THAN:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, false, getStringValue(operands.get(1)),
-                operands.get(1).getLiteral().getType()));
+                getLiteralType(operands.get(1))));
       case LESS_THAN_OR_EQUAL:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, true, getStringValue(operands.get(1)),
-                operands.get(1).getLiteral().getType()));
+                getLiteralType(operands.get(1))));
       case BETWEEN:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), true,
-                getStringValue(operands.get(2)), operands.get(1).getLiteral().getType()));
+                getStringValue(operands.get(2)), getLiteralType(operands.get(1))));
       case RANGE:
         return FilterContext.forPredicate(new RangePredicate(operands.get(0), getStringValue(operands.get(1))));
       case REGEXP_LIKE:
@@ -479,11 +478,96 @@ public class RequestContextUtils {
   //       literal context doesn't support float, and we cannot differentiate explicit string literal and literal
   //       without explicit type, so we always convert the literal into string.
   private static String getStringValue(ExpressionContext expressionContext) {
-    if (expressionContext.getType() != ExpressionContext.Type.LITERAL) {
-      throw new BadQueryRequestException(
-          "Pinot does not support column or function on the right-hand side of the predicate");
+    return evaluateLiteralValue(expressionContext).getStringValue();
+  }
+
+  private static DataType getLiteralType(Expression thriftExpression) {
+    return evaluateLiteralValue(thriftExpression).getType();
+  }
+
+  private static DataType getLiteralType(ExpressionContext expressionContext) {
+    return evaluateLiteralValue(expressionContext).getType();
+  }
+
+  private static EvaluatedLiteralValue evaluateLiteralValue(Expression thriftExpression) {
+    Literal literal = thriftExpression.getLiteral();
+    if (literal != null) {
+      return fromLiteralContext(new LiteralContext(literal));
     }
-    return expressionContext.getLiteral().getStringValue();
+    Function function = thriftExpression.getFunctionCall();
+    if (function != null) {
+      return evaluateFunctionLiteral(function.getOperator(), function.getOperands(),
+          RequestContextUtils::evaluateLiteralValue);
+    }
+    throw new BadQueryRequestException(UNSUPPORTED_RHS_MESSAGE);
+  }
+
+  private static EvaluatedLiteralValue evaluateLiteralValue(ExpressionContext expressionContext) {
+    if (expressionContext.getType() == ExpressionContext.Type.LITERAL) {
+      return fromLiteralContext(expressionContext.getLiteral());
+    }
+    if (expressionContext.getType() == ExpressionContext.Type.FUNCTION) {
+      FunctionContext function = expressionContext.getFunction();
+      return evaluateFunctionLiteral(function.getFunctionName(), function.getArguments(),
+          RequestContextUtils::evaluateLiteralValue);
+    }
+    throw new BadQueryRequestException(UNSUPPORTED_RHS_MESSAGE);
+  }
+
+  private static <T> EvaluatedLiteralValue evaluateFunctionLiteral(String functionName, List<T> operands,
+      java.util.function.Function<T, EvaluatedLiteralValue> evaluator) {
+    if (!functionName.equalsIgnoreCase("cast")) {
+      throw new BadQueryRequestException(UNSUPPORTED_RHS_MESSAGE);
+    }
+    Preconditions.checkState(operands.size() == 2, "CAST function must have exactly 2 operands");
+    EvaluatedLiteralValue source = evaluator.apply(operands.get(0));
+    EvaluatedLiteralValue target = evaluator.apply(operands.get(1));
+    DataType targetType = getCastTargetType(target.getStringValue());
+    if (source.getType() == DataType.UNKNOWN) {
+      return new EvaluatedLiteralValue(source.getStringValue(), targetType);
+    }
+    Object converted = targetType.convert(source.getStringValue());
+    return new EvaluatedLiteralValue(targetType.toString(converted), targetType);
+  }
+
+  private static DataType getCastTargetType(String targetTypeString) {
+    switch (targetTypeString.toUpperCase()) {
+      case "INT":
+      case "INTEGER":
+        return DataType.INT;
+      case "LONG":
+      case "BIGINT":
+        return DataType.LONG;
+      case "FLOAT":
+        return DataType.FLOAT;
+      case "DOUBLE":
+        return DataType.DOUBLE;
+      case "DECIMAL":
+      case "BIGDECIMAL":
+      case "BIG_DECIMAL":
+        return DataType.BIG_DECIMAL;
+      case "BOOL":
+      case "BOOLEAN":
+        return DataType.BOOLEAN;
+      case "TIMESTAMP":
+        return DataType.TIMESTAMP;
+      case "STRING":
+      case "VARCHAR":
+        return DataType.STRING;
+      case "JSON":
+        return DataType.JSON;
+      case "BYTES":
+      case "VARBINARY":
+        return DataType.BYTES;
+      case "UUID":
+        return DataType.UUID;
+      default:
+        throw new BadQueryRequestException("Unable to cast expression to type - " + targetTypeString);
+    }
+  }
+
+  private static EvaluatedLiteralValue fromLiteralContext(LiteralContext literalContext) {
+    return new EvaluatedLiteralValue(literalContext.getStringValue(), literalContext.getType());
   }
 
   private static float[] getVectorValue(ExpressionContext expressionContext) {
@@ -571,6 +655,24 @@ public class RequestContextUtils {
         return (float) literal.getDoubleValue();
       default:
         throw new IllegalStateException("Unsupported literal type: " + type);
+    }
+  }
+
+  private static final class EvaluatedLiteralValue {
+    private final String _stringValue;
+    private final DataType _type;
+
+    private EvaluatedLiteralValue(String stringValue, DataType type) {
+      _stringValue = stringValue;
+      _type = type;
+    }
+
+    private String getStringValue() {
+      return _stringValue;
+    }
+
+    private DataType getType() {
+      return _type;
     }
   }
 }
