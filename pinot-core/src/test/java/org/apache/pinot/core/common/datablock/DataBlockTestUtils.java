@@ -24,11 +24,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -72,6 +74,9 @@ public class DataBlockTestUtils {
           break;
         case BYTES:
           row[colId] = new ByteArray(RandomStringUtils.random(RANDOM.nextInt(20)).getBytes());
+          break;
+        case UUID:
+          row[colId] = new ByteArray(UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong())));
           break;
         case INT_ARRAY:
           int length = RANDOM.nextInt(ARRAY_SIZE);
