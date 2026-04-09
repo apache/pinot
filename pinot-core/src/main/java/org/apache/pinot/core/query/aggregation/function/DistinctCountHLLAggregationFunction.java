@@ -42,23 +42,39 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
+  // When the dictionary size exceeds this threshold, dictionary IDs are offered directly to HyperLogLog
+  // rather than being collected in a RoaringBitmap for deduplication first. For high-cardinality columns,
+  // this avoids the O(n log n) cost of bitmap insertions and provides significant speedup.
+  public static final int DEFAULT_DICT_SIZE_THRESHOLD = 100_000;
+
   protected final int _log2m;
+  protected final int _dictSizeThreshold;
 
   public DistinctCountHLLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
     int numExpressions = arguments.size();
-    // This function expects 1 or 2 arguments.
-    Preconditions.checkArgument(numExpressions <= 2, "DistinctCountHLL expects 1 or 2 arguments, got: %s",
+    // This function expects 1, 2, or 3 arguments.
+    Preconditions.checkArgument(numExpressions <= 3, "DistinctCountHLL expects 1, 2, or 3 arguments, got: %s",
         numExpressions);
-    if (arguments.size() == 2) {
+    if (numExpressions >= 2) {
       _log2m = arguments.get(1).getLiteral().getIntValue();
     } else {
       _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
+    }
+    if (numExpressions >= 3) {
+      int dictSizeThreshold = arguments.get(2).getLiteral().getIntValue();
+      _dictSizeThreshold = dictSizeThreshold > 0 ? dictSizeThreshold : Integer.MAX_VALUE;
+    } else {
+      _dictSizeThreshold = DEFAULT_DICT_SIZE_THRESHOLD;
     }
   }
 
   public int getLog2m() {
     return _log2m;
+  }
+
+  public int getDictSizeThreshold() {
+    return _dictSizeThreshold;
   }
 
   @Override
@@ -113,11 +129,21 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
       DataType storedType) {
-    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
+      if (dictionary.length() > _dictSizeThreshold) {
+        // High-cardinality dictionary: bypass RoaringBitmap and offer values directly to HLL.
+        // Avoids O(n log n) bitmap insertion cost at the expense of approximate deduplication,
+        // which is acceptable since DISTINCTCOUNTHLL already returns an approximate result.
+        HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
+        for (int i = 0; i < length; i++) {
+          hyperLogLog.offer(dictionary.get(dictIds[i]));
+        }
+      } else {
+        getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
+      }
       return;
     }
 
@@ -161,13 +187,22 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
       DataType storedType) {
-    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      for (int i = 0; i < length; i++) {
-        dictIdBitmap.add(dictIds[i]);
+      if (dictionary.length() > _dictSizeThreshold) {
+        HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
+        for (int i = 0; i < length; i++) {
+          for (int dictId : dictIds[i]) {
+            hyperLogLog.offer(dictionary.get(dictId));
+          }
+        }
+      } else {
+        RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
+        for (int i = 0; i < length; i++) {
+          dictIdBitmap.add(dictIds[i]);
+        }
       }
       return;
     }
@@ -255,12 +290,18 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      for (int i = 0; i < length; i++) {
-        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+      if (dictionary.length() > _dictSizeThreshold) {
+        for (int i = 0; i < length; i++) {
+          getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(dictionary.get(dictIds[i]));
+        }
+      } else {
+        for (int i = 0; i < length; i++) {
+          getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+        }
       }
       return;
     }
@@ -304,12 +345,21 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      for (int i = 0; i < length; i++) {
-        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+      if (dictionary.length() > _dictSizeThreshold) {
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          for (int dictId : dictIds[i]) {
+            hyperLogLog.offer(dictionary.get(dictId));
+          }
+        }
+      } else {
+        for (int i = 0; i < length; i++) {
+          getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+        }
       }
       return;
     }
@@ -404,12 +454,21 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      for (int i = 0; i < length; i++) {
-        setDictIdForGroupKeys(groupByResultHolder, groupKeysArray[i], dictionary, dictIds[i]);
+      if (dictionary.length() > _dictSizeThreshold) {
+        for (int i = 0; i < length; i++) {
+          Object value = dictionary.get(dictIds[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            getHyperLogLog(groupByResultHolder, groupKey).offer(value);
+          }
+        }
+      } else {
+        for (int i = 0; i < length; i++) {
+          setDictIdForGroupKeys(groupByResultHolder, groupKeysArray[i], dictionary, dictIds[i]);
+        }
       }
       return;
     }
@@ -453,13 +512,25 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds[i]);
+      if (dictionary.length() > _dictSizeThreshold) {
+        for (int i = 0; i < length; i++) {
+          int[] rowDictIds = dictIds[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+            for (int dictId : rowDictIds) {
+              hyperLogLog.offer(dictionary.get(dictId));
+            }
+          }
+        }
+      } else {
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds[i]);
+          }
         }
       }
       return;
