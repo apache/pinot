@@ -39,6 +39,8 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -143,19 +145,20 @@ public class RowInsertExecutorTest {
 
   @Test
   public void testExecuteNullTableName() {
+    // Builder.build() now validates tableName is required, so this should throw
     GenericRow row = new GenericRow();
     row.putValue("id", 1);
 
-    InsertRequest request = new InsertRequest.Builder()
-        .setStatementId("stmt-4")
-        .setInsertType(InsertType.ROW)
-        .setRows(Collections.singletonList(row))
-        .build();
-
-    InsertResult result = _executor.execute(request);
-
-    assertEquals(result.getState(), InsertStatementState.ABORTED);
-    assertEquals(result.getErrorCode(), "INVALID_TABLE");
+    try {
+      new InsertRequest.Builder()
+          .setStatementId("stmt-4")
+          .setInsertType(InsertType.ROW)
+          .setRows(Collections.singletonList(row))
+          .build();
+      fail("Expected IllegalArgumentException for null tableName");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("tableName"));
+    }
   }
 
   @Test
