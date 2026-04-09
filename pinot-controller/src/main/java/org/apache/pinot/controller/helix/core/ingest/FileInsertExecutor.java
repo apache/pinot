@@ -177,12 +177,17 @@ public class FileInsertExecutor implements InsertExecutor {
    * @param segmentNames  the segment names produced by the Minion task
    * @return the result reflecting the new state
    */
-  public InsertResult completeFileInsert(String statementId, List<String> segmentNames) {
+  /**
+   * Completes a file insert using in-memory state only. Package-private because callers
+   * should use the three-arg overload with a ZK manifest for failover safety.
+   */
+  InsertResult completeFileInsert(String statementId, List<String> segmentNames) {
     return completeFileInsert(statementId, segmentNames, null);
   }
 
   /**
-   * Overload that accepts a ZK manifest for failover recovery when in-memory state is lost.
+   * Completes a file insert with ZK manifest fallback for failover recovery.
+   * This is the primary entry point — always pass the ZK manifest when available.
    */
   public InsertResult completeFileInsert(String statementId, List<String> segmentNames,
       @Nullable InsertStatementManifest zkManifest) {

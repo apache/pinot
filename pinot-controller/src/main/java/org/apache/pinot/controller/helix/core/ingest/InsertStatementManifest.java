@@ -38,7 +38,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * recover statement state across controller restarts. The manifest tracks the full lifecycle
  * of the statement from creation through garbage collection.
  *
- * <p>Instances are mutable but should only be modified under the coordinator's lock.
+ * <p>Instances are mutable and thread-safe. All setters are {@code synchronized} to ensure
+ * compound mutations (e.g., setState + setSegmentNames + setErrorMessage before a ZK write)
+ * are atomic with respect to concurrent reads and the cleanup sweep.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InsertStatementManifest {
@@ -47,12 +49,12 @@ public class InsertStatementManifest {
   private final String _payloadHash;
   private final String _tableNameWithType;
   private final InsertType _insertType;
-  private volatile InsertStatementState _state;
+  private InsertStatementState _state;
   private final long _createdTimeMs;
-  private volatile long _lastUpdatedTimeMs;
-  private volatile List<String> _segmentNames;
-  private volatile String _errorMessage;
-  private volatile String _lineageEntryId;
+  private long _lastUpdatedTimeMs;
+  private List<String> _segmentNames;
+  private String _errorMessage;
+  private String _lineageEntryId;
 
   @JsonCreator
   public InsertStatementManifest(
@@ -106,11 +108,11 @@ public class InsertStatementManifest {
   }
 
   @JsonProperty("state")
-  public InsertStatementState getState() {
+  public synchronized InsertStatementState getState() {
     return _state;
   }
 
-  public void setState(InsertStatementState state) {
+  public synchronized void setState(InsertStatementState state) {
     _state = state;
     _lastUpdatedTimeMs = System.currentTimeMillis();
   }
@@ -121,42 +123,42 @@ public class InsertStatementManifest {
   }
 
   @JsonProperty("lastUpdatedTimeMs")
-  public long getLastUpdatedTimeMs() {
+  public synchronized long getLastUpdatedTimeMs() {
     return _lastUpdatedTimeMs;
   }
 
-  public void setLastUpdatedTimeMs(long lastUpdatedTimeMs) {
+  public synchronized void setLastUpdatedTimeMs(long lastUpdatedTimeMs) {
     _lastUpdatedTimeMs = lastUpdatedTimeMs;
   }
 
   @JsonProperty("segmentNames")
-  public List<String> getSegmentNames() {
+  public synchronized List<String> getSegmentNames() {
     return Collections.unmodifiableList(_segmentNames);
   }
 
-  public void setSegmentNames(List<String> segmentNames) {
+  public synchronized void setSegmentNames(List<String> segmentNames) {
     _segmentNames = new ArrayList<>(segmentNames);
     _lastUpdatedTimeMs = System.currentTimeMillis();
   }
 
   @JsonProperty("errorMessage")
   @Nullable
-  public String getErrorMessage() {
+  public synchronized String getErrorMessage() {
     return _errorMessage;
   }
 
-  public void setErrorMessage(@Nullable String errorMessage) {
+  public synchronized void setErrorMessage(@Nullable String errorMessage) {
     _errorMessage = errorMessage;
     _lastUpdatedTimeMs = System.currentTimeMillis();
   }
 
   @JsonProperty("lineageEntryId")
   @Nullable
-  public String getLineageEntryId() {
+  public synchronized String getLineageEntryId() {
     return _lineageEntryId;
   }
 
-  public void setLineageEntryId(@Nullable String lineageEntryId) {
+  public synchronized void setLineageEntryId(@Nullable String lineageEntryId) {
     _lineageEntryId = lineageEntryId;
     _lastUpdatedTimeMs = System.currentTimeMillis();
   }

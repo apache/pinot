@@ -374,6 +374,7 @@ public class InsertStatementCoordinatorTest {
         .setStatementId("stmt-10")
         .setTableName("testTable")
         .setInsertType(InsertType.FILE)
+        .setFileUri("s3://bucket/data.json")
         .build();
 
     InsertResult result = _coordinator.submitInsert(request);

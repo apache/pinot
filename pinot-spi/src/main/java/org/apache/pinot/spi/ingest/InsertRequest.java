@@ -224,6 +224,15 @@ public class InsertRequest {
     }
 
     public InsertRequest build() {
+      if (_tableName == null || _tableName.isEmpty()) {
+        throw new IllegalArgumentException("tableName is required for InsertRequest");
+      }
+      if (_insertType == null) {
+        throw new IllegalArgumentException("insertType is required for InsertRequest");
+      }
+      if (_insertType == InsertType.FILE && (_fileUri == null || _fileUri.isEmpty())) {
+        throw new IllegalArgumentException("fileUri is required for FILE insert");
+      }
       return new InsertRequest(this);
     }
   }

@@ -187,25 +187,16 @@ public class FileInsertExecutorTest {
     assertEquals(result.getErrorCode(), "TABLE_NOT_FOUND");
   }
 
-  @Test
-  public void testExecuteInvalidFileUri() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("testTable")
-        .build();
-    mockTableConfig(TABLE_NAME, tableConfig);
-
-    // Build request with empty file URI
-    InsertRequest request = new InsertRequest.Builder()
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*fileUri is required.*")
+  public void testBuildRejectsEmptyFileUri() {
+    new InsertRequest.Builder()
         .setStatementId("stmt-1")
         .setTableName(TABLE_NAME)
         .setTableType(TableType.OFFLINE)
         .setInsertType(InsertType.FILE)
         .setFileUri("")
         .build();
-
-    InsertResult result = _executor.execute(request);
-    assertEquals(result.getState(), InsertStatementState.ABORTED);
-    assertEquals(result.getErrorCode(), "INVALID_FILE_URI");
   }
 
   @Test

@@ -55,6 +55,32 @@ public class InsertStatementManifestTest {
     assertEquals(deserialized.getLastUpdatedTimeMs(), 2000L);
     assertEquals(deserialized.getSegmentNames(), Arrays.asList("seg-1", "seg-2"));
     assertNull(deserialized.getErrorMessage());
+    assertNull(deserialized.getLineageEntryId());
+  }
+
+  @Test
+  public void testJsonRoundTripAllFields()
+      throws IOException {
+    InsertStatementManifest original = new InsertStatementManifest(
+        "stmt-full", "req-full", "hash-full", "fullTable_OFFLINE",
+        InsertType.FILE, InsertStatementState.VISIBLE,
+        5000L, 6000L, Arrays.asList("seg-x", "seg-y", "seg-z"),
+        "completed normally", "lineage-entry-42");
+
+    String json = original.toJsonString();
+    InsertStatementManifest deserialized = InsertStatementManifest.fromJsonString(json);
+
+    assertEquals(deserialized.getStatementId(), original.getStatementId());
+    assertEquals(deserialized.getRequestId(), original.getRequestId());
+    assertEquals(deserialized.getPayloadHash(), original.getPayloadHash());
+    assertEquals(deserialized.getTableNameWithType(), original.getTableNameWithType());
+    assertEquals(deserialized.getInsertType(), original.getInsertType());
+    assertEquals(deserialized.getState(), original.getState());
+    assertEquals(deserialized.getCreatedTimeMs(), original.getCreatedTimeMs());
+    assertEquals(deserialized.getLastUpdatedTimeMs(), original.getLastUpdatedTimeMs());
+    assertEquals(deserialized.getSegmentNames(), original.getSegmentNames());
+    assertEquals(deserialized.getErrorMessage(), original.getErrorMessage());
+    assertEquals(deserialized.getLineageEntryId(), original.getLineageEntryId());
   }
 
   @Test
