@@ -17,6 +17,13 @@
 # under the License.
 #
 # Dependabot GitHub Configuration
+#
+# NOTE:
+# GitHub does not support repository/fork conditionals in dependabot.yml.
+# This configuration is intended for the canonical apache/pinot repository.
+# On forks, Dependabot version updates are not enabled automatically, and
+# Dependabot security updates are disabled automatically unless the fork owner
+# explicitly turns them on in repository settings.
 
 version: 2
 updates:
