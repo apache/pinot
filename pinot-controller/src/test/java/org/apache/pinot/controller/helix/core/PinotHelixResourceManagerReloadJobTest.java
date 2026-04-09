@@ -83,4 +83,16 @@ public class PinotHelixResourceManagerReloadJobTest {
     assertTrue(result);
     assertNull(manager._jobMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_NAME));
   }
+
+  @Test
+  public void testAddNewReloadSegmentJobStoresExactInstanceMappingWhenProvided() {
+    CapturingHelixResourceManager manager = new CapturingHelixResourceManager();
+
+    boolean result = manager.addNewReloadSegmentJob("table_OFFLINE", "seg_1|seg_2", null, "job-3", 789L, 2,
+        "{\"server1\":[\"seg_1\"],\"server2\":[\"seg_2\"]}");
+
+    assertTrue(result);
+    assertEquals(manager._jobMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_TO_SEGMENTS_MAP),
+        "{\"server1\":[\"seg_1\"],\"server2\":[\"seg_2\"]}");
+  }
 }

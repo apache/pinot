@@ -130,9 +130,9 @@ public class PinotTableReloadResource {
   @ApiOperation(value = "Reload all segments in a table",
       notes = "Reloads all segments for the specified table. Supports filtering by type, instance, "
           + "custom mapping, or time range. Time range params are in milliseconds and the range is "
-          + "[startTimestamp, endTimestamp). When using time range parameters, do not specify "
-          + "targetInstance or instanceToSegmentsMap; these options are mutually exclusive with time "
-          + "range filters.")
+          + "[startTimestamp, endTimestamp). Either timestamp can be omitted to make that side of the "
+          + "range unbounded. When using time range parameters, do not specify targetInstance or "
+          + "instanceToSegmentsMap; these options are mutually exclusive with time range filters.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Reload jobs submitted successfully"),
       @ApiResponse(code = 404, message = "No segments found")
@@ -144,9 +144,9 @@ public class PinotTableReloadResource {
       String tableTypeStr,
       @ApiParam(value = "Force server to re-download segments from deep store", defaultValue = "false")
       @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload,
-      @ApiParam(value = "Start timestamp (inclusive) in milliseconds")
+      @ApiParam(value = "Start timestamp (inclusive) in milliseconds. Omit for an unbounded lower bound.")
       @QueryParam("startTimestamp") String startTimestampStr,
-      @ApiParam(value = "End timestamp (exclusive) in milliseconds")
+      @ApiParam(value = "End timestamp (exclusive) in milliseconds. Omit for an unbounded upper bound.")
       @QueryParam("endTimestamp") String endTimestampStr,
       @ApiParam(value = "Whether to exclude segments overlapping the time range", defaultValue = "false")
       @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping,

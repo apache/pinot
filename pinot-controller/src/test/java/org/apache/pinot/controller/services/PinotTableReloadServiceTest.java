@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -75,9 +74,9 @@ public class PinotTableReloadServiceTest {
     serverToSegments.put("server2", List.of("seg_2"));
     when(helixResourceManager.getServerToSegmentsMap(tableNameWithType, null, false)).thenReturn(serverToSegments);
 
-    Map<String, Pair<Integer, String>> reloadResult = new HashMap<>();
-    reloadResult.put("server1", Pair.of(1, "job1"));
-    reloadResult.put("server2", Pair.of(1, "job2"));
+    Map<String, Integer> reloadResult = new HashMap<>();
+    reloadResult.put("server1", 1);
+    reloadResult.put("server2", 1);
     when(helixResourceManager.reloadSegments(eq(tableNameWithType), eq(false), anyMap(), anyString()))
         .thenReturn(reloadResult);
     when(helixResourceManager.addNewReloadSegmentJob(eq(tableNameWithType), anyString(), eq(null), anyString(),
@@ -130,7 +129,7 @@ public class PinotTableReloadServiceTest {
     when(helixResourceManager.getServerToSegmentsMap(tableNameWithType, null, false))
         .thenReturn(Map.of("server1", List.of("seg_1", "seg_2")));
     when(helixResourceManager.reloadSegments(eq(tableNameWithType), eq(false), anyMap(), anyString()))
-        .thenReturn(Map.of("server1", Pair.of(1, "job1")));
+        .thenReturn(Map.of("server1", 1));
     when(helixResourceManager.addNewReloadSegmentJob(eq(tableNameWithType), anyString(), eq(null), anyString(),
         anyLong(), anyInt())).thenReturn(true);
 
@@ -160,6 +159,52 @@ public class PinotTableReloadServiceTest {
     assertNotNull(exception);
     assertEquals(exception.getResponse().getStatus(), Response.Status.NOT_FOUND.getStatusCode());
     verify(helixResourceManager).getExistingTableNamesWithType("rawTable", TableType.OFFLINE);
+  }
+
+  @Test
+  public void testReloadSegmentsInTimeRangeAllowsOpenStart() throws Exception {
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotTableReloadService service = new PinotTableReloadService(helixResourceManager, new ControllerConf(),
+        mock(Executor.class), mock(HttpClientConnectionManager.class));
+
+    String tableNameWithType = "myTable_OFFLINE";
+    when(helixResourceManager.getExistingTableNamesWithType("myTable", TableType.OFFLINE))
+        .thenReturn(List.of(tableNameWithType));
+    when(helixResourceManager.getSegmentsFor(tableNameWithType, true, Long.MIN_VALUE, 2000L, false))
+        .thenReturn(List.of("seg_1"));
+    when(helixResourceManager.getServerToSegmentsMap(tableNameWithType, null, false))
+        .thenReturn(Map.of("server1", List.of("seg_1")));
+    when(helixResourceManager.reloadSegments(eq(tableNameWithType), eq(false), anyMap(), anyString()))
+        .thenReturn(Map.of("server1", 1));
+    when(helixResourceManager.addNewReloadSegmentJob(eq(tableNameWithType), anyString(), eq("server1"), anyString(),
+        anyLong(), anyInt(), anyString())).thenReturn(true);
+
+    service.reloadAllSegments("myTable", "OFFLINE", false, null, null, null, "2000", false, null);
+
+    verify(helixResourceManager).getSegmentsFor(tableNameWithType, true, Long.MIN_VALUE, 2000L, false);
+  }
+
+  @Test
+  public void testReloadSegmentsInTimeRangeAllowsOpenEnd() throws Exception {
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotTableReloadService service = new PinotTableReloadService(helixResourceManager, new ControllerConf(),
+        mock(Executor.class), mock(HttpClientConnectionManager.class));
+
+    String tableNameWithType = "myTable_OFFLINE";
+    when(helixResourceManager.getExistingTableNamesWithType("myTable", TableType.OFFLINE))
+        .thenReturn(List.of(tableNameWithType));
+    when(helixResourceManager.getSegmentsFor(tableNameWithType, true, 1000L, Long.MAX_VALUE, false))
+        .thenReturn(List.of("seg_1"));
+    when(helixResourceManager.getServerToSegmentsMap(tableNameWithType, null, false))
+        .thenReturn(Map.of("server1", List.of("seg_1")));
+    when(helixResourceManager.reloadSegments(eq(tableNameWithType), eq(false), anyMap(), anyString()))
+        .thenReturn(Map.of("server1", 1));
+    when(helixResourceManager.addNewReloadSegmentJob(eq(tableNameWithType), anyString(), eq("server1"), anyString(),
+        anyLong(), anyInt(), anyString())).thenReturn(true);
+
+    service.reloadAllSegments("myTable", "OFFLINE", false, null, null, "1000", null, false, null);
+
+    verify(helixResourceManager).getSegmentsFor(tableNameWithType, true, 1000L, Long.MAX_VALUE, false);
   }
 
   @Test
@@ -221,7 +266,7 @@ public class PinotTableReloadServiceTest {
         .thenReturn(Map.of("server1", List.of("seg_1")));
 
     when(helixResourceManager.reloadSegments(eq(tableNameWithType), eq(false), anyMap(), anyString()))
-        .thenReturn(Map.of("server1", Pair.of(1, "job1")));
+        .thenReturn(Map.of("server1", 1));
     when(helixResourceManager.addNewReloadSegmentJob(eq(tableNameWithType), anyString(), eq(null), anyString(),
         anyLong(), anyInt())).thenReturn(false);
 
@@ -250,12 +295,45 @@ public class PinotTableReloadServiceTest {
     when(helixResourceManager.getServerToSegmentsMap(tableNameWithType, null, false))
         .thenReturn(Map.of("server1", List.of("seg_1")));
     when(helixResourceManager.reloadSegments(eq(tableNameWithType), eq(false), anyMap(), anyString()))
-        .thenReturn(Map.of("server1", Pair.of(0, "job1")));
+        .thenReturn(Map.of("server1", 0));
 
     ControllerApplicationException exception =
         expectThrows(ControllerApplicationException.class,
             () -> service.reloadAllSegments(rawTableName, "OFFLINE", false, null, null, "1000", "2000", false, null));
     assertEquals(exception.getResponse().getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+  }
+
+  @Test
+  public void testReloadSegmentsWithInstanceToSegmentsMapStoresExactMappingForStatus() throws Exception {
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    PinotTableReloadService service = new PinotTableReloadService(helixResourceManager, new ControllerConf(),
+        mock(Executor.class), mock(HttpClientConnectionManager.class));
+
+    String rawTableName = "myTable";
+    String tableNameWithType = "myTable_OFFLINE";
+    when(helixResourceManager.getExistingTableNamesWithType(rawTableName, TableType.OFFLINE))
+        .thenReturn(List.of(tableNameWithType));
+
+    Map<String, List<String>> instanceToSegmentsMap = Map.of(
+        "server1", List.of("seg_1"),
+        "server2", List.of("seg_2"));
+    when(helixResourceManager.reloadSegments(eq(tableNameWithType), eq(false), eq(instanceToSegmentsMap), anyString()))
+        .thenReturn(Map.of(
+            "server1", 1,
+            "server2", 1));
+    when(helixResourceManager.addNewReloadSegmentJob(eq(tableNameWithType), anyString(), eq(null), anyString(),
+        anyLong(), anyInt(), anyString())).thenReturn(true);
+
+    service.reloadAllSegments(rawTableName, "OFFLINE", false, null, JsonUtils.objectToString(instanceToSegmentsMap),
+        null, null, false, null);
+
+    ArgumentCaptor<String> instanceToSegmentsMapCaptor = ArgumentCaptor.forClass(String.class);
+    verify(helixResourceManager).addNewReloadSegmentJob(eq(tableNameWithType), anyString(), eq(null), anyString(),
+        anyLong(), eq(2), instanceToSegmentsMapCaptor.capture());
+    Map<String, List<String>> capturedMap =
+        JsonUtils.stringToObject(instanceToSegmentsMapCaptor.getValue(), new TypeReference<>() {
+        });
+    assertEquals(capturedMap, instanceToSegmentsMap);
   }
 
   @Test

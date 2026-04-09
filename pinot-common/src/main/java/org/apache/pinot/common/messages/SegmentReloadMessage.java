@@ -56,23 +56,7 @@ public class SegmentReloadMessage extends Message {
    * @param forceDownload     whether to download segments from deep store when reloading.
    */
   public SegmentReloadMessage(String tableNameWithType, @Nullable List<String> segmentNames, boolean forceDownload) {
-    super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
-    setResourceName(tableNameWithType);
-    setMsgSubType(RELOAD_SEGMENT_MSG_SUB_TYPE);
-    // Give it infinite time to process the message, as long as session is alive
-    setExecutionTimeout(-1);
-
-    ZNRecord znRecord = getRecord();
-
-    // Persisting the msg ID as the reload job ID.
-    znRecord.setSimpleField(RELOAD_JOB_ID_KEY, getMsgId());
-
-    znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
-    if (CollectionUtils.isNotEmpty(segmentNames)) {
-      // TODO: use the new List field and deprecate the partition name in next release.
-      setPartitionName(segmentNames.get(0));
-      znRecord.setListField(SEGMENT_NAMES, segmentNames);
-    }
+    this(tableNameWithType, segmentNames, forceDownload, null);
   }
 
   /**
@@ -85,9 +69,25 @@ public class SegmentReloadMessage extends Message {
    */
   public SegmentReloadMessage(String tableNameWithType, @Nullable List<String> segmentNames, boolean forceDownload,
       @Nullable String reloadJobId) {
-    this(tableNameWithType, segmentNames, forceDownload);
+    super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
+    setResourceName(tableNameWithType);
+    setMsgSubType(RELOAD_SEGMENT_MSG_SUB_TYPE);
+    // Give it infinite time to process the message, as long as session is alive
+    setExecutionTimeout(-1);
+
+    ZNRecord znRecord = getRecord();
+
+    // Persisting the msg ID as the reload job ID.
+    znRecord.setSimpleField(RELOAD_JOB_ID_KEY, getMsgId());
     if (reloadJobId != null) {
-      getRecord().setSimpleField(RELOAD_JOB_ID_KEY, reloadJobId);
+      znRecord.setSimpleField(RELOAD_JOB_ID_KEY, reloadJobId);
+    }
+
+    znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
+    if (CollectionUtils.isNotEmpty(segmentNames)) {
+      // TODO: use the new List field and deprecate the partition name in next release.
+      setPartitionName(segmentNames.get(0));
+      znRecord.setListField(SEGMENT_NAMES, segmentNames);
     }
   }
 

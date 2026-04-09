@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
@@ -111,19 +112,16 @@ public class PinotTableReloadService {
             targetInstance == null ? "every instance" : targetInstance), Response.Status.NOT_FOUND);
   }
 
-  public SuccessResponse reloadAllSegments(String tableName, String tableTypeStr, boolean forceDownload,
-      String targetInstance, String instanceToSegmentsMapInJson, String startTimestampStr, String endTimestampStr,
-      boolean excludeOverlapping, HttpHeaders headers)
+  public SuccessResponse reloadAllSegments(String tableName, @Nullable String tableTypeStr, boolean forceDownload,
+      @Nullable String targetInstance, @Nullable String instanceToSegmentsMapInJson,
+      @Nullable String startTimestampStr, @Nullable String endTimestampStr, boolean excludeOverlapping,
+      HttpHeaders headers)
       throws IOException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableTypeFromRequest = resolveTableTypeForReload(tableName, tableTypeStr, forceDownload);
     boolean hasStartTimestamp = !Strings.isNullOrEmpty(startTimestampStr);
     boolean hasEndTimestamp = !Strings.isNullOrEmpty(endTimestampStr);
     if (hasStartTimestamp || hasEndTimestamp) {
-      if (!(hasStartTimestamp && hasEndTimestamp)) {
-        throw new ControllerApplicationException(LOG, "startTimestamp and endTimestamp must be provided together.",
-            Response.Status.BAD_REQUEST);
-      }
       if (targetInstance != null || instanceToSegmentsMapInJson != null) {
         throw new ControllerApplicationException(LOG,
             "startTimestamp/endTimestamp cannot be used together with targetInstance or instanceToSegmentsMap.",
@@ -194,17 +192,25 @@ public class PinotTableReloadService {
     return new SuccessResponse(JsonUtils.objectToString(perTableMsgData));
   }
 
-  public SuccessResponse reloadSegmentsInTimeRange(String tableName, String tableTypeStr, String startTimestampStr,
-      String endTimestampStr, boolean excludeOverlapping, boolean forceDownload, @Nullable String targetInstance,
-      HttpHeaders headers) {
-    long startTimestamp;
-    long endTimestamp;
+  public SuccessResponse reloadSegmentsInTimeRange(String tableName, @Nullable String tableTypeStr,
+      @Nullable String startTimestampStr, @Nullable String endTimestampStr, boolean excludeOverlapping,
+      boolean forceDownload, @Nullable String targetInstance, HttpHeaders headers) {
+    long startTimestamp = Long.MIN_VALUE;
+    long endTimestamp = Long.MAX_VALUE;
+    if (Strings.isNullOrEmpty(startTimestampStr) && Strings.isNullOrEmpty(endTimestampStr)) {
+      throw new ControllerApplicationException(LOG, "At least one of startTimestamp or endTimestamp must be provided.",
+          Response.Status.BAD_REQUEST);
+    }
     try {
-      startTimestamp = Long.parseLong(startTimestampStr);
-      endTimestamp = Long.parseLong(endTimestampStr);
+      if (!Strings.isNullOrEmpty(startTimestampStr)) {
+        startTimestamp = Long.parseLong(startTimestampStr);
+      }
+      if (!Strings.isNullOrEmpty(endTimestampStr)) {
+        endTimestamp = Long.parseLong(endTimestampStr);
+      }
     } catch (NumberFormatException e) {
       throw new ControllerApplicationException(LOG,
-          "Failed to parse the start/end timestamp. Please make sure they are in 'milliseconds since epoch' format.",
+          "Failed to parse start/end timestamp. Please make sure they are in 'milliseconds since epoch' format.",
           Response.Status.BAD_REQUEST, e);
     }
     if (startTimestamp >= endTimestamp) {
@@ -244,10 +250,13 @@ public class PinotTableReloadService {
       }
       String reloadJobId = UUID.randomUUID().toString();
       long startTimeMs = System.currentTimeMillis();
-      Map<String, Pair<Integer, String>> instanceMsgInfoMap =
+      Map<String, Integer> instanceMsgCountMap =
           _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, filteredInstanceToSegmentsMap,
               reloadJobId);
-      int numReloadMsgSent = instanceMsgInfoMap.values().stream().mapToInt(Pair::getLeft).sum();
+      int numReloadMsgSent = 0;
+      for (int instanceMsgCount : instanceMsgCountMap.values()) {
+        numReloadMsgSent += instanceMsgCount;
+      }
       if (numReloadMsgSent <= 0) {
         continue;
       }
@@ -359,36 +368,45 @@ public class PinotTableReloadService {
   private Map<String, Map<String, String>> reloadSegmentsForTable(String tableNameWithType, boolean forceDownload,
       Map<String, List<String>> instanceToSegmentsMap) {
     long startTimeMs = System.currentTimeMillis();
-    Map<String, Pair<Integer, String>> instanceMsgInfoMap =
-        _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, instanceToSegmentsMap);
+    // Use a single shared job ID across all instances so the logical reload operation can be tracked
+    // via a single ZK entry, consistent with the time-range reload path.
+    String reloadJobId = UUID.randomUUID().toString();
+    String targetInstance = instanceToSegmentsMap.size() == 1 ? instanceToSegmentsMap.keySet().iterator().next() : null;
+    Map<String, Integer> instanceMsgCountMap =
+        _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, instanceToSegmentsMap, reloadJobId);
+    int totalNumReloadMsgSent = 0;
     Map<String, Map<String, String>> instanceMsgData = new HashMap<>();
-    for (Map.Entry<String, Pair<Integer, String>> instanceMsgInfo : instanceMsgInfoMap.entrySet()) {
+    for (Map.Entry<String, Integer> instanceMsgInfo : instanceMsgCountMap.entrySet()) {
       String instance = instanceMsgInfo.getKey();
-      Pair<Integer, String> msgInfo = instanceMsgInfo.getValue();
-      int numReloadMsgSent = msgInfo.getLeft();
+      int numReloadMsgSent = instanceMsgInfo.getValue();
       if (numReloadMsgSent <= 0) {
         continue;
       }
+      totalNumReloadMsgSent += numReloadMsgSent;
       Map<String, String> tableReloadMeta = new HashMap<>();
       tableReloadMeta.put("numMessagesSent", String.valueOf(numReloadMsgSent));
-      tableReloadMeta.put("reloadJobId", msgInfo.getRight());
+      tableReloadMeta.put("reloadJobId", reloadJobId);
       instanceMsgData.put(instance, tableReloadMeta);
-      // Store in ZK
+    }
+    if (totalNumReloadMsgSent > 0) {
+      // Store a single ZK entry for the entire job (all instances share the same reloadJobId).
+      Set<String> allSegments = new TreeSet<>();
+      for (List<String> segments : instanceToSegmentsMap.values()) {
+        allSegments.addAll(segments);
+      }
+      String segmentNamesStr = StringUtils.join(allSegments, SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
       try {
-        String segmentNames =
-            StringUtils.join(instanceToSegmentsMap.get(instance), SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
-        if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentNames, instance,
-            msgInfo.getRight(), startTimeMs, numReloadMsgSent)) {
-          tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
+        String instanceToSegmentsMapJson = JsonUtils.objectToString(instanceToSegmentsMap);
+        if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentNamesStr, targetInstance,
+            reloadJobId, startTimeMs, totalNumReloadMsgSent, instanceToSegmentsMapJson)) {
+          instanceMsgData.values().forEach(meta -> meta.put("reloadJobMetaZKStorageStatus", "SUCCESS"));
         } else {
-          tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
-          LOG.error("Failed to add batch reload job meta into zookeeper for table: {} targeted instance: {}",
-              tableNameWithType, instance);
+          instanceMsgData.values().forEach(meta -> meta.put("reloadJobMetaZKStorageStatus", "FAILED"));
+          LOG.error("Failed to add batch reload job meta into zookeeper for table: {}", tableNameWithType);
         }
       } catch (Exception e) {
-        tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
-        LOG.error("Failed to add batch reload job meta into zookeeper for table: {} targeted instance: {}",
-            tableNameWithType, instance, e);
+        instanceMsgData.values().forEach(meta -> meta.put("reloadJobMetaZKStorageStatus", "FAILED"));
+        LOG.error("Failed to add batch reload job meta into zookeeper for table: {}", tableNameWithType, e);
       }
     }
     return instanceMsgData;

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.services;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
@@ -252,6 +253,14 @@ public class PinotTableReloadStatusReporter {
 
   @VisibleForTesting
   Map<String, List<String>> getServerToSegments(PinotControllerJobMetadataDto job) {
+    if (job.getInstanceToSegmentsMap() != null) {
+      try {
+        return JsonUtils.stringToObject(job.getInstanceToSegmentsMap(), new TypeReference<>() {
+        });
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Failed to parse controller job instanceToSegmentsMap", e);
+      }
+    }
     return getServerToSegments(job.getTableNameWithType(), job.getSegmentName(), job.getInstanceName());
   }
 
