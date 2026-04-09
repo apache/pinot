@@ -45,6 +45,13 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   // When the dictionary size exceeds this threshold, dictionary IDs are offered directly to HyperLogLog
   // rather than being collected in a RoaringBitmap for deduplication first. For high-cardinality columns,
   // this avoids the O(n log n) cost of bitmap insertions and provides significant speedup.
+  //
+  // 100K is chosen as the crossover point where direct-HLL becomes faster than bitmap dedup:
+  // - Below 100K: RoaringBitmap is compact (~12KB), insertions are cheap, and pre-deduplication
+  //   marginally improves HLL accuracy by reducing duplicate offers before finalization.
+  // - Above 100K: bitmap memory and insertion cost dominate; HLL's ~0.8% error (log2m=12)
+  //   makes exact pre-deduplication negligible for correctness anyway.
+  // This default matches DISTINCT_COUNT_SMART_HLL's dictThreshold default (see #17411).
   public static final int DEFAULT_DICT_SIZE_THRESHOLD = 100_000;
 
   protected final int _log2m;
