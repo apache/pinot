@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG JAVA_VERSION=11
+ARG JAVA_VERSION=21
 ARG JDK_IMAGE=amazoncorretto
 
 FROM ${JDK_IMAGE}:${JAVA_VERSION}-al2-jdk

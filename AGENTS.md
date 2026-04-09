@@ -92,8 +92,8 @@ repo. It is intentionally short and focused on day-to-day work.
 - assembly-descriptor: Maven assembly descriptor for plugin packaging.
 
 ## Build and test
-- Build JDK: Use JDK 11+ (CI runs 11/17/21); code targets Java 11.
-- Runtime JRE: Broker/server/controller/minion run on Java 11+.
+- Build JDK: Use JDK 21+ for Pinot services and the default build; client and SPI artifacts still target Java 11 bytecode.
+- Runtime JRE: Broker/server/controller/minion run on Java 21+.
 - Default build: `./mvnw clean install`
 - Faster dev build: `./mvnw verify -Ppinot-fastdev`
 - Full binary/shaded build:
@@ -107,7 +107,7 @@ repo. It is intentionally short and focused on day-to-day work.
 
 ## Coding conventions and hygiene
 - Add class-level Javadoc for new classes; describe behavior and thread-safety.
-- Use Javadoc comments with either `/** ... */` or `///` syntax (per JEP-467); code targets Java 11.
+- Use Javadoc comments with either `/** ... */` or `///` syntax (per JEP-467); service code targets Java 21 by default.
 - Keep license headers on all new source files.
 - Use `./mvnw license:format` to add headers to new files.
 - Preserve backward compatibility across mixed-version broker/server/controller.

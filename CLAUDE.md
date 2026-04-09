@@ -88,7 +88,7 @@ Apache Pinot is a real-time distributed OLAP datastore for low-latency analytics
 - **assembly-descriptor**: Maven assembly descriptor for plugin packaging.
 
 ## Build commands
-- **JDK**: Use JDK 11+ (CI runs 11/21); code targets Java 11.
+- **JDK**: Use JDK 21+ for Pinot services and the default build; client and SPI artifacts still target Java 11 bytecode.
 - **Default build**: `./mvnw clean install`
 - **Fast dev build**: `./mvnw verify -Ppinot-fastdev`
 - **Full binary/shaded build**: `./mvnw clean install -DskipTests -Pbin-dist -Pbuild-shaded-jar`
@@ -106,7 +106,7 @@ Apache Pinot is a real-time distributed OLAP datastore for low-latency analytics
 
 ## Coding conventions
 - Add class-level Javadoc for new classes; describe behavior and thread-safety.
-- Use Javadoc comments (`/** ... */` or `///` syntax); code targets Java 11.
+- Use Javadoc comments (`/** ... */` or `///` syntax); service code targets Java 21 by default.
 - Keep Apache 2.0 license headers on all new source files.
 - Preserve backward compatibility across mixed-version broker/server/controller.
 - Prefer imports over fully qualified class names (e.g., use `import com.foo.Bar` and refer to `Bar`, not `com.foo.Bar` inline).
