@@ -81,12 +81,12 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
     // isChildChange: an instance ZK node was added or removed under /CONFIGS/PARTICIPANT.
     // Both require a full scan to rebuild _shuttingDownServers from the current cluster state.
     NotificationContext.Type type = context.getType();
-    String pathChanged = context.getPathChanged();
-    if (type == NotificationContext.Type.INIT || context.getIsChildChange() || pathChanged == null) {
+    if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {
       handleFullScan();
-    } else {
+    } else if (type == NotificationContext.Type.CALLBACK) {
       // An existing instance's config changed (e.g. IS_SHUTDOWN_IN_PROGRESS toggled).
       // pathChanged is the ZK path of the specific instance that changed.
+      String pathChanged = context.getPathChanged();
       String instanceName = pathChanged.substring(pathChanged.lastIndexOf('/') + 1);
       handleSingleInstanceChange(instanceName);
     }
