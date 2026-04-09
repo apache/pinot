@@ -31,7 +31,7 @@ import org.testng.annotations.Test;
 public class CastTypeAliasRewriterTest {
 
   private final CastTypeAliasRewriter _rewriter = new CastTypeAliasRewriter();
-  
+
   /**
    * Calcite / SQL standard uses BIGINT; rewriter maps it to Pinot LONG for server compatibility.
    */
