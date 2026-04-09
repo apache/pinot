@@ -31,6 +31,67 @@ import org.testng.annotations.Test;
 public class CastTypeAliasRewriterTest {
 
   private final CastTypeAliasRewriter _rewriter = new CastTypeAliasRewriter();
+  
+  /**
+   * Calcite / SQL standard uses BIGINT; rewriter maps it to Pinot LONG for server compatibility.
+   */
+  @Test
+  public void testTopLevelCastBigintRewritesToLong() {
+    Expression cast = RequestUtils.getFunctionExpression("cast",
+        RequestUtils.getIdentifierExpression("event_timestamp"),
+        RequestUtils.getLiteralExpression("BIGINT"));
+    PinotQuery pinotQuery = new PinotQuery();
+    pinotQuery.addToSelectList(cast);
+
+    PinotQuery rewritten = _rewriter.rewrite(pinotQuery);
+    Assert.assertEquals(
+        rewritten.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
+        "LONG");
+  }
+
+  /**
+   * Type literal matching is case-insensitive (switch uses {@code toUpperCase()}).
+   */
+  @Test
+  public void testBigintTypeLiteralCaseInsensitiveRewritesToLong() {
+    Expression cast = RequestUtils.getFunctionExpression("cast",
+        RequestUtils.getIdentifierExpression("x"),
+        RequestUtils.getLiteralExpression("bigint"));
+    PinotQuery pinotQuery = new PinotQuery();
+    pinotQuery.addToSelectList(cast);
+
+    PinotQuery rewritten = _rewriter.rewrite(pinotQuery);
+    Assert.assertEquals(
+        rewritten.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
+        "LONG");
+  }
+
+  /**
+   * Compiled SQL with explicit {@code AS BIGINT} must rewrite the cast target to LONG.
+   */
+  @Test
+  public void testCompiledSimpleCastAsBigintRewritesToLong() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
+        "SELECT CAST(event_timestamp AS BIGINT) FROM t");
+    PinotQuery rewritten = _rewriter.rewrite(pinotQuery);
+    Assert.assertEquals(
+        rewritten.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
+        "LONG");
+  }
+
+  /**
+   * Nested {@code CAST(CAST(x AS BIGINT) AS BIGINT)} — both CAST type operands must become LONG.
+   */
+  @Test
+  public void testCompiledNestedBothBigintRewritesBothToLong() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
+        "SELECT CAST(CAST(event_timestamp AS BIGINT) AS BIGINT) FROM t");
+    PinotQuery rewritten = _rewriter.rewrite(pinotQuery);
+    Expression outer = rewritten.getSelectList().get(0);
+    Assert.assertEquals(outer.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "LONG");
+    Expression inner = outer.getFunctionCall().getOperands().get(0);
+    Assert.assertEquals(inner.getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "LONG");
+  }
 
   /**
    * Nested CAST(... AS DOUBLE) around CAST(col AS BIGINT) must rewrite the inner BIGINT alias so
