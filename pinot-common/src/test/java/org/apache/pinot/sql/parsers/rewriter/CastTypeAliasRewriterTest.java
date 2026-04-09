@@ -19,6 +19,7 @@
 package org.apache.pinot.sql.parsers.rewriter;
 
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.FilterKind;
@@ -122,7 +123,7 @@ public class CastTypeAliasRewriterTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
         "SELECT intMetric1 FROM t WHERE CAST(CAST(event_timestamp AS LONG) AS DOUBLE) >= 0");
     PinotQuery rewritten = _rewriter.rewrite(pinotQuery);
-    Expression greaterOrEquals = rewritten.getFilterExpression().getFunctionCall();
+    Function greaterOrEquals = rewritten.getFilterExpression().getFunctionCall();
     Assert.assertEquals(greaterOrEquals.getOperator(), FilterKind.GREATER_THAN_OR_EQUAL.name());
     Expression outerCast = greaterOrEquals.getOperands().get(0);
     Expression inner = outerCast.getFunctionCall().getOperands().get(0);
