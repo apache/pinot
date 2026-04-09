@@ -2743,6 +2743,10 @@
                 <!-- Spark datasource register -->
                 <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
 
+                <!-- Custom filter predicate plugin ServiceLoader files -->
+                <exclude>**/org.apache.pinot.common.filter.FilterPredicatePlugin</exclude>
+                <exclude>**/org.apache.pinot.core.operator.filter.custom.CustomFilterOperatorFactory</exclude>
+
                 <!-- Binary files -->
                 <exclude>**/*.avro</exclude>
                 <exclude>**/*.avsc</exclude>
@@ -2885,6 +2889,10 @@
 
             <!-- Spark datasource register -->
             <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
+
+            <!-- Custom filter predicate plugin ServiceLoader files -->
+            <exclude>**/org.apache.pinot.common.filter.FilterPredicatePlugin</exclude>
+            <exclude>**/org.apache.pinot.core.operator.filter.custom.CustomFilterOperatorFactory</exclude>
 
             <!-- Binary files -->
             <exclude>**/*.avro</exclude>
