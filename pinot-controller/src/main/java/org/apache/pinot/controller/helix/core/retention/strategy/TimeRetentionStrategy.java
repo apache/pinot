@@ -32,21 +32,50 @@ public class TimeRetentionStrategy implements RetentionStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeRetentionStrategy.class);
 
   private final long _retentionMs;
+  private final boolean _useCreationTimeFallback;
 
   public TimeRetentionStrategy(TimeUnit timeUnit, long timeValue) {
+    this(timeUnit, timeValue, false);
+  }
+
+  public TimeRetentionStrategy(TimeUnit timeUnit, long timeValue, boolean useCreationTimeFallback) {
     _retentionMs = timeUnit.toMillis(timeValue);
+    _useCreationTimeFallback = useCreationTimeFallback;
   }
 
   @Override
   public boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
 
     // For realtime tables, only completed segments(DONE or UPLOADED) are eligible for purging.
-    //For offline tables, status defaults to UPLOADED which is completed, so they proceed to normal retention
+    // For offline tables, status defaults to UPLOADED which is completed, so they proceed to normal retention
     if (!segmentZKMetadata.getStatus().isCompleted()) {
       return false; // Incomplete segments don't have final end time and should not be purged
     }
 
-    return isPurgeable(tableNameWithType, segmentZKMetadata.getSegmentName(), segmentZKMetadata.getEndTimeMs());
+    String segmentName = segmentZKMetadata.getSegmentName();
+    long endTimeMs = segmentZKMetadata.getEndTimeMs();
+
+    // If end time is valid, use it directly
+    if (TimeUtils.timeValueInValidRange(endTimeMs)) {
+      return System.currentTimeMillis() - endTimeMs > _retentionMs;
+    }
+
+    long creationTimeMs = segmentZKMetadata.getCreationTime();
+
+    if (_useCreationTimeFallback && TimeUtils.timeValueInValidRange(creationTimeMs)) {
+      LOGGER.debug("Segment: {} of table: {} has invalid end time: {}. Using creation time: {} as fallback",
+          segmentName, tableNameWithType, endTimeMs, creationTimeMs);
+      return System.currentTimeMillis() - creationTimeMs > _retentionMs;
+    }
+
+    if (_useCreationTimeFallback) {
+      LOGGER.warn("Segment: {} of table: {} has invalid end time: {} and invalid creation time: {}. "
+          + "Cannot determine retention, skipping", segmentName, tableNameWithType, endTimeMs, creationTimeMs);
+    } else {
+      LOGGER.warn("Segment: {} of table: {} has invalid end time in millis: {}. "
+          + "Creation time fallback is disabled", segmentName, tableNameWithType, endTimeMs);
+    }
+    return false;
   }
 
   @Override
