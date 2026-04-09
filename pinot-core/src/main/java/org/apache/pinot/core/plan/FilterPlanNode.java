@@ -569,6 +569,10 @@ public class FilterPlanNode implements PlanNode {
     // FilterAwareVectorIndexReader. MutableVectorIndex does not implement
     // FilterAwareVectorIndexReader, so mutable segments exit early via the
     // anySupportsPreFilter guard.
+    // backendType and searchParams are passed as null here because at the pre-filter wiring
+    // stage we are deciding whether to activate pre-filtering at all, not per-backend tuning.
+    // The strategy currently uses only selectivity (numDocs, estimatedFilteredDocs) for this
+    // decision. Per-backend and per-query-option tuning is handled later inside the operator.
     VectorSearchStrategy.Decision decision = VectorSearchStrategy.decide(
         numDocs, estimatedFilteredDocs,
         /* hasVectorIndex= */ true,

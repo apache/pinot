@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Operator for vector similarity search using an ANN index (HNSW or IVF_FLAT).
+ * Operator for vector similarity search using an ANN index (HNSW, IVF_FLAT, IVF_PQ, or IVF_ON_DISK).
  *
  * <p>This operator supports backend-neutral vector search with the following capabilities:</p>
  * <ul>
@@ -60,12 +60,15 @@ import org.slf4j.LoggerFactory;
  *       using exact distance from the forward index and re-sorted before final top-K selection.</li>
  *   <li><b>maxCandidates:</b> Controls how many ANN candidates are retrieved before rerank. Only
  *       meaningful when rerank is enabled.</li>
+ *   <li><b>Pre-filter:</b> For backends that implement FilterAwareVectorIndexReader, a pre-filter
+ *       bitmap from sibling filter operators can be passed in to improve search quality under
+ *       highly selective filters.</li>
  * </ul>
  *
  * <p>When no query options are specified, behavior is identical to the previous HNSW-only path
  * (full backward compatibility).</p>
  *
- * <p>This class is thread-safe for single-threaded execution per query.</p>
+ * <p>This class is NOT thread-safe. Each operator instance is used by a single query thread.</p>
  */
 public class VectorSimilarityFilterOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(VectorSimilarityFilterOperator.class);
@@ -346,18 +349,28 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
             column);
       }
 
-      // 4. Apply threshold refinement if distance threshold is set.
-      // NOTE: This is approximate threshold search. The ANN index generates a candidate pool
-      // (controlled by vectorMaxCandidates, default topK*10), and only those candidates are
-      // checked against the threshold. Vectors within the threshold but outside the ANN candidate
-      // pool will be missed. For exact threshold search, use a table without a vector index
-      // (ExactVectorScanFilterOperator handles threshold correctly via brute-force scan).
-      // Increase vectorMaxCandidates to improve recall at the cost of latency.
+      // 4. Apply exact rerank if requested (handles both rerank-only and rerank+threshold cases).
+      //    When exact rerank is enabled, it subsumes the threshold check: the rerank step scores
+      //    candidates exactly and can apply the threshold simultaneously.
       if (_hasThresholdPredicate && _forwardIndexReader == null) {
         throw new IllegalStateException(
             "Vector distance threshold was requested on column: " + column
                 + " but no forward index reader is available to apply threshold refinement");
       }
+      if (explainContext.isEffectiveExactRerank() && _forwardIndexReader != null && annCandidateCount > 0) {
+        Float threshold = _hasThresholdPredicate ? _distanceThreshold : null;
+        ImmutableRoaringBitmap reranked = applyExactRerank(annResults, queryVector, _predicate.getTopK(), column,
+            threshold);
+        _rerankedCandidateCount = reranked.getCardinality();
+        LOGGER.debug("Exact rerank on column: {}, candidates: {} -> final: {} (threshold={})",
+            column, annCandidateCount, reranked.getCardinality(), threshold);
+        return reranked;
+      }
+
+      // 5. Apply threshold filter (approximate: only ANN candidates are checked).
+      // NOTE: Vectors within the threshold but outside the ANN candidate pool will be missed.
+      // For exact threshold search, use a table without a vector index or enable vectorExactRerank=true.
+      // Increase vectorMaxCandidates to improve recall at the cost of latency.
       if (_hasThresholdPredicate && annCandidateCount > 0) {
         ImmutableRoaringBitmap thresholded = applyThresholdFilter(
             annResults, queryVector, _distanceThreshold, column);
@@ -368,26 +381,6 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
         return thresholded;
       }
 
-      // 5. Apply exact rerank if requested
-      if (explainContext.isEffectiveExactRerank() && _forwardIndexReader != null && annCandidateCount > 0) {
-        Float threshold = _hasThresholdPredicate ? _distanceThreshold : null;
-        ImmutableRoaringBitmap reranked = applyExactRerank(annResults, queryVector, _predicate.getTopK(), column,
-            threshold);
-        _rerankedCandidateCount = reranked.getCardinality();
-        LOGGER.debug("Exact rerank on column: {}, candidates: {} -> final: {}",
-            column, annCandidateCount, reranked.getCardinality());
-        return reranked;
-      }
-
-      // 5. Apply vectorDistanceThreshold as a post-filter distance cutoff even without rerank,
-      //    if a forward index is available for exact distance computation
-      Float threshold = _hasThresholdPredicate ? _distanceThreshold : null;
-      if (threshold != null && _forwardIndexReader != null && annCandidateCount > 0) {
-        ImmutableRoaringBitmap filtered = applyThresholdFilter(annResults, queryVector, threshold, column);
-        LOGGER.debug("Applied vectorThreshold={} on column: {}, candidates: {} -> final: {}",
-            threshold, column, annCandidateCount, filtered.getCardinality());
-        return filtered;
-      }
       return annResults;
     } finally {
       // Record search metrics for observability — always, regardless of which path was taken
@@ -411,7 +404,11 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       Integer efSearch = _searchParams.getEfSearch();
       if (efSearch != null) {
         ((EfSearchAware) _vectorIndexReader).setEfSearch(efSearch);
-        LOGGER.debug("Set efSearch={} on {} reader for column: {}", efSearch, getBackendName(), column);
+        // EfSearchAware stores the value for explain output only. Actual Lucene graph traversal
+        // is not currently affected — see CommonConstants.VECTOR_EF_SEARCH for details.
+        LOGGER.warn("vectorEfSearch={} was set for column: {} but does not yet affect HNSW graph "
+                + "traversal. The value appears in EXPLAIN output only.",
+            efSearch, column);
       }
     }
   }
@@ -568,7 +565,6 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       recording.setColumnName(_predicate.getLhs().getIdentifier());
       recording.setFilter(FilterType.INDEX, "VECTOR_SIMILARITY");
       recording.setInputDataType(FieldSpec.DataType.FLOAT, false);
-      recording.setNumDocsMatchingAfterFilter(matches.getCardinality());
     }
   }
 

@@ -162,6 +162,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
   @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    // NOTE: IVF_ON_DISK intentionally reuses the IVF_FLAT file extension since it reads the
+    // same on-disk format via FileChannel rather than memory-mapped I/O.
     return List.of(V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION,
         V1Constants.Indexes.VECTOR_V99_INDEX_FILE_EXTENSION,
