@@ -183,7 +183,7 @@ public class CombinePlanNode implements PlanNode {
     }
 
     // Default to non-blocking combine which uses per-thread SimpleIndexedTables
-    // to eliminate ConcurrentHashMap contention (1.8x-3.1x faster than the legacy DEFAULT)
+    // to eliminate ConcurrentHashMap contention (1.8x-3.1x faster than the CONCURRENT algorithm)
     return new NonblockingGroupByCombineOperator(operators, _queryContext, _executorService);
   }
 }
