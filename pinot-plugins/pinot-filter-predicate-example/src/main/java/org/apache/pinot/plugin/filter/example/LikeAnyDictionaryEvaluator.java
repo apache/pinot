@@ -31,20 +31,19 @@ public class LikeAnyDictionaryEvaluator extends BaseDictionaryBasedPredicateEval
 
   private final int[] _matchingDictIds;
   private final int[] _nonMatchingDictIds;
-  private final Dictionary _dictionary;
+  private final boolean[] _matchLookup;
 
   public LikeAnyDictionaryEvaluator(LikeAnyPredicate predicate, Pattern pattern, Dictionary dictionary) {
     super(predicate, dictionary);
-    _dictionary = dictionary;
 
-    // Pre-compute matching dictionary IDs
+    // Pre-compute matching dictionary IDs and O(1) lookup table
     int length = dictionary.length();
     int matchCount = 0;
-    boolean[] matches = new boolean[length];
+    _matchLookup = new boolean[length];
     for (int i = 0; i < length; i++) {
       String value = dictionary.getStringValue(i);
       if (value != null && pattern.matcher(value).find()) {
-        matches[i] = true;
+        _matchLookup[i] = true;
         matchCount++;
       }
     }
@@ -54,7 +53,7 @@ public class LikeAnyDictionaryEvaluator extends BaseDictionaryBasedPredicateEval
     int matchIdx = 0;
     int nonMatchIdx = 0;
     for (int i = 0; i < length; i++) {
-      if (matches[i]) {
+      if (_matchLookup[i]) {
         _matchingDictIds[matchIdx++] = i;
       } else {
         _nonMatchingDictIds[nonMatchIdx++] = i;
@@ -80,13 +79,6 @@ public class LikeAnyDictionaryEvaluator extends BaseDictionaryBasedPredicateEval
 
   @Override
   public boolean applySV(int dictId) {
-    String value = _dictionary.getStringValue(dictId);
-    // Already pre-computed, but needed for correctness with the SV apply path
-    for (int matchingDictId : _matchingDictIds) {
-      if (matchingDictId == dictId) {
-        return true;
-      }
-    }
-    return false;
+    return _matchLookup[dictId];
   }
 }
