@@ -729,6 +729,16 @@ public class QueryOptionsUtils {
     }
   }
 
+  /**
+   * Returns the configured efSearch value for HNSW vector search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Integer getVectorEfSearch(Map<String, String> queryOptions) {
+    String efSearch = queryOptions.get(QueryOptionKey.VECTOR_EF_SEARCH);
+    return checkedParseIntPositive(QueryOptionKey.VECTOR_EF_SEARCH, efSearch);
+  }
+
+
   public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
     String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
     if (sortExchangeCopyThreshold != null) {

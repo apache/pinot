@@ -38,6 +38,7 @@ import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
+import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusPredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -268,6 +269,15 @@ public class RequestContextUtils {
           topK = operands.get(2).getLiteral().getIntValue();
         }
         return FilterContext.forPredicate(new VectorSimilarityPredicate(lhs, vectorValue, topK));
+      case VECTOR_SIMILARITY_RADIUS:
+        ExpressionContext radiusLhs = getExpression(operands.get(0));
+        float[] radiusVectorValue = getVectorValue(operands.get(1));
+        float threshold = VectorSimilarityRadiusPredicate.DEFAULT_THRESHOLD;
+        if (operands.size() == 3) {
+          threshold = getFloatValue(operands.get(2));
+        }
+        return FilterContext.forPredicate(
+            new VectorSimilarityRadiusPredicate(radiusLhs, radiusVectorValue, threshold));
       case IS_NULL:
         return FilterContext.forPredicate(new IsNullPredicate(getExpression(operands.get(0))));
       case IS_NOT_NULL:
@@ -449,6 +459,13 @@ public class RequestContextUtils {
         }
         return FilterContext.forPredicate(
             new VectorSimilarityPredicate(operands.get(0), getVectorValue(operands.get(1)), topK));
+      case VECTOR_SIMILARITY_RADIUS:
+        float radiusThreshold = VectorSimilarityRadiusPredicate.DEFAULT_THRESHOLD;
+        if (operands.size() == 3) {
+          radiusThreshold = Float.parseFloat(operands.get(2).getLiteral().getValue().toString());
+        }
+        return FilterContext.forPredicate(
+            new VectorSimilarityRadiusPredicate(operands.get(0), getVectorValue(operands.get(1)), radiusThreshold));
       case IS_NULL:
         return FilterContext.forPredicate(new IsNullPredicate(operands.get(0)));
       case IS_NOT_NULL:

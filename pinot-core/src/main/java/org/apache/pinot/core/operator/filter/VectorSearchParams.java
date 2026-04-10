@@ -39,7 +39,8 @@ public final class VectorSearchParams {
   public static final int DEFAULT_NPROBE = 4;
 
   /** Singleton instance with all defaults, used when no query options are specified. */
-  public static final VectorSearchParams DEFAULT = new VectorSearchParams(null, null, null);
+  public static final VectorSearchParams DEFAULT =
+      new VectorSearchParams(null, null, null, null, null);
 
   private final int _nprobe;
   @Nullable
@@ -48,9 +49,11 @@ public final class VectorSearchParams {
   private final boolean _maxCandidatesExplicit;
   private final float _distanceThreshold;
   private final boolean _hasDistanceThreshold;
+  @Nullable
+  private final Integer _efSearch;
 
   /**
-   * Constructs search params from raw query option values.
+   * Backward-compatible constructor that uses only the original three parameters.
    *
    * @param nprobe number of IVF probes, or null for default
    * @param exactRerankOverride whether to re-score ANN candidates with exact distance, or null to use the backend
@@ -59,26 +62,36 @@ public final class VectorSearchParams {
    */
   public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
       @Nullable Integer maxCandidates) {
-    this(nprobe, exactRerankOverride, maxCandidates, null);
+    this(nprobe, exactRerankOverride, maxCandidates, null, null);
   }
 
   /**
-   * Constructs search params from raw query option values.
+   * Backward-compatible constructor with distance threshold (Phase 3).
+   */
+  public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
+      @Nullable Integer maxCandidates, @Nullable Float distanceThreshold) {
+    this(nprobe, exactRerankOverride, maxCandidates, distanceThreshold, null);
+  }
+
+  /**
+   * Full constructor with all query option values.
    *
    * @param nprobe number of IVF probes, or null for default
    * @param exactRerankOverride whether to re-score ANN candidates with exact distance, or null to use the backend
    *                           default
    * @param maxCandidates max candidates before final top-K, or null for default (topK * 10)
    * @param distanceThreshold distance threshold for radius search, or null for top-K mode
+   * @param efSearch HNSW efSearch parameter, or null to use default
    */
   public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
-      @Nullable Integer maxCandidates, @Nullable Float distanceThreshold) {
+      @Nullable Integer maxCandidates, @Nullable Float distanceThreshold, @Nullable Integer efSearch) {
     _nprobe = nprobe != null ? nprobe : DEFAULT_NPROBE;
     _exactRerankOverride = exactRerankOverride;
     _maxCandidates = maxCandidates != null ? maxCandidates : 0;
     _maxCandidatesExplicit = maxCandidates != null;
     _distanceThreshold = distanceThreshold != null ? distanceThreshold : Float.NaN;
     _hasDistanceThreshold = distanceThreshold != null;
+    _efSearch = efSearch;
   }
 
   /**
@@ -97,12 +110,14 @@ public final class VectorSearchParams {
     Boolean exactRerank = QueryOptionsUtils.getVectorExactRerank(queryOptions);
     Integer maxCandidates = QueryOptionsUtils.getVectorMaxCandidates(queryOptions);
     Float distanceThreshold = QueryOptionsUtils.getVectorDistanceThreshold(queryOptions);
+    Integer efSearch = QueryOptionsUtils.getVectorEfSearch(queryOptions);
 
-    if (nprobe == null && exactRerank == null && maxCandidates == null && distanceThreshold == null) {
+    if (nprobe == null && exactRerank == null && maxCandidates == null && distanceThreshold == null
+        && efSearch == null) {
       return DEFAULT;
     }
 
-    return new VectorSearchParams(nprobe, exactRerank, maxCandidates, distanceThreshold);
+    return new VectorSearchParams(nprobe, exactRerank, maxCandidates, distanceThreshold, efSearch);
   }
 
   /**
@@ -164,12 +179,28 @@ public final class VectorSearchParams {
     return _hasDistanceThreshold;
   }
 
+  /**
+   * Returns the efSearch value for HNSW index search, or {@code null} if not set.
+   */
+  @Nullable
+  public Integer getEfSearch() {
+    return _efSearch;
+  }
+
   @Override
   public String toString() {
-    return "VectorSearchParams{nprobe=" + _nprobe + ", exactRerank="
-        + (_exactRerankOverride != null ? _exactRerankOverride : "backend_default")
-        + ", maxCandidates=" + (_maxCandidatesExplicit ? _maxCandidates : "default(topK*10)")
-        + (_hasDistanceThreshold ? ", distanceThreshold=" + _distanceThreshold : "")
-        + '}';
+    StringBuilder sb = new StringBuilder("VectorSearchParams{nprobe=").append(_nprobe)
+        .append(", exactRerank=")
+        .append(_exactRerankOverride != null ? _exactRerankOverride : "backend_default")
+        .append(", maxCandidates=")
+        .append(_maxCandidatesExplicit ? _maxCandidates : "default(topK*10)");
+    if (_hasDistanceThreshold) {
+      sb.append(", distanceThreshold=").append(_distanceThreshold);
+    }
+    if (_efSearch != null) {
+      sb.append(", efSearch=").append(_efSearch);
+    }
+    sb.append('}');
+    return sb.toString();
   }
 }

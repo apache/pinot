@@ -299,6 +299,30 @@ public class CalciteSqlParser {
               + "the signature is VECTOR_SIMILARITY(float[], float[], int)");
         }
       }
+    } else if (operator.equals(FilterKind.VECTOR_SIMILARITY_RADIUS.name())) {
+      Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
+      if (!vectorIdentifier.isSetIdentifier()) {
+        throw new IllegalStateException(
+            "The first argument of VECTOR_SIMILARITY_RADIUS must be an identifier of float array, "
+                + "the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float).");
+      }
+      Expression vectorLiteral = filterExpression.getFunctionCall().getOperands().get(1);
+      if ((vectorLiteral.isSetFunctionCall() && !vectorLiteral.getFunctionCall().getOperator().equalsIgnoreCase(
+          "arrayvalueconstructor"))
+          || (vectorLiteral.isSetLiteral() && !vectorLiteral.getLiteral().isSetFloatArrayValue()
+          && !vectorLiteral.getLiteral().isSetDoubleArrayValue())) {
+        throw new IllegalStateException(
+            "The second argument of VECTOR_SIMILARITY_RADIUS must be a float/double array "
+                + "literal, the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float)");
+      }
+      if (filterExpression.getFunctionCall().getOperands().size() == 3) {
+        Expression threshold = filterExpression.getFunctionCall().getOperands().get(2);
+        if (!threshold.isSetLiteral()) {
+          throw new IllegalStateException(
+              "The third argument of VECTOR_SIMILARITY_RADIUS must be a numeric literal, "
+                  + "the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float)");
+        }
+      }
     } else {
       List<Expression> operands = filterExpression.getFunctionCall().getOperands();
       for (int i = 1; i < operands.size(); i++) {
