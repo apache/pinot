@@ -161,6 +161,7 @@ import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableType;
@@ -555,6 +556,8 @@ public class PinotHelixResourceManager {
       throw new ClientErrorException("Instance: " + instanceId + " already exists", Response.Status.CONFLICT);
     }
 
+    InstanceConfigValidatorRegistry.validate(instance);
+
     instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
     _helixAdmin.addInstance(_helixClusterName, instanceConfig);
 
@@ -590,6 +593,8 @@ public class PinotHelixResourceManager {
     if (instanceConfig == null) {
       throw new NotFoundException("Failed to find instance config for instance: " + instanceId);
     }
+
+    InstanceConfigValidatorRegistry.validate(newInstance);
 
     List<String> newTags = newInstance.getTags();
     List<String> oldTags = instanceConfig.getTags();
@@ -635,7 +640,12 @@ public class PinotHelixResourceManager {
 
     List<String> newTags = Arrays.asList(StringUtils.split(tagsString, ','));
     List<String> oldTags = instanceConfig.getTags();
+
+    // Apply new tags in-memory, validate, then persist. Safe: instanceConfig is a fresh local fetch,
+    // oldTags is captured above, and if validation throws the mutated config is never persisted.
     instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), newTags);
+    InstanceConfigValidatorRegistry.validate(InstanceUtils.toInstance(instanceConfig));
+
     if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
       throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
