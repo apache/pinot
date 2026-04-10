@@ -78,6 +78,7 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -535,6 +536,7 @@ public class TableConfigsRestletResource {
           }
         }
         TaskConfigUtils.validateTaskConfigs(tableConfigs.getOffline(), schema, _pinotTaskManager, typesToSkip);
+        TableConfigValidatorRegistry.validate(offlineTableConfig, schema);
       }
       if (realtimeTableConfig != null) {
         String realtimeRawTableName = DatabaseUtils.translateTableName(
@@ -555,6 +557,7 @@ public class TableConfigsRestletResource {
           }
         }
         TaskConfigUtils.validateTaskConfigs(tableConfigs.getRealtime(), schema, _pinotTaskManager, typesToSkip);
+        TableConfigValidatorRegistry.validate(realtimeTableConfig, schema);
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);
