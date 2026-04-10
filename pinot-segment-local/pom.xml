@@ -141,4 +141,34 @@
       <artifactId>clp-ffi</artifactId>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+        <executions>
+          <execution>
+            <id>copy-tdigest-32-for-compat-tests</id>
+            <phase>process-test-resources</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.tdunning</groupId>
+                  <artifactId>t-digest</artifactId>
+                  <version>3.2</version>
+                  <destFileName>t-digest-3.2.jar</destFileName>
+                  <outputDirectory>${project.build.directory}/tdigest-compat</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
