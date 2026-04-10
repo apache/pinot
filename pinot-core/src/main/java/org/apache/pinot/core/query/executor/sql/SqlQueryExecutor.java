@@ -45,6 +45,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.common.utils.http.HttpProxyUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -68,13 +69,15 @@ public class SqlQueryExecutor {
   private final String _controllerUrl;
   private final HelixManager _helixManager;
 
-  // Guarded by synchronized(this) when _helixManager != null
-  private volatile String _cachedControllerUrl;
-  private volatile long _cachedControllerUrlExpiry;
+  // Guarded by synchronized(this) for all accesses.
+  private String _cachedControllerUrl;
+  private long _cachedControllerUrlExpiry;
 
-  // Shared transport reused across all controller calls. Created lazily on first use and
-  // never closed — it lives for the process lifetime alongside SqlQueryExecutor.
-  private volatile PinotAdminTransport _sharedAdminTransport;
+  // Shared transport reused across all controller calls. Created lazily on first use.
+  // Re-created if the resolved controller URL scheme changes (e.g. http → https).
+  // Guarded by synchronized(this) via getOrCreateSharedTransport().
+  private PinotAdminTransport _sharedAdminTransport;
+  private String _sharedAdminTransportScheme;
 
   /**
    * Fetch the lead controller from helix, HA is not guaranteed.
@@ -113,6 +116,7 @@ public class SqlQueryExecutor {
   /** Invalidates the cached controller URL so the next call re-fetches from ZK. */
   private synchronized void invalidateControllerUrlCache() {
     _cachedControllerUrl = null;
+    _cachedControllerUrlExpiry = 0;
   }
 
   private static String getControllerBaseUrl(HelixManager helixManager) {
@@ -146,18 +150,17 @@ public class SqlQueryExecutor {
     switch (statement.getExecutionType()) {
       case MINION:
         AdhocTaskConfig taskConf = statement.generateAdhocTaskConfig();
-        PinotAdminClient minionAdminClient = null;
-        try {
-          minionAdminClient = createAdminClient(copyHeaders(headers));
+        try (PinotAdminClient minionAdminClient = createAdminClient(copyHeaders(headers))) {
           Map<String, String> tableToTaskIdMap = minionAdminClient.getTaskClient().executeTask(taskConf);
           List<Object[]> rows = new ArrayList<>();
-          tableToTaskIdMap.forEach((key, value) -> rows.add(new Object[]{key, value}));
+          for (Map.Entry<String, String> entry : tableToTaskIdMap.entrySet()) {
+            rows.add(new Object[]{entry.getKey(), entry.getValue()});
+          }
           result.setResultTable(new ResultTable(statement.getResultSchema(), rows));
         } catch (Exception e) {
-          if (minionAdminClient != null) {
-            invalidateControllerUrlCache();
-          }
-          result.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
+          invalidateControllerUrlCache();
+          result.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION,
+              e.getClass().getSimpleName() + ": " + (e.getMessage() != null ? e.getMessage() : "(no message)")));
         }
         break;
       case HTTP:
@@ -317,7 +320,7 @@ public class SqlQueryExecutor {
 
   private List<String> fetchDatabases(Map<String, String> headers)
       throws IOException {
-    try (PinotAdminClient adminClient = createAdminClient(headers)) {
+    try (PinotAdminClient adminClient = createAdminClient(new TreeMap<>(headers))) {
       return adminClient.getDatabaseClient().listDatabaseNames();
     } catch (Exception e) {
       invalidateControllerUrlCache();
@@ -328,7 +331,8 @@ public class SqlQueryExecutor {
 
   private List<String> fetchTables(String database, Map<String, String> headers)
       throws IOException {
-    Map<String, String> requestHeaders = copyHeaders(headers);
+    // headers is already a filtered TreeMap; create a mutable copy to add the database key.
+    Map<String, String> requestHeaders = new TreeMap<>(headers);
     requestHeaders.put(CommonConstants.DATABASE, database);
     try (PinotAdminClient adminClient = createAdminClient(requestHeaders)) {
       return adminClient.getTableClient().listTables(null, null, null);
@@ -340,7 +344,8 @@ public class SqlQueryExecutor {
 
   private List<String> fetchSchemas(String database, Map<String, String> headers)
       throws IOException {
-    Map<String, String> requestHeaders = copyHeaders(headers);
+    // headers is already a filtered TreeMap; create a mutable copy to add the database key.
+    Map<String, String> requestHeaders = new TreeMap<>(headers);
     requestHeaders.put(CommonConstants.DATABASE, database);
     try (PinotAdminClient adminClient = createAdminClient(requestHeaders)) {
       return adminClient.getSchemaClient().listSchemaNames();
@@ -394,25 +399,30 @@ public class SqlQueryExecutor {
   }
 
   private synchronized PinotAdminTransport getOrCreateSharedTransport(String scheme) {
-    if (_sharedAdminTransport == null) {
+    if (_sharedAdminTransport == null || !scheme.equals(_sharedAdminTransportScheme)) {
+      if (_sharedAdminTransport != null) {
+        try {
+          _sharedAdminTransport.close();
+        } catch (IOException e) {
+          // Best-effort close of the old transport; proceed with creating the new one.
+        }
+      }
       Properties properties = new Properties();
       properties.setProperty(PinotAdminTransport.ADMIN_TRANSPORT_SCHEME, scheme);
       _sharedAdminTransport = new PinotAdminTransport(properties, null);
+      _sharedAdminTransportScheme = scheme;
     }
     return _sharedAdminTransport;
   }
 
   /**
-   * Returns a case-insensitive copy of the given headers map.
+   * Returns a case-insensitive copy of the given headers map with hop-by-hop and transport-specific headers removed.
+   * See {@link HttpProxyUtils#copyForwardableHeaders} for the full exclusion list.
    * All downstream lookups (e.g. {@link #getHeaderValue}) rely on the case-insensitive ordering
    * of the returned TreeMap, so the map type must not be changed.
    */
   private Map<String, String> copyHeaders(@Nullable Map<String, String> headers) {
-    Map<String, String> requestHeaders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-    if (headers != null && !headers.isEmpty()) {
-      requestHeaders.putAll(headers);
-    }
-    return requestHeaders;
+    return HttpProxyUtils.copyForwardableHeaders(headers);
   }
 
   private String getHeaderValue(Map<String, String> headers, String key) {

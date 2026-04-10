@@ -34,13 +34,11 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import javax.inject.Inject;
@@ -73,6 +71,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.http.HttpProxyUtils;
 import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
@@ -116,13 +115,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 public class PinotClientRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequest.class);
   private static final Marker RESPONSE_EXCEPTION_MARKER = MarkerFactory.getMarker("QUERY_RESPONSE_EXCEPTION");
-  // Drop hop-by-hop and transport-specific headers when replaying broker requests to controller/minion sidecars.
-  private static final Set<String> NON_FORWARDABLE_HEADERS = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-
-  static {
-    NON_FORWARDABLE_HEADERS.addAll(Arrays.asList("Host", "Connection", "Content-Length", "Transfer-Encoding",
-        "Expect", "Keep-Alive", "Proxy-Connection", "TE", "Trailer", "Upgrade"));
-  }
 
   @Inject
   PinotConfiguration _brokerConf;
@@ -682,13 +674,11 @@ public class PinotClientRequest {
 
   @VisibleForTesting
   static Map<String, String> extractForwardHeaders(HttpRequesterIdentity httpRequesterIdentity) {
-    Map<String, String> headers = new HashMap<>();
-    httpRequesterIdentity.getHttpHeaders().entries().forEach(entry -> {
-      if (!NON_FORWARDABLE_HEADERS.contains(entry.getKey())) {
-        headers.put(entry.getKey(), entry.getValue());
-      }
-    });
-    return headers;
+    Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+    for (Map.Entry<String, String> entry : httpRequesterIdentity.getHttpHeaders().entries()) {
+      headers.put(entry.getKey(), entry.getValue());
+    }
+    return HttpProxyUtils.copyForwardableHeaders(headers);
   }
 
   /**

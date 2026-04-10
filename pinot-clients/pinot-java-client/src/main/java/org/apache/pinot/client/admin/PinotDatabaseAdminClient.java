@@ -26,16 +26,10 @@ import java.util.Map;
 /**
  * Client for database administration operations.
  */
-public class PinotDatabaseAdminClient {
-  private final PinotAdminTransport _transport;
-  private final String _controllerAddress;
-  private final Map<String, String> _headers;
-
+public class PinotDatabaseAdminClient extends BaseServiceAdminClient {
   public PinotDatabaseAdminClient(PinotAdminTransport transport, String controllerAddress,
       Map<String, String> headers) {
-    _transport = transport;
-    _controllerAddress = controllerAddress;
-    _headers = headers;
+    super(transport, controllerAddress, headers);
   }
 
   /**

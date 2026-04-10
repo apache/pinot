@@ -56,6 +56,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.encoder.ResponseEncoder;
 import org.apache.pinot.common.response.encoder.ResponseEncoderFactory;
+import org.apache.pinot.common.utils.http.HttpProxyUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
@@ -263,10 +264,10 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
                   null);
           break;
         case DML:
-          brokerResponse = _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, metadataMap);
+          brokerResponse = _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, toRequestHeaders(metadataMap));
           break;
         case METADATA:
-          brokerResponse = _sqlQueryExecutor.executeMetadataStatement(sqlNodeAndOptions, metadataMap);
+          brokerResponse = _sqlQueryExecutor.executeMetadataStatement(sqlNodeAndOptions, toRequestHeaders(metadataMap));
           break;
         default:
           brokerResponse = new BrokerResponseNative(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
@@ -413,6 +414,18 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
             ));
     target.putAll(convertedTlsMap);
     return new GrpcConfig(target);
+  }
+
+  /**
+   * Converts gRPC request metadata to HTTP request headers for forwarding to the controller.
+   * Strips HTTP hop-by-hop headers and gRPC-protocol-specific keys that must not be sent as HTTP headers.
+   */
+  private static Map<String, String> toRequestHeaders(Map<String, String> metadataMap) {
+    Map<String, String> headers = HttpProxyUtils.copyForwardableHeaders(metadataMap);
+    headers.remove(CommonConstants.Broker.Grpc.BLOCK_ROW_SIZE);
+    headers.remove(CommonConstants.Broker.Grpc.COMPRESSION);
+    headers.remove(CommonConstants.Broker.Grpc.ENCODING);
+    return headers;
   }
 
   public static boolean isEnabled(PinotConfiguration brokerConf) {
