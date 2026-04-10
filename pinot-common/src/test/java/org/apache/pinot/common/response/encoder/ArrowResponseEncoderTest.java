@@ -115,6 +115,26 @@ public class ArrowResponseEncoderTest {
   }
 
   @Test
+  public void testEncodeDecodeUuidColumn()
+      throws IOException {
+    DataSchema schema = new DataSchema(new String[]{"uuidCol"}, new ColumnDataType[]{ColumnDataType.UUID});
+    List<Object[]> rows = Arrays.asList(
+        new Object[]{"550e8400-e29b-41d4-a716-446655440000"},
+        new Object[]{"f81d4fae-7dec-11d0-a765-00a0c91e6bf6"}
+    );
+
+    ResultTable resultTable = new ResultTable(schema, rows);
+    ArrowResponseEncoder encoder = new ArrowResponseEncoder();
+    byte[] encodedBytes = encoder.encodeResultTable(resultTable, 0, rows.size());
+    ResultTable decodedTable = encoder.decodeResultTable(encodedBytes, rows.size(), schema);
+
+    assertEquals(decodedTable.getRows().size(), rows.size(), "Row count should match");
+    for (int i = 0; i < rows.size(); i++) {
+      assertEquals(decodedTable.getRows().get(i)[0], rows.get(i)[0], "UUID row " + i + " should match");
+    }
+  }
+
+  @Test
   public void testEncodeDecodeAllDataTypes()
       throws IOException {
     // Define the column names and corresponding data types.

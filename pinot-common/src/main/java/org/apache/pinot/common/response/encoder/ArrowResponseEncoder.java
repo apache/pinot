@@ -104,6 +104,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
           vector = new Float8Vector(colName, ALLOCATOR);
           break;
         case TIMESTAMP:
+        case UUID:
         case STRING:
         case BYTES:
         case BIG_DECIMAL:
@@ -230,6 +231,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
               ((Float8Vector) vector).setSafe(rowIndex, ((Number) value).doubleValue());
               break;
             case TIMESTAMP:
+            case UUID:
             case STRING:
             case BYTES:
             case BIG_DECIMAL:
@@ -406,6 +408,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
               row[col] = ((BitVector) vector).get(i) == 1;
               break;
             case TIMESTAMP:
+            case UUID:
             case STRING:
             case BYTES:
             case BIG_DECIMAL:

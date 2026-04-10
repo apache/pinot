@@ -68,6 +68,7 @@ public final class UuidUtils {
   }
 
   public static byte[] toBytes(Object value) {
+    validateNotNull(value, "UUID bytes");
     if (value instanceof UUID) {
       return toBytes((UUID) value);
     }
@@ -99,6 +100,7 @@ public final class UuidUtils {
   }
 
   public static UUID toUUID(Object value) {
+    validateNotNull(value, "UUID");
     if (value instanceof UUID) {
       return (UUID) value;
     }
@@ -131,6 +133,12 @@ public final class UuidUtils {
     if (uuidBytes.length != UUID_NUM_BYTES) {
       throw new IllegalArgumentException(
           "Invalid UUID byte length: " + uuidBytes.length + ", expected: " + UUID_NUM_BYTES);
+    }
+  }
+
+  private static void validateNotNull(Object value, String targetType) {
+    if (value == null) {
+      throw new IllegalArgumentException("Cannot convert null value to " + targetType);
     }
   }
 }

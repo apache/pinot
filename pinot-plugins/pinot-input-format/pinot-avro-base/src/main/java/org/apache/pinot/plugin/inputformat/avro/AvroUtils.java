@@ -179,13 +179,11 @@ public class AvroUtils {
 
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
       if (fieldSpec.getDataType() == DataType.UUID) {
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "UUID data type only supports single-value fields: %s", fieldSpec.getName());
         org.apache.avro.Schema uuidSchema = LogicalTypes.uuid().addToSchema(org.apache.avro.Schema.create(
             org.apache.avro.Schema.Type.STRING));
-        if (fieldSpec.isSingleValueField()) {
-          fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type(uuidSchema).noDefault();
-        } else {
-          fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items(uuidSchema).noDefault();
-        }
+        fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type(uuidSchema).noDefault();
         continue;
       }
       DataType storedType = fieldSpec.getDataType().getStoredType();
@@ -352,8 +350,11 @@ public class AvroUtils {
               timeUnit, collectionNotUnnestedToJson);
         } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE
             && AvroSchemaUtil.isPrimitiveType(elementType.getType())) {
-          addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType), path, false, fieldTypeMap,
-              timeUnit);
+          DataType elementDataType = AvroSchemaUtil.valueOf(elementType);
+          Preconditions.checkState(elementDataType != DataType.UUID,
+              "Avro ARRAY<uuid> cannot be mapped to Pinot UUID because UUID data type only supports single-value "
+                  + "fields: %s", path);
+          addFieldToPinotSchema(pinotSchema, elementDataType, path, false, fieldTypeMap, timeUnit);
         } else if (shallConvertToJson(collectionNotUnnestedToJson, elementType)) {
           addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
         }
