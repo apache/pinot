@@ -321,7 +321,8 @@ public class SqlQueryExecutor {
       return adminClient.getDatabaseClient().listDatabaseNames();
     } catch (Exception e) {
       invalidateControllerUrlCache();
-      throw e instanceof IOException ? (IOException) e : new IOException("Failed to fetch databases from controller", e);
+      throw e instanceof IOException ? (IOException) e
+          : new IOException("Failed to fetch databases from controller", e);
     }
   }
 
