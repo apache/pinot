@@ -19,6 +19,10 @@
 package org.apache.pinot.connector.flink.sink;
 
 import java.net.URI;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -31,7 +35,10 @@ import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 import org.apache.pinot.connector.flink.common.PinotGenericRowConverter;
 import org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 import org.slf4j.Logger;
@@ -49,6 +56,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   public static final long DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS = 500000;
   public static final int DEFAULT_EXECUTOR_POOL_SIZE = 5;
   public static final long DEFAULT_EXECUTOR_SHUTDOWN_WAIT_MS = 3000;
+  public static final String DEFAULT_OUTPUT_DIR_URI = "/tmp/pinotoutput";
 
   private static final long serialVersionUID = 1L;
   private static final Logger LOG = LoggerFactory.getLogger(PinotSinkFunction.class);
@@ -75,6 +83,16 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
     this(recordConverter, tableConfig, schema, DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
   }
 
+  /**
+   * Creates a sink using a table config fetched from the controller and injects the upload settings required by the
+   * Flink connector.
+   */
+  public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
+      String controllerBaseUrl) {
+    this(recordConverter, prepareTableConfigForSink(tableConfig, controllerBaseUrl), schema,
+        DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
+  }
+
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize) {
     this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize, null, null);
@@ -90,6 +108,45 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
     _executorPoolSize = executorPoolSize;
     _segmentNamePrefix = segmentNamePrefix;
     _segmentUploadTimeMs = segmentUploadTimeMs;
+  }
+
+  /**
+   * Applies the connector-specific batch-ingestion defaults needed for segment generation and upload.
+   */
+  static TableConfig prepareTableConfigForSink(TableConfig tableConfig, String controllerBaseUrl) {
+    Map<String, String> requiredBatchConfig = new HashMap<>();
+    requiredBatchConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, controllerBaseUrl);
+    requiredBatchConfig.put(BatchConfigProperties.OUTPUT_DIR_URI, DEFAULT_OUTPUT_DIR_URI);
+
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null) {
+      ingestionConfig = new IngestionConfig();
+      ingestionConfig.setBatchIngestionConfig(
+          new BatchIngestionConfig(Collections.singletonList(requiredBatchConfig), "APPEND", "HOURLY"));
+      tableConfig.setIngestionConfig(ingestionConfig);
+      return tableConfig;
+    }
+
+    BatchIngestionConfig batchIngestionConfig = ingestionConfig.getBatchIngestionConfig();
+    if (batchIngestionConfig == null) {
+      ingestionConfig.setBatchIngestionConfig(
+          new BatchIngestionConfig(Collections.singletonList(requiredBatchConfig), "APPEND", "HOURLY"));
+      return tableConfig;
+    }
+
+    List<Map<String, String>> batchConfigMaps = batchIngestionConfig.getBatchConfigMaps();
+    if (batchConfigMaps == null || batchConfigMaps.isEmpty()) {
+      batchIngestionConfig.setBatchConfigMaps(Collections.singletonList(requiredBatchConfig));
+    } else if (batchConfigMaps.size() > 1) {
+      throw new IllegalStateException(String.format(
+          "Flink connector requires exactly 1 batchConfigMap for table %s, got %d", tableConfig.getTableName(),
+          batchConfigMaps.size()));
+    } else {
+      Map<String, String> mergedBatchConfig = new HashMap<>(batchConfigMaps.get(0));
+      mergedBatchConfig.putAll(requiredBatchConfig);
+      batchIngestionConfig.setBatchConfigMaps(Collections.singletonList(mergedBatchConfig));
+    }
+    return tableConfig;
   }
 
   @Override
