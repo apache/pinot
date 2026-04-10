@@ -23,6 +23,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Base64;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.URIUtils;
@@ -441,7 +442,7 @@ public class StringFunctions {
   @ScalarFunction
   public static byte[] toUUIDBytes(String input) {
     try {
-      return UuidUtils.toBytes(input);
+      return UuidUtils.toBytes(UUID.fromString(input));
     } catch (Exception e) {
       return null;
     }
