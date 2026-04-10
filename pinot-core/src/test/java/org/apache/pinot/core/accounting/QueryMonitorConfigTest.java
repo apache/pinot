@@ -52,6 +52,9 @@ public class QueryMonitorConfigTest {
     return CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + config;
   }
 
+  private static final boolean EXPECTED_OOM_PAUSE_ENABLED = true;
+  private static final long EXPECTED_OOM_PAUSE_TIMEOUT_MS = 2000;
+
   @BeforeClass
   public void setUp() {
     CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY),
@@ -76,6 +79,10 @@ public class QueryMonitorConfigTest {
         Double.toString(EXPECTED_MIN_MEMORY_FOOTPRINT_FOR_KILL));
     CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED),
         Boolean.toString(EXPECTED_IS_QUERY_KILLED_METRIC_ENABLED));
+    CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PAUSE_ENABLED),
+        Boolean.toString(EXPECTED_OOM_PAUSE_ENABLED));
+    CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS),
+        Long.toString(EXPECTED_OOM_PAUSE_TIMEOUT_MS));
   }
 
   @Test
@@ -218,5 +225,28 @@ public class QueryMonitorConfigTest {
         .onChange(Set.of(getFullyQualifiedConfigName(Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED)),
             CLUSTER_CONFIGS);
     assertTrue(accountant.getQueryMonitorConfig().isQueryKilledMetricEnabled());
+  }
+
+  @Test
+  void testOomPauseEnabledConfigChange() {
+    PerQueryCPUMemResourceUsageAccountant accountant =
+        new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
+
+    assertFalse(accountant.getQueryMonitorConfig().isOomPauseEnabled());
+    accountant.getWatcherTask()
+        .onChange(Set.of(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PAUSE_ENABLED)), CLUSTER_CONFIGS);
+    assertTrue(accountant.getQueryMonitorConfig().isOomPauseEnabled());
+  }
+
+  @Test
+  void testOomPauseTimeoutMsConfigChange() {
+    PerQueryCPUMemResourceUsageAccountant accountant =
+        new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
+
+    assertEquals(accountant.getQueryMonitorConfig().getOomPauseTimeoutMs(),
+        Accounting.DEFAULT_OOM_PAUSE_TIMEOUT_MS);
+    accountant.getWatcherTask()
+        .onChange(Set.of(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS)), CLUSTER_CONFIGS);
+    assertEquals(accountant.getQueryMonitorConfig().getOomPauseTimeoutMs(), EXPECTED_OOM_PAUSE_TIMEOUT_MS);
   }
 }
