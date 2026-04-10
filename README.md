@@ -214,7 +214,11 @@ WHERE eventId = CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID)
 
 Migration notes:
 - Existing `BYTES` columns keep returning hex strings. Pinot only renders canonical UUID strings for columns declared as `UUID`.
-- Existing `STRING` or `BYTES` UUID data can be migrated to `UUID` columns without a segment or wire format change in v1.
+- Pinot does not support changing the data type of an existing column in place. To adopt `UUID` for existing
+  `STRING` or `BYTES` UUID-shaped data, create a new `UUID` column or a new table/schema and reingest/backfill the
+  data into it.
+- The `UUID` type itself does not require a segment or wire format bump in v1, but migration still requires rebuild or
+  reingest because schema type mutation is unsupported.
 - Multi-value UUID columns are not supported in v1.
 
 ## License
