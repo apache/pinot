@@ -56,19 +56,46 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   public static final String ALGORITHM = "CONCURRENT";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
-  private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
+  protected static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
-  protected final int _numAggregationFunctions;
-  protected final int _numGroupByExpressions;
-  protected final int _numColumns;
+  private final int _numAggregationFunctions;
+  private final int _numGroupByExpressions;
+  private final int _numColumns;
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
-  protected final CountDownLatch _operatorLatch;
+  private final CountDownLatch _operatorLatch;
 
-  protected volatile IndexedTable _indexedTable;
-  protected volatile boolean _groupsTrimmed;
-  protected volatile boolean _numGroupsLimitReached;
-  protected volatile boolean _numGroupsWarningLimitReached;
+  // Shared indexed table used during combine; accessed only under synchronized(this)
+  private volatile IndexedTable _indexedTable;
+  private volatile boolean _groupsTrimmed;
+  private volatile boolean _numGroupsLimitReached;
+  private volatile boolean _numGroupsWarningLimitReached;
+
+  /**
+   * Atomically steals the shared indexed table (setting it to null) and returns it.
+   * Returns null if no shared table is available. Must be called under {@code synchronized(this)}.
+   */
+  protected IndexedTable stealSharedTable() {
+    IndexedTable table = _indexedTable;
+    _indexedTable = null;
+    return table;
+  }
+
+  /**
+   * Deposits the given indexed table as the shared result.
+   * Must be called under {@code synchronized(this)}.
+   */
+  protected void depositSharedTable(IndexedTable table) {
+    _indexedTable = table;
+  }
+
+  /**
+   * Returns true if the shared indexed table is non-null.
+   * Must be called under {@code synchronized(this)}.
+   */
+  protected boolean hasSharedTable() {
+    return _indexedTable != null;
+  }
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);

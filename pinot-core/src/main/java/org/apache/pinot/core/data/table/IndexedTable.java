@@ -261,6 +261,13 @@ public abstract class IndexedTable extends BaseTable {
     return _topRecords != null ? _topRecords.size() : _lookupMap.size();
   }
 
+  /**
+   * Returns an iterator over all records in this table.
+   * <p>
+   * If {@link #finish} has already been called, iterates over the trimmed/sorted top records. Otherwise iterates
+   * directly over the internal lookup map. In the pre-finish case the caller is responsible for ensuring no
+   * concurrent modifications are made to this table while iterating.
+   */
   @Override
   public Iterator<Record> iterator() {
     if (_topRecords == null) {
@@ -269,10 +276,13 @@ public abstract class IndexedTable extends BaseTable {
     return _topRecords.iterator();
   }
 
-
   /**
-   * Absorbs the resize/trim statistics from another {@link IndexedTable} into this table.
-   * Call this after merging tables to ensure resize metrics are accurately reported.
+   * Accumulates the resize/trim statistics from {@code other} into this table.
+   * <p>
+   * This method is <em>not</em> thread-safe. It must only be called when both tables are exclusively owned by the
+   * calling thread (i.e., neither table is concurrently modified or iterated).
+   *
+   * @param other the table whose stats are absorbed; must be exclusively owned by the caller
    */
   public void absorbTrimStats(IndexedTable other) {
     _numResizes += other._numResizes;

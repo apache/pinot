@@ -32,6 +32,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Non-blocking combine operator for group-by queries.
  * <p>
+ * Each worker thread builds its own {@link org.apache.pinot.core.data.table.SimpleIndexedTable} (uncontended
+ * {@code HashMap}) and processes segments independently. After processing, threads merge their local tables via a
+ * lock-free tournament exchange protocol, depositing the final merged table into the shared slot for
+ * {@link #mergeResults()} to collect.
+ * <p>
  * Parallelism is bounded by the configured max execution threads via {@link GroupByCombineOperator}.
  */
 @SuppressWarnings("rawtypes")
@@ -39,7 +44,6 @@ public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
   public static final String ALGORITHM = "NON-BLOCKING";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(NonblockingGroupByCombineOperator.class);
-  private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
   public NonblockingGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
@@ -47,13 +51,10 @@ public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
     LOGGER.debug("Using {} for group-by combine with {} tasks", ALGORITHM, _numTasks);
   }
 
-  @Override
-  public String toExplainString() {
-    return EXPLAIN_NAME;
-  }
-
   /**
-   * Executes query on one segment in a worker thread and merges the results into the indexed table.
+   * Executes query on one segment in a worker thread and merges the results into a thread-local indexed table.
+   * After all segments are processed the thread merges its local table into the shared slot via a lock-free
+   * tournament exchange.
    */
   @Override
   protected void processSegments() {
@@ -68,9 +69,8 @@ public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
         if (indexedTable == null) {
           synchronized (this) {
-            if (_indexedTable != null) {
-              indexedTable = _indexedTable;
-              _indexedTable = null;
+            if (hasSharedTable()) {
+              indexedTable = stealSharedTable();
             }
           }
           if (indexedTable == null) {
@@ -91,13 +91,12 @@ public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
     while (indexedTable != null && !setGroupByResult) {
       IndexedTable indexedTableToMerge;
       synchronized (this) {
-        if (_indexedTable == null) {
-          _indexedTable = indexedTable;
+        if (!hasSharedTable()) {
+          depositSharedTable(indexedTable);
           setGroupByResult = true;
           continue;
         } else {
-          indexedTableToMerge = _indexedTable;
-          _indexedTable = null;
+          indexedTableToMerge = stealSharedTable();
         }
       }
       if (indexedTable.size() > indexedTableToMerge.size()) {

@@ -24,7 +24,6 @@ import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.combine.AggregationCombineOperator;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
@@ -176,8 +175,8 @@ public class CombinePlanNode implements PlanNode {
       return new SortedGroupByCombineOperator(operators, _queryContext, _executorService);
     }
 
-    // Allow fallback to the legacy ConcurrentHashMap-based operator via query option
-    String algo = QueryOptionsUtils.getGroupByAlgorithm(_queryContext.getQueryOptions());
+    // Allow fallback to the legacy ConcurrentHashMap-based operator via instance config or query option
+    String algo = _queryContext.getGroupByAlgorithm();
     if (GroupByCombineOperator.ALGORITHM.equalsIgnoreCase(algo)) {
       return new GroupByCombineOperator(operators, _queryContext, _executorService);
     }
