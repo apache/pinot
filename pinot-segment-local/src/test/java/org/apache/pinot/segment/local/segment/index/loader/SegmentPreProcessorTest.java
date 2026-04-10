@@ -348,21 +348,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(NEWLY_ADDED_STRING_COL_RAW,
         new FieldConfig(NEWLY_ADDED_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
-    // Text index creation for newly added raw columns may not fully succeed; verify pre-processing doesn't crash.
-    try {
-      checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, true, 4);
-    } catch (AssertionError | RuntimeException e) {
-      // Text index on newly added raw column may not be created correctly; this is a known limitation.
-    }
+    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, true, 4);
     _fieldConfigMap.put(NEWLY_ADDED_STRING_MV_COL_RAW,
         new FieldConfig(NEWLY_ADDED_STRING_MV_COL_RAW, FieldConfig.EncodingType.RAW,
             List.of(FieldConfig.IndexType.TEXT), null, null));
-    try {
-      checkTextIndexCreation(NEWLY_ADDED_STRING_MV_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, false, 4,
-          false, 1);
-    } catch (AssertionError | RuntimeException e) {
-      // Text index on newly added raw column may not be created correctly; this is a known limitation.
-    }
+    checkTextIndexCreation(NEWLY_ADDED_STRING_MV_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, false, 4,
+        false, 1);
   }
 
   @Test(dataProvider = "bothV1AndV3")
@@ -602,18 +593,13 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     long oldRangeIndexSize =
         new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeFor(StandardIndexes.range());
     _noDictionaryColumns.add(COLUMN10_NAME);
-    try {
-      checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
-          true, 0, DataType.INT, 100000);
-      validateIndex(StandardIndexes.range(), COLUMN10_NAME, 3960, 12, false, false, false, 0, true, 0,
-          ChunkCompressionType.LZ4, false, DataType.INT, 100000);
-      long newRangeIndexSize = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME)
-          .getIndexSizeFor(StandardIndexes.range());
-      assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
-    } catch (RuntimeException e) {
-      assertTrue(e.getMessage() != null && e.getMessage().toLowerCase().contains("forward index"),
-          "Unexpected exception when rebuilding range index: " + e.getMessage());
-    }
+    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
+        true, 0, DataType.INT, 100000);
+    validateIndex(StandardIndexes.range(), COLUMN10_NAME, 3960, 12, false, false, false, 0, true, 0,
+        ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+    long newRangeIndexSize = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
 
     // TEST4: Disable dictionary but add text index.
     validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4, false, true, false, 26, true, 0, null,
@@ -622,15 +608,10 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_DICT,
         new FieldConfig(EXISTING_STRING_COL_DICT, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
-    try {
-      checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0,
-          ChunkCompressionType.LZ4, true, 0, DataType.STRING, 100000);
-      validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4, false, false, false, 0, true, 0,
-          null, false, DataType.STRING, 100000);
-    } catch (RuntimeException e) {
-      assertTrue(e.getMessage() != null && e.getMessage().toLowerCase().contains("forward index"),
-          "Unexpected exception when rebuilding text index: " + e.getMessage());
-    }
+    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0,
+        ChunkCompressionType.LZ4, true, 0, DataType.STRING, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4, false, false, false, 0, true, 0,
+        null, false, DataType.STRING, 100000);
   }
 
   @Test
@@ -1846,12 +1827,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             new IndexLoadingConfig(tableConfig, schema))) {
       // Should need processing due to new star-tree config
       assertTrue(processor.needProcess());
-      // Process may fail with invalid function column pair; swallow to verify no star-tree is created
-      try {
-        processor.process(SEGMENT_OPERATIONS_THROTTLER);
-      } catch (IllegalStateException e) {
-        // expected for invalid function pair; proceed to validation
-      }
+      // Process logs error and skips invalid star-tree config; no exception is thrown
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
     // Verify that no star-tree index was created due to invalid config
@@ -1904,11 +1881,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             new IndexLoadingConfig(tableConfig, schema))) {
       // Should need processing due to changed star-tree config
       assertTrue(processor.needProcess());
-      try {
-        processor.process(SEGMENT_OPERATIONS_THROTTLER);
-      } catch (IllegalStateException e) {
-        // expected for invalid function pair; continue to validate existing star-tree unchanged
-      }
+      // Process logs error and skips invalid star-tree config; no exception is thrown
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
     // Verify that the original star-tree index still exists and hasn't changed
