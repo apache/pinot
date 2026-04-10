@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.segment.spi.partition;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionFunctionExprCompiler;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 
 
 /**
@@ -97,5 +100,35 @@ public class PartitionFunctionFactory {
       default:
         throw new IllegalArgumentException("Illegal partition function name: " + functionName);
     }
+  }
+
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig columnPartitionConfig) {
+    return getPartitionFunction(columnName, columnPartitionConfig, columnPartitionConfig.getNumPartitions());
+  }
+
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig columnPartitionConfig,
+      int numPartitions) {
+    Preconditions.checkNotNull(columnPartitionConfig, "Column partition config must be configured");
+    return getPartitionFunction(columnName, columnPartitionConfig.getFunctionName(), numPartitions,
+        columnPartitionConfig.getFunctionConfig(), columnPartitionConfig.getFunctionExpr(),
+        columnPartitionConfig.getPartitionIdNormalizer());
+  }
+
+  public static PartitionFunction getPartitionFunction(String columnName, @Nullable String functionName,
+      int numPartitions, @Nullable Map<String, String> functionConfig, @Nullable String functionExpr) {
+    return getPartitionFunction(columnName, functionName, numPartitions, functionConfig, functionExpr, null);
+  }
+
+  public static PartitionFunction getPartitionFunction(String columnName, @Nullable String functionName,
+      int numPartitions, @Nullable Map<String, String> functionConfig, @Nullable String functionExpr,
+      @Nullable String partitionIdNormalizer) {
+    if (functionExpr != null) {
+      return PartitionFunctionExprCompiler
+          .compilePartitionFunction(columnName, functionExpr, numPartitions, partitionIdNormalizer);
+    }
+    Preconditions.checkArgument(partitionIdNormalizer == null,
+        "'partitionIdNormalizer' is only supported with 'functionExpr'");
+    Preconditions.checkArgument(functionName != null, "Partition function name must be configured");
+    return getPartitionFunction(functionName, numPartitions, functionConfig);
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.partition;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.io.Serializable;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -55,6 +56,18 @@ public interface PartitionFunction extends Serializable {
 
   @Nullable
   default Map<String, String> getFunctionConfig() {
+    return null;
+  }
+
+  @JsonIgnore
+  @Nullable
+  default String getFunctionExpr() {
+    return null;
+  }
+
+  @JsonIgnore
+  @Nullable
+  default String getPartitionIdNormalizer() {
     return null;
   }
 }

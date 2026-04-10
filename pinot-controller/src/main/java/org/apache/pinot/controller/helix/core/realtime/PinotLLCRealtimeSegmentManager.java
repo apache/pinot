@@ -108,6 +108,8 @@ import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -1154,9 +1156,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       // This ensures the partition metadata stored in ZK matches what the broker's partition function computes
       // during query pruning. For example, stream 1 partition 5 has Pinot partition ID 10005, but should store 5.
       int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(tableConfig, partitionId);
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(entry.getKey(), columnPartitionConfig, numPartitionGroups);
       ColumnPartitionMetadata columnPartitionMetadata =
-          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), numPartitionGroups,
-              Collections.singleton(streamPartitionId), columnPartitionConfig.getFunctionConfig());
+          new ColumnPartitionMetadata(partitionFunction, Collections.singleton(streamPartitionId));
       return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
     } else {
       LOGGER.warn(

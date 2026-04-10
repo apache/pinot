@@ -109,12 +109,20 @@ public class HashFunctions {
   }
 
   /**
+   * Return raw MD5 digest bytes.
+   */
+  @ScalarFunction(names = {"md5_raw"})
+  public static byte[] md5Raw(byte[] input) {
+    return DigestUtils.md5(input);
+  }
+
+  /**
    * Computes 32-bit MurmurHash2 of the given byte array.
    *
    * @param input the byte array to hash
    * @return 32-bit hash
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"murmur2"})
   public static int murmurHash2(byte[] input) {
     return MurmurHashFunctions.murmurHash2(input);
   }
@@ -161,6 +169,14 @@ public class HashFunctions {
   @ScalarFunction
   public static int murmurHash3Bit32(byte[] input, int seed) {
     return Hashing.murmur3_32_fixed(seed).hashBytes(input).asInt();
+  }
+
+  /**
+   * Computes 32-bit Murmur3 hash of the given byte array with seed 0 using the partition-expression friendly name.
+   */
+  @ScalarFunction(names = {"murmur3_32"})
+  public static int murmur3Bit32Default(byte[] input) {
+    return murmurHash3Bit32(input, 0);
   }
 
   /**
@@ -224,7 +240,7 @@ public class HashFunctions {
    * @param input the byte array to hash
    * @return 32-bit hash
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"fnv1_32"})
   public static int fnv1Hash32(byte[] input) {
     return FnvHashFunctions.fnv1Hash32(input);
   }
@@ -246,7 +262,7 @@ public class HashFunctions {
    * @param input the byte array to hash
    * @return 32-bit hash
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"fnv1a_32"})
   public static int fnv1aHash32(byte[] input) {
     return FnvHashFunctions.fnv1aHash32(input);
   }
@@ -268,7 +284,7 @@ public class HashFunctions {
    * @param input the byte array to hash
    * @return 64-bit hash
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"fnv1_64"})
   public static long fnv1Hash64(byte[] input) {
     return FnvHashFunctions.fnv1Hash64(input);
   }
@@ -290,7 +306,7 @@ public class HashFunctions {
    * @param input the byte array to hash
    * @return 64-bit hash
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"fnv1a_64"})
   public static long fnv1aHash64(byte[] input) {
     return FnvHashFunctions.fnv1aHash64(input);
   }

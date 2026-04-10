@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
@@ -431,6 +432,36 @@ public class PartitionFunctionTest {
     assertEquals(partitionFunction.getPartition("English"), 2);
     assertEquals(partitionFunction.getPartition("Chemistry"), 3);
     assertEquals(partitionFunction.getPartition("Physics"), 0);
+  }
+
+  @Test
+  public void testLegacyPartitionFunctionsExposeDefaultPartitionIdNormalizer() {
+    assertEquals(PartitionFunctionFactory.getPartitionFunction("Modulo", 8, null).getPartitionIdNormalizer(),
+        "POSITIVE_MODULO");
+    assertEquals(PartitionFunctionFactory.getPartitionFunction("HashCode", 8, null).getPartitionIdNormalizer(),
+        "ABS");
+    assertEquals(PartitionFunctionFactory.getPartitionFunction("ByteArray", 8, null).getPartitionIdNormalizer(),
+        "ABS");
+    assertEquals(PartitionFunctionFactory.getPartitionFunction("Murmur2", 8, null).getPartitionIdNormalizer(),
+        "MASK");
+    assertEquals(PartitionFunctionFactory.getPartitionFunction("Murmur3", 8, null).getPartitionIdNormalizer(),
+        "MASK");
+    assertEquals(PartitionFunctionFactory.getPartitionFunction("Fnv", 8, null).getPartitionIdNormalizer(), "MASK");
+    assertEquals(PartitionFunctionFactory.getPartitionFunction("Fnv", 8,
+        Map.of("negativePartitionHandling", "abs")).getPartitionIdNormalizer(), "ABS");
+  }
+
+  @Test
+  public void testFunctionExprPartitionFunctionSerialization() {
+    PartitionFunction partitionFunction =
+        PartitionFunctionFactory.getPartitionFunction("id", null, 128, null, "fnv1a_32(md5(id))", "MASK");
+
+    JsonNode jsonNode = JsonUtils.objectToJsonNode(partitionFunction);
+    assertEquals(partitionFunction.getName(), PartitionPipelineFunction.NAME);
+    assertEquals(jsonNode.get("name").asText(), PartitionPipelineFunction.NAME);
+    assertEquals(jsonNode.get("numPartitions").asInt(), 128);
+    assertEquals(jsonNode.get("functionExpr").asText(), "fnv1a_32(md5(id))");
+    assertEquals(jsonNode.get("partitionIdNormalizer").asText(), "MASK");
   }
 
   private void testBasicProperties(PartitionFunction partitionFunction, String functionName, int numPartitions) {

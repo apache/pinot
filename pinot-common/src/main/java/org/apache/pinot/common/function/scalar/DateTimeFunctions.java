@@ -578,7 +578,7 @@ public class DateTimeFunctions {
     return System.currentTimeMillis();
   }
 
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static long sleep(long millis) {
     try {
       if (FunctionUtils.isAssertEnabled()) {

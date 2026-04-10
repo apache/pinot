@@ -227,9 +227,12 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
 
       // Compute partition ID for the specified partition column value
       int partitionId = PartitionFunctionFactory.getPartitionFunction(
+          _partitionColumn,
           columnMetadata.getFunctionName(),
           columnMetadata.getNumPartitions(),
-          columnMetadata.getFunctionConfig()
+          columnMetadata.getFunctionConfig(),
+          columnMetadata.getFunctionExpr(),
+          columnMetadata.getPartitionIdNormalizer()
       ).getPartition(_partitionColumnValue);
 
       // Return true if segment contains the computed partition

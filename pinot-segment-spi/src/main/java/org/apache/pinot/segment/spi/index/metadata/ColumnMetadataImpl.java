@@ -304,7 +304,9 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         .equals(StringEscapeUtils.unescapeJava(padding)), "Got non-zero string padding: %s", padding);
 
     String partitionFunctionName = config.getString(Column.getKeyFor(column, Column.PARTITION_FUNCTION), null);
-    if (partitionFunctionName != null) {
+    String partitionFunctionExpr = config.getString(Column.getKeyFor(column, Column.PARTITION_FUNCTION_EXPR), null);
+    String partitionIdNormalizer = config.getString(Column.getKeyFor(column, Column.PARTITION_ID_NORMALIZER), null);
+    if (partitionFunctionName != null || partitionFunctionExpr != null) {
       int numPartitions = config.getInt(Column.getKeyFor(column, Column.NUM_PARTITIONS));
       Map<String, String> partitionFunctionConfigMap = null;
       Configuration partitionFunctionConfig = config.subset(Column.getKeyFor(column, Column.PARTITION_FUNCTION_CONFIG));
@@ -325,8 +327,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         }
       }
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
-              partitionFunctionConfigMap);
+          PartitionFunctionFactory.getPartitionFunction(column, partitionFunctionName, numPartitions,
+              partitionFunctionConfigMap, partitionFunctionExpr, partitionIdNormalizer);
       builder.setPartitionFunction(partitionFunction);
       builder.setPartitions(
           ColumnPartitionMetadata.extractPartitions(config.getList(Column.getKeyFor(column, Column.PARTITION_VALUES))));

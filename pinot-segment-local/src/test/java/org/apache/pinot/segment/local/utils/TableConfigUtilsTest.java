@@ -3231,6 +3231,77 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig6);
   }
 
+  @Test
+  public void testValidateSegmentPartitionFunctionExpr() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(PARTITION_COLUMN, FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(Collections.singletonMap(
+        PARTITION_COLUMN, ColumnPartitionConfig.forFunctionExpr("murmur2(lower(" + PARTITION_COLUMN + "))", 8)));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(getStreamConfigs())
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .build();
+
+    TableConfigUtils.validate(tableConfig, schema);
+  }
+
+  @Test
+  public void testValidateSegmentPartitionFunctionExprWithLiteralArgument() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(PARTITION_COLUMN, FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(Collections.singletonMap(
+        TIME_COLUMN, ColumnPartitionConfig.forFunctionExpr("toEpochSecondsRounded(" + TIME_COLUMN + ", 10)", 8)));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(getStreamConfigs())
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .build();
+
+    TableConfigUtils.validate(tableConfig, schema);
+  }
+
+  @Test
+  public void testValidateSegmentPartitionFunctionExprWithExplicitMaskNormalizer() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(PARTITION_COLUMN, FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(Collections.singletonMap(
+        PARTITION_COLUMN, ColumnPartitionConfig.forFunctionExpr("fnv1a_32(md5(" + PARTITION_COLUMN + "))", 128,
+            "MASK")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(getStreamConfigs())
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .build();
+
+    TableConfigUtils.validate(tableConfig, schema);
+  }
+
+  @Test
+  public void testRejectInvalidSegmentPartitionFunctionExpr() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(PARTITION_COLUMN, FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(Collections.singletonMap(
+        PARTITION_COLUMN, ColumnPartitionConfig.forFunctionExpr("md5(" + PARTITION_COLUMN + ")", 8)));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(getStreamConfigs())
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .build();
+
+    IllegalArgumentException e =
+        expectThrows(IllegalArgumentException.class, () -> TableConfigUtils.validate(tableConfig, schema));
+    assertEquals(e.getMessage(), "Partition pipeline must produce INT or LONG output, got: STRING");
+  }
+
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
