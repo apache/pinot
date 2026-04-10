@@ -414,7 +414,7 @@ public class DictionaryIndexTypeTest {
         .add(StandardIndexes.inverted(), IndexConfig.ENABLED)
         .add(StandardIndexes.fst(), new org.apache.pinot.segment.spi.index.FstIndexConfig())
         .build();
-    java.util.List<IndexType> required =
+    java.util.List<IndexType<?, ?, ?>> required =
         DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(fieldSpec, withBoth);
     assertTrue(required.stream().anyMatch(t -> t.getId().equals(StandardIndexes.INVERTED_ID)),
         "Inverted index should be in the required list");

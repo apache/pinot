@@ -346,7 +346,8 @@ public class DataFetcher implements AutoCloseable {
         if (_singleValue) {
           readDictIdsFromRawValues(docIds, length, dictIdBuffer, readerContext);
         } else {
-          throw new UnsupportedOperationException("Use readDictIdsMV for multi-value columns");
+          throw new UnsupportedOperationException(
+              "Multi-value columns with raw forward index and shared dictionary are not supported");
         }
       }
     }

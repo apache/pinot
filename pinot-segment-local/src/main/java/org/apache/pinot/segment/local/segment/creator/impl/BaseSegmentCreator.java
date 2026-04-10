@@ -568,6 +568,15 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
   /**
    * Adds column metadata information to the properties configuration.
+   *
+   * <p>This overload derives the forward-index encoding from {@code hasDictionary}: {@code true} maps to
+   * {@link IndexCreationContext.ForwardIndexEncoding#DICTIONARY}, {@code false} to
+   * {@link IndexCreationContext.ForwardIndexEncoding#RAW}. Callers that need to represent a
+   * <em>shared-dictionary</em> column (raw forward index with a standalone dictionary for secondary indexes,
+   * where {@code hasDictionary=true} but encoding is RAW) must use the overload that accepts the
+   * {@code forwardIndexEncoding} parameter directly. Passing {@code hasDictionary=true} here for such a
+   * column would incorrectly set {@code HAS_DICTIONARY=true} instead of {@code HAS_SHARED_DICTIONARY=true},
+   * breaking backward compatibility with older servers.
    */
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
       ColumnStatistics columnStatistics, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
@@ -597,7 +606,20 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     properties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
     properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldType));
     properties.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(columnStatistics.isSorted()));
-    properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));
+    // For a raw forward index with a shared dictionary (dictionary exists for secondary indexes only),
+    // write HAS_SHARED_DICTIONARY=true and HAS_DICTIONARY=false. Old servers use hasDictionary() to
+    // choose the forward index reader: they must see HAS_DICTIONARY=false to correctly load the raw
+    // forward reader. New servers combine HAS_DICTIONARY and HAS_SHARED_DICTIONARY to determine
+    // whether a physical dictionary is present. In practice this branch is unreachable from
+    // BaseSegmentCreator because createDictionaryForColumn() returns true only when the dictionary
+    // config is not disabled, which implies DICTIONARY forward-index encoding (not RAW). This guard
+    // is defensive to ensure the backward-compatibility invariant is always maintained correctly.
+    boolean isSharedDictionary =
+        hasDictionary && forwardIndexEncoding == IndexCreationContext.ForwardIndexEncoding.RAW;
+    properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary && !isSharedDictionary));
+    if (isSharedDictionary) {
+      properties.setProperty(getKeyFor(column, HAS_SHARED_DICTIONARY), String.valueOf(true));
+    }
     properties.setProperty(getKeyFor(column, FORWARD_INDEX_ENCODING), forwardIndexEncoding.name());
     properties.setProperty(getKeyFor(column, IS_SINGLE_VALUED), String.valueOf(fieldSpec.isSingleValueField()));
     properties.setProperty(getKeyFor(column, MAX_MULTI_VALUE_ELEMENTS),

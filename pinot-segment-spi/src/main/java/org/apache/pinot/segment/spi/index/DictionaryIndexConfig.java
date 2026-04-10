@@ -135,11 +135,11 @@ public class DictionaryIndexConfig extends IndexConfig {
   }
 
   /**
-   * Returns {@code true} if a dictionary must be created for the given column based on the configured indexes.
+   * Returns the list of index types that require a dictionary for the given column based on the configured indexes.
    */
-  public static List<IndexType> getIndexTypesWithDictionaryRequired(FieldSpec fieldSpec,
+  public static List<IndexType<?, ?, ?>> getIndexTypesWithDictionaryRequired(FieldSpec fieldSpec,
       FieldIndexConfigs fieldIndexConfigs) {
-    List<IndexType> indexTypes = new ArrayList<>();
+    List<IndexType<?, ?, ?>> indexTypes = new ArrayList<>();
     for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
       if (indexType == StandardIndexes.dictionary()) {
         continue;

@@ -1601,7 +1601,7 @@ public final class TableConfigUtils {
       if (dictionaryConfig != null && dictionaryConfig.isEnabled()) {
         continue;
       }
-      List<IndexType> requiringIndexes =
+      List<IndexType<?, ?, ?>> requiringIndexes =
           DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(fieldSpec, indexConfigs);
       Preconditions.checkState(requiringIndexes.isEmpty(),
           "Column '%s' has indexes %s that require a dictionary, but dictionary is not enabled. "
