@@ -37,7 +37,6 @@ import org.apache.helix.PropertyKey;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminTransport;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
-import org.apache.pinot.common.minion.MinionClient;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -72,6 +71,10 @@ public class SqlQueryExecutor {
   // Guarded by synchronized(this) when _helixManager != null
   private volatile String _cachedControllerUrl;
   private volatile long _cachedControllerUrlExpiry;
+
+  // Shared transport reused across all controller calls. Created lazily on first use and
+  // never closed — it lives for the process lifetime alongside SqlQueryExecutor.
+  private volatile PinotAdminTransport _sharedAdminTransport;
 
   /**
    * Fetch the lead controller from helix, HA is not guaranteed.
@@ -143,12 +146,17 @@ public class SqlQueryExecutor {
     switch (statement.getExecutionType()) {
       case MINION:
         AdhocTaskConfig taskConf = statement.generateAdhocTaskConfig();
+        PinotAdminClient minionAdminClient = null;
         try {
-          Map<String, String> tableToTaskIdMap = getMinionClient().executeTask(taskConf, headers);
+          minionAdminClient = createAdminClient(copyHeaders(headers));
+          Map<String, String> tableToTaskIdMap = minionAdminClient.getTaskClient().executeTask(taskConf);
           List<Object[]> rows = new ArrayList<>();
           tableToTaskIdMap.forEach((key, value) -> rows.add(new Object[]{key, value}));
           result.setResultTable(new ResultTable(statement.getResultSchema(), rows));
         } catch (Exception e) {
+          if (minionAdminClient != null) {
+            invalidateControllerUrlCache();
+          }
           result.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
         }
         break;
@@ -184,14 +192,6 @@ public class SqlQueryExecutor {
               + (e.getMessage() != null ? e.getMessage() : "(no message)")));
     }
     return result;
-  }
-
-  private MinionClient getMinionClient() {
-    // NOTE: using null auth provider here as auth headers injected by caller in "executeDMLStatement()"
-    if (_helixManager != null) {
-      return new MinionClient(getControllerBaseUrl(_helixManager), null);
-    }
-    return new MinionClient(_controllerUrl, null);
   }
 
   private ResultTable buildMetadataResult(SqlNode sqlNode, Map<String, String> options, Map<String, String> headers)
@@ -389,10 +389,17 @@ public class SqlQueryExecutor {
     }
 
     ControllerEndpoint controllerEndpoint = toControllerEndpoint(baseUrl);
+    PinotAdminTransport transport = getOrCreateSharedTransport(controllerEndpoint._scheme);
+    return new PinotAdminClient(controllerEndpoint._controllerAddress, transport, headers);
+  }
 
-    Properties properties = new Properties();
-    properties.setProperty(PinotAdminTransport.ADMIN_TRANSPORT_SCHEME, controllerEndpoint._scheme);
-    return new PinotAdminClient(controllerEndpoint._controllerAddress, properties, headers);
+  private synchronized PinotAdminTransport getOrCreateSharedTransport(String scheme) {
+    if (_sharedAdminTransport == null) {
+      Properties properties = new Properties();
+      properties.setProperty(PinotAdminTransport.ADMIN_TRANSPORT_SCHEME, scheme);
+      _sharedAdminTransport = new PinotAdminTransport(properties, null);
+    }
+    return _sharedAdminTransport;
   }
 
   /**

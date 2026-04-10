@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.executor.sql;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +45,7 @@ public class SqlQueryExecutorTest {
   private int _port;
   private final AtomicReference<String> _lastTablesDatabase = new AtomicReference<>();
   private final AtomicReference<String> _lastSchemasDatabase = new AtomicReference<>();
+  private final AtomicReference<String> _lastTaskExecuteBody = new AtomicReference<>();
 
   @BeforeMethod
   public void setUp()
@@ -117,6 +119,29 @@ public class SqlQueryExecutorTest {
     Assert.assertTrue(exceptions.get(0).getMessage().contains("from statement does not match database name"));
   }
 
+  @Test
+  public void testDmlMinionTaskExecution()
+      throws Exception {
+    SqlQueryExecutor sqlQueryExecutor = new SqlQueryExecutor("http://localhost:" + _port);
+
+    // INSERT INTO myTable FROM FILE uses the MINION execution path
+    BrokerResponseNative response = (BrokerResponseNative) sqlQueryExecutor.executeDMLStatement(
+        CalciteSqlParser.compileToSqlNodeAndOptions(
+            "INSERT INTO myTable FROM FILE 'file:///tmp/data.json'"),
+        Collections.emptyMap());
+
+    // Verify the server received a /tasks/execute POST with a non-empty body
+    Assert.assertNotNull(_lastTaskExecuteBody.get(), "Server should have received a POST to /tasks/execute");
+    Assert.assertFalse(_lastTaskExecuteBody.get().isEmpty(), "Request body should not be empty");
+
+    // Verify the response is mapped to the result table returned by the server
+    Assert.assertNotNull(response.getResultTable(), "Result table should be present");
+    Assert.assertEquals(response.getResultTable().getRows().size(), 1);
+    Object[] row = response.getResultTable().getRows().get(0);
+    Assert.assertEquals(row[0], "myTable");
+    Assert.assertEquals(row[1], "task_001");
+  }
+
   private void registerHandlers() {
     _server.createContext("/databases", exchange -> writeResponse(exchange, "[\"default\",\"analytics_db\"]"));
     _server.createContext("/tables", exchange -> {
@@ -126,6 +151,12 @@ public class SqlQueryExecutorTest {
     _server.createContext("/schemas", exchange -> {
       _lastSchemasDatabase.set(exchange.getRequestHeaders().getFirst(CommonConstants.DATABASE));
       writeResponse(exchange, "[\"salesSchema\",\"inventory\"]");
+    });
+    _server.createContext("/tasks/execute", exchange -> {
+      try (InputStream is = exchange.getRequestBody()) {
+        _lastTaskExecuteBody.set(new String(is.readAllBytes(), StandardCharsets.UTF_8));
+      }
+      writeResponse(exchange, "{\"myTable\":\"task_001\"}");
     });
   }
 
