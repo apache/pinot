@@ -404,6 +404,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         LOGGER.info("_minMemoryFootprintForKill: {}", queryMonitorConfig.getMinMemoryFootprintForKill());
         LOGGER.info("_cpuTimeBasedKillingEnabled: {}", queryMonitorConfig.isCpuTimeBasedKillingEnabled());
         LOGGER.info("_cpuTimeBasedKillingThresholdNs: {}", queryMonitorConfig.getCpuTimeBasedKillingThresholdNs());
+        LOGGER.info("_oomPauseEnabled: {}", queryMonitorConfig.isOomPauseEnabled());
+        LOGGER.info("_oomPauseTimeoutMs: {}", queryMonitorConfig.getOomPauseTimeoutMs());
       }
 
       @Override

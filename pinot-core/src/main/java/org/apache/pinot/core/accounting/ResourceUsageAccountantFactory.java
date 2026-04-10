@@ -133,6 +133,8 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       if (_memorySamplingEnabled) {
         threadTracker.updateMemorySnapshot();
       }
+      // Block if an OOM pause is active (fast-path: single volatile read)
+      _queryResourceAggregator.waitIfPaused();
     }
 
     @Override
@@ -330,6 +332,8 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
         LOGGER.info("_minMemoryFootprintForKill: {}", queryMonitorConfig.getMinMemoryFootprintForKill());
         LOGGER.info("_cpuTimeBasedKillingEnabled: {}", queryMonitorConfig.isCpuTimeBasedKillingEnabled());
         LOGGER.info("_cpuTimeBasedKillingThresholdNs: {}", queryMonitorConfig.getCpuTimeBasedKillingThresholdNs());
+        LOGGER.info("_oomPauseEnabled: {}", queryMonitorConfig.isOomPauseEnabled());
+        LOGGER.info("_oomPauseTimeoutMs: {}", queryMonitorConfig.getOomPauseTimeoutMs());
         LOGGER.info("_workloadSleepTimeMs: {}", queryMonitorConfig.getWorkloadSleepTimeMs());
         LOGGER.info("_workloadCostEnforcementEnabled: {}", queryMonitorConfig.isWorkloadCostEnforcementEnabled());
       }

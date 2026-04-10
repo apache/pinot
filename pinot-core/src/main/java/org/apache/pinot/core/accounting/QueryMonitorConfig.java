@@ -62,6 +62,12 @@ public class QueryMonitorConfig {
 
   private final boolean _queryKilledMetricEnabled;
 
+  // if we want to pause query threads before killing to allow the JVM to reclaim memory
+  private final boolean _oomPauseEnabled;
+
+  // how long to pause query threads (ms) before proceeding with kill
+  private final long _oomPauseTimeoutMs;
+
   private final int _workloadSleepTimeMs;
 
   private final boolean _workloadCostEnforcementEnabled;
@@ -110,6 +116,12 @@ public class QueryMonitorConfig {
 
     _queryKilledMetricEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
         CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
+
+    _oomPauseEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_ENABLED,
+        CommonConstants.Accounting.DEFAULT_OOM_PAUSE_ENABLED);
+
+    _oomPauseTimeoutMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS,
+        CommonConstants.Accounting.DEFAULT_OOM_PAUSE_TIMEOUT_MS);
 
     _workloadSleepTimeMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS);
@@ -257,6 +269,30 @@ public class QueryMonitorConfig {
       _queryKilledMetricEnabled = oldConfig._queryKilledMetricEnabled;
     }
 
+    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_ENABLED)) {
+      if (clusterConfigs == null || !clusterConfigs.containsKey(
+          CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_ENABLED)) {
+        _oomPauseEnabled = CommonConstants.Accounting.DEFAULT_OOM_PAUSE_ENABLED;
+      } else {
+        _oomPauseEnabled =
+            Boolean.parseBoolean(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_ENABLED));
+      }
+    } else {
+      _oomPauseEnabled = oldConfig._oomPauseEnabled;
+    }
+
+    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS)) {
+      if (clusterConfigs == null || !clusterConfigs.containsKey(
+          CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS)) {
+        _oomPauseTimeoutMs = CommonConstants.Accounting.DEFAULT_OOM_PAUSE_TIMEOUT_MS;
+      } else {
+        _oomPauseTimeoutMs =
+            Long.parseLong(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS));
+      }
+    } else {
+      _oomPauseTimeoutMs = oldConfig._oomPauseTimeoutMs;
+    }
+
     if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
           CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS)) {
@@ -328,6 +364,14 @@ public class QueryMonitorConfig {
 
   public boolean isQueryKilledMetricEnabled() {
     return _queryKilledMetricEnabled;
+  }
+
+  public boolean isOomPauseEnabled() {
+    return _oomPauseEnabled;
+  }
+
+  public long getOomPauseTimeoutMs() {
+    return _oomPauseTimeoutMs;
   }
 
   public int getWorkloadSleepTimeMs() {
