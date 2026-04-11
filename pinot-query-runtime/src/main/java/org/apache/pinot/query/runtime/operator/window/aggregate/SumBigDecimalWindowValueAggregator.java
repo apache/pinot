@@ -18,59 +18,54 @@
  */
 package org.apache.pinot.query.runtime.operator.window.aggregate;
 
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 /**
- * Window value aggregator for BOOL_OR window function.
+ * Window value aggregator for SUM window function over BIG_DECIMAL types.
+ * Accumulates as {@link BigDecimal} to preserve full precision.
  */
-public class BoolOrValueAggregator implements WindowValueAggregator<Object> {
-  private int _numFalse = 0;
-  private int _numTrue = 0;
-  private int _numNull = 0;
+public class SumBigDecimalWindowValueAggregator implements WindowValueAggregator<Object> {
+  private BigDecimal _sum = BigDecimal.ZERO;
+  private int _count = 0;
 
   @Override
   public void addValue(@Nullable Object value) {
-    if (value == null) {
-      _numNull++;
-    } else if (BooleanUtils.isFalseInternalValue(value)) {
-      _numFalse++;
-    } else {
-      _numTrue++;
+    if (value != null) {
+      _count++;
+      _sum = _sum.add(toBigDecimal(value));
     }
   }
 
   @Override
   public void removeValue(@Nullable Object value) {
-    if (value == null) {
-      _numNull--;
-    } else if (BooleanUtils.isFalseInternalValue(value)) {
-      _numFalse--;
-    } else {
-      _numTrue--;
+    if (value != null) {
+      _count--;
+      _sum = _sum.subtract(toBigDecimal(value));
     }
   }
 
-  @Nullable
   @Override
+  @Nullable
   public Object getCurrentAggregatedValue() {
-    if (_numTrue > 0) {
-      return BooleanUtils.INTERNAL_TRUE;
-    }
-    if (_numNull > 0) {
+    if (_count == 0) {
       return null;
+    } else {
+      return _sum;
     }
-    if (_numFalse > 0) {
-      return BooleanUtils.INTERNAL_FALSE;
-    }
-    return null;
   }
 
   @Override
   public void clear() {
-    _numFalse = 0;
-    _numTrue = 0;
-    _numNull = 0;
+    _sum = BigDecimal.ZERO;
+    _count = 0;
+  }
+
+  private static BigDecimal toBigDecimal(Object value) {
+    if (value instanceof BigDecimal) {
+      return (BigDecimal) value;
+    }
+    return BigDecimal.valueOf(((Number) value).doubleValue());
   }
 }

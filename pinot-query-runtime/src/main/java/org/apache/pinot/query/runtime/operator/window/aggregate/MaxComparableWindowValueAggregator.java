@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.query.runtime.operator.window.aggregate;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayFIFOQueue;
+import java.util.ArrayDeque;
 import javax.annotation.Nullable;
 
 
 /**
- * Window value aggregator for MIN window function.
+ * Window value aggregator for MAX window function that preserves the input type by using {@link Comparable} for
+ * comparisons. Used for types like BIG_DECIMAL that don't have a dedicated primitive-typed aggregator.
  */
-public class MinWindowValueAggregator implements WindowValueAggregator<Object> {
+public class MaxComparableWindowValueAggregator implements WindowValueAggregator<Object> {
 
   private final boolean _supportRemoval;
-  private final DoubleArrayFIFOQueue _deque = new DoubleArrayFIFOQueue();
-  private Double _minValue = null;
+  private final ArrayDeque<Object> _deque = new ArrayDeque<>();
+  private Object _maxValue = null;
 
   /**
    * @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
@@ -37,23 +38,22 @@ public class MinWindowValueAggregator implements WindowValueAggregator<Object> {
    *                       if {@code supportRemoval} is true, this value aggregator will have O(K) space complexity
    *                       (where K is the max size of the window).
    */
-  public MinWindowValueAggregator(boolean supportRemoval) {
+  public MaxComparableWindowValueAggregator(boolean supportRemoval) {
     _supportRemoval = supportRemoval;
   }
 
   @Override
   public void addValue(@Nullable Object value) {
     if (value != null) {
-      double doubleValue = ((Number) value).doubleValue();
       if (_supportRemoval) {
-        // Remove previously added elements if they're > than the current element since they're no longer useful
-        while (!_deque.isEmpty() && _deque.lastDouble() > doubleValue) {
-          _deque.dequeueLastDouble();
+        // Remove previously added elements if they're < than the current element since they're no longer useful
+        while (!_deque.isEmpty() && compare(_deque.peekLast(), value) < 0) {
+          _deque.pollLast();
         }
-        _deque.enqueue(doubleValue);
+        _deque.addLast(value);
       } else {
-        if (_minValue == null || doubleValue < _minValue) {
-          _minValue = doubleValue;
+        if (_maxValue == null || compare(value, _maxValue) > 0) {
+          _maxValue = value;
         }
       }
     }
@@ -66,28 +66,30 @@ public class MinWindowValueAggregator implements WindowValueAggregator<Object> {
     }
 
     if (value != null) {
-      double doubleValue = ((Number) value).doubleValue();
-      if (!_deque.isEmpty() && _deque.firstDouble() == doubleValue) {
-        _deque.dequeueDouble();
+      if (!_deque.isEmpty() && compare(_deque.peekFirst(), value) == 0) {
+        _deque.pollFirst();
       }
     }
   }
 
+  @Nullable
   @Override
   public Object getCurrentAggregatedValue() {
     if (_supportRemoval) {
-      if (_deque.isEmpty()) {
-        return null;
-      }
-      return _deque.firstDouble();
+      return _deque.peekFirst();
     } else {
-      return _minValue;
+      return _maxValue;
     }
   }
 
   @Override
   public void clear() {
     _deque.clear();
-    _minValue = null;
+    _maxValue = null;
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static int compare(Object a, Object b) {
+    return ((Comparable) a).compareTo(b);
   }
 }
