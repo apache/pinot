@@ -89,6 +89,12 @@ public class TableSizeReaderCompressionStatsTest {
 
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("compressionTable").setNumReplicas(NUM_REPLICAS).build();
+    tableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
+
+    TableConfig flagOffTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("flagOffTable").setNumReplicas(NUM_REPLICAS).build();
+    // compressionStatsEnabled defaults to false — do NOT enable it
+
     ZkHelixPropertyStore mockPropertyStore = mock(ZkHelixPropertyStore.class);
 
     when(mockPropertyStore.get(ArgumentMatchers.anyString(), ArgumentMatchers.eq(null),
@@ -97,11 +103,14 @@ public class TableSizeReaderCompressionStatsTest {
           if (path.contains("offline_OFFLINE")) {
             return TableConfigSerDeUtils.toZNRecord(tableConfig);
           }
+          if (path.contains("flagOffTable_OFFLINE")) {
+            return TableConfigSerDeUtils.toZNRecord(flagOffTableConfig);
+          }
           return null;
         });
 
     when(_helix.getPropertyStore()).thenReturn(mockPropertyStore);
-    when(_helix.getNumReplicas(ArgumentMatchers.eq(tableConfig))).thenReturn(NUM_REPLICAS);
+    when(_helix.getNumReplicas(any(TableConfig.class))).thenReturn(NUM_REPLICAS);
     when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
 
     // server0: segment s1 and s2 with compression stats
@@ -203,16 +212,18 @@ public class TableSizeReaderCompressionStatsTest {
     // s1: rawFwdIdx=30000, compressedFwdIdx=7000 (max across replicas)
     // s2: rawFwdIdx=15000, compressedFwdIdx=3000 (max across replicas)
     // Total per replica: raw=45000, compressed=10000
-    assertEquals(offlineDetails._rawForwardIndexSizePerReplicaInBytes, 45000);
-    assertEquals(offlineDetails._compressedForwardIndexSizePerReplicaInBytes, 10000);
+    TableSizeReader.CompressionStats cs = offlineDetails._compressionStats;
+    assertNotNull(cs);
+    assertEquals(cs._rawForwardIndexSizePerReplicaInBytes, 45000);
+    assertEquals(cs._compressedForwardIndexSizePerReplicaInBytes, 10000);
 
     // Compression ratio = 45000 / 10000 = 4.5
-    assertEquals(offlineDetails._compressionRatio, 4.5, 0.01);
+    assertEquals(cs._compressionRatio, 4.5, 0.01);
 
     // Both segments have stats
-    assertEquals(offlineDetails._segmentsWithStats, 2);
-    assertEquals(offlineDetails._totalSegments, 2);
-    assertFalse(offlineDetails._isPartialCoverage);
+    assertEquals(cs._segmentsWithStats, 2);
+    assertEquals(cs._totalSegments, 2);
+    assertFalse(cs._isPartialCoverage);
 
     // Verify compression metrics emitted
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType("offline");
@@ -222,6 +233,34 @@ public class TableSizeReaderCompressionStatsTest {
         ControllerGauge.TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA), 10000);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
         ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT), 450);
+
+    // Verify per-column compression stats aggregation
+    // s1: col_a(raw=10000, compressed=2000), col_b(raw=20000, compressed=5000)
+    // s2: col_a(raw=15000, compressed=3000)
+    // Aggregated: col_a: raw=10000+15000=25000, compressed=2000+3000=5000
+    //             col_b: raw=20000, compressed=5000
+    assertFalse(cs._columnCompressionStats.isEmpty(), "Per-column compression stats should be present");
+    TableSizeReader.ColumnCompressionDetail colA = cs._columnCompressionStats.get("col_a");
+    assertNotNull(colA, "col_a should have compression stats");
+    assertEquals(colA._rawForwardIndexSizeBytes, 25000);
+    assertEquals(colA._compressedForwardIndexSizeBytes, 5000);
+    assertEquals(colA._compressionRatio, 5.0, 0.01);
+    assertEquals(colA._compressionCodec, "LZ4");
+
+    TableSizeReader.ColumnCompressionDetail colB = cs._columnCompressionStats.get("col_b");
+    assertNotNull(colB, "col_b should have compression stats");
+    assertEquals(colB._rawForwardIndexSizeBytes, 20000);
+    assertEquals(colB._compressedForwardIndexSizeBytes, 5000);
+    assertEquals(colB._compressionRatio, 4.0, 0.01);
+    assertEquals(colB._compressionCodec, "ZSTANDARD");
+
+    // Verify storageBreakdown is present
+    assertNotNull(offlineDetails._storageBreakdown);
+    assertFalse(offlineDetails._storageBreakdown._tiers.isEmpty());
+    TableSizeReader.TierSizeInfo defaultTier = offlineDetails._storageBreakdown._tiers.get("default");
+    assertNotNull(defaultTier, "default tier should be present");
+    assertEquals(defaultTier._count, 2, "Should have 2 segments in default tier");
+    assertTrue(defaultTier._sizePerReplicaInBytes > 0, "Tier size should be > 0");
   }
 
   @Test
@@ -235,14 +274,16 @@ public class TableSizeReaderCompressionStatsTest {
     assertNotNull(offlineDetails);
 
     // s1 and s2 have compression stats, s3 does not
-    assertEquals(offlineDetails._segmentsWithStats, 2);
-    assertEquals(offlineDetails._totalSegments, 3);
-    assertTrue(offlineDetails._isPartialCoverage);
+    TableSizeReader.CompressionStats cs = offlineDetails._compressionStats;
+    assertNotNull(cs);
+    assertEquals(cs._segmentsWithStats, 2);
+    assertEquals(cs._totalSegments, 3);
+    assertTrue(cs._isPartialCoverage);
 
     // Compression ratio still computed from segments that have stats
-    assertEquals(offlineDetails._rawForwardIndexSizePerReplicaInBytes, 45000);
-    assertEquals(offlineDetails._compressedForwardIndexSizePerReplicaInBytes, 10000);
-    assertEquals(offlineDetails._compressionRatio, 4.5, 0.01);
+    assertEquals(cs._rawForwardIndexSizePerReplicaInBytes, 45000);
+    assertEquals(cs._compressedForwardIndexSizePerReplicaInBytes, 10000);
+    assertEquals(cs._compressionRatio, 4.5, 0.01);
   }
 
   @Test
@@ -255,11 +296,38 @@ public class TableSizeReaderCompressionStatsTest {
     TableSizeReader.TableSubTypeSizeDetails offlineDetails = details._offlineSegments;
     assertNotNull(offlineDetails);
 
-    assertEquals(offlineDetails._segmentsWithStats, 0);
-    assertEquals(offlineDetails._totalSegments, 1);
-    assertFalse(offlineDetails._isPartialCoverage);
-    assertEquals(offlineDetails._rawForwardIndexSizePerReplicaInBytes, 0);
-    assertEquals(offlineDetails._compressedForwardIndexSizePerReplicaInBytes, 0);
-    assertEquals(offlineDetails._compressionRatio, 0.0, 0.01);
+    TableSizeReader.CompressionStats cs = offlineDetails._compressionStats;
+    assertNotNull(cs);
+    assertEquals(cs._segmentsWithStats, 0);
+    assertEquals(cs._totalSegments, 1);
+    // isPartialCoverage should be true: 0 segments have stats but 1 non-missing segment exists
+    assertTrue(cs._isPartialCoverage);
+    assertEquals(cs._rawForwardIndexSizePerReplicaInBytes, 0);
+    assertEquals(cs._compressedForwardIndexSizePerReplicaInBytes, 0);
+    assertEquals(cs._compressionRatio, 0.0, 0.01);
+  }
+
+  @Test
+  public void testCompressionStatsNullWhenFlagOff()
+      throws InvalidConfigException {
+    // Use servers with compression stats but with compressionStatsEnabled=false on the table config
+    String[] servers = {"server0", "server1"};
+    TableSizeReader.TableSizeDetails details = testRunner(servers, "flagOffTable");
+
+    TableSizeReader.TableSubTypeSizeDetails offlineDetails = details._offlineSegments;
+    assertNotNull(offlineDetails);
+
+    // compressionStats should be null when the flag is OFF (suppressed from JSON via @JsonInclude NON_NULL)
+    assertNull(offlineDetails._compressionStats,
+        "compressionStats should be null when compressionStatsEnabled is false");
+
+    // storageBreakdown should still be present (REQ-4.2: always reported)
+    assertNotNull(offlineDetails._storageBreakdown,
+        "storageBreakdown should still be present when compressionStatsEnabled is false");
+
+    // Verify no compression metrics were emitted for this table
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType("flagOffTable");
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+        ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT), 0);
   }
 }

@@ -328,4 +328,34 @@ public class ForwardIndexHandlerCompressionStatsTest {
     assertEquals(changedMeta.getCompressionCodec(), "LZ4",
         "Changed column should have LZ4 codec");
   }
+
+  @Test
+  public void testRawToDictClearsCompressionStats()
+      throws Exception {
+    // First, verify that the raw column has compression stats persisted
+    SegmentMetadataImpl metadataBefore = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata rawMeta = metadataBefore.getColumnMetadataFor(RAW_INT_COL);
+    assertFalse(rawMeta.hasDictionary(), "Column should start as raw");
+
+    // Convert RAW_INT_COL from raw to dictionary-encoded
+    _noDictionaryColumns.remove(RAW_INT_COL);
+    _fieldConfigMap.remove(RAW_INT_COL);
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      ForwardIndexHandler handler = new ForwardIndexHandler(segmentDirectory, createIndexLoadingConfig());
+      assertTrue(handler.needUpdateIndices(writer), "Handler should detect raw-to-dict change");
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    // Validate that compression stats metadata has been cleared
+    SegmentMetadataImpl metadataAfter = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata dictMeta = metadataAfter.getColumnMetadataFor(RAW_INT_COL);
+    assertTrue(dictMeta.hasDictionary(), "Column should now have dictionary");
+    assertNull(dictMeta.getCompressionCodec(),
+        "Compression codec should be cleared after raw-to-dict conversion");
+    assertEquals(dictMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.INDEX_NOT_FOUND,
+        "Uncompressed forward index size should be cleared after raw-to-dict conversion");
+  }
 }
