@@ -122,7 +122,6 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
@@ -256,7 +255,6 @@ public class PinotTableRestletResource {
 
       TableConfigValidationUtils.validateTableConfig(
           tableConfig, schema, typesToSkip, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
-      TableConfigValidatorRegistry.validate(tableConfig, schema);
     } catch (TableAlreadyExistsException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
@@ -362,7 +360,8 @@ public class PinotTableRestletResource {
 
       _pinotHelixResourceManager.addSchema(schema, true, false);
       LOGGER.info("[copyTable] Successfully added schema for table: {}", tableName);
-      // TODO: add TableConfigValidatorRegistry.validate() and TableConfigValidationUtils.validateTableConfig() here
+      TableConfigValidationUtils.validateTableConfig(
+          realtimeTableConfig, schema, null, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
       // Add the table with designated starting kafka offset and segment sequence number to create consuming segments
       _pinotHelixResourceManager.addTable(realtimeTableConfig, streamMetadataList);
       LOGGER.info("[copyTable] Successfully added table config: {} with designated high watermark", tableName);
@@ -795,7 +794,6 @@ public class PinotTableRestletResource {
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
       TableConfigValidationUtils.validateTableConfig(
           tableConfig, schema, typesToSkip, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
-      TableConfigValidatorRegistry.validate(tableConfig, schema);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
