@@ -363,6 +363,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public Object getDefaultNullValue() {
+    if (_dataType == DataType.UUID && _defaultNullValue instanceof byte[]) {
+      byte[] uuidDefaultNullValue = (byte[]) _defaultNullValue;
+      return Arrays.copyOf(uuidDefaultNullValue, uuidDefaultNullValue.length);
+    }
     return _defaultNullValue;
   }
 
@@ -475,7 +479,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             case BYTES:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
             case UUID:
-              return DEFAULT_DIMENSION_NULL_VALUE_OF_UUID;
+              return UuidUtils.nullUuidBytes();
             case BIG_DECIMAL:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL;
             default:

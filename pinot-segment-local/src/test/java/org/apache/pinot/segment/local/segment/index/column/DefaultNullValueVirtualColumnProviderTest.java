@@ -31,7 +31,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.UuidUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -156,8 +156,10 @@ public class DefaultNullValueVirtualColumnProviderTest {
     virtualColumnContext = new VirtualColumnContext(SV_UUID, 1);
     dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     assertEquals(dictionary.getClass(), ConstantValueBytesDictionary.class);
-    assertEquals(dictionary.getStringValue(0), UuidUtils.toString((byte[]) SV_UUID.getDefaultNullValue()));
-    assertEquals(dictionary.indexOf(UuidUtils.toString((byte[]) SV_UUID.getDefaultNullValue())), 0);
+    byte[] uuidDefaultNullValue = (byte[]) SV_UUID.getDefaultNullValue();
+    assertEquals(dictionary.getBytesValue(0), uuidDefaultNullValue);
+    assertEquals(dictionary.getStringValue(0), BytesUtils.toHexString(uuidDefaultNullValue));
+    assertEquals(dictionary.indexOf(BytesUtils.toHexString(uuidDefaultNullValue)), 0);
 
     virtualColumnContext = new VirtualColumnContext(MV_INT, 1);
     dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);

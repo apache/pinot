@@ -75,6 +75,7 @@ public final class UuidUtils {
   }
 
   public static byte[] toBytes(ByteArray uuidBytes) {
+    validateNotNull(uuidBytes, "UUID bytes");
     return toBytes(uuidBytes.getBytes());
   }
 
@@ -104,6 +105,7 @@ public final class UuidUtils {
   }
 
   public static UUID toUUID(ByteArray uuidBytes) {
+    validateNotNull(uuidBytes, "UUID");
     return toUUID(uuidBytes.getBytes());
   }
 

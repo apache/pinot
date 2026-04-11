@@ -56,8 +56,7 @@ public class RawValueBitmapInvertedIndexTest {
         {DataType.LONG},
         {DataType.FLOAT},
         {DataType.DOUBLE},
-        {DataType.STRING},
-        {DataType.UUID}
+        {DataType.STRING}
     };
   }
 

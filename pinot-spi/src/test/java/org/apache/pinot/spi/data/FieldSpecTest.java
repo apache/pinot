@@ -215,7 +215,11 @@ public class FieldSpecTest {
     Assert.assertEquals(uuidBytesFieldSpec.getDefaultNullValueString(), UUID_VALUE);
 
     FieldSpec defaultUuidFieldSpec = new DimensionFieldSpec("defaultUuidDimension", UUID, true);
-    assertThat((byte[]) defaultUuidFieldSpec.getDefaultNullValue()).isEqualTo(UuidUtils.nullUuidBytes());
+    byte[] firstDefaultNullValue = (byte[]) defaultUuidFieldSpec.getDefaultNullValue();
+    byte[] secondDefaultNullValue = (byte[]) defaultUuidFieldSpec.getDefaultNullValue();
+    assertThat(firstDefaultNullValue).isEqualTo(UuidUtils.nullUuidBytes());
+    assertThat(secondDefaultNullValue).isEqualTo(UuidUtils.nullUuidBytes());
+    Assert.assertNotSame(firstDefaultNullValue, secondDefaultNullValue);
     Assert.assertEquals(defaultUuidFieldSpec.getDefaultNullValueString(), "00000000-0000-0000-0000-000000000000");
   }
 

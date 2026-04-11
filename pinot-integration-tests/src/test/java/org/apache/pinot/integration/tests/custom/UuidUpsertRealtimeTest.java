@@ -51,6 +51,7 @@ import static org.testng.Assert.assertEquals;
  */
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTest {
+  private static final long DEDUPLICATED_RECORDS_READY_TIMEOUT_MS = 120_000L;
   private static final String TABLE_NAME = "UuidUpsertRealtimeTest";
   private static final String UUID_PK_COLUMN = "uuidPk";
   private static final String PAYLOAD_COLUMN = "payload";
@@ -133,12 +134,11 @@ public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTes
     TestUtils.waitForCondition(aVoid -> {
       try {
         return hasConsistentCount(String.format("SELECT COUNT(*) FROM %s OPTION(skipUpsert=true)", getTableName()),
-            TOTAL_RAW_RECORDS) && hasConsistentCount(String.format("SELECT COUNT(*) FROM %s", getTableName()),
-            getCountStarResult());
+            TOTAL_RAW_RECORDS);
       } catch (Exception e) {
         return null;
       }
-    }, 100L, timeoutMs, "Failed to converge raw and deduplicated UUID upsert record counts");
+    }, 100L, timeoutMs, "Failed to load raw UUID upsert records");
   }
 
   @Override
@@ -177,6 +177,7 @@ public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTes
   public void testUuidPrimaryKeyUpsertDedup(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    waitForDeduplicatedDocsLoaded(DEDUPLICATED_RECORDS_READY_TIMEOUT_MS);
 
     JsonNode response = postQuery(String.format("SELECT COUNT(*) FROM %s", getTableName()));
     assertNoExceptions(response);
@@ -206,9 +207,15 @@ public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTes
     assertEquals(response.get("exceptions").size(), 0, response.toPrettyString());
   }
 
-  private long queryCountStarWithoutUpsert() {
-    return Long.parseLong(getPinotConnection().execute(
-        String.format("SELECT COUNT(*) FROM %s OPTION(skipUpsert=true)", getTableName())).getResultSet(0).getString(0));
+  private void waitForDeduplicatedDocsLoaded(long timeoutMs)
+      throws Exception {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return hasConsistentCount(String.format("SELECT COUNT(*) FROM %s", getTableName()), getCountStarResult());
+      } catch (Exception e) {
+        return null;
+      }
+    }, 100L, timeoutMs, "Failed to converge deduplicated UUID upsert record counts");
   }
 
   private boolean hasConsistentCount(String query, long expectedCount) {

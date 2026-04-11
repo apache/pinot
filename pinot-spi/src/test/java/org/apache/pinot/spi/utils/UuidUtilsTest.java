@@ -106,12 +106,16 @@ public class UuidUtilsTest {
     IllegalArgumentException exception =
         Assert.expectThrows(IllegalArgumentException.class, () -> UuidUtils.toBytes((Object) null));
     assertEquals(exception.getMessage(), "Cannot convert null value to UUID bytes");
+    exception = Assert.expectThrows(IllegalArgumentException.class, () -> UuidUtils.toBytes((ByteArray) null));
+    assertEquals(exception.getMessage(), "Cannot convert null value to UUID bytes");
   }
 
   @Test
   public void testToUuidRejectsNull() {
     IllegalArgumentException exception =
         Assert.expectThrows(IllegalArgumentException.class, () -> UuidUtils.toUUID((Object) null));
+    assertEquals(exception.getMessage(), "Cannot convert null value to UUID");
+    exception = Assert.expectThrows(IllegalArgumentException.class, () -> UuidUtils.toUUID((ByteArray) null));
     assertEquals(exception.getMessage(), "Cannot convert null value to UUID");
   }
 
