@@ -193,7 +193,7 @@ public class TableSizeReader {
           stats._compressedForwardIndexSizePerReplicaInBytes);
       // Emit ratio * 100 to preserve two decimal digits of precision as a long gauge
       long ratioPercent = Math.round(stats._compressionRatio * 100);
-      emitMetrics(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS, ratioPercent);
+      emitMetrics(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT, ratioPercent);
     } else {
       // No segments have stats — clear any previously emitted stale metrics
       clearCompressionMetrics(tableNameWithType);
@@ -214,7 +214,7 @@ public class TableSizeReader {
       _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_RAW_FORWARD_INDEX_SIZE_PER_REPLICA);
       _controllerMetrics.removeTableGauge(tableNameWithType,
           ControllerGauge.TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA);
-      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS);
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT);
     }
   }
 
@@ -454,8 +454,12 @@ public class TableSizeReader {
               String colName = colEntry.getKey();
               ColumnCompressionStatsInfo colInfo = colEntry.getValue();
               long[] maxVals = perColumnMax.computeIfAbsent(colName, k -> new long[2]);
-              maxVals[0] = Math.max(maxVals[0], colInfo.getUncompressedSizeInBytes());
-              maxVals[1] = Math.max(maxVals[1], colInfo.getCompressedSizeInBytes());
+              if (colInfo.getUncompressedSizeInBytes() > 0) {
+                maxVals[0] = Math.max(maxVals[0], colInfo.getUncompressedSizeInBytes());
+              }
+              if (colInfo.getCompressedSizeInBytes() > 0) {
+                maxVals[1] = Math.max(maxVals[1], colInfo.getCompressedSizeInBytes());
+              }
               if (colInfo.getCodec() != null) {
                 perColumnCodec.put(colName, colInfo.getCodec());
               }
@@ -554,12 +558,12 @@ public class TableSizeReader {
     }
     subTypeSizeDetails._columnCompressionStats = columnStatsList;
 
-    // Suppress compression stats when no segments have raw forward index data (e.g. dict-only tables)
+    // Suppress table-level compression stats when no segments have raw forward index data,
+    // but keep per-column stats (dict columns may still have valid forward index size data)
     if (compressionStats._segmentsWithStats > 0) {
       subTypeSizeDetails._compressionStats = compressionStats;
     } else {
       subTypeSizeDetails._compressionStats = null;
-      subTypeSizeDetails._columnCompressionStats = null;
     }
     subTypeSizeDetails._storageBreakdown = storageBreakdown._tiers.isEmpty() ? null : storageBreakdown;
 

@@ -117,7 +117,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false),
 
   // Forward index compression ratio scaled by 100 (e.g., 4.5x ratio → 450). Divide by 100 to get actual ratio.
-  TABLE_COMPRESSION_RATIO_HUNDREDTHS("TableCompressionRatioHundredths", false),
+  TABLE_COMPRESSION_RATIO_PERCENT("TableCompressionRatioPercent", false),
 
   // Raw (uncompressed) forward index size per replica
   TABLE_RAW_FORWARD_INDEX_SIZE_PER_REPLICA("TableRawForwardIndexSizePerReplica", false),

@@ -124,39 +124,46 @@ public class TableSizeResource {
           ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
           long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
           if (detailed) {
-            long rawFwdIndexSize = 0;
-            long compressedFwdIndexSize = 0;
-            Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
-            SegmentMetadata segmentMetadata = immutableSegment.getSegmentMetadata();
-            for (ColumnMetadata colMeta : segmentMetadata.getColumnMetadataMap().values()) {
-              long uncompressed = colMeta.getUncompressedForwardIndexSizeBytes();
-              if (uncompressed > 0) {
-                rawFwdIndexSize += uncompressed;
-              }
-              long fwdIndexSize = colMeta.getIndexSizeFor(StandardIndexes.forward());
-              if (compressionStatsEnabled && fwdIndexSize > 0) {
+            if (compressionStatsEnabled) {
+              long rawFwdIndexSize = 0;
+              long compressedFwdIndexSize = 0;
+              Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
+              IndexService indexService = IndexService.getInstance();
+              SegmentMetadata segmentMetadata = immutableSegment.getSegmentMetadata();
+              for (ColumnMetadata colMeta : segmentMetadata.getColumnMetadataMap().values()) {
+                long uncompressed = colMeta.getUncompressedForwardIndexSizeBytes();
                 if (uncompressed > 0) {
-                  compressedFwdIndexSize += fwdIndexSize;
+                  rawFwdIndexSize += uncompressed;
                 }
-                double ratio = (fwdIndexSize > 0 && uncompressed > 0) ? (double) uncompressed / fwdIndexSize : 0;
-                // Collect index names for this column
-                IndexService indexService = IndexService.getInstance();
-                List<String> indexNames = new ArrayList<>();
-                for (int i = 0, n = colMeta.getNumIndexes(); i < n; i++) {
-                  indexNames.add(indexService.get(colMeta.getIndexType(i)).getId());
+                long fwdIndexSize = colMeta.getIndexSizeFor(StandardIndexes.forward());
+                if (fwdIndexSize > 0) {
+                  if (uncompressed > 0) {
+                    compressedFwdIndexSize += fwdIndexSize;
+                  }
+                  // Skip old raw segments that lack a persisted compression codec
+                  if (colMeta.getCompressionCodec() == null && !colMeta.hasDictionary()) {
+                    continue;
+                  }
+                  double ratio = (uncompressed > 0) ? (double) uncompressed / fwdIndexSize : 0;
+                  List<String> indexNames = new ArrayList<>();
+                  for (int i = 0, n = colMeta.getNumIndexes(); i < n; i++) {
+                    indexNames.add(indexService.get(colMeta.getIndexType(i)).getId());
+                  }
+                  if (columnCompressionStats == null) {
+                    columnCompressionStats = new HashMap<>();
+                  }
+                  columnCompressionStats.put(colMeta.getColumnName(),
+                      new ColumnCompressionStatsInfo(colMeta.getColumnName(),
+                          uncompressed, fwdIndexSize, ratio,
+                          colMeta.getCompressionCodec(), colMeta.hasDictionary(),
+                          indexNames.isEmpty() ? null : indexNames));
                 }
-                if (columnCompressionStats == null) {
-                  columnCompressionStats = new HashMap<>();
-                }
-                columnCompressionStats.put(colMeta.getColumnName(),
-                    new ColumnCompressionStatsInfo(colMeta.getColumnName(),
-                        uncompressed, fwdIndexSize, ratio,
-                        colMeta.getCompressionCodec(), colMeta.hasDictionary(),
-                        indexNames.isEmpty() ? null : indexNames));
               }
+              segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes,
+                  rawFwdIndexSize, compressedFwdIndexSize, immutableSegment.getTier(), columnCompressionStats));
+            } else {
+              segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes));
             }
-            segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes,
-                rawFwdIndexSize, compressedFwdIndexSize, immutableSegment.getTier(), columnCompressionStats));
           }
           tableSizeInBytes += segmentSizeBytes;
         }
