@@ -181,7 +181,7 @@ public class InvertedIndexHandler extends BaseIndexHandler {
           ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
         if (columnMetadata.isSingleValue()) {
           // Single-value column
-          switch (columnMetadata.getDataType().getStoredType()) {
+          switch (columnMetadata.getDataType()) {
             case INT:
               for (int i = 0; i < numDocs; i++) {
                 creator.add(forwardIndexReader.getInt(i, readerContext));
@@ -205,11 +205,6 @@ public class InvertedIndexHandler extends BaseIndexHandler {
             case STRING:
               for (int i = 0; i < numDocs; i++) {
                 creator.add(forwardIndexReader.getString(i, readerContext));
-              }
-              break;
-            case BYTES:
-              for (int i = 0; i < numDocs; i++) {
-                creator.add(forwardIndexReader.getBytes(i, readerContext));
               }
               break;
             default:

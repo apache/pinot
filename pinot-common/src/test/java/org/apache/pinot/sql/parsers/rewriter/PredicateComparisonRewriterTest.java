@@ -179,4 +179,66 @@ public class PredicateComparisonRewriterTest {
         CalciteSqlParser.compileToPinotQueryWithoutRewrites("SELECT * FROM mytable WHERE col1 BETWEEN col2 AND col3");
     assertThrows(SqlCompilationException.class, () -> _predicateComparisonRewriter.rewrite(betweenQuery));
   }
+
+  @Test
+  public void testUuidComparisonWithLiteralFunctionRhsIsNotRewrittenToMinus() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
+        "SELECT * FROM mytable WHERE uuidCol = CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID)");
+
+    PinotQuery rewrittenQuery = _predicateComparisonRewriter.rewrite(pinotQuery);
+    assertEquals(rewrittenQuery.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(rewrittenQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "uuidCol");
+    assertEquals(
+        rewrittenQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperator()
+            .toLowerCase(), "cast");
+  }
+
+  @Test
+  public void testUuidComparisonWithLiteralFunctionLhsIsSwapped() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
+        "SELECT * FROM mytable WHERE TO_UUID('550e8400-e29b-41d4-a716-446655440000') = uuidCol");
+
+    PinotQuery rewrittenQuery = _predicateComparisonRewriter.rewrite(pinotQuery);
+    assertEquals(rewrittenQuery.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(rewrittenQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "uuidCol");
+    String operator =
+        rewrittenQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperator()
+            .toLowerCase();
+    Assert.assertTrue(operator.equals("touuid") || operator.equals("to_uuid"), operator);
+  }
+
+  @Test
+  public void testUuidInPredicateAcceptsLiteralFunctions() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
+        "SELECT * FROM mytable WHERE uuidCol IN (CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID),"
+            + " TO_UUID('550e8400-e29b-41d4-a716-446655440001'))");
+
+    PinotQuery rewrittenQuery = _predicateComparisonRewriter.rewrite(pinotQuery);
+    assertEquals(rewrittenQuery.getFilterExpression().getFunctionCall().getOperator(), "IN");
+    assertEquals(rewrittenQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "uuidCol");
+    assertEquals(
+        rewrittenQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperator()
+            .toLowerCase(), "cast");
+    String operator =
+        rewrittenQuery.getFilterExpression().getFunctionCall().getOperands().get(2).getFunctionCall().getOperator()
+            .toLowerCase();
+    Assert.assertTrue(operator.equals("touuid") || operator.equals("to_uuid"), operator);
+  }
+
+  @Test
+  public void testUuidNotInPredicateAcceptsLiteralFunctions() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
+        "SELECT * FROM mytable WHERE uuidCol NOT IN (CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID))");
+
+    PinotQuery rewrittenQuery = _predicateComparisonRewriter.rewrite(pinotQuery);
+    assertEquals(rewrittenQuery.getFilterExpression().getFunctionCall().getOperator(), "NOT_IN");
+    assertEquals(rewrittenQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "uuidCol");
+    assertEquals(
+        rewrittenQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperator()
+            .toLowerCase(), "cast");
+  }
 }

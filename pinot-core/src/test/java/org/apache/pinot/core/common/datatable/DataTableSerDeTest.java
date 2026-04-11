@@ -368,7 +368,7 @@ public class DataTableSerDeTest {
             dataTableBuilder.setColumn(colId, new ByteArray(BYTES[rowId]));
             break;
           case UUID:
-            UUIDS[rowId] = isNull ? UuidUtils.NIL_UUID_BYTES.clone()
+            UUIDS[rowId] = isNull ? UuidUtils.nullUuidBytes()
                 : UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong()));
             dataTableBuilder.setColumn(colId, new ByteArray(UUIDS[rowId]));
             break;
@@ -511,7 +511,7 @@ public class DataTableSerDeTest {
             break;
           case UUID:
             Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(),
-                isNull ? UuidUtils.NIL_UUID_BYTES : UUIDS[rowId], ERROR_MESSAGE);
+                isNull ? UuidUtils.nullUuidBytes() : UUIDS[rowId], ERROR_MESSAGE);
             break;
           case INT_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), INT_ARRAYS[rowId]), ERROR_MESSAGE);

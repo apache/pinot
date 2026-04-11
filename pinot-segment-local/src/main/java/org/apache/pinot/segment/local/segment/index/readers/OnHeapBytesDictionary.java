@@ -29,7 +29,6 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.FALFInterner;
-import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -43,17 +42,10 @@ import org.apache.pinot.spi.utils.UuidUtils;
 public class OnHeapBytesDictionary extends BaseImmutableDictionary {
   private final Object2IntOpenHashMap<ByteArray> _valToDictId;
   private final ByteArray[] _dictIdToVal;
-  private final DataType _logicalType;
 
   public OnHeapBytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue,
       @Nullable FALFInterner<byte[]> byteInterner) {
-    this(dataBuffer, length, numBytesPerValue, byteInterner, DataType.BYTES);
-  }
-
-  public OnHeapBytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue,
-      @Nullable FALFInterner<byte[]> byteInterner, DataType logicalType) {
     super(dataBuffer, length, numBytesPerValue);
-    _logicalType = logicalType;
 
     _valToDictId = new Object2IntOpenHashMap<>(length);
     _valToDictId.defaultReturnValue(Dictionary.NULL_VALUE_INDEX);
@@ -73,7 +65,7 @@ public class OnHeapBytesDictionary extends BaseImmutableDictionary {
 
   @Override
   public int indexOf(String stringValue) {
-    return _valToDictId.getInt(new ByteArray(parseBytes(stringValue)));
+    return _valToDictId.getInt(BytesUtils.toByteArray(stringValue));
   }
 
   @Override
@@ -83,7 +75,7 @@ public class OnHeapBytesDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    ByteArray byteArray = new ByteArray(parseBytes(stringValue));
+    ByteArray byteArray = BytesUtils.toByteArray(stringValue);
     int index = _valToDictId.getInt(byteArray);
     return (index != Dictionary.NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, byteArray);
   }
@@ -125,8 +117,7 @@ public class OnHeapBytesDictionary extends BaseImmutableDictionary {
 
   @Override
   public String getStringValue(int dictId) {
-    byte[] value = _dictIdToVal[dictId].getBytes();
-    return _logicalType == DataType.UUID ? UuidUtils.toString(value) : BytesUtils.toHexString(value);
+    return BytesUtils.toHexString(_dictIdToVal[dictId].getBytes());
   }
 
   @Override
@@ -142,9 +133,5 @@ public class OnHeapBytesDictionary extends BaseImmutableDictionary {
   @Override
   public int getValueSize(int dictId) {
     return _dictIdToVal[dictId].length();
-  }
-
-  private byte[] parseBytes(String stringValue) {
-    return _logicalType == DataType.UUID ? UuidUtils.toBytes(stringValue) : BytesUtils.toBytes(stringValue);
   }
 }

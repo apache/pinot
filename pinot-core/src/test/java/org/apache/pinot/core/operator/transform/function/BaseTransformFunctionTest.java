@@ -59,6 +59,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.AfterClass;
@@ -620,8 +621,13 @@ public abstract class BaseTransformFunctionTest {
   protected void testTransformFunction(TransformFunction transformFunction, byte[][] expectedValues) {
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     byte[][] bytesValues = transformFunction.transformToBytesValuesSV(_projectionBlock);
+    FieldSpec.DataType resultDataType = transformFunction.getResultMetadata().getDataType();
     for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(bytesValues[i], BytesUtils.toBytes(stringValues[i]));
+      if (resultDataType == FieldSpec.DataType.UUID) {
+        assertEquals(bytesValues[i], UuidUtils.toBytes(stringValues[i]));
+      } else {
+        assertEquals(bytesValues[i], BytesUtils.toBytes(stringValues[i]));
+      }
       assertEquals(bytesValues[i], expectedValues[i]);
     }
     testNullBitmap(transformFunction, null);

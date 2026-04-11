@@ -24,22 +24,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
  * Extension of {@link BaseImmutableDictionary} that implements immutable dictionary for byte[] type.
  */
 public class BytesDictionary extends BaseImmutableDictionary {
-  private final DataType _logicalType;
-
   public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
-    this(dataBuffer, length, numBytesPerValue, DataType.BYTES);
-  }
-
-  public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, DataType logicalType) {
     super(dataBuffer, length, numBytesPerValue);
-    _logicalType = logicalType;
   }
 
   @Override
@@ -54,7 +46,7 @@ public class BytesDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    return binarySearch(parseBytes(stringValue));
+    return binarySearch(BytesUtils.toBytes(stringValue));
   }
 
   @Override
@@ -104,8 +96,7 @@ public class BytesDictionary extends BaseImmutableDictionary {
 
   @Override
   public String getStringValue(int dictId) {
-    byte[] value = getBytes(dictId);
-    return _logicalType == DataType.UUID ? UuidUtils.toString(value) : BytesUtils.toHexString(value);
+    return BytesUtils.toHexString(getBytes(dictId));
   }
 
   @Override
@@ -140,9 +131,5 @@ public class BytesDictionary extends BaseImmutableDictionary {
     for (int i = 0; i < length; i++) {
       outValues[i] = get128BitsMurmur3HashValue(dictIds[i], buffer);
     }
-  }
-
-  private byte[] parseBytes(String stringValue) {
-    return _logicalType == DataType.UUID ? UuidUtils.toBytes(stringValue) : BytesUtils.toBytes(stringValue);
   }
 }

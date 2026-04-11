@@ -90,7 +90,7 @@ public class RawValueBitmapInvertedIndexReader implements InvertedIndexReader<Im
         _dictionary = new StringDictionary(dictionaryBuffer, cardinality, maxLength);
         break;
       case BYTES:
-        _dictionary = new BytesDictionary(dictionaryBuffer, cardinality, maxLength, _dataType);
+        _dictionary = new BytesDictionary(dictionaryBuffer, cardinality, maxLength);
         break;
       default:
         throw new IllegalStateException("Unsupported data type: " + _dataType);

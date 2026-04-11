@@ -18,16 +18,88 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.util.UUID;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**
  * Tests for {@link UuidUtils}.
  */
 public class UuidUtilsTest {
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
+
+  @DataProvider(name = "invalidUuidStrings")
+  public Object[][] invalidUuidStrings() {
+    return new Object[][]{
+        {"550e8400-e29b-41d4-a716-44665544000"},
+        {"550e8400-e29b-41d4-a716-4466554400000"},
+        {"550e8400-e29b-41d4-a716-44665544000g"},
+        {"550e8400e29b41d4a716446655440000"},
+        {""}
+    };
+  }
+
+  @DataProvider(name = "invalidUuidBytes")
+  public Object[][] invalidUuidBytes() {
+    return new Object[][]{
+        {new byte[15]},
+        {new byte[17]}
+    };
+  }
+
+  @Test
+  public void testMixedCaseUuidStringRoundTrips() {
+    String mixedCaseUuid = "550E8400-E29B-41D4-A716-446655440000";
+    byte[] bytes = UuidUtils.toBytes(mixedCaseUuid);
+
+    assertEquals(UuidUtils.toString(bytes), UUID_VALUE);
+    assertEquals(UuidUtils.toUUID(mixedCaseUuid), UUID.fromString(UUID_VALUE));
+  }
+
+  @Test
+  public void testCharSequenceRoundTrips() {
+    CharSequence mixedCaseUuid = new StringBuilder("550E8400-E29B-41D4-A716-446655440000");
+
+    assertEquals(UuidUtils.toBytes(mixedCaseUuid), UuidUtils.toBytes(UUID_VALUE));
+    assertEquals(UuidUtils.toUUID(mixedCaseUuid), UUID.fromString(UUID_VALUE));
+    assertTrue(UuidUtils.isUuid(mixedCaseUuid));
+  }
+
+  @Test(dataProvider = "invalidUuidStrings")
+  public void testRejectsInvalidUuidStrings(String invalidUuid) {
+    Assert.expectThrows(IllegalArgumentException.class, () -> UuidUtils.toBytes(invalidUuid));
+    Assert.expectThrows(IllegalArgumentException.class, () -> UuidUtils.toUUID(invalidUuid));
+    assertFalse(UuidUtils.isUuid(invalidUuid));
+  }
+
+  @Test(dataProvider = "invalidUuidBytes")
+  public void testRejectsInvalidUuidBytes(byte[] invalidBytes) {
+    Assert.expectThrows(IllegalArgumentException.class, () -> UuidUtils.toBytes(invalidBytes));
+    Assert.expectThrows(IllegalArgumentException.class, () -> UuidUtils.toUUID(invalidBytes));
+    assertFalse(UuidUtils.isUuid(invalidBytes));
+  }
+
+  @Test
+  public void testIsUuidAcceptsValidStringAndBytes() {
+    byte[] uuidBytes = UuidUtils.toBytes(UUID_VALUE);
+
+    assertTrue(UuidUtils.isUuid(UUID_VALUE));
+    assertTrue(UuidUtils.isUuid(uuidBytes));
+    assertTrue(UuidUtils.isUuid(new ByteArray(uuidBytes)));
+  }
+
+  @Test
+  public void testIsUuidRejectsNull() {
+    assertFalse(UuidUtils.isUuid((String) null));
+    assertFalse(UuidUtils.isUuid((byte[]) null));
+    assertFalse(UuidUtils.isUuid((Object) null));
+  }
 
   @Test
   public void testToBytesRejectsNull() {
@@ -41,5 +113,15 @@ public class UuidUtilsTest {
     IllegalArgumentException exception =
         Assert.expectThrows(IllegalArgumentException.class, () -> UuidUtils.toUUID((Object) null));
     assertEquals(exception.getMessage(), "Cannot convert null value to UUID");
+  }
+
+  @Test
+  public void testNullUuidBytesReturnsDefensiveCopy() {
+    byte[] first = UuidUtils.nullUuidBytes();
+    byte[] second = UuidUtils.nullUuidBytes();
+
+    first[0] = 1;
+    assertEquals(second, new byte[UuidUtils.UUID_NUM_BYTES]);
+    assertEquals(UuidUtils.nilUuidBytes(), new byte[UuidUtils.UUID_NUM_BYTES]);
   }
 }

@@ -175,7 +175,8 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testCastTransformFunctionUUID() {
-    ExpressionContext expression = RequestContextUtils.getExpression(String.format("CAST('%s' AS UUID)", UUID_VALUE));
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("CAST('%s' AS UUID)", UUID_VALUE.toUpperCase()));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof CastTransformFunction);
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.UUID);
@@ -187,6 +188,35 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
       Assert.assertEquals(bytesValues[i], expectedBytes);
       Assert.assertEquals(stringValues[i], UUID_VALUE);
     }
+  }
+
+  @Test
+  public void testCastTransformFunctionUuidRoundTrips() {
+    String bytesHex = org.apache.pinot.spi.utils.BytesUtils.toHexString(UuidUtils.toBytes(UUID_VALUE));
+
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("CAST(CAST('%s' AS BYTES) AS UUID)", bytesHex));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    byte[] expectedBytes = UuidUtils.toBytes(UUID_VALUE);
+    byte[][] expectedUuidValues = new byte[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedUuidValues[i] = expectedBytes;
+    }
+    testTransformFunction(transformFunction, expectedUuidValues);
+
+    expression = RequestContextUtils.getExpression(String.format("CAST(CAST('%s' AS UUID) AS STRING)", UUID_VALUE));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    String[] expectedStringValues = new String[NUM_ROWS];
+    Arrays.fill(expectedStringValues, UUID_VALUE);
+    testTransformFunction(transformFunction, expectedStringValues);
+
+    expression = RequestContextUtils.getExpression(String.format("CAST(CAST('%s' AS UUID) AS BYTES)", UUID_VALUE));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    byte[][] expectedBytesValues = new byte[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBytesValues[i] = expectedBytes;
+    }
+    testTransformFunction(transformFunction, expectedBytesValues);
   }
 
   @Test
@@ -286,6 +316,17 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
         () -> transformFunction.transformToBytesValuesSV(_projectionBlock));
     Assert.assertTrue(exception.getMessage().contains("Invalid UUID"));
+  }
+
+  @Test
+  public void testCastTransformFunctionUUIDRejectsInvalidBytesLiteral() {
+    ExpressionContext expression = RequestContextUtils.getExpression("CAST(CAST('0011' AS BYTES) AS UUID)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+
+    IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
+        () -> transformFunction.transformToBytesValuesSV(_projectionBlock));
+    Assert.assertTrue(exception.getMessage().contains("Invalid UUID byte length"));
   }
 
   @Test

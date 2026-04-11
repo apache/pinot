@@ -46,6 +46,7 @@ import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,7 +114,6 @@ public class BloomFilterHandler extends BaseIndexHandler {
   private void createAndSealBloomFilterForDictionaryColumn(File indexDir, ColumnMetadata columnMetadata,
       BloomFilterConfig bloomFilterConfig, SegmentDirectory.Writer segmentWriter)
       throws Exception {
-    DataType dataType = columnMetadata.getDataType();
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
@@ -126,7 +126,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
         Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
       int length = dictionary.length();
       for (int i = 0; i < length; i++) {
-        bloomFilterCreator.add(dataType.toString(dictionary.getInternal(i)));
+        bloomFilterCreator.add(dictionary.getStringValue(i));
       }
       bloomFilterCreator.seal();
     }
@@ -144,7 +144,6 @@ public class BloomFilterHandler extends BaseIndexHandler {
             && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-    DataType dataType = columnMetadata.getDataType();
     try (BloomFilterCreator bloomFilterCreator = StandardIndexes.bloomFilter()
         .createIndexCreator(context, bloomFilterConfig);
         ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
@@ -152,7 +151,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
       if (columnMetadata.isSingleValue()) {
         // SV
-        switch (dataType.getStoredType()) {
+        switch (columnMetadata.getDataType()) {
           case INT:
             for (int i = 0; i < numDocs; i++) {
               bloomFilterCreator.add(Integer.toString(forwardIndexReader.getInt(i, readerContext)));
@@ -180,17 +179,17 @@ public class BloomFilterHandler extends BaseIndexHandler {
             break;
           case BYTES:
             for (int i = 0; i < numDocs; i++) {
-              bloomFilterCreator.add(dataType.toString(forwardIndexReader.getBytes(i, readerContext)));
+              bloomFilterCreator.add(BytesUtils.toHexString(forwardIndexReader.getBytes(i, readerContext)));
             }
             break;
           default:
-            throw new IllegalStateException("Unsupported data type: " + dataType + " for column: "
+            throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType() + " for column: "
                 + columnMetadata.getColumnName());
         }
         bloomFilterCreator.seal();
       } else {
         // MV
-        switch (dataType.getStoredType()) {
+        switch (columnMetadata.getDataType()) {
           case INT:
             for (int i = 0; i < numDocs; i++) {
               int[] buffer = new int[columnMetadata.getMaxNumberOfMultiValues()];
@@ -241,12 +240,12 @@ public class BloomFilterHandler extends BaseIndexHandler {
               byte[][] buffer = new byte[columnMetadata.getMaxNumberOfMultiValues()][];
               int length = forwardIndexReader.getBytesMV(i, buffer, readerContext);
               for (int j = 0; j < length; j++) {
-                bloomFilterCreator.add(dataType.toString(buffer[j]));
+                bloomFilterCreator.add(BytesUtils.toHexString(buffer[j]));
               }
             }
             break;
           default:
-            throw new IllegalStateException("Unsupported data type: " + dataType + " for column: "
+            throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType() + " for column: "
                 + columnMetadata.getColumnName());
         }
         bloomFilterCreator.seal();
@@ -301,7 +300,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
       throws IOException {
     DataType dataType = columnMetadata.getDataType();
 
-    switch (dataType.getStoredType()) {
+    switch (dataType) {
       case INT:
       case LONG:
       case FLOAT:

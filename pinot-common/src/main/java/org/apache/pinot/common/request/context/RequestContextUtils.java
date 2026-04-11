@@ -22,7 +22,9 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import org.apache.commons.lang3.EnumUtils;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -44,6 +46,8 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -131,7 +135,19 @@ public class RequestContextUtils {
       case LITERAL:
         return FilterContext.forConstant(new LiteralContext(thriftExpression.getLiteral()).getBooleanValue());
       default:
-        throw new IllegalStateException();
+      throw new IllegalStateException();
+    }
+  }
+
+  /**
+   * Returns {@code true} when the expression can be reduced to a literal value without accessing columns.
+   */
+  public static boolean canEvaluateLiteral(Expression thriftExpression) {
+    try {
+      evaluateLiteralValue(thriftExpression);
+      return true;
+    } catch (RuntimeException e) {
+      return false;
     }
   }
 
@@ -516,22 +532,109 @@ public class RequestContextUtils {
 
   private static <T> EvaluatedLiteralValue evaluateFunctionLiteral(String functionName, List<T> operands,
       java.util.function.Function<T, EvaluatedLiteralValue> evaluator) {
-    if (!functionName.equalsIgnoreCase("cast")) {
-      throw new BadQueryRequestException(UNSUPPORTED_RHS_MESSAGE);
+    String canonicalName = FunctionRegistry.canonicalize(functionName);
+    switch (canonicalName) {
+      case "cast": {
+        validateFunctionArity("CAST", operands, 2);
+        EvaluatedLiteralValue source = evaluator.apply(operands.get(0));
+        EvaluatedLiteralValue target = evaluator.apply(operands.get(1));
+        return evaluateCastLiteral(source, getCastTargetType(target.getStringValue()));
+      }
+      case "touuid":
+        validateFunctionArity("TO_UUID", operands, 1);
+        return evaluateToUuidLiteral(evaluator.apply(operands.get(0)));
+      case "uuidtobytes":
+        validateFunctionArity("UUID_TO_BYTES", operands, 1);
+        return evaluateUuidToBytesLiteral(evaluator.apply(operands.get(0)));
+      case "bytestouuid":
+        validateFunctionArity("BYTES_TO_UUID", operands, 1);
+        return evaluateBytesToUuidLiteral(evaluator.apply(operands.get(0)));
+      case "uuidtostring":
+        validateFunctionArity("UUID_TO_STRING", operands, 1);
+        return evaluateUuidToStringLiteral(evaluator.apply(operands.get(0)));
+      case "isuuid":
+        validateFunctionArity("IS_UUID", operands, 1);
+        return evaluateIsUuidLiteral(evaluator.apply(operands.get(0)));
+      default:
+        throw new BadQueryRequestException(UNSUPPORTED_RHS_MESSAGE);
     }
-    Preconditions.checkState(operands.size() == 2, "CAST function must have exactly 2 operands");
-    EvaluatedLiteralValue source = evaluator.apply(operands.get(0));
-    EvaluatedLiteralValue target = evaluator.apply(operands.get(1));
-    DataType targetType = getCastTargetType(target.getStringValue());
+  }
+
+  private static EvaluatedLiteralValue evaluateCastLiteral(EvaluatedLiteralValue source, DataType targetType) {
     if (source.getType() == DataType.UNKNOWN) {
       return new EvaluatedLiteralValue(source.getStringValue(), targetType);
     }
+
+    if (targetType == DataType.UUID) {
+      return new EvaluatedLiteralValue(convertToCanonicalUuidString(source), DataType.UUID);
+    }
+    if (targetType == DataType.STRING && source.getType() == DataType.UUID) {
+      return new EvaluatedLiteralValue(convertToCanonicalUuidString(source), DataType.STRING);
+    }
+    if (targetType == DataType.BYTES && source.getType() == DataType.UUID) {
+      return new EvaluatedLiteralValue(BytesUtils.toHexString(UuidUtils.toBytes(convertToCanonicalUuidString(source))),
+          DataType.BYTES);
+    }
+
     Object converted = targetType.convert(source.getStringValue());
     return new EvaluatedLiteralValue(targetType.toString(converted), targetType);
   }
 
+  private static EvaluatedLiteralValue evaluateToUuidLiteral(EvaluatedLiteralValue source) {
+    return new EvaluatedLiteralValue(convertToCanonicalUuidString(source), DataType.UUID);
+  }
+
+  private static EvaluatedLiteralValue evaluateUuidToBytesLiteral(EvaluatedLiteralValue source) {
+    Preconditions.checkArgument(source.getType() == DataType.UUID, "UUID_TO_BYTES requires a UUID operand");
+    return new EvaluatedLiteralValue(BytesUtils.toHexString(UuidUtils.toBytes(source.getStringValue())),
+        DataType.BYTES);
+  }
+
+  private static EvaluatedLiteralValue evaluateBytesToUuidLiteral(EvaluatedLiteralValue source) {
+    Preconditions.checkArgument(source.getType() == DataType.BYTES, "BYTES_TO_UUID requires a BYTES operand");
+    return new EvaluatedLiteralValue(convertToCanonicalUuidString(source), DataType.UUID);
+  }
+
+  private static EvaluatedLiteralValue evaluateUuidToStringLiteral(EvaluatedLiteralValue source) {
+    Preconditions.checkArgument(source.getType() == DataType.UUID, "UUID_TO_STRING requires a UUID operand");
+    return new EvaluatedLiteralValue(convertToCanonicalUuidString(source), DataType.STRING);
+  }
+
+  private static EvaluatedLiteralValue evaluateIsUuidLiteral(EvaluatedLiteralValue source) {
+    boolean isUuid;
+    switch (source.getType()) {
+      case STRING:
+        isUuid = UuidUtils.isUuid(source.getStringValue());
+        break;
+      case BYTES:
+        isUuid = UuidUtils.isUuid(BytesUtils.toBytes(source.getStringValue()));
+        break;
+      case UUID:
+        isUuid = true;
+        break;
+      case UNKNOWN:
+        isUuid = false;
+        break;
+      default:
+        throw new IllegalArgumentException("IS_UUID only supports STRING, BYTES, or UUID operands");
+    }
+    return new EvaluatedLiteralValue(Boolean.toString(isUuid), DataType.BOOLEAN);
+  }
+
+  private static String convertToCanonicalUuidString(EvaluatedLiteralValue source) {
+    switch (source.getType()) {
+      case STRING:
+      case UUID:
+        return UuidUtils.toString(UuidUtils.toBytes(source.getStringValue()));
+      case BYTES:
+        return UuidUtils.toString(BytesUtils.toBytes(source.getStringValue()));
+      default:
+        throw new IllegalArgumentException("Cannot convert " + source.getType() + " literal to UUID");
+    }
+  }
+
   private static DataType getCastTargetType(String targetTypeString) {
-    switch (targetTypeString.toUpperCase()) {
+    switch (targetTypeString.toUpperCase(Locale.ROOT)) {
       case "INT":
       case "INTEGER":
         return DataType.INT;
@@ -563,6 +666,13 @@ public class RequestContextUtils {
         return DataType.UUID;
       default:
         throw new BadQueryRequestException("Unable to cast expression to type - " + targetTypeString);
+    }
+  }
+
+  private static void validateFunctionArity(String functionName, List<?> operands, int expectedArity) {
+    if (operands.size() != expectedArity) {
+      throw new BadQueryRequestException(functionName + " function must have exactly " + expectedArity + " operand"
+          + (expectedArity == 1 ? "" : "s"));
     }
   }
 

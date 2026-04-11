@@ -207,8 +207,10 @@ public class PinotDataTypeTest {
   public void testUUID() {
     java.util.UUID uuid = java.util.UUID.fromString(UUID_VALUE);
     byte[] uuidBytes = UuidUtils.toBytes(UUID_VALUE);
+    String mixedCaseUuid = UUID_VALUE.toUpperCase();
 
     assertEquals(UUID.convert(UUID_VALUE, STRING), uuid);
+    assertEquals(UUID.convert(mixedCaseUuid, STRING), uuid);
     assertEquals(UUID.convert(uuid, UUID), uuid);
     assertEquals(UUID.convert(uuidBytes, BYTES), uuid);
     assertEquals(STRING.convert(uuid, UUID), UUID_VALUE);

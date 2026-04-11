@@ -171,6 +171,9 @@ public class LiteralContext {
         return PinotDataType.BIG_DECIMAL;
       case STRING:
         return singleValue ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
+      case UUID:
+        Preconditions.checkState(singleValue, "UUID array is not supported");
+        return PinotDataType.UUID;
       default:
         throw new IllegalStateException("Unsupported DataType: " + type);
     }

@@ -31,13 +31,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.UuidUtils;
 
 
 @SuppressWarnings("Duplicates")
 public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   private final MutableOffHeapByteArrayStore _byteStore;
-  private final DataType _logicalType;
 
   private volatile byte[] _min = null;
   private volatile byte[] _max = null;
@@ -53,14 +51,8 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
    */
   public BytesOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
       PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgLength) {
-    this(estimatedCardinality, maxOverflowHashSize, memoryManager, allocationContext, avgLength, DataType.BYTES);
-  }
-
-  public BytesOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
-      PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgLength, DataType logicalType) {
     super(estimatedCardinality, maxOverflowHashSize, memoryManager, allocationContext);
     _byteStore = new MutableOffHeapByteArrayStore(memoryManager, allocationContext, estimatedCardinality, avgLength);
-    _logicalType = logicalType;
   }
 
   @Override
@@ -91,7 +83,7 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
     int lowerCompareThreshold = includeLower ? 0 : 1;
     int upperCompareThreshold = includeUpper ? 0 : -1;
     if (lower.equals(RangePredicate.UNBOUNDED)) {
-      byte[] upperValue = parseBytes(upper);
+      byte[] upperValue = BytesUtils.toBytes(upper);
       for (int dictId = 0; dictId < numValues; dictId++) {
         byte[] value = getBytesValue(dictId);
         if (ByteArray.compare(value, upperValue) <= upperCompareThreshold) {
@@ -99,7 +91,7 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
         }
       }
     } else if (upper.equals(RangePredicate.UNBOUNDED)) {
-      byte[] lowerValue = parseBytes(lower);
+      byte[] lowerValue = BytesUtils.toBytes(lower);
       for (int dictId = 0; dictId < numValues; dictId++) {
         byte[] value = getBytesValue(dictId);
         if (ByteArray.compare(value, lowerValue) >= lowerCompareThreshold) {
@@ -107,8 +99,8 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
         }
       }
     } else {
-      byte[] lowerValue = parseBytes(lower);
-      byte[] upperValue = parseBytes(upper);
+      byte[] lowerValue = BytesUtils.toBytes(lower);
+      byte[] upperValue = BytesUtils.toBytes(upper);
       for (int dictId = 0; dictId < numValues; dictId++) {
         byte[] value = getBytesValue(dictId);
         if (ByteArray.compare(value, lowerValue) >= lowerCompareThreshold
@@ -150,7 +142,7 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
   @Override
   public int indexOf(String stringValue) {
-    byte[] bytesValue = parseBytes(stringValue);
+    byte[] bytesValue = BytesUtils.toBytes(stringValue);
     return getDictId(new ByteArray(bytesValue), bytesValue);
   }
 
@@ -196,8 +188,7 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
   @Override
   public String getStringValue(int dictId) {
-    byte[] value = getBytesValue(dictId);
-    return _logicalType == DataType.UUID ? UuidUtils.toString(value) : BytesUtils.toHexString(value);
+    return BytesUtils.toHexString(getBytesValue(dictId));
   }
 
   @Override
@@ -248,9 +239,5 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
         _max = value;
       }
     }
-  }
-
-  private byte[] parseBytes(String stringValue) {
-    return _logicalType == DataType.UUID ? UuidUtils.toBytes(stringValue) : BytesUtils.toBytes(stringValue);
   }
 }

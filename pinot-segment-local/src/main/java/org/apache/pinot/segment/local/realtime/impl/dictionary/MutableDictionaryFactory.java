@@ -27,13 +27,12 @@ public class MutableDictionaryFactory {
   private MutableDictionaryFactory() {
   }
 
-  public static MutableDictionary getMutableDictionary(DataType dataType, boolean isOffHeapAllocation,
+  public static MutableDictionary getMutableDictionary(DataType valueType, boolean isOffHeapAllocation,
       PinotDataBufferMemoryManager memoryManager, int avgLength, int cardinality, String allocationContext) {
-    DataType storedType = dataType.getStoredType();
     if (isOffHeapAllocation) {
       // OnHeap allocation
       int maxOverflowSize = cardinality / 10;
-      switch (storedType) {
+      switch (valueType) {
         case INT:
           return new IntOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext);
         case LONG:
@@ -50,13 +49,13 @@ public class MutableDictionaryFactory {
               avgLength);
         case BYTES:
           return new BytesOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext,
-              avgLength, dataType);
+              avgLength);
         default:
           throw new UnsupportedOperationException();
       }
     } else {
       // OnHeap allocation
-      switch (storedType) {
+      switch (valueType) {
         case INT:
           return new IntOnHeapMutableDictionary();
         case LONG:
@@ -70,7 +69,7 @@ public class MutableDictionaryFactory {
         case STRING:
           return new StringOnHeapMutableDictionary();
         case BYTES:
-          return new BytesOnHeapMutableDictionary(dataType);
+          return new BytesOnHeapMutableDictionary();
         default:
           throw new UnsupportedOperationException();
       }

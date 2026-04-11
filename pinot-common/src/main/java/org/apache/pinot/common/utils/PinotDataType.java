@@ -653,7 +653,7 @@ public enum PinotDataType {
 
     @Override
     public UUID toUUID(Object value) {
-      return UuidUtils.toUUID(value.toString().trim());
+      return UuidUtils.toUUID(value.toString());
     }
 
     @Override

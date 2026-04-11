@@ -215,7 +215,7 @@ public class FieldSpecTest {
     Assert.assertEquals(uuidBytesFieldSpec.getDefaultNullValueString(), UUID_VALUE);
 
     FieldSpec defaultUuidFieldSpec = new DimensionFieldSpec("defaultUuidDimension", UUID, true);
-    assertThat((byte[]) defaultUuidFieldSpec.getDefaultNullValue()).isEqualTo(UuidUtils.NIL_UUID_BYTES);
+    assertThat((byte[]) defaultUuidFieldSpec.getDefaultNullValue()).isEqualTo(UuidUtils.nullUuidBytes());
     Assert.assertEquals(defaultUuidFieldSpec.getDefaultNullValueString(), "00000000-0000-0000-0000-000000000000");
   }
 
@@ -223,10 +223,13 @@ public class FieldSpecTest {
   public void testUUIDConversions() {
     byte[] uuidBytes = UuidUtils.toBytes(UUID_VALUE);
     byte[] largerUuidBytes = UuidUtils.toBytes(LARGER_UUID_VALUE);
+    String mixedCaseUuidValue = UUID_VALUE.toUpperCase();
     ByteArray uuidInternal = new ByteArray(uuidBytes);
 
     assertThat((byte[]) UUID.convert(UUID_VALUE)).isEqualTo(uuidBytes);
+    assertThat((byte[]) UUID.convert(mixedCaseUuidValue)).isEqualTo(uuidBytes);
     Assert.assertEquals(UUID.convertInternal(UUID_VALUE), uuidInternal);
+    Assert.assertEquals(UUID.convertInternal(mixedCaseUuidValue), uuidInternal);
     Assert.assertEquals(UUID.toString(uuidBytes), UUID_VALUE);
     Assert.assertEquals(UUID.toString(uuidInternal), UUID_VALUE);
     Assert.assertTrue(UUID.equals(uuidBytes, uuidInternal));

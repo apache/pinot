@@ -24,7 +24,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -32,16 +31,10 @@ import org.apache.pinot.spi.utils.UuidUtils;
  */
 public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
   private final byte[] _value;
-  private final DataType _logicalType;
 
   public ConstantValueBytesDictionary(byte[] value) {
-    this(value, DataType.BYTES);
-  }
-
-  public ConstantValueBytesDictionary(byte[] value, DataType logicalType) {
     super(1);
     _value = value;
-    _logicalType = logicalType;
   }
 
   @Override
@@ -51,7 +44,7 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
 
   @Override
   public int indexOf(String stringValue) {
-    return Arrays.equals(parseBytes(stringValue), _value) ? 0 : NULL_VALUE_INDEX;
+    return Arrays.equals(BytesUtils.toBytes(stringValue), _value) ? 0 : NULL_VALUE_INDEX;
   }
 
   @Override
@@ -61,7 +54,7 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    int result = ByteArray.compare(parseBytes(stringValue), _value);
+    int result = ByteArray.compare(BytesUtils.toBytes(stringValue), _value);
     if (result < 0) {
       return -1;
     }
@@ -123,7 +116,7 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
 
   @Override
   public String getStringValue(int dictId) {
-    return _logicalType == DataType.UUID ? UuidUtils.toString(_value) : BytesUtils.toHexString(_value);
+    return BytesUtils.toHexString(_value);
   }
 
   @Override
@@ -134,9 +127,5 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
   @Override
   public int getValueSize(int dictId) {
     return _value.length;
-  }
-
-  private byte[] parseBytes(String stringValue) {
-    return _logicalType == DataType.UUID ? UuidUtils.toBytes(stringValue) : BytesUtils.toBytes(stringValue);
   }
 }

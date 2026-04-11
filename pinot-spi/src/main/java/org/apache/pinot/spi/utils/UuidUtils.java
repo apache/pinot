@@ -31,12 +31,22 @@ import java.util.UUID;
  */
 public final class UuidUtils {
   public static final int UUID_NUM_BYTES = 16;
-  public static final byte[] NIL_UUID_BYTES = new byte[UUID_NUM_BYTES];
+  private static final byte[] NULL_UUID_BYTES = new byte[UUID_NUM_BYTES];
 
   private UuidUtils() {
   }
 
+  public static byte[] nullUuidBytes() {
+    return Arrays.copyOf(NULL_UUID_BYTES, UUID_NUM_BYTES);
+  }
+
+  @Deprecated
+  public static byte[] nilUuidBytes() {
+    return nullUuidBytes();
+  }
+
   public static byte[] toBytes(UUID uuid) {
+    validateNotNull(uuid, "UUID bytes");
     ByteBuffer byteBuffer = ByteBuffer.wrap(new byte[UUID_NUM_BYTES]);
     byteBuffer.putLong(uuid.getMostSignificantBits());
     byteBuffer.putLong(uuid.getLeastSignificantBits());
@@ -51,14 +61,15 @@ public final class UuidUtils {
       throw new IllegalArgumentException("Invalid UUID value: '" + uuidString + "'", e);
     }
     String canonical = uuid.toString();
-    if (!canonical.equals(uuidString)) {
+    if (!canonical.equalsIgnoreCase(uuidString)) {
       throw new IllegalArgumentException(
-          "Invalid UUID value: '" + uuidString + "'. Expected canonical lowercase RFC 4122 format");
+          "Invalid UUID value: '" + uuidString + "'. Expected RFC 4122 format: " + canonical);
     }
     return toBytes(uuid);
   }
 
   public static byte[] toBytes(byte[] uuidBytes) {
+    validateNotNull(uuidBytes, "UUID bytes");
     validateLength(uuidBytes);
     return Arrays.copyOf(uuidBytes, uuidBytes.length);
   }
@@ -78,14 +89,15 @@ public final class UuidUtils {
     if (value instanceof ByteArray) {
       return toBytes((ByteArray) value);
     }
-    if (value instanceof String) {
-      return toBytes((String) value);
+    if (value instanceof CharSequence) {
+      return toBytes(value.toString());
     }
     throw new IllegalArgumentException(
         "Cannot convert value: '" + value + "' to UUID bytes, unsupported type: " + value.getClass());
   }
 
   public static UUID toUUID(byte[] uuidBytes) {
+    validateNotNull(uuidBytes, "UUID");
     validateLength(uuidBytes);
     ByteBuffer byteBuffer = ByteBuffer.wrap(uuidBytes);
     return new UUID(byteBuffer.getLong(), byteBuffer.getLong());
@@ -110,8 +122,8 @@ public final class UuidUtils {
     if (value instanceof ByteArray) {
       return toUUID((ByteArray) value);
     }
-    if (value instanceof String) {
-      return toUUID((String) value);
+    if (value instanceof CharSequence) {
+      return toUUID(value.toString());
     }
     throw new IllegalArgumentException(
         "Cannot convert value: '" + value + "' to UUID, unsupported type: " + value.getClass());
@@ -127,6 +139,53 @@ public final class UuidUtils {
 
   public static String toString(UUID uuid) {
     return uuid.toString();
+  }
+
+  public static boolean isUuid(String uuidString) {
+    if (uuidString == null) {
+      return false;
+    }
+    try {
+      toBytes(uuidString);
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  public static boolean isUuid(byte[] uuidBytes) {
+    if (uuidBytes == null) {
+      return false;
+    }
+    try {
+      validateLength(uuidBytes);
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  public static boolean isUuid(ByteArray uuidBytes) {
+    return uuidBytes != null && isUuid(uuidBytes.getBytes());
+  }
+
+  public static boolean isUuid(Object value) {
+    if (value == null) {
+      return false;
+    }
+    if (value instanceof UUID) {
+      return true;
+    }
+    if (value instanceof byte[]) {
+      return isUuid((byte[]) value);
+    }
+    if (value instanceof ByteArray) {
+      return isUuid((ByteArray) value);
+    }
+    if (value instanceof CharSequence) {
+      return isUuid(value.toString());
+    }
+    return false;
   }
 
   private static void validateLength(byte[] uuidBytes) {
