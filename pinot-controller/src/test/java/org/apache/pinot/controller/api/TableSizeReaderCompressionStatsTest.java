@@ -115,11 +115,11 @@ public class TableSizeReaderCompressionStatsTest {
 
     // server0: segment s1 and s2 with compression stats
     Map<String, ColumnCompressionStatsInfo> s1ColStats = new HashMap<>();
-    s1ColStats.put("col_a", new ColumnCompressionStatsInfo(10000, 2000, "LZ4"));
-    s1ColStats.put("col_b", new ColumnCompressionStatsInfo(20000, 5000, "ZSTANDARD"));
+    s1ColStats.put("col_a", new ColumnCompressionStatsInfo("col_a", 10000, 2000, 5.0, "LZ4", false, null));
+    s1ColStats.put("col_b", new ColumnCompressionStatsInfo("col_b", 20000, 5000, 4.0, "ZSTANDARD", false, null));
 
     Map<String, ColumnCompressionStatsInfo> s2ColStats = new HashMap<>();
-    s2ColStats.put("col_a", new ColumnCompressionStatsInfo(15000, 3000, "LZ4"));
+    s2ColStats.put("col_a", new ColumnCompressionStatsInfo("col_a", 15000, 3000, 5.0, "LZ4", false, null));
 
     List<SegmentSizeInfo> server0Sizes = Arrays.asList(
         new SegmentSizeInfo("s1", 50000, 30000, 7000, "default", s1ColStats),

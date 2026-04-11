@@ -20,39 +20,74 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import javax.annotation.Nullable;
 
 
 /**
- * Per-column forward index compression statistics for a segment.
+ * Per-column forward index compression statistics.
+ *
+ * <p>Contains the column name, uncompressed and compressed sizes, compression ratio, codec,
+ * whether the column has a dictionary, and the list of indexes present on the column.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ColumnCompressionStatsInfo {
-  private final long _rawForwardIndexSizeBytes;
-  private final long _compressedForwardIndexSizeBytes;
-  private final String _compressionCodec;
+  private final String _column;
+  private final long _uncompressedSizeInBytes;
+  private final long _compressedSizeInBytes;
+  private final double _compressionRatio;
+  private final String _codec;
+  private final boolean _hasDictionary;
+  private final List<String> _indexes;
 
   @JsonCreator
   public ColumnCompressionStatsInfo(
-      @JsonProperty("rawForwardIndexSizeBytes") long rawForwardIndexSizeBytes,
-      @JsonProperty("compressedForwardIndexSizeBytes") long compressedForwardIndexSizeBytes,
-      @JsonProperty("compressionCodec") @Nullable String compressionCodec) {
-    _rawForwardIndexSizeBytes = rawForwardIndexSizeBytes;
-    _compressedForwardIndexSizeBytes = compressedForwardIndexSizeBytes;
-    _compressionCodec = compressionCodec;
+      @JsonProperty("column") String column,
+      @JsonProperty("uncompressedSizeInBytes") long uncompressedSizeInBytes,
+      @JsonProperty("compressedSizeInBytes") long compressedSizeInBytes,
+      @JsonProperty("compressionRatio") double compressionRatio,
+      @JsonProperty("codec") @Nullable String codec,
+      @JsonProperty("hasDictionary") boolean hasDictionary,
+      @JsonProperty("indexes") @Nullable List<String> indexes) {
+    _column = column;
+    _uncompressedSizeInBytes = uncompressedSizeInBytes;
+    _compressedSizeInBytes = compressedSizeInBytes;
+    _compressionRatio = compressionRatio;
+    _codec = codec;
+    _hasDictionary = hasDictionary;
+    _indexes = indexes;
   }
 
-  public long getRawForwardIndexSizeBytes() {
-    return _rawForwardIndexSizeBytes;
+  public String getColumn() {
+    return _column;
   }
 
-  public long getCompressedForwardIndexSizeBytes() {
-    return _compressedForwardIndexSizeBytes;
+  public long getUncompressedSizeInBytes() {
+    return _uncompressedSizeInBytes;
+  }
+
+  public long getCompressedSizeInBytes() {
+    return _compressedSizeInBytes;
+  }
+
+  public double getCompressionRatio() {
+    return _compressionRatio;
   }
 
   @Nullable
-  public String getCompressionCodec() {
-    return _compressionCodec;
+  public String getCodec() {
+    return _codec;
+  }
+
+  public boolean isHasDictionary() {
+    return _hasDictionary;
+  }
+
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public List<String> getIndexes() {
+    return _indexes;
   }
 }

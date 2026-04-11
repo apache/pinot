@@ -121,8 +121,11 @@ public class ServerSegmentMetadataReader {
     final Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     final Map<String, Map<String, Double>> columnIndexSizeMap = new HashMap<>();
     final Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
+    // Per-column compression stats accumulators: [0]=uncompressed, [1]=compressed
     final Map<String, long[]> columnCompressionAccum = new HashMap<>();
     final Map<String, String> columnCodecMap = new HashMap<>();
+    final Map<String, Boolean> columnHasDictMap = new HashMap<>();
+    final Map<String, Set<String>> columnIndexNamesMap = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         TableMetadataInfo tableMetadataInfo =
@@ -148,17 +151,20 @@ public class ServerSegmentMetadataReader {
                   return l;
                 }));
         // Aggregate per-column compression stats from server responses
-        Map<String, ColumnCompressionStatsInfo> serverColStats = tableMetadataInfo.getColumnCompressionStats();
+        List<ColumnCompressionStatsInfo> serverColStats = tableMetadataInfo.getColumnCompressionStats();
         if (serverColStats != null) {
-          for (Map.Entry<String, ColumnCompressionStatsInfo> colEntry : serverColStats.entrySet()) {
-            String col = colEntry.getKey();
-            ColumnCompressionStatsInfo info = colEntry.getValue();
+          for (ColumnCompressionStatsInfo info : serverColStats) {
+            String col = info.getColumn();
             long[] accum = columnCompressionAccum.computeIfAbsent(col, k -> new long[2]);
-            accum[0] += info.getRawForwardIndexSizeBytes();
-            accum[1] += info.getCompressedForwardIndexSizeBytes();
-            if (info.getCompressionCodec() != null) {
-              columnCodecMap.merge(col, info.getCompressionCodec(),
+            accum[0] += info.getUncompressedSizeInBytes();
+            accum[1] += info.getCompressedSizeInBytes();
+            if (info.getCodec() != null) {
+              columnCodecMap.merge(col, info.getCodec(),
                   (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+            }
+            columnHasDictMap.put(col, info.isHasDictionary());
+            if (info.getIndexes() != null) {
+              columnIndexNamesMap.computeIfAbsent(col, k -> new HashSet<>()).addAll(info.getIndexes());
             }
           }
         }
@@ -183,16 +189,23 @@ public class ServerSegmentMetadataReader {
     totalNumSegments /= numReplica;
     totalNumRows /= numReplica;
 
-    // Build per-column compression stats (divide by numReplica since each replica reports the same stats)
-    Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
+    // Build per-column compression stats list (divide by numReplica since each replica reports the same stats)
+    List<ColumnCompressionStatsInfo> columnCompressionStats = null;
     if (!columnCompressionAccum.isEmpty()) {
-      columnCompressionStats = new HashMap<>();
+      columnCompressionStats = new ArrayList<>();
       for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
+        String col = entry.getKey();
         long[] accum = entry.getValue();
-        columnCompressionStats.put(entry.getKey(),
-            new ColumnCompressionStatsInfo(accum[0] / numReplica, accum[1] / numReplica,
-                columnCodecMap.get(entry.getKey())));
+        long uncompressed = accum[0] / numReplica;
+        long compressed = accum[1] / numReplica;
+        double ratio = compressed > 0 ? (double) uncompressed / compressed : 0;
+        boolean hasDictionary = Boolean.TRUE.equals(columnHasDictMap.get(col));
+        Set<String> idxNames = columnIndexNamesMap.get(col);
+        List<String> indexes = idxNames != null ? new ArrayList<>(idxNames) : null;
+        columnCompressionStats.add(new ColumnCompressionStatsInfo(
+            col, uncompressed, compressed, ratio, columnCodecMap.get(col), hasDictionary, indexes));
       }
+      columnCompressionStats.sort((a, b) -> a.getColumn().compareTo(b.getColumn()));
     }
 
     TableMetadataInfo aggregateTableMetadataInfo =

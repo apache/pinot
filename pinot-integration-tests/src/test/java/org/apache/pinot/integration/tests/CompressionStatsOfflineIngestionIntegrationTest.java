@@ -242,12 +242,16 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
             for (String col : RAW_COLUMNS) {
               if (columnStats.has(col)) {
                 JsonNode colInfo = columnStats.get(col);
-                assertTrue(colInfo.get("rawForwardIndexSizeBytes").asLong() > 0,
-                    "Per-column raw size should be > 0 for " + col);
-                assertTrue(colInfo.get("compressedForwardIndexSizeBytes").asLong() > 0,
+                assertTrue(colInfo.get("uncompressedSizeInBytes").asLong() > 0,
+                    "Per-column uncompressed size should be > 0 for " + col);
+                assertTrue(colInfo.get("compressedSizeInBytes").asLong() > 0,
                     "Per-column compressed size should be > 0 for " + col);
-                assertEquals(colInfo.get("compressionCodec").asText(), "LZ4",
+                assertTrue(colInfo.get("compressionRatio").asDouble() > 0,
+                    "Per-column compression ratio should be > 0 for " + col);
+                assertEquals(colInfo.get("codec").asText(), "LZ4",
                     "Compression codec should be LZ4 for " + col);
+                assertFalse(colInfo.get("hasDictionary").asBoolean(),
+                    "Raw column should not have dictionary for " + col);
                 columnsWithStats++;
               }
             }

@@ -19,6 +19,7 @@
 package org.apache.pinot.common.restlet.resources;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -32,8 +33,10 @@ public class SegmentSizeInfoTest {
   public void testJsonRoundTripWithCompressionStats()
       throws Exception {
     Map<String, ColumnCompressionStatsInfo> columnStats = new HashMap<>();
-    columnStats.put("col1", new ColumnCompressionStatsInfo(10000, 2500, "LZ4"));
-    columnStats.put("col2", new ColumnCompressionStatsInfo(20000, 4000, "ZSTANDARD"));
+    columnStats.put("col1", new ColumnCompressionStatsInfo("col1", 10000, 2500, 4.0, "LZ4", false,
+        List.of("forward_index")));
+    columnStats.put("col2", new ColumnCompressionStatsInfo("col2", 20000, 4000, 5.0, "ZSTANDARD", false,
+        List.of("forward_index")));
 
     SegmentSizeInfo original = new SegmentSizeInfo("seg1", 50000, 30000, 6500, "tier1", columnStats);
 
@@ -50,9 +53,12 @@ public class SegmentSizeInfoTest {
 
     ColumnCompressionStatsInfo col1Stats = deserialized.getColumnCompressionStats().get("col1");
     assertNotNull(col1Stats);
-    assertEquals(col1Stats.getRawForwardIndexSizeBytes(), 10000);
-    assertEquals(col1Stats.getCompressedForwardIndexSizeBytes(), 2500);
-    assertEquals(col1Stats.getCompressionCodec(), "LZ4");
+    assertEquals(col1Stats.getColumn(), "col1");
+    assertEquals(col1Stats.getUncompressedSizeInBytes(), 10000);
+    assertEquals(col1Stats.getCompressedSizeInBytes(), 2500);
+    assertEquals(col1Stats.getCompressionRatio(), 4.0, 0.01);
+    assertEquals(col1Stats.getCodec(), "LZ4");
+    assertFalse(col1Stats.isHasDictionary());
   }
 
   @Test

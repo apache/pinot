@@ -1270,9 +1270,16 @@ public class PinotTableRestletResource {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     int numReplica = tableConfig == null ? 1 : tableConfig.getReplication();
 
+    // Check feature flag — suppress columnCompressionStats when disabled
+    boolean compressionStatsEnabled = tableConfig != null && tableConfig.getIndexingConfig() != null
+        && tableConfig.getIndexingConfig().isCompressionStatsEnabled();
+
     String segmentsMetadata;
     try {
       JsonNode segmentsMetadataJson = getAggregateMetadataFromServer(tableNameWithType, columns, numReplica);
+      if (!compressionStatsEnabled && segmentsMetadataJson.has("columnCompressionStats")) {
+        ((ObjectNode) segmentsMetadataJson).remove("columnCompressionStats");
+      }
       segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
@@ -1322,9 +1329,16 @@ public class PinotTableRestletResource {
       }
     }
 
+    // Check feature flag — suppress columnCompressionStats when disabled
+    boolean compressionStatsEnabled = tableConfig != null && tableConfig.getIndexingConfig() != null
+        && tableConfig.getIndexingConfig().isCompressionStatsEnabled();
+
     try {
       JsonNode segmentsMetadataJson =
           getAggregateMetadataFromServer(existingTableNameWithType, columnsList, numReplica);
+      if (!compressionStatsEnabled && segmentsMetadataJson.has("columnCompressionStats")) {
+        ((ObjectNode) segmentsMetadataJson).remove("columnCompressionStats");
+      }
       return JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);

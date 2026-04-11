@@ -456,10 +456,10 @@ public class TableSizeReader {
               String colName = colEntry.getKey();
               ColumnCompressionStatsInfo colInfo = colEntry.getValue();
               long[] maxVals = perColumnMax.computeIfAbsent(colName, k -> new long[2]);
-              maxVals[0] = Math.max(maxVals[0], colInfo.getRawForwardIndexSizeBytes());
-              maxVals[1] = Math.max(maxVals[1], colInfo.getCompressedForwardIndexSizeBytes());
-              if (colInfo.getCompressionCodec() != null) {
-                perColumnCodec.put(colName, colInfo.getCompressionCodec());
+              maxVals[0] = Math.max(maxVals[0], colInfo.getUncompressedSizeInBytes());
+              maxVals[1] = Math.max(maxVals[1], colInfo.getCompressedSizeInBytes());
+              if (colInfo.getCodec() != null) {
+                perColumnCodec.put(colName, colInfo.getCodec());
               }
             }
           }

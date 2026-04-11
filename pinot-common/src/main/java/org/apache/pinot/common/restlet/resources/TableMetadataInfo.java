@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -48,7 +49,7 @@ public class TableMetadataInfo {
   // JSON property name kept as "upsertPartitionToServerPrimaryKeyCountMap" to avoid silent data loss during rolling
   // upgrades where servers and controllers may temporarily run different versions of this class.
   private final Map<Integer, Map<String, Long>> _partitionToServerPrimaryKeyCountMap;
-  private final Map<String, ColumnCompressionStatsInfo> _columnCompressionStats;
+  private final List<ColumnCompressionStatsInfo> _columnCompressionStats;
 
   @JsonCreator
   public TableMetadataInfo(@JsonProperty("tableName") String tableName,
@@ -60,7 +61,7 @@ public class TableMetadataInfo {
       @JsonProperty("upsertPartitionToServerPrimaryKeyCountMap")
       Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap,
       @JsonProperty("columnCompressionStats") @Nullable
-      Map<String, ColumnCompressionStatsInfo> columnCompressionStats) {
+      List<ColumnCompressionStatsInfo> columnCompressionStats) {
     _tableName = tableName;
     _diskSizeInBytes = sizeInBytes;
     _numSegments = numSegments;
@@ -123,7 +124,7 @@ public class TableMetadataInfo {
 
   @Nullable
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public Map<String, ColumnCompressionStatsInfo> getColumnCompressionStats() {
+  public List<ColumnCompressionStatsInfo> getColumnCompressionStats() {
     return _columnCompressionStats;
   }
 }

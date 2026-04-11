@@ -66,8 +66,10 @@ public class ServerTableSizeReaderRawBytesTest {
       throws IOException {
     // Server with compression stats
     Map<String, ColumnCompressionStatsInfo> colStats = new HashMap<>();
-    colStats.put("col_a", new ColumnCompressionStatsInfo(10000, 2000, "LZ4"));
-    colStats.put("col_b", new ColumnCompressionStatsInfo(20000, 5000, "ZSTANDARD"));
+    colStats.put("col_a", new ColumnCompressionStatsInfo("col_a", 10000, 2000, 5.0, "LZ4", false,
+        List.of("forward_index")));
+    colStats.put("col_b", new ColumnCompressionStatsInfo("col_b", 20000, 5000, 4.0, "ZSTANDARD", false,
+        List.of("forward_index")));
 
     List<SegmentSizeInfo> statsSegments = Arrays.asList(
         new SegmentSizeInfo("s1", 50000, 30000, 7000, "default", colStats),
@@ -123,9 +125,12 @@ public class ServerTableSizeReaderRawBytesTest {
     Map<String, ColumnCompressionStatsInfo> colStats = s1.getColumnCompressionStats();
     assertNotNull(colStats);
     assertEquals(colStats.size(), 2);
-    assertEquals(colStats.get("col_a").getRawForwardIndexSizeBytes(), 10000);
-    assertEquals(colStats.get("col_a").getCompressedForwardIndexSizeBytes(), 2000);
-    assertEquals(colStats.get("col_a").getCompressionCodec(), "LZ4");
+    assertEquals(colStats.get("col_a").getColumn(), "col_a");
+    assertEquals(colStats.get("col_a").getUncompressedSizeInBytes(), 10000);
+    assertEquals(colStats.get("col_a").getCompressedSizeInBytes(), 2000);
+    assertEquals(colStats.get("col_a").getCompressionRatio(), 5.0, 0.01);
+    assertEquals(colStats.get("col_a").getCodec(), "LZ4");
+    assertFalse(colStats.get("col_a").isHasDictionary());
 
     // s2 has tier but no column stats
     SegmentSizeInfo s2 = segments.get(1);
