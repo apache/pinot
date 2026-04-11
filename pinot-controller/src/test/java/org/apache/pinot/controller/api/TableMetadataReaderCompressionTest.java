@@ -25,7 +25,8 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -60,9 +61,11 @@ public class TableMetadataReaderCompressionTest {
   public void setUp()
       throws IOException {
     // Server 0: has compression stats for col_a and col_b
-    Map<String, ColumnCompressionStatsInfo> colStats0 = new HashMap<>();
-    colStats0.put("col_a", new ColumnCompressionStatsInfo(10000, 2000, "LZ4"));
-    colStats0.put("col_b", new ColumnCompressionStatsInfo(20000, 5000, "ZSTANDARD"));
+    List<ColumnCompressionStatsInfo> colStats0 = new ArrayList<>();
+    colStats0.add(new ColumnCompressionStatsInfo("col_a", 10000, 2000, 5.0, "LZ4", false,
+        List.of("forward_index")));
+    colStats0.add(new ColumnCompressionStatsInfo("col_b", 20000, 5000, 4.0, "ZSTANDARD", false,
+        List.of("forward_index", "inverted_index")));
 
     TableMetadataInfo server0Info = new TableMetadataInfo("testTable_OFFLINE", 50000, 3, 1000,
         Map.of("col_a", 4.0, "col_b", 100.0),
@@ -72,9 +75,11 @@ public class TableMetadataReaderCompressionTest {
     _httpServer0 = startServer(PORT_SERVER0, createHandler(server0Info));
 
     // Server 1 (replica): same compression stats
-    Map<String, ColumnCompressionStatsInfo> colStats1 = new HashMap<>();
-    colStats1.put("col_a", new ColumnCompressionStatsInfo(10000, 2000, "LZ4"));
-    colStats1.put("col_b", new ColumnCompressionStatsInfo(20000, 5000, "ZSTANDARD"));
+    List<ColumnCompressionStatsInfo> colStats1 = new ArrayList<>();
+    colStats1.add(new ColumnCompressionStatsInfo("col_a", 10000, 2000, 5.0, "LZ4", false,
+        List.of("forward_index")));
+    colStats1.add(new ColumnCompressionStatsInfo("col_b", 20000, 5000, 4.0, "ZSTANDARD", false,
+        List.of("forward_index", "inverted_index")));
 
     TableMetadataInfo server1Info = new TableMetadataInfo("testTable_OFFLINE", 50000, 3, 1000,
         Map.of("col_a", 4.0, "col_b", 100.0),
@@ -109,23 +114,30 @@ public class TableMetadataReaderCompressionTest {
     assertEquals(result.getDiskSizeInBytes(), 50000);
 
     // Per-column compression stats should be aggregated and divided by replicas
-    Map<String, ColumnCompressionStatsInfo> colStats = result.getColumnCompressionStats();
+    List<ColumnCompressionStatsInfo> colStats = result.getColumnCompressionStats();
     assertNotNull(colStats);
     assertEquals(colStats.size(), 2);
 
-    // col_a: (10000+10000)/2 = 10000 raw, (2000+2000)/2 = 2000 compressed
-    ColumnCompressionStatsInfo colA = colStats.get("col_a");
+    // Results are sorted by column name
+    ColumnCompressionStatsInfo colA = colStats.get(0);
     assertNotNull(colA);
-    assertEquals(colA.getRawForwardIndexSizeBytes(), 10000);
-    assertEquals(colA.getCompressedForwardIndexSizeBytes(), 2000);
-    assertEquals(colA.getCompressionCodec(), "LZ4");
+    assertEquals(colA.getColumn(), "col_a");
+    // (10000+10000)/2 = 10000 uncompressed, (2000+2000)/2 = 2000 compressed
+    assertEquals(colA.getUncompressedSizeInBytes(), 10000);
+    assertEquals(colA.getCompressedSizeInBytes(), 2000);
+    assertEquals(colA.getCompressionRatio(), 5.0, 0.01);
+    assertEquals(colA.getCodec(), "LZ4");
+    assertFalse(colA.isHasDictionary());
 
-    // col_b: (20000+20000)/2 = 20000 raw, (5000+5000)/2 = 5000 compressed
-    ColumnCompressionStatsInfo colB = colStats.get("col_b");
+    ColumnCompressionStatsInfo colB = colStats.get(1);
     assertNotNull(colB);
-    assertEquals(colB.getRawForwardIndexSizeBytes(), 20000);
-    assertEquals(colB.getCompressedForwardIndexSizeBytes(), 5000);
-    assertEquals(colB.getCompressionCodec(), "ZSTANDARD");
+    assertEquals(colB.getColumn(), "col_b");
+    // (20000+20000)/2 = 20000 uncompressed, (5000+5000)/2 = 5000 compressed
+    assertEquals(colB.getUncompressedSizeInBytes(), 20000);
+    assertEquals(colB.getCompressedSizeInBytes(), 5000);
+    assertEquals(colB.getCompressionRatio(), 4.0, 0.01);
+    assertEquals(colB.getCodec(), "ZSTANDARD");
+    assertFalse(colB.isHasDictionary());
   }
 
   @Test
@@ -147,7 +159,7 @@ public class TableMetadataReaderCompressionTest {
           "testTable_OFFLINE", endpoints, null, 1, TIMEOUT_MSEC);
 
       assertNotNull(result);
-      // No compression stats should result in null map
+      // No compression stats should result in null list
       assertNull(result.getColumnCompressionStats());
     } catch (IOException e) {
       throw new RuntimeException(e);

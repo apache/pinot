@@ -43,6 +43,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
@@ -55,8 +56,10 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -106,6 +109,12 @@ public class TableSizeResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
+    // Check feature flag — only collect per-column compression stats if enabled
+    Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
+    boolean compressionStatsEnabled = cachedPair != null && cachedPair.getLeft() != null
+        && cachedPair.getLeft().getIndexingConfig() != null
+        && cachedPair.getLeft().getIndexingConfig().isCompressionStatsEnabled();
+
     long tableSizeInBytes = 0L;
     List<SegmentSizeInfo> segmentSizeInfos = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
@@ -117,7 +126,7 @@ public class TableSizeResource {
           if (detailed) {
             long rawFwdIndexSize = 0;
             long compressedFwdIndexSize = 0;
-            Map<String, ColumnCompressionStatsInfo> columnCompressionStats = new HashMap<>();
+            Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
             SegmentMetadata segmentMetadata = immutableSegment.getSegmentMetadata();
             for (ColumnMetadata colMeta : segmentMetadata.getColumnMetadataMap().values()) {
               long uncompressed = colMeta.getUncompressedForwardIndexSizeBytes();
@@ -125,15 +134,26 @@ public class TableSizeResource {
                 rawFwdIndexSize += uncompressed;
               }
               long fwdIndexSize = colMeta.getIndexSizeFor(StandardIndexes.forward());
-              if (fwdIndexSize > 0 && uncompressed > 0) {
+              if (compressionStatsEnabled && fwdIndexSize > 0 && uncompressed > 0) {
                 compressedFwdIndexSize += fwdIndexSize;
+                double ratio = fwdIndexSize > 0 ? (double) uncompressed / fwdIndexSize : 0;
+                // Collect index names for this column
+                IndexService indexService = IndexService.getInstance();
+                List<String> indexNames = new ArrayList<>();
+                for (int i = 0, n = colMeta.getNumIndexes(); i < n; i++) {
+                  indexNames.add(indexService.get(colMeta.getIndexType(i)).getId());
+                }
+                if (columnCompressionStats == null) {
+                  columnCompressionStats = new HashMap<>();
+                }
                 columnCompressionStats.put(colMeta.getColumnName(),
-                    new ColumnCompressionStatsInfo(uncompressed, fwdIndexSize, colMeta.getCompressionCodec()));
+                    new ColumnCompressionStatsInfo(colMeta.getColumnName(), uncompressed, fwdIndexSize, ratio,
+                        colMeta.getCompressionCodec(), colMeta.hasDictionary(),
+                        indexNames.isEmpty() ? null : indexNames));
               }
             }
             segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes,
-                rawFwdIndexSize, compressedFwdIndexSize, immutableSegment.getTier(),
-                columnCompressionStats.isEmpty() ? null : columnCompressionStats));
+                rawFwdIndexSize, compressedFwdIndexSize, immutableSegment.getTier(), columnCompressionStats));
           }
           tableSizeInBytes += segmentSizeBytes;
         }

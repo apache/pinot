@@ -110,6 +110,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
@@ -231,9 +232,19 @@ public class TablesResource {
     Map<String, Double> columnCardinalityMap = new HashMap<>();
     Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     Map<String, Map<String, Double>> columnIndexSizesMap = new HashMap<>();
-    // Per-column compression stats: accumulate raw and compressed sizes, track codec
+    // Per-column compression stats accumulators: [0]=uncompressed, [1]=compressed (fwd index)
     Map<String, long[]> columnCompressionAccum = new HashMap<>();
     Map<String, String> columnCodecMap = new HashMap<>();
+    // Track hasDictionary and index names per column for the compression stats DTO
+    Map<String, Boolean> columnHasDictMap = new HashMap<>();
+    Map<String, Set<String>> columnIndexNamesMap = new HashMap<>();
+
+    // Check feature flag — only collect compression stats if enabled
+    Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
+    boolean compressionStatsEnabled = cachedPair != null && cachedPair.getLeft() != null
+        && cachedPair.getLeft().getIndexingConfig() != null
+        && cachedPair.getLeft().getIndexingConfig().isCompressionStatsEnabled();
+
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
@@ -275,8 +286,8 @@ public class TablesResource {
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
 
-            long forwardIndexSize = 0;
             IndexService indexService = IndexService.getInstance();
+            List<String> indexNames = new ArrayList<>();
             for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
               String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();
               long value = columnMetadata.getIndexSize(i);
@@ -286,20 +297,24 @@ public class TablesResource {
               columnIndexSizes.put(indexName, indexSize);
               columnIndexSizesMap.put(column, columnIndexSizes);
 
-              if (StandardIndexes.FORWARD_ID.equals(indexName)) {
-                forwardIndexSize = value;
-              }
+              indexNames.add(indexName);
             }
 
-            // Collect per-column compression stats for raw columns with stats
-            String codec = columnMetadata.getCompressionCodec();
-            long uncompressedSize = columnMetadata.getUncompressedForwardIndexSizeBytes();
-            if (codec != null && uncompressedSize > 0) {
-              long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
-              accum[0] += uncompressedSize;
-              accum[1] += forwardIndexSize;
-              columnCodecMap.merge(column, codec,
-                  (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+            // Collect per-column compression stats when feature flag is enabled
+            if (compressionStatsEnabled) {
+              String codec = columnMetadata.getCompressionCodec();
+              long uncompressedSize = columnMetadata.getUncompressedForwardIndexSizeBytes();
+              if (codec != null && uncompressedSize > 0) {
+                // Use getIndexSizeFor() to get the forward index size directly for this segment/column
+                long fwdIndexSize = columnMetadata.getIndexSizeFor(StandardIndexes.forward());
+                long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
+                accum[0] += uncompressedSize;
+                accum[1] += (fwdIndexSize > 0 ? fwdIndexSize : 0);
+                columnCodecMap.merge(column, codec,
+                    (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+              }
+              columnHasDictMap.put(column, columnMetadata.hasDictionary());
+              columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
             }
           }
         }
@@ -322,15 +337,23 @@ public class TablesResource {
         (partition, primaryKeyCount) -> partitionToServerPrimaryKeyCountMap.put(partition,
             Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
 
-    // Build per-column compression stats map if any columns have stats
-    Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
-    if (!columnCompressionAccum.isEmpty()) {
-      columnCompressionStats = new HashMap<>();
+    // Build per-column compression stats list if flag is enabled and any columns have stats
+    List<ColumnCompressionStatsInfo> columnCompressionStats = null;
+    if (compressionStatsEnabled && !columnCompressionAccum.isEmpty()) {
+      columnCompressionStats = new ArrayList<>();
       for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
+        String col = entry.getKey();
         long[] accum = entry.getValue();
-        columnCompressionStats.put(entry.getKey(),
-            new ColumnCompressionStatsInfo(accum[0], accum[1], columnCodecMap.get(entry.getKey())));
+        long uncompressed = accum[0];
+        long compressed = accum[1];
+        double ratio = compressed > 0 ? (double) uncompressed / compressed : 0;
+        boolean hasDictionary = Boolean.TRUE.equals(columnHasDictMap.get(col));
+        Set<String> idxNames = columnIndexNamesMap.get(col);
+        List<String> indexes = idxNames != null ? new ArrayList<>(idxNames) : null;
+        columnCompressionStats.add(new ColumnCompressionStatsInfo(
+            col, uncompressed, compressed, ratio, columnCodecMap.get(col), hasDictionary, indexes));
       }
+      columnCompressionStats.sort((a, b) -> a.getColumn().compareTo(b.getColumn()));
     }
 
     TableMetadataInfo tableMetadataInfo =

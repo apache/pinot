@@ -19,7 +19,8 @@
 package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -29,7 +30,7 @@ import static org.testng.Assert.*;
 
 /**
  * Tests the TableMetadataInfo response schema for compression stats (T056/T057).
- * Validates server-side response includes columnCompressionStats when present
+ * Validates server-side response includes columnCompressionStats array when present
  * and suppresses it (via NON_NULL) when absent.
  */
 public class TableMetadataInfoCompressionTest {
@@ -37,9 +38,10 @@ public class TableMetadataInfoCompressionTest {
   @Test
   public void testSerializationWithCompressionStats()
       throws Exception {
-    Map<String, ColumnCompressionStatsInfo> colStats = new HashMap<>();
-    colStats.put("col_a", new ColumnCompressionStatsInfo(10000, 2000, "LZ4"));
-    colStats.put("col_b", new ColumnCompressionStatsInfo(20000, 5000, "ZSTANDARD"));
+    List<ColumnCompressionStatsInfo> colStats = new ArrayList<>();
+    colStats.add(new ColumnCompressionStatsInfo("col_a", 10000, 2000, 5.0, "LZ4", false, List.of("forward_index")));
+    colStats.add(new ColumnCompressionStatsInfo("col_b", 20000, 5000, 4.0, "ZSTANDARD", false,
+        List.of("forward_index", "inverted_index")));
 
     TableMetadataInfo info = new TableMetadataInfo("testTable", 50000, 3, 1000,
         Map.of("col_a", 4.0), Map.of("col_a", 50.0), Map.of(), Map.of(), Map.of(), colStats);
@@ -47,23 +49,31 @@ public class TableMetadataInfoCompressionTest {
     String json = JsonUtils.objectToString(info);
     JsonNode node = JsonUtils.stringToJsonNode(json);
 
-    // columnCompressionStats should be present
+    // columnCompressionStats should be present as an array
     assertTrue(node.has("columnCompressionStats"));
     JsonNode colStatsNode = node.get("columnCompressionStats");
-    assertTrue(colStatsNode.has("col_a"));
-    assertTrue(colStatsNode.has("col_b"));
+    assertTrue(colStatsNode.isArray(), "columnCompressionStats should be a JSON array");
+    assertEquals(colStatsNode.size(), 2);
 
-    // Validate col_a values
-    JsonNode colA = colStatsNode.get("col_a");
-    assertEquals(colA.get("rawForwardIndexSizeBytes").asLong(), 10000);
-    assertEquals(colA.get("compressedForwardIndexSizeBytes").asLong(), 2000);
-    assertEquals(colA.get("compressionCodec").asText(), "LZ4");
+    // Validate col_a values (first element)
+    JsonNode colA = colStatsNode.get(0);
+    assertEquals(colA.get("column").asText(), "col_a");
+    assertEquals(colA.get("uncompressedSizeInBytes").asLong(), 10000);
+    assertEquals(colA.get("compressedSizeInBytes").asLong(), 2000);
+    assertEquals(colA.get("compressionRatio").asDouble(), 5.0, 0.01);
+    assertEquals(colA.get("codec").asText(), "LZ4");
+    assertFalse(colA.get("hasDictionary").asBoolean());
+    assertTrue(colA.has("indexes"));
 
-    // Validate col_b values
-    JsonNode colB = colStatsNode.get("col_b");
-    assertEquals(colB.get("rawForwardIndexSizeBytes").asLong(), 20000);
-    assertEquals(colB.get("compressedForwardIndexSizeBytes").asLong(), 5000);
-    assertEquals(colB.get("compressionCodec").asText(), "ZSTANDARD");
+    // Validate col_b values (second element)
+    JsonNode colB = colStatsNode.get(1);
+    assertEquals(colB.get("column").asText(), "col_b");
+    assertEquals(colB.get("uncompressedSizeInBytes").asLong(), 20000);
+    assertEquals(colB.get("compressedSizeInBytes").asLong(), 5000);
+    assertEquals(colB.get("compressionRatio").asDouble(), 4.0, 0.01);
+    assertEquals(colB.get("codec").asText(), "ZSTANDARD");
+    assertFalse(colB.get("hasDictionary").asBoolean());
+    assertEquals(colB.get("indexes").size(), 2);
   }
 
   @Test
@@ -84,8 +94,9 @@ public class TableMetadataInfoCompressionTest {
   @Test
   public void testDeserializationRoundTrip()
       throws Exception {
-    Map<String, ColumnCompressionStatsInfo> colStats = new HashMap<>();
-    colStats.put("metric_col", new ColumnCompressionStatsInfo(50000, 8000, "SNAPPY"));
+    List<ColumnCompressionStatsInfo> colStats = new ArrayList<>();
+    colStats.add(new ColumnCompressionStatsInfo("metric_col", 50000, 8000, 6.25, "SNAPPY", false,
+        List.of("forward_index")));
 
     TableMetadataInfo original = new TableMetadataInfo("roundTripTable", 100000, 5, 5000,
         Map.of("metric_col", 8.0), Map.of("metric_col", 100.0), Map.of(), Map.of(), Map.of(), colStats);
@@ -98,11 +109,15 @@ public class TableMetadataInfoCompressionTest {
     assertNotNull(deserialized.getColumnCompressionStats());
     assertEquals(deserialized.getColumnCompressionStats().size(), 1);
 
-    ColumnCompressionStatsInfo stats = deserialized.getColumnCompressionStats().get("metric_col");
+    ColumnCompressionStatsInfo stats = deserialized.getColumnCompressionStats().get(0);
     assertNotNull(stats);
-    assertEquals(stats.getRawForwardIndexSizeBytes(), 50000);
-    assertEquals(stats.getCompressedForwardIndexSizeBytes(), 8000);
-    assertEquals(stats.getCompressionCodec(), "SNAPPY");
+    assertEquals(stats.getColumn(), "metric_col");
+    assertEquals(stats.getUncompressedSizeInBytes(), 50000);
+    assertEquals(stats.getCompressedSizeInBytes(), 8000);
+    assertEquals(stats.getCompressionRatio(), 6.25, 0.01);
+    assertEquals(stats.getCodec(), "SNAPPY");
+    assertFalse(stats.isHasDictionary());
+    assertNotNull(stats.getIndexes());
   }
 
   @Test
