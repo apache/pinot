@@ -470,6 +470,14 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
     _dataFile.close();
   }
 
+  /**
+   * Returns the total uncompressed size across all CLP sub-streams (logtype IDs, dictionary variable
+   * IDs, encoded variables, and raw fallback messages). This represents the pre-compression
+   * sub-stream byte total, not the original UTF-8 message length, because CLP encodes strings into
+   * typed sub-columns before compression. The ratio of this value to the compressed forward index
+   * size reflects how effectively the final compression stage operates on CLP's intermediate
+   * representation.
+   */
   @Override
   public long getUncompressedSize() {
     long total = 0;

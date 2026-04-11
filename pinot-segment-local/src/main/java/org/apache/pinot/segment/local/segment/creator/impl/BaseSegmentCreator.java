@@ -77,7 +77,6 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceType;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -576,19 +575,9 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
           FieldIndexConfigs fieldIndexConfigs = indexConfigs.get(column);
           if (fieldIndexConfigs != null) {
             ForwardIndexConfig fwdConfig = fieldIndexConfigs.getConfig(StandardIndexes.forward());
-            // Resolve CLP codecs first since ForwardIndexConfig maps all CLP variants to
-            // PASS_THROUGH, but the actual internal compression differs (e.g. CLPV2 uses ZSTANDARD)
-            ChunkCompressionType compressionType = resolveCompressionTypeFromCodec(fwdConfig, column);
-            if (compressionType == null) {
-              compressionType = fwdConfig.getChunkCompressionType();
-            }
-            if (compressionType == null) {
-              // No explicit compression configured — use the field-type default
-              FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-              if (fieldSpec != null) {
-                compressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
-              }
-            }
+            FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+            ChunkCompressionType compressionType = ForwardIndexType.resolveCompressionType(
+                fwdConfig, fieldSpec != null ? fieldSpec.getFieldType() : null);
             if (compressionType != null) {
               properties.setProperty(
                   V1Constants.MetadataKeys.Column.getKeyFor(column,
@@ -1066,31 +1055,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         output.writeLong(dataCrc);
       }
     }
-  }
-
-  /**
-   * Resolves the actual chunk compression type used by the writer for CLP codec variants.
-   * ForwardIndexConfig maps all CLP variants to PASS_THROUGH, but the underlying writers use
-   * different compression internally (e.g. CLPForwardIndexCreatorV2 defaults to ZSTANDARD).
-   * Returns null for non-CLP codecs so the caller can fall back to getChunkCompressionType().
-   */
-  @Nullable
-  private static ChunkCompressionType resolveCompressionTypeFromCodec(ForwardIndexConfig fwdConfig, String column) {
-    FieldConfig.CompressionCodec codec = fwdConfig.getCompressionCodec();
-    if (codec != null) {
-      switch (codec) {
-        case CLP:
-          return ChunkCompressionType.PASS_THROUGH;
-        case CLPV2:
-        case CLPV2_ZSTD:
-          return ChunkCompressionType.ZSTANDARD;
-        case CLPV2_LZ4:
-          return ChunkCompressionType.LZ4;
-        default:
-          return null;
-      }
-    }
-    return null;
   }
 
   @Override

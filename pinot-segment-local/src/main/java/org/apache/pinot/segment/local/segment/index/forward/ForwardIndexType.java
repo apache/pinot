@@ -296,6 +296,36 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     }
   }
 
+  /**
+   * Resolves the actual chunk compression type for a forward index config, handling CLP codec variants
+   * that use internal compression different from what ForwardIndexConfig.getChunkCompressionType() reports.
+   * Falls back to getChunkCompressionType(), then to the field-type default.
+   *
+   * @param fwdConfig the forward index configuration
+   * @param fieldType the field type, may be {@code null} if the field spec is unavailable (e.g. schema evolution);
+   *                  when null the field-type default fallback is skipped and the method may return {@code null}
+   * @return the resolved compression type, or {@code null} if it cannot be determined
+   */
+  public static ChunkCompressionType resolveCompressionType(ForwardIndexConfig fwdConfig,
+      @Nullable FieldSpec.FieldType fieldType) {
+    FieldConfig.CompressionCodec codec = fwdConfig.getCompressionCodec();
+    if (codec != null) {
+      switch (codec) {
+        case CLP:
+          return ChunkCompressionType.PASS_THROUGH;
+        case CLPV2:
+        case CLPV2_ZSTD:
+          return ChunkCompressionType.ZSTANDARD;
+        case CLPV2_LZ4:
+          return ChunkCompressionType.LZ4;
+        default:
+          break;
+      }
+    }
+    ChunkCompressionType type = fwdConfig.getChunkCompressionType();
+    return type != null ? type : (fieldType != null ? getDefaultCompressionType(fieldType) : null);
+  }
+
   @Override
   public ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
       throws Exception {
