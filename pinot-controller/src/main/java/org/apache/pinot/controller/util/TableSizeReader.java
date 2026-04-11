@@ -329,23 +329,17 @@ public class TableSizeReader {
     for (Map.Entry<String, SegmentSizeDetails> entry : segmentToSizeDetailsMap.entrySet()) {
       String segment = entry.getKey();
       SegmentSizeDetails sizeDetails = entry.getValue();
-      // Iterate over all segment size info, update reported size, track max segment size and number of errored servers
+      // Iterate over all segment size info: update reported size, track max segment size,
+      // count errored servers, and track max raw/compressed forward index sizes across replicas.
       sizeDetails._maxReportedSizePerReplicaInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       int errors = 0;
+      long maxRawFwdIndexSize = 0;
+      long maxCompressedFwdIndexSize = 0;
       for (SegmentSizeInfo sizeInfo : sizeDetails._serverInfo.values()) {
         if (sizeInfo.getDiskSizeInBytes() != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
           sizeDetails._reportedSizeInBytes += sizeInfo.getDiskSizeInBytes();
           sizeDetails._maxReportedSizePerReplicaInBytes =
               Math.max(sizeDetails._maxReportedSizePerReplicaInBytes, sizeInfo.getDiskSizeInBytes());
-        } else {
-          errors++;
-        }
-      }
-      // Track max raw/compressed forward index sizes across replicas for this segment
-      long maxRawFwdIndexSize = 0;
-      long maxCompressedFwdIndexSize = 0;
-      for (SegmentSizeInfo sizeInfo : sizeDetails._serverInfo.values()) {
-        if (sizeInfo.getDiskSizeInBytes() != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
           if (sizeInfo.getRawForwardIndexSizeBytes() > 0) {
             maxRawFwdIndexSize = Math.max(maxRawFwdIndexSize, sizeInfo.getRawForwardIndexSizeBytes());
           }
@@ -353,6 +347,8 @@ public class TableSizeReader {
             maxCompressedFwdIndexSize =
                 Math.max(maxCompressedFwdIndexSize, sizeInfo.getCompressedForwardIndexSizeBytes());
           }
+        } else {
+          errors++;
         }
       }
 
