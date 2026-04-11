@@ -226,7 +226,7 @@ public class ServerSegmentMetadataReader {
         long[] accum = entry.getValue();
         long uncompressed = accum[0] / numReplica;
         long compressed = accum[1] / numReplica;
-        double ratio = compressed > 0 ? (double) uncompressed / compressed : 0;
+        double ratio = (uncompressed > 0 && compressed > 0) ? (double) uncompressed / compressed : 0;
         boolean hasDictionary = Boolean.TRUE.equals(columnHasDictMap.get(col));
         Set<String> idxNames = columnIndexNamesMap.get(col);
         List<String> indexes = idxNames != null ? new ArrayList<>(idxNames) : null;
@@ -241,7 +241,8 @@ public class ServerSegmentMetadataReader {
     if (hasCompressionSummary) {
       long rawPerReplica = aggRawSize / numReplica;
       long compressedPerReplica = aggCompressedSize / numReplica;
-      double ratio = compressedPerReplica > 0 ? (double) rawPerReplica / compressedPerReplica : 0;
+      double ratio = (rawPerReplica > 0 && compressedPerReplica > 0)
+          ? (double) rawPerReplica / compressedPerReplica : 0;
       int segmentsWithStats = aggSegmentsWithStats / numReplica;
       int totalSegments = aggTotalSegments / numReplica;
       boolean isPartialCoverage = segmentsWithStats < totalSegments;

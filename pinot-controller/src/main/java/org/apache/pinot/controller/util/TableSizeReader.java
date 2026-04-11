@@ -26,10 +26,12 @@ import com.google.common.collect.BiMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nullable;
@@ -61,6 +63,8 @@ public class TableSizeReader {
   private final PinotHelixResourceManager _helixResourceManager;
   private final ControllerMetrics _controllerMetrics;
   private final LeadControllerManager _leadControllerManager;
+  // Tracks emitted tier keys per table so stale tier gauges can be removed
+  private final Map<String, Set<String>> _emittedTierKeys = new ConcurrentHashMap<>();
 
   public TableSizeReader(Executor executor, HttpClientConnectionManager connectionManager,
       ControllerMetrics controllerMetrics, PinotHelixResourceManager helixResourceManager,
@@ -201,10 +205,31 @@ public class TableSizeReader {
   }
 
   private void emitTierMetrics(String tableNameWithType, @Nullable StorageBreakdown breakdown) {
+    Set<String> currentTierKeys = new HashSet<>();
     if (breakdown != null) {
       for (Map.Entry<String, TierSizeInfo> tierEntry : breakdown._tiers.entrySet()) {
-        emitMetrics(tableNameWithType + "." + tierEntry.getKey(), ControllerGauge.TABLE_TIERED_STORAGE_SIZE,
+        String tierKey = tierEntry.getKey();
+        currentTierKeys.add(tierKey);
+        emitMetrics(tableNameWithType + "." + tierKey, ControllerGauge.TABLE_TIERED_STORAGE_SIZE,
             tierEntry.getValue()._sizePerReplicaInBytes);
+      }
+    }
+    // Remove gauges for tier keys that were emitted previously but are no longer present.
+    // Only track tables that actually have tiers to avoid unnecessary map entries.
+    Set<String> previousTierKeys;
+    if (currentTierKeys.isEmpty()) {
+      previousTierKeys = _emittedTierKeys.remove(tableNameWithType);
+    } else {
+      previousTierKeys = _emittedTierKeys.put(tableNameWithType, currentTierKeys);
+    }
+    if (previousTierKeys != null) {
+      for (String oldKey : previousTierKeys) {
+        if (!currentTierKeys.contains(oldKey)) {
+          if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+            _controllerMetrics.removeTableGauge(tableNameWithType + "." + oldKey,
+                ControllerGauge.TABLE_TIERED_STORAGE_SIZE);
+          }
+        }
       }
     }
   }
@@ -215,6 +240,21 @@ public class TableSizeReader {
       _controllerMetrics.removeTableGauge(tableNameWithType,
           ControllerGauge.TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA);
       _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT);
+    }
+  }
+
+  /**
+   * Removes all tier-specific gauges previously emitted for the given table.
+   * Called from SegmentStatusChecker.removeMetricsForTable during both leader and non-leader cleanup,
+   * so no leader check is applied here (the caller decides when cleanup is appropriate).
+   */
+  public void clearTierMetrics(String tableNameWithType) {
+    Set<String> previousTierKeys = _emittedTierKeys.remove(tableNameWithType);
+    if (previousTierKeys != null) {
+      for (String tierKey : previousTierKeys) {
+        _controllerMetrics.removeTableGauge(tableNameWithType + "." + tierKey,
+            ControllerGauge.TABLE_TIERED_STORAGE_SIZE);
+      }
     }
   }
 
