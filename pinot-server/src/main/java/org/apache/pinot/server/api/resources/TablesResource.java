@@ -69,9 +69,11 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
+import org.apache.pinot.common.restlet.resources.CompressionStatsSummary;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.StorageBreakdownInfo;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
@@ -238,6 +240,7 @@ public class TablesResource {
     // Track hasDictionary and index names per column for the compression stats DTO
     Map<String, Boolean> columnHasDictMap = new HashMap<>();
     Map<String, Set<String>> columnIndexNamesMap = new HashMap<>();
+    Map<String, long[]> tierAccum = new HashMap<>(); // [count, size]
 
     // Check feature flag — only collect compression stats if enabled
     Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
@@ -320,6 +323,13 @@ public class TablesResource {
               columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
             }
           }
+
+          // Accumulate storage breakdown by tier (always-on, not gated by compression flag)
+          String tier = immutableSegment.getTier();
+          String tierKey = tier != null ? tier : "default";
+          long[] tierVals = tierAccum.computeIfAbsent(tierKey, k -> new long[2]);
+          tierVals[0]++;
+          tierVals[1] += segmentSizeBytes;
         }
       }
     } finally {
@@ -342,8 +352,11 @@ public class TablesResource {
 
     // Build per-column compression stats list if flag is enabled and any columns have stats
     List<ColumnCompressionStatsInfo> columnCompressionStats = null;
+    CompressionStatsSummary compressionStatsSummary = null;
     if (compressionStatsEnabled && !columnCompressionAccum.isEmpty()) {
       columnCompressionStats = new ArrayList<>();
+      long totalRaw = 0;
+      long totalCompressed = 0;
       for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
         String col = entry.getKey();
         long[] accum = entry.getValue();
@@ -356,14 +369,35 @@ public class TablesResource {
         List<String> indexes = idxNames != null ? new ArrayList<>(idxNames) : null;
         columnCompressionStats.add(new ColumnCompressionStatsInfo(
             col, uncompressed, compressed, ratio, columnCodecMap.get(col), hasDictionary, indexes));
+        // Only include raw columns in the table-level summary
+        if (!hasDictionary && uncompressed > 0) {
+          totalRaw += uncompressed;
+          totalCompressed += compressed;
+        }
       }
       columnCompressionStats.sort((a, b) -> a.getColumn().compareTo(b.getColumn()));
+      // Build table-level compression summary (null if no raw columns have stats)
+      if (totalRaw > 0 || totalCompressed > 0) {
+        double summaryRatio = totalCompressed > 0 ? (double) totalRaw / totalCompressed : 0;
+        compressionStatsSummary = new CompressionStatsSummary(totalRaw, totalCompressed, summaryRatio);
+      }
+    }
+
+    // Build storage breakdown from tier data accumulated inside the try block
+    StorageBreakdownInfo storageBreakdownInfo = null;
+    if (!tierAccum.isEmpty()) {
+      Map<String, StorageBreakdownInfo.TierInfo> tiers = new HashMap<>();
+      for (Map.Entry<String, long[]> entry : tierAccum.entrySet()) {
+        tiers.put(entry.getKey(), new StorageBreakdownInfo.TierInfo((int) entry.getValue()[0], entry.getValue()[1]));
+      }
+      storageBreakdownInfo = new StorageBreakdownInfo(tiers);
     }
 
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
             totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
-            partitionToServerPrimaryKeyCountMap, columnCompressionStats);
+            partitionToServerPrimaryKeyCountMap, columnCompressionStats, compressionStatsSummary,
+            storageBreakdownInfo);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
