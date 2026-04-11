@@ -112,6 +112,8 @@ public class IndexingConfig extends BaseJsonConfig {
 
   private MultiColumnTextIndexConfig _multiColumnTextIndexConfig;
 
+  private boolean _compressionStatsEnabled;
+
   @Nullable
   public List<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
@@ -418,6 +420,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setMultiColumnTextIndexConfig(MultiColumnTextIndexConfig multiColumnTextIndexConfig) {
     _multiColumnTextIndexConfig = multiColumnTextIndexConfig;
+  }
+
+  public boolean isCompressionStatsEnabled() {
+    return _compressionStatsEnabled;
+  }
+
+  public void setCompressionStatsEnabled(boolean compressionStatsEnabled) {
+    _compressionStatsEnabled = compressionStatsEnabled;
   }
 
   /**

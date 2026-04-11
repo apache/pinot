@@ -27,6 +27,7 @@ import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -90,6 +91,19 @@ public class ColumnIndexCreators implements Closeable {
   /// RAW by the dictionary optimizer even though the original config said DICTIONARY).
   public FieldIndexConfigs getIndexConfigs() {
     return _indexConfigs;
+  }
+
+  /**
+   * Returns the ForwardIndexCreator for this column, or null if not found.
+   */
+  @Nullable
+  public ForwardIndexCreator getForwardIndexCreator() {
+    for (IndexCreator creator : _indexCreators) {
+      if (creator instanceof ForwardIndexCreator) {
+        return (ForwardIndexCreator) creator;
+      }
+    }
+    return null;
   }
 
   public void seal() throws IOException {

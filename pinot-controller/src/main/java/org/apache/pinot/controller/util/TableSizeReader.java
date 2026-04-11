@@ -125,6 +125,7 @@ public class TableSizeReader {
       if (largestSegmentSizeOnServer != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
         emitMetrics(realtimeTableName, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER, largestSegmentSizeOnServer);
       }
+      emitCompressionMetrics(realtimeTableName, tableSizeDetails._realtimeSegments);
     }
     if (hasOfflineTableConfig) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -151,6 +152,7 @@ public class TableSizeReader {
       if (largestSegmentSizeOnServer != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
         emitMetrics(offlineTableName, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER, largestSegmentSizeOnServer);
       }
+      emitCompressionMetrics(offlineTableName, tableSizeDetails._offlineSegments);
     }
 
     // Set the top level sizes to  DEFAULT_SIZE_WHEN_MISSING_OR_ERROR when all segments are error
@@ -162,6 +164,18 @@ public class TableSizeReader {
       tableSizeDetails._reportedSizePerReplicaInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
     }
     return tableSizeDetails;
+  }
+
+  private void emitCompressionMetrics(String tableNameWithType, TableSubTypeSizeDetails subTypeDetails) {
+    if (subTypeDetails._compressedForwardIndexSizePerReplicaInBytes > 0) {
+      emitMetrics(tableNameWithType, ControllerGauge.TABLE_RAW_FORWARD_INDEX_SIZE_PER_REPLICA,
+          subTypeDetails._rawForwardIndexSizePerReplicaInBytes);
+      emitMetrics(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA,
+          subTypeDetails._compressedForwardIndexSizePerReplicaInBytes);
+      // Emit ratio * 100 to preserve two decimal digits of precision as a long gauge
+      long ratioPercent = Math.round(subTypeDetails._compressionRatio * 100);
+      emitMetrics(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT, ratioPercent);
+    }
   }
 
   private void emitMetrics(String tableNameWithType, ControllerGauge controllerGauge, long value) {
@@ -222,6 +236,24 @@ public class TableSizeReader {
     // reported size per replica
     @JsonProperty("reportedSizePerReplicaInBytes")
     public long _reportedSizePerReplicaInBytes = 0;
+
+    @JsonProperty("rawForwardIndexSizePerReplicaInBytes")
+    public long _rawForwardIndexSizePerReplicaInBytes = 0;
+
+    @JsonProperty("compressedForwardIndexSizePerReplicaInBytes")
+    public long _compressedForwardIndexSizePerReplicaInBytes = 0;
+
+    @JsonProperty("compressionRatio")
+    public double _compressionRatio = 0;
+
+    @JsonProperty("segmentsWithStats")
+    public int _segmentsWithStats = 0;
+
+    @JsonProperty("totalSegments")
+    public int _totalSegments = 0;
+
+    @JsonProperty("isPartialCoverage")
+    public boolean _isPartialCoverage = false;
 
     @JsonProperty("segments")
     public Map<String, SegmentSizeDetails> _segments = new HashMap<>();
@@ -309,6 +341,21 @@ public class TableSizeReader {
           errors++;
         }
       }
+      // Track max raw/compressed forward index sizes across replicas for this segment
+      long maxRawFwdIndexSize = 0;
+      long maxCompressedFwdIndexSize = 0;
+      for (SegmentSizeInfo sizeInfo : sizeDetails._serverInfo.values()) {
+        if (sizeInfo.getDiskSizeInBytes() != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
+          if (sizeInfo.getRawForwardIndexSizeBytes() > 0) {
+            maxRawFwdIndexSize = Math.max(maxRawFwdIndexSize, sizeInfo.getRawForwardIndexSizeBytes());
+          }
+          if (sizeInfo.getCompressedForwardIndexSizeBytes() > 0) {
+            maxCompressedFwdIndexSize =
+                Math.max(maxCompressedFwdIndexSize, sizeInfo.getCompressedForwardIndexSizeBytes());
+          }
+        }
+      }
+
       // Update estimated size, track segments that are missing from all servers
       if (errors != sizeDetails._serverInfo.size()) {
         // Use max segment size from other servers to estimate the segment size not reported
@@ -317,6 +364,13 @@ public class TableSizeReader {
         subTypeSizeDetails._reportedSizeInBytes += sizeDetails._reportedSizeInBytes;
         subTypeSizeDetails._estimatedSizeInBytes += sizeDetails._estimatedSizeInBytes;
         subTypeSizeDetails._reportedSizePerReplicaInBytes += sizeDetails._maxReportedSizePerReplicaInBytes;
+
+        // Aggregate forward index compression stats (per-replica max)
+        if (maxRawFwdIndexSize > 0 && maxCompressedFwdIndexSize > 0) {
+          subTypeSizeDetails._rawForwardIndexSizePerReplicaInBytes += maxRawFwdIndexSize;
+          subTypeSizeDetails._compressedForwardIndexSizePerReplicaInBytes += maxCompressedFwdIndexSize;
+          subTypeSizeDetails._segmentsWithStats++;
+        }
       } else {
         // Segment is missing from all servers
         missingSegments.add(segment);
@@ -325,6 +379,18 @@ public class TableSizeReader {
         sizeDetails._estimatedSizeInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
         subTypeSizeDetails._missingSegments++;
       }
+    }
+
+    // Compute compression ratio stats
+    subTypeSizeDetails._totalSegments = segmentToSizeDetailsMap.size();
+    subTypeSizeDetails._isPartialCoverage =
+        subTypeSizeDetails._segmentsWithStats > 0
+            && subTypeSizeDetails._segmentsWithStats < subTypeSizeDetails._totalSegments
+                - subTypeSizeDetails._missingSegments;
+    if (subTypeSizeDetails._compressedForwardIndexSizePerReplicaInBytes > 0) {
+      subTypeSizeDetails._compressionRatio =
+          (double) subTypeSizeDetails._rawForwardIndexSizePerReplicaInBytes
+              / subTypeSizeDetails._compressedForwardIndexSizePerReplicaInBytes;
     }
 
     // Update metrics for missing segments

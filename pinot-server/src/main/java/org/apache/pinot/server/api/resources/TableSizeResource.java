@@ -28,7 +28,9 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -41,6 +43,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
@@ -49,7 +52,10 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.server.starter.ServerInstance;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
@@ -109,7 +115,25 @@ public class TableSizeResource {
           ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
           long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
           if (detailed) {
-            segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes));
+            long rawFwdIndexSize = 0;
+            long compressedFwdIndexSize = 0;
+            Map<String, ColumnCompressionStatsInfo> columnCompressionStats = new HashMap<>();
+            SegmentMetadata segmentMetadata = immutableSegment.getSegmentMetadata();
+            for (ColumnMetadata colMeta : segmentMetadata.getColumnMetadataMap().values()) {
+              long uncompressed = colMeta.getUncompressedForwardIndexSizeBytes();
+              if (uncompressed > 0) {
+                rawFwdIndexSize += uncompressed;
+              }
+              long fwdIndexSize = colMeta.getIndexSizeFor(StandardIndexes.forward());
+              if (fwdIndexSize > 0 && uncompressed > 0) {
+                compressedFwdIndexSize += fwdIndexSize;
+                columnCompressionStats.put(colMeta.getColumnName(),
+                    new ColumnCompressionStatsInfo(uncompressed, fwdIndexSize, colMeta.getCompressionCodec()));
+              }
+            }
+            segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes,
+                rawFwdIndexSize, compressedFwdIndexSize, immutableSegment.getTier(),
+                columnCompressionStats.isEmpty() ? null : columnCompressionStats));
           }
           tableSizeInBytes += segmentSizeBytes;
         }

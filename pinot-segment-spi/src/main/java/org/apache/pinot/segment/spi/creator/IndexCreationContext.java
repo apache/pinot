@@ -105,6 +105,8 @@ public interface IndexCreationContext extends ColumnShape {
     return columnStatistics != null ? columnStatistics.getUniqueValuesSet() : null;
   }
 
+  boolean isCompressionStatsEnabled();
+
   @SuppressWarnings("UnusedReturnValue")
   final class Builder {
     // Identity. Non-overridable shape accessors delegate to `_columnShape`.
@@ -137,6 +139,7 @@ public interface IndexCreationContext extends ColumnShape {
 
     // Error handling.
     private boolean _continueOnError;
+    private boolean _compressionStatsEnabled;
 
     /// Segment-creation path. Shape values come from the freshly-collected [ColumnStatistics]; `hasDictionary` is
     /// supplied separately because it's a driver decision not carried on [ColumnStatistics]. `_tableNameWithType`
@@ -260,6 +263,11 @@ public interface IndexCreationContext extends ColumnShape {
       return this;
     }
 
+    public Builder withCompressionStatsEnabled(boolean compressionStatsEnabled) {
+      _compressionStatsEnabled = compressionStatsEnabled;
+      return this;
+    }
+
     public Common build() {
       return new Common(this);
     }
@@ -295,6 +303,7 @@ public interface IndexCreationContext extends ColumnShape {
 
     // Error handling.
     private final boolean _continueOnError;
+    private final boolean _compressionStatsEnabled;
 
     private Common(Builder builder) {
       _tableNameWithType = builder._tableNameWithType;
@@ -315,6 +324,7 @@ public interface IndexCreationContext extends ColumnShape {
       _mutableSegmentCompacted = builder._mutableSegmentCompacted;
       _mutableToImmutableDocIdMap = builder._mutableToImmutableDocIdMap;
       _continueOnError = builder._continueOnError;
+      _compressionStatsEnabled = builder._compressionStatsEnabled;
     }
 
     // Identity accessors.
@@ -470,6 +480,11 @@ public interface IndexCreationContext extends ColumnShape {
     @Override
     public boolean isContinueOnError() {
       return _continueOnError;
+    }
+
+    @Override
+    public boolean isCompressionStatsEnabled() {
+      return _compressionStatsEnabled;
     }
   }
 }
