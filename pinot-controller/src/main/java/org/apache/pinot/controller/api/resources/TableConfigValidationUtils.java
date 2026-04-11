@@ -26,6 +26,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.util.TaskConfigUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -65,6 +66,7 @@ public final class TableConfigValidationUtils {
     validateInstanceAssignment(resourceManager, tableConfig);
     resourceManager.validateTableTenantConfig(tableConfig);
     resourceManager.validateTableTaskMinionInstanceTagConfig(tableConfig);
+    TableConfigValidatorRegistry.validate(tableConfig, schema);
   }
 
   private static void checkHybridTableConfig(PinotHelixResourceManager resourceManager, TableConfig tableConfig) {
