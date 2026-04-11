@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
@@ -41,6 +42,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.avro.Schema.create;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 /**
  * Realtime upsert coverage for UUID primary keys.
@@ -69,6 +71,13 @@ public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTes
       "550e8400-e29b-41d4-a716-446655440001",
       "550e8400-e29b-41d4-a716-446655440002");
   private static final List<String> EXPECTED_PAYLOAD_VALUES = List.of("alpha-v2", "beta-v2", "gamma-v1");
+  private static final String COUNT_QUERY = String.format("SELECT COUNT(*) FROM %s", TABLE_NAME);
+  private static final String RAW_COUNT_QUERY =
+      String.format("SELECT COUNT(*) FROM %s OPTION(skipUpsert=true)", TABLE_NAME);
+  private static final String ORDERED_ROWS_QUERY =
+      String.format("SELECT %s, %s FROM %s ORDER BY %s", UUID_PK_COLUMN, PAYLOAD_COLUMN, TABLE_NAME, UUID_PK_COLUMN);
+  private static final String FILTER_QUERY = String.format("SELECT %s FROM %s WHERE %s = TO_UUID('%s')",
+      PAYLOAD_COLUMN, TABLE_NAME, UUID_PK_COLUMN, UUID_INPUT_VALUES.get(0));
   private static final int TOTAL_RAW_RECORDS = UUID_INPUT_VALUES.size();
   private static final long BASE_TIMESTAMP_MILLIS = 1_700_100_000_000L;
 
@@ -133,8 +142,7 @@ public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTes
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return hasConsistentCount(String.format("SELECT COUNT(*) FROM %s OPTION(skipUpsert=true)", getTableName()),
-            TOTAL_RAW_RECORDS);
+        return queryCountStarWithoutUpsert() == TOTAL_RAW_RECORDS;
       } catch (Exception e) {
         return null;
       }
@@ -177,54 +185,152 @@ public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTes
   public void testUuidPrimaryKeyUpsertDedup(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    waitForDeduplicatedDocsLoaded(DEDUPLICATED_RECORDS_READY_TIMEOUT_MS);
+    UuidQueryResults queryResults = waitForExpectedQueryResults(DEDUPLICATED_RECORDS_READY_TIMEOUT_MS);
 
-    JsonNode response = postQuery(String.format("SELECT COUNT(*) FROM %s", getTableName()));
-    assertNoExceptions(response);
-    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), EXPECTED_UUID_VALUES.size());
+    assertExpectedCountResponse(queryResults._countResponse, EXPECTED_UUID_VALUES.size());
+    assertExpectedCountResponse(queryResults._rawCountResponse, TOTAL_RAW_RECORDS);
+    assertExpectedOrderedRowsResponse(queryResults._orderedRowsResponse);
+    assertExpectedFilterResponse(queryResults._filterResponse);
+  }
 
-    response = postQuery(String.format("SELECT COUNT(*) FROM %s OPTION(skipUpsert=true)", getTableName()));
-    assertNoExceptions(response);
-    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), TOTAL_RAW_RECORDS);
+  private static void assertNoExceptions(JsonNode response) {
+    assertEquals(getExceptionCount(response), 0, response.toPrettyString());
+  }
 
-    response = postQuery(String.format("SELECT %s, %s FROM %s ORDER BY %s", UUID_PK_COLUMN, PAYLOAD_COLUMN,
-        getTableName(), UUID_PK_COLUMN));
+  private void assertExpectedCountResponse(JsonNode response, long expectedCount) {
     assertNoExceptions(response);
-    JsonNode rows = response.get("resultTable").get("rows");
+    JsonNode firstRowFirstColumn = getFirstRowFirstColumn(response);
+    assertNotNull(firstRowFirstColumn, response.toPrettyString());
+    assertEquals(firstRowFirstColumn.asLong(), expectedCount);
+  }
+
+  private void assertExpectedOrderedRowsResponse(JsonNode response) {
+    assertNoExceptions(response);
+    JsonNode rows = getRows(response);
+    assertNotNull(rows, response.toPrettyString());
     assertEquals(rows.size(), EXPECTED_UUID_VALUES.size());
     for (int i = 0; i < EXPECTED_UUID_VALUES.size(); i++) {
       assertEquals(rows.get(i).get(0).asText(), EXPECTED_UUID_VALUES.get(i));
       assertEquals(rows.get(i).get(1).asText(), EXPECTED_PAYLOAD_VALUES.get(i));
     }
+  }
 
-    response = postQuery(String.format("SELECT %s FROM %s WHERE %s = TO_UUID('%s')", PAYLOAD_COLUMN, getTableName(),
-        UUID_PK_COLUMN, UUID_INPUT_VALUES.get(0)));
+  private void assertExpectedFilterResponse(JsonNode response) {
     assertNoExceptions(response);
-    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asText(), "alpha-v2");
+    JsonNode firstRowFirstColumn = getFirstRowFirstColumn(response);
+    assertNotNull(firstRowFirstColumn, response.toPrettyString());
+    assertEquals(firstRowFirstColumn.asText(), "alpha-v2");
   }
 
-  private static void assertNoExceptions(JsonNode response) {
-    assertEquals(response.get("exceptions").size(), 0, response.toPrettyString());
-  }
-
-  private void waitForDeduplicatedDocsLoaded(long timeoutMs)
+  private UuidQueryResults waitForExpectedQueryResults(long timeoutMs)
       throws Exception {
+    AtomicReference<UuidQueryResults> queryResultsRef = new AtomicReference<>();
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return hasConsistentCount(String.format("SELECT COUNT(*) FROM %s", getTableName()), getCountStarResult());
+        UuidQueryResults queryResults = fetchQueryResults();
+        if (matchesExpectedQueryResults(queryResults)) {
+          queryResultsRef.set(queryResults);
+          return true;
+        }
+        return false;
       } catch (Exception e) {
         return null;
       }
-    }, 100L, timeoutMs, "Failed to converge deduplicated UUID upsert record counts");
+    }, 100L, timeoutMs, "Failed to observe expected UUID upsert query results");
+    return queryResultsRef.get();
   }
 
-  private boolean hasConsistentCount(String query, long expectedCount) {
-    for (int i = 0; i < 10; i++) {
-      long count = Long.parseLong(getPinotConnection().execute(query).getResultSet(0).getString(0));
-      if (count != expectedCount) {
+  private UuidQueryResults fetchQueryResults()
+      throws Exception {
+    return new UuidQueryResults(postQuery(COUNT_QUERY), postQuery(RAW_COUNT_QUERY), postQuery(ORDERED_ROWS_QUERY),
+        postQuery(FILTER_QUERY));
+  }
+
+  private boolean matchesExpectedQueryResults(UuidQueryResults queryResults) {
+    return hasExpectedCount(queryResults._countResponse, EXPECTED_UUID_VALUES.size())
+        && hasExpectedCount(queryResults._rawCountResponse, TOTAL_RAW_RECORDS)
+        && hasExpectedOrderedRows(queryResults._orderedRowsResponse)
+        && hasExpectedFilterValue(queryResults._filterResponse, "alpha-v2");
+  }
+
+  private boolean hasExpectedCount(JsonNode response, long expectedCount) {
+    JsonNode firstRowFirstColumn = getFirstRowFirstColumn(response);
+    return hasNoExceptions(response) && firstRowFirstColumn != null
+        && firstRowFirstColumn.asLong(Long.MIN_VALUE) == expectedCount;
+  }
+
+  private boolean hasExpectedOrderedRows(JsonNode response) {
+    if (!hasNoExceptions(response)) {
+      return false;
+    }
+    JsonNode rows = getRows(response);
+    if (rows == null) {
+      return false;
+    }
+    if (rows.size() != EXPECTED_UUID_VALUES.size()) {
+      return false;
+    }
+    for (int i = 0; i < EXPECTED_UUID_VALUES.size(); i++) {
+      JsonNode row = rows.get(i);
+      if (row == null || row.size() < 2 || !EXPECTED_UUID_VALUES.get(i).equals(row.get(0).asText())
+          || !EXPECTED_PAYLOAD_VALUES.get(i).equals(row.get(1).asText())) {
         return false;
       }
     }
     return true;
+  }
+
+  private boolean hasExpectedFilterValue(JsonNode response, String expectedValue) {
+    JsonNode firstRowFirstColumn = getFirstRowFirstColumn(response);
+    return hasNoExceptions(response) && firstRowFirstColumn != null
+        && expectedValue.equals(firstRowFirstColumn.asText());
+  }
+
+  private static boolean hasNoExceptions(JsonNode response) {
+    return getExceptionCount(response) == 0;
+  }
+
+  private static int getExceptionCount(JsonNode response) {
+    JsonNode exceptions = response.get("exceptions");
+    return exceptions != null ? exceptions.size() : 0;
+  }
+
+  private static JsonNode getRows(JsonNode response) {
+    JsonNode resultTable = response.get("resultTable");
+    if (resultTable == null) {
+      return null;
+    }
+    return resultTable.get("rows");
+  }
+
+  private static JsonNode getFirstRowFirstColumn(JsonNode response) {
+    JsonNode rows = getRows(response);
+    if (rows == null || rows.isEmpty()) {
+      return null;
+    }
+    JsonNode firstRow = rows.get(0);
+    if (firstRow == null || firstRow.isEmpty()) {
+      return null;
+    }
+    return firstRow.get(0);
+  }
+
+  private long queryCountStarWithoutUpsert() {
+    return getPinotConnection().execute(RAW_COUNT_QUERY).getResultSet(0).getLong(0);
+  }
+
+  private static final class UuidQueryResults {
+    private final JsonNode _countResponse;
+    private final JsonNode _rawCountResponse;
+    private final JsonNode _orderedRowsResponse;
+    private final JsonNode _filterResponse;
+
+    private UuidQueryResults(JsonNode countResponse, JsonNode rawCountResponse, JsonNode orderedRowsResponse,
+        JsonNode filterResponse) {
+      _countResponse = countResponse;
+      _rawCountResponse = rawCountResponse;
+      _orderedRowsResponse = orderedRowsResponse;
+      _filterResponse = filterResponse;
+    }
   }
 }
