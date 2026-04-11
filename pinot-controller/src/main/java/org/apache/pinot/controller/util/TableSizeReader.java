@@ -182,7 +182,7 @@ public class TableSizeReader {
 
   private void emitCompressionMetrics(String tableNameWithType, TableSubTypeSizeDetails subTypeDetails) {
     CompressionStats stats = subTypeDetails._compressionStats;
-    if (stats != null && stats._compressedForwardIndexSizePerReplicaInBytes > 0) {
+    if (stats != null && stats._segmentsWithStats > 0 && stats._compressedForwardIndexSizePerReplicaInBytes > 0) {
       emitMetrics(tableNameWithType, ControllerGauge.TABLE_RAW_FORWARD_INDEX_SIZE_PER_REPLICA,
           stats._rawForwardIndexSizePerReplicaInBytes);
       emitMetrics(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA,
@@ -190,6 +190,9 @@ public class TableSizeReader {
       // Emit ratio * 100 to preserve two decimal digits of precision as a long gauge
       long ratioPercent = Math.round(stats._compressionRatio * 100);
       emitMetrics(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS, ratioPercent);
+    } else {
+      // No segments have stats — clear any previously emitted stale metrics
+      clearCompressionMetrics(tableNameWithType);
     }
   }
 
@@ -534,7 +537,10 @@ public class TableSizeReader {
             (double) detail._rawForwardIndexSizeBytes / detail._compressedForwardIndexSizeBytes;
       }
     }
-    subTypeSizeDetails._compressionStats = compressionStats;
+    // Suppress compression stats when no segments have raw forward index data (e.g. dict-only tables)
+    subTypeSizeDetails._compressionStats =
+        (compressionStats._segmentsWithStats > 0 || !compressionStats._columnCompressionStats.isEmpty())
+            ? compressionStats : null;
     subTypeSizeDetails._storageBreakdown = storageBreakdown._tiers.isEmpty() ? null : storageBreakdown;
 
     // Update metrics for missing segments
