@@ -994,6 +994,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT),
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
+    // Clear stale compression stats that were set when the column was raw-encoded
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), null);
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_UNCOMPRESSED_SIZE), null);
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index

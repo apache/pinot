@@ -150,23 +150,25 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends BaseCluste
     JsonNode realtimeSegments = tableSizeJson.get("realtimeSegments");
     assertNotNull(realtimeSegments, "realtimeSegments should be present");
 
-    // Verify compression stats fields exist
-    assertTrue(realtimeSegments.has("rawForwardIndexSizePerReplicaInBytes"),
-        "realtimeSegments should have rawForwardIndexSizePerReplicaInBytes");
-    assertTrue(realtimeSegments.has("compressedForwardIndexSizePerReplicaInBytes"),
-        "realtimeSegments should have compressedForwardIndexSizePerReplicaInBytes");
-    assertTrue(realtimeSegments.has("compressionRatio"),
-        "realtimeSegments should have compressionRatio");
-    assertTrue(realtimeSegments.has("segmentsWithStats"),
-        "realtimeSegments should have segmentsWithStats");
-    assertTrue(realtimeSegments.has("totalSegments"),
-        "realtimeSegments should have totalSegments");
+    // Verify compression stats are nested under compressionStats object
+    JsonNode compressionStatsNode = realtimeSegments.get("compressionStats");
+    assertNotNull(compressionStatsNode, "compressionStats should be present");
+    assertTrue(compressionStatsNode.has("rawForwardIndexSizePerReplicaInBytes"),
+        "compressionStats should have rawForwardIndexSizePerReplicaInBytes");
+    assertTrue(compressionStatsNode.has("compressedForwardIndexSizePerReplicaInBytes"),
+        "compressionStats should have compressedForwardIndexSizePerReplicaInBytes");
+    assertTrue(compressionStatsNode.has("compressionRatio"),
+        "compressionStats should have compressionRatio");
+    assertTrue(compressionStatsNode.has("segmentsWithStats"),
+        "compressionStats should have segmentsWithStats");
+    assertTrue(compressionStatsNode.has("totalSegments"),
+        "compressionStats should have totalSegments");
 
-    long rawFwdIndexSize = realtimeSegments.get("rawForwardIndexSizePerReplicaInBytes").asLong();
-    long compressedFwdIndexSize = realtimeSegments.get("compressedForwardIndexSizePerReplicaInBytes").asLong();
-    double compressionRatio = realtimeSegments.get("compressionRatio").asDouble();
-    int segmentsWithStats = realtimeSegments.get("segmentsWithStats").asInt();
-    int totalSegments = realtimeSegments.get("totalSegments").asInt();
+    long rawFwdIndexSize = compressionStatsNode.get("rawForwardIndexSizePerReplicaInBytes").asLong();
+    long compressedFwdIndexSize = compressionStatsNode.get("compressedForwardIndexSizePerReplicaInBytes").asLong();
+    double compressionRatio = compressionStatsNode.get("compressionRatio").asDouble();
+    int segmentsWithStats = compressionStatsNode.get("segmentsWithStats").asInt();
+    int totalSegments = compressionStatsNode.get("totalSegments").asInt();
 
     // Total segments should be > 0 (at least consuming segments exist)
     assertTrue(totalSegments > 0,

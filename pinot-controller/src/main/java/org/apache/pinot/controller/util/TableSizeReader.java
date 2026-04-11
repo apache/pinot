@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.util;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -35,6 +36,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
@@ -125,7 +127,13 @@ public class TableSizeReader {
       if (largestSegmentSizeOnServer != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
         emitMetrics(realtimeTableName, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER, largestSegmentSizeOnServer);
       }
-      emitCompressionMetrics(realtimeTableName, tableSizeDetails._realtimeSegments);
+      emitTierMetrics(realtimeTableName, tableSizeDetails._realtimeSegments._storageBreakdown);
+      if (isCompressionStatsEnabled(realtimeTableConfig)) {
+        emitCompressionMetrics(realtimeTableName, tableSizeDetails._realtimeSegments);
+      } else {
+        clearCompressionMetrics(realtimeTableName, tableSizeDetails._realtimeSegments._storageBreakdown);
+        tableSizeDetails._realtimeSegments._compressionStats = null;
+      }
     }
     if (hasOfflineTableConfig) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -152,7 +160,13 @@ public class TableSizeReader {
       if (largestSegmentSizeOnServer != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
         emitMetrics(offlineTableName, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER, largestSegmentSizeOnServer);
       }
-      emitCompressionMetrics(offlineTableName, tableSizeDetails._offlineSegments);
+      emitTierMetrics(offlineTableName, tableSizeDetails._offlineSegments._storageBreakdown);
+      if (isCompressionStatsEnabled(offlineTableConfig)) {
+        emitCompressionMetrics(offlineTableName, tableSizeDetails._offlineSegments);
+      } else {
+        clearCompressionMetrics(offlineTableName, tableSizeDetails._offlineSegments._storageBreakdown);
+        tableSizeDetails._offlineSegments._compressionStats = null;
+      }
     }
 
     // Set the top level sizes to  DEFAULT_SIZE_WHEN_MISSING_OR_ERROR when all segments are error
@@ -167,14 +181,40 @@ public class TableSizeReader {
   }
 
   private void emitCompressionMetrics(String tableNameWithType, TableSubTypeSizeDetails subTypeDetails) {
-    if (subTypeDetails._compressedForwardIndexSizePerReplicaInBytes > 0) {
+    CompressionStats stats = subTypeDetails._compressionStats;
+    if (stats != null && stats._compressedForwardIndexSizePerReplicaInBytes > 0) {
       emitMetrics(tableNameWithType, ControllerGauge.TABLE_RAW_FORWARD_INDEX_SIZE_PER_REPLICA,
-          subTypeDetails._rawForwardIndexSizePerReplicaInBytes);
+          stats._rawForwardIndexSizePerReplicaInBytes);
       emitMetrics(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA,
-          subTypeDetails._compressedForwardIndexSizePerReplicaInBytes);
+          stats._compressedForwardIndexSizePerReplicaInBytes);
       // Emit ratio * 100 to preserve two decimal digits of precision as a long gauge
-      long ratioPercent = Math.round(subTypeDetails._compressionRatio * 100);
+      long ratioPercent = Math.round(stats._compressionRatio * 100);
       emitMetrics(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT, ratioPercent);
+    }
+  }
+
+  private void emitTierMetrics(String tableNameWithType, @Nullable StorageBreakdown breakdown) {
+    if (breakdown != null) {
+      for (Map.Entry<String, TierSizeInfo> tierEntry : breakdown._tiers.entrySet()) {
+        emitMetrics(tableNameWithType + "." + tierEntry.getKey(), ControllerGauge.TABLE_TIERED_STORAGE_SIZE,
+            tierEntry.getValue()._sizePerReplicaInBytes);
+      }
+    }
+  }
+
+  private void clearCompressionMetrics(String tableNameWithType, @Nullable StorageBreakdown breakdown) {
+    if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_RAW_FORWARD_INDEX_SIZE_PER_REPLICA);
+      _controllerMetrics.removeTableGauge(tableNameWithType,
+          ControllerGauge.TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA);
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT);
+      // Also clear any previously emitted tier gauges
+      if (breakdown != null) {
+        for (String tierName : breakdown._tiers.keySet()) {
+          _controllerMetrics.removeTableGauge(tableNameWithType + "." + tierName,
+              ControllerGauge.TABLE_TIERED_STORAGE_SIZE);
+        }
+      }
     }
   }
 
@@ -182,6 +222,11 @@ public class TableSizeReader {
     if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, controllerGauge, value);
     }
+  }
+
+  private static boolean isCompressionStatsEnabled(@Nullable TableConfig tableConfig) {
+    return tableConfig != null && tableConfig.getIndexingConfig() != null
+        && tableConfig.getIndexingConfig().isCompressionStatsEnabled();
   }
 
   //
@@ -237,23 +282,15 @@ public class TableSizeReader {
     @JsonProperty("reportedSizePerReplicaInBytes")
     public long _reportedSizePerReplicaInBytes = 0;
 
-    @JsonProperty("rawForwardIndexSizePerReplicaInBytes")
-    public long _rawForwardIndexSizePerReplicaInBytes = 0;
+    @Nullable
+    @JsonProperty("compressionStats")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public CompressionStats _compressionStats;
 
-    @JsonProperty("compressedForwardIndexSizePerReplicaInBytes")
-    public long _compressedForwardIndexSizePerReplicaInBytes = 0;
-
-    @JsonProperty("compressionRatio")
-    public double _compressionRatio = 0;
-
-    @JsonProperty("segmentsWithStats")
-    public int _segmentsWithStats = 0;
-
-    @JsonProperty("totalSegments")
-    public int _totalSegments = 0;
-
-    @JsonProperty("isPartialCoverage")
-    public boolean _isPartialCoverage = false;
+    @Nullable
+    @JsonProperty("storageBreakdown")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public StorageBreakdown _storageBreakdown;
 
     @JsonProperty("segments")
     public Map<String, SegmentSizeDetails> _segments = new HashMap<>();
@@ -273,6 +310,69 @@ public class TableSizeReader {
 
     @JsonProperty("serverInfo")
     public Map<String, SegmentSizeInfo> _serverInfo = new HashMap<>();
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class CompressionStats {
+    @JsonProperty("rawForwardIndexSizePerReplicaInBytes")
+    public long _rawForwardIndexSizePerReplicaInBytes = 0;
+
+    @JsonProperty("compressedForwardIndexSizePerReplicaInBytes")
+    public long _compressedForwardIndexSizePerReplicaInBytes = 0;
+
+    @JsonProperty("compressionRatio")
+    public double _compressionRatio = 0;
+
+    @JsonProperty("segmentsWithStats")
+    public int _segmentsWithStats = 0;
+
+    @JsonProperty("totalSegments")
+    public int _totalSegments = 0;
+
+    @JsonProperty("isPartialCoverage")
+    public boolean _isPartialCoverage = false;
+
+    @JsonProperty("columnCompressionStats")
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public Map<String, ColumnCompressionDetail> _columnCompressionStats = new HashMap<>();
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class ColumnCompressionDetail {
+    @JsonProperty("rawForwardIndexSizeBytes")
+    public long _rawForwardIndexSizeBytes = 0;
+
+    @JsonProperty("compressedForwardIndexSizeBytes")
+    public long _compressedForwardIndexSizeBytes = 0;
+
+    @JsonProperty("compressionRatio")
+    public double _compressionRatio = 0;
+
+    @JsonProperty("compressionCodec")
+    public String _compressionCodec;
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class TierSizeInfo {
+    @JsonProperty("count")
+    public int _count = 0;
+
+    @JsonProperty("sizePerReplicaInBytes")
+    public long _sizePerReplicaInBytes = 0;
+
+    public TierSizeInfo() {
+    }
+
+    public TierSizeInfo(int count, long sizePerReplicaInBytes) {
+      _count = count;
+      _sizePerReplicaInBytes = sizePerReplicaInBytes;
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class StorageBreakdown {
+    @JsonProperty("tiers")
+    public Map<String, TierSizeInfo> _tiers = new HashMap<>();
   }
 
   public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs,
@@ -325,6 +425,8 @@ public class TableSizeReader {
     // segments are not reflected in that count. Estimated size is what we estimate in case of
     // errors, as described above.
     // estimatedSize >= reportedSize. If no server reported error, estimatedSize == reportedSize
+    CompressionStats compressionStats = new CompressionStats();
+    StorageBreakdown storageBreakdown = new StorageBreakdown();
     List<String> missingSegments = new ArrayList<>();
     for (Map.Entry<String, SegmentSizeDetails> entry : segmentToSizeDetailsMap.entrySet()) {
       String segment = entry.getKey();
@@ -335,6 +437,10 @@ public class TableSizeReader {
       int errors = 0;
       long maxRawFwdIndexSize = 0;
       long maxCompressedFwdIndexSize = 0;
+      String segmentTier = null;
+      // Track per-column max stats across replicas for this segment
+      Map<String, long[]> perColumnMax = new HashMap<>(); // [rawSize, compressedSize]
+      Map<String, String> perColumnCodec = new HashMap<>();
       for (SegmentSizeInfo sizeInfo : sizeDetails._serverInfo.values()) {
         if (sizeInfo.getDiskSizeInBytes() != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
           sizeDetails._reportedSizeInBytes += sizeInfo.getDiskSizeInBytes();
@@ -346,6 +452,23 @@ public class TableSizeReader {
           if (sizeInfo.getCompressedForwardIndexSizeBytes() > 0) {
             maxCompressedFwdIndexSize =
                 Math.max(maxCompressedFwdIndexSize, sizeInfo.getCompressedForwardIndexSizeBytes());
+          }
+          if (sizeInfo.getTier() != null) {
+            segmentTier = sizeInfo.getTier();
+          }
+          // Track per-column stats (max across replicas)
+          Map<String, ColumnCompressionStatsInfo> colStats = sizeInfo.getColumnCompressionStats();
+          if (colStats != null) {
+            for (Map.Entry<String, ColumnCompressionStatsInfo> colEntry : colStats.entrySet()) {
+              String colName = colEntry.getKey();
+              ColumnCompressionStatsInfo colInfo = colEntry.getValue();
+              long[] maxVals = perColumnMax.computeIfAbsent(colName, k -> new long[2]);
+              maxVals[0] = Math.max(maxVals[0], colInfo.getRawForwardIndexSizeBytes());
+              maxVals[1] = Math.max(maxVals[1], colInfo.getCompressedForwardIndexSizeBytes());
+              if (colInfo.getCompressionCodec() != null) {
+                perColumnCodec.put(colName, colInfo.getCompressionCodec());
+              }
+            }
           }
         } else {
           errors++;
@@ -363,10 +486,35 @@ public class TableSizeReader {
 
         // Aggregate forward index compression stats (per-replica max)
         if (maxRawFwdIndexSize > 0 && maxCompressedFwdIndexSize > 0) {
-          subTypeSizeDetails._rawForwardIndexSizePerReplicaInBytes += maxRawFwdIndexSize;
-          subTypeSizeDetails._compressedForwardIndexSizePerReplicaInBytes += maxCompressedFwdIndexSize;
-          subTypeSizeDetails._segmentsWithStats++;
+          compressionStats._rawForwardIndexSizePerReplicaInBytes += maxRawFwdIndexSize;
+          compressionStats._compressedForwardIndexSizePerReplicaInBytes += maxCompressedFwdIndexSize;
+          compressionStats._segmentsWithStats++;
         }
+
+        // Accumulate per-column compression stats across segments
+        for (Map.Entry<String, long[]> colEntry : perColumnMax.entrySet()) {
+          String colName = colEntry.getKey();
+          long[] maxVals = colEntry.getValue();
+          ColumnCompressionDetail detail =
+              compressionStats._columnCompressionStats.computeIfAbsent(colName, k -> new ColumnCompressionDetail());
+          detail._rawForwardIndexSizeBytes += maxVals[0];
+          detail._compressedForwardIndexSizeBytes += maxVals[1];
+          String segmentCodec = perColumnCodec.get(colName);
+          if (segmentCodec != null) {
+            if (detail._compressionCodec == null) {
+              detail._compressionCodec = segmentCodec;
+            } else if (!detail._compressionCodec.equals(segmentCodec)
+                && !"MIXED".equals(detail._compressionCodec)) {
+              detail._compressionCodec = "MIXED";
+            }
+          }
+        }
+
+        // Aggregate tier-based storage breakdown
+        String tierKey = segmentTier != null ? segmentTier : "default";
+        TierSizeInfo tierInfo = storageBreakdown._tiers.computeIfAbsent(tierKey, k -> new TierSizeInfo());
+        tierInfo._count++;
+        tierInfo._sizePerReplicaInBytes += sizeDetails._maxReportedSizePerReplicaInBytes;
       } else {
         // Segment is missing from all servers
         missingSegments.add(segment);
@@ -377,17 +525,24 @@ public class TableSizeReader {
       }
     }
 
-    // Compute compression ratio stats
-    subTypeSizeDetails._totalSegments = segmentToSizeDetailsMap.size();
-    subTypeSizeDetails._isPartialCoverage =
-        subTypeSizeDetails._segmentsWithStats > 0
-            && subTypeSizeDetails._segmentsWithStats < subTypeSizeDetails._totalSegments
-                - subTypeSizeDetails._missingSegments;
-    if (subTypeSizeDetails._compressedForwardIndexSizePerReplicaInBytes > 0) {
-      subTypeSizeDetails._compressionRatio =
-          (double) subTypeSizeDetails._rawForwardIndexSizePerReplicaInBytes
-              / subTypeSizeDetails._compressedForwardIndexSizePerReplicaInBytes;
+    // Compute compression ratio and coverage stats
+    compressionStats._totalSegments = segmentToSizeDetailsMap.size();
+    int nonMissingSegments = compressionStats._totalSegments - subTypeSizeDetails._missingSegments;
+    compressionStats._isPartialCoverage = compressionStats._segmentsWithStats < nonMissingSegments;
+    if (compressionStats._compressedForwardIndexSizePerReplicaInBytes > 0) {
+      compressionStats._compressionRatio =
+          (double) compressionStats._rawForwardIndexSizePerReplicaInBytes
+              / compressionStats._compressedForwardIndexSizePerReplicaInBytes;
     }
+    // Compute per-column compression ratios
+    for (ColumnCompressionDetail detail : compressionStats._columnCompressionStats.values()) {
+      if (detail._compressedForwardIndexSizeBytes > 0) {
+        detail._compressionRatio =
+            (double) detail._rawForwardIndexSizeBytes / detail._compressedForwardIndexSizeBytes;
+      }
+    }
+    subTypeSizeDetails._compressionStats = compressionStats;
+    subTypeSizeDetails._storageBreakdown = storageBreakdown._tiers.isEmpty() ? null : storageBreakdown;
 
     // Update metrics for missing segments
     if (subTypeSizeDetails._missingSegments > 0) {

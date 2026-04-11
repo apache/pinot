@@ -156,13 +156,16 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
     JsonNode offlineSegments = tableSizeJson.get("offlineSegments");
     assertNotNull(offlineSegments, "offlineSegments should be present");
 
-    // Verify compression stats fields exist and are valid
-    long rawFwdIndexSize = offlineSegments.get("rawForwardIndexSizePerReplicaInBytes").asLong();
-    long compressedFwdIndexSize = offlineSegments.get("compressedForwardIndexSizePerReplicaInBytes").asLong();
-    double compressionRatio = offlineSegments.get("compressionRatio").asDouble();
-    int segmentsWithStats = offlineSegments.get("segmentsWithStats").asInt();
-    int totalSegments = offlineSegments.get("totalSegments").asInt();
-    boolean isPartialCoverage = offlineSegments.get("isPartialCoverage").asBoolean();
+    // Verify compression stats are nested under compressionStats object
+    JsonNode compressionStatsNode = offlineSegments.get("compressionStats");
+    assertNotNull(compressionStatsNode, "compressionStats should be present");
+
+    long rawFwdIndexSize = compressionStatsNode.get("rawForwardIndexSizePerReplicaInBytes").asLong();
+    long compressedFwdIndexSize = compressionStatsNode.get("compressedForwardIndexSizePerReplicaInBytes").asLong();
+    double compressionRatio = compressionStatsNode.get("compressionRatio").asDouble();
+    int segmentsWithStats = compressionStatsNode.get("segmentsWithStats").asInt();
+    int totalSegments = compressionStatsNode.get("totalSegments").asInt();
+    boolean isPartialCoverage = compressionStatsNode.get("isPartialCoverage").asBoolean();
 
     // Raw forward index size should be > 0 (we have 4 raw columns across 12 segments)
     assertTrue(rawFwdIndexSize > 0,
@@ -305,20 +308,14 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
       JsonNode offlineSegments = tableSizeJson.get("offlineSegments");
       assertNotNull(offlineSegments);
 
-      // Compression stats should be zero since compressionStatsEnabled was false
-      long rawFwdIndexSize = offlineSegments.get("rawForwardIndexSizePerReplicaInBytes").asLong();
-      long compressedFwdIndexSize = offlineSegments.get("compressedForwardIndexSizePerReplicaInBytes").asLong();
-      double compressionRatio = offlineSegments.get("compressionRatio").asDouble();
-      int segmentsWithStats = offlineSegments.get("segmentsWithStats").asInt();
+      // compressionStats should be absent (null/suppressed) since compressionStatsEnabled was false
+      JsonNode compressionStatsNode = offlineSegments.get("compressionStats");
+      assertNull(compressionStatsNode,
+          "compressionStats should be absent when compressionStatsEnabled is false");
 
-      assertEquals(rawFwdIndexSize, 0,
-          "rawForwardIndexSizePerReplicaInBytes should be 0 when compressionStatsEnabled is false");
-      assertEquals(compressedFwdIndexSize, 0,
-          "compressedForwardIndexSizePerReplicaInBytes should be 0 when compressionStatsEnabled is false");
-      assertEquals(compressionRatio, 0.0, 0.01,
-          "compressionRatio should be 0 when compressionStatsEnabled is false");
-      assertEquals(segmentsWithStats, 0,
-          "segmentsWithStats should be 0 when compressionStatsEnabled is false");
+      // storageBreakdown should still be present (always reported regardless of flag)
+      JsonNode storageBreakdown = offlineSegments.get("storageBreakdown");
+      assertNotNull(storageBreakdown, "storageBreakdown should be present even when flag is off");
     } finally {
       // Clean up the second table even if assertions fail
       dropOfflineTable(noStatsTableName);

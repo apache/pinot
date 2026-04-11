@@ -125,6 +125,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Compressed forward index size per replica
   TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA("TableCompressedForwardIndexSizePerReplica", false),
 
+  // Size per replica broken down by storage tier
+  TABLE_TIERED_STORAGE_SIZE("TableTieredStorageSize", false),
+
   // Number of scheduled Cron jobs
   CRON_SCHEDULER_JOB_SCHEDULED("cronSchedulerJobScheduled", false),
 
