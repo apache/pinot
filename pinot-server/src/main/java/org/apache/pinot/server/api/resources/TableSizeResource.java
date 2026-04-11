@@ -150,7 +150,7 @@ public class TableSizeResource {
                 }
                 columnCompressionStats.put(colMeta.getColumnName(),
                     new ColumnCompressionStatsInfo(colMeta.getColumnName(),
-                        Math.max(uncompressed, 0), fwdIndexSize, ratio,
+                        uncompressed, fwdIndexSize, ratio,
                         colMeta.getCompressionCodec(), colMeta.hasDictionary(),
                         indexNames.isEmpty() ? null : indexNames));
               }

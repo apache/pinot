@@ -26,8 +26,10 @@ import com.google.common.collect.BiMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nullable;
@@ -133,6 +135,7 @@ public class TableSizeReader {
       } else {
         clearCompressionMetrics(realtimeTableName);
         tableSizeDetails._realtimeSegments._compressionStats = null;
+        tableSizeDetails._realtimeSegments._columnCompressionStats = null;
       }
     }
     if (hasOfflineTableConfig) {
@@ -166,6 +169,7 @@ public class TableSizeReader {
       } else {
         clearCompressionMetrics(offlineTableName);
         tableSizeDetails._offlineSegments._compressionStats = null;
+        tableSizeDetails._offlineSegments._columnCompressionStats = null;
       }
     }
 
@@ -284,6 +288,11 @@ public class TableSizeReader {
     public CompressionStats _compressionStats;
 
     @Nullable
+    @JsonProperty("columnCompressionStats")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public List<ColumnCompressionStatsInfo> _columnCompressionStats;
+
+    @Nullable
     @JsonProperty("storageBreakdown")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public StorageBreakdown _storageBreakdown;
@@ -327,25 +336,6 @@ public class TableSizeReader {
 
     @JsonProperty("isPartialCoverage")
     public boolean _isPartialCoverage = false;
-
-    @JsonProperty("columnCompressionStats")
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
-    public Map<String, ColumnCompressionDetail> _columnCompressionStats = new HashMap<>();
-  }
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public static class ColumnCompressionDetail {
-    @JsonProperty("rawForwardIndexSizeBytes")
-    public long _rawForwardIndexSizeBytes = 0;
-
-    @JsonProperty("compressedForwardIndexSizeBytes")
-    public long _compressedForwardIndexSizeBytes = 0;
-
-    @JsonProperty("compressionRatio")
-    public double _compressionRatio = 0;
-
-    @JsonProperty("compressionCodec")
-    public String _compressionCodec;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -423,6 +413,11 @@ public class TableSizeReader {
     // estimatedSize >= reportedSize. If no server reported error, estimatedSize == reportedSize
     CompressionStats compressionStats = new CompressionStats();
     StorageBreakdown storageBreakdown = new StorageBreakdown();
+    // Per-column aggregation: accumulate across segments (max across replicas per segment, sum across segments)
+    Map<String, long[]> columnAccum = new HashMap<>(); // [rawSize, compressedSize]
+    Map<String, String> columnCodecAgg = new HashMap<>();
+    Map<String, Boolean> columnDictMap = new HashMap<>();
+    Map<String, Set<String>> columnIndexesMap = new HashMap<>();
     List<String> missingSegments = new ArrayList<>();
     for (Map.Entry<String, SegmentSizeDetails> entry : segmentToSizeDetailsMap.entrySet()) {
       String segment = entry.getKey();
@@ -491,17 +486,26 @@ public class TableSizeReader {
         for (Map.Entry<String, long[]> colEntry : perColumnMax.entrySet()) {
           String colName = colEntry.getKey();
           long[] maxVals = colEntry.getValue();
-          ColumnCompressionDetail detail =
-              compressionStats._columnCompressionStats.computeIfAbsent(colName, k -> new ColumnCompressionDetail());
-          detail._rawForwardIndexSizeBytes += maxVals[0];
-          detail._compressedForwardIndexSizeBytes += maxVals[1];
+          long[] accum = columnAccum.computeIfAbsent(colName, k -> new long[2]);
+          accum[0] += maxVals[0];
+          accum[1] += maxVals[1];
           String segmentCodec = perColumnCodec.get(colName);
           if (segmentCodec != null) {
-            if (detail._compressionCodec == null) {
-              detail._compressionCodec = segmentCodec;
-            } else if (!detail._compressionCodec.equals(segmentCodec)
-                && !"MIXED".equals(detail._compressionCodec)) {
-              detail._compressionCodec = "MIXED";
+            columnCodecAgg.merge(colName, segmentCodec,
+                (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+          }
+        }
+        // Track per-column dictionary/indexes from per-segment server info
+        for (SegmentSizeInfo sizeInfo : sizeDetails._serverInfo.values()) {
+          Map<String, ColumnCompressionStatsInfo> colStats = sizeInfo.getColumnCompressionStats();
+          if (colStats != null) {
+            for (Map.Entry<String, ColumnCompressionStatsInfo> colEntry : colStats.entrySet()) {
+              ColumnCompressionStatsInfo colInfo = colEntry.getValue();
+              columnDictMap.putIfAbsent(colEntry.getKey(), colInfo.isHasDictionary());
+              if (colInfo.getIndexes() != null) {
+                columnIndexesMap.computeIfAbsent(colEntry.getKey(), k -> new LinkedHashSet<>())
+                    .addAll(colInfo.getIndexes());
+              }
             }
           }
         }
@@ -530,17 +534,33 @@ public class TableSizeReader {
           (double) compressionStats._rawForwardIndexSizePerReplicaInBytes
               / compressionStats._compressedForwardIndexSizePerReplicaInBytes;
     }
-    // Compute per-column compression ratios
-    for (ColumnCompressionDetail detail : compressionStats._columnCompressionStats.values()) {
-      if (detail._compressedForwardIndexSizeBytes > 0) {
-        detail._compressionRatio =
-            (double) detail._rawForwardIndexSizeBytes / detail._compressedForwardIndexSizeBytes;
+    // Build per-column compression stats list from accumulated data
+    List<ColumnCompressionStatsInfo> columnStatsList = null;
+    if (!columnAccum.isEmpty()) {
+      columnStatsList = new ArrayList<>();
+      for (Map.Entry<String, long[]> colEntry : columnAccum.entrySet()) {
+        String colName = colEntry.getKey();
+        long[] accum = colEntry.getValue();
+        boolean hasDictionary = Boolean.TRUE.equals(columnDictMap.get(colName));
+        long uncompressed = (hasDictionary && accum[0] == 0) ? -1 : accum[0];
+        long compressed = accum[1];
+        double ratio = (uncompressed > 0 && compressed > 0) ? (double) uncompressed / compressed : 0;
+        Set<String> indexSet = columnIndexesMap.get(colName);
+        List<String> indexes = (indexSet != null && !indexSet.isEmpty()) ? new ArrayList<>(indexSet) : null;
+        columnStatsList.add(new ColumnCompressionStatsInfo(colName, uncompressed, compressed, ratio,
+            columnCodecAgg.get(colName), hasDictionary, indexes));
       }
+      columnStatsList.sort((a, b) -> a.getColumn().compareTo(b.getColumn()));
     }
+    subTypeSizeDetails._columnCompressionStats = columnStatsList;
+
     // Suppress compression stats when no segments have raw forward index data (e.g. dict-only tables)
-    subTypeSizeDetails._compressionStats =
-        (compressionStats._segmentsWithStats > 0 || !compressionStats._columnCompressionStats.isEmpty())
-            ? compressionStats : null;
+    if (compressionStats._segmentsWithStats > 0) {
+      subTypeSizeDetails._compressionStats = compressionStats;
+    } else {
+      subTypeSizeDetails._compressionStats = null;
+      subTypeSizeDetails._columnCompressionStats = null;
+    }
     subTypeSizeDetails._storageBreakdown = storageBreakdown._tiers.isEmpty() ? null : storageBreakdown;
 
     // Update metrics for missing segments
