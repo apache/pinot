@@ -68,6 +68,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
@@ -104,6 +105,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
@@ -229,6 +231,9 @@ public class TablesResource {
     Map<String, Double> columnCardinalityMap = new HashMap<>();
     Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     Map<String, Map<String, Double>> columnIndexSizesMap = new HashMap<>();
+    // Per-column compression stats: accumulate raw and compressed sizes, track codec
+    Map<String, long[]> columnCompressionAccum = new HashMap<>();
+    Map<String, String> columnCodecMap = new HashMap<>();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
@@ -270,6 +275,7 @@ public class TablesResource {
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
 
+            long forwardIndexSize = 0;
             IndexService indexService = IndexService.getInstance();
             for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
               String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();
@@ -279,6 +285,21 @@ public class TablesResource {
               Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + value;
               columnIndexSizes.put(indexName, indexSize);
               columnIndexSizesMap.put(column, columnIndexSizes);
+
+              if (StandardIndexes.FORWARD_ID.equals(indexName)) {
+                forwardIndexSize = value;
+              }
+            }
+
+            // Collect per-column compression stats for raw columns with stats
+            String codec = columnMetadata.getCompressionCodec();
+            long uncompressedSize = columnMetadata.getUncompressedForwardIndexSizeBytes();
+            if (codec != null && uncompressedSize > 0) {
+              long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
+              accum[0] += uncompressedSize;
+              accum[1] += forwardIndexSize;
+              columnCodecMap.merge(column, codec,
+                  (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
             }
           }
         }
@@ -301,10 +322,21 @@ public class TablesResource {
         (partition, primaryKeyCount) -> partitionToServerPrimaryKeyCountMap.put(partition,
             Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
 
+    // Build per-column compression stats map if any columns have stats
+    Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
+    if (!columnCompressionAccum.isEmpty()) {
+      columnCompressionStats = new HashMap<>();
+      for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
+        long[] accum = entry.getValue();
+        columnCompressionStats.put(entry.getKey(),
+            new ColumnCompressionStatsInfo(accum[0], accum[1], columnCodecMap.get(entry.getKey())));
+      }
+    }
+
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
             totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
-            partitionToServerPrimaryKeyCountMap);
+            partitionToServerPrimaryKeyCountMap, columnCompressionStats);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 

@@ -73,37 +73,38 @@ public class ForwardIndexCreatorFactory {
     } else {
       // Raw forward index
       DataType storedType = fieldSpec.getDataType().getStoredType();
+      ForwardIndexCreator creator;
       if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
         // CLP (V1) uses hard-coded chunk compressor which is set to `PassThrough`
-        return new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
-      }
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2) {
+        creator = new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2) {
         // Use the default chunk compression codec for CLP, currently configured to use ZStandard
-        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics());
-      }
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_ZSTD) {
-        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.ZSTANDARD);
-      }
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_LZ4) {
-        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.LZ4);
-      }
-      ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
-      if (chunkCompressionType == null) {
-        chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
-      }
-      boolean deriveNumDocsPerChunk = indexConfig.isDeriveNumDocsPerChunk();
-      int writerVersion = indexConfig.getRawIndexWriterVersion();
-      int targetMaxChunkSize = indexConfig.getTargetMaxChunkSizeBytes();
-      int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
-      if (fieldSpec.isSingleValueField()) {
-        return getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getLengthOfLongestElement(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
-            targetDocsPerChunk);
+        creator = new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics());
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_ZSTD) {
+        creator = new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.ZSTANDARD);
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_LZ4) {
+        creator = new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.LZ4);
       } else {
-        return getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getMaxNumberOfMultiValues(), deriveNumDocsPerChunk, writerVersion,
-            context.getMaxRowLengthInBytes(), targetMaxChunkSize, targetDocsPerChunk);
+        ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
+        if (chunkCompressionType == null) {
+          chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
+        }
+        boolean deriveNumDocsPerChunk = indexConfig.isDeriveNumDocsPerChunk();
+        int writerVersion = indexConfig.getRawIndexWriterVersion();
+        int targetMaxChunkSize = indexConfig.getTargetMaxChunkSizeBytes();
+        int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
+        if (fieldSpec.isSingleValueField()) {
+          creator = getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
+              context.getLengthOfLongestElement(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
+              targetDocsPerChunk);
+        } else {
+          creator = getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
+              context.getMaxNumberOfMultiValues(), deriveNumDocsPerChunk, writerVersion,
+              context.getMaxRowLengthInBytes(), targetMaxChunkSize, targetDocsPerChunk);
+        }
       }
+      creator.setTrackUncompressedSize(context.isCompressionStatsEnabled());
+      return creator;
     }
   }
 

@@ -49,4 +49,10 @@ public interface VarByteChunkWriter extends Closeable {
   default long getUncompressedSize() {
     return 0;
   }
+
+  /**
+   * Controls whether the writer tracks uncompressed data size.
+   */
+  default void setTrackUncompressedSize(boolean trackUncompressedSize) {
+  }
 }

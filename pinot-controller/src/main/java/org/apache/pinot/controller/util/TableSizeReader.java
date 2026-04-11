@@ -131,7 +131,7 @@ public class TableSizeReader {
       if (isCompressionStatsEnabled(realtimeTableConfig)) {
         emitCompressionMetrics(realtimeTableName, tableSizeDetails._realtimeSegments);
       } else {
-        clearCompressionMetrics(realtimeTableName, tableSizeDetails._realtimeSegments._storageBreakdown);
+        clearCompressionMetrics(realtimeTableName);
         tableSizeDetails._realtimeSegments._compressionStats = null;
       }
     }
@@ -164,7 +164,7 @@ public class TableSizeReader {
       if (isCompressionStatsEnabled(offlineTableConfig)) {
         emitCompressionMetrics(offlineTableName, tableSizeDetails._offlineSegments);
       } else {
-        clearCompressionMetrics(offlineTableName, tableSizeDetails._offlineSegments._storageBreakdown);
+        clearCompressionMetrics(offlineTableName);
         tableSizeDetails._offlineSegments._compressionStats = null;
       }
     }
@@ -189,7 +189,7 @@ public class TableSizeReader {
           stats._compressedForwardIndexSizePerReplicaInBytes);
       // Emit ratio * 100 to preserve two decimal digits of precision as a long gauge
       long ratioPercent = Math.round(stats._compressionRatio * 100);
-      emitMetrics(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT, ratioPercent);
+      emitMetrics(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS, ratioPercent);
     }
   }
 
@@ -202,19 +202,12 @@ public class TableSizeReader {
     }
   }
 
-  private void clearCompressionMetrics(String tableNameWithType, @Nullable StorageBreakdown breakdown) {
+  private void clearCompressionMetrics(String tableNameWithType) {
     if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
       _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_RAW_FORWARD_INDEX_SIZE_PER_REPLICA);
       _controllerMetrics.removeTableGauge(tableNameWithType,
           ControllerGauge.TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA);
-      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT);
-      // Also clear any previously emitted tier gauges
-      if (breakdown != null) {
-        for (String tierName : breakdown._tiers.keySet()) {
-          _controllerMetrics.removeTableGauge(tableNameWithType + "." + tierName,
-              ControllerGauge.TABLE_TIERED_STORAGE_SIZE);
-        }
-      }
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS);
     }
   }
 

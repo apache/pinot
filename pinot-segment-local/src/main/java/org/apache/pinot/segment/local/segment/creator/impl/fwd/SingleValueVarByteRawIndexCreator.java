@@ -142,4 +142,9 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   public long getUncompressedSize() {
     return _indexWriter.getUncompressedSize();
   }
+
+  @Override
+  public void setTrackUncompressedSize(boolean trackUncompressedSize) {
+    _indexWriter.setTrackUncompressedSize(trackUncompressedSize);
+  }
 }
