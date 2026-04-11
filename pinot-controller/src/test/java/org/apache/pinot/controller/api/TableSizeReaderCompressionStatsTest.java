@@ -234,25 +234,28 @@ public class TableSizeReaderCompressionStatsTest {
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
         ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS), 450);
 
-    // Verify per-column compression stats aggregation
+    // Verify per-column compression stats aggregation (now top-level on TableSubTypeSizeDetails)
     // s1: col_a(raw=10000, compressed=2000), col_b(raw=20000, compressed=5000)
     // s2: col_a(raw=15000, compressed=3000)
     // Aggregated: col_a: raw=10000+15000=25000, compressed=2000+3000=5000
     //             col_b: raw=20000, compressed=5000
-    assertFalse(cs._columnCompressionStats.isEmpty(), "Per-column compression stats should be present");
-    TableSizeReader.ColumnCompressionDetail colA = cs._columnCompressionStats.get("col_a");
-    assertNotNull(colA, "col_a should have compression stats");
-    assertEquals(colA._rawForwardIndexSizeBytes, 25000);
-    assertEquals(colA._compressedForwardIndexSizeBytes, 5000);
-    assertEquals(colA._compressionRatio, 5.0, 0.01);
-    assertEquals(colA._compressionCodec, "LZ4");
+    List<ColumnCompressionStatsInfo> colStats = offlineDetails._columnCompressionStats;
+    assertNotNull(colStats, "Per-column compression stats should be present");
+    assertFalse(colStats.isEmpty(), "Per-column compression stats should not be empty");
+    // List is sorted by column name: col_a, col_b
+    ColumnCompressionStatsInfo colA = colStats.get(0);
+    assertEquals(colA.getColumn(), "col_a");
+    assertEquals(colA.getUncompressedSizeInBytes(), 25000);
+    assertEquals(colA.getCompressedSizeInBytes(), 5000);
+    assertEquals(colA.getCompressionRatio(), 5.0, 0.01);
+    assertEquals(colA.getCodec(), "LZ4");
 
-    TableSizeReader.ColumnCompressionDetail colB = cs._columnCompressionStats.get("col_b");
-    assertNotNull(colB, "col_b should have compression stats");
-    assertEquals(colB._rawForwardIndexSizeBytes, 20000);
-    assertEquals(colB._compressedForwardIndexSizeBytes, 5000);
-    assertEquals(colB._compressionRatio, 4.0, 0.01);
-    assertEquals(colB._compressionCodec, "ZSTANDARD");
+    ColumnCompressionStatsInfo colB = colStats.get(1);
+    assertEquals(colB.getColumn(), "col_b");
+    assertEquals(colB.getUncompressedSizeInBytes(), 20000);
+    assertEquals(colB.getCompressedSizeInBytes(), 5000);
+    assertEquals(colB.getCompressionRatio(), 4.0, 0.01);
+    assertEquals(colB.getCodec(), "ZSTANDARD");
 
     // Verify storageBreakdown is present
     assertNotNull(offlineDetails._storageBreakdown);
@@ -336,7 +339,11 @@ public class TableSizeReaderCompressionStatsTest {
     assertNull(offlineDetails._compressionStats,
         "compressionStats should be null when compressionStatsEnabled is false");
 
-    // storageBreakdown should still be present (REQ-4.2: always reported)
+    // columnCompressionStats should also be null when flag is OFF
+    assertNull(offlineDetails._columnCompressionStats,
+        "columnCompressionStats should be null when compressionStatsEnabled is false");
+
+    // storageBreakdown is always reported regardless of compression flag
     assertNotNull(offlineDetails._storageBreakdown,
         "storageBreakdown should still be present when compressionStatsEnabled is false");
 

@@ -1355,7 +1355,11 @@ public class PinotTableRestletResource {
 
   /**
    * Computes a table-level compressionStats summary from the per-column columnCompressionStats array
-   * and adds it to the metadata JSON response.
+   * and adds it to the metadata JSON response. Suppresses the summary if no raw columns have stats.
+   *
+   * <p>Note: The metadata endpoint aggregates per-column data across segments on each server,
+   * so segment-level coverage counts (segmentsWithStats, totalSegments, isPartialCoverage) are
+   * not available here — those are only present on the size endpoint response.
    */
   private void addCompressionStatsSummary(ObjectNode metadataJson) {
     JsonNode colStatsNode = metadataJson.get("columnCompressionStats");
@@ -1372,10 +1376,14 @@ public class PinotTableRestletResource {
       totalRaw += colStat.path("uncompressedSizeInBytes").asLong(0);
       totalCompressed += colStat.path("compressedSizeInBytes").asLong(0);
     }
+    // Suppress summary when no raw columns have meaningful stats (dict-only tables)
+    if (totalRaw == 0 && totalCompressed == 0) {
+      return;
+    }
     double ratio = totalCompressed > 0 ? (double) totalRaw / totalCompressed : 0;
     ObjectNode summaryNode = metadataJson.objectNode();
-    summaryNode.put("rawForwardIndexSizeInBytes", totalRaw);
-    summaryNode.put("compressedForwardIndexSizeInBytes", totalCompressed);
+    summaryNode.put("rawForwardIndexSizePerReplicaInBytes", totalRaw);
+    summaryNode.put("compressedForwardIndexSizePerReplicaInBytes", totalCompressed);
     summaryNode.put("compressionRatio", ratio);
     metadataJson.set("compressionStats", summaryNode);
   }

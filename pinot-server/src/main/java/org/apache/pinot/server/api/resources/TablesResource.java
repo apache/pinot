@@ -347,10 +347,11 @@ public class TablesResource {
       for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
         String col = entry.getKey();
         long[] accum = entry.getValue();
-        long uncompressed = accum[0];
-        long compressed = accum[1];
-        double ratio = compressed > 0 ? (double) uncompressed / compressed : 0;
         boolean hasDictionary = Boolean.TRUE.equals(columnHasDictMap.get(col));
+        // Dict columns have no raw forward index; report -1 to distinguish from 0-size raw columns
+        long uncompressed = (hasDictionary && accum[0] == 0) ? -1 : accum[0];
+        long compressed = accum[1];
+        double ratio = (uncompressed > 0 && compressed > 0) ? (double) uncompressed / compressed : 0;
         Set<String> idxNames = columnIndexNamesMap.get(col);
         List<String> indexes = idxNames != null ? new ArrayList<>(idxNames) : null;
         columnCompressionStats.add(new ColumnCompressionStatsInfo(
