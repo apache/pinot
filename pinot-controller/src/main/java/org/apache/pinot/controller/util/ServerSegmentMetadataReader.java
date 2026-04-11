@@ -96,7 +96,8 @@ public class ServerSegmentMetadataReader {
    *   table.
    */
   public TableMetadataInfo getAggregatedTableMetadataFromServer(String tableNameWithType,
-      BiMap<String, String> serverEndPoints, List<String> columns, int numReplica, int timeoutMs) {
+      BiMap<String, String> serverEndPoints, List<String> columns, int numReplica, int timeoutMs,
+      boolean compressionStatsEnabled) {
     int numServers = serverEndPoints.size();
     LOGGER.info("Reading aggregated segment metadata from {} servers for table: {} with timeout: {}ms", numServers,
         tableNameWithType, timeoutMs);
@@ -130,6 +131,8 @@ public class ServerSegmentMetadataReader {
     final Map<String, Set<String>> columnIndexNamesMap = new HashMap<>();
     long aggRawSize = 0;
     long aggCompressedSize = 0;
+    int aggSegmentsWithStats = 0;
+    int aggTotalSegments = 0;
     boolean hasCompressionSummary = false;
     final Map<String, long[]> tierAccum = new HashMap<>(); // [count, size]
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
@@ -179,6 +182,8 @@ public class ServerSegmentMetadataReader {
         if (serverSummary != null) {
           aggRawSize += serverSummary.getRawForwardIndexSizePerReplicaInBytes();
           aggCompressedSize += serverSummary.getCompressedForwardIndexSizePerReplicaInBytes();
+          aggSegmentsWithStats += serverSummary.getSegmentsWithStats();
+          aggTotalSegments += serverSummary.getTotalSegments();
           hasCompressionSummary = true;
         }
         // Aggregate storageBreakdown (sum counts and sizes per tier)
@@ -237,7 +242,11 @@ public class ServerSegmentMetadataReader {
       long rawPerReplica = aggRawSize / numReplica;
       long compressedPerReplica = aggCompressedSize / numReplica;
       double ratio = compressedPerReplica > 0 ? (double) rawPerReplica / compressedPerReplica : 0;
-      compressionStatsSummary = new CompressionStatsSummary(rawPerReplica, compressedPerReplica, ratio);
+      int segmentsWithStats = aggSegmentsWithStats / numReplica;
+      int totalSegments = aggTotalSegments / numReplica;
+      boolean isPartialCoverage = segmentsWithStats < totalSegments;
+      compressionStatsSummary = new CompressionStatsSummary(rawPerReplica, compressedPerReplica, ratio,
+          segmentsWithStats, totalSegments, isPartialCoverage);
     }
 
     // Build aggregated storage breakdown (divide by numReplica to avoid double counting)
@@ -250,6 +259,13 @@ public class ServerSegmentMetadataReader {
         tiers.put(entry.getKey(), new StorageBreakdownInfo.TierInfo(count, size));
       }
       storageBreakdownInfo = new StorageBreakdownInfo(tiers);
+    }
+
+    // When compression stats flag is OFF, suppress compressionStats and columnCompressionStats
+    // but always keep storageBreakdown (tier breakdown is independent of the compression stats flag)
+    if (!compressionStatsEnabled) {
+      columnCompressionStats = null;
+      compressionStatsSummary = null;
     }
 
     TableMetadataInfo aggregateTableMetadataInfo =

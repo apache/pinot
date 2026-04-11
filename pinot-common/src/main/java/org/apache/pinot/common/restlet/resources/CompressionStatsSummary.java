@@ -25,22 +25,34 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Table-level compression statistics summary, aggregated from per-column data.
- * Contains total raw and compressed forward index sizes and the overall compression ratio.
+ * Contains total raw and compressed forward index sizes, the overall compression ratio,
+ * and segment coverage information.
+ *
+ * <p>JSON schema is identical to {@code TableSizeReader.CompressionStats} on the size endpoint.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CompressionStatsSummary {
   private final long _rawForwardIndexSizePerReplicaInBytes;
   private final long _compressedForwardIndexSizePerReplicaInBytes;
   private final double _compressionRatio;
+  private final int _segmentsWithStats;
+  private final int _totalSegments;
+  private final boolean _isPartialCoverage;
 
   @JsonCreator
   public CompressionStatsSummary(
       @JsonProperty("rawForwardIndexSizePerReplicaInBytes") long rawForwardIndexSizePerReplicaInBytes,
       @JsonProperty("compressedForwardIndexSizePerReplicaInBytes") long compressedForwardIndexSizePerReplicaInBytes,
-      @JsonProperty("compressionRatio") double compressionRatio) {
+      @JsonProperty("compressionRatio") double compressionRatio,
+      @JsonProperty("segmentsWithStats") int segmentsWithStats,
+      @JsonProperty("totalSegments") int totalSegments,
+      @JsonProperty("isPartialCoverage") boolean isPartialCoverage) {
     _rawForwardIndexSizePerReplicaInBytes = rawForwardIndexSizePerReplicaInBytes;
     _compressedForwardIndexSizePerReplicaInBytes = compressedForwardIndexSizePerReplicaInBytes;
     _compressionRatio = compressionRatio;
+    _segmentsWithStats = segmentsWithStats;
+    _totalSegments = totalSegments;
+    _isPartialCoverage = isPartialCoverage;
   }
 
   public long getRawForwardIndexSizePerReplicaInBytes() {
@@ -53,5 +65,18 @@ public class CompressionStatsSummary {
 
   public double getCompressionRatio() {
     return _compressionRatio;
+  }
+
+  public int getSegmentsWithStats() {
+    return _segmentsWithStats;
+  }
+
+  public int getTotalSegments() {
+    return _totalSegments;
+  }
+
+  @JsonProperty("isPartialCoverage")
+  public boolean isPartialCoverage() {
+    return _isPartialCoverage;
   }
 }

@@ -241,6 +241,7 @@ public class TablesResource {
     Map<String, Boolean> columnHasDictMap = new HashMap<>();
     Map<String, Set<String>> columnIndexNamesMap = new HashMap<>();
     Map<String, long[]> tierAccum = new HashMap<>(); // [count, size]
+    int segmentsWithStats = 0;
 
     // Check feature flag — only collect compression stats if enabled
     Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
@@ -264,6 +265,7 @@ public class TablesResource {
           } else {
             columnSet.retainAll(segmentMetadata.getAllColumns());
           }
+          boolean segmentHasCompressionStats = false;
           for (String column : columnSet) {
             ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
             int columnLength = columnMetadata.getLengthOfLongestElement();
@@ -315,6 +317,7 @@ public class TablesResource {
                 accum[1] += (fwdIndexSize > 0 ? fwdIndexSize : 0);
                 columnCodecMap.merge(column, codec,
                     (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+                segmentHasCompressionStats = true;
               } else if (fwdIndexSize > 0) {
                 // Dictionary-encoded column: track forward index size but no raw uncompressed size
                 accum[1] += fwdIndexSize;
@@ -322,6 +325,10 @@ public class TablesResource {
               columnHasDictMap.put(column, columnMetadata.hasDictionary());
               columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
             }
+          }
+
+          if (segmentHasCompressionStats) {
+            segmentsWithStats++;
           }
 
           // Accumulate storage breakdown by tier (always-on, not gated by compression flag)
@@ -357,6 +364,7 @@ public class TablesResource {
       columnCompressionStats = new ArrayList<>();
       long totalRaw = 0;
       long totalCompressed = 0;
+      int totalSegmentCount = segmentDataManagers.size();
       for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
         String col = entry.getKey();
         long[] accum = entry.getValue();
@@ -379,7 +387,9 @@ public class TablesResource {
       // Build table-level compression summary (null if no raw columns have stats)
       if (totalRaw > 0 || totalCompressed > 0) {
         double summaryRatio = totalCompressed > 0 ? (double) totalRaw / totalCompressed : 0;
-        compressionStatsSummary = new CompressionStatsSummary(totalRaw, totalCompressed, summaryRatio);
+        boolean isPartialCoverage = segmentsWithStats < totalSegmentCount;
+        compressionStatsSummary = new CompressionStatsSummary(totalRaw, totalCompressed, summaryRatio,
+            segmentsWithStats, totalSegmentCount, isPartialCoverage);
       }
     }
 
