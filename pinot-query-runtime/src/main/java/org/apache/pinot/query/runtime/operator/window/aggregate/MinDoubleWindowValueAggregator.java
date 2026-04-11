@@ -23,13 +23,13 @@ import javax.annotation.Nullable;
 
 
 /**
- * Window value aggregator for MAX window function.
+ * Window value aggregator for MIN window function.
  */
-public class MaxWindowValueAggregator implements WindowValueAggregator<Object> {
+public class MinDoubleWindowValueAggregator implements WindowValueAggregator<Object> {
 
   private final boolean _supportRemoval;
   private final DoubleArrayFIFOQueue _deque = new DoubleArrayFIFOQueue();
-  private Double _maxValue = null;
+  private Double _minValue = null;
 
   /**
    * @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
@@ -37,7 +37,7 @@ public class MaxWindowValueAggregator implements WindowValueAggregator<Object> {
    *                       if {@code supportRemoval} is true, this value aggregator will have O(K) space complexity
    *                       (where K is the max size of the window).
    */
-  public MaxWindowValueAggregator(boolean supportRemoval) {
+  public MinDoubleWindowValueAggregator(boolean supportRemoval) {
     _supportRemoval = supportRemoval;
   }
 
@@ -46,14 +46,14 @@ public class MaxWindowValueAggregator implements WindowValueAggregator<Object> {
     if (value != null) {
       double doubleValue = ((Number) value).doubleValue();
       if (_supportRemoval) {
-        // Remove previously added elements if they're < than the current element since they're no longer useful
-        while (!_deque.isEmpty() && _deque.lastDouble() < doubleValue) {
+        // Remove previously added elements if they're > than the current element since they're no longer useful
+        while (!_deque.isEmpty() && _deque.lastDouble() > doubleValue) {
           _deque.dequeueLastDouble();
         }
         _deque.enqueue(doubleValue);
       } else {
-        if (_maxValue == null || doubleValue > _maxValue) {
-          _maxValue = doubleValue;
+        if (_minValue == null || doubleValue < _minValue) {
+          _minValue = doubleValue;
         }
       }
     }
@@ -73,6 +73,7 @@ public class MaxWindowValueAggregator implements WindowValueAggregator<Object> {
     }
   }
 
+  @Nullable
   @Override
   public Object getCurrentAggregatedValue() {
     if (_supportRemoval) {
@@ -81,13 +82,13 @@ public class MaxWindowValueAggregator implements WindowValueAggregator<Object> {
       }
       return _deque.firstDouble();
     } else {
-      return _maxValue;
+      return _minValue;
     }
   }
 
   @Override
   public void clear() {
     _deque.clear();
-    _maxValue = null;
+    _minValue = null;
   }
 }
