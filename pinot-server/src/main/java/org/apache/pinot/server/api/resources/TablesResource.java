@@ -266,6 +266,7 @@ public class TablesResource {
             columnSet.retainAll(segmentMetadata.getAllColumns());
           }
           boolean segmentHasCompressionStats = false;
+          IndexService indexService = IndexService.getInstance();
           for (String column : columnSet) {
             ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
             int columnLength = columnMetadata.getLengthOfLongestElement();
@@ -291,7 +292,6 @@ public class TablesResource {
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
 
-            IndexService indexService = IndexService.getInstance();
             List<String> indexNames = new ArrayList<>();
             for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
               String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();

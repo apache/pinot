@@ -304,18 +304,16 @@ public class ForwardIndexWriterUncompressedSizeTest {
       writer.putInt(i);
     }
 
-    // Before close: only full chunks are tracked
-    int fullChunks = totalDocs / normalizedDocsPerChunk; // 3
-    long expectedBeforeClose = (long) fullChunks * normalizedDocsPerChunk * Integer.BYTES;
-    assertEquals(writer.getUncompressedSize(), expectedBeforeClose,
-        "Before close, only full chunks should be tracked");
+    // With per-value tracking, all values are accounted for immediately (not per-chunk)
+    long expectedTotal = (long) totalDocs * Integer.BYTES;
+    assertEquals(writer.getUncompressedSize(), expectedTotal,
+        "Before close, all written values should be tracked");
 
-    // After close: partial chunk is also flushed
+    // After close: same total — close flushes the chunk buffer but doesn't change uncompressed size
     writer.close();
-    long expectedAfterClose = expectedBeforeClose + (long) (totalDocs % normalizedDocsPerChunk) * Integer.BYTES;
-    assertEquals(writer.getUncompressedSize(), expectedAfterClose,
-        "After close, partial chunk should also be included");
-    assertEquals(expectedAfterClose, (long) totalDocs * Integer.BYTES,
+    assertEquals(writer.getUncompressedSize(), expectedTotal,
+        "After close, total uncompressed size should be unchanged");
+    assertEquals(expectedTotal, (long) totalDocs * Integer.BYTES,
         "Total uncompressed size should equal totalDocs * INT_BYTES");
   }
 }

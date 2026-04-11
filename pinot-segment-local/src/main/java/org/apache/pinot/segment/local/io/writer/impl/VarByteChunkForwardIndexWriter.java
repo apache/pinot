@@ -88,6 +88,9 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
 
   @Override
   public void putBytes(byte[] value) {
+    if (_trackUncompressedSize) {
+      _uncompressedSize += value.length;
+    }
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
     _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 

@@ -232,7 +232,7 @@ public class TableSizeReaderCompressionStatsTest {
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
         ControllerGauge.TABLE_COMPRESSED_FORWARD_INDEX_SIZE_PER_REPLICA), 10000);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
-        ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS), 450);
+        ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT), 450);
 
     // Verify per-column compression stats aggregation (now top-level on TableSubTypeSizeDetails)
     // s1: col_a(raw=10000, compressed=2000), col_b(raw=20000, compressed=5000)
@@ -314,7 +314,7 @@ public class TableSizeReaderCompressionStatsTest {
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType("offline");
     // Verify metrics were emitted
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
-        ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS), 450);
+        ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT), 450);
 
     // Now run with only old server (no stats) — stale metrics should be cleared
     String[] serversNoStats = {"server2"};
@@ -322,7 +322,7 @@ public class TableSizeReaderCompressionStatsTest {
 
     // Metrics should be cleared (0 means removed)
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
-        ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS), 0);
+        ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT), 0);
   }
 
   @Test
@@ -350,6 +350,6 @@ public class TableSizeReaderCompressionStatsTest {
     // Verify no compression metrics were emitted for this table
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType("flagOffTable");
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
-        ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS), 0);
+        ControllerGauge.TABLE_COMPRESSION_RATIO_PERCENT), 0);
   }
 }

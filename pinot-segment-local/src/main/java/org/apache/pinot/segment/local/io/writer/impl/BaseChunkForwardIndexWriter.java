@@ -177,9 +177,6 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   protected void writeChunk() {
     int sizeToWrite;
     _chunkBuffer.flip();
-    if (_trackUncompressedSize) {
-      _uncompressedSize += _chunkBuffer.remaining();
-    }
 
     try {
       sizeToWrite = _chunkCompressor.compress(_chunkBuffer, _compressedBuffer);
