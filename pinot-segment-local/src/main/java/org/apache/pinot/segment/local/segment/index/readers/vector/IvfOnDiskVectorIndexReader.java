@@ -365,22 +365,13 @@ public class IvfOnDiskVectorIndexReader
     for (int i = 0; i < listSize; i++) {
       int docId = docIds[i];
 
-      float dist;
-      if (_legacyFloatEncoding) {
-        for (int d = 0; d < _dimension; d++) {
-          docVector[d] = buf.getFloat();
-        }
-        dist = computeDistance(query, docVector);
-      } else {
-        buf.get(encodedVector);
-        dist = _quantizer.computeDistance(query, encodedVector, _distanceFunction);
-      }
-
-      // Apply pre-filter if provided
+      // In filter-aware mode, skip decoding and distance computation for rejected docs.
       if (preFilterBitmap != null && !preFilterBitmap.contains(docId)) {
+        skipStoredVector(buf);
         continue;
       }
 
+      float dist = readDistanceForCurrentVector(buf, query, docVector, encodedVector);
       offer(maxHeap, docId, dist, topK);
     }
   }
@@ -412,20 +403,28 @@ public class IvfOnDiskVectorIndexReader
     byte[] encodedVector = _legacyFloatEncoding ? null : new byte[_encodedBytesPerVector];
     for (int i = 0; i < listSize; i++) {
       int docId = docIds[i];
-      float distance;
-      if (_legacyFloatEncoding) {
-        for (int d = 0; d < _dimension; d++) {
-          docVector[d] = buf.getFloat();
-        }
-        distance = computeDistance(query, docVector);
-      } else {
-        buf.get(encodedVector);
-        distance = _quantizer.computeDistance(query, encodedVector, _distanceFunction);
-      }
+      float distance = readDistanceForCurrentVector(buf, query, docVector, encodedVector);
       if (distance <= threshold) {
         offer(maxHeap, docId, distance, maxCandidates);
       }
     }
+  }
+
+  protected float readDistanceForCurrentVector(ByteBuffer buf, float[] query, float[] docVector,
+      byte[] encodedVector) {
+    if (_legacyFloatEncoding) {
+      for (int d = 0; d < _dimension; d++) {
+        docVector[d] = buf.getFloat();
+      }
+      return computeDistance(query, docVector);
+    }
+
+    buf.get(encodedVector);
+    return _quantizer.computeDistance(query, encodedVector, _distanceFunction);
+  }
+
+  private void skipStoredVector(ByteBuffer buf) {
+    buf.position(buf.position() + _encodedBytesPerVector);
   }
 
   // ThreadLocal ByteBuffer for scanInvertedList to avoid per-call heap allocation.

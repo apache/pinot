@@ -20,9 +20,11 @@ package org.apache.pinot.segment.local.segment.index.readers.vector;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -86,6 +88,32 @@ public class IvfOnDiskFilterAwareTest {
         Assert.assertTrue(preFilter.contains(docId),
             "Returned doc ID " + docId + " is not in the pre-filter bitmap");
       }
+    }
+  }
+
+  @Test
+  public void testPreFilterSkipsDistanceForRejectedDocs()
+      throws Exception {
+    int numVectors = 16;
+    int dimension = 4;
+    int nlist = 1;
+    float[][] vectors = generateVectors(numVectors, dimension, new Random(TEST_SEED));
+    createIvfFlatIndex(vectors, dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
+
+    VectorIndexConfig readerConfig =
+        createReaderConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
+    try (CountingIvfOnDiskVectorIndexReader reader =
+             new CountingIvfOnDiskVectorIndexReader(COLUMN_NAME, _tempDir, readerConfig)) {
+      reader.setNprobe(nlist);
+
+      MutableRoaringBitmap preFilter = new MutableRoaringBitmap();
+      preFilter.add(0);
+
+      ImmutableRoaringBitmap result = reader.getDocIds(vectors[0], 5, preFilter);
+      Assert.assertEquals(result.getCardinality(), 1);
+      Assert.assertTrue(result.contains(0));
+      Assert.assertEquals(reader.getDistanceComputationCount(), 1,
+          "Only docs that survive the pre-filter should be decoded and scored");
     }
   }
 
@@ -199,5 +227,24 @@ public class IvfOnDiskFilterAwareTest {
     properties.put("nlist", String.valueOf(nlist));
     properties.put("quantizer", quantizerType.name());
     return new VectorIndexConfig(false, "IVF_ON_DISK", dimension, 1, distanceFunction, properties);
+  }
+
+  private static final class CountingIvfOnDiskVectorIndexReader extends IvfOnDiskVectorIndexReader {
+    private final AtomicInteger _distanceComputations = new AtomicInteger();
+
+    private CountingIvfOnDiskVectorIndexReader(String column, File indexDir, VectorIndexConfig config) {
+      super(column, indexDir, config);
+    }
+
+    @Override
+    protected float readDistanceForCurrentVector(ByteBuffer buf, float[] query, float[] docVector,
+        byte[] encodedVector) {
+      _distanceComputations.incrementAndGet();
+      return super.readDistanceForCurrentVector(buf, query, docVector, encodedVector);
+    }
+
+    private int getDistanceComputationCount() {
+      return _distanceComputations.get();
+    }
   }
 }

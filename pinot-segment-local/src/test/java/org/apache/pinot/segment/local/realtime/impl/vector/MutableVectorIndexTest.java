@@ -22,8 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
-import org.testng.annotations.BeforeClass;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
