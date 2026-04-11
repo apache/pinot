@@ -43,6 +43,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
+import org.apache.pinot.common.restlet.resources.CompressionStatsSummary;
+import org.apache.pinot.common.restlet.resources.StorageBreakdownInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
@@ -126,6 +128,10 @@ public class ServerSegmentMetadataReader {
     final Map<String, String> columnCodecMap = new HashMap<>();
     final Map<String, Boolean> columnHasDictMap = new HashMap<>();
     final Map<String, Set<String>> columnIndexNamesMap = new HashMap<>();
+    long aggRawSize = 0;
+    long aggCompressedSize = 0;
+    boolean hasCompressionSummary = false;
+    final Map<String, long[]> tierAccum = new HashMap<>(); // [count, size]
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         TableMetadataInfo tableMetadataInfo =
@@ -168,6 +174,23 @@ public class ServerSegmentMetadataReader {
             }
           }
         }
+        // Aggregate compressionStats summary (sum raw/compressed across servers)
+        CompressionStatsSummary serverSummary = tableMetadataInfo.getCompressionStats();
+        if (serverSummary != null) {
+          aggRawSize += serverSummary.getRawForwardIndexSizePerReplicaInBytes();
+          aggCompressedSize += serverSummary.getCompressedForwardIndexSizePerReplicaInBytes();
+          hasCompressionSummary = true;
+        }
+        // Aggregate storageBreakdown (sum counts and sizes per tier)
+        StorageBreakdownInfo serverBreakdown = tableMetadataInfo.getStorageBreakdown();
+        if (serverBreakdown != null && serverBreakdown.getTiers() != null) {
+          for (Map.Entry<String, StorageBreakdownInfo.TierInfo> tierEntry
+              : serverBreakdown.getTiers().entrySet()) {
+            long[] vals = tierAccum.computeIfAbsent(tierEntry.getKey(), k -> new long[2]);
+            vals[0] += tierEntry.getValue().getCount();
+            vals[1] += tierEntry.getValue().getSizePerReplicaInBytes();
+          }
+        }
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
@@ -208,10 +231,31 @@ public class ServerSegmentMetadataReader {
       columnCompressionStats.sort((a, b) -> a.getColumn().compareTo(b.getColumn()));
     }
 
+    // Build aggregated compression summary (divide by numReplica to avoid double counting)
+    CompressionStatsSummary compressionStatsSummary = null;
+    if (hasCompressionSummary) {
+      long rawPerReplica = aggRawSize / numReplica;
+      long compressedPerReplica = aggCompressedSize / numReplica;
+      double ratio = compressedPerReplica > 0 ? (double) rawPerReplica / compressedPerReplica : 0;
+      compressionStatsSummary = new CompressionStatsSummary(rawPerReplica, compressedPerReplica, ratio);
+    }
+
+    // Build aggregated storage breakdown (divide by numReplica to avoid double counting)
+    StorageBreakdownInfo storageBreakdownInfo = null;
+    if (!tierAccum.isEmpty()) {
+      Map<String, StorageBreakdownInfo.TierInfo> tiers = new HashMap<>();
+      for (Map.Entry<String, long[]> entry : tierAccum.entrySet()) {
+        int count = (int) (entry.getValue()[0] / numReplica);
+        long size = entry.getValue()[1] / numReplica;
+        tiers.put(entry.getKey(), new StorageBreakdownInfo.TierInfo(count, size));
+      }
+      storageBreakdownInfo = new StorageBreakdownInfo(tiers);
+    }
+
     TableMetadataInfo aggregateTableMetadataInfo =
         new TableMetadataInfo(tableNameWithType, totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
             columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap, partitionToServerPrimaryKeyCountMap,
-            columnCompressionStats);
+            columnCompressionStats, compressionStatsSummary, storageBreakdownInfo);
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
           serverUrls.size());
