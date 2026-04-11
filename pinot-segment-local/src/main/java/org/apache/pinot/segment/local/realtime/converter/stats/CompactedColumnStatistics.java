@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -37,14 +38,13 @@ import org.roaringbitmap.RoaringBitmap;
 /// When commit-time compaction is enabled, only valid (non-deleted) documents should be considered.
 @SuppressWarnings("rawtypes")
 public class CompactedColumnStatistics extends MutableColumnStatistics {
-  @Nullable
-  private final Object _minValue;
-  @Nullable
-  private final Object _maxValue;
+  private final Comparable _minValue;
+  private final Comparable _maxValue;
   private final Object _uniqueValues;
   private final int _cardinality;
   private final int _minElementLength;
   private final int _maxElementLength;
+  private final boolean _isAscii;
   private final boolean _isSorted;
   private final int _totalEntries;
   private final int _maxMultiValues;
@@ -53,13 +53,15 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
   public CompactedColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn,
       RoaringBitmap validDocIds) {
     super(dataSource, sortedDocIds, isSortedColumn);
-
-    MutableForwardIndex forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
-    Dictionary dictionary = _dictionary;
-    DataType valueType = dictionary.getValueType();
-    boolean isSingleValue = forwardIndex.isSingleValue();
+    Preconditions.checkState(!validDocIds.isEmpty(), "Use EmptyColumnStatistics for empty column: %s",
+        _fieldSpec.getName());
+    DataType valueType = getValueType();
+    boolean isSingleValue = isSingleValue();
     boolean isFixedWidth = valueType.isFixedWidth();
     boolean isVarBytesMV = !isSingleValue && !isFixedWidth;
+    MutableForwardIndex forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
+    Preconditions.checkState(forwardIndex != null, "Failed to find forward index for column: %s", _fieldSpec.getName());
+    Dictionary dictionary = _dictionary;
 
     // Single pass over valid documents to collect used dict IDs and entry counts.
     // For SV columns, sort order is tracked inline: when sortedDocIds is provided, iterate in that order; when null,
@@ -69,9 +71,9 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
     IntOpenHashSet usedDictIds = new IntOpenHashSet();
     boolean isSorted = !_isSortedColumn;
     int prevDictId = -1;
-    int maxRowLength = -1;
+    int maxRowLength = 0;
     int totalEntries = 0;
-    int maxMultiValues = -1;
+    int maxMultiValues = 0;
 
     if (isSingleValue) {
       if (_sortedDocIds != null) {
@@ -127,7 +129,6 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
     _cardinality = usedDictIds.size();
     _totalEntries = totalEntries;
     _maxMultiValues = maxMultiValues;
-    _maxRowLength = maxRowLength;
 
     // Build a typed array from the used dict IDs, sort it by natural value order, and extract min/max value and element
     // lengths from the sorted results.
@@ -136,6 +137,7 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
     // For fixed-width types element length is constant; for variable-width it is tracked per entry
     int minElementLength = isFixedWidth ? valueType.size() : Integer.MAX_VALUE;
     int maxElementLength = isFixedWidth ? valueType.size() : 0;
+    boolean isAscii = false;
     switch (valueType) {
       case INT: {
         int[] values = new int[_cardinality];
@@ -205,12 +207,8 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
           maxValue = values[_cardinality - 1];
           for (BigDecimal value : values) {
             int length = BigDecimalUtils.byteSize(value);
-            if (length < minElementLength) {
-              minElementLength = length;
-            }
-            if (length > maxElementLength) {
-              maxElementLength = length;
-            }
+            minElementLength = Math.min(minElementLength, length);
+            maxElementLength = Math.max(maxElementLength, length);
           }
         }
         _uniqueValues = values;
@@ -226,13 +224,13 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
           Arrays.sort(values);
           minValue = values[0];
           maxValue = values[_cardinality - 1];
+          isAscii = true;
           for (String value : values) {
             int length = Utf8.encodedLength(value);
-            if (length < minElementLength) {
-              minElementLength = length;
-            }
-            if (length > maxElementLength) {
-              maxElementLength = length;
+            minElementLength = Math.min(minElementLength, length);
+            maxElementLength = Math.max(maxElementLength, length);
+            if (isAscii) {
+              isAscii = length == value.length();
             }
           }
         }
@@ -251,12 +249,8 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
           maxValue = values[_cardinality - 1];
           for (ByteArray value : values) {
             int length = value.length();
-            if (length < minElementLength) {
-              minElementLength = length;
-            }
-            if (length > maxElementLength) {
-              maxElementLength = length;
-            }
+            minElementLength = Math.min(minElementLength, length);
+            maxElementLength = Math.max(maxElementLength, length);
           }
         }
         _uniqueValues = values;
@@ -269,7 +263,14 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
     _maxValue = maxValue;
     _minElementLength = minElementLength;
     _maxElementLength = maxElementLength;
-
+    _isAscii = isAscii;
+    if (isSingleValue) {
+      _maxRowLength = maxElementLength;
+    } else if (isVarBytesMV) {
+      _maxRowLength = maxRowLength;
+    } else {
+      _maxRowLength = maxMultiValues * valueType.size();
+    }
     if (_isSortedColumn) {
       _isSorted = true;
     } else if (!isSingleValue) {
@@ -279,15 +280,13 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
     }
   }
 
-  @Nullable
   @Override
-  public Object getMinValue() {
+  public Comparable getMinValue() {
     return _minValue;
   }
 
-  @Nullable
   @Override
-  public Object getMaxValue() {
+  public Comparable getMaxValue() {
     return _maxValue;
   }
 
@@ -307,8 +306,13 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
   }
 
   @Override
-  public int getLengthOfLargestElement() {
+  public int getLengthOfLongestElement() {
     return _maxElementLength;
+  }
+
+  @Override
+  public boolean isAscii() {
+    return _isAscii;
   }
 
   @Override

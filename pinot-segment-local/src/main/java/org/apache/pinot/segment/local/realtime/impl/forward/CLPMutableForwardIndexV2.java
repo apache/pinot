@@ -32,7 +32,8 @@ import org.apache.pinot.segment.local.realtime.impl.dictionary.BytesOffHeapMutab
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,8 +115,9 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   protected int _nextEncodedVarId = 0;
   protected int _bytesRawFwdIndexDocIdStartOffset = Integer.MAX_VALUE;
   protected boolean _isClpEncoded = true;
-  protected int _lengthOfLongestElement;
-  protected int _lengthOfShortestElement;
+  protected int _lengthOfShortestElement = Integer.MAX_VALUE;
+  protected int _lengthOfLongestElement = 0;
+  protected boolean _isAscii = true;
 
   protected int _maxNumDictVarIdPerDoc = 0;
   protected int _maxNumEncodedVarPerDoc = 0;
@@ -173,30 +175,28 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
     }
 
     // Raw forward index stored as bytes
-    _rawBytes = new VarByteSVMutableForwardIndex(FieldSpec.DataType.BYTES, memoryManager, columnName + "_rawBytes.fwd",
+    _rawBytes = new VarByteSVMutableForwardIndex(DataType.BYTES, memoryManager, columnName + "_rawBytes.fwd",
         _estimatedMaxDocCount, _rawMessageEstimatedAvgEncodedLength);
 
     // LogtypeId + logtype dictionary
-    _logtypeId =
-        new FixedByteSVMutableForwardIndex(false, FieldSpec.DataType.INT, _logtypeIdNumRowsPerChunk, memoryManager,
-            columnName + "_logtypeId.fwd");
+    _logtypeId = new FixedByteSVMutableForwardIndex(false, DataType.INT, _logtypeIdNumRowsPerChunk, memoryManager,
+        columnName + "_logtypeId.fwd");
     _logtypeDict = new BytesOffHeapMutableDictionary(_logtypeDictEstimatedCardinality, _logtypeDictMaxOverflowHashSize,
         memoryManager, columnName + "_logtype.dict", _estimatedLogtypeAvgEncodedLength);
 
     // DictVars
-    _dictVarOffset =
-        new FixedByteSVMutableForwardIndex(false, FieldSpec.DataType.INT, _dictVarOffsetPerChunk, memoryManager,
-            columnName + "_dictVarOffsets.fwd");
-    _dictVarId = new FixedByteSVMutableForwardIndex(false, FieldSpec.DataType.INT, _dictVarIdPerChunk, memoryManager,
+    _dictVarOffset = new FixedByteSVMutableForwardIndex(false, DataType.INT, _dictVarOffsetPerChunk, memoryManager,
+        columnName + "_dictVarOffsets.fwd");
+    _dictVarId = new FixedByteSVMutableForwardIndex(false, DataType.INT, _dictVarIdPerChunk, memoryManager,
         columnName + "_dictVarIds.fwd");
     _dictVarDict = new BytesOffHeapMutableDictionary(_dictVarDictEstimatedCardinality, _dictVarDictMaxOverflowHashSize,
         memoryManager, columnName + "_dictVar.dict", _dictVarEstimatedAverageLength);
 
     // EncodedVars
     _encodedVarOffset =
-        new FixedByteSVMutableForwardIndex(false, FieldSpec.DataType.INT, _encodedVarOffsetPerChunk, memoryManager,
+        new FixedByteSVMutableForwardIndex(false, DataType.INT, _encodedVarOffsetPerChunk, memoryManager,
             columnName + "_encodedVarOffsets.fwd");
-    _encodedVar = new FixedByteSVMutableForwardIndex(false, FieldSpec.DataType.LONG, _encodedVarPerChunk, memoryManager,
+    _encodedVar = new FixedByteSVMutableForwardIndex(false, DataType.LONG, _encodedVarPerChunk, memoryManager,
         columnName + "_encodedVar.fwd");
 
     // Setup offsets used to access flattened dictVarId and encoded var multi-value docs
@@ -238,6 +238,7 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
    * @param clpEncodedMessage The {@link EncodedMessage} to append.
    */
   public void appendEncodedMessage(EncodedMessage clpEncodedMessage) {
+    byte[] rawMessageBytes = clpEncodedMessage.getMessage();
     if (_isClpEncoded || _forceEnableClpEncoding) {
       _logtypeId.setInt(_nextDocId, _logtypeDict.index(clpEncodedMessage.getLogtype()));
 
@@ -279,13 +280,16 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
         }
       }
     } else {
-      _rawBytes.setBytes(_nextDocId - _bytesRawFwdIndexDocIdStartOffset, clpEncodedMessage.getMessage());
+      _rawBytes.setBytes(_nextDocId - _bytesRawFwdIndexDocIdStartOffset, rawMessageBytes);
     }
     _nextDocId++;
 
     // Update mutable index statistics for compatibility purposes only
-    _lengthOfLongestElement = Math.max(_lengthOfLongestElement, clpEncodedMessage.getMessage().length);
-    _lengthOfShortestElement = Math.min(_lengthOfShortestElement, clpEncodedMessage.getMessage().length);
+    _lengthOfShortestElement = Math.min(_lengthOfShortestElement, rawMessageBytes.length);
+    _lengthOfLongestElement = Math.max(_lengthOfLongestElement, rawMessageBytes.length);
+    if (_isAscii) {
+      _isAscii = Utf8Utils.isAscii(rawMessageBytes);
+    }
   }
 
   public int getNumDoc() {
@@ -415,13 +419,18 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   }
 
   @Override
+  public int getLengthOfShortestElement() {
+    return _lengthOfShortestElement;
+  }
+
+  @Override
   public int getLengthOfLongestElement() {
     return _lengthOfLongestElement;
   }
 
   @Override
-  public int getLengthOfShortestElement() {
-    return _lengthOfShortestElement;
+  public boolean isAscii() {
+    return _isAscii;
   }
 
   public int getMaxNumDictVarIdPerDoc() {
@@ -474,8 +483,8 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   }
 
   @Override
-  public FieldSpec.DataType getStoredType() {
-    return FieldSpec.DataType.STRING;
+  public DataType getStoredType() {
+    return DataType.STRING;
   }
 
   @Override

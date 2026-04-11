@@ -118,7 +118,7 @@ public class MapColumnPreIndexStatsCollectorTest {
     assertEquals(keyStrStats.getTotalNumberOfEntries(), 3);
     assertEquals(keyStrStats.getMaxNumberOfMultiValues(), 0);
     assertFalse(keyStrStats.isSorted());
-    assertEquals(keyStrStats.getLengthOfLargestElement(), 5);
+    assertEquals(keyStrStats.getLengthOfLongestElement(), 5);
     assertTrue(keyStrStats instanceof StringColumnPreIndexStatsCollector);
 
     AbstractColumnStatisticsCollector keyIntStats = mapCollector.getKeyStatistics("kInt");
@@ -221,7 +221,7 @@ public class MapColumnPreIndexStatsCollectorTest {
     assertEquals(mapNoDict.getMaxNumberOfMultiValues(), mapDict.getMaxNumberOfMultiValues());
     assertEquals(mapNoDict.isSorted(), mapDict.isSorted());
     assertEquals(mapNoDict.getLengthOfShortestElement(), mapDict.getLengthOfShortestElement());
-    assertEquals(mapNoDict.getLengthOfLargestElement(), mapDict.getLengthOfLargestElement());
+    assertEquals(mapNoDict.getLengthOfLongestElement(), mapDict.getLengthOfLongestElement());
     assertEquals(mapNoDict.getMaxRowLengthInBytes(), mapDict.getMaxRowLengthInBytes());
 
     // Partition metadata
@@ -309,7 +309,7 @@ public class MapColumnPreIndexStatsCollectorTest {
     int expectedMin = Math.min(l1, Math.min(l2, l3));
     int expectedMax = Math.max(l1, Math.max(l2, l3));
     assertEquals(col.getLengthOfShortestElement(), expectedMin);
-    assertEquals(col.getLengthOfLargestElement(), expectedMax);
+    assertEquals(col.getLengthOfLongestElement(), expectedMax);
     assertEquals(col.getMaxRowLengthInBytes(), expectedMax);
   }
 
@@ -474,7 +474,7 @@ public class MapColumnPreIndexStatsCollectorTest {
 
     AbstractColumnStatisticsCollector keyStats = col.getKeyStatistics("blob");
     assertNotNull(keyStats);
-    assertTrue(keyStats instanceof BytesColumnPredIndexStatsCollector);
+    assertTrue(keyStats instanceof BytesColumnPreIndexStatsCollector);
     assertEquals(keyStats.getMinValue(), new ByteArray(new byte[]{1, 2}));
     assertEquals(keyStats.getMaxValue(), new ByteArray(new byte[]{1, 3}));
     assertEquals(keyStats.getCardinality(), 2);

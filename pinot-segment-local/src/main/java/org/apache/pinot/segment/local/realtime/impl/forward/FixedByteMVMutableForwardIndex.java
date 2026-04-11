@@ -250,6 +250,11 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
+  public boolean isAscii() {
+    return false;
+  }
+
+  @Override
   public int getDictIdMV(int docId, int[] dictIdBuffer) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
     int rowInCurrentHeader = getRowInCurrentHeader(docId);

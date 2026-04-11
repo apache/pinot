@@ -16,27 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.creator;
+package org.apache.pinot.spi.utils;
 
-import java.util.Set;
+import com.google.common.base.Utf8;
+import java.nio.charset.StandardCharsets;
 
 
-/**
- * An interface to read the map column statistics from statistics collectors.
- */
-public interface MapColumnStatistics extends ColumnStatistics {
+public class Utf8Utils {
+  private Utf8Utils() {
+  }
 
- Object getMinValueForKey(String key);
+  public static byte[] encode(String s) {
+    return s.getBytes(StandardCharsets.UTF_8);
+  }
 
- Object getMaxValueForKey(String key);
+  public static int encodedLength(String s) {
+    return Utf8.encodedLength(s);
+  }
 
- int getLengthOfShortestElementForKey(String key);
+  public static String decode(byte[] bytes) {
+    return new String(bytes, StandardCharsets.UTF_8);
+  }
 
- int getLengthOfLargestElementForKey(String key);
-
- Set<String> getKeys();
-
- boolean isSortedForKey(String key);
-
- int getTotalNumberOfEntriesForKey(String key);
+  public static boolean isAscii(byte[] bytes) {
+    int or = 0;
+    for (byte b : bytes) {
+      // Do not check within loop because most values are ASCII
+      or |= b;
+    }
+    return (or & 0x80) == 0;
+  }
 }

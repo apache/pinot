@@ -118,6 +118,11 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
+  public boolean isAscii() {
+    return false;
+  }
+
+  @Override
   public int getDictId(int docId) {
     int bufferId = getBufferId(docId);
     return _readers.get(bufferId).getInt(docId);

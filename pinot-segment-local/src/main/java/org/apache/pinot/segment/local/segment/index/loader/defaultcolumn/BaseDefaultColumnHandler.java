@@ -42,7 +42,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSorted
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
-import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
@@ -81,7 +81,6 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -465,50 +464,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Generate column index creation information.
     int totalDocs = _segmentMetadata.getTotalDocs();
-    DataType dataType = fieldSpec.getDataType();
-    Object defaultValue = fieldSpec.getDefaultNullValue();
-    boolean isSingleValue = fieldSpec.isSingleValueField();
-    int maxNumberOfMultiValueElements = isSingleValue ? 0 : 1;
-
-    Object sortedArray;
-    switch (dataType.getStoredType()) {
-      case INT:
-        Preconditions.checkState(defaultValue instanceof Integer);
-        sortedArray = new int[]{(Integer) defaultValue};
-        break;
-      case LONG:
-        Preconditions.checkState(defaultValue instanceof Long);
-        sortedArray = new long[]{(Long) defaultValue};
-        break;
-      case FLOAT:
-        Preconditions.checkState(defaultValue instanceof Float);
-        sortedArray = new float[]{(Float) defaultValue};
-        break;
-      case DOUBLE:
-        Preconditions.checkState(defaultValue instanceof Double);
-        sortedArray = new double[]{(Double) defaultValue};
-        break;
-      case BIG_DECIMAL:
-        Preconditions.checkState(defaultValue instanceof BigDecimal);
-        sortedArray = new BigDecimal[]{(BigDecimal) defaultValue};
-        break;
-      case STRING:
-        Preconditions.checkState(defaultValue instanceof String);
-        sortedArray = new String[]{(String) defaultValue};
-        break;
-      case BYTES:
-        Preconditions.checkState(defaultValue instanceof byte[]);
-        // Convert byte[] to ByteArray for internal usage
-        ByteArray bytesDefaultValue = new ByteArray((byte[]) defaultValue);
-        defaultValue = bytesDefaultValue;
-        sortedArray = new ByteArray[]{bytesDefaultValue};
-        break;
-      default:
-        throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for column: " + column);
-    }
-    DefaultColumnStatistics columnStatistics =
-        new DefaultColumnStatistics(defaultValue  /* min */, defaultValue  /* max */, sortedArray, isSingleValue,
-            totalDocs, maxNumberOfMultiValueElements);
+    DefaultColumnStatistics columnStatistics = new DefaultColumnStatistics(fieldSpec, totalDocs);
+    Object sortedArray = columnStatistics.getUniqueValuesSet();
 
     // We always create a dictionary for default value columns.
     // We will have only one value in the dictionary.
@@ -519,7 +476,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     }
 
     // Create forward index.
-    if (isSingleValue) {
+    if (fieldSpec.isSingleValueField()) {
       // Single-value column.
 
       try (SingleValueSortedForwardIndexCreator svFwdIndexCreator = new SingleValueSortedForwardIndexCreator(_indexDir,
@@ -776,7 +733,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
                 (byte[]) fieldSpec.getDefaultNullValue());
           }
           statsCollector = !useNoDictColumnStatsCollector
-              ? new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig)
+              ? new BytesColumnPreIndexStatsCollector(column, statsCollectorConfig)
               : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);

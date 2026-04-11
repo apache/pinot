@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,52 +32,73 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class NoDictColumnStatisticsCollectorTest {
 
-  private static StatsCollectorConfig newConfig(FieldSpec.DataType dataType, boolean isSingleValue) {
-    TableConfig tableConfig = new TableConfigBuilder(org.apache.pinot.spi.config.table.TableType.OFFLINE)
-        .setTableName("testTable")
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(
-            Collections.singletonMap("col", new ColumnPartitionConfig("murmur", 4))))
-        .build();
+  private static StatsCollectorConfig newConfig(DataType dataType, boolean isSingleValue) {
+    TableConfig tableConfig =
+        new TableConfigBuilder(org.apache.pinot.spi.config.table.TableType.OFFLINE).setTableName("testTable")
+            .setSegmentPartitionConfig(
+                new SegmentPartitionConfig(Collections.singletonMap("col", new ColumnPartitionConfig("murmur", 4))))
+            .build();
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec("col", dataType, isSingleValue));
 
     return new StatsCollectorConfig(tableConfig, schema, tableConfig.getIndexingConfig().getSegmentPartitionConfig());
   }
 
+  // ======== DataProviders ========
+
   @DataProvider(name = "primitiveTypeTestData")
   public Object[][] primitiveTypeTestData() {
-    return new Object[][] {
+    return new Object[][]{
         // Ensure data has exactly 1 duplicate entry and total 4 entries
 
-        // Sorted data
-        {FieldSpec.DataType.INT, new Object[]{5, 5, 10, 20}, true},
-        {FieldSpec.DataType.LONG, new Object[]{1L, 1L, 15L, 25L}, true},
-        {FieldSpec.DataType.FLOAT, new Object[]{1.5f, 1.5f, 3.5f, 7.5f}, true},
-        {FieldSpec.DataType.DOUBLE, new Object[]{2.5, 2.5, 4.5, 8.5}, true},
+        // Sorted data (INT, LONG, FLOAT, DOUBLE)
+        {DataType.INT, new Object[]{5, 5, 10, 20}, true}, {DataType.LONG, new Object[]{1L, 1L, 15L, 25L}, true},
+        {DataType.FLOAT, new Object[]{1.5f, 1.5f, 3.5f, 7.5f}, true}, {DataType.DOUBLE, new Object[]{2.5, 2.5, 4.5,
+        8.5}, true},
 
+        // Unsorted data (INT, LONG, FLOAT, DOUBLE)
+        {DataType.INT, new Object[]{10, 5, 20, 5}, false}, {DataType.LONG, new Object[]{15L, 1L, 25L, 1L}, false},
+        {DataType.FLOAT, new Object[]{3.5f, 1.5f, 7.5f, 1.5f}, false}, {DataType.DOUBLE, new Object[]{4.5, 2.5, 8.5,
+        2.5}, false}
+    };
+  }
+
+  @DataProvider(name = "bigDecimalTypeTestData")
+  public Object[][] bigDecimalTypeTestData() {
+    return new Object[][]{
+        // Ensure data has exactly 1 duplicate entry and total 4 entries
+        // Sorted data
+        {
+            new BigDecimal[]{
+                new BigDecimal("1.23"), new BigDecimal("1.23"), new BigDecimal("2.34"), new BigDecimal("9.99")
+            }, true
+        },
         // Unsorted data
-        {FieldSpec.DataType.INT, new Object[]{10, 5, 20, 5}, false},
-        {FieldSpec.DataType.LONG, new Object[]{15L, 1L, 25L, 1L}, false},
-        {FieldSpec.DataType.FLOAT, new Object[]{3.5f, 1.5f, 7.5f, 1.5f}, false},
-        {FieldSpec.DataType.DOUBLE, new Object[]{4.5, 2.5, 8.5, 2.5}, false}
+        {
+            new BigDecimal[]{
+                new BigDecimal("2.34"), new BigDecimal("1.23"), new BigDecimal("9.99"), new BigDecimal("1.23")
+            }, false
+        }
     };
   }
 
   @DataProvider(name = "stringTypeTestData")
   public Object[][] stringTypeTestData() {
-    return new Object[][] {
+    return new Object[][]{
         // Ensure data has exactly 1 duplicate entry and total 4 entries
         // Sorted data
         {new String[]{"a", "a", "bbb", "ccc"}, true},
@@ -87,7 +109,7 @@ public class NoDictColumnStatisticsCollectorTest {
 
   @DataProvider(name = "bytesTypeTestData")
   public Object[][] bytesTypeTestData() {
-    return new Object[][] {
+    return new Object[][]{
         // Ensure data has exactly 1 duplicate entry and total 4 entries
         // Sorted data
         {new byte[][]{new byte[]{1}, new byte[]{1}, new byte[]{2}, new byte[]{3}}, true},
@@ -96,29 +118,45 @@ public class NoDictColumnStatisticsCollectorTest {
     };
   }
 
-  @DataProvider(name = "bigDecimalTypeTestData")
-  public Object[][] bigDecimalTypeTestData() {
-    return new Object[][] {
-        // Ensure data has exactly 1 duplicate entry and total 4 entries
-        // Sorted data
-        {new BigDecimal[]{
-            new BigDecimal("1.23"), new BigDecimal("1.23"), new BigDecimal("2.34"), new BigDecimal("9.99")}, true},
-        // Unsorted data
-        {new BigDecimal[]{
-            new BigDecimal("2.34"), new BigDecimal("1.23"), new BigDecimal("9.99"), new BigDecimal("1.23")}, false}
+  @DataProvider(name = "primitiveMVTypeTestData")
+  public Object[][] primitiveMVTypeTestData() {
+    return new Object[][]{
+        // Two MV rows with one duplicate across total 4 values -> cardinality 3
+        // (INT, LONG, FLOAT, DOUBLE)
+        {DataType.INT, new int[][]{new int[]{5, 10}, new int[]{5, 20}}},
+        {DataType.LONG, new long[][]{new long[]{1L, 15L}, new long[]{1L, 25L}}},
+        {DataType.FLOAT, new float[][]{new float[]{1.5f, 3.5f}, new float[]{1.5f, 7.5f}}},
+        {DataType.DOUBLE, new double[][]{new double[]{2.5, 4.5}, new double[]{2.5, 8.5}}}
     };
   }
 
+  @DataProvider(name = "stringMVTypeTestData")
+  public Object[][] stringMVTypeTestData() {
+    return new Object[][]{
+        // Two MV rows with one duplicate across total 4 values -> cardinality 3
+        {new String[][]{new String[]{"a", "bbb"}, new String[]{"a", "ccc"}}}
+    };
+  }
+
+  @DataProvider(name = "bytesMVTypeTestData")
+  public Object[][] bytesMVTypeTestData() {
+    return new Object[][]{
+        // Two MV rows with one duplicate across total 4 values
+        {new byte[][][]{new byte[][]{new byte[]{1}, new byte[]{2}}, new byte[][]{new byte[]{1}, new byte[]{3}}}}
+    };
+  }
+
+  // ======== SV Tests ========
+
   @Test(dataProvider = "primitiveTypeTestData")
-  public void testSVPrimitiveTypes(FieldSpec.DataType dataType, Object[] entries, boolean isSorted) {
-    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col",
-        newConfig(dataType, true));
+  public void testSVPrimitiveTypes(DataType dataType, Object[] entries, boolean isSorted) {
+    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", newConfig(dataType, true));
     for (Object entry : entries) {
       c.collect(entry);
     }
     c.seal();
 
-    AbstractColumnStatisticsCollector expectedStatsCollector = null;
+    AbstractColumnStatisticsCollector expectedStatsCollector;
     switch (dataType) {
       case INT:
         expectedStatsCollector = new IntColumnPreIndexStatsCollector("col", newConfig(dataType, true));
@@ -140,115 +178,108 @@ public class NoDictColumnStatisticsCollectorTest {
     }
     expectedStatsCollector.seal();
 
-    assertEquals(c.getCardinality(), 3);
     assertEquals(c.getMinValue(), expectedStatsCollector.getMinValue());
     assertEquals(c.getMaxValue(), expectedStatsCollector.getMaxValue());
+    assertEquals(c.getCardinality(), 3);
+    assertEquals(c.getLengthOfShortestElement(), dataType.size());
+    assertEquals(c.getLengthOfLongestElement(), dataType.size());
+    assertTrue(c.isFixedLength());
+    assertEquals(c.isSorted(), isSorted);
     assertEquals(c.getTotalNumberOfEntries(), 4);
     assertEquals(c.getMaxNumberOfMultiValues(), 0);
-    assertEquals(c.isSorted(), isSorted);
-    assertEquals(c.getLengthOfShortestElement(), 8);
-    assertEquals(c.getLengthOfLargestElement(), 8);
-    assertEquals(c.getMaxRowLengthInBytes(), 8);
+    assertEquals(c.getMaxRowLengthInBytes(), dataType.size());
     assertEquals(c.getPartitions(), expectedStatsCollector.getPartitions());
+  }
+
+  @Test(dataProvider = "bigDecimalTypeTestData")
+  public void testSVBigDecimal(BigDecimal[] entries, boolean isSorted) {
+    NoDictColumnStatisticsCollector c =
+        new NoDictColumnStatisticsCollector("col", newConfig(DataType.BIG_DECIMAL, true));
+    for (BigDecimal e : entries) {
+      c.collect(e);
+    }
+    c.seal();
+
+    BigDecimalColumnPreIndexStatsCollector bigDecimalStats =
+        new BigDecimalColumnPreIndexStatsCollector("col", newConfig(DataType.BIG_DECIMAL, true));
+    for (BigDecimal e : entries) {
+      bigDecimalStats.collect(e);
+    }
+    bigDecimalStats.seal();
+
+    assertEquals(c.getMinValue(), bigDecimalStats.getMinValue());
+    assertEquals(c.getMaxValue(), bigDecimalStats.getMaxValue());
+    assertEquals(c.getCardinality(), 3);
+    assertEquals(c.getLengthOfShortestElement(), bigDecimalStats.getLengthOfShortestElement());
+    assertEquals(c.getLengthOfLongestElement(), bigDecimalStats.getLengthOfLongestElement());
+    assertEquals(c.isFixedLength(), bigDecimalStats.isFixedLength());
+    assertEquals(c.isSorted(), isSorted);
+    assertEquals(c.getTotalNumberOfEntries(), entries.length);
+    assertEquals(c.getMaxNumberOfMultiValues(), 0);
+    assertEquals(c.getMaxRowLengthInBytes(), bigDecimalStats.getMaxRowLengthInBytes());
+    assertEquals(c.getPartitions(), bigDecimalStats.getPartitions());
   }
 
   @Test(dataProvider = "stringTypeTestData")
   public void testSVString(String[] entries, boolean isSorted) {
-    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col",
-        newConfig(FieldSpec.DataType.STRING, true));
+    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", newConfig(DataType.STRING, true));
     for (String e : entries) {
       c.collect(e);
     }
     c.seal();
 
-    StringColumnPreIndexStatsCollector stringStats = new StringColumnPreIndexStatsCollector("col",
-        newConfig(FieldSpec.DataType.STRING, true));
+    StringColumnPreIndexStatsCollector stringStats =
+        new StringColumnPreIndexStatsCollector("col", newConfig(DataType.STRING, true));
     for (String e : entries) {
       stringStats.collect(e);
     }
     stringStats.seal();
 
-    assertEquals(c.getCardinality(), 3);
     assertEquals(c.getMinValue(), "a");
     assertEquals(c.getMaxValue(), "ccc");
+    assertEquals(c.getCardinality(), 3);
+    assertEquals(c.getLengthOfShortestElement(), 1);
+    assertEquals(c.getLengthOfLongestElement(), 3);
+    assertFalse(c.isFixedLength());
+    assertEquals(c.isSorted(), isSorted);
     assertEquals(c.getTotalNumberOfEntries(), entries.length);
     assertEquals(c.getMaxNumberOfMultiValues(), 0);
-    assertEquals(c.isSorted(), isSorted);
-    assertEquals(c.getLengthOfShortestElement(), 1);
-    assertEquals(c.getLengthOfLargestElement(), 3);
     assertEquals(c.getMaxRowLengthInBytes(), 3);
     assertEquals(c.getPartitions(), stringStats.getPartitions());
   }
 
   @Test(dataProvider = "bytesTypeTestData")
   public void testSVBytes(byte[][] entries, boolean isSorted) {
-    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col",
-        newConfig(FieldSpec.DataType.BYTES, true));
+    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", newConfig(DataType.BYTES, true));
     for (byte[] e : entries) {
       c.collect(e);
     }
     c.seal();
 
-    BytesColumnPredIndexStatsCollector bytesStats = new BytesColumnPredIndexStatsCollector("col",
-        newConfig(FieldSpec.DataType.BYTES, true));
+    BytesColumnPreIndexStatsCollector bytesStats =
+        new BytesColumnPreIndexStatsCollector("col", newConfig(DataType.BYTES, true));
     for (byte[] e : entries) {
       bytesStats.collect(e);
     }
     bytesStats.seal();
 
-    assertEquals(c.getCardinality(), bytesStats.getCardinality());
     assertEquals(c.getMinValue(), bytesStats.getMinValue());
     assertEquals(c.getMaxValue(), bytesStats.getMaxValue());
+    assertEquals(c.getCardinality(), bytesStats.getCardinality());
+    assertEquals(c.getLengthOfShortestElement(), bytesStats.getLengthOfShortestElement());
+    assertEquals(c.getLengthOfLongestElement(), bytesStats.getLengthOfLongestElement());
+    assertEquals(c.isFixedLength(), bytesStats.isFixedLength());
+    assertEquals(c.isSorted(), isSorted);
     assertEquals(c.getTotalNumberOfEntries(), entries.length);
     assertEquals(c.getMaxNumberOfMultiValues(), 0);
-    assertEquals(c.isSorted(), isSorted);
-    assertEquals(c.getLengthOfShortestElement(), bytesStats.getLengthOfShortestElement());
-    assertEquals(c.getLengthOfLargestElement(), bytesStats.getLengthOfLargestElement());
     assertEquals(c.getMaxRowLengthInBytes(), bytesStats.getMaxRowLengthInBytes());
     assertEquals(c.getPartitions(), bytesStats.getPartitions());
   }
 
-  @Test(dataProvider = "bigDecimalTypeTestData")
-  public void testSVBigDecimal(BigDecimal[] entries, boolean isSorted) {
-    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col",
-        newConfig(FieldSpec.DataType.BIG_DECIMAL, true));
-    for (BigDecimal e : entries) {
-      c.collect(e);
-    }
-    c.seal();
-
-    BigDecimalColumnPreIndexStatsCollector bigDecimalStats = new BigDecimalColumnPreIndexStatsCollector("col",
-        newConfig(FieldSpec.DataType.BIG_DECIMAL, true));
-    for (BigDecimal e : entries) {
-      bigDecimalStats.collect(e);
-    }
-    bigDecimalStats.seal();
-
-    assertEquals(c.getCardinality(), 3);
-    assertEquals(c.getMinValue(), bigDecimalStats.getMinValue());
-    assertEquals(c.getMaxValue(), bigDecimalStats.getMaxValue());
-    assertEquals(c.getTotalNumberOfEntries(), entries.length);
-    assertEquals(c.getMaxNumberOfMultiValues(), 0);
-    assertEquals(c.isSorted(), isSorted);
-    assertEquals(c.getLengthOfShortestElement(), bigDecimalStats.getLengthOfShortestElement());
-    assertEquals(c.getLengthOfLargestElement(), bigDecimalStats.getLengthOfLargestElement());
-    assertEquals(c.getMaxRowLengthInBytes(), bigDecimalStats.getMaxRowLengthInBytes());
-    assertEquals(c.getPartitions(), bigDecimalStats.getPartitions());
-  }
-
-  @DataProvider(name = "primitiveMVTypeTestData")
-  public Object[][] primitiveMVTypeTestData() {
-    return new Object[][] {
-        // Two MV rows with one duplicate across total 4 values -> cardinality 3
-        {FieldSpec.DataType.INT, new int[][]{new int[]{5, 10}, new int[]{5, 20}}},
-        {FieldSpec.DataType.LONG, new long[][]{new long[]{1L, 15L}, new long[]{1L, 25L}}},
-        {FieldSpec.DataType.FLOAT, new float[][]{new float[]{1.5f, 3.5f}, new float[]{1.5f, 7.5f}}},
-        {FieldSpec.DataType.DOUBLE, new double[][]{new double[]{2.5, 4.5}, new double[]{2.5, 8.5}}}
-    };
-  }
+  // ======== MV Tests ========
 
   @Test(dataProvider = "primitiveMVTypeTestData")
-  public void testMVPrimitiveTypes(FieldSpec.DataType dataType, Object entries) {
+  public void testMVPrimitiveTypes(DataType dataType, Object entries) {
     // Validate MV behavior for numeric primitives using native arrays
     // - isSorted should be false for MV columns
     // - lengths are not tracked for native MV primitives (expect -1)
@@ -287,109 +318,124 @@ public class NoDictColumnStatisticsCollectorTest {
     c.seal();
     expectedStatsCollector.seal();
 
-    assertEquals(c.getCardinality(), expectedStatsCollector.getCardinality());
     assertEquals(c.getMinValue(), expectedStatsCollector.getMinValue());
     assertEquals(c.getMaxValue(), expectedStatsCollector.getMaxValue());
+    assertEquals(c.getCardinality(), expectedStatsCollector.getCardinality());
+    assertEquals(c.getLengthOfShortestElement(), expectedStatsCollector.getLengthOfShortestElement());
+    assertEquals(c.getLengthOfLongestElement(), expectedStatsCollector.getLengthOfLongestElement());
+    assertEquals(c.isFixedLength(), expectedStatsCollector.isFixedLength());
+    assertFalse(c.isSorted());
     assertEquals(c.getTotalNumberOfEntries(), 4);
     assertEquals(c.getMaxNumberOfMultiValues(), 2);
-    assertFalse(c.isSorted());
-    assertEquals(c.getLengthOfShortestElement(), expectedStatsCollector.getLengthOfShortestElement());
-    assertEquals(c.getLengthOfLargestElement(), expectedStatsCollector.getLengthOfLargestElement());
     assertEquals(c.getMaxRowLengthInBytes(), expectedStatsCollector.getMaxRowLengthInBytes());
     assertEquals(c.getPartitions(), expectedStatsCollector.getPartitions());
   }
 
-  @DataProvider(name = "stringMVTypeTestData")
-  public Object[][] stringMVTypeTestData() {
-    return new Object[][] {
-        // Two MV rows with one duplicate across total 4 values -> cardinality 3
-        {new String[][]{new String[]{"a", "bbb"}, new String[]{"a", "ccc"}}}
-    };
-  }
-
   @Test(dataProvider = "stringMVTypeTestData")
   public void testMVString(String[][] rows) {
-    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col",
-        newConfig(FieldSpec.DataType.STRING, false));
+    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", newConfig(DataType.STRING, false));
     for (String[] r : rows) {
       c.collect(r);
     }
     c.seal();
 
-    StringColumnPreIndexStatsCollector stringStats = new StringColumnPreIndexStatsCollector("col",
-        newConfig(FieldSpec.DataType.STRING, false));
+    StringColumnPreIndexStatsCollector stringStats =
+        new StringColumnPreIndexStatsCollector("col", newConfig(DataType.STRING, false));
     for (String[] r : rows) {
       stringStats.collect(r);
     }
     stringStats.seal();
 
-    assertEquals(c.getCardinality(), stringStats.getCardinality());
     assertEquals(c.getMinValue(), stringStats.getMinValue());
     assertEquals(c.getMaxValue(), stringStats.getMaxValue());
+    assertEquals(c.getCardinality(), stringStats.getCardinality());
+    assertEquals(c.getLengthOfShortestElement(), 1);
+    assertEquals(c.getLengthOfLongestElement(), 3);
+    assertFalse(c.isFixedLength());
+    assertFalse(c.isSorted());
     assertEquals(c.getTotalNumberOfEntries(), 4);
     assertEquals(c.getMaxNumberOfMultiValues(), 2);
-    assertFalse(c.isSorted());
-    assertEquals(c.getLengthOfShortestElement(), 1);
-    assertEquals(c.getLengthOfLargestElement(), 3);
     assertEquals(c.getMaxRowLengthInBytes(), 4);
     assertEquals(c.getPartitions(), stringStats.getPartitions());
   }
 
-  @DataProvider(name = "bytesMVTypeTestData")
-  public Object[][] bytesMVTypeTestData() {
-    return new Object[][] {
-        // Two MV rows with one duplicate across total 4 values
-        {new byte[][][]{new byte[][]{new byte[]{1}, new byte[]{2}}, new byte[][]{new byte[]{1}, new byte[]{3}}}}
-    };
-  }
-
   @Test(dataProvider = "bytesMVTypeTestData")
   public void testMVBytes(byte[][][] rows) {
-    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col",
-        newConfig(FieldSpec.DataType.BYTES, false));
+    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", newConfig(DataType.BYTES, false));
     for (byte[][] r : rows) {
       c.collect(r);
     }
     c.seal();
 
-    BytesColumnPredIndexStatsCollector bytesStats = new BytesColumnPredIndexStatsCollector("col",
-        newConfig(FieldSpec.DataType.BYTES, false));
+    BytesColumnPreIndexStatsCollector bytesStats =
+        new BytesColumnPreIndexStatsCollector("col", newConfig(DataType.BYTES, false));
     for (byte[][] r : rows) {
       bytesStats.collect(r);
     }
     bytesStats.seal();
 
-    assertEquals(c.getCardinality(), bytesStats.getCardinality());
     assertEquals(c.getMinValue(), bytesStats.getMinValue());
     assertEquals(c.getMaxValue(), bytesStats.getMaxValue());
+    assertEquals(c.getCardinality(), bytesStats.getCardinality());
+    assertEquals(c.getLengthOfShortestElement(), bytesStats.getLengthOfShortestElement());
+    assertEquals(c.getLengthOfLongestElement(), bytesStats.getLengthOfLongestElement());
+    assertEquals(c.isFixedLength(), bytesStats.isFixedLength());
+    assertFalse(c.isSorted());
     assertEquals(c.getTotalNumberOfEntries(), 4);
     assertEquals(c.getMaxNumberOfMultiValues(), 2);
-    assertFalse(c.isSorted());
-    assertEquals(c.getLengthOfShortestElement(), bytesStats.getLengthOfShortestElement());
-    assertEquals(c.getLengthOfLargestElement(), bytesStats.getLengthOfLargestElement());
     assertEquals(c.getMaxRowLengthInBytes(), bytesStats.getMaxRowLengthInBytes());
     assertEquals(c.getPartitions(), bytesStats.getPartitions());
   }
 
+  // ======== isAscii ========
+
   @Test
-  public void testMVBigDecimal()
-      throws Exception {
-    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col",
-        newConfig(FieldSpec.DataType.BIG_DECIMAL, false));
-    try {
-      c.collect(new Object[] {new BigDecimal("1.1"), new BigDecimal("2.2")});
-      fail("Expected UnsupportedOperationException");
-    } catch (UnsupportedOperationException expected) {
-      // expected: BigDecimal MV not supported by NoDict collector by design
-    }
+  public void testIsAsciiStringSvAllAscii() {
+    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", newConfig(DataType.STRING, true));
+    c.collect("hello");
+    c.collect("world");
+    c.seal();
+
+    assertTrue(c.isAscii());
   }
+
+  @Test
+  public void testIsAsciiStringSvNonAscii() {
+    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", newConfig(DataType.STRING, true));
+    c.collect("hello");
+    c.collect("café");
+    c.seal();
+
+    assertFalse(c.isAscii());
+  }
+
+  @Test
+  public void testIsAsciiStringMvNonAscii() {
+    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", newConfig(DataType.STRING, false));
+    c.collect(new String[]{"hello", "world"});
+    c.collect(new String[]{"café"});
+    c.seal();
+
+    assertFalse(c.isAscii());
+  }
+
+  @Test
+  public void testIsAsciiIntType() {
+    NoDictColumnStatisticsCollector c = new NoDictColumnStatisticsCollector("col", newConfig(DataType.INT, true));
+    c.collect(42);
+    c.seal();
+
+    assertFalse(c.isAscii());
+  }
+
+  // ======== Randomized Test ========
 
   // A test that picks a random data type, generates random data for that type (sorted or unsorted,
   // single or multi value, high or low or medium cardinality), collects stats using NoDictColumnStatisticsCollector
   // and the corresponding PreIndexStatsCollector, and compares the stats.
   // Runs this setup multiple times to cover different scenarios.
   @Test
-  public void testRandomizedDataComparison() throws Exception {
+  public void testRandomizedDataComparison() {
     Random random = new Random();
 
     // Run multiple iterations with different random scenarios
@@ -398,17 +444,16 @@ public class NoDictColumnStatisticsCollectorTest {
     }
   }
 
-  private void runRandomizedTest(Random random, int iteration) throws Exception {
+  private void runRandomizedTest(Random random, int iteration) {
     // Randomly select data type (excluding BIG_DECIMAL for MV as it's unsupported)
-    FieldSpec.DataType[] supportedTypes = {
-        FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT,
-        FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES,
-        FieldSpec.DataType.BIG_DECIMAL
+    DataType[] supportedTypes = {
+        DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.BIG_DECIMAL, DataType.STRING,
+        DataType.BYTES
     };
-    FieldSpec.DataType dataType = supportedTypes[random.nextInt(supportedTypes.length)];
+    DataType dataType = supportedTypes[random.nextInt(supportedTypes.length)];
 
     // Randomly choose single vs multi-value (skip MV for BIG_DECIMAL)
-    boolean isSingleValue = dataType == FieldSpec.DataType.BIG_DECIMAL || random.nextBoolean();
+    boolean isSingleValue = dataType == DataType.BIG_DECIMAL || random.nextBoolean();
 
     // Randomly choose cardinality level
     CardinalityLevel cardinalityLevel = CardinalityLevel.values()[random.nextInt(CardinalityLevel.values().length)];
@@ -419,9 +464,9 @@ public class NoDictColumnStatisticsCollectorTest {
     try {
       runTestForConfiguration(dataType, isSingleValue, cardinalityLevel, shouldBeSorted, random, iteration);
     } catch (Exception e) {
-      throw new RuntimeException(String.format(
-          "Test failed for iteration %d: dataType=%s, isSingleValue=%s, cardinality=%s, sorted=%s",
-          iteration, dataType, isSingleValue, cardinalityLevel, shouldBeSorted), e);
+      throw new RuntimeException(
+          String.format("Test failed for iteration %d: dataType=%s, isSingleValue=%s, cardinality=%s, sorted=%s",
+              iteration, dataType, isSingleValue, cardinalityLevel, shouldBeSorted), e);
     }
   }
 
@@ -443,9 +488,8 @@ public class NoDictColumnStatisticsCollectorTest {
     }
   }
 
-  private void runTestForConfiguration(FieldSpec.DataType dataType, boolean isSingleValue,
-      CardinalityLevel cardinalityLevel, boolean shouldBeSorted, Random random, int iteration) throws Exception {
-
+  private void runTestForConfiguration(DataType dataType, boolean isSingleValue, CardinalityLevel cardinalityLevel,
+      boolean shouldBeSorted, Random random, int iteration) {
     int uniqueValueCount = cardinalityLevel.getUniqueCount(random);
     int totalEntries = uniqueValueCount + random.nextInt(uniqueValueCount * 2); // Add some duplicates
 
@@ -460,8 +504,7 @@ public class NoDictColumnStatisticsCollectorTest {
     // Create collectors
     NoDictColumnStatisticsCollector noDictCollector =
         new NoDictColumnStatisticsCollector("col", newConfig(dataType, isSingleValue));
-    AbstractColumnStatisticsCollector expectedCollector =
-        createDictCollector(dataType, isSingleValue);
+    AbstractColumnStatisticsCollector expectedCollector = createDictCollector(dataType, isSingleValue);
 
     // Collect stats from both collectors
     for (Object entry : testData) {
@@ -476,8 +519,8 @@ public class NoDictColumnStatisticsCollectorTest {
     compareCollectorStats(noDictCollector, expectedCollector, dataType, isSingleValue, iteration, testData);
   }
 
-  private Object[] generateData(FieldSpec.DataType dataType, boolean isSingleValue,
-      int uniqueValueCount, int totalEntries, boolean shouldBeSorted, Random random) {
+  private Object[] generateData(DataType dataType, boolean isSingleValue, int uniqueValueCount, int totalEntries,
+      boolean shouldBeSorted, Random random) {
 
     try {
       switch (dataType) {
@@ -489,12 +532,12 @@ public class NoDictColumnStatisticsCollectorTest {
           return generateFloatData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
         case DOUBLE:
           return generateDoubleData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
+        case BIG_DECIMAL:
+          return generateBigDecimalData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
         case STRING:
           return generateStringData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
         case BYTES:
           return generateBytesData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
-        case BIG_DECIMAL:
-          return generateBigDecimalData(isSingleValue, uniqueValueCount, totalEntries, shouldBeSorted, random);
         default:
           return null;
       }
@@ -564,6 +607,21 @@ public class NoDictColumnStatisticsCollectorTest {
     }
   }
 
+  private Object[] generateBigDecimalData(boolean isSingleValue, int uniqueValueCount, int totalEntries,
+      boolean shouldBeSorted, Random random) {
+    if (!isSingleValue) {
+      throw new UnsupportedOperationException("BigDecimal MV not supported");
+    }
+
+    Set<BigDecimal> uniqueValues = new HashSet<>();
+    while (uniqueValues.size() < uniqueValueCount) {
+      uniqueValues.add(new BigDecimal(random.nextDouble() * 1000).setScale(2, RoundingMode.HALF_UP));
+    }
+    List<BigDecimal> values = new ArrayList<>(uniqueValues);
+
+    return generateSingleValueData(values, totalEntries, shouldBeSorted, random).toArray();
+  }
+
   private Object[] generateStringData(boolean isSingleValue, int uniqueValueCount, int totalEntries,
       boolean shouldBeSorted, Random random) {
     Set<String> uniqueValues = new HashSet<>();
@@ -599,23 +657,8 @@ public class NoDictColumnStatisticsCollectorTest {
     }
   }
 
-  private Object[] generateBigDecimalData(boolean isSingleValue, int uniqueValueCount, int totalEntries,
+  private <T extends Comparable<T>> List<T> generateSingleValueData(List<T> uniqueValues, int totalEntries,
       boolean shouldBeSorted, Random random) {
-    if (!isSingleValue) {
-      throw new UnsupportedOperationException("BigDecimal MV not supported");
-    }
-
-    Set<BigDecimal> uniqueValues = new HashSet<>();
-    while (uniqueValues.size() < uniqueValueCount) {
-      uniqueValues.add(new BigDecimal(random.nextDouble() * 1000).setScale(2, BigDecimal.ROUND_HALF_UP));
-    }
-    List<BigDecimal> values = new ArrayList<>(uniqueValues);
-
-    return generateSingleValueData(values, totalEntries, shouldBeSorted, random).toArray();
-  }
-
-  private <T extends Comparable<T>> List<T> generateSingleValueData(List<T> uniqueValues,
-      int totalEntries, boolean shouldBeSorted, Random random) {
     List<T> result = new ArrayList<>();
     for (int i = 0; i < totalEntries; i++) {
       result.add(uniqueValues.get(random.nextInt(uniqueValues.size())));
@@ -628,8 +671,8 @@ public class NoDictColumnStatisticsCollectorTest {
     return result;
   }
 
-  private Object[] generateSingleValueByteArrayData(List<byte[]> uniqueValues,
-      int totalEntries, boolean shouldBeSorted, Random random) {
+  private Object[] generateSingleValueByteArrayData(List<byte[]> uniqueValues, int totalEntries, boolean shouldBeSorted,
+      Random random) {
     List<byte[]> result = new ArrayList<>();
     for (int i = 0; i < totalEntries; i++) {
       result.add(uniqueValues.get(random.nextInt(uniqueValues.size())));
@@ -753,7 +796,7 @@ public class NoDictColumnStatisticsCollectorTest {
     return bytes;
   }
 
-  private AbstractColumnStatisticsCollector createDictCollector(FieldSpec.DataType dataType, boolean isSingleValue) {
+  private AbstractColumnStatisticsCollector createDictCollector(DataType dataType, boolean isSingleValue) {
     switch (dataType) {
       case INT:
         return new IntColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
@@ -763,48 +806,47 @@ public class NoDictColumnStatisticsCollectorTest {
         return new FloatColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
       case DOUBLE:
         return new DoubleColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
+      case BIG_DECIMAL:
+        return new BigDecimalColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
       case STRING:
         return new StringColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
       case BYTES:
-        return new BytesColumnPredIndexStatsCollector("col", newConfig(dataType, isSingleValue));
-      case BIG_DECIMAL:
-        return new BigDecimalColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
+        return new BytesColumnPreIndexStatsCollector("col", newConfig(dataType, isSingleValue));
       default:
         throw new IllegalArgumentException("Unsupported data type: " + dataType);
     }
   }
 
   private void compareCollectorStats(NoDictColumnStatisticsCollector noDictCollector,
-      AbstractColumnStatisticsCollector expectedCollector, FieldSpec.DataType dataType,
-      boolean isSingleValue, int iteration, Object[] testData) {
+      AbstractColumnStatisticsCollector expectedCollector, DataType dataType, boolean isSingleValue, int iteration,
+      Object[] testData) {
 
-    String context = String.format("Iteration %d, DataType: %s, SingleValue: %s, Data: %s",
-        iteration, dataType, isSingleValue, Arrays.deepToString(testData));
+    String context =
+        String.format("Iteration %d, DataType: %s, SingleValue: %s, Data: %s", iteration, dataType, isSingleValue,
+            Arrays.deepToString(testData));
 
+    assertEquals(noDictCollector.getMinValue(), expectedCollector.getMinValue(), "MinValue mismatch - " + context);
+    assertEquals(noDictCollector.getMaxValue(), expectedCollector.getMaxValue(), "MaxValue mismatch - " + context);
     int approx = noDictCollector.getCardinality();
     int exact = expectedCollector.getCardinality();
     assertTrue(approx >= exact,
-        "Approx Cardinality " + approx + " is lower than actual cardinality "
-            + exact + " for " + context);
-    assertEquals(noDictCollector.getMinValue(), expectedCollector.getMinValue(),
-        "MinValue mismatch - " + context);
-    assertEquals(noDictCollector.getMaxValue(), expectedCollector.getMaxValue(),
-        "MaxValue mismatch - " + context);
+        "Approx Cardinality " + approx + " is lower than actual cardinality " + exact + " for " + context);
+    if (dataType != DataType.INT && dataType != DataType.LONG && dataType != DataType.FLOAT
+        && dataType != DataType.DOUBLE) {
+      assertEquals(noDictCollector.getLengthOfShortestElement(), expectedCollector.getLengthOfShortestElement(),
+          "LengthOfShortestElement mismatch - " + context);
+      assertEquals(noDictCollector.getLengthOfLongestElement(), expectedCollector.getLengthOfLongestElement(),
+          "LengthOfLongestElement mismatch - " + context);
+      assertEquals(noDictCollector.isFixedLength(), expectedCollector.isFixedLength(),
+          "isFixedLength mismatch - " + context);
+    }
+    assertEquals(noDictCollector.isSorted(), expectedCollector.isSorted(), "isSorted mismatch - " + context);
     assertEquals(noDictCollector.getTotalNumberOfEntries(), expectedCollector.getTotalNumberOfEntries(),
         "TotalNumberOfEntries mismatch - " + context);
     assertEquals(noDictCollector.getMaxNumberOfMultiValues(), expectedCollector.getMaxNumberOfMultiValues(),
         "MaxNumberOfMultiValues mismatch - " + context);
-    assertEquals(noDictCollector.isSorted(), expectedCollector.isSorted(),
-        "isSorted mismatch - " + context);
-    if (dataType != FieldSpec.DataType.INT && dataType != FieldSpec.DataType.LONG
-        && dataType != FieldSpec.DataType.FLOAT && dataType != FieldSpec.DataType.DOUBLE) {
-      if (dataType != FieldSpec.DataType.STRING) {
-        // StringCollector currently does not return shortest element length
-        assertEquals(noDictCollector.getLengthOfShortestElement(), expectedCollector.getLengthOfShortestElement(),
-            "LengthOfShortestElement mismatch - " + context);
-      }
-      assertEquals(noDictCollector.getLengthOfLargestElement(), expectedCollector.getLengthOfLargestElement(),
-          "LengthOfLargestElement mismatch - " + context);
+    if (dataType != DataType.INT && dataType != DataType.LONG && dataType != DataType.FLOAT
+        && dataType != DataType.DOUBLE) {
       assertEquals(noDictCollector.getMaxRowLengthInBytes(), expectedCollector.getMaxRowLengthInBytes(),
           "MaxRowLengthInBytes mismatch - " + context);
     }

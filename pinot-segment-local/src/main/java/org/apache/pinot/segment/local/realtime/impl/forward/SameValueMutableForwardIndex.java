@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.forward;
 
+import com.google.common.base.Utf8;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -29,25 +30,31 @@ import org.apache.pinot.spi.data.FieldSpec;
  * allow noRawDataForTextIndex config to work with mutable indexes.
  */
 public class SameValueMutableForwardIndex implements MutableForwardIndex {
-
-  private final Object _actualValue;
+  private final String _actualValue;
   private final Object[] _actualValues;
+  private final int _valueLength;
   private final MutableForwardIndex _delegate;
 
   public SameValueMutableForwardIndex(Object actualValue, MutableForwardIndex delegate) {
-    _actualValue = actualValue;
-    _actualValues = new Object[]{actualValue};
+    _actualValue = actualValue.toString();
+    _actualValues = new Object[]{_actualValue};
+    _valueLength = Utf8.encodedLength(_actualValue);
     _delegate = delegate;
   }
 
   @Override
   public int getLengthOfShortestElement() {
-    return _actualValue.toString().length();
+    return _valueLength;
   }
 
   @Override
   public int getLengthOfLongestElement() {
-    return _actualValue.toString().length();
+    return _valueLength;
+  }
+
+  @Override
+  public boolean isAscii() {
+    return _valueLength == _actualValue.length();
   }
 
   @Override
@@ -61,7 +68,7 @@ public class SameValueMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public FieldSpec.DataType getStoredType() {
+  public DataType getStoredType() {
     return _delegate.getStoredType();
   }
 

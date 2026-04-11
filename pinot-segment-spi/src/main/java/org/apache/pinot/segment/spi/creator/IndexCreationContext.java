@@ -150,7 +150,7 @@ public interface IndexCreationContext {
       _maxValue = (Comparable<?>) columnStatistics.getMaxValue();
       _sortedUniqueElementsArray = columnStatistics.getUniqueValuesSet();
       _cardinality = columnStatistics.getCardinality();
-      _lengthOfLongestEntry = columnStatistics.getLengthOfLargestElement();
+      _lengthOfLongestEntry = columnStatistics.getLengthOfLongestElement();
       _fixedLength = columnStatistics.isFixedLength();
       _sorted = columnStatistics.isSorted();
       _totalNumberOfEntries = columnStatistics.getTotalNumberOfEntries();
