@@ -137,4 +137,9 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
       throws IOException {
     _indexWriter.close();
   }
+
+  @Override
+  public long getUncompressedSize() {
+    return _indexWriter.getUncompressedSize();
+  }
 }

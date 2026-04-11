@@ -64,4 +64,19 @@ public interface ColumnMetadata extends ColumnShape {
   default int getColumnMaxLength() {
     return getLengthOfLongestElement();
   }
+
+  /**
+   * Returns the uncompressed forward index size in bytes, or {@link #UNAVAILABLE} if not available.
+   */
+  default long getUncompressedForwardIndexSizeBytes() {
+    return UNAVAILABLE;
+  }
+
+  /**
+   * Returns the compression codec used for this column's forward index, or null if not available.
+   */
+  @Nullable
+  default String getCompressionCodec() {
+    return null;
+  }
 }

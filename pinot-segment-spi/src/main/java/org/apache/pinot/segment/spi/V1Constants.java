@@ -194,6 +194,8 @@ public class V1Constants {
       public static final String TOTAL_DOCS = "totalDocs";
 
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
+      public static final String FORWARD_INDEX_UNCOMPRESSED_SIZE = "forwardIndex.uncompressedSizeBytes";
+      public static final String FORWARD_INDEX_COMPRESSION_CODEC = "forwardIndex.compressionCodec";
 
       public static String getKeyFor(String column, String key) {
         return COLUMN_PROPS_KEY_PREFIX + column + "." + key;

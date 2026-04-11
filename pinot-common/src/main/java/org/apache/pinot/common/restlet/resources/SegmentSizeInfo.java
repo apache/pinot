@@ -21,18 +21,42 @@ package org.apache.pinot.common.restlet.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
+import javax.annotation.Nullable;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentSizeInfo {
   private final String _segmentName;
   private final long _diskSizeInBytes;
+  private final long _rawForwardIndexSizeBytes;
+  private final long _compressedForwardIndexSizeBytes;
+  private final String _tier;
+  private final Map<String, ColumnCompressionStatsInfo> _columnCompressionStats;
+
+  public SegmentSizeInfo(String segmentName, long sizeBytes) {
+    this(segmentName, sizeBytes, -1, -1, null, null);
+  }
+
+  public SegmentSizeInfo(String segmentName, long sizeBytes, long rawForwardIndexSizeBytes,
+      long compressedForwardIndexSizeBytes, @Nullable String tier) {
+    this(segmentName, sizeBytes, rawForwardIndexSizeBytes, compressedForwardIndexSizeBytes, tier, null);
+  }
 
   @JsonCreator
   public SegmentSizeInfo(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("diskSizeInBytes") long sizeBytes) {
+      @JsonProperty("diskSizeInBytes") long sizeBytes,
+      @JsonProperty("rawForwardIndexSizeBytes") long rawForwardIndexSizeBytes,
+      @JsonProperty("compressedForwardIndexSizeBytes") long compressedForwardIndexSizeBytes,
+      @JsonProperty("tier") @Nullable String tier,
+      @JsonProperty("columnCompressionStats") @Nullable Map<String, ColumnCompressionStatsInfo>
+          columnCompressionStats) {
     _segmentName = segmentName;
     _diskSizeInBytes = sizeBytes;
+    _rawForwardIndexSizeBytes = rawForwardIndexSizeBytes;
+    _compressedForwardIndexSizeBytes = compressedForwardIndexSizeBytes;
+    _tier = tier;
+    _columnCompressionStats = columnCompressionStats;
   }
 
   public String getSegmentName() {
@@ -41,6 +65,24 @@ public class SegmentSizeInfo {
 
   public long getDiskSizeInBytes() {
     return _diskSizeInBytes;
+  }
+
+  public long getRawForwardIndexSizeBytes() {
+    return _rawForwardIndexSizeBytes;
+  }
+
+  public long getCompressedForwardIndexSizeBytes() {
+    return _compressedForwardIndexSizeBytes;
+  }
+
+  @Nullable
+  public String getTier() {
+    return _tier;
+  }
+
+  @Nullable
+  public Map<String, ColumnCompressionStatsInfo> getColumnCompressionStats() {
+    return _columnCompressionStats;
   }
 
   @Override

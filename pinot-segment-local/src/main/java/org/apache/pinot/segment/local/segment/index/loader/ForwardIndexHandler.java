@@ -597,6 +597,16 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     segmentWriter.removeIndex(column, StandardIndexes.forward());
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
 
+    // Persist the new compression codec in metadata.properties
+    ForwardIndexConfig newConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+    if (newConfig.getChunkCompressionType() != null) {
+      Map<String, String> metadataProperties = new HashMap<>();
+      metadataProperties.put(
+          getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
+          newConfig.getChunkCompressionType().name());
+      SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+    }
+
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
 
@@ -1098,7 +1108,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
 
     LOGGER.info("Creating raw forward index for segment={} and column={}", segmentName, column);
-    rewriteDictToRawForwardIndex(existingColMetadata, segmentWriter, indexDir);
+    long uncompressedSize = rewriteDictToRawForwardIndex(existingColMetadata, segmentWriter, indexDir);
 
     // Remove dictionary and forward index
     segmentWriter.removeIndex(column, StandardIndexes.forward());
@@ -1114,6 +1124,15 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // TODO: See https://github.com/apache/pinot/pull/16921 for details
     // TODO: Remove the property after 1.6.0 release
     // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), null);
+    ForwardIndexConfig fwdConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+    if (fwdConfig.getChunkCompressionType() != null) {
+      metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
+          fwdConfig.getChunkCompressionType().name());
+    }
+    if (uncompressedSize > 0) {
+      metadataProperties.put(getKeyFor(column, FORWARD_INDEX_UNCOMPRESSED_SIZE),
+          String.valueOf(uncompressedSize));
+    }
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // Remove range index, inverted index and FST index.
@@ -1166,7 +1185,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     LOGGER.info("Converted forward index to raw (dictionary kept) for segment: {}, column: {}", segmentName, column);
   }
 
-  private void rewriteDictToRawForwardIndex(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter,
+  /**
+   * Rewrites a dictionary-encoded forward index as a raw forward index.
+   * @return the uncompressed size of the new raw forward index, or 0 if not tracked
+   */
+  private long rewriteDictToRawForwardIndex(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter,
       File indexDir)
       throws Exception {
     String column = columnMetadata.getColumnName();
@@ -1179,6 +1202,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         forwardIndexRewriteHelper(column, columnMetadata, forwardIndex, creator, columnMetadata.getTotalDocs(), null,
             dictionary);
+        return creator.getUncompressedSize();
       }
     }
   }

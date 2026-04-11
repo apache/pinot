@@ -310,6 +310,13 @@ public interface ForwardIndexCreator extends IndexCreator {
   DataType getValueType();
 
   /**
+   * Returns the total uncompressed size of the forward index data written, or 0 if not tracked.
+   */
+  default long getUncompressedSize() {
+    return 0;
+  }
+
+  /**
    * DICTIONARY-ENCODED INDEX APIs
    */
 

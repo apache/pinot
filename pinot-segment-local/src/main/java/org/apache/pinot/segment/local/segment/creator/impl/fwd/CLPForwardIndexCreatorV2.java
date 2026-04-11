@@ -471,6 +471,24 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
   }
 
   @Override
+  public long getUncompressedSize() {
+    long total = 0;
+    if (_logtypeIdFwdIndex != null) {
+      total += _logtypeIdFwdIndex.getUncompressedSize();
+    }
+    if (_dictVarIdFwdIndex != null) {
+      total += _dictVarIdFwdIndex.getUncompressedSize();
+    }
+    if (_encodedVarFwdIndex != null) {
+      total += _encodedVarFwdIndex.getUncompressedSize();
+    }
+    if (_rawMsgFwdIndex != null) {
+      total += _rawMsgFwdIndex.getUncompressedSize();
+    }
+    return total;
+  }
+
+  @Override
   public boolean isDictionaryEncoded() {
     return false;
   }
