@@ -32,9 +32,13 @@ import java.util.PriorityQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
+import org.apache.pinot.segment.local.segment.index.vector.VectorQuantizationUtils;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
+import org.apache.pinot.segment.spi.index.reader.ApproximateRadiusVectorIndexReader;
+import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
-import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -57,7 +61,8 @@ import org.slf4j.LoggerFactory;
  * <p>Thread-safe for concurrent reads. Query-scoped nprobe overrides use ThreadLocal.
  * FileChannel positional reads are thread-safe; each read specifies an absolute offset.</p>
  */
-public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAware {
+public class IvfOnDiskVectorIndexReader
+    implements FilterAwareVectorIndexReader, ApproximateRadiusVectorIndexReader, NprobeAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfOnDiskVectorIndexReader.class);
 
   static final int DEFAULT_NPROBE = 4;
@@ -67,6 +72,11 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
   private final int _numVectors;
   private final int _nlist;
   private final VectorIndexConfig.VectorDistanceFunction _distanceFunction;
+  private final int _indexFormatVersion;
+  private final VectorQuantizerType _quantizerType;
+  private final VectorQuantizer _quantizer;
+  private final boolean _legacyFloatEncoding;
+  private final int _encodedBytesPerVector;
   private final String _column;
   private final int _defaultNprobe;
 
@@ -85,6 +95,8 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
   // Observability: per-centroid access count
   private final AtomicLong[] _centroidAccessCounts;
   private final AtomicLong _totalSearches = new AtomicLong(0);
+  private final AtomicLong _filteredSearches = new AtomicLong(0);
+  private final AtomicLong _unfilteredSearches = new AtomicLong(0);
 
   private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
 
@@ -119,9 +131,11 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
           Integer.toHexString(magic), Integer.toHexString(IvfFlatVectorIndexCreator.MAGIC));
 
       int version = headerBuf.getInt();
-      Preconditions.checkState(version == IvfFlatVectorIndexCreator.FORMAT_VERSION,
-          "Unsupported IVF format version: %s, expected: %s",
-          version, IvfFlatVectorIndexCreator.FORMAT_VERSION);
+      Preconditions.checkState(version == IvfFlatVectorIndexCreator.LEGACY_FORMAT_VERSION
+              || version == IvfFlatVectorIndexCreator.FORMAT_VERSION,
+          "Unsupported IVF format version: %s, expected one of: [%s, %s]",
+          version, IvfFlatVectorIndexCreator.LEGACY_FORMAT_VERSION, IvfFlatVectorIndexCreator.FORMAT_VERSION);
+      _indexFormatVersion = version;
 
       _dimension = headerBuf.getInt();
       _numVectors = headerBuf.getInt();
@@ -132,10 +146,40 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
           "Invalid distance function ordinal: %s", distanceFunctionOrdinal);
       _distanceFunction = allFunctions[distanceFunctionOrdinal];
 
+      long centroidsOffset = 24;
+      if (_indexFormatVersion == IvfFlatVectorIndexCreator.FORMAT_VERSION) {
+        ByteBuffer quantizerHeader = ByteBuffer.allocate(8);
+        readFully(_channel, quantizerHeader, 24);
+        quantizerHeader.flip();
+
+        int quantizerTypeOrdinal = quantizerHeader.getInt();
+        VectorQuantizerType[] allQuantizerTypes = VectorQuantizerType.values();
+        Preconditions.checkState(quantizerTypeOrdinal >= 0 && quantizerTypeOrdinal < allQuantizerTypes.length,
+            "Invalid quantizer type ordinal: %s", quantizerTypeOrdinal);
+        _quantizerType = allQuantizerTypes[quantizerTypeOrdinal];
+
+        int quantizerParamsLength = quantizerHeader.getInt();
+        Preconditions.checkState(quantizerParamsLength >= 0,
+            "Invalid quantizer params length: %s", quantizerParamsLength);
+        byte[] quantizerParams = new byte[quantizerParamsLength];
+        if (quantizerParamsLength > 0) {
+          ByteBuffer quantizerParamsBuf = ByteBuffer.wrap(quantizerParams);
+          readFully(_channel, quantizerParamsBuf, 32);
+        }
+        _quantizer = VectorQuantizationUtils.createReadQuantizer(_quantizerType, _dimension, quantizerParams);
+        _legacyFloatEncoding = false;
+        _encodedBytesPerVector = _quantizer.getEncodedBytesPerVector();
+        centroidsOffset = 32L + quantizerParamsLength;
+      } else {
+        _quantizerType = VectorQuantizerType.FLAT;
+        _quantizer = null;
+        _legacyFloatEncoding = true;
+        _encodedBytesPerVector = _dimension * Float.BYTES;
+      }
+
       _defaultNprobe = Math.min(DEFAULT_NPROBE, _nlist);
 
       // --- Read Centroids into heap via FileChannel ---
-      long centroidsOffset = 24; // right after header
       int centroidsBytesTotal = _nlist * _dimension * Float.BYTES;
       ByteBuffer centroidsBuf = ByteBuffer.allocate(centroidsBytesTotal);
       readFully(_channel, centroidsBuf, centroidsOffset);
@@ -181,8 +225,9 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
         _centroidAccessCounts[c] = new AtomicLong(0);
       }
 
-      LOGGER.info("Opened IVF_ON_DISK index for column: {}: {} vectors, {} centroids, dim={}, file={}",
-          column, _numVectors, _nlist, _dimension, indexFile.getAbsolutePath());
+      LOGGER.info("Opened IVF_ON_DISK index for column: {}: {} vectors, {} centroids, dim={}, file={}, "
+              + "formatVersion={}, quantizer={}",
+          column, _numVectors, _nlist, _dimension, indexFile.getAbsolutePath(), _indexFormatVersion, _quantizerType);
     } catch (Exception e) {
       // Close resources if construction fails partway through (e.g., IllegalStateException
       // from Preconditions.checkState is not caught by IOException alone)
@@ -197,6 +242,54 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
 
   @Override
   public MutableRoaringBitmap getDocIds(float[] searchQuery, int topK) {
+    _unfilteredSearches.incrementAndGet();
+    return searchInternal(searchQuery, topK, null);
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDocIds(float[] searchQuery, int topK, ImmutableRoaringBitmap preFilterBitmap) {
+    Preconditions.checkArgument(preFilterBitmap != null, "preFilterBitmap must not be null");
+    if (preFilterBitmap.isEmpty()) {
+      return new MutableRoaringBitmap();
+    }
+    _filteredSearches.incrementAndGet();
+    return searchInternal(searchQuery, topK, preFilterBitmap);
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDocIdsWithinApproximateRadius(float[] searchQuery, float threshold,
+      int maxCandidates) {
+    Preconditions.checkArgument(searchQuery.length == _dimension,
+        "Query dimension mismatch: expected %s, got %s", _dimension, searchQuery.length);
+    Preconditions.checkArgument(maxCandidates > 0, "maxCandidates must be positive, got: %s", maxCandidates);
+
+    if (_numVectors == 0 || _nlist == 0) {
+      return new MutableRoaringBitmap();
+    }
+
+    _unfilteredSearches.incrementAndGet();
+    _totalSearches.incrementAndGet();
+    int effectiveNprobe = Math.min(getNprobe(), _nlist);
+    int[] probeCentroids = findClosestCentroids(searchQuery, effectiveNprobe);
+    int effectiveMaxCandidates = Math.min(maxCandidates, _numVectors);
+    PriorityQueue<ScoredDoc> maxHeap = new PriorityQueue<>(effectiveMaxCandidates,
+        (a, b) -> Float.compare(b._distance, a._distance));
+
+    for (int probeIdx : probeCentroids) {
+      _centroidAccessCounts[probeIdx].incrementAndGet();
+      scanInvertedListWithinApproximateRadius(
+          probeIdx, searchQuery, threshold, effectiveMaxCandidates, maxHeap);
+    }
+
+    MutableRoaringBitmap result = new MutableRoaringBitmap();
+    for (ScoredDoc doc : maxHeap) {
+      result.add(doc._docId);
+    }
+    return result;
+  }
+
+  private MutableRoaringBitmap searchInternal(float[] searchQuery, int topK,
+      ImmutableRoaringBitmap preFilterBitmap) {
     Preconditions.checkArgument(searchQuery.length == _dimension,
         "Query dimension mismatch: expected %s, got %s", _dimension, searchQuery.length);
     Preconditions.checkArgument(topK > 0, "topK must be positive, got: %s", topK);
@@ -215,7 +308,7 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
 
     for (int probeIdx : probeCentroids) {
       _centroidAccessCounts[probeIdx].incrementAndGet();
-      scanInvertedList(probeIdx, searchQuery, effectiveTopK, maxHeap, null);
+      scanInvertedList(probeIdx, searchQuery, effectiveTopK, maxHeap, preFilterBitmap);
     }
 
     MutableRoaringBitmap result = new MutableRoaringBitmap();
@@ -247,8 +340,8 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
     // Position after the listSize int
     long dataOffset = _listOffsets[centroidIdx] + 4;
 
-    // Read entire inverted list data via FileChannel: docIds (int[]) + vectors (float[][])
-    int listBytes = listSize * (Integer.BYTES + _dimension * Float.BYTES);
+    // Read entire inverted list data via FileChannel: docIds (int[]) + encoded vectors
+    int listBytes = listSize * (Integer.BYTES + _encodedBytesPerVector);
     ByteBuffer buf = getOrResizeThreadLocalBuffer(listBytes);
     try {
       readFully(_channel, buf, dataOffset);
@@ -264,16 +357,23 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
       docIds[i] = buf.getInt();
     }
 
-    // Reuse a single float[] for reading each document vector to avoid per-doc allocation
-    float[] docVector = new float[_dimension];
+    // Reuse per-doc buffers to avoid allocation churn in the hot loop.
+    float[] docVector = _legacyFloatEncoding ? new float[_dimension] : null;
+    byte[] encodedVector = _legacyFloatEncoding ? null : new byte[_encodedBytesPerVector];
 
     // Read and score vectors
     for (int i = 0; i < listSize; i++) {
       int docId = docIds[i];
 
-      // Read vector from buffer into the reused array
-      for (int d = 0; d < _dimension; d++) {
-        docVector[d] = buf.getFloat();
+      float dist;
+      if (_legacyFloatEncoding) {
+        for (int d = 0; d < _dimension; d++) {
+          docVector[d] = buf.getFloat();
+        }
+        dist = computeDistance(query, docVector);
+      } else {
+        buf.get(encodedVector);
+        dist = _quantizer.computeDistance(query, encodedVector, _distanceFunction);
       }
 
       // Apply pre-filter if provided
@@ -281,12 +381,49 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
         continue;
       }
 
-      float dist = computeDistance(query, docVector);
-      if (maxHeap.size() < topK) {
-        maxHeap.offer(new ScoredDoc(docId, dist));
-      } else if (dist < maxHeap.peek()._distance) {
-        maxHeap.poll();
-        maxHeap.offer(new ScoredDoc(docId, dist));
+      offer(maxHeap, docId, dist, topK);
+    }
+  }
+
+  private void scanInvertedListWithinApproximateRadius(int centroidIdx, float[] query, float threshold,
+      int maxCandidates, PriorityQueue<ScoredDoc> maxHeap) {
+    int listSize = _listSizes[centroidIdx];
+    if (listSize == 0) {
+      return;
+    }
+
+    long dataOffset = _listOffsets[centroidIdx] + 4;
+    int listBytes = listSize * (Integer.BYTES + _encodedBytesPerVector);
+    ByteBuffer buf = getOrResizeThreadLocalBuffer(listBytes);
+    try {
+      readFully(_channel, buf, dataOffset);
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "Failed to read inverted list for centroid " + centroidIdx + " in column: " + _column, e);
+    }
+    buf.flip();
+
+    int[] docIds = new int[listSize];
+    for (int i = 0; i < listSize; i++) {
+      docIds[i] = buf.getInt();
+    }
+
+    float[] docVector = _legacyFloatEncoding ? new float[_dimension] : null;
+    byte[] encodedVector = _legacyFloatEncoding ? null : new byte[_encodedBytesPerVector];
+    for (int i = 0; i < listSize; i++) {
+      int docId = docIds[i];
+      float distance;
+      if (_legacyFloatEncoding) {
+        for (int d = 0; d < _dimension; d++) {
+          docVector[d] = buf.getFloat();
+        }
+        distance = computeDistance(query, docVector);
+      } else {
+        buf.get(encodedVector);
+        distance = _quantizer.computeDistance(query, encodedVector, _distanceFunction);
+      }
+      if (distance <= threshold) {
+        offer(maxHeap, docId, distance, maxCandidates);
       }
     }
   }
@@ -404,6 +541,15 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
     return bestIndices;
   }
 
+  private static void offer(PriorityQueue<ScoredDoc> heap, int docId, float distance, int maxCandidates) {
+    if (heap.size() < maxCandidates) {
+      heap.offer(new ScoredDoc(docId, distance));
+    } else if (distance < heap.peek()._distance) {
+      heap.poll();
+      heap.offer(new ScoredDoc(docId, distance));
+    }
+  }
+
   // -----------------------------------------------------------------------
   // Debug / observability
   // -----------------------------------------------------------------------
@@ -418,7 +564,13 @@ public class IvfOnDiskVectorIndexReader implements VectorIndexReader, NprobeAwar
     info.put("nlist", _nlist);
     info.put("distanceFunction", _distanceFunction.name());
     info.put("effectiveNprobe", getNprobe());
+    info.put("indexFormatVersion", _indexFormatVersion);
+    info.put("quantizer", _quantizerType.name());
+    info.put("encodedBytesPerVector", _encodedBytesPerVector);
     info.put("totalSearches", _totalSearches.get());
+    info.put("filteredSearches", _filteredSearches.get());
+    info.put("unfilteredSearches", _unfilteredSearches.get());
+    info.put("supportsPreFilter", true);
     info.put("storageMode", "fileChannel");
 
     // Compute cache warmth estimate: fraction of centroids accessed at least once

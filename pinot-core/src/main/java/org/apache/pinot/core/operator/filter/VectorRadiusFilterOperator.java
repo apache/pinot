@@ -30,6 +30,7 @@ import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.ApproximateRadiusVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
@@ -72,6 +73,9 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
   private final VectorBackendType _backendType;
   private final VectorIndexConfig.VectorDistanceFunction _distanceFunction;
   private final boolean _hasVectorIndex;
+  private final boolean _backendSupportsApproximateRadius;
+  private final boolean _readerSupportsApproximateRadius;
+  private final boolean _useApproximateRadiusPath;
   private ImmutableRoaringBitmap _matches;
 
   /**
@@ -95,6 +99,10 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
     _backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
     _distanceFunction = VectorDistanceUtils.resolveDistanceFunction(vectorIndexConfig);
     _hasVectorIndex = vectorIndexReader != null;
+    _backendSupportsApproximateRadius = _backendType.getCapabilities().supportsApproximateRadius();
+    _readerSupportsApproximateRadius = vectorIndexReader instanceof ApproximateRadiusVectorIndexReader;
+    _useApproximateRadiusPath =
+        _hasVectorIndex && _backendSupportsApproximateRadius && _readerSupportsApproximateRadius;
   }
 
   @Override
@@ -134,11 +142,12 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
 
   @Override
   public String toExplainString() {
-    return EXPLAIN_NAME + "(indexLookUp:" + (_hasVectorIndex ? "vector_index_with_scan" : "exact_scan")
+    return EXPLAIN_NAME + "(indexLookUp:" + getIndexLookupMode()
         + ", operator:" + _predicate.getType()
         + ", vector identifier:" + _column
         + ", backend:" + _backendType
         + ", distanceFunction:" + _distanceFunction
+        + ", approximateRadiusPath:" + _useApproximateRadiusPath
         + ", vector literal:" + Arrays.toString(_predicate.getValue())
         + ", threshold:" + _predicate.getThreshold()
         + ')';
@@ -152,11 +161,12 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
     super.explainAttributes(attributeBuilder);
-    attributeBuilder.putString("indexLookUp", _hasVectorIndex ? "vector_index_with_scan" : "exact_scan");
+    attributeBuilder.putString("indexLookUp", getIndexLookupMode());
     attributeBuilder.putString("operator", _predicate.getType().name());
     attributeBuilder.putString("vectorIdentifier", _column);
     attributeBuilder.putString("backend", _backendType.name());
     attributeBuilder.putString("distanceFunction", _distanceFunction.name());
+    attributeBuilder.putBool("approximateRadiusPath", _useApproximateRadiusPath);
     attributeBuilder.putString("vectorLiteral", Arrays.toString(_predicate.getValue()));
     attributeBuilder.putString("threshold", String.valueOf(_predicate.getThreshold()));
   }
@@ -183,11 +193,18 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
    */
   private ImmutableRoaringBitmap executeIndexAssistedSearch(float[] queryVector, float threshold) {
     int internalLimit = Math.min(VectorSimilarityRadiusPredicate.DEFAULT_INTERNAL_LIMIT, _numDocs);
-    ImmutableRoaringBitmap candidates = _vectorIndexReader.getDocIds(queryVector, internalLimit);
+    ImmutableRoaringBitmap candidates;
+    if (_useApproximateRadiusPath) {
+      candidates =
+          ((ApproximateRadiusVectorIndexReader) _vectorIndexReader).getDocIdsWithinApproximateRadius(queryVector,
+              threshold, internalLimit);
+    } else {
+      candidates = _vectorIndexReader.getDocIds(queryVector, internalLimit);
+    }
 
     int candidateCount = candidates.getCardinality();
-    LOGGER.debug("Vector radius search on column: {}, candidates from index: {}, threshold: {}",
-        _column, candidateCount, threshold);
+    LOGGER.debug("Vector radius search on column: {}, candidates from index: {}, threshold: {}, source: {}",
+        _column, candidateCount, threshold, _useApproximateRadiusPath ? "approximate_radius_path" : "topk_path");
 
     if (candidateCount >= internalLimit) {
       // ANN candidate pool is saturated — fall back to exact brute-force scan to guarantee
@@ -200,6 +217,16 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
     }
 
     return filterByThreshold(candidates, queryVector, threshold);
+  }
+
+  private String getIndexLookupMode() {
+    if (!_hasVectorIndex) {
+      return "exact_scan";
+    }
+    if (_useApproximateRadiusPath) {
+      return "vector_index_approx_radius_with_scan";
+    }
+    return "vector_index_topk_with_scan";
   }
 
   /**

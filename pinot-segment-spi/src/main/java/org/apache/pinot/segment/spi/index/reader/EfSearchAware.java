@@ -45,4 +45,34 @@ public interface EfSearchAware {
    */
   default void clearEfSearch() {
   }
+
+  /**
+   * Enables or disables relative-distance competitive checks for the next HNSW search.
+   *
+   * <p>When enabled, HNSW traversal can prune candidate exploration based on the current
+   * competitive similarity threshold. When disabled, no score-threshold pruning is applied.</p>
+   */
+  default void setUseRelativeDistance(boolean useRelativeDistance) {
+  }
+
+  /**
+   * Clears any query-scoped override set via {@link #setUseRelativeDistance(boolean)}.
+   */
+  default void clearUseRelativeDistance() {
+  }
+
+  /**
+   * Enables or disables bounded queue behavior for the next HNSW search.
+   *
+   * <p>Bounded queue mode keeps only the current top-K candidates; unbounded mode retains all
+   * collected candidates up to the visit limit.</p>
+   */
+  default void setUseBoundedQueue(boolean useBoundedQueue) {
+  }
+
+  /**
+   * Clears any query-scoped override set via {@link #setUseBoundedQueue(boolean)}.
+   */
+  default void clearUseBoundedQueue() {
+  }
 }

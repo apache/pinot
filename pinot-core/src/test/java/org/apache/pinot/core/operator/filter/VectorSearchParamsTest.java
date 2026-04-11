@@ -196,4 +196,21 @@ public class VectorSearchParamsTest {
     Assert.assertTrue(params.hasDistanceThreshold());
     Assert.assertEquals(params.getDistanceThreshold(), -0.8f);
   }
+
+  @Test
+  public void testHnswRuntimeControlsFromQueryOptions() {
+    Map<String, String> opts = new HashMap<>();
+    opts.put(QueryOptionKey.VECTOR_EF_SEARCH, "64");
+    opts.put(QueryOptionKey.VECTOR_HNSW_USE_RELATIVE_DISTANCE, "false");
+    opts.put(QueryOptionKey.VECTOR_HNSW_USE_BOUNDED_QUEUE, "false");
+
+    VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
+
+    Assert.assertEquals(params.getEfSearch(), Integer.valueOf(64));
+    Assert.assertEquals(params.getHnswUseRelativeDistance(), Boolean.FALSE);
+    Assert.assertEquals(params.getHnswUseBoundedQueue(), Boolean.FALSE);
+    Assert.assertTrue(params.toString().contains("efSearch=64"));
+    Assert.assertTrue(params.toString().contains("hnswUseRelativeDistance=false"));
+    Assert.assertTrue(params.toString().contains("hnswUseBoundedQueue=false"));
+  }
 }

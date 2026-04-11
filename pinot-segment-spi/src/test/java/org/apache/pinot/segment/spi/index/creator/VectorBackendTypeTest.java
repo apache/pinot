@@ -89,13 +89,21 @@ public class VectorBackendTypeTest {
     assertTrue(VectorBackendType.HNSW.supportsMutableSegments());
     assertFalse(VectorBackendType.HNSW.supportsNprobe());
     assertFalse(VectorBackendType.HNSW.defaultExactRerankEnabled());
+    assertTrue(VectorBackendType.HNSW.getCapabilities().supportsRuntimeSearchParams());
 
     assertFalse(VectorBackendType.IVF_FLAT.supportsMutableSegments());
     assertTrue(VectorBackendType.IVF_FLAT.supportsNprobe());
     assertFalse(VectorBackendType.IVF_FLAT.defaultExactRerankEnabled());
+    assertTrue(VectorBackendType.IVF_FLAT.getCapabilities().supportsRuntimeSearchParams());
 
     assertFalse(VectorBackendType.IVF_PQ.supportsMutableSegments());
     assertTrue(VectorBackendType.IVF_PQ.supportsNprobe());
     assertTrue(VectorBackendType.IVF_PQ.defaultExactRerankEnabled());
+    assertTrue(VectorBackendType.IVF_PQ.getCapabilities().supportsRuntimeSearchParams());
+
+    assertFalse(VectorBackendType.IVF_ON_DISK.supportsMutableSegments());
+    assertTrue(VectorBackendType.IVF_ON_DISK.supportsNprobe());
+    assertFalse(VectorBackendType.IVF_ON_DISK.defaultExactRerankEnabled());
+    assertTrue(VectorBackendType.IVF_ON_DISK.getCapabilities().supportsRuntimeSearchParams());
   }
 }

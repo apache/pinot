@@ -156,6 +156,37 @@ public class VectorIndexConfigValidatorTest {
   }
 
   @Test
+  public void testValidIvfFlatConfigWithSq8Quantizer() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_FLAT");
+    properties.put("vectorDimension", "384");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("nlist", "64");
+    properties.put("trainSampleSize", "2048");
+    properties.put("quantizer", "SQ8");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+    assertEquals(config.resolveBackendType(), VectorBackendType.IVF_FLAT);
+  }
+
+  @Test
+  public void testValidIvfOnDiskConfigWithSq4Quantizer() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_ON_DISK");
+    properties.put("vectorDimension", "256");
+    properties.put("vectorDistanceFunction", "EUCLIDEAN");
+    properties.put("nlist", "32");
+    properties.put("trainSampleSize", "1024");
+    properties.put("minRowsForIndex", "500");
+    properties.put("quantizer", "SQ4");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+    assertEquals(config.resolveBackendType(), VectorBackendType.IVF_ON_DISK);
+  }
+
+  @Test
   public void testValidIvfPqConfig() {
     Map<String, String> properties = new HashMap<>();
     properties.put("vectorIndexType", "IVF_PQ");
@@ -253,6 +284,68 @@ public class VectorIndexConfigValidatorTest {
     properties.put("vectorDimension", "768");
     properties.put("vectorDistanceFunction", "COSINE");
     properties.put("beamWidth", "200");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*HNSW supports only quantizer='FLAT'.*")
+  public void testRejectSq8QuantizerOnHnswConfig() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "768");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("quantizer", "SQ8");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*IVF_FLAT does not support quantizer='PQ'.*")
+  public void testRejectPqQuantizerOnIvfFlatConfig() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_FLAT");
+    properties.put("vectorDimension", "768");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("nlist", "64");
+    properties.put("trainSampleSize", "1024");
+    properties.put("quantizer", "PQ");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+  }
+
+  @Test
+  public void testIvfPqAcceptsLegacyFlatQuantizer() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_PQ");
+    properties.put("vectorDimension", "768");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("nlist", "128");
+    properties.put("pqM", "32");
+    properties.put("pqNbits", "8");
+    properties.put("trainSampleSize", "10000");
+    properties.put("quantizer", "FLAT");
+
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    VectorIndexConfigValidator.validate(config);
+    assertEquals(config.resolveBackendType(), VectorBackendType.IVF_PQ);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*IVF_PQ supports quantizer='PQ'.*")
+  public void testRejectSq4QuantizerOnIvfPqConfig() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "IVF_PQ");
+    properties.put("vectorDimension", "768");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put("nlist", "128");
+    properties.put("pqM", "32");
+    properties.put("pqNbits", "8");
+    properties.put("trainSampleSize", "10000");
+    properties.put("quantizer", "SQ4");
 
     VectorIndexConfig config = new VectorIndexConfig(properties);
     VectorIndexConfigValidator.validate(config);

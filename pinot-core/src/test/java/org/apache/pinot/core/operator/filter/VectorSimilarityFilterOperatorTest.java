@@ -22,6 +22,7 @@ import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.EfSearchAware;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
@@ -34,6 +35,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -539,10 +541,44 @@ public class VectorSimilarityFilterOperatorTest {
     verify(mockReader).getDocIds(queryVector, 5);
   }
 
+  @Test
+  public void testHnswRuntimeControlsAreDispatchedAndCleared() {
+    EfSearchAwareVectorReader mockReader = mock(EfSearchAwareVectorReader.class);
+    float[] queryVector = {1.0f, 2.0f};
+    MutableRoaringBitmap expectedResult = new MutableRoaringBitmap();
+    expectedResult.add(0);
+    when(mockReader.getDocIds(queryVector, 1)).thenReturn(expectedResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
+    VectorSearchParams params = new VectorSearchParams(null, false, null, null, 32, false, false);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, params, null,
+        createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 1);
+    verify(mockReader).setEfSearch(32);
+    verify(mockReader).setUseRelativeDistance(false);
+    verify(mockReader).setUseBoundedQueue(false);
+    verify(mockReader).clearEfSearch();
+    verify(mockReader).clearUseRelativeDistance();
+    verify(mockReader).clearUseBoundedQueue();
+    verify(mockReader, never()).getIndexDebugInfo();
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("effectiveEfSearch:32"), explain);
+    Assert.assertTrue(explain.contains("effectiveHnswUseRelativeDistance:false"), explain);
+    Assert.assertTrue(explain.contains("effectiveHnswUseBoundedQueue:false"), explain);
+  }
+
   /**
    * Interface combining VectorIndexReader and NprobeAware for mocking IVF_FLAT readers.
    */
   interface NprobeAwareVectorReader extends VectorIndexReader, NprobeAware {
+  }
+
+  interface EfSearchAwareVectorReader extends VectorIndexReader, EfSearchAware {
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
