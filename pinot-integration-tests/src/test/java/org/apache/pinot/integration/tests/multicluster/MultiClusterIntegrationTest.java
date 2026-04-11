@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,6 +100,39 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
     assertEquals(count2, TABLE_SIZE_CLUSTER_2);
 
     LOGGER.info("Multi-cluster broker test passed: both clusters started and queryable");
+  }
+
+  @Test(groups = "query")
+  public void testMultiClusterRoutingTableDebugEndpoint() throws Exception {
+    String logicalTable = getLogicalTableName();
+    String brokerBase = "http://localhost:" + _cluster1._brokerPort;
+
+    // Local routing for a physical table should work without the multi-cluster flag
+    String physicalTable = getPhysicalTable1InCluster1();
+    String localRouting = ControllerTest.sendGetRequest(
+        brokerBase + "/debug/routingTable/" + physicalTable);
+    JsonMapper mapper = JsonMapper.builder().build();
+    JsonNode localJson = mapper.readTree(localRouting);
+    String physicalOfflineKey = physicalTable + "_OFFLINE";
+    assertTrue(localJson.has(physicalOfflineKey),
+        "Local routing should include physical offline table: " + localRouting);
+
+    // Multi-cluster routing for a logical table
+    String multiRouting = ControllerTest.sendGetRequest(
+        brokerBase + "/debug/routingTable/" + logicalTable + "?useMultiClusterRouting=true");
+    JsonNode multiJson = mapper.readTree(multiRouting);
+
+    // The logical table expands to its physical tables; verify both physical tables are represented.
+    String phys1OfflineKey = getPhysicalTable1InCluster1() + "_OFFLINE";
+    String phys2OfflineKey = getPhysicalTable1InCluster2() + "_OFFLINE";
+    assertTrue(multiJson.has(phys1OfflineKey),
+        "Multi-cluster routing should include physical table from cluster 1: " + multiRouting);
+    assertTrue(multiJson.has(phys2OfflineKey),
+        "Multi-cluster routing should include physical table from cluster 2: " + multiRouting);
+    assertTrue(multiJson.get(phys1OfflineKey).size() >= 1,
+        "Cluster 1 physical table should have at least one server");
+    assertTrue(multiJson.get(phys2OfflineKey).size() >= 1,
+        "Cluster 2 physical table should have at least one server");
   }
 
   @BeforeGroups("query")
