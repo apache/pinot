@@ -601,10 +601,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // Persist the new compression codec in metadata.properties (only when compression stats are enabled)
     if (_tableConfig.getIndexingConfig().isCompressionStatsEnabled()) {
       ForwardIndexConfig newConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-      ChunkCompressionType compressionType = newConfig.getChunkCompressionType();
-      if (compressionType == null) {
-        compressionType = ForwardIndexType.getDefaultCompressionType(existingColMetadata.getFieldSpec().getFieldType());
-      }
+      ChunkCompressionType compressionType =
+          ForwardIndexType.resolveCompressionType(newConfig, existingColMetadata.getFieldSpec().getFieldType());
       Map<String, String> metadataProperties = new HashMap<>();
       metadataProperties.put(
           getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
@@ -1187,11 +1185,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), null);
     if (_tableConfig.getIndexingConfig().isCompressionStatsEnabled()) {
       ForwardIndexConfig fwdConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-      ChunkCompressionType compressionType = fwdConfig.getChunkCompressionType();
-      if (compressionType == null) {
-        compressionType =
-            ForwardIndexType.getDefaultCompressionType(existingColMetadata.getFieldSpec().getFieldType());
-      }
+      ChunkCompressionType compressionType =
+          ForwardIndexType.resolveCompressionType(fwdConfig, existingColMetadata.getFieldSpec().getFieldType());
       metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), compressionType.name());
       if (uncompressedSize > 0) {
         metadataProperties.put(getKeyFor(column, FORWARD_INDEX_UNCOMPRESSED_SIZE),
