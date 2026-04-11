@@ -70,6 +70,7 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   protected int _chunkSize;
   protected long _dataOffset;
   protected long _uncompressedSize;
+  protected boolean _trackUncompressedSize = true;
 
   private final int _headerEntryChunkOffsetSize;
 
@@ -176,7 +177,9 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   protected void writeChunk() {
     int sizeToWrite;
     _chunkBuffer.flip();
-    _uncompressedSize += _chunkBuffer.remaining();
+    if (_trackUncompressedSize) {
+      _uncompressedSize += _chunkBuffer.remaining();
+    }
 
     try {
       sizeToWrite = _chunkCompressor.compress(_chunkBuffer, _compressedBuffer);
@@ -204,5 +207,9 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
    */
   public long getUncompressedSize() {
     return _uncompressedSize;
+  }
+
+  public void setTrackUncompressedSize(boolean trackUncompressedSize) {
+    _trackUncompressedSize = trackUncompressedSize;
   }
 }

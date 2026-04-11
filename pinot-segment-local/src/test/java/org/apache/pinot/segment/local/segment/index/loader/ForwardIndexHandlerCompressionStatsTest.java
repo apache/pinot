@@ -135,10 +135,12 @@ public class ForwardIndexHandlerCompressionStatsTest {
   }
 
   private TableConfig createTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .setNoDictionaryColumns(new ArrayList<>(_noDictionaryColumns))
         .setFieldConfigList(new ArrayList<>(_fieldConfigMap.values()))
         .build();
+    config.getIndexingConfig().setCompressionStatsEnabled(true);
+    return config;
   }
 
   private IndexLoadingConfig createIndexLoadingConfig() {

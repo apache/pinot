@@ -42,6 +42,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
@@ -120,6 +121,8 @@ public class ServerSegmentMetadataReader {
     final Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     final Map<String, Map<String, Double>> columnIndexSizeMap = new HashMap<>();
     final Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
+    final Map<String, long[]> columnCompressionAccum = new HashMap<>();
+    final Map<String, String> columnCodecMap = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         TableMetadataInfo tableMetadataInfo =
@@ -144,6 +147,21 @@ public class ServerSegmentMetadataReader {
                   }
                   return l;
                 }));
+        // Aggregate per-column compression stats from server responses
+        Map<String, ColumnCompressionStatsInfo> serverColStats = tableMetadataInfo.getColumnCompressionStats();
+        if (serverColStats != null) {
+          for (Map.Entry<String, ColumnCompressionStatsInfo> colEntry : serverColStats.entrySet()) {
+            String col = colEntry.getKey();
+            ColumnCompressionStatsInfo info = colEntry.getValue();
+            long[] accum = columnCompressionAccum.computeIfAbsent(col, k -> new long[2]);
+            accum[0] += info.getRawForwardIndexSizeBytes();
+            accum[1] += info.getCompressedForwardIndexSizeBytes();
+            if (info.getCompressionCodec() != null) {
+              columnCodecMap.merge(col, info.getCompressionCodec(),
+                  (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+            }
+          }
+        }
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
@@ -165,9 +183,22 @@ public class ServerSegmentMetadataReader {
     totalNumSegments /= numReplica;
     totalNumRows /= numReplica;
 
+    // Build per-column compression stats (divide by numReplica since each replica reports the same stats)
+    Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
+    if (!columnCompressionAccum.isEmpty()) {
+      columnCompressionStats = new HashMap<>();
+      for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
+        long[] accum = entry.getValue();
+        columnCompressionStats.put(entry.getKey(),
+            new ColumnCompressionStatsInfo(accum[0] / numReplica, accum[1] / numReplica,
+                columnCodecMap.get(entry.getKey())));
+      }
+    }
+
     TableMetadataInfo aggregateTableMetadataInfo =
         new TableMetadataInfo(tableNameWithType, totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
-            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap, partitionToServerPrimaryKeyCountMap);
+            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap, partitionToServerPrimaryKeyCountMap,
+            columnCompressionStats);
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
           serverUrls.size());

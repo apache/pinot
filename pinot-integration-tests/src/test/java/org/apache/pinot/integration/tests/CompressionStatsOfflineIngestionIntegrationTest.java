@@ -267,7 +267,8 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
     // Create a second table WITHOUT compressionStatsEnabled
     String noStatsTableName = "compressionStatsDisabledTest";
     Schema schema = createSchema();
-    // Schema is already added from setUp
+    schema.setSchemaName(noStatsTableName);
+    addSchema(schema);
 
     TableConfig noStatsConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(noStatsTableName)

@@ -317,6 +317,13 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   /**
+   * Controls whether the writer tracks uncompressed data size. When disabled, the writer skips
+   * the per-chunk size accumulation, providing zero overhead when compression stats are not needed.
+   */
+  default void setTrackUncompressedSize(boolean trackUncompressedSize) {
+  }
+
+  /**
    * DICTIONARY-ENCODED INDEX APIs
    */
 

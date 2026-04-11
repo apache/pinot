@@ -93,6 +93,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   private int _metadataSize = 0;
   private long _chunkOffset = 0;
   private long _uncompressedSize = 0;
+  private boolean _trackUncompressedSize = true;
 
   public VarByteChunkForwardIndexWriterV4(File file, ChunkCompressionType compressionType, int chunkSize)
       throws IOException {
@@ -270,7 +271,9 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   private void write(ByteBuffer buffer, boolean huge) {
     ByteBuffer mapped = null;
     final int compressedSize;
-    _uncompressedSize += buffer.remaining();
+    if (_trackUncompressedSize) {
+      _uncompressedSize += buffer.remaining();
+    }
     try {
       if (huge) {
         // the compression buffer isn't guaranteed to be large enough for huge chunks,
@@ -340,5 +343,9 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
    */
   public long getUncompressedSize() {
     return _uncompressedSize;
+  }
+
+  public void setTrackUncompressedSize(boolean trackUncompressedSize) {
+    _trackUncompressedSize = trackUncompressedSize;
   }
 }

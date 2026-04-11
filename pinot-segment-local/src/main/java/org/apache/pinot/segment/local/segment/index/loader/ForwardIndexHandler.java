@@ -597,14 +597,16 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     segmentWriter.removeIndex(column, StandardIndexes.forward());
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
 
-    // Persist the new compression codec in metadata.properties
-    ForwardIndexConfig newConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-    if (newConfig.getChunkCompressionType() != null) {
-      Map<String, String> metadataProperties = new HashMap<>();
-      metadataProperties.put(
-          getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
-          newConfig.getChunkCompressionType().name());
-      SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+    // Persist the new compression codec in metadata.properties (only when compression stats are enabled)
+    if (_tableConfig.getIndexingConfig().isCompressionStatsEnabled()) {
+      ForwardIndexConfig newConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      if (newConfig.getChunkCompressionType() != null) {
+        Map<String, String> metadataProperties = new HashMap<>();
+        metadataProperties.put(
+            getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
+            newConfig.getChunkCompressionType().name());
+        SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+      }
     }
 
     // Delete the marker file.
@@ -612,6 +614,59 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     LOGGER.info("Created forward index for segment: {}, column: {}", segmentName, column);
   }
+
+  private void rewriteForwardIndexForCompressionChange(String column, ColumnMetadata columnMetadata, File indexDir,
+      SegmentDirectory.Writer segmentWriter)
+      throws Exception {
+    // Get the forward index reader factory and create a reader
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    try (ForwardIndexReader<?> reader = readerFactory.createIndexReader(segmentWriter, _fieldIndexConfigs.get(column),
+        columnMetadata)) {
+      IndexCreationContext.Builder builder = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata)
+          .withCompressionStatsEnabled(_tableConfig.getIndexingConfig().isCompressionStatsEnabled());
+      // Encoding flows through ForwardIndexConfig; for compression-change rewrite the encoding does not change so
+      // the config in _fieldIndexConfigs already carries the correct encoding.
+      // Set entry length info for raw index creators. No need to set this when changing dictionary id compression type.
+      if (!reader.isDictionaryEncoded() && !columnMetadata.getDataType().getStoredType().isFixedWidth()) {
+        int lengthOfLongestEntry = reader.getLengthOfLongestEntry();
+        if (lengthOfLongestEntry < 0) {
+          // When this info is not available from the reader, we need to scan the column.
+          lengthOfLongestEntry = getMaxRowLength(columnMetadata, reader, null);
+        }
+        if (columnMetadata.isSingleValue()) {
+          builder.withLengthOfLongestElement(lengthOfLongestEntry);
+        } else {
+          // For VarByte MV columns like String and Bytes, the storage representation of each row contains the following
+          // components:
+          // 1. bytes required to store the actual elements of the MV row (A)
+          // 2. bytes required to store the number of elements in the MV row (B)
+          // 3. bytes required to store the length of each MV element (C)
+          //
+          // lengthOfLongestEntry = A + B + C
+          // maxRowLengthInBytes = A
+          int maxNumValuesPerEntry = columnMetadata.getMaxNumberOfMultiValues();
+          int maxRowLengthInBytes =
+              MultiValueVarByteRawIndexCreator.getMaxRowDataLengthInBytes(lengthOfLongestEntry, maxNumValuesPerEntry);
+          builder.withMaxRowLengthInBytes(maxRowLengthInBytes);
+        }
+      }
+      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      IndexCreationContext context = builder.build();
+      try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
+        if (!reader.getStoredType().equals(creator.getValueType())) {
+          // Creator stored type should match reader stored type for raw columns. We do not support changing datatypes.
+          String failureMsg =
+              "Unsupported operation to change datatype for column=" + column + " from " + reader.getStoredType()
+                  .toString() + " to " + creator.getValueType().toString();
+          throw new UnsupportedOperationException(failureMsg);
+        }
+
+        int numDocs = columnMetadata.getTotalDocs();
+        forwardIndexRewriteHelper(column, columnMetadata, reader, creator, numDocs, null, null);
+      }
+    }
+  }
+
 
   private void forwardIndexRewriteHelper(String column, ColumnMetadata existingColumnMetadata,
       ForwardIndexReader<?> reader, ForwardIndexCreator creator, int numDocs,
@@ -1127,14 +1182,16 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // TODO: See https://github.com/apache/pinot/pull/16921 for details
     // TODO: Remove the property after 1.6.0 release
     // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), null);
-    ForwardIndexConfig fwdConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-    if (fwdConfig.getChunkCompressionType() != null) {
-      metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
-          fwdConfig.getChunkCompressionType().name());
-    }
-    if (uncompressedSize > 0) {
-      metadataProperties.put(getKeyFor(column, FORWARD_INDEX_UNCOMPRESSED_SIZE),
-          String.valueOf(uncompressedSize));
+    if (_tableConfig.getIndexingConfig().isCompressionStatsEnabled()) {
+      ForwardIndexConfig fwdConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      if (fwdConfig.getChunkCompressionType() != null) {
+        metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
+            fwdConfig.getChunkCompressionType().name());
+      }
+      if (uncompressedSize > 0) {
+        metadataProperties.put(getKeyFor(column, FORWARD_INDEX_UNCOMPRESSED_SIZE),
+            String.valueOf(uncompressedSize));
+      }
     }
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
@@ -1200,9 +1257,14 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     try (ForwardIndexReader<?> forwardIndex = StandardIndexes.forward().getReaderFactory()
         .createIndexReader(segmentWriter, indexConfigs, columnMetadata);
         Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
-      IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).build();
+      IndexCreationContext.Builder builder =
+          new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata)
+              .withCompressionStatsEnabled(_tableConfig.getIndexingConfig().isCompressionStatsEnabled());
+      if (columnMetadata.getMaxRowLengthInBytes() == ColumnMetadata.UNAVAILABLE) {
+        builder.withMaxRowLengthInBytes(getMaxRowLength(columnMetadata, forwardIndex, dictionary));
+      }
       ForwardIndexConfig config = indexConfigs.getConfig(StandardIndexes.forward());
-      try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
+      try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(builder.build(), config)) {
         forwardIndexRewriteHelper(column, columnMetadata, forwardIndex, creator, columnMetadata.getTotalDocs(), null,
             dictionary);
         return creator.getUncompressedSize();
