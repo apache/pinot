@@ -26,7 +26,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 @ScalarFunction(names = {"add", "plus"})
-public class PlusScalarFunction extends PolymorphicBinaryArithmeticScalarFunction {
+public class PlusScalarFunction extends BaseBinaryArithmeticScalarFunction {
 
   private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new EnumMap<>(ColumnDataType.class);
 

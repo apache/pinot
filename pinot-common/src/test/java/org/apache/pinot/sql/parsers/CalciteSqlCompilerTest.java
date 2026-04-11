@@ -1087,6 +1087,21 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testPolymorphicArithmeticScalarFunctionsCompile() {
+    PinotQuery pinotQuery = compileToPinotQuery("SELECT least(col1, col2), greatest(col3, col4), negate(col5), "
+        + "positiveModulo(col6, col7), moduloOrZero(col8, col9) FROM myTable WHERE least(col1, col2) = 1 "
+        + "AND greatest(col3, col4) = 2 AND negate(col5) = -1 AND positiveModulo(col6, col7) = 0 "
+        + "AND moduloOrZero(col8, col9) = 0");
+
+    List<Expression> selectList = pinotQuery.getSelectList();
+    Assert.assertEquals(selectList.get(0).getFunctionCall().getOperator(), "least");
+    Assert.assertEquals(selectList.get(1).getFunctionCall().getOperator(), "greatest");
+    Assert.assertEquals(selectList.get(2).getFunctionCall().getOperator(), "negate");
+    Assert.assertEquals(selectList.get(3).getFunctionCall().getOperator(), "positivemodulo");
+    Assert.assertEquals(selectList.get(4).getFunctionCall().getOperator(), "moduloorzero");
+  }
+
+  @Test
   public void testSelectionTransformFunction() {
     PinotQuery pinotQuery =
         compileToPinotQuery("  select mapKey(mapField,k1) from baseballStats where mapKey(mapField,k1) = 'v1'");

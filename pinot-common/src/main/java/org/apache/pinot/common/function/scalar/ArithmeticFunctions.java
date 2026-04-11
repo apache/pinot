@@ -74,55 +74,6 @@ public class ArithmeticFunctions {
     return Double.isNaN(value) ? 1 : 0;
   }
 
-  @ScalarFunction
-  public static double mod(double a, double b) {
-    return a % b;
-  }
-
-  @ScalarFunction
-  public static double moduloOrZero(double a, double b) {
-    //Same as mod but returns zero when dividing by zero or when dividing a minimal negative number by minus one.
-    return (b == 0 || (a == Long.MIN_VALUE && b == -1)) ? 0 : mod(a, b);
-  }
-
-  @ScalarFunction
-  public static double positiveModulo(double a, double b) {
-    double result = a % b;
-    return result >= 0 ? result : result + Math.abs(b);
-  }
-
-  @ScalarFunction
-  public static double negate(double a) {
-    return -a;
-  }
-
-  @ScalarFunction
-  public static double least(double a, double b) {
-    return Double.min(a, b);
-  }
-
-  @ScalarFunction
-  public static double greatest(double a, double b) {
-    return Double.max(a, b);
-  }
-
-  @Deprecated
-  @ScalarFunction
-  public static double min(double a, double b) {
-    return least(a, b);
-  }
-
-  @Deprecated
-  @ScalarFunction
-  public static double max(double a, double b) {
-    return greatest(a, b);
-  }
-
-  @ScalarFunction
-  public static double abs(double a) {
-    return Math.abs(a);
-  }
-
   @ScalarFunction(names = {"ceil", "ceiling"})
   public static double ceil(double a) {
     return Math.ceil(a);

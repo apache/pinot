@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.function;
 
+import java.math.BigDecimal;
 import java.util.EnumSet;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -143,5 +144,84 @@ public class FunctionRegistryTest {
     FunctionInfo bitextractByArity = FunctionRegistry.lookupFunctionInfo("bitextract", 2);
     assertNotNull(bitextractByArity);
     assertEquals(bitextractByArity.getMethod().getName(), "longBitExtract");
+  }
+
+  @Test
+  public void testArithmeticFunctionPolymorphism() {
+    FunctionInfo intAbs = FunctionRegistry.lookupFunctionInfo("abs", new ColumnDataType[]{ColumnDataType.INT});
+    assertNotNull(intAbs);
+    assertEquals(intAbs.getMethod().getName(), "intAbs");
+    assertEquals(intAbs.getMethod().getReturnType(), int.class);
+
+    FunctionInfo longAbs = FunctionRegistry.lookupFunctionInfo("abs", new ColumnDataType[]{ColumnDataType.LONG});
+    assertNotNull(longAbs);
+    assertEquals(longAbs.getMethod().getName(), "longAbs");
+    assertEquals(longAbs.getMethod().getReturnType(), long.class);
+
+    FunctionInfo floatAbs = FunctionRegistry.lookupFunctionInfo("abs", new ColumnDataType[]{ColumnDataType.FLOAT});
+    assertNotNull(floatAbs);
+    assertEquals(floatAbs.getMethod().getName(), "floatAbs");
+    assertEquals(floatAbs.getMethod().getReturnType(), float.class);
+
+    FunctionInfo bigDecimalAbs =
+        FunctionRegistry.lookupFunctionInfo("abs", new ColumnDataType[]{ColumnDataType.BIG_DECIMAL});
+    assertNotNull(bigDecimalAbs);
+    assertEquals(bigDecimalAbs.getMethod().getName(), "bigDecimalAbs");
+    assertEquals(bigDecimalAbs.getMethod().getReturnType(), BigDecimal.class);
+
+    FunctionInfo stringAbs = FunctionRegistry.lookupFunctionInfo("abs", new ColumnDataType[]{ColumnDataType.STRING});
+    assertNotNull(stringAbs);
+    assertEquals(stringAbs.getMethod().getName(), "doubleAbs");
+    assertEquals(stringAbs.getMethod().getReturnType(), double.class);
+
+    FunctionInfo absByArity = FunctionRegistry.lookupFunctionInfo("abs", 1);
+    assertNotNull(absByArity);
+    assertEquals(absByArity.getMethod().getName(), "doubleAbs");
+
+    FunctionInfo intMod =
+        FunctionRegistry.lookupFunctionInfo("mod", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    assertNotNull(intMod);
+    assertEquals(intMod.getMethod().getName(), "intMod");
+    assertEquals(intMod.getMethod().getReturnType(), int.class);
+
+    FunctionInfo longMod =
+        FunctionRegistry.lookupFunctionInfo("mod", new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.INT});
+    assertNotNull(longMod);
+    assertEquals(longMod.getMethod().getName(), "longMod");
+    assertEquals(longMod.getMethod().getReturnType(), long.class);
+
+    FunctionInfo floatMod =
+        FunctionRegistry.lookupFunctionInfo("mod", new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.INT});
+    assertNotNull(floatMod);
+    assertEquals(floatMod.getMethod().getName(), "floatMod");
+    assertEquals(floatMod.getMethod().getReturnType(), float.class);
+
+    FunctionInfo bigDecimalMod = FunctionRegistry.lookupFunctionInfo("mod",
+        new ColumnDataType[]{ColumnDataType.BIG_DECIMAL, ColumnDataType.INT});
+    assertNotNull(bigDecimalMod);
+    assertEquals(bigDecimalMod.getMethod().getName(), "bigDecimalMod");
+    assertEquals(bigDecimalMod.getMethod().getReturnType(), BigDecimal.class);
+
+    FunctionInfo stringMod =
+        FunctionRegistry.lookupFunctionInfo("mod", new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
+    assertNotNull(stringMod);
+    assertEquals(stringMod.getMethod().getName(), "doubleMod");
+    assertEquals(stringMod.getMethod().getReturnType(), double.class);
+
+    FunctionInfo modByArity = FunctionRegistry.lookupFunctionInfo("mod", 2);
+    assertNotNull(modByArity);
+    assertEquals(modByArity.getMethod().getName(), "doubleMod");
+
+    FunctionInfo negateFloat =
+        FunctionRegistry.lookupFunctionInfo("negate", new ColumnDataType[]{ColumnDataType.FLOAT});
+    assertNotNull(negateFloat);
+    assertEquals(negateFloat.getMethod().getName(), "floatNegate");
+    assertEquals(negateFloat.getMethod().getReturnType(), float.class);
+
+    FunctionInfo leastBigDecimal = FunctionRegistry.lookupFunctionInfo("least",
+        new ColumnDataType[]{ColumnDataType.BIG_DECIMAL, ColumnDataType.DOUBLE});
+    assertNotNull(leastBigDecimal);
+    assertEquals(leastBigDecimal.getMethod().getName(), "bigDecimalLeast");
+    assertEquals(leastBigDecimal.getMethod().getReturnType(), BigDecimal.class);
   }
 }

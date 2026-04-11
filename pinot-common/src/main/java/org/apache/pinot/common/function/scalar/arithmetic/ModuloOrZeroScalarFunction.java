@@ -1,0 +1,97 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.common.function.scalar.arithmetic;
+
+import java.math.BigDecimal;
+import java.util.EnumMap;
+import java.util.Map;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.sql.PinotSqlFunction;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.annotations.ScalarFunction;
+
+
+/**
+ * Polymorphic modulo-or-zero scalar function implementation.
+ *
+ * <p>Instances are immutable and thread-safe.
+ */
+@ScalarFunction
+public class ModuloOrZeroScalarFunction extends BaseBinaryArithmeticScalarFunction {
+
+  private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new EnumMap<>(ColumnDataType.class);
+
+  static {
+    try {
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.INT, new FunctionInfo(
+          ModuloOrZeroScalarFunction.class.getMethod("intModuloOrZero", int.class, int.class),
+          ModuloOrZeroScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.LONG, new FunctionInfo(
+          ModuloOrZeroScalarFunction.class.getMethod("longModuloOrZero", long.class, long.class),
+          ModuloOrZeroScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.FLOAT, new FunctionInfo(
+          ModuloOrZeroScalarFunction.class.getMethod("floatModuloOrZero", float.class, float.class),
+          ModuloOrZeroScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.DOUBLE, new FunctionInfo(
+          ModuloOrZeroScalarFunction.class.getMethod("doubleModuloOrZero", double.class, double.class),
+          ModuloOrZeroScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.BIG_DECIMAL, new FunctionInfo(
+          ModuloOrZeroScalarFunction.class.getMethod("bigDecimalModuloOrZero", BigDecimal.class, BigDecimal.class),
+          ModuloOrZeroScalarFunction.class, false));
+    } catch (NoSuchMethodException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  protected FunctionInfo functionInfoForType(ColumnDataType argumentType) {
+    FunctionInfo functionInfo = TYPE_FUNCTION_INFO_MAP.get(argumentType);
+    return functionInfo != null ? functionInfo : defaultFunctionInfo();
+  }
+
+  @Override
+  public String getName() {
+    return "moduloOrZero";
+  }
+
+  @Override
+  public PinotSqlFunction toPinotSqlFunction() {
+    return ArithmeticFunctionUtils.binaryArithmeticSqlFunction(getName());
+  }
+
+  public static int intModuloOrZero(int a, int b) {
+    return b == 0 ? 0 : a % b;
+  }
+
+  public static long longModuloOrZero(long a, long b) {
+    return b == 0 ? 0L : a % b;
+  }
+
+  public static float floatModuloOrZero(float a, float b) {
+    return b == 0 ? 0F : a % b;
+  }
+
+  public static double doubleModuloOrZero(double a, double b) {
+    return b == 0 ? 0D : a % b;
+  }
+
+  public static BigDecimal bigDecimalModuloOrZero(BigDecimal a, BigDecimal b) {
+    return b.signum() == 0 ? BigDecimal.ZERO : a.remainder(b);
+  }
+}

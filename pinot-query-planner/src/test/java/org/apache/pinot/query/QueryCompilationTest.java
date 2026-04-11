@@ -65,6 +65,14 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertNotNull(dispatchableSubPlan);
   }
 
+  @Test
+  public void testPolymorphicArithmeticScalarFunctionsPlanQuery() {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT abs(col3), negate(col7), least(col4, col4), greatest(col4, col4), positiveModulo(col3, col6), "
+            + "moduloOrZero(col4, col4) FROM a");
+    assertNotNull(dispatchableSubPlan);
+  }
+
   @Test(dataProvider = "testQueryExceptionDataProvider")
   public void testQueryWithException(String query, String exceptionSnippet) {
     try {
