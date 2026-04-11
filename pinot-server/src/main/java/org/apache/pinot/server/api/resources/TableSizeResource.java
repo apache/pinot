@@ -134,9 +134,11 @@ public class TableSizeResource {
                 rawFwdIndexSize += uncompressed;
               }
               long fwdIndexSize = colMeta.getIndexSizeFor(StandardIndexes.forward());
-              if (compressionStatsEnabled && fwdIndexSize > 0 && uncompressed > 0) {
-                compressedFwdIndexSize += fwdIndexSize;
-                double ratio = fwdIndexSize > 0 ? (double) uncompressed / fwdIndexSize : 0;
+              if (compressionStatsEnabled && fwdIndexSize > 0) {
+                if (uncompressed > 0) {
+                  compressedFwdIndexSize += fwdIndexSize;
+                }
+                double ratio = (fwdIndexSize > 0 && uncompressed > 0) ? (double) uncompressed / fwdIndexSize : 0;
                 // Collect index names for this column
                 IndexService indexService = IndexService.getInstance();
                 List<String> indexNames = new ArrayList<>();
@@ -147,7 +149,8 @@ public class TableSizeResource {
                   columnCompressionStats = new HashMap<>();
                 }
                 columnCompressionStats.put(colMeta.getColumnName(),
-                    new ColumnCompressionStatsInfo(colMeta.getColumnName(), uncompressed, fwdIndexSize, ratio,
+                    new ColumnCompressionStatsInfo(colMeta.getColumnName(),
+                        Math.max(uncompressed, 0), fwdIndexSize, ratio,
                         colMeta.getCompressionCodec(), colMeta.hasDictionary(),
                         indexNames.isEmpty() ? null : indexNames));
               }

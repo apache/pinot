@@ -221,6 +221,32 @@ public class CompressionStatsSegmentCreationTest {
   }
 
   @Test
+  public void testDefaultCodecPersistedWhenNoExplicitConfig()
+      throws Exception {
+    // Build segment with compressionStatsEnabled=true but no explicit compression codec.
+    // The default codec (LZ4 for DIMENSION columns) should be resolved and persisted.
+    File segmentDir = buildSegment(true, null);
+
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
+
+    // Raw int column (DIMENSION type) should get LZ4 as default codec
+    ColumnMetadata intMeta = metadata.getColumnMetadataFor(INT_RAW_COL);
+    assertNotNull(intMeta);
+    assertFalse(intMeta.hasDictionary());
+    assertEquals(intMeta.getCompressionCodec(), "LZ4",
+        "Default codec LZ4 should be persisted for DIMENSION column when no explicit codec configured");
+    assertTrue(intMeta.getUncompressedForwardIndexSizeBytes() > 0,
+        "Uncompressed size should be > 0");
+
+    // Raw string column (DIMENSION type) should also get LZ4
+    ColumnMetadata stringMeta = metadata.getColumnMetadataFor(STRING_RAW_COL);
+    assertNotNull(stringMeta);
+    assertFalse(stringMeta.hasDictionary());
+    assertEquals(stringMeta.getCompressionCodec(), "LZ4",
+        "Default codec LZ4 should be persisted for DIMENSION string column");
+  }
+
+  @Test
   public void testUncompressedSizeConsistencyAcrossCodecs()
       throws Exception {
     // Create segments with different codecs and verify uncompressed sizes are consistent

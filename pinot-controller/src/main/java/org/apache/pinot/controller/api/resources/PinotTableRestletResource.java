@@ -1277,7 +1277,10 @@ public class PinotTableRestletResource {
     String segmentsMetadata;
     try {
       JsonNode segmentsMetadataJson = getAggregateMetadataFromServer(tableNameWithType, columns, numReplica);
-      if (!compressionStatsEnabled && segmentsMetadataJson.has("columnCompressionStats")) {
+      if (compressionStatsEnabled && segmentsMetadataJson.has("columnCompressionStats")) {
+        // Compute table-level compressionStats summary from per-column data
+        addCompressionStatsSummary((ObjectNode) segmentsMetadataJson);
+      } else if (segmentsMetadataJson.has("columnCompressionStats")) {
         ((ObjectNode) segmentsMetadataJson).remove("columnCompressionStats");
       }
       segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
@@ -1336,7 +1339,9 @@ public class PinotTableRestletResource {
     try {
       JsonNode segmentsMetadataJson =
           getAggregateMetadataFromServer(existingTableNameWithType, columnsList, numReplica);
-      if (!compressionStatsEnabled && segmentsMetadataJson.has("columnCompressionStats")) {
+      if (compressionStatsEnabled && segmentsMetadataJson.has("columnCompressionStats")) {
+        addCompressionStatsSummary((ObjectNode) segmentsMetadataJson);
+      } else if (segmentsMetadataJson.has("columnCompressionStats")) {
         ((ObjectNode) segmentsMetadataJson).remove("columnCompressionStats");
       }
       return JsonUtils.objectToPrettyString(segmentsMetadataJson);
@@ -1346,6 +1351,33 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
     }
+  }
+
+  /**
+   * Computes a table-level compressionStats summary from the per-column columnCompressionStats array
+   * and adds it to the metadata JSON response.
+   */
+  private void addCompressionStatsSummary(ObjectNode metadataJson) {
+    JsonNode colStatsNode = metadataJson.get("columnCompressionStats");
+    if (colStatsNode == null || !colStatsNode.isArray() || colStatsNode.isEmpty()) {
+      return;
+    }
+    long totalRaw = 0;
+    long totalCompressed = 0;
+    for (JsonNode colStat : colStatsNode) {
+      // Only include raw-encoded columns in the summary (skip dictionary columns)
+      if (colStat.path("hasDictionary").asBoolean(false)) {
+        continue;
+      }
+      totalRaw += colStat.path("uncompressedSizeInBytes").asLong(0);
+      totalCompressed += colStat.path("compressedSizeInBytes").asLong(0);
+    }
+    double ratio = totalCompressed > 0 ? (double) totalRaw / totalCompressed : 0;
+    ObjectNode summaryNode = metadataJson.objectNode();
+    summaryNode.put("rawForwardIndexSizeInBytes", totalRaw);
+    summaryNode.put("compressedForwardIndexSizeInBytes", totalCompressed);
+    summaryNode.put("compressionRatio", ratio);
+    metadataJson.set("compressionStats", summaryNode);
   }
 
   @GET

@@ -289,22 +289,37 @@ public class TableSizeReaderCompressionStatsTest {
   @Test
   public void testNoCompressionStats()
       throws InvalidConfigException {
-    // Only old server without compression stats
+    // Only old server without compression stats — compressionStats should be null
+    // since no segments have stats and no per-column stats exist
     String[] servers = {"server2"};
     TableSizeReader.TableSizeDetails details = testRunner(servers, "offline");
 
     TableSizeReader.TableSubTypeSizeDetails offlineDetails = details._offlineSegments;
     assertNotNull(offlineDetails);
 
-    TableSizeReader.CompressionStats cs = offlineDetails._compressionStats;
-    assertNotNull(cs);
-    assertEquals(cs._segmentsWithStats, 0);
-    assertEquals(cs._totalSegments, 1);
-    // isPartialCoverage should be true: 0 segments have stats but 1 non-missing segment exists
-    assertTrue(cs._isPartialCoverage);
-    assertEquals(cs._rawForwardIndexSizePerReplicaInBytes, 0);
-    assertEquals(cs._compressedForwardIndexSizePerReplicaInBytes, 0);
-    assertEquals(cs._compressionRatio, 0.0, 0.01);
+    assertNull(offlineDetails._compressionStats,
+        "compressionStats should be null when no segments have compression data");
+  }
+
+  @Test
+  public void testStaleMetricsClearedWhenNoStats()
+      throws InvalidConfigException {
+    // First run with servers that have stats to emit metrics
+    String[] serversWithStats = {"server0", "server1"};
+    testRunner(serversWithStats, "offline");
+
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType("offline");
+    // Verify metrics were emitted
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+        ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS), 450);
+
+    // Now run with only old server (no stats) — stale metrics should be cleared
+    String[] serversNoStats = {"server2"};
+    testRunner(serversNoStats, "offline");
+
+    // Metrics should be cleared (0 means removed)
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableNameWithType,
+        ControllerGauge.TABLE_COMPRESSION_RATIO_HUNDREDTHS), 0);
   }
 
   @Test

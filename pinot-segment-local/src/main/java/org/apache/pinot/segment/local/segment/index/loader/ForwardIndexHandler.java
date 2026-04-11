@@ -43,6 +43,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreInd
 import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -600,13 +601,15 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // Persist the new compression codec in metadata.properties (only when compression stats are enabled)
     if (_tableConfig.getIndexingConfig().isCompressionStatsEnabled()) {
       ForwardIndexConfig newConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-      if (newConfig.getChunkCompressionType() != null) {
-        Map<String, String> metadataProperties = new HashMap<>();
-        metadataProperties.put(
-            getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
-            newConfig.getChunkCompressionType().name());
-        SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+      ChunkCompressionType compressionType = newConfig.getChunkCompressionType();
+      if (compressionType == null) {
+        compressionType = ForwardIndexType.getDefaultCompressionType(existingColMetadata.getFieldSpec().getFieldType());
       }
+      Map<String, String> metadataProperties = new HashMap<>();
+      metadataProperties.put(
+          getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
+          compressionType.name());
+      SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
     }
 
     // Delete the marker file.
@@ -1184,10 +1187,12 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), null);
     if (_tableConfig.getIndexingConfig().isCompressionStatsEnabled()) {
       ForwardIndexConfig fwdConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-      if (fwdConfig.getChunkCompressionType() != null) {
-        metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
-            fwdConfig.getChunkCompressionType().name());
+      ChunkCompressionType compressionType = fwdConfig.getChunkCompressionType();
+      if (compressionType == null) {
+        compressionType =
+            ForwardIndexType.getDefaultCompressionType(existingColMetadata.getFieldSpec().getFieldType());
       }
+      metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), compressionType.name());
       if (uncompressedSize > 0) {
         metadataProperties.put(getKeyFor(column, FORWARD_INDEX_UNCOMPRESSED_SIZE),
             String.valueOf(uncompressedSize));

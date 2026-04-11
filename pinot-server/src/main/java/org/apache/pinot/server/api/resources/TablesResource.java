@@ -304,14 +304,17 @@ public class TablesResource {
             if (compressionStatsEnabled) {
               String codec = columnMetadata.getCompressionCodec();
               long uncompressedSize = columnMetadata.getUncompressedForwardIndexSizeBytes();
+              long fwdIndexSize = columnMetadata.getIndexSizeFor(StandardIndexes.forward());
+              // Always create an entry so dictionary columns appear in the stats
+              long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
               if (codec != null && uncompressedSize > 0) {
-                // Use getIndexSizeFor() to get the forward index size directly for this segment/column
-                long fwdIndexSize = columnMetadata.getIndexSizeFor(StandardIndexes.forward());
-                long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
                 accum[0] += uncompressedSize;
                 accum[1] += (fwdIndexSize > 0 ? fwdIndexSize : 0);
                 columnCodecMap.merge(column, codec,
                     (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+              } else if (fwdIndexSize > 0) {
+                // Dictionary-encoded column: track forward index size but no raw uncompressed size
+                accum[1] += fwdIndexSize;
               }
               columnHasDictMap.put(column, columnMetadata.hasDictionary());
               columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);

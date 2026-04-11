@@ -48,11 +48,13 @@ import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVe
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -574,11 +576,18 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
           FieldIndexConfigs fieldIndexConfigs = indexConfigs.get(column);
           if (fieldIndexConfigs != null) {
             ForwardIndexConfig fwdConfig = fieldIndexConfigs.getConfig(StandardIndexes.forward());
-            if (fwdConfig.getChunkCompressionType() != null) {
+            ChunkCompressionType compressionType = fwdConfig.getChunkCompressionType();
+            if (compressionType == null) {
+              FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+              if (fieldSpec != null) {
+                compressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
+              }
+            }
+            if (compressionType != null) {
               properties.setProperty(
                   V1Constants.MetadataKeys.Column.getKeyFor(column,
                       V1Constants.MetadataKeys.Column.FORWARD_INDEX_COMPRESSION_CODEC),
-                  fwdConfig.getChunkCompressionType().name());
+                  compressionType.name());
             }
           }
         }

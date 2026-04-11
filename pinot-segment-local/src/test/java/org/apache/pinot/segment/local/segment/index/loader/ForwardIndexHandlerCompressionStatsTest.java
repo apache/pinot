@@ -332,6 +332,33 @@ public class ForwardIndexHandlerCompressionStatsTest {
   }
 
   @Test
+  public void testDefaultCodecPersistedOnDictToRaw()
+      throws Exception {
+    // Convert DICT_INT_COL from dictionary to raw WITHOUT specifying a compression codec.
+    // The handler should resolve and persist the default codec (LZ4 for DIMENSION columns).
+    _noDictionaryColumns.add(DICT_INT_COL);
+    // Use EncodingType.RAW but no explicit compression codec (null → default)
+    _fieldConfigMap.put(DICT_INT_COL,
+        new FieldConfig(DICT_INT_COL, FieldConfig.EncodingType.RAW, List.of(), null, null));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      ForwardIndexHandler handler = new ForwardIndexHandler(segmentDirectory, createIndexLoadingConfig());
+      assertTrue(handler.needUpdateIndices(writer), "Handler should detect dict-to-raw change");
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata colMeta = metadata.getColumnMetadataFor(DICT_INT_COL);
+    assertFalse(colMeta.hasDictionary(), "Column should no longer have dictionary");
+    assertEquals(colMeta.getCompressionCodec(), "LZ4",
+        "Default codec LZ4 should be persisted for DIMENSION column even when no explicit codec configured");
+    assertTrue(colMeta.getUncompressedForwardIndexSizeBytes() > 0,
+        "Uncompressed size should be > 0 after dict-to-raw conversion");
+  }
+
+  @Test
   public void testRawToDictClearsCompressionStats()
       throws Exception {
     // First, verify that the raw column has compression stats persisted
