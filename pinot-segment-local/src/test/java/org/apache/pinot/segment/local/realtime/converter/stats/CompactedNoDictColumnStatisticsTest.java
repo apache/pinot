@@ -20,19 +20,20 @@ package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
-import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -57,8 +58,8 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 10);
     assertEquals(stats.getMaxValue(), 30);
-    assertEquals(stats.getTotalNumberOfEntries(), 3);
     assertTrue(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
   }
 
   @Test
@@ -75,8 +76,8 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 10);
     assertEquals(stats.getMaxValue(), 30);
-    assertEquals(stats.getTotalNumberOfEntries(), 3);
     assertFalse(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
   }
 
   @Test
@@ -94,8 +95,8 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 10);
     assertEquals(stats.getMaxValue(), 30);
-    assertEquals(stats.getTotalNumberOfEntries(), 3);
     assertFalse(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
   }
 
   @Test
@@ -112,8 +113,8 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 10);
     assertEquals(stats.getMaxValue(), 30);
-    assertEquals(stats.getTotalNumberOfEntries(), 3);
     assertTrue(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
   }
 
   @Test
@@ -146,10 +147,10 @@ public class CompactedNoDictColumnStatisticsTest {
     CompactedNoDictColumnStatistics stats =
         new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), new int[]{1, 3, 0, 2}, false, validDocIds);
 
-    assertEquals(stats.getTotalNumberOfEntries(), 3);
     assertEquals(stats.getMinValue(), 10);
     assertEquals(stats.getMaxValue(), 30);
     assertTrue(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
   }
 
   // ======== LONG SV ========
@@ -166,8 +167,8 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 100L);
     assertEquals(stats.getMaxValue(), 200L);
-    assertEquals(stats.getTotalNumberOfEntries(), 2);
     assertTrue(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 2);
   }
 
   @Test
@@ -183,8 +184,8 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 100L);
     assertEquals(stats.getMaxValue(), 300L);
-    assertEquals(stats.getTotalNumberOfEntries(), 2);
     assertTrue(stats.isSorted()); // bitmap order: doc0=100, doc2=300 → ascending
+    assertEquals(stats.getTotalNumberOfEntries(), 2);
   }
 
   // ======== FLOAT SV ========
@@ -219,6 +220,41 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 1.1);
     assertEquals(stats.getMaxValue(), 2.2);
+    assertTrue(stats.isSorted());
+  }
+
+  // ======== BOOLEAN SV ========
+
+  @Test
+  public void testBooleanSv() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.INT, true);
+    when(forwardIndex.getInt(0)).thenReturn(0);
+    when(forwardIndex.getInt(1)).thenReturn(1);
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex, DataType.BOOLEAN), null, false, validDocIds);
+
+    assertEquals(stats.getMinValue(), 0);
+    assertEquals(stats.getMaxValue(), 1);
+    assertTrue(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 2);
+  }
+
+  // ======== TIMESTAMP SV ========
+
+  @Test
+  public void testTimestampSv() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.LONG, true);
+    when(forwardIndex.getLong(0)).thenReturn(1000L);
+    when(forwardIndex.getLong(1)).thenReturn(2000L);
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex, DataType.TIMESTAMP), null, false, validDocIds);
+
+    assertEquals(stats.getMinValue(), 1000L);
+    assertEquals(stats.getMaxValue(), 2000L);
     assertTrue(stats.isSorted());
   }
 
@@ -274,7 +310,24 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), "apple");
     assertEquals(stats.getMaxValue(), "cherry");
+    assertTrue(stats.isSorted());
     assertEquals(stats.getTotalNumberOfEntries(), 3);
+  }
+
+  // ======== JSON SV ========
+
+  @Test
+  public void testJsonSv() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.STRING, true);
+    when(forwardIndex.getString(0)).thenReturn("null");
+    when(forwardIndex.getString(1)).thenReturn("{\"a\":1}");
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex, DataType.JSON), null, false, validDocIds);
+
+    assertEquals(stats.getMinValue(), "null");
+    assertEquals(stats.getMaxValue(), "{\"a\":1}");
     assertTrue(stats.isSorted());
   }
 
@@ -295,8 +348,8 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), new ByteArray(b0));
     assertEquals(stats.getMaxValue(), new ByteArray(b1));
-    assertEquals(stats.getTotalNumberOfEntries(), 2);
     assertTrue(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 2);
   }
 
   @Test
@@ -315,8 +368,8 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), new ByteArray(b1));
     assertEquals(stats.getMaxValue(), new ByteArray(b0));
-    assertEquals(stats.getTotalNumberOfEntries(), 2);
     assertTrue(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 2);
   }
 
   // ======== Multi-value ========
@@ -334,9 +387,9 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 5);
     assertEquals(stats.getMaxValue(), 30);
+    assertFalse(stats.isSorted()); // MV with totalEntries > 1 → always false
     assertEquals(stats.getTotalNumberOfEntries(), 4);
     assertEquals(stats.getMaxNumberOfMultiValues(), 2);
-    assertFalse(stats.isSorted()); // MV with totalEntries > 1 → always false
   }
 
   @Test
@@ -352,9 +405,9 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 5);
     assertEquals(stats.getMaxValue(), 30);
+    assertFalse(stats.isSorted()); // MV with totalEntries > 1 → always false
     assertEquals(stats.getTotalNumberOfEntries(), 5); // 2+3
     assertEquals(stats.getMaxNumberOfMultiValues(), 3);
-    assertFalse(stats.isSorted()); // MV with totalEntries > 1 → always false
   }
 
   @Test
@@ -370,9 +423,9 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 100L);
     assertEquals(stats.getMaxValue(), 300L);
+    assertFalse(stats.isSorted());
     assertEquals(stats.getTotalNumberOfEntries(), 3);
     assertEquals(stats.getMaxNumberOfMultiValues(), 2);
-    assertFalse(stats.isSorted());
   }
 
   @Test
@@ -387,8 +440,8 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 1.0f);
     assertEquals(stats.getMaxValue(), 3.0f);
-    assertEquals(stats.getTotalNumberOfEntries(), 3);
     assertFalse(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
   }
 
   @Test
@@ -403,8 +456,42 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 1.5);
     assertEquals(stats.getMaxValue(), 4.5);
-    assertEquals(stats.getTotalNumberOfEntries(), 3);
     assertFalse(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
+  }
+
+  @Test
+  public void testBooleanMv() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.INT, false);
+    when(forwardIndex.getIntMV(0)).thenReturn(new int[]{0, 1});
+    when(forwardIndex.getIntMV(1)).thenReturn(new int[]{0});
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex, DataType.BOOLEAN), null, false, validDocIds);
+
+    assertEquals(stats.getMinValue(), 0);
+    assertEquals(stats.getMaxValue(), 1);
+    assertFalse(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
+    assertEquals(stats.getMaxNumberOfMultiValues(), 2);
+  }
+
+  @Test
+  public void testTimestampMv() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.LONG, false);
+    when(forwardIndex.getLongMV(0)).thenReturn(new long[]{1000L, 2000L});
+    when(forwardIndex.getLongMV(1)).thenReturn(new long[]{3000L});
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex, DataType.TIMESTAMP), null, false, validDocIds);
+
+    assertEquals(stats.getMinValue(), 1000L);
+    assertEquals(stats.getMaxValue(), 3000L);
+    assertFalse(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
+    assertEquals(stats.getMaxNumberOfMultiValues(), 2);
   }
 
   @Test
@@ -420,8 +507,25 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), "a");
     assertEquals(stats.getMaxValue(), "c");
-    assertEquals(stats.getTotalNumberOfEntries(), 3);
     assertFalse(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
+  }
+
+  @Test
+  public void testJsonMv() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.STRING, false);
+    when(forwardIndex.getStringMV(0)).thenReturn(new String[]{"null", "[]"});
+    when(forwardIndex.getStringMV(1)).thenReturn(new String[]{"{}"});
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex, DataType.JSON), null, false, validDocIds);
+
+    assertEquals(stats.getMinValue(), "[]");
+    assertEquals(stats.getMaxValue(), "{}");
+    assertFalse(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
+    assertEquals(stats.getMaxNumberOfMultiValues(), 2);
   }
 
   @Test
@@ -440,27 +544,14 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), new ByteArray(b0));
     assertEquals(stats.getMaxValue(), new ByteArray(b1));
+    assertFalse(stats.isSorted());
     assertEquals(stats.getTotalNumberOfEntries(), 3);
     assertEquals(stats.getMaxNumberOfMultiValues(), 2);
-    assertFalse(stats.isSorted());
   }
+
+  // Empty validDocIds cases are now handled by EmptyColumnStatistics via RealtimeSegmentStatsContainer
 
   // ======== Edge cases ========
-
-  @Test
-  public void testEmptyValidDocs() {
-    // RoaringBitmap is empty — no entries, min/max remain null, isSorted=true (totalEntries <= 1)
-    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.INT, true);
-
-    RoaringBitmap validDocIds = new RoaringBitmap();
-    CompactedNoDictColumnStatistics stats =
-        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
-
-    assertNull(stats.getMinValue());
-    assertNull(stats.getMaxValue());
-    assertEquals(stats.getTotalNumberOfEntries(), 0);
-    assertTrue(stats.isSorted()); // totalEntries <= 1
-  }
 
   @Test
   public void testSingleValidDoc() {
@@ -474,8 +565,8 @@ public class CompactedNoDictColumnStatisticsTest {
 
     assertEquals(stats.getMinValue(), 42);
     assertEquals(stats.getMaxValue(), 42);
-    assertEquals(stats.getTotalNumberOfEntries(), 1);
     assertTrue(stats.isSorted()); // totalEntries <= 1
+    assertEquals(stats.getTotalNumberOfEntries(), 1);
   }
 
   @Test
@@ -492,18 +583,7 @@ public class CompactedNoDictColumnStatisticsTest {
     assertTrue(stats.isSorted()); // isSortedColumn=true overrides scan result
   }
 
-  @Test
-  public void testMvWithEmptyValidDocsSorted() {
-    // MV column but zero valid docs → totalEntries=0 → isSorted=true (totalEntries <= 1)
-    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.STRING, false);
-
-    RoaringBitmap validDocIds = new RoaringBitmap();
-    CompactedNoDictColumnStatistics stats =
-        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
-
-    assertEquals(stats.getTotalNumberOfEntries(), 0);
-    assertFalse(stats.isSorted());
-  }
+  // testMvWithEmptyValidDocsSorted removed — empty case handled by EmptyColumnStatistics
 
   // ======== Element length ========
 
@@ -519,7 +599,8 @@ public class CompactedNoDictColumnStatisticsTest {
         new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
 
     assertEquals(stats.getLengthOfShortestElement(), Integer.BYTES);
-    assertEquals(stats.getLengthOfLargestElement(), Integer.BYTES);
+    assertEquals(stats.getLengthOfLongestElement(), Integer.BYTES);
+    assertTrue(stats.isFixedLength());
   }
 
   @Test
@@ -534,8 +615,9 @@ public class CompactedNoDictColumnStatisticsTest {
     CompactedNoDictColumnStatistics stats =
         new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
 
-    assertEquals(stats.getLengthOfShortestElement(), 2); // "hi"
-    assertEquals(stats.getLengthOfLargestElement(), 5);  // "hello"
+    assertEquals(stats.getLengthOfShortestElement(), 2);
+    assertEquals(stats.getLengthOfLongestElement(), 5);  // "hello"
+    assertFalse(stats.isFixedLength());
   }
 
   @Test
@@ -549,7 +631,8 @@ public class CompactedNoDictColumnStatisticsTest {
         new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
 
     assertEquals(stats.getLengthOfShortestElement(), 3);
-    assertEquals(stats.getLengthOfLargestElement(), 4);
+    assertEquals(stats.getLengthOfLongestElement(), 4);
+    assertFalse(stats.isFixedLength());
   }
 
   @Test
@@ -563,8 +646,9 @@ public class CompactedNoDictColumnStatisticsTest {
     CompactedNoDictColumnStatistics stats =
         new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
 
-    assertEquals(stats.getLengthOfShortestElement(), 2); // "hi"
-    assertEquals(stats.getLengthOfLargestElement(), 5);  // "hello"
+    assertEquals(stats.getLengthOfShortestElement(), 2);
+    assertEquals(stats.getLengthOfLongestElement(), 5);  // "hello"
+    assertFalse(stats.isFixedLength());
   }
 
   @Test
@@ -578,21 +662,11 @@ public class CompactedNoDictColumnStatisticsTest {
         new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
 
     assertEquals(stats.getLengthOfShortestElement(), 2);
-    assertEquals(stats.getLengthOfLargestElement(), 4);
+    assertEquals(stats.getLengthOfLongestElement(), 4);
+    assertFalse(stats.isFixedLength());
   }
 
-  @Test
-  public void testElementLengthEmptyValidDocs() {
-    // No valid docs → variable-width element lengths must be 0
-    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.STRING, true);
-
-    RoaringBitmap validDocIds = new RoaringBitmap();
-    CompactedNoDictColumnStatistics stats =
-        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
-
-    assertEquals(stats.getLengthOfShortestElement(), Integer.MAX_VALUE);
-    assertEquals(stats.getLengthOfLargestElement(), 0);
-  }
+  // testElementLengthEmptyValidDocs removed — empty case handled by EmptyColumnStatistics
 
   @Test
   public void testElementLengthStringPartialValidDocs() {
@@ -605,8 +679,62 @@ public class CompactedNoDictColumnStatisticsTest {
     CompactedNoDictColumnStatistics stats =
         new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
 
-    assertEquals(stats.getLengthOfShortestElement(), 5); // "short"
-    assertEquals(stats.getLengthOfLargestElement(), 8);  // "medium__"
+    assertEquals(stats.getLengthOfShortestElement(), 5);
+    assertEquals(stats.getLengthOfLongestElement(), 8);  // "medium__"
+    assertFalse(stats.isFixedLength());
+  }
+
+  // ======== isAscii ========
+
+  @Test
+  public void testIsAsciiStringAllAscii() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.STRING, true);
+    when(forwardIndex.getString(0)).thenReturn("hello");
+    when(forwardIndex.getString(1)).thenReturn("world");
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
+
+    assertTrue(stats.isAscii());
+  }
+
+  @Test
+  public void testIsAsciiStringWithNonAscii() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.STRING, true);
+    when(forwardIndex.getString(0)).thenReturn("hello");
+    when(forwardIndex.getString(1)).thenReturn("héllo");
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
+
+    assertFalse(stats.isAscii());
+  }
+
+  @Test
+  public void testIsAsciiStringMvWithNonAscii() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.STRING, false);
+    when(forwardIndex.getStringMV(0)).thenReturn(new String[]{"hello", "café"});
+    when(forwardIndex.getStringMV(1)).thenReturn(new String[]{"world"});
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
+
+    assertFalse(stats.isAscii());
+  }
+
+  @Test
+  public void testIsAsciiIntType() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.INT, true);
+    when(forwardIndex.getInt(0)).thenReturn(42);
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(mockDataSource(forwardIndex), null, false, validDocIds);
+
+    assertFalse(stats.isAscii());
   }
 
   // ======== Helper ========
@@ -619,7 +747,30 @@ public class CompactedNoDictColumnStatisticsTest {
   }
 
   private DataSource mockDataSource(MutableForwardIndex forwardIndex) {
-    DataSource dataSource = mock(DataSource.class, RETURNS_DEEP_STUBS);
+    DataType type = forwardIndex.getStoredType();
+    boolean sv = forwardIndex.isSingleValue();
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", type, sv);
+
+    DataSourceMetadata metadata = mock(DataSourceMetadata.class);
+    when(metadata.getFieldSpec()).thenReturn(fieldSpec);
+    when(metadata.getNumDocs()).thenReturn(1000); // arbitrary positive to satisfy precondition
+
+    DataSource dataSource = mock(DataSource.class);
+    when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
+    doReturn(forwardIndex).when(dataSource).getForwardIndex();
+    return dataSource;
+  }
+
+  private DataSource mockDataSource(MutableForwardIndex forwardIndex, DataType logicalType) {
+    boolean sv = forwardIndex.isSingleValue();
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", logicalType, sv);
+
+    DataSourceMetadata metadata = mock(DataSourceMetadata.class);
+    when(metadata.getFieldSpec()).thenReturn(fieldSpec);
+    when(metadata.getNumDocs()).thenReturn(1000);
+
+    DataSource dataSource = mock(DataSource.class);
+    when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
     doReturn(forwardIndex).when(dataSource).getForwardIndex();
     return dataSource;
   }

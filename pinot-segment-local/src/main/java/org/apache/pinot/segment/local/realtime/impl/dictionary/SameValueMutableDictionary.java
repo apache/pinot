@@ -22,21 +22,24 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
 import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.Utf8Utils;
+
 
 /**
  * SameValueMutableDictionary is used to wrap any MutableDictionary, but store the same value. This is done to
  * allow noRawDataForTextIndex config to work with mutable indexes.
  */
 public class SameValueMutableDictionary implements MutableDictionary {
-
-  private final Object _actualValue;
-  private final Object[] _actualValues;
+  private final String _actualValue;
+  private final String[] _actualValues;
+  private final byte[] _valueBytes;
   private final MutableDictionary _delegate;
 
-  public SameValueMutableDictionary(Object value, MutableDictionary delegate) {
-    _actualValue = value;
-    _actualValues = new Object[]{value};
+  public SameValueMutableDictionary(Object actualValue, MutableDictionary delegate) {
+    _actualValue = actualValue.toString();
+    _actualValues = new String[]{_actualValue};
+    _valueBytes = Utf8Utils.encode(_actualValue);
     _delegate = delegate;
   }
 
@@ -49,7 +52,7 @@ public class SameValueMutableDictionary implements MutableDictionary {
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
+  public DataType getValueType() {
     return _delegate.getValueType();
   }
 
@@ -75,57 +78,62 @@ public class SameValueMutableDictionary implements MutableDictionary {
 
   @Override
   public String getMinVal() {
-    return _actualValue.toString();
+    return _actualValue;
   }
 
   @Override
   public String getMaxVal() {
-    return _actualValue.toString();
+    return _actualValue;
   }
 
   @Override
-  public Object getSortedValues() {
-    return _delegate.getSortedValues();
+  public String[] getSortedValues() {
+    return _actualValues;
   }
 
   @Override
-  public Object get(int dictId) {
+  public String get(int dictId) {
     return _actualValue;
   }
 
   @Override
   public int getIntValue(int dictId) {
-    return Integer.parseInt(_actualValue.toString());
+    return Integer.parseInt(_actualValue);
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return Long.parseLong(_actualValue.toString());
+    return Long.parseLong(_actualValue);
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return Float.parseFloat(_actualValue.toString());
+    return Float.parseFloat(_actualValue);
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return Double.parseDouble(_actualValue.toString());
+    return Double.parseDouble(_actualValue);
   }
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return BigDecimal.valueOf(getDoubleValue(dictId));
+    return new BigDecimal(_actualValue);
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return _actualValue.toString();
+    return _actualValue;
+  }
+
+  @Override
+  public byte[] getBytesValue(int dictId) {
+    return _valueBytes;
   }
 
   @Override
   public int getValueSize(int dictId) {
-    return _delegate.getValueSize(dictId);
+    return _valueBytes.length;
   }
 
   @Override

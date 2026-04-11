@@ -31,35 +31,46 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
 
 
+@SuppressWarnings("rawtypes")
 public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStatsProvider {
   protected final DataSourceMetadata _dataSourceMetadata;
-  protected final MutableForwardIndex _forwardIndex;
+  protected final FieldSpec _fieldSpec;
   @Nullable
   protected final int[] _sortedDocIds;
   protected final boolean _isSortedColumn;
+  protected final MutableForwardIndex _forwardIndex;
 
   public MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
-    _forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
-    Preconditions.checkState(_forwardIndex != null, "Forward index should not be null for column: %s",
-        _dataSourceMetadata.getFieldSpec().getName());
+    _fieldSpec = _dataSourceMetadata.getFieldSpec();
+    Preconditions.checkState(_dataSourceMetadata.getNumDocs() > 0,
+        "Use EmptyColumnStatistics for empty column: %s", _fieldSpec.getName());
     _sortedDocIds = sortedDocIds;
     _isSortedColumn = isSortedColumn;
+    _forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
+    Preconditions.checkState(_forwardIndex != null, "Failed to find forward index for column: %s",
+        _fieldSpec.getName());
   }
 
   @Override
-  public Object getMinValue() {
+  public FieldSpec getFieldSpec() {
+    return _fieldSpec;
+  }
+
+  @Override
+  public Comparable getMinValue() {
     return _dataSourceMetadata.getMinValue();
   }
 
   @Override
-  public Object getMaxValue() {
+  public Comparable getMaxValue() {
     return _dataSourceMetadata.getMaxValue();
   }
 
@@ -80,8 +91,13 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   }
 
   @Override
-  public int getLengthOfLargestElement() {
+  public int getLengthOfLongestElement() {
     return _forwardIndex.getLengthOfLongestElement();
+  }
+
+  @Override
+  public boolean isAscii() {
+    return _forwardIndex.isAscii();
   }
 
   @Override
@@ -92,17 +108,14 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     }
 
     // Multi-valued column cannot be sorted
-    if (!_dataSourceMetadata.isSingleValue()) {
+    if (!isSingleValue()) {
       return false;
     }
 
     int numDocs = _dataSourceMetadata.getNumDocs();
-    if (numDocs <= 1) {
-      return true;
-    }
 
     // Verify that values are non-decreasing when iterated in the given order
-    DataType valueType = _forwardIndex.getStoredType();
+    DataType valueType = getValueType();
     if (_sortedDocIds != null) {
       switch (valueType) {
         case INT: {

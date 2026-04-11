@@ -32,7 +32,6 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
   private ObjectOpenHashSet<BigDecimal> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
-  private int _maxRowLength = 0;
   private BigDecimal[] _sortedValues;
   private boolean _sealed = false;
 
@@ -56,7 +55,6 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
         }
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);
-        _maxRowLength = _maxLength;
       }
       _totalNumberOfEntries++;
     }
@@ -88,17 +86,17 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
 
   @Override
   public int getLengthOfShortestElement() {
-    return _minLength;
+    return _minLength != Integer.MAX_VALUE ? _minLength : 0;
   }
 
   @Override
-  public int getLengthOfLargestElement() {
+  public int getLengthOfLongestElement() {
     return _maxLength;
   }
 
   @Override
   public int getMaxRowLengthInBytes() {
-    return _maxRowLength;
+    return _maxLength;
   }
 
   @Override
