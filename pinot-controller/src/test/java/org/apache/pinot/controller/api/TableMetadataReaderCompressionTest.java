@@ -107,7 +107,7 @@ public class TableMetadataReaderCompressionTest {
     endpoints.put("server1", "http://localhost:" + PORT_SERVER1);
 
     TableMetadataInfo result = reader.getAggregatedTableMetadataFromServer(
-        "testTable_OFFLINE", endpoints, null, NUM_REPLICAS, TIMEOUT_MSEC);
+        "testTable_OFFLINE", endpoints, null, NUM_REPLICAS, TIMEOUT_MSEC, true);
 
     assertNotNull(result);
     // Disk size divided by replicas: (50000+50000) / 2 = 50000
@@ -156,7 +156,7 @@ public class TableMetadataReaderCompressionTest {
       endpoints.put("old_server", "http://localhost:11210");
 
       TableMetadataInfo result = reader.getAggregatedTableMetadataFromServer(
-          "testTable_OFFLINE", endpoints, null, 1, TIMEOUT_MSEC);
+          "testTable_OFFLINE", endpoints, null, 1, TIMEOUT_MSEC, true);
 
       assertNotNull(result);
       // No compression stats should result in null list
@@ -168,6 +168,24 @@ public class TableMetadataReaderCompressionTest {
         noStatsServer.stop(0);
       }
     }
+  }
+
+  @Test
+  public void testCompressionStatsSuppressedWhenFlagOff() {
+    ServerSegmentMetadataReader reader = new ServerSegmentMetadataReader(_executor, _connectionManager);
+    BiMap<String, String> endpoints = HashBiMap.create();
+    endpoints.put("server0", "http://localhost:" + PORT_SERVER0);
+    endpoints.put("server1", "http://localhost:" + PORT_SERVER1);
+
+    // Flag OFF: compression stats and columnCompressionStats should be null,
+    // but storageBreakdown should still be preserved
+    TableMetadataInfo result = reader.getAggregatedTableMetadataFromServer(
+        "testTable_OFFLINE", endpoints, null, NUM_REPLICAS, TIMEOUT_MSEC, false);
+
+    assertNotNull(result);
+    assertNull(result.getColumnCompressionStats(), "columnCompressionStats should be null when flag is OFF");
+    assertNull(result.getCompressionStats(), "compressionStats should be null when flag is OFF");
+    // storageBreakdown is always-on; it is null here only because test servers don't send it
   }
 
   private HttpHandler createHandler(TableMetadataInfo info) {

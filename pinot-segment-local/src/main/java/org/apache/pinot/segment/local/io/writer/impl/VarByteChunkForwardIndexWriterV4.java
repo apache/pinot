@@ -140,6 +140,9 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   public void putBytes(byte[] bytes) {
     Preconditions.checkState(_chunkOffset < (1L << 32),
         "exceeded 4GB of compressed chunks for: " + _dataBuffer.getName());
+    if (_trackUncompressedSize) {
+      _uncompressedSize += bytes.length;
+    }
     int sizeRequired = Integer.BYTES + bytes.length;
     if (_chunkBuffer.position() > _chunkBuffer.capacity() - sizeRequired) {
       flushChunk();
@@ -271,9 +274,6 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   private void write(ByteBuffer buffer, boolean huge) {
     ByteBuffer mapped = null;
     final int compressedSize;
-    if (_trackUncompressedSize) {
-      _uncompressedSize += buffer.remaining();
-    }
     try {
       if (huge) {
         // the compression buffer isn't guaranteed to be large enough for huge chunks,

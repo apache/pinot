@@ -1276,13 +1276,8 @@ public class PinotTableRestletResource {
 
     String segmentsMetadata;
     try {
-      JsonNode segmentsMetadataJson = getAggregateMetadataFromServer(tableNameWithType, columns, numReplica);
-      // Strip compression fields when the feature flag is OFF
-      if (!compressionStatsEnabled) {
-        ObjectNode mutable = (ObjectNode) segmentsMetadataJson;
-        mutable.remove("columnCompressionStats");
-        mutable.remove("compressionStats");
-      }
+      JsonNode segmentsMetadataJson =
+          getAggregateMetadataFromServer(tableNameWithType, columns, numReplica, compressionStatsEnabled);
       segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
@@ -1338,13 +1333,8 @@ public class PinotTableRestletResource {
 
     try {
       JsonNode segmentsMetadataJson =
-          getAggregateMetadataFromServer(existingTableNameWithType, columnsList, numReplica);
-      // Strip compression fields when the feature flag is OFF
-      if (!compressionStatsEnabled) {
-        ObjectNode mutable = (ObjectNode) segmentsMetadataJson;
-        mutable.remove("columnCompressionStats");
-        mutable.remove("compressionStats");
-      }
+          getAggregateMetadataFromServer(existingTableNameWithType, columnsList, numReplica,
+              compressionStatsEnabled);
       return JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
@@ -1474,12 +1464,13 @@ public class PinotTableRestletResource {
    * @param numReplica num or replica for the table
    * @return aggregated metadata of the table segments
    */
-  private JsonNode getAggregateMetadataFromServer(String tableNameWithType, List<String> columns, int numReplica)
+  private JsonNode getAggregateMetadataFromServer(String tableNameWithType, List<String> columns, int numReplica,
+      boolean compressionStatsEnabled)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader.getAggregateTableMetadata(tableNameWithType, columns, numReplica,
-        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, compressionStatsEnabled);
   }
 
   @GET
