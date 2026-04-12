@@ -28,6 +28,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.predicate.CustomPredicate;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
@@ -54,6 +55,8 @@ import org.apache.pinot.core.operator.filter.VectorSearchMode;
 import org.apache.pinot.core.operator.filter.VectorSearchParams;
 import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
+import org.apache.pinot.core.operator.filter.custom.CustomFilterOperatorFactory;
+import org.apache.pinot.core.operator.filter.custom.CustomFilterOperatorRegistry;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.IFSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -232,6 +235,8 @@ public class FilterPlanNode implements PlanNode {
           if (isVectorSimilarityFilter(childFilter) && hasNonVectorSibling(childFilters)) {
             // Pass filtered context so vector operator reports correct execution mode
             childFilterOperator = constructFilteredVectorOperator(childFilter, numDocs);
+          } else if (isCustomFilter(childFilter) && hasNonCustomSibling(childFilters)) {
+            childFilterOperator = constructFilteredCustomOperator(childFilter, numDocs);
           } else {
             childFilterOperator = constructPhysicalOperator(childFilter, numDocs);
           }
@@ -278,6 +283,8 @@ public class FilterPlanNode implements PlanNode {
             return new H3InclusionIndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else if (canApplyMapFilter(predicate)) {
             return new MapFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
+          } else if (predicate.getType() == Predicate.Type.CUSTOM) {
+            return constructCustomFilterOperator(predicate, null, numDocs, false);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (TEXT_MATCH)
             return new ExpressionFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
@@ -366,6 +373,9 @@ public class FilterPlanNode implements PlanNode {
                 return new MatchAllFilterOperator(numDocs);
               }
             }
+            case CUSTOM: {
+              return constructCustomFilterOperator(predicate, dataSource, numDocs, false);
+            }
             default:
               predicateEvaluator =
                   PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);
@@ -435,6 +445,32 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
+   * Constructs a custom filter operator for a predicate that is part of an AND with
+   * non-custom siblings. This allows custom operators to adapt their execution when
+   * metadata filters are present.
+   */
+  private BaseFilterOperator constructFilteredCustomOperator(FilterContext filter, int numDocs) {
+    Predicate predicate = filter.getPredicate();
+    ExpressionContext lhs = predicate.getLhs();
+    DataSource dataSource =
+        lhs.getType() == ExpressionContext.Type.IDENTIFIER ? _indexSegment.getDataSource(lhs.getIdentifier(),
+            _queryContext.getSchema()) : null;
+    return constructCustomFilterOperator(predicate, dataSource, numDocs, true);
+  }
+
+  private BaseFilterOperator constructCustomFilterOperator(Predicate predicate, @Nullable DataSource dataSource,
+      int numDocs, boolean hasMetadataFilter) {
+    Preconditions.checkState(predicate instanceof CustomPredicate,
+        "Predicate of type CUSTOM must extend CustomPredicate, got: %s", predicate.getClass().getName());
+    CustomPredicate customPredicate = (CustomPredicate) predicate;
+    CustomFilterOperatorFactory factory = CustomFilterOperatorRegistry.get(customPredicate.getCustomTypeName());
+    Preconditions.checkState(factory != null, "No CustomFilterOperatorFactory registered for custom predicate: %s",
+        customPredicate.getCustomTypeName());
+    return factory.createFilterOperator(_indexSegment, _queryContext, predicate, dataSource, numDocs,
+        hasMetadataFilter);
+  }
+
+  /**
    * Returns true if the child list contains at least one non-VECTOR_SIMILARITY predicate
    * (i.e., a real metadata filter sibling).
    */
@@ -448,11 +484,31 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
+   * Returns true if the child list contains at least one non-custom sibling.
+   */
+  private static boolean hasNonCustomSibling(List<FilterContext> childFilters) {
+    for (FilterContext child : childFilters) {
+      if (!isCustomFilter(child)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Returns true if the filter is a VECTOR_SIMILARITY predicate.
    */
   private static boolean isVectorSimilarityFilter(FilterContext filter) {
     return filter.getType() == FilterContext.Type.PREDICATE
         && filter.getPredicate().getType() == Predicate.Type.VECTOR_SIMILARITY;
+  }
+
+  /**
+   * Returns true if the filter is a custom predicate.
+   */
+  private static boolean isCustomFilter(FilterContext filter) {
+    return filter.getType() == FilterContext.Type.PREDICATE
+        && filter.getPredicate().getType() == Predicate.Type.CUSTOM;
   }
 
   /**

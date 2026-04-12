@@ -173,7 +173,10 @@ public class TimeSegmentPruner implements SegmentPruner {
   @Nullable
   private List<Interval> getFilterTimeIntervals(Expression filterExpression) {
     Function function = filterExpression.getFunctionCall();
-    FilterKind filterKind = FilterKind.valueOf(function.getOperator());
+    FilterKind filterKind = FilterKind.fromOperator(function.getOperator());
+    if (filterKind == null) {
+      return null;
+    }
     List<Expression> operands = function.getOperands();
     switch (filterKind) {
       case AND:

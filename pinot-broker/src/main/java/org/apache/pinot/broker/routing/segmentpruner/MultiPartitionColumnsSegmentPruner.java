@@ -119,7 +119,10 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
   private boolean isPartitionMatch(Expression filterExpression,
       Map<String, SegmentPartitionInfo> columnPartitionInfoMap) {
     Function function = filterExpression.getFunctionCall();
-    FilterKind filterKind = FilterKind.valueOf(function.getOperator());
+    FilterKind filterKind = FilterKind.fromOperator(function.getOperator());
+    if (filterKind == null) {
+      return true;
+    }
     List<Expression> operands = function.getOperands();
     switch (filterKind) {
       case AND:

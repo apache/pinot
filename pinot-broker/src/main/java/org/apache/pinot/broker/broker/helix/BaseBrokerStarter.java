@@ -68,6 +68,7 @@ import org.apache.pinot.common.config.provider.ZkTableCache;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.failuredetector.FailureDetectorFactory;
+import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -361,6 +362,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _accessControlFactory = AccessControlFactory.loadFactory(factoryConf, _propertyStore);
     _queryQuotaManager = new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
     _queryQuotaManager.init(_spectatorHelixManager);
+    // Initialize custom filter predicate plugins
+    LOGGER.info("Initializing FilterPredicateRegistry");
+    FilterPredicateRegistry.init();
     // Initialize QueryRewriterFactory
     LOGGER.info("Initializing QueryRewriterFactory");
     QueryRewriterFactory.init(_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REWRITER_CLASS_NAMES));

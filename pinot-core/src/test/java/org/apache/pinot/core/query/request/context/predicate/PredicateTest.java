@@ -19,20 +19,30 @@
 package org.apache.pinot.core.query.request.context.predicate;
 
 import java.util.List;
+import org.apache.pinot.common.filter.FilterPredicatePlugin;
+import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.request.context.predicate.CustomPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class PredicateTest {
+
+  @AfterMethod
+  public void tearDown() {
+    FilterPredicateRegistry.clear();
+  }
 
   @Test
   public void testSerDe() {
@@ -89,6 +99,18 @@ public class PredicateTest {
     assertEquals(children.get(1).toString(), "foo < '456'");
   }
 
+  @Test
+  public void testCustomPredicateFromThriftExpression() {
+    FilterPredicateRegistry.register(new LikeAnyPlugin());
+
+    Expression thriftExpression = CalciteSqlParser.compileToExpression("LIKE_ANY(foo, 'bar', 'baz')");
+    FilterContext filter = RequestContextUtils.getFilter(thriftExpression);
+
+    assertEquals(filter.getType(), FilterContext.Type.PREDICATE);
+    assertTrue(filter.getPredicate() instanceof LikeAnyPredicate);
+    assertEquals(((CustomPredicate) filter.getPredicate()).getCustomTypeName(), "LIKE_ANY");
+  }
+
   /**
    * Tests that the serialized predicate can be parsed and converted back to the same predicate, and returns the
    * serialized predicate (standardized string representation of the predicate expression).
@@ -110,5 +132,42 @@ public class PredicateTest {
     assertEquals(filter.getPredicate(), predicate);
 
     return predicateExpression;
+  }
+
+  private static final class LikeAnyPlugin implements FilterPredicatePlugin {
+    @Override
+    public String name() {
+      return "LIKE_ANY";
+    }
+
+    @Override
+    public void validateFilterExpression(List<Expression> operands) {
+    }
+
+    @Override
+    public List<OperandType> getOperandTypes() {
+      return List.of(OperandType.STRING, OperandType.STRING, OperandType.STRING);
+    }
+
+    @Override
+    public boolean acceptsVariadicArguments() {
+      return true;
+    }
+
+    @Override
+    public Predicate createPredicate(List<ExpressionContext> operands) {
+      return new LikeAnyPredicate(operands.get(0));
+    }
+  }
+
+  private static final class LikeAnyPredicate extends CustomPredicate {
+    private LikeAnyPredicate(ExpressionContext lhs) {
+      super(lhs, "LIKE_ANY");
+    }
+
+    @Override
+    public String toString() {
+      return "LIKE_ANY(" + getLhs() + ")";
+    }
   }
 }

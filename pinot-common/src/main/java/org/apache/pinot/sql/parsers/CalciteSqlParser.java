@@ -52,6 +52,8 @@ import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.filter.FilterPredicatePlugin;
+import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -271,63 +273,65 @@ public class CalciteSqlParser {
       for (Expression filter : filterExpression.getFunctionCall().getOperands()) {
         validateFilter(filter);
       }
-    } else if (operator.equals(FilterKind.VECTOR_SIMILARITY.name())) {
-      Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
-      if (!vectorIdentifier.isSetIdentifier()) {
-        throw new IllegalStateException("The first argument of VECTOR_SIMILARITY must be an identifier of float array, "
-            + "the signature is VECTOR_SIMILARITY(float[], float[], int).");
-      }
-      Expression vectorLiteral = filterExpression.getFunctionCall().getOperands().get(1);
-      /*
-       * Array Literal could be either:
-       * 1. a function of type 'ARRAYVALUECONSTRUCTOR' with operands of float/double
-       * 2. a float/double array literals
-       * Also check in
-       * {@link org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter#updateFunctionExpression(Expression)}
-       */
-      if ((vectorLiteral.isSetFunctionCall() && !vectorLiteral.getFunctionCall().getOperator().equalsIgnoreCase(
-          "arrayvalueconstructor"))
-          || (vectorLiteral.isSetLiteral() && !vectorLiteral.getLiteral().isSetFloatArrayValue()
-          && !vectorLiteral.getLiteral().isSetDoubleArrayValue())) {
-        throw new IllegalStateException("The second argument of VECTOR_SIMILARITY must be a float/double array "
-            + "literal, the signature is VECTOR_SIMILARITY(float[], float[], int)");
-      }
-      if (filterExpression.getFunctionCall().getOperands().size() == 3) {
-        Expression topK = filterExpression.getFunctionCall().getOperands().get(2);
-        if (!topK.isSetLiteral()) {
-          throw new IllegalStateException("The third argument of VECTOR_SIMILARITY must be an integer literal, "
-              + "the signature is VECTOR_SIMILARITY(float[], float[], int)");
-        }
-      }
-    } else if (operator.equals(FilterKind.VECTOR_SIMILARITY_RADIUS.name())) {
-      Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
-      if (!vectorIdentifier.isSetIdentifier()) {
-        throw new IllegalStateException(
-            "The first argument of VECTOR_SIMILARITY_RADIUS must be an identifier of float array, "
-                + "the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float).");
-      }
-      Expression vectorLiteral = filterExpression.getFunctionCall().getOperands().get(1);
-      if ((vectorLiteral.isSetFunctionCall() && !vectorLiteral.getFunctionCall().getOperator().equalsIgnoreCase(
-          "arrayvalueconstructor"))
-          || (vectorLiteral.isSetLiteral() && !vectorLiteral.getLiteral().isSetFloatArrayValue()
-          && !vectorLiteral.getLiteral().isSetDoubleArrayValue())) {
-        throw new IllegalStateException(
-            "The second argument of VECTOR_SIMILARITY_RADIUS must be a float/double array "
-                + "literal, the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float)");
-      }
-      if (filterExpression.getFunctionCall().getOperands().size() == 3) {
-        Expression threshold = filterExpression.getFunctionCall().getOperands().get(2);
-        if (!threshold.isSetLiteral()) {
-          throw new IllegalStateException(
-              "The third argument of VECTOR_SIMILARITY_RADIUS must be a numeric literal, "
-                  + "the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float)");
-        }
-      }
     } else {
-      List<Expression> operands = filterExpression.getFunctionCall().getOperands();
-      for (int i = 1; i < operands.size(); i++) {
-        if (operands.get(i).getLiteral().isSetNullValue()) {
-          throw new IllegalStateException("Using NULL in " + operator + " filter is not supported");
+      // Check if this is a custom filter predicate registered via plugin
+      FilterPredicatePlugin plugin = FilterPredicateRegistry.get(operator);
+      if (plugin != null) {
+        plugin.validateFilterExpression(filterExpression.getFunctionCall().getOperands());
+        return;
+      }
+      if (operator.equals(FilterKind.VECTOR_SIMILARITY.name())) {
+        Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
+        if (!vectorIdentifier.isSetIdentifier()) {
+          throw new IllegalStateException(
+              "The first argument of VECTOR_SIMILARITY must be an identifier of float array, "
+                  + "the signature is VECTOR_SIMILARITY(float[], float[], int).");
+        }
+        Expression vectorLiteral = filterExpression.getFunctionCall().getOperands().get(1);
+        if ((vectorLiteral.isSetFunctionCall() && !vectorLiteral.getFunctionCall().getOperator().equalsIgnoreCase(
+            "arrayvalueconstructor"))
+            || (vectorLiteral.isSetLiteral() && !vectorLiteral.getLiteral().isSetFloatArrayValue()
+            && !vectorLiteral.getLiteral().isSetDoubleArrayValue())) {
+          throw new IllegalStateException("The second argument of VECTOR_SIMILARITY must be a float/double array "
+              + "literal, the signature is VECTOR_SIMILARITY(float[], float[], int)");
+        }
+        if (filterExpression.getFunctionCall().getOperands().size() == 3) {
+          Expression topK = filterExpression.getFunctionCall().getOperands().get(2);
+          if (!topK.isSetLiteral()) {
+            throw new IllegalStateException("The third argument of VECTOR_SIMILARITY must be an integer literal, "
+                + "the signature is VECTOR_SIMILARITY(float[], float[], int)");
+          }
+        }
+      } else if (operator.equals(FilterKind.VECTOR_SIMILARITY_RADIUS.name())) {
+        Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
+        if (!vectorIdentifier.isSetIdentifier()) {
+          throw new IllegalStateException(
+              "The first argument of VECTOR_SIMILARITY_RADIUS must be an identifier of float array, "
+                  + "the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float).");
+        }
+        Expression vectorLiteral = filterExpression.getFunctionCall().getOperands().get(1);
+        if ((vectorLiteral.isSetFunctionCall() && !vectorLiteral.getFunctionCall().getOperator().equalsIgnoreCase(
+            "arrayvalueconstructor"))
+            || (vectorLiteral.isSetLiteral() && !vectorLiteral.getLiteral().isSetFloatArrayValue()
+            && !vectorLiteral.getLiteral().isSetDoubleArrayValue())) {
+          throw new IllegalStateException(
+              "The second argument of VECTOR_SIMILARITY_RADIUS must be a float/double array "
+                  + "literal, the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float)");
+        }
+        if (filterExpression.getFunctionCall().getOperands().size() == 3) {
+          Expression threshold = filterExpression.getFunctionCall().getOperands().get(2);
+          if (!threshold.isSetLiteral()) {
+            throw new IllegalStateException(
+                "The third argument of VECTOR_SIMILARITY_RADIUS must be a numeric literal, "
+                    + "the signature is VECTOR_SIMILARITY_RADIUS(float[], float[], float)");
+          }
+        }
+      } else {
+        List<Expression> operands = filterExpression.getFunctionCall().getOperands();
+        for (int i = 1; i < operands.size(); i++) {
+          if (operands.get(i).getLiteral().isSetNullValue()) {
+            throw new IllegalStateException("Using NULL in " + operator + " filter is not supported");
+          }
         }
       }
     }

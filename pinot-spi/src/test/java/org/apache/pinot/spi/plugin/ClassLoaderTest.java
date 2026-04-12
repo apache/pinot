@@ -19,9 +19,15 @@
 package org.apache.pinot.spi.plugin;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.List;
+import java.util.jar.JarOutputStream;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -218,6 +224,53 @@ public class ClassLoaderTest {
 
     assertThrows("Class is part of a different plugin, so should not be accessible",
         ClassNotFoundException.class, () -> pluginManager.loadClass(pluginName, DROPWIZARD_METRICS_REGISTRY));
+  }
+
+  @Test
+  public void loadServicesFromPlugins() {
+    String originalPluginDir = System.getProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME);
+    try {
+      Path tempPluginDir = Files.createTempDirectory("pinot-service-loader-plugin");
+      Path pluginDir = tempPluginDir.resolve("test-metrics-plugin");
+      Path classesDir = pluginDir.resolve("classes");
+      Path classFile = classesDir.resolve(
+          "org/apache/pinot/spi/plugin/ClassLoaderTest$TestPinotMetricsFactory.class");
+      Files.createDirectories(classFile.getParent());
+      try (InputStream inputStream = ClassLoaderTest.class.getClassLoader().getResourceAsStream(
+          "org/apache/pinot/spi/plugin/ClassLoaderTest$TestPinotMetricsFactory.class")) {
+        assertNotNull(inputStream);
+        Files.copy(inputStream, classFile);
+      }
+      Path serviceDescriptor =
+          classesDir.resolve("META-INF/services/org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory");
+      Files.createDirectories(serviceDescriptor.getParent());
+      Files.writeString(serviceDescriptor, TestPinotMetricsFactory.class.getName() + System.lineSeparator(),
+          StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+      Files.writeString(pluginDir.resolve("pinot-plugin.properties"), "parent.realmId=pinot" + System.lineSeparator(),
+          StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+      try (JarOutputStream ignored = new JarOutputStream(Files.newOutputStream(pluginDir.resolve("test-plugin.jar")))) {
+      }
+
+      System.setProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME, tempPluginDir.toString());
+      PluginManager pluginManager = new PluginManager();
+
+      List<String> classNames = pluginManager.loadServices(PinotMetricsFactory.class).stream()
+          .map(factory -> factory.getClass().getName())
+          .collect(Collectors.toList());
+
+      assertTrue(classNames.contains(TestPinotMetricsFactory.class.getName()));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      if (originalPluginDir != null) {
+        System.setProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME, originalPluginDir);
+      } else {
+        System.clearProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME);
+      }
+    }
+  }
+
+  public static class TestPinotMetricsFactory extends PinotMetricsFactory.Noop {
   }
 
   @AfterClass
