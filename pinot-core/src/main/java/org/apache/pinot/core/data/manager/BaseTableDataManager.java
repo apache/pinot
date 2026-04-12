@@ -926,7 +926,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private void reloadSegmentDataManagersInParallel(List<SegmentDataManager> segmentDataManagers, 
+  private void reloadSegmentDataManagersInParallel(List<SegmentDataManager> segmentDataManagers,
       boolean forceDownload, String reloadJobId)
       throws Exception {
     IndexLoadingConfig indexLoadingConfigTemplate = fetchIndexLoadingConfig();
