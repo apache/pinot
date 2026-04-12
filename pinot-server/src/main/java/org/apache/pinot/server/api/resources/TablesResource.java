@@ -310,23 +310,25 @@ public class TablesResource {
               String codec = columnMetadata.getCompressionCodec();
               long uncompressedSize = columnMetadata.getUncompressedForwardIndexSizeBytes();
               long fwdIndexSize = columnMetadata.getIndexSizeFor(StandardIndexes.forward());
-              // Always create an entry so dictionary columns appear in the stats
-              long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
               if (codec != null && uncompressedSize > 0) {
                 // Raw column with stats: include in both numerator and denominator
+                long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
                 accum[0] += uncompressedSize;
                 accum[1] += (fwdIndexSize > 0 ? fwdIndexSize : 0);
                 columnCodecMap.merge(column, codec,
                     (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+                columnHasDictMap.put(column, columnMetadata.hasDictionary());
+                columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
                 segmentHasCompressionStats = true;
               } else if (columnMetadata.hasDictionary() && fwdIndexSize > 0) {
                 // Dictionary-encoded column: track forward index size but no raw uncompressed size
+                long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
                 accum[1] += fwdIndexSize;
+                columnHasDictMap.put(column, columnMetadata.hasDictionary());
+                columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
               }
               // Old segments without stats (codec==null, uncompressed==INDEX_NOT_FOUND) are
-              // excluded from both numerator and denominator — not treated as zero
-              columnHasDictMap.put(column, columnMetadata.hasDictionary());
-              columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
+              // excluded entirely — not added to any accumulation maps
             }
           }
 

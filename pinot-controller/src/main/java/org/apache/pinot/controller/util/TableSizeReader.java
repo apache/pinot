@@ -206,12 +206,12 @@ public class TableSizeReader {
 
   private void emitTierMetrics(String tableNameWithType, @Nullable StorageBreakdown breakdown) {
     Set<String> currentTierKeys = new HashSet<>();
-    if (breakdown != null) {
+    if (breakdown != null && _leadControllerManager.isLeaderForTable(tableNameWithType)) {
       for (Map.Entry<String, TierSizeInfo> tierEntry : breakdown._tiers.entrySet()) {
         String tierKey = tierEntry.getKey();
         currentTierKeys.add(tierKey);
-        emitMetrics(tableNameWithType + "." + tierKey, ControllerGauge.TABLE_TIERED_STORAGE_SIZE,
-            tierEntry.getValue()._sizePerReplicaInBytes);
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType + "." + tierKey,
+            ControllerGauge.TABLE_TIERED_STORAGE_SIZE, tierEntry.getValue()._sizePerReplicaInBytes);
       }
     }
     // Remove gauges for tier keys that were emitted previously but are no longer present.
