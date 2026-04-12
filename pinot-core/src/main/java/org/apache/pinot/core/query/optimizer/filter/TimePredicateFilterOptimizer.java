@@ -83,7 +83,10 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
   @VisibleForTesting
   static Expression optimize(Expression filterExpression) {
     Function filterFunction = filterExpression.getFunctionCall();
-    FilterKind filterKind = FilterKind.valueOf(filterFunction.getOperator());
+    FilterKind filterKind = FilterKind.fromOperator(filterFunction.getOperator());
+    if (filterKind == null) {
+      return filterExpression;
+    }
     List<Expression> operands = filterFunction.getOperands();
     if (filterKind == FilterKind.AND || filterKind == FilterKind.OR || filterKind == FilterKind.NOT) {
       // NOTE: We don't need to replace the children because all the changes are applied in-place

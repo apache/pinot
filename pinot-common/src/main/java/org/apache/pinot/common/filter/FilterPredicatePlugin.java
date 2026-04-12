@@ -44,7 +44,7 @@ public interface FilterPredicatePlugin {
   /**
    * Returns the canonical name of this filter predicate (e.g., "SEMANTIC_MATCH").
    * Must be unique across all registered plugins and built-in filter kinds.
-   * The name is case-insensitive and will be uppercased for matching.
+   * The name is case-insensitive and will be canonicalized for matching.
    */
   String name();
 
@@ -92,6 +92,19 @@ public interface FilterPredicatePlugin {
    */
   default List<Integer> getOptionalOperandIndices() {
     return List.of();
+  }
+
+  /**
+   * Returns whether this predicate accepts additional trailing operands beyond those declared in
+   * {@link #getOperandTypes()}.
+   *
+   * <p>Variadic custom predicates are currently registered as homogeneous variadic functions in Calcite,
+   * so every declared operand type must be identical. For example,
+   * {@code List.of(OperandType.STRING, OperandType.STRING)} with this flag enabled accepts
+   * {@code (STRING, STRING, STRING, ...)}.
+   */
+  default boolean acceptsVariadicArguments() {
+    return false;
   }
 
   // --- Predicate Creation Layer (RequestContextUtils) ---

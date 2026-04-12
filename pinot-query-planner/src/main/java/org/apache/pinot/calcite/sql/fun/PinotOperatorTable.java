@@ -46,6 +46,7 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
@@ -435,18 +436,33 @@ public class PinotOperatorTable implements SqlOperatorTable {
   }
 
   private void registerCustomFilterPredicates(Map<String, SqlOperator> operatorMap) {
+    FilterPredicateRegistry.init();
     for (FilterPredicatePlugin plugin : FilterPredicateRegistry.getAllPlugins()) {
       String canonicalName = FunctionRegistry.canonicalize(plugin.name());
-      if (operatorMap.containsKey(canonicalName)) {
-        continue;
-      }
+      Preconditions.checkState(!operatorMap.containsKey(canonicalName),
+          "Custom filter predicate: %s collides with an existing Pinot operator", plugin.name());
       List<SqlTypeFamily> typeFamilies = new ArrayList<>();
       for (FilterPredicatePlugin.OperandType operandType : plugin.getOperandTypes()) {
         typeFamilies.add(toSqlTypeFamily(operandType));
       }
       List<Integer> optionalIndices = plugin.getOptionalOperandIndices();
-      PinotSqlFunction sqlFunction = new PinotSqlFunction(plugin.name(), ReturnTypes.BOOLEAN,
-          OperandTypes.family(typeFamilies, optionalIndices::contains));
+      PinotSqlFunction sqlFunction;
+      if (plugin.acceptsVariadicArguments()) {
+        Preconditions.checkState(optionalIndices.isEmpty(),
+            "Variadic custom filter predicate: %s cannot declare optional operands", plugin.name());
+        Preconditions.checkState(!typeFamilies.isEmpty(),
+            "Variadic custom filter predicate: %s must declare at least one operand type", plugin.name());
+        SqlTypeFamily repeatedTypeFamily = typeFamilies.get(0);
+        Preconditions.checkState(typeFamilies.stream().allMatch(repeatedTypeFamily::equals),
+            "Variadic custom filter predicate: %s must use identical operand types, got: %s", plugin.name(),
+            typeFamilies);
+        sqlFunction = new PinotSqlFunction(plugin.name(), ReturnTypes.BOOLEAN,
+            OperandTypes.repeat(SqlOperandCountRanges.from(typeFamilies.size()),
+                OperandTypes.family(repeatedTypeFamily)));
+      } else {
+        sqlFunction = new PinotSqlFunction(plugin.name(), ReturnTypes.BOOLEAN,
+            OperandTypes.family(typeFamilies, optionalIndices::contains));
+      }
       operatorMap.put(canonicalName, sqlFunction);
     }
   }

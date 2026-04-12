@@ -82,7 +82,10 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
   @Override
   Expression optimizeChild(Expression filterExpression, @Nullable Schema schema) {
     Function function = filterExpression.getFunctionCall();
-    FilterKind kind = FilterKind.valueOf(function.getOperator());
+    FilterKind kind = FilterKind.fromOperator(function.getOperator());
+    if (kind == null) {
+      return filterExpression;
+    }
 
     if (!kind.isRange() && kind != FilterKind.EQUALS && kind != FilterKind.NOT_EQUALS) {
       return filterExpression;

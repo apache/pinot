@@ -43,6 +43,6 @@ public class LikeAnyRawEvaluator extends BaseRawValueBasedPredicateEvaluator {
 
   @Override
   public boolean applySV(String value) {
-    return _pattern.matcher(value).find();
+    return value != null && _pattern.matcher(value).find();
   }
 }

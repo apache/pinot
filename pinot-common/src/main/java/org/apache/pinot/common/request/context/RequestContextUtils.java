@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.filter.FilterPredicatePlugin;
 import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.request.Expression;
@@ -136,13 +135,22 @@ public class RequestContextUtils {
   private static FilterContext getFilterInner(Function thriftFunction) {
     String functionOperator = thriftFunction.getOperator();
 
+    FilterPredicatePlugin customPlugin = FilterPredicateRegistry.get(functionOperator);
+    if (customPlugin != null) {
+      List<ExpressionContext> operands = new ArrayList<>(thriftFunction.getOperandsSize());
+      for (Expression operand : thriftFunction.getOperands()) {
+        operands.add(getExpression(operand));
+      }
+      return FilterContext.forPredicate(customPlugin.createPredicate(operands));
+    }
+
     // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
-    if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+    FilterKind filterKind = FilterKind.fromOperator(functionOperator);
+    if (filterKind == null) {
       return FilterContext.forPredicate(
           new EqPredicate(ExpressionContext.forFunction(getFunction(thriftFunction)), "true"));
     }
 
-    FilterKind filterKind = FilterKind.valueOf(thriftFunction.getOperator().toUpperCase());
     List<Expression> operands = thriftFunction.getOperands();
     int numOperands = operands.size();
     switch (filterKind) {
@@ -331,7 +339,7 @@ public class RequestContextUtils {
   }
 
   private static FilterContext getFilterInner(FunctionContext filterFunction) {
-    String functionOperator = filterFunction.getFunctionName().toUpperCase();
+    String functionOperator = filterFunction.getFunctionName();
 
     // Check if this is a custom filter predicate registered via plugin
     FilterPredicatePlugin customPlugin = FilterPredicateRegistry.get(functionOperator);
@@ -341,11 +349,11 @@ public class RequestContextUtils {
     }
 
     // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
-    if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+    FilterKind filterKind = FilterKind.fromOperator(functionOperator);
+    if (filterKind == null) {
       return FilterContext.forPredicate(new EqPredicate(ExpressionContext.forFunction(filterFunction), "true"));
     }
 
-    FilterKind filterKind = FilterKind.valueOf(filterFunction.getFunctionName().toUpperCase());
     List<ExpressionContext> operands = filterFunction.getArguments();
     int numOperands = operands.size();
     switch (filterKind) {

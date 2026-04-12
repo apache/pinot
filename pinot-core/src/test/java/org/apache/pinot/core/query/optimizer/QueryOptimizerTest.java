@@ -84,6 +84,25 @@ public class QueryOptimizerTest {
     assertEquals(secondChildChildren.get(2), getEqFilterExpression("double", 7.5));
   }
 
+  @Test
+  public void testCustomFilterPredicateSurvivesOptimization() {
+    Expression customFilter =
+        RequestUtils.getFunctionExpression("likeany", RequestUtils.getIdentifierExpression("string"),
+            RequestUtils.getLiteralExpression("foo"), RequestUtils.getLiteralExpression("bar"));
+    PinotQuery pinotQuery = new PinotQuery();
+    pinotQuery.setFilterExpression(
+        RequestUtils.getFunctionExpression(FilterKind.AND.name(), customFilter, getEqFilterExpression("int", 4)));
+
+    OPTIMIZER.optimize(pinotQuery, SCHEMA);
+
+    Function filterFunction = pinotQuery.getFilterExpression().getFunctionCall();
+    assertEquals(filterFunction.getOperator(), FilterKind.AND.name());
+    List<Expression> children = filterFunction.getOperands();
+    assertEquals(children.size(), 2);
+    assertEquals(children.get(0).getFunctionCall().getOperator(), "likeany");
+    assertEquals(children.get(1), getEqFilterExpression("int", 4));
+  }
+
   private static Expression getEqFilterExpression(String column, Object value) {
     return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), RequestUtils.getIdentifierExpression(column),
         RequestUtils.getLiteralExpression(value));

@@ -50,7 +50,10 @@ public abstract class BaseAndOrBooleanFilterOptimizer implements FilterOptimizer
 
     Function function = filterExpression.getFunctionCall();
     List<Expression> operands = function.getOperands();
-    FilterKind kind = FilterKind.valueOf(function.getOperator());
+    FilterKind kind = FilterKind.fromOperator(function.getOperator());
+    if (kind == null) {
+      return optimizeChild(filterExpression, schema);
+    }
     switch (kind) {
       case AND:
       case OR:

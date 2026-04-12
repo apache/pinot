@@ -109,7 +109,10 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
 
   private boolean isPartitionMatch(Expression filterExpression, SegmentPartitionInfo partitionInfo) {
     Function function = filterExpression.getFunctionCall();
-    FilterKind filterKind = FilterKind.valueOf(function.getOperator());
+    FilterKind filterKind = FilterKind.fromOperator(function.getOperator());
+    if (filterKind == null) {
+      return true;
+    }
     List<Expression> operands = function.getOperands();
     switch (filterKind) {
       case AND:

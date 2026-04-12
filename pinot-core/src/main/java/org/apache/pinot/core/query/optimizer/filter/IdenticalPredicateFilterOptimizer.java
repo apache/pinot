@@ -43,7 +43,10 @@ public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOpt
   @Override
   Expression optimizeChild(Expression filterExpression, @Nullable Schema schema) {
     Function function = filterExpression.getFunctionCall();
-    FilterKind kind = FilterKind.valueOf(function.getOperator());
+    FilterKind kind = FilterKind.fromOperator(function.getOperator());
+    if (kind == null) {
+      return filterExpression;
+    }
     switch (kind) {
       case EQUALS:
         if (hasIdenticalLhsAndRhs(function.getOperands())) {

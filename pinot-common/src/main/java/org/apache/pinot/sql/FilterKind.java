@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.sql;
 
+import javax.annotation.Nullable;
+
 public enum FilterKind {
   AND,
   OR,
@@ -49,5 +51,20 @@ public enum FilterKind {
   public boolean isRange() {
     return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
         || this == BETWEEN || this == RANGE;
+  }
+
+  /**
+   * Resolves the given operator name to a built-in filter kind.
+   *
+   * <p>Returns {@code null} for custom predicates registered through the plugin system.
+   */
+  @Nullable
+  public static FilterKind fromOperator(String operator) {
+    for (FilterKind filterKind : values()) {
+      if (filterKind.name().equalsIgnoreCase(operator)) {
+        return filterKind;
+      }
+    }
+    return null;
   }
 }

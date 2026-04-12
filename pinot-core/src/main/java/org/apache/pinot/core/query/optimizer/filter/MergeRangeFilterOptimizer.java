@@ -58,9 +58,10 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
       // Iterate over all the child filters to create and merge ranges
       for (Expression child : children) {
         Function childFunction = child.getFunctionCall();
-        FilterKind filterKind = FilterKind.valueOf(childFunction.getOperator());
-        assert filterKind != FilterKind.AND;
-        if (filterKind == FilterKind.OR || filterKind == FilterKind.NOT) {
+        FilterKind filterKind = childFunction != null ? FilterKind.fromOperator(childFunction.getOperator()) : null;
+        if (filterKind == null) {
+          newChildren.add(child);
+        } else if (filterKind == FilterKind.OR || filterKind == FilterKind.NOT) {
           childFunction.getOperands().replaceAll(o -> optimize(o, schema));
           newChildren.add(child);
         } else if (filterKind.isRange()) {

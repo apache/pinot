@@ -63,9 +63,14 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
   private static final int NUM_MATCHING_SKILLS = 4;
   private static final int NUM_RECORDS = NUM_SKILLS * 1000;
   private static final int NUM_MATCHING_RECORDS = NUM_MATCHING_SKILLS * 1000;
+  private static final int NUM_LIKE_ANY_MATCHING_SKILLS = 3;
+  private static final int NUM_LIKE_ANY_MATCHING_RECORDS = NUM_LIKE_ANY_MATCHING_SKILLS * 1000;
 
   private static final String TEST_TEXT_COLUMN_QUERY =
       "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(skills, '\"machine learning\" AND spark')";
+  private static final String TEST_LIKE_ANY_QUERY =
+      "SELECT COUNT(*) FROM %s WHERE LIKE_ANY(skills, 'Java, C++, worked on open source projects%%', "
+          + "'%%NullPointerException', 'IT support,%%')";
 
   @Override
   public String getTimeColumnName() {
@@ -246,6 +251,14 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(getTextColumnQueryResult(String.format(queryWithMatch, getTableName())), 12000);
     // Test case sensitive match, all skills are 'Java' not 'java'
     assertEquals(getTextColumnQueryResult(String.format(queryWithoutMatch, getTableName())), 0);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testLikeAnyQuery(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    assertEquals(getTextColumnQueryResult(String.format(TEST_LIKE_ANY_QUERY, getTableName())),
+        NUM_LIKE_ANY_MATCHING_RECORDS);
   }
 
   private long getTextColumnQueryResult(String query)

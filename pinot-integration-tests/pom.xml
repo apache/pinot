@@ -184,6 +184,12 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-planner</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-filter-predicate-example</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.pinot</groupId>

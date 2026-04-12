@@ -34,9 +34,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -132,6 +136,7 @@ public class PluginManager {
 
   private final ClassWorld _classWorld;
   private final Map<Plugin, PluginClassLoader> _registry;
+  private final Set<String> _loadedPlugins;
 
   private String _pluginsDirectories;
   private String _pluginsInclude;
@@ -141,6 +146,7 @@ public class PluginManager {
     // For the shaded plugins
     _registry = new HashMap<>();
     _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
+    _loadedPlugins = new LinkedHashSet<>();
 
     // for the new pinot plugins
     try {
@@ -338,6 +344,7 @@ public class PluginManager {
 
       LOGGER.info("Successfully loaded plugin [{}] from jar files: {}", pluginName, Arrays.toString(urlList.toArray()));
     }
+    _loadedPlugins.add(pluginName);
   }
 
   private PluginClassLoader createClassLoader(Collection<URL> urlList) {
@@ -465,6 +472,39 @@ public class PluginManager {
     constructor = loadedClass.getConstructor(argTypes);
     Object instance = constructor.newInstance(argValues);
     return (T) instance;
+  }
+
+  /**
+   * Loads service implementations visible from the application classpath and all loaded Pinot plugin realms.
+   *
+   * <p>Implementations are deduplicated by implementation class name so the same provider is not returned twice when
+   * it is visible from both the application classpath and a plugin realm.
+   */
+  public synchronized <T> List<T> loadServices(Class<T> serviceClass) {
+    Map<String, T> servicesByClassName = new LinkedHashMap<>();
+    addServices(ServiceLoader.load(serviceClass), servicesByClassName);
+    for (String pluginName : _loadedPlugins) {
+      addServices(ServiceLoader.load(serviceClass, getPluginClassLoader(pluginName)), servicesByClassName);
+    }
+    return List.copyOf(servicesByClassName.values());
+  }
+
+  private ClassLoader getPluginClassLoader(String pluginName) {
+    Plugin plugin = new Plugin(pluginName);
+    if (_registry.containsKey(plugin)) {
+      return _registry.get(plugin);
+    }
+    try {
+      return _classWorld.getRealm(pluginName);
+    } catch (NoSuchRealmException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static <T> void addServices(Iterable<T> services, Map<String, T> servicesByClassName) {
+    for (T service : services) {
+      servicesByClassName.putIfAbsent(service.getClass().getName(), service);
+    }
   }
 
   public String[] getPluginsDirectories() {

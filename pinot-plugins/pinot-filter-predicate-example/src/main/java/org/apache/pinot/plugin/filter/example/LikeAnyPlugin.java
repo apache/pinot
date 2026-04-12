@@ -70,6 +70,11 @@ public class LikeAnyPlugin implements FilterPredicatePlugin {
   }
 
   @Override
+  public boolean acceptsVariadicArguments() {
+    return true;
+  }
+
+  @Override
   public Predicate createPredicate(List<ExpressionContext> operands) {
     ExpressionContext column = operands.get(0);
     List<String> patterns = new ArrayList<>(operands.size() - 1);
