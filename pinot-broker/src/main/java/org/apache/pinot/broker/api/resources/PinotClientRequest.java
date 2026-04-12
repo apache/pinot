@@ -62,6 +62,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.GraphRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -135,6 +136,8 @@ public class PinotClientRequest {
   @Inject
   @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
   private String _instanceId;
+
+  private volatile GraphRequestHandler _graphRequestHandler;
 
   @GET
   @ManagedAsync
@@ -409,6 +412,66 @@ public class PinotClientRequest {
   }
 
   @POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query/graph")
+  @ApiOperation(value = "Query Pinot using graph (Cypher) queries (experimental)")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 400, message = "Graph query feature is disabled or invalid request"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  @ManualAuthorization
+  public void processGraphQuery(String requestBody, @Suspended AsyncResponse asyncResponse,
+      @Context org.glassfish.grizzly.http.server.Request requestContext,
+      @Context HttpHeaders httpHeaders) {
+    try {
+      boolean graphEnabled = _brokerConf.getProperty(CommonConstants.Graph.CONFIG_OF_GRAPH_QUERY_ENABLED,
+          CommonConstants.Graph.DEFAULT_GRAPH_QUERY_ENABLED);
+      if (!graphEnabled) {
+        asyncResponse.resume(Response.status(Response.Status.BAD_REQUEST)
+            .entity("{\"error\": \"Graph query feature is not enabled. "
+                + "Set 'pinot.graph.enabled=true' in broker configuration to enable it.\"}")
+            .type(MediaType.APPLICATION_JSON)
+            .build());
+        return;
+      }
+
+      JsonNode requestJson = JsonUtils.stringToJsonNode(requestBody);
+      if (!requestJson.has("query")) {
+        throw new IllegalArgumentException("Payload is missing the required 'query' field (Cypher query string)");
+      }
+      if (!requestJson.has("graphSchema")) {
+        throw new IllegalArgumentException("Payload is missing the required 'graphSchema' field");
+      }
+
+      String cypherQuery = requestJson.get("query").asText();
+      JsonNode graphSchemaJson = requestJson.get("graphSchema");
+
+      GraphRequestHandler graphHandler = getOrCreateGraphRequestHandler();
+
+      try (RequestScope requestScope = Tracing.getTracer().createRequestScope()) {
+        requestScope.setRequestArrivalTimeMillis(System.currentTimeMillis());
+        BrokerResponse brokerResponse = graphHandler.handleRequest(cypherQuery, graphSchemaJson,
+            makeHttpIdentity(requestContext), requestScope, httpHeaders);
+        brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
+        asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+      }
+    } catch (IllegalArgumentException e) {
+      LOGGER.warn("Invalid graph query request", e);
+      asyncResponse.resume(Response.status(Response.Status.BAD_REQUEST)
+          .entity("{\"error\": \"" + e.getMessage().replace("\"", "'") + "\"}")
+          .type(MediaType.APPLICATION_JSON)
+          .build());
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing graph query request", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      asyncResponse.resume(new WebApplicationException(e,
+          Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build()));
+    }
+  }
+
+  @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query/compare")
   @ApiOperation(value = "Query Pinot using both the single-stage query engine and the multi-stage query engine and "
@@ -552,6 +615,20 @@ public class PinotClientRequest {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity("Failed to get running queries on the broker due to error: " + e.getMessage()).build());
     }
+  }
+
+  private GraphRequestHandler getOrCreateGraphRequestHandler() {
+    GraphRequestHandler handler = _graphRequestHandler;
+    if (handler == null) {
+      synchronized (this) {
+        handler = _graphRequestHandler;
+        if (handler == null) {
+          handler = new GraphRequestHandler(_requestHandler);
+          _graphRequestHandler = handler;
+        }
+      }
+    }
+    return handler;
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
