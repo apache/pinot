@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
@@ -31,10 +30,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
   private String _deletedSegmentsRetentionPeriod;
-  @Deprecated
-  private String _segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
-  @Deprecated
-  private String _segmentPushType;
   private String _replication;
   @Deprecated // Use _replication instead
   private String _replicasPerPartition;
@@ -110,32 +105,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setDeletedSegmentsRetentionPeriod(String deletedSegmentsRetentionPeriod) {
     _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
-  }
-
-  /**
-   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
-  @Deprecated
-  public String getSegmentPushFrequency() {
-    return _segmentPushFrequency;
-  }
-
-  @Deprecated
-  public void setSegmentPushFrequency(String segmentPushFrequency) {
-    _segmentPushFrequency = segmentPushFrequency;
-  }
-
-  /**
-   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
-  @Deprecated
-  public String getSegmentPushType() {
-    return _segmentPushType;
-  }
-
-  @Deprecated
-  public void setSegmentPushType(String segmentPushType) {
-    _segmentPushType = segmentPushType;
   }
 
   /**
