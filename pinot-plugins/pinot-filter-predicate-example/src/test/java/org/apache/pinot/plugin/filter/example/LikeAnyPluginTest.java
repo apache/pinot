@@ -48,6 +48,12 @@ public class LikeAnyPluginTest {
   }
 
   @Test
+  public void testAcceptsVariadicArguments() {
+    LikeAnyPlugin plugin = new LikeAnyPlugin();
+    Assert.assertTrue(plugin.acceptsVariadicArguments());
+  }
+
+  @Test
   public void testCreatePredicate() {
     LikeAnyPlugin plugin = new LikeAnyPlugin();
     List<ExpressionContext> operands = List.of(
@@ -84,6 +90,7 @@ public class LikeAnyPluginTest {
     Assert.assertTrue(evaluator.applySV("John Doe"));
     Assert.assertTrue(evaluator.applySV("Jane Smith"));
     Assert.assertTrue(evaluator.applySV("Johnny"));
+    Assert.assertFalse(evaluator.applySV((String) null));
     Assert.assertFalse(evaluator.applySV("Alice"));
     Assert.assertFalse(evaluator.applySV("Bob Jones"));
     Assert.assertEquals(evaluator.getDataType(), DataType.STRING);
@@ -97,6 +104,6 @@ public class LikeAnyPluginTest {
         ExpressionContext.forIdentifier("col"),
         List.of("a%", "%b")
     );
-    Assert.assertEquals(predicate.toString(), "like_any(col, a%, %b)");
+    Assert.assertEquals(predicate.toString(), "like_any(col, 'a%', '%b')");
   }
 }

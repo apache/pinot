@@ -20,7 +20,6 @@ package org.apache.pinot.sql.parsers.rewriter;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
-import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.filter.FilterPredicatePlugin;
 import org.apache.pinot.common.filter.FilterPredicateRegistry;
 import org.apache.pinot.common.request.Expression;
@@ -82,8 +81,9 @@ public class PredicateComparisonRewriter implements QueryRewriter {
   private static Expression updateFunctionExpression(Expression expression) {
     Function function = expression.getFunctionCall();
     String functionOperator = function.getOperator();
+    FilterKind filterKind = FilterKind.fromOperator(functionOperator);
 
-    if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+    if (filterKind == null) {
       // Check if this is a custom filter predicate registered via plugin
       FilterPredicatePlugin customPlugin = FilterPredicateRegistry.get(functionOperator);
       if (customPlugin != null) {
@@ -96,7 +96,6 @@ public class PredicateComparisonRewriter implements QueryRewriter {
       expression = convertPredicateToEqualsBooleanExpression(expression);
       return expression;
     } else {
-      FilterKind filterKind = FilterKind.valueOf(function.getOperator());
       List<Expression> operands = function.getOperands();
       switch (filterKind) {
         case AND:

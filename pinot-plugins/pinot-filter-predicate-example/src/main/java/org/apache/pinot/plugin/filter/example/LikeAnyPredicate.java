@@ -62,6 +62,10 @@ public class LikeAnyPredicate extends CustomPredicate {
 
   @Override
   public String toString() {
-    return "like_any(" + _lhs + ", " + String.join(", ", _patterns) + ")";
+    StringBuilder builder = new StringBuilder("like_any(").append(_lhs);
+    for (String pattern : _patterns) {
+      builder.append(", '").append(pattern).append('\'');
+    }
+    return builder.append(')').toString();
   }
 }
