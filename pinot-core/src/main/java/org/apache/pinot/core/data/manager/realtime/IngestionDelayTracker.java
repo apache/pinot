@@ -337,9 +337,9 @@ public class IngestionDelayTracker {
    */
   private void removePartitionId(int partitionId) {
     _partitionsHostedByThisServer.remove(partitionId);
-    _ingestionInfoMap.remove(partitionId);
+    IngestionInfo removed = _ingestionInfoMap.remove(partitionId);
     _partitionsTracked.computeIfPresent(partitionId, (k, v) -> {
-      removeMetrics(partitionId);
+      removeMetrics(partitionId, removed != null ? removed._streamTopicName : null);
       return null;
     });
 
