@@ -567,6 +567,32 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Registers a per-partition table gauge keyed by table name with type, Kafka (or other stream) topic, and partition
+   * group id. The resulting MBean name matches {@code server.yml} rules so Prometheus exports {@code topic} and
+   * {@code partition} labels (see apache/pinot#18099).
+   */
+  public void setOrUpdatePartitionGaugeForStreamTopic(final String tableNameWithType, final String topicName,
+      final int partitionGroupId, final G gauge, final Supplier<Long> valueSupplier) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(topicName), "topicName must not be blank");
+    setOrUpdateTableGauge(composeStreamTopicPartitionKey(tableNameWithType, topicName, partitionGroupId), gauge,
+        valueSupplier);
+  }
+
+  /**
+   * Removes a gauge registered via {@link #setOrUpdatePartitionGaugeForStreamTopic}.
+   */
+  public void removePartitionGaugeForStreamTopic(final String tableNameWithType, final String topicName,
+      final int partitionGroupId, final G gauge) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(topicName), "topicName must not be blank");
+    removeTableGauge(composeStreamTopicPartitionKey(tableNameWithType, topicName, partitionGroupId), gauge);
+  }
+
+  private static String composeStreamTopicPartitionKey(String tableNameWithType, String topicName,
+      int partitionGroupId) {
+    return tableNameWithType + "-" + topicName + "-" + partitionGroupId;
+  }
+
+  /**
    * @deprecated please use setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) instead.
    *
    * Adds a new gauge whose values are retrieved from a callback function.
