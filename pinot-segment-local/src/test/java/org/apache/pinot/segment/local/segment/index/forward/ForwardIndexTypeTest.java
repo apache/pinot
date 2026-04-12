@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -142,6 +143,7 @@ public class ForwardIndexTypeTest {
           new ForwardIndexConfig.Builder()
               .withCompressionType(ChunkCompressionType.SNAPPY)
               .withDeriveNumDocsPerChunk(false)
+              .withForwardIndexEncoding(IndexCreationContext.ForwardIndexEncoding.RAW)
               .build()
       );
     }
@@ -162,6 +164,7 @@ public class ForwardIndexTypeTest {
           new ForwardIndexConfig.Builder()
               .withCompressionType(ChunkCompressionType.SNAPPY)
               .withDeriveNumDocsPerChunk(false)
+              .withForwardIndexEncoding(IndexCreationContext.ForwardIndexEncoding.RAW)
               .build()
       );
     }
@@ -202,7 +205,9 @@ public class ForwardIndexTypeTest {
                   + " }"
       );
 
-      assertEquals(ForwardIndexConfig.getDefault());
+      assertEquals(new ForwardIndexConfig.Builder()
+          .withForwardIndexEncoding(IndexCreationContext.ForwardIndexEncoding.RAW)
+          .build());
     }
 
     @Test(dataProvider = "allCompressionCodec", dataProviderClass = ForwardIndexTypeTest.class)
@@ -226,6 +231,7 @@ public class ForwardIndexTypeTest {
                 .withDictIdCompressionType(expectedDictCompression)
                 .withDeriveNumDocsPerChunk(false)
                 .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
+                .withForwardIndexEncoding(IndexCreationContext.ForwardIndexEncoding.RAW)
                 .build()
       );
     }
@@ -247,6 +253,7 @@ public class ForwardIndexTypeTest {
           .withCompressionType(null)
           .withDeriveNumDocsPerChunk(true)
           .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
+          .withForwardIndexEncoding(IndexCreationContext.ForwardIndexEncoding.RAW)
           .build());
     }
 
@@ -267,6 +274,7 @@ public class ForwardIndexTypeTest {
           .withCompressionType(null)
           .withDeriveNumDocsPerChunk(false)
           .withRawIndexWriterVersion(3)
+          .withForwardIndexEncoding(IndexCreationContext.ForwardIndexEncoding.RAW)
           .build());
     }
 

@@ -392,4 +392,33 @@ public class DictionaryIndexTypeTest {
     fieldIndexConfigs = new FieldIndexConfigs.Builder().add(StandardIndexes.inverted(), indexConfig).build();
     assertTrue(DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, null, metric, fieldIndexConfigs, 5, 20));
   }
+
+  @Test
+  public void testIsDictionaryRequiredDetectsInvertedIndex() {
+    FieldSpec fieldSpec = new DimensionFieldSpec("rawCol", FieldSpec.DataType.STRING, true);
+    FieldIndexConfigs withInverted = new FieldIndexConfigs.Builder()
+        .add(StandardIndexes.inverted(), IndexConfig.ENABLED)
+        .build();
+    assertTrue(DictionaryIndexConfig.isDictionaryRequired(fieldSpec, withInverted),
+        "Inverted index should require dictionary");
+
+    FieldIndexConfigs withoutInverted = new FieldIndexConfigs.Builder().build();
+    assertFalse(DictionaryIndexConfig.isDictionaryRequired(fieldSpec, withoutInverted),
+        "No dictionary-requiring index configured");
+  }
+
+  @Test
+  public void testGetIndexTypesWithDictionaryRequiredReturnsFstAndInverted() {
+    FieldSpec fieldSpec = new DimensionFieldSpec("rawCol", FieldSpec.DataType.STRING, true);
+    FieldIndexConfigs withBoth = new FieldIndexConfigs.Builder()
+        .add(StandardIndexes.inverted(), IndexConfig.ENABLED)
+        .add(StandardIndexes.fst(), new org.apache.pinot.segment.spi.index.FstIndexConfig())
+        .build();
+    java.util.List<IndexType<?, ?, ?>> required =
+        DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(fieldSpec, withBoth);
+    assertTrue(required.stream().anyMatch(t -> t.getId().equals(StandardIndexes.INVERTED_ID)),
+        "Inverted index should be in the required list");
+    assertTrue(required.stream().anyMatch(t -> t.getId().equals(StandardIndexes.FST_ID)),
+        "FST index should be in the required list");
+  }
 }

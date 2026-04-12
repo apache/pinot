@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -236,6 +237,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _ingestionConfig = new IngestionConfig();
     _ingestionConfig.setRowTimeValueCheck(false);
     _ingestionConfig.setSegmentTimeValueCheck(false);
+    _ingestionConfig.setContinueOnError(true);
 
     _columnMinMaxValueGeneratorMode = null;
     _bloomFilterConfigs = null;
@@ -346,23 +348,35 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(NEWLY_ADDED_STRING_COL_RAW,
         new FieldConfig(NEWLY_ADDED_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
+    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, true, 4);
     _fieldConfigMap.put(NEWLY_ADDED_STRING_MV_COL_RAW,
         new FieldConfig(NEWLY_ADDED_STRING_MV_COL_RAW, FieldConfig.EncodingType.RAW,
             List.of(FieldConfig.IndexType.TEXT), null, null));
-    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, true, 4);
-    checkTextIndexCreation(NEWLY_ADDED_STRING_MV_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, false, 4, false,
-        1);
+    checkTextIndexCreation(NEWLY_ADDED_STRING_MV_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, false, 4,
+        false, 1);
   }
 
-  @Test(dataProvider = "bothV1AndV3", expectedExceptions = UnsupportedOperationException.class,
-      expectedExceptionsMessageRegExp = "FST index is currently only supported on dictionary encoded columns: column4")
+  @Test(dataProvider = "bothV1AndV3")
   public void testEnableFSTIndexOnExistingColumnRaw(SegmentVersion segmentVersion)
       throws Exception {
     buildSegment(segmentVersion);
+    // FST on RAW column requires explicit dictionary config.
+    // Must remove from noDictionaryColumns to avoid ConfigDeclaredTwiceException.
+    _noDictionaryColumns.remove(EXISTING_STRING_COL_RAW);
+    ObjectNode fstIndexes = org.apache.pinot.spi.utils.JsonUtils.newObjectNode();
+    fstIndexes.set("dictionary", org.apache.pinot.spi.utils.JsonUtils.newObjectNode());
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
-        new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.FST), null,
-            null));
+        new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST,
+            null, null, null, fstIndexes, null, null));
+    if (segmentVersion == SegmentVersion.v1) {
+      assertThrows(UnsupportedOperationException.class, this::runPreProcessor);
+      return;
+    }
     runPreProcessor();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
+    assertTrue(columnMetadata.hasDictionary());
+    assertTrue(columnMetadata.getIndexSizeFor(StandardIndexes.fst()) > 0);
   }
 
   @Test(dataProvider = "bothV1AndV3")
@@ -579,12 +593,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     long oldRangeIndexSize =
         new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeFor(StandardIndexes.range());
     _noDictionaryColumns.add(COLUMN10_NAME);
-    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4, true,
-        0, DataType.INT, 100000);
+    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
+        true, 0, DataType.INT, 100000);
     validateIndex(StandardIndexes.range(), COLUMN10_NAME, 3960, 12, false, false, false, 0, true, 0,
         ChunkCompressionType.LZ4, false, DataType.INT, 100000);
-    long newRangeIndexSize =
-        new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeFor(StandardIndexes.range());
+    long newRangeIndexSize = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME)
+        .getIndexSizeFor(StandardIndexes.range());
     assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
 
     // TEST4: Disable dictionary but add text index.
@@ -594,10 +608,10 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_DICT,
         new FieldConfig(EXISTING_STRING_COL_DICT, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
-    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
-        true, 0, DataType.STRING, 100000);
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4, false, false, false, 0, true, 0, null,
-        false, DataType.STRING, 100000);
+    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0,
+        ChunkCompressionType.LZ4, true, 0, DataType.STRING, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4, false, false, false, 0, true, 0,
+        null, false, DataType.STRING, 100000);
   }
 
   @Test
@@ -1813,7 +1827,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             new IndexLoadingConfig(tableConfig, schema))) {
       // Should need processing due to new star-tree config
       assertTrue(processor.needProcess());
-      // Process should complete without throwing exception, but star-tree should not be created
+      // Process logs error and skips invalid star-tree config; no exception is thrown
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
@@ -1867,7 +1881,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             new IndexLoadingConfig(tableConfig, schema))) {
       // Should need processing due to changed star-tree config
       assertTrue(processor.needProcess());
-      // Process should complete without throwing exception, but star-tree should not be updated
+      // Process logs error and skips invalid star-tree config; no exception is thrown
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 

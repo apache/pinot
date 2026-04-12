@@ -28,6 +28,7 @@ import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
@@ -74,7 +75,7 @@ public class ForwardIndexConfig extends IndexConfig {
   }
 
   public static ForwardIndexConfig getDisabled() {
-    return new ForwardIndexConfig(true, null, null, null, null, null, null, null, null);
+    return new ForwardIndexConfig(true, null, null, null, null, null, null);
   }
 
   @Nullable
@@ -91,11 +92,35 @@ public class ForwardIndexConfig extends IndexConfig {
   private final DictIdCompressionType _dictIdCompressionType;
   @Nullable
   private final Map<String, Object> _configs;
+  private final IndexCreationContext.ForwardIndexEncoding _forwardIndexEncoding;
 
   public ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
       @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
       @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk,
       @Nullable Map<String, Object> configs) {
+    this(disabled, compressionCodec, deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSize,
+        targetDocsPerChunk, configs, IndexCreationContext.ForwardIndexEncoding.DICTIONARY);
+  }
+
+  @JsonCreator
+  public ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
+      @JsonProperty("compressionCodec") @Nullable CompressionCodec compressionCodec,
+      @Deprecated @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
+      @Deprecated @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType,
+      @JsonProperty("deriveNumDocsPerChunk") @Nullable Boolean deriveNumDocsPerChunk,
+      @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion,
+      @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
+      @JsonProperty("targetDocsPerChunk") @Nullable Integer targetDocsPerChunk,
+      @JsonProperty("configs") @Nullable Map<String, Object> configs) {
+    this(disabled, getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType),
+        deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk, configs,
+        null);
+  }
+
+  private ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
+      @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
+      @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk,
+      @Nullable Map<String, Object> configs, @Nullable IndexCreationContext.ForwardIndexEncoding forwardIndexEncoding) {
     super(disabled);
     _compressionCodec = compressionCodec;
     _deriveNumDocsPerChunk = Boolean.TRUE.equals(deriveNumDocsPerChunk);
@@ -151,20 +176,8 @@ public class ForwardIndexConfig extends IndexConfig {
       _dictIdCompressionType = null;
       _chunkCompressionType = null;
     }
-  }
-
-  @JsonCreator
-  public ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
-      @JsonProperty("compressionCodec") @Nullable CompressionCodec compressionCodec,
-      @Deprecated @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
-      @Deprecated @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType,
-      @JsonProperty("deriveNumDocsPerChunk") @Nullable Boolean deriveNumDocsPerChunk,
-      @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion,
-      @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
-      @JsonProperty("targetDocsPerChunk") @Nullable Integer targetDocsPerChunk,
-      @JsonProperty("configs") @Nullable Map<String, Object> configs) {
-    this(disabled, getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType),
-        deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk, configs);
+    _forwardIndexEncoding =
+        forwardIndexEncoding != null ? forwardIndexEncoding : IndexCreationContext.ForwardIndexEncoding.DICTIONARY;
   }
 
   public static CompressionCodec getActualCompressionCodec(@Nullable CompressionCodec compressionCodec,
@@ -248,6 +261,11 @@ public class ForwardIndexConfig extends IndexConfig {
     return _configs;
   }
 
+  @JsonIgnore
+  public IndexCreationContext.ForwardIndexEncoding getForwardIndexEncoding() {
+    return _forwardIndexEncoding;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -262,13 +280,14 @@ public class ForwardIndexConfig extends IndexConfig {
     ForwardIndexConfig that = (ForwardIndexConfig) o;
     return _compressionCodec == that._compressionCodec && _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
         && _rawIndexWriterVersion == that._rawIndexWriterVersion && Objects.equals(_targetMaxChunkSize,
-        that._targetMaxChunkSize) && _targetDocsPerChunk == that._targetDocsPerChunk;
+        that._targetMaxChunkSize) && _targetDocsPerChunk == that._targetDocsPerChunk
+        && _forwardIndexEncoding == that._forwardIndexEncoding;
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _compressionCodec, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
-        _targetMaxChunkSize, _targetDocsPerChunk);
+        _targetMaxChunkSize, _targetDocsPerChunk, _forwardIndexEncoding);
   }
 
   public static class Builder {
@@ -279,6 +298,8 @@ public class ForwardIndexConfig extends IndexConfig {
     private String _targetMaxChunkSize = _defaultTargetMaxChunkSize;
     private int _targetDocsPerChunk = _defaultTargetDocsPerChunk;
     private Map<String, Object> _configs = new HashMap<>();
+    private IndexCreationContext.ForwardIndexEncoding _forwardIndexEncoding =
+        IndexCreationContext.ForwardIndexEncoding.DICTIONARY;
 
     public Builder() {
     }
@@ -290,6 +311,7 @@ public class ForwardIndexConfig extends IndexConfig {
       _targetMaxChunkSize = other._targetMaxChunkSize;
       _targetDocsPerChunk = other._targetDocsPerChunk;
       _configs = other._configs;
+      _forwardIndexEncoding = other._forwardIndexEncoding;
     }
 
     public Builder withCompressionCodec(CompressionCodec compressionCodec) {
@@ -314,6 +336,11 @@ public class ForwardIndexConfig extends IndexConfig {
 
     public Builder withTargetDocsPerChunk(int targetDocsPerChunk) {
       _targetDocsPerChunk = targetDocsPerChunk;
+      return this;
+    }
+
+    public Builder withForwardIndexEncoding(IndexCreationContext.ForwardIndexEncoding forwardIndexEncoding) {
+      _forwardIndexEncoding = Objects.requireNonNull(forwardIndexEncoding);
       return this;
     }
 
@@ -377,7 +404,7 @@ public class ForwardIndexConfig extends IndexConfig {
 
     public ForwardIndexConfig build() {
       return new ForwardIndexConfig(false, _compressionCodec, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
-          _targetMaxChunkSize, _targetDocsPerChunk, _configs);
+          _targetMaxChunkSize, _targetDocsPerChunk, _configs, _forwardIndexEncoding);
     }
   }
 }

@@ -64,6 +64,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -1506,6 +1507,7 @@ public final class TableConfigUtils {
         indexType.validate(indexConfigs, fieldSpec, tableConfig);
       }
     }
+    validateExplicitDictionaryForRawForwardIndex(tableConfig, schema, indexConfigsMap);
 
     validateMultiColumnTextIndex(indexingConfig.getMultiColumnTextIndexConfig());
 
@@ -1583,6 +1585,28 @@ public final class TableConfigUtils {
               "Multi-column text index doesn't allow: %s as property for column: %s", key, column);
         }
       }
+    }
+  }
+
+  private static void validateExplicitDictionaryForRawForwardIndex(TableConfig tableConfig, Schema schema,
+      Map<String, FieldIndexConfigs> indexConfigsMap) {
+    for (Map.Entry<String, FieldIndexConfigs> entry : indexConfigsMap.entrySet()) {
+      String column = entry.getKey();
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      if (fieldSpec == null) {
+        continue;
+      }
+      FieldIndexConfigs indexConfigs = entry.getValue();
+      IndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
+      if (dictionaryConfig != null && dictionaryConfig.isEnabled()) {
+        continue;
+      }
+      List<IndexType<?, ?, ?>> requiringIndexes =
+          DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(fieldSpec, indexConfigs);
+      Preconditions.checkState(requiringIndexes.isEmpty(),
+          "Column '%s' has indexes %s that require a dictionary, but dictionary is not enabled. "
+              + "Please add an explicit dictionary config in the FieldConfig for this column, e.g. "
+              + "\"indexes\": {\"dictionary\": {}}", column, requiringIndexes);
     }
   }
 

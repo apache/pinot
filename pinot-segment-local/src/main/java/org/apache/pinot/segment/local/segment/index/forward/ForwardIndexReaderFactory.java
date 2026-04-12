@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
@@ -40,6 +41,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunk
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
@@ -47,6 +49,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -67,14 +70,28 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
   }
 
   @Override
-  protected ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-      ForwardIndexConfig indexConfig)
-      throws IndexReaderConstraintException {
-    return createIndexReader(dataBuffer, metadata);
+  public ForwardIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
+      FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+      throws IOException, IndexReaderConstraintException {
+    if (!segmentReader.hasIndexFor(metadata.getColumnName(), getIndexType())) {
+      return null;
+    }
+
+    PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), getIndexType());
+    ForwardIndexConfig indexConfig = fieldIndexConfigs != null ? fieldIndexConfigs.getConfig(getIndexType()) : null;
+    try {
+      return createIndexReader(buffer, metadata, indexConfig);
+    } catch (RuntimeException ex) {
+      throw new RuntimeException(
+          "Cannot read index " + getIndexType() + " for column " + metadata.getColumnName(), ex);
+    }
   }
 
-  public ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    if (metadata.hasDictionary()) {
+  @Override
+  public ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+      ForwardIndexConfig indexConfig)
+      throws IndexReaderConstraintException {
+    if (metadata.isForwardIndexDictionaryEncoded()) {
       if (metadata.isSingleValue()) {
         if (metadata.isSorted()) {
           return new SortedIndexReaderImpl(dataBuffer, metadata.getCardinality());

@@ -109,20 +109,31 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
       FieldSpec fieldSpec) {
     String column = fieldSpec.getName();
     CompressionCodec compressionCodec = forwardIndexConfig.getCompressionCodec();
+    if (compressionCodec == null) {
+      // No explicit codec — compatible with both dict-encoded and raw forward indexes.
+      return;
+    }
+    // CLP codecs have special handling and are always valid for STRING columns
+    boolean isCLPCodec = compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
+        || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4;
+    if (isCLPCodec) {
+      Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
+          "Cannot apply CLP compression codec to column: %s of stored type other than STRING", column);
+      return;
+    }
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
-    if (dictionaryConfig.isEnabled()) {
-      Preconditions.checkState(compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex(),
+    boolean isDictEncoded = dictionaryConfig.isEnabled()
+        && forwardIndexConfig.getForwardIndexEncoding() != IndexCreationContext.ForwardIndexEncoding.RAW;
+    if (isDictEncoded) {
+      // Dictionary-encoded forward index — only dict-applicable codecs allowed
+      Preconditions.checkState(compressionCodec.isApplicableToDictEncodedIndex(),
           "Compression codec: %s is not applicable to dictionary encoded column: %s", compressionCodec, column);
+    } else if (compressionCodec.isApplicableToRawIndex()) {
+      // Raw forward index with a raw-applicable codec — valid
     } else {
-      boolean isCLPCodec = compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
-          || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4;
-      if (isCLPCodec) {
-        Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
-            "Cannot apply CLP compression codec to column: %s of stored type other than STRING", column);
-      } else {
-        Preconditions.checkState(compressionCodec == null || compressionCodec.isApplicableToRawIndex(),
-            "Compression codec: %s is not applicable to raw column: %s", compressionCodec, column);
-      }
+      // Dict-only codec (e.g., MV_ENTRY_DICT) on a raw column
+      Preconditions.checkState(dictionaryConfig.isEnabled(),
+          "Compression codec: %s is not applicable to raw column: %s", compressionCodec, column);
     }
   }
 
@@ -221,7 +232,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Override
   public ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
       throws Exception {
-    return ForwardIndexCreatorFactory.createIndexCreator(context, indexConfig);
+    return ForwardIndexCreatorFactory.createIndexCreator(context);
   }
 
   @Override

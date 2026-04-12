@@ -45,15 +45,16 @@ public class ForwardIndexCreatorFactory {
   private ForwardIndexCreatorFactory() {
   }
 
-  public static ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
+  public static ForwardIndexCreator createIndexCreator(IndexCreationContext context)
       throws Exception {
+    ForwardIndexConfig indexConfig = context.getForwardIndexConfig();
     File indexDir = context.getIndexDir();
     FieldSpec fieldSpec = context.getFieldSpec();
     String columnName = fieldSpec.getName();
     int numTotalDocs = context.getTotalDocs();
-
-    if (context.hasDictionary()) {
-      // Dictionary enabled columns
+    if (context.hasDictionary()
+        && context.getForwardIndexEncoding() == IndexCreationContext.ForwardIndexEncoding.DICTIONARY) {
+      // Dictionary encoded forward index
       int cardinality = context.getCardinality();
       if (fieldSpec.isSingleValueField()) {
         if (context.isSorted()) {
@@ -70,7 +71,7 @@ public class ForwardIndexCreatorFactory {
         }
       }
     } else {
-      // Dictionary disabled columns
+      // Raw forward index columns
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
         // CLP (V1) uses hard-coded chunk compressor which is set to `PassThrough`

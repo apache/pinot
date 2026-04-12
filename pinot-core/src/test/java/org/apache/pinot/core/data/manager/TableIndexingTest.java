@@ -243,9 +243,12 @@ public class TableIndexingTest {
     String getErrorMessage() {
       if (_error == null) {
         return null;
-      } else {
-        return _error.getMessage().replaceAll("\n", " ");
       }
+      String message = _error.getMessage();
+      if (message == null) {
+        return _error.getClass().getSimpleName();
+      }
+      return message.replaceAll("\n", " ");
     }
   }
 
@@ -305,6 +308,9 @@ public class TableIndexingTest {
                 ]
              */
           indexTypes.add(FieldConfig.IndexType.FST);
+          if (encoding == FieldConfig.EncodingType.RAW) {
+            indexes.put("dictionary", new ObjectNode(JsonNodeFactory.instance));
+          }
           break;
         case "h3_index":
             /* geospatial - requires dictionary be disabled
@@ -343,6 +349,9 @@ public class TableIndexingTest {
                -> "tableIndexConfig": {  "invertedIndexColumns": ["uuid"], */
           // no params, has to be dictionary
           indexes.put("inverted", new ObjectNode(JsonNodeFactory.instance));
+          if (encoding == FieldConfig.EncodingType.RAW) {
+            indexes.put("dictionary", new ObjectNode(JsonNodeFactory.instance));
+          }
           break;
         case "json_index":
             /* json index (string or json column), should be no-dictionary
@@ -545,7 +554,7 @@ public class TableIndexingTest {
           .append(test._error == null).append(';');
       //@formatter:on
       if (test._error != null) {
-        summary.append(test._error.getMessage().replaceAll("\n", " "));
+        summary.append(test.getErrorMessage());
       }
       summary.append('\n');
     }
