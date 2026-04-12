@@ -36,7 +36,7 @@ public class VectorBackendCapabilitiesTest {
     VectorBackendCapabilities caps = VectorBackendType.HNSW.getCapabilities();
     assertNotNull(caps);
     assertTrue(caps.supportsTopKAnn());
-    assertFalse(caps.supportsFilterAwareSearch());
+    assertTrue(caps.supportsFilterAwareSearch());
     assertFalse(caps.supportsApproximateRadius());
     assertTrue(caps.supportsExactRerank());
     assertFalse(caps.supportsRuntimeSearchParams());
@@ -47,7 +47,7 @@ public class VectorBackendCapabilitiesTest {
     VectorBackendCapabilities caps = VectorBackendType.IVF_FLAT.getCapabilities();
     assertNotNull(caps);
     assertTrue(caps.supportsTopKAnn());
-    assertFalse(caps.supportsFilterAwareSearch());
+    assertTrue(caps.supportsFilterAwareSearch());
     assertFalse(caps.supportsApproximateRadius());
     assertTrue(caps.supportsExactRerank());
     assertTrue(caps.supportsRuntimeSearchParams());
@@ -58,7 +58,7 @@ public class VectorBackendCapabilitiesTest {
     VectorBackendCapabilities caps = VectorBackendType.IVF_PQ.getCapabilities();
     assertNotNull(caps);
     assertTrue(caps.supportsTopKAnn());
-    assertFalse(caps.supportsFilterAwareSearch());
+    assertTrue(caps.supportsFilterAwareSearch());
     assertFalse(caps.supportsApproximateRadius());
     assertTrue(caps.supportsExactRerank());
     assertTrue(caps.supportsRuntimeSearchParams());
@@ -105,7 +105,7 @@ public class VectorBackendCapabilitiesTest {
     VectorBackendCapabilities caps = VectorBackendType.HNSW.getCapabilities();
     String str = caps.toString();
     assertTrue(str.contains("topKAnn=true"));
-    assertTrue(str.contains("filterAwareSearch=false"));
+    assertTrue(str.contains("filterAwareSearch=true"));
     assertTrue(str.contains("runtimeSearchParams=false"));
   }
 

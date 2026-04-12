@@ -62,6 +62,19 @@ public class NullValueVectorReaderImplTest implements PinotBuffersAfterMethodChe
     }
   }
 
+  @Test
+  public void testNullBitmapIsCached()
+      throws IOException {
+    File nullValueFile = new File(TEMP_DIR, TEMP_DIR.list()[0]);
+    try (PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(nullValueFile)) {
+      NullValueVectorReaderImpl reader = new NullValueVectorReaderImpl(buffer);
+      // Repeated calls to getNullBitmap() must return the same instance, not reconstruct it
+      org.roaringbitmap.buffer.ImmutableRoaringBitmap first = reader.getNullBitmap();
+      org.roaringbitmap.buffer.ImmutableRoaringBitmap second = reader.getNullBitmap();
+      Assert.assertSame(first, second, "getNullBitmap() should return the cached instance on repeated calls");
+    }
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {

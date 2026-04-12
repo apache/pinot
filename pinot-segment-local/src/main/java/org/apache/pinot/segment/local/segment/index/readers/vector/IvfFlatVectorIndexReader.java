@@ -32,9 +32,10 @@ import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
-import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +58,7 @@ import org.slf4j.LoggerFactory;
  * after construction. Query-scoped {@code nprobe} overrides are stored in a {@link ThreadLocal}
  * so concurrent queries cannot overwrite each other's search parameters.</p>
  */
-public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware {
+public class IvfFlatVectorIndexReader implements FilterAwareVectorIndexReader, NprobeAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfFlatVectorIndexReader.class);
 
   /** Default nprobe value when not explicitly set. */
@@ -185,6 +186,53 @@ public class IvfFlatVectorIndexReader implements VectorIndexReader, NprobeAware 
       float[][] vectors = _listVectors[probeIdx];
 
       for (int i = 0; i < docIds.length; i++) {
+        float dist = computeDistance(searchQuery, vectors[i]);
+        if (maxHeap.size() < effectiveTopK) {
+          maxHeap.offer(new ScoredDoc(docIds[i], dist));
+        } else if (dist < maxHeap.peek()._distance) {
+          maxHeap.poll();
+          maxHeap.offer(new ScoredDoc(docIds[i], dist));
+        }
+      }
+    }
+
+    // Step 3: Collect results into a bitmap
+    MutableRoaringBitmap result = new MutableRoaringBitmap();
+    for (ScoredDoc doc : maxHeap) {
+      result.add(doc._docId);
+    }
+    return result;
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDocIds(float[] searchQuery, int topK, ImmutableRoaringBitmap preFilterBitmap) {
+    Preconditions.checkArgument(searchQuery.length == _dimension,
+        "Query dimension mismatch: expected %s, got %s", _dimension, searchQuery.length);
+    Preconditions.checkArgument(topK > 0, "topK must be positive, got: %s", topK);
+
+    if (_numVectors == 0 || _nlist == 0 || preFilterBitmap.isEmpty()) {
+      return new MutableRoaringBitmap();
+    }
+
+    int effectiveNprobe = Math.min(getNprobe(), _nlist);
+
+    // Step 1: Find the nprobe closest centroids (same as unfiltered)
+    int[] probeCentroids = findClosestCentroids(searchQuery, effectiveNprobe);
+
+    // Step 2: Scan selected inverted lists, but only consider docs present in preFilterBitmap
+    int effectiveTopK = Math.min(topK, _numVectors);
+    PriorityQueue<ScoredDoc> maxHeap = new PriorityQueue<>(effectiveTopK,
+        (a, b) -> Float.compare(b._distance, a._distance));
+
+    for (int probeIdx : probeCentroids) {
+      int[] docIds = _listDocIds[probeIdx];
+      float[][] vectors = _listVectors[probeIdx];
+
+      for (int i = 0; i < docIds.length; i++) {
+        // Only consider documents that pass the pre-filter
+        if (!preFilterBitmap.contains(docIds[i])) {
+          continue;
+        }
         float dist = computeDistance(searchQuery, vectors[i]);
         if (maxHeap.size() < effectiveTopK) {
           maxHeap.offer(new ScoredDoc(docIds[i], dist));

@@ -928,10 +928,16 @@ public class CommonConstants {
          *  top-K selection. Defaults to topK * 10 if not set. */
         public static final String VECTOR_MAX_CANDIDATES = "vectorMaxCandidates";
 
-        /** Distance threshold for vector radius/threshold search. When set, the query returns
-         *  all vectors within this distance rather than a fixed top-K. ANN candidate generation
-         *  is used followed by exact threshold refinement. */
+        /** Distance threshold for vector search. When set, only results within this distance are
+         *  returned. The threshold is compared against the raw distance value from the configured
+         *  distance function: EUCLIDEAN/L2 uses squared L2 (sum of squared diffs, no sqrt),
+         *  COSINE uses 1 - cosine_similarity, INNER_PRODUCT/DOT_PRODUCT uses negated dot product. */
         public static final String VECTOR_DISTANCE_THRESHOLD = "vectorDistanceThreshold";
+
+        /** efSearch parameter for HNSW vector indexes. Reserved for future use — currently parsed
+         *  and included in explain output but does not yet affect Lucene HNSW graph traversal.
+         *  A future release will wire this through a custom KnnVectorQuery implementation. */
+        public static final String VECTOR_EF_SEARCH = "vectorEfSearch";
       }
 
       public static class QueryOptionValue {

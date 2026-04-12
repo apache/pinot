@@ -165,6 +165,10 @@ public class SegmentDirectoryPaths {
       case IVF_PQ:
         return findFlatVectorIndexFile(segmentIndexDir, column,
             V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+      case IVF_ON_DISK:
+        // IVF_ON_DISK reuses the IVF_FLAT file format with FileChannel random-access reads
+        return findFlatVectorIndexFile(segmentIndexDir, column,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
       default:
         throw new IllegalStateException("Unsupported vector backend type: " + backendType);
     }

@@ -127,6 +127,14 @@ public class TableAdminClient extends BaseServiceAdminClient {
   }
 
   /**
+   * Gets the configuration for a specific raw table and type as a typed object.
+   */
+  public TableConfig getTableConfigObjectForType(String tableName, TableType tableType)
+      throws PinotAdminException, IOException {
+    return getTableConfigObject(tableName, tableType.name());
+  }
+
+  /**
    * Gets the configuration for a specific table as a typed object.
    */
   public TableConfig getTableConfigObject(String tableName)
