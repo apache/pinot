@@ -27,7 +27,7 @@ public interface CLPStatsProvider {
 
   default CLPV2Stats getCLPV2Stats() {
     throw new IllegalStateException(
-        "This method should only be implemented and used in MutableNoDictionaryColStatistics class.");
+        "This method should only be implemented and used in MutableNoDictColumnStatistics class.");
   }
 
   class CLPStats {

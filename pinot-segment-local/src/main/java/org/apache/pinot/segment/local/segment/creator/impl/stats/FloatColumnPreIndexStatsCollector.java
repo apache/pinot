@@ -110,6 +110,10 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
     return _sealed ? _sortedValues.length : _values.size();
   }
 
+  float[] getValues() {
+    return _values.toFloatArray();
+  }
+
   @Override
   public void seal() {
     if (!_sealed) {

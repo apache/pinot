@@ -32,7 +32,7 @@ public interface TextIndexReader extends IndexReader {
 
   /**
    * Returns the matching document ids for the given search query.
-   * This is the legacy method for backward compatibility with native/FST text index readers.
+   * This is the legacy entry point retained for backward compatibility.
    */
   MutableRoaringBitmap getDocIds(String searchQuery);
 
@@ -45,7 +45,7 @@ public interface TextIndexReader extends IndexReader {
    * @return Matching document ids
    */
   default MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
-    // Default implementation falls back to the regular method for backward compatibility
+    // Default implementation falls back to the legacy method for backward compatibility.
     return getDocIds(searchQuery);
   }
 
@@ -54,5 +54,21 @@ public interface TextIndexReader extends IndexReader {
    */
   default boolean isMultiColumn() {
     return false;
+  }
+
+  /**
+   * Returns the number of documents that are searchable in the index. For near-realtime indexes
+   * (e.g. Lucene on consuming segments), this may be less than the total segment doc count because
+   * recently ingested documents may not yet be visible to the index searcher. For offline/completed
+   * segments, this returns -1 (meaning all docs are searchable).
+   *
+   * <p>This is used to implement the "searchable doc fence" for NOT filters: when inverting a
+   * text match result, only docs within [0, searchableDocCount) are considered, preventing
+   * unindexed documents from appearing as false positives.</p>
+   *
+   * @return the number of searchable documents, or -1 if all documents are searchable
+   */
+  default int getSearchableDocCount() {
+    return -1;
   }
 }

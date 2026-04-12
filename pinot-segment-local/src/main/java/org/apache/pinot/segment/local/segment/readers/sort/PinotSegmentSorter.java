@@ -19,15 +19,18 @@
 package org.apache.pinot.segment.local.segment.readers.sort;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.Arrays;
+import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 
-
 /**
  * Sorter implementation for pinot segments
+ * Sorts documents within a segment by one or more columns. For no-dictionary columns, values are
+ * pre-materialized into in-memory arrays before sorting so that the comparator never needs to
+ * decompress forward-index chunks during the random-access phase of quicksort.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class PinotSegmentSorter implements SegmentSorter {
   private final int _numDocs;
   private final Map<String, PinotSegmentColumnReader> _columnReaderMap;
@@ -37,27 +40,24 @@ public class PinotSegmentSorter implements SegmentSorter {
     _columnReaderMap = columnReaderMap;
   }
 
-  /**
-   * Sort the segment by the sort order columns. Orderings are computed by comparing dictionary ids.
-   *
-   * TODO: add the support for no-dictionary and multi-value columns.
-   *
-   * @param sortOrder a list of column names that represent the sorting order
-   * @return an array of sorted docIds
-   */
   @Override
   public int[] getSortedDocIds(List<String> sortOrder) {
     int numSortedColumns = sortOrder.size();
     PinotSegmentColumnReader[] sortedColumnReaders = new PinotSegmentColumnReader[numSortedColumns];
+    // Pre-materialized values for no-dictionary columns; null for dictionary-encoded columns
+    Comparable[][] preReadValues = new Comparable[numSortedColumns][];
+
     for (int i = 0; i < numSortedColumns; i++) {
       String sortedColumn = sortOrder.get(i);
       PinotSegmentColumnReader sortedColumnReader = _columnReaderMap.get(sortedColumn);
       Preconditions.checkState(sortedColumnReader != null, "Failed to find sorted column: %s", sortedColumn);
       Preconditions
           .checkState(sortedColumnReader.isSingleValue(), "Unsupported sorted multi-value column: %s", sortedColumn);
-      Preconditions
-          .checkState(sortedColumnReader.hasDictionary(), "Unsupported sorted no-dictionary column: %s", sortedColumn);
       sortedColumnReaders[i] = sortedColumnReader;
+
+      if (!sortedColumnReader.hasDictionary()) {
+        preReadValues[i] = sortedColumnReader.readAllValuesForSorting(_numDocs);
+      }
     }
 
     int[] sortedDocIds = new int[_numDocs];
@@ -65,24 +65,20 @@ public class PinotSegmentSorter implements SegmentSorter {
       sortedDocIds[i] = i;
     }
 
-    Arrays.quickSort(0, _numDocs, (i1, i2) -> {
-      int docId1 = sortedDocIds[i1];
-      int docId2 = sortedDocIds[i2];
-
-      for (PinotSegmentColumnReader sortedColumnReader : sortedColumnReaders) {
-        int result = sortedColumnReader.getDictionary()
-            .compare(sortedColumnReader.getDictId(docId1), sortedColumnReader.getDictId(docId2));
+    IntArrays.quickSort(sortedDocIds, (docId1, docId2) -> {
+      for (int j = 0; j < numSortedColumns; j++) {
+        int result;
+        if (preReadValues[j] != null) {
+          result = preReadValues[j][docId1].compareTo(preReadValues[j][docId2]);
+        } else {
+          result = sortedColumnReaders[j].compare(docId1, docId2);
+        }
         if (result != 0) {
           return result;
         }
       }
       return 0;
-    }, (i, j) -> {
-      int temp = sortedDocIds[i];
-      sortedDocIds[i] = sortedDocIds[j];
-      sortedDocIds[j] = temp;
     });
-
     return sortedDocIds;
   }
 }

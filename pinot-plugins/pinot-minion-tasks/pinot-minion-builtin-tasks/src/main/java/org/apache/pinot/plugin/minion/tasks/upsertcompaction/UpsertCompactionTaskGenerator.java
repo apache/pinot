@@ -187,6 +187,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           continue;
         }
         Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, List.of(segment.getSegmentName())));
+        configs.putAll(MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs, _clusterInfoAccessor));
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, segment.getDownloadUrl());
         configs.put(MinionConstants.UPLOAD_URL_KEY,
             _clusterInfoAccessor.getVipUrlForLeadController(tableNameWithType) + "/segments");

@@ -25,8 +25,8 @@ import org.apache.pinot.connector.spark.common.partition.PinotSplit
 import java.io.Closeable
 
 /**
- * Abstract partition reader is designed to be shared between two concrete reader implementations
- * for Spark2 and Spark3 connectors.
+ * Abstract partition reader is designed to be shared between concrete reader implementations
+ * for Spark 3 connectors.
  *
  * @tparam RowType
  */

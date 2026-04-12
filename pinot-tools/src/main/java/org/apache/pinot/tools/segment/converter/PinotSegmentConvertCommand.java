@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.tools.AbstractBaseCommand;
@@ -38,6 +39,7 @@ import picocli.CommandLine;
  *   <li>AVRO format</li>
  *   <li>CSV format</li>
  *   <li>JSON format</li>
+ *   <li>PARQUET format</li>
  * </ul>
  */
 @SuppressWarnings("FieldCanBeLocal")
@@ -54,7 +56,7 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
   private String _outputDir;
 
   @CommandLine.Option(names = {"-outputFormat"}, required = true,
-      description = "Format to convert to (AVRO/CSV/JSON).")
+      description = "Format to convert to (AVRO/CSV/JSON/PARQUET).")
   private String _outputFormat;
 
   @CommandLine.Option(names = {"-csvDelimiter"}, required = false, description = "CSV delimiter (default ',').")
@@ -66,6 +68,14 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
 
   @CommandLine.Option(names = {"-csvWithHeader"}, required = false, description = "Print CSV Header (default false).")
   private boolean _csvWithHeader;
+
+  @CommandLine.Option(names = {"-parquetCompression"}, required = false,
+      description = "Parquet compression codec (GZIP/SNAPPY/ZSTD/LZ4/UNCOMPRESSED, default GZIP).")
+  private CompressionCodecName _parquetCompression = CompressionCodecName.GZIP;
+
+  @CommandLine.Option(names = {"-forwardIndexOnly"}, required = false,
+      description = "Load only forward index from the segment, skipping secondary indexes (default false).")
+  private boolean _forwardIndexOnly;
 
   @CommandLine.Option(names = {"-overwrite"}, required = false,
       description = "Overwrite the existing file (default false).")
@@ -127,16 +137,21 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
         switch (FileFormat.fromString(_outputFormat)) {
           case AVRO:
             outputPath += ".avro";
-            new PinotSegmentToAvroConverter(inputPath, outputPath).convert();
+            new PinotSegmentToAvroConverter(inputPath, outputPath, _forwardIndexOnly).convert();
             break;
           case CSV:
             outputPath += ".csv";
-            new PinotSegmentToCsvConverter(inputPath, outputPath, _csvDelimiter, _csvDelimiter, _csvWithHeader)
-                .convert();
+            new PinotSegmentToCsvConverter(inputPath, outputPath, _csvDelimiter, _csvListDelimiter, _csvWithHeader,
+                _forwardIndexOnly).convert();
             break;
           case JSON:
             outputPath += ".json";
-            new PinotSegmentToJsonConverter(inputPath, outputPath).convert();
+            new PinotSegmentToJsonConverter(inputPath, outputPath, _forwardIndexOnly).convert();
+            break;
+          case PARQUET:
+            outputPath += ".parquet";
+            new PinotSegmentToParquetConverter(inputPath, outputPath, _parquetCompression, _forwardIndexOnly)
+                .convert();
             break;
           default:
             throw new RuntimeException("Unsupported conversion to file format: " + _outputFormat);
@@ -152,6 +167,6 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
 
   @Override
   public String description() {
-    return "Convert Pinot segments to another format such as AVRO/CSV/JSON.";
+    return "Convert Pinot segments to another format such as AVRO/CSV/JSON/PARQUET.";
   }
 }

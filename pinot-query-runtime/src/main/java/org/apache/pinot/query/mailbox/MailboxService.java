@@ -182,6 +182,15 @@ public class MailboxService {
   }
 
   /**
+   * Resets the GRPC connection backoff for the channel to the given server.
+   * @see ChannelManager#resetConnectBackoff(String, int)
+   * @return true if the channel was in TRANSIENT_FAILURE and backoff was reset
+   */
+  public boolean resetConnectBackoff(String hostname, int port) {
+    return _channelManager.resetConnectBackoff(hostname, port);
+  }
+
+  /**
    * Releases the receiving mailbox from the cache.
    *
    * The receiving mailbox for a given OpChain may be created before the OpChain is even registered. Reason being that

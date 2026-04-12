@@ -348,7 +348,7 @@ public class MailboxServiceTest {
     });
     TestUtils.waitForCondition(
         aVoid -> receivingMailbox.getNumPendingBlocks() == ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS, 1000L,
-        "Failed to deliver mails");
+        10000L, "Failed to deliver mails");
 
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);

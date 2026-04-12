@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+
 /**
  * Interface for the context of the forward index reader.
  * <p>The forward index reader itself is always stateless because it needs to be accessed by multiple threads. The

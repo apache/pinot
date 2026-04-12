@@ -32,11 +32,16 @@ import org.slf4j.LoggerFactory;
 public class PolicyBasedResourceManager extends ResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PolicyBasedResourceManager.class);
 
-  private final ResourceLimitPolicy _resourcePolicy;
+  private volatile ResourceLimitPolicy _resourcePolicy;
 
   public PolicyBasedResourceManager(PinotConfiguration config) {
     super(config);
     _resourcePolicy = new ResourceLimitPolicy(config, _numQueryWorkerThreads);
+  }
+
+  @Override
+  protected void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads) {
+    _resourcePolicy = new ResourceLimitPolicy(_config, newWorkerThreads);
   }
 
   /**

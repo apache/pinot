@@ -51,6 +51,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
 
 public class TableConfigBuilder {
@@ -97,7 +98,6 @@ public class TableConfigBuilder {
   private String _segmentVersion;
   private String _sortedColumn;
   private List<String> _invertedIndexColumns;
-  private boolean _createInvertedIndexDuringSegmentGeneration;
   private List<String> _noDictionaryColumns;
   private List<String> _onHeapDictionaryColumns;
   private List<String> _bloomFilterColumns;
@@ -120,11 +120,16 @@ public class TableConfigBuilder {
   private double _noDictionarySizeRatioThreshold;
   private double _noDictionaryCardinalityRatioThreshold;
 
+  /// @deprecated This flag is ignored. Keep it for backward compatibility during upgrade (especially for JSON ser/de).
+  @Deprecated
+  private boolean _createInvertedIndexDuringSegmentGeneration;
+
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
   private TableTaskConfig _taskConfig;
   private RoutingConfig _routingConfig;
   private QueryConfig _queryConfig;
+  private List<TableSamplerConfig> _tableSamplers;
   private Map<String, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private Map<InstancePartitionsType, String> _instancePartitionsMap;
   private Map<String, SegmentAssignmentConfig> _segmentAssignmentConfigMap;
@@ -139,6 +144,8 @@ public class TableConfigBuilder {
   private JsonNode _tierOverwrites;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
   private MultiColumnTextIndexConfig _multiColumnTextIndexConfig;
+  private String _description;
+  private List<String> _tags;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -304,6 +311,7 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @Deprecated
   public TableConfigBuilder setCreateInvertedIndexDuringSegmentGeneration(
       boolean createInvertedIndexDuringSegmentGeneration) {
     _createInvertedIndexDuringSegmentGeneration = createInvertedIndexDuringSegmentGeneration;
@@ -412,6 +420,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setTableSamplers(List<TableSamplerConfig> tableSamplers) {
+    _tableSamplers = tableSamplers;
+    return this;
+  }
+
   public TableConfigBuilder setInstanceAssignmentConfigMap(
       Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
@@ -479,6 +492,16 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setDescription(String description) {
+    _description = description;
+    return this;
+  }
+
+  public TableConfigBuilder setTags(List<String> tags) {
+    _tags = tags;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -535,9 +558,13 @@ public class TableConfigBuilder {
       _customConfig = new TableCustomConfig(null);
     }
 
-    return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
-        _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
-        _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap);
+    TableConfig tableConfig =
+        new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
+            _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
+            _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
+            _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap, _tableSamplers);
+    tableConfig.setDescription(_description);
+    tableConfig.setTags(_tags);
+    return tableConfig;
   }
 }

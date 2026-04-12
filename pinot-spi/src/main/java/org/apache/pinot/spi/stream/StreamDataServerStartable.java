@@ -56,6 +56,18 @@ public interface StreamDataServerStartable {
   void createTopic(String topic, Properties topicProps);
 
   /**
+   * Create a data stream with the given partition count.
+   *
+   * @param topic topic name
+   * @param numPartitions number of partitions
+   */
+  default void createTopic(String topic, int numPartitions) {
+    Properties topicProps = new Properties();
+    topicProps.setProperty("partition", Integer.toString(numPartitions));
+    createTopic(topic, topicProps);
+  }
+
+  /**
    * Delete a data stream (e.g Kafka topic) in the server.
    *
    * @param topic
@@ -71,6 +83,17 @@ public interface StreamDataServerStartable {
    */
   default void createPartitions(String topic, int numPartitions) {
     throw new NotImplementedException("createPartitions is not implemented!");
+  }
+
+  /**
+   * Delete records before a given offset for a topic partition.
+   *
+   * @param topic topic name
+   * @param partition partition id
+   * @param offset offset boundary (exclusive)
+   */
+  default void deleteRecordsBeforeOffset(String topic, int partition, long offset) {
+    throw new NotImplementedException("deleteRecordsBeforeOffset is not implemented!");
   }
 
   /**

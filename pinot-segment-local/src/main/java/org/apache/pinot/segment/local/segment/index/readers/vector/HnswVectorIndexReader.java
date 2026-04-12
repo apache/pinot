@@ -23,27 +23,39 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.Collector;
+import org.apache.lucene.search.ConstantScoreWeight;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreMode;
+import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.Weight;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
-import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.apache.pinot.segment.spi.index.reader.EfSearchAware;
+import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
 
 
-public class HnswVectorIndexReader implements VectorIndexReader {
+public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSearchAware {
 
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(HnswVectorIndexReader.class);
 
@@ -53,6 +65,7 @@ public class HnswVectorIndexReader implements VectorIndexReader {
   private final String _column;
   private final HnswVectorIndexReader.DocIdTranslator _docIdTranslator;
   private boolean _useANDForMultiTermQueries = false;
+  private final ThreadLocal<Integer> _efSearchOverride = new ThreadLocal<>();
 
   public HnswVectorIndexReader(String column, File indexDir, int numDocs, VectorIndexConfig config) {
     _column = column;
@@ -87,11 +100,32 @@ public class HnswVectorIndexReader implements VectorIndexReader {
    */
   private File getVectorIndexFile(File segmentIndexDir) {
     // will return null if file does not exist
-    File file = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, _column);
+    File file = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, _column, VectorBackendType.HNSW);
     if (file == null) {
       throw new IllegalStateException("Failed to find HNSW index file for column: " + _column);
     }
     return file;
+  }
+
+  @Override
+  public void setEfSearch(int efSearch) {
+    if (efSearch < 1) {
+      throw new IllegalArgumentException("efSearch must be >= 1, got: " + efSearch);
+    }
+    _efSearchOverride.set(efSearch);
+  }
+
+  @Override
+  public void clearEfSearch() {
+    _efSearchOverride.remove();
+  }
+
+  /**
+   * Returns the efSearch value for debug/explain output, or 0 if not set.
+   */
+  int getEffectiveEfSearch() {
+    Integer efSearch = _efSearchOverride.get();
+    return efSearch != null ? efSearch : 0;
   }
 
   @Override
@@ -117,12 +151,41 @@ public class HnswVectorIndexReader implements VectorIndexReader {
     }
   }
 
+  @Override
+  public ImmutableRoaringBitmap getDocIds(float[] searchQuery, int topK, ImmutableRoaringBitmap preFilterBitmap) {
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    Collector docIDCollector = new HnswDocIdCollector(docIds, _docIdTranslator);
+    try {
+      // Build a Lucene filter query that restricts HNSW traversal to pre-filtered doc IDs.
+      // We need to translate Pinot doc IDs to Lucene doc IDs for the filter.
+      Query filterQuery = new RoaringBitmapFilterQuery(preFilterBitmap, _docIdTranslator, _indexReader.numDocs());
+      KnnFloatVectorQuery knnQuery = new KnnFloatVectorQuery(_column, searchQuery, topK, filterQuery);
+      _indexSearcher.search(knnQuery, docIDCollector);
+      return docIds;
+    } catch (Exception e) {
+      String msg = "Caught exception while searching the HNSW index with pre-filter for column: " + _column
+          + ", search query: " + Arrays.toString(searchQuery);
+      throw new RuntimeException(msg, e);
+    }
+  }
+
   /**
    * When we destroy the loaded ImmutableSegment, all the indexes
    * (for each column) are destroyed and as part of that
    * we release the vector index
    * @throws IOException
    */
+  @Override
+  public Map<String, Object> getIndexDebugInfo() {
+    Map<String, Object> info = new LinkedHashMap<>();
+    info.put("backend", "HNSW");
+    info.put("column", _column);
+    info.put("numDocs", _indexReader.numDocs());
+    info.put("numDeletedDocs", _indexReader.numDeletedDocs());
+    info.put("luceneSegments", _indexReader.leaves().size());
+    return info;
+  }
+
   @Override
   public void close()
       throws IOException {
@@ -181,6 +244,145 @@ public class HnswVectorIndexReader implements VectorIndexReader {
     public void close()
         throws IOException {
       _buffer.close();
+    }
+  }
+
+  /**
+   * A Lucene {@link Query} that accepts only documents whose Pinot doc IDs are present
+   * in a {@link ImmutableRoaringBitmap}. Used to implement pre-filter ANN search by
+   * restricting HNSW graph traversal to the pre-filtered document set.
+   *
+   * <p>Because Lucene uses its own internal doc IDs (which differ from Pinot doc IDs),
+   * this query translates Lucene doc IDs to Pinot doc IDs using the {@link DocIdTranslator}
+   * before checking membership in the bitmap.</p>
+   */
+  static class RoaringBitmapFilterQuery extends Query {
+    private final ImmutableRoaringBitmap _bitmap;
+    private final DocIdTranslator _docIdTranslator;
+    private final int _maxDoc;
+
+    RoaringBitmapFilterQuery(ImmutableRoaringBitmap bitmap, DocIdTranslator docIdTranslator, int maxDoc) {
+      _bitmap = bitmap;
+      _docIdTranslator = docIdTranslator;
+      _maxDoc = maxDoc;
+    }
+
+    @Override
+    public Weight createWeight(IndexSearcher searcher, ScoreMode scoreMode, float boost) {
+      return new ConstantScoreWeight(this, boost) {
+        @Override
+        public Scorer scorer(LeafReaderContext context) {
+          int docBase = context.docBase;
+          int maxDocInLeaf = context.reader().maxDoc();
+          DocIdSetIterator iterator = new BitmapDocIdSetIterator(docBase, maxDocInLeaf);
+          float constScore = score();
+          return new Scorer(this) {
+            @Override
+            public DocIdSetIterator iterator() {
+              return iterator;
+            }
+
+            @Override
+            public float getMaxScore(int upTo) {
+              return constScore;
+            }
+
+            @Override
+            public float score() {
+              return constScore;
+            }
+
+            @Override
+            public int docID() {
+              return iterator.docID();
+            }
+          };
+        }
+
+        @Override
+        public boolean isCacheable(LeafReaderContext ctx) {
+          return false;
+        }
+      };
+    }
+
+    @Override
+    public String toString(String field) {
+      return "RoaringBitmapFilterQuery(cardinality=" + _bitmap.getCardinality() + ")";
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof RoaringBitmapFilterQuery)) {
+        return false;
+      }
+      RoaringBitmapFilterQuery that = (RoaringBitmapFilterQuery) other;
+      return _bitmap == that._bitmap && _docIdTranslator == that._docIdTranslator;
+    }
+
+    @Override
+    public int hashCode() {
+      return System.identityHashCode(_bitmap) * 31 + System.identityHashCode(_docIdTranslator);
+    }
+
+    @Override
+    public void visit(org.apache.lucene.search.QueryVisitor visitor) {
+      visitor.visitLeaf(this);
+    }
+
+    /**
+     * Iterates over Lucene doc IDs whose corresponding Pinot doc IDs are in the bitmap.
+     */
+    private class BitmapDocIdSetIterator extends DocIdSetIterator {
+      private final int _docBase;
+      private final int _maxDocInLeaf;
+      private int _doc = -1;
+
+      BitmapDocIdSetIterator(int docBase, int maxDocInLeaf) {
+        _docBase = docBase;
+        _maxDocInLeaf = maxDocInLeaf;
+      }
+
+      @Override
+      public int docID() {
+        return _doc;
+      }
+
+      @Override
+      public int nextDoc() {
+        _doc++;
+        while (_doc < _maxDocInLeaf) {
+          int pinotDocId = _docIdTranslator.getPinotDocId(_docBase + _doc);
+          if (_bitmap.contains(pinotDocId)) {
+            return _doc;
+          }
+          _doc++;
+        }
+        _doc = NO_MORE_DOCS;
+        return _doc;
+      }
+
+      @Override
+      public int advance(int target) {
+        _doc = target;
+        while (_doc < _maxDocInLeaf) {
+          int pinotDocId = _docIdTranslator.getPinotDocId(_docBase + _doc);
+          if (_bitmap.contains(pinotDocId)) {
+            return _doc;
+          }
+          _doc++;
+        }
+        _doc = NO_MORE_DOCS;
+        return _doc;
+      }
+
+      @Override
+      public long cost() {
+        return _bitmap.getLongCardinality();
+      }
     }
   }
 }

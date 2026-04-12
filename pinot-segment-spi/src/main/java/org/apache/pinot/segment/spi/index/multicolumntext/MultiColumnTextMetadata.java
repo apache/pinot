@@ -42,7 +42,6 @@ public class MultiColumnTextMetadata {
   public static final int VERSION_1 = 1;
 
   private static final Set<String> SHARED_PROPERTIES = Set.of(
-      FieldConfig.TEXT_FST_TYPE, // fst type should only be 'default' (never 'native'!)
       FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE,
       FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES,
       FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY,

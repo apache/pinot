@@ -66,6 +66,7 @@ public class IndexLoadingConfig {
   private Set<String> _knownColumns;
   private String _tableDataDir;
   private boolean _errorOnColumnBuildFailure;
+  private boolean _forwardIndexOnly;
 
   // Initialized by instance data manager config
   private String _instanceId;
@@ -347,6 +348,14 @@ public class IndexLoadingConfig {
 
   public void setErrorOnColumnBuildFailure(boolean errorOnColumnBuildFailure) {
     _errorOnColumnBuildFailure = errorOnColumnBuildFailure;
+  }
+
+  public boolean isForwardIndexOnly() {
+    return _forwardIndexOnly;
+  }
+
+  public void setForwardIndexOnly(boolean forwardIndexOnly) {
+    _forwardIndexOnly = forwardIndexOnly;
   }
 
   public boolean isSkipSegmentPreprocess() {

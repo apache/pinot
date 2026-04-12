@@ -100,6 +100,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     startZk();
+    startKafka();
     startController();
     startBroker();
     startServer();
@@ -113,7 +114,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected void setupNonPauselessTable()
       throws Exception {
     _avroFiles = unpackAvroData(_tempDir);
-    startKafka();
     pushAvroIntoKafka(_avroFiles);
 
     Schema schema = createSchema();
@@ -126,7 +126,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
     addTableConfig(tableConfig);
 
-    waitForDocsLoaded(600_000L, true, tableConfig.getTableName());
+    waitForAllDocsLoaded(tableConfig.getTableName(), 600_000L);
     TestUtils.waitForCondition((aVoid) -> {
       List<SegmentZKMetadata> segmentZKMetadataList =
           _helixResourceManager.getSegmentsZKMetadata(tableConfig.getTableName());
@@ -214,7 +214,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     _controllerStarter.getRealtimeSegmentValidationManager().run();
 
     waitForAllDocsLoaded(600_000L);
-    waitForDocsLoaded(600_000L, true, tableNameWithType2);
+    waitForAllDocsLoaded(tableNameWithType2, 600_000L);
 
     PauselessRealtimeTestUtils.verifyIdealState(tableNameWithType, NUM_REALTIME_SEGMENTS, _helixManager);
     PauselessRealtimeTestUtils.verifyIdealState(tableNameWithType2, NUM_REALTIME_SEGMENTS, _helixManager);

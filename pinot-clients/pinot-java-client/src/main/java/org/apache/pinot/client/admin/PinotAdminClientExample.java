@@ -18,14 +18,22 @@
  */
 package org.apache.pinot.client.admin;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Example demonstrating how to use PinotAdminClient.
  */
 public class PinotAdminClientExample {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdminClientExample.class);
+
   private PinotAdminClientExample() {
   }
 
@@ -34,7 +42,7 @@ public class PinotAdminClientExample {
     try (PinotAdminClient adminClient = new PinotAdminClient("localhost:9000")) {
       exampleBasicUsage(adminClient);
     } catch (Exception e) {
-      System.err.println("Error in basic usage example: " + e.getMessage());
+      LOGGER.error("Error in basic usage example", e);
     }
 
     // Example 2: Usage with basic authentication
@@ -42,102 +50,107 @@ public class PinotAdminClientExample {
       Properties properties = new Properties();
       properties.setProperty("pinot.admin.request.timeout.ms", "30000");
 
-      PinotAdminClient adminClient = new PinotAdminClient("localhost:9000", properties,
+      try (PinotAdminClient adminClient = new PinotAdminClient("localhost:9000", properties,
           PinotAdminAuthentication.AuthType.BASIC,
-          Map.of("username", "admin", "password", "password"));
-
-      exampleWithAuthentication(adminClient);
-      adminClient.close();
+          Map.of("username", "admin", "password", "password"))) {
+        exampleWithAuthentication(adminClient);
+      }
     } catch (Exception e) {
-      System.err.println("Error in authentication example: " + e.getMessage());
+      LOGGER.error("Error in authentication example", e);
     }
 
     // Example 3: Usage with bearer token authentication
     try {
       Properties properties = new Properties();
-      PinotAdminClient adminClient = new PinotAdminClient("localhost:9000", properties,
+      try (PinotAdminClient adminClient = new PinotAdminClient("localhost:9000", properties,
           PinotAdminAuthentication.AuthType.BEARER,
-          Map.of("token", "your-bearer-token"));
-
-      exampleWithBearerAuth(adminClient);
-      adminClient.close();
+          Map.of("token", "your-bearer-token"))) {
+        exampleWithBearerAuth(adminClient);
+      }
     } catch (Exception e) {
-      System.err.println("Error in bearer auth example: " + e.getMessage());
+      LOGGER.error("Error in bearer auth example", e);
     }
   }
 
   private static void exampleBasicUsage(PinotAdminClient adminClient)
       throws PinotAdminException {
-    System.out.println("=== Basic Usage Example ===");
+    LOGGER.info("=== Basic Usage Example ===");
 
     try {
       // List tables
       var tables = adminClient.getTableClient().listTables(null, null, null);
-      System.out.println("Tables: " + tables);
+      LOGGER.info("Tables: {}", tables);
 
       // List schemas
       var schemas = adminClient.getSchemaClient().listSchemaNames();
-      System.out.println("Schemas: " + schemas);
+      LOGGER.info("Schemas: {}", schemas);
 
       // List instances
       var instances = adminClient.getInstanceClient().listInstances();
-      System.out.println("Instances: " + instances);
+      LOGGER.info("Instances: {}", instances);
 
       // List tenants
       var tenants = adminClient.getTenantClient().listTenants();
-      System.out.println("Tenants: " + tenants);
+      LOGGER.info("Tenants: {}", tenants);
 
       // List task types
       var taskTypes = adminClient.getTaskClient().listTaskTypes();
-      System.out.println("Task types: " + taskTypes);
+      LOGGER.info("Task types: {}", taskTypes);
     } catch (PinotAdminException e) {
-      System.out.println("Admin operation failed: " + e.getMessage());
+      LOGGER.error("Admin operation failed", e);
     }
   }
 
   private static void exampleWithAuthentication(PinotAdminClient adminClient)
-      throws PinotAdminException {
-    System.out.println("=== Authentication Example ===");
+      throws IOException {
+    LOGGER.info("=== Authentication Example ===");
 
     try {
       // Get a specific table configuration
       String tableConfig = adminClient.getTableClient().getTableConfig("myTable");
-      System.out.println("Table config: " + tableConfig);
+      LOGGER.info("Table config: {}", tableConfig);
+
+      TableConfig offlineTableConfig =
+          adminClient.getTableClient().getTableConfigObjectForType("myTable", TableType.OFFLINE);
+      LOGGER.info("Typed table config: {}", offlineTableConfig.getTableName());
+
+      Schema schema = adminClient.getSchemaClient().getSchemaObject("myTable");
+      LOGGER.info("Typed schema: {}", schema.getSchemaName());
 
       // Validate a schema
       String schemaConfig =
           "{\"schemaName\":\"testSchema\",\"dimensionFieldSpecs\":[{\"name\":\"id\",\"dataType\":\"INT\"}]}";
       String validationResult = adminClient.getSchemaClient().validateSchema(schemaConfig);
-      System.out.println("Schema validation: " + validationResult);
+      LOGGER.info("Schema validation: {}", validationResult);
     } catch (PinotAdminAuthenticationException e) {
-      System.out.println("Authentication failed: " + e.getMessage());
+      LOGGER.error("Authentication failed", e);
     } catch (PinotAdminNotFoundException e) {
-      System.out.println("Resource not found: " + e.getMessage());
+      LOGGER.error("Resource not found", e);
     } catch (PinotAdminException e) {
-      System.out.println("Admin operation failed: " + e.getMessage());
+      LOGGER.error("Admin operation failed", e);
     }
   }
 
   private static void exampleWithBearerAuth(PinotAdminClient adminClient)
       throws PinotAdminException {
-    System.out.println("=== Bearer Authentication Example ===");
+    LOGGER.info("=== Bearer Authentication Example ===");
 
     try {
       // Create a new schema
       String schemaConfig =
           "{\"schemaName\":\"exampleSchema\",\"dimensionFieldSpecs\":[{\"name\":\"id\",\"dataType\":\"INT\"}]}";
       String createResult = adminClient.getSchemaClient().createSchema(schemaConfig);
-      System.out.println("Schema creation: " + createResult);
+      LOGGER.info("Schema creation: {}", createResult);
 
       // Get instance information
       var liveInstances = adminClient.getInstanceClient().listLiveInstances();
-      System.out.println("Live instances: " + liveInstances);
+      LOGGER.info("Live instances: {}", liveInstances);
     } catch (PinotAdminAuthenticationException e) {
-      System.out.println("Authentication failed: " + e.getMessage());
+      LOGGER.error("Authentication failed", e);
     } catch (PinotAdminValidationException e) {
-      System.out.println("Validation failed: " + e.getMessage());
+      LOGGER.error("Validation failed", e);
     } catch (PinotAdminException e) {
-      System.out.println("Admin operation failed: " + e.getMessage());
+      LOGGER.error("Admin operation failed", e);
     }
   }
 }

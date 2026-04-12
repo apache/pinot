@@ -47,6 +47,7 @@ import org.apache.pinot.plugin.filesystem.ADLSGen2PinotFS;
 import org.apache.pinot.plugin.filesystem.AzurePinotFSUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -139,6 +140,34 @@ public class ADLSGen2PinotFSTest {
 
     // Verify that the filesystem client was set properly
     assertTrue(sasTokenFS != null);
+  }
+
+  @Test
+  public void testChecksumEnabledWithMd5DisabledFails() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("authenticationType", "SAS_TOKEN");
+    pinotConfiguration.setProperty("sasToken", "sp=rwdl&se=2025-12-31T23:59:59Z&sv=2022-11-02&sr=c&sig=test");
+    pinotConfiguration.setProperty("accountName", "testaccount");
+    pinotConfiguration.setProperty("fileSystemName", "testcontainer");
+    pinotConfiguration.setProperty("enableChecksum", "true");
+
+    ADLSGen2PinotFS adlsGen2PinotFs = new ADLSGen2PinotFS() {
+      @Override
+      public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient,
+          String fileSystemName) {
+        return _mockFileSystemClient;
+      }
+    };
+
+    try {
+      PinotMd5Mode.setPinotMd5Disabled(true);
+      IllegalStateException exception =
+          expectThrows(IllegalStateException.class, () -> adlsGen2PinotFs.init(pinotConfiguration));
+      assertTrue(exception.getMessage().contains("pinot.md5.disabled"));
+      assertTrue(exception.getMessage().contains("enableChecksum"));
+    } finally {
+      PinotMd5Mode.setPinotMd5Disabled(false);
+    }
   }
 
   @Test(expectedExceptions = NullPointerException.class)

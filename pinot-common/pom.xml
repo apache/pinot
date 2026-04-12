@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-common</artifactId>
   <name>Pinot Common</name>
@@ -46,7 +46,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration  combine.children="override">
+        <configuration combine.children="override">
           <forkCount>1</forkCount>
           <reuseForks>true</reuseForks>
           <properties>
@@ -119,7 +119,13 @@
   <dependencies>
     <dependency>
       <groupId>io.prometheus.jmx</groupId>
-      <artifactId>jmx_prometheus_javaagent</artifactId>
+      <artifactId>collector</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-exporter-httpserver</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -203,7 +209,7 @@
       <artifactId>zstd-jni</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.lz4</groupId>
+      <groupId>at.yawk.lz4</groupId>
       <artifactId>lz4-java</artifactId>
     </dependency>
     <dependency>
@@ -398,7 +404,7 @@
       <id>sqlparser</id>
       <activation>
         <file>
-          <missing>${project.build.directory}/generated-sources/javacc/Parser.jj</missing>
+          <missing>${basedir}/target/generated-sources/javacc/Parser.jj</missing>
         </file>
       </activation>
       <build>
@@ -417,10 +423,8 @@
                 </goals>
                 <configuration>
                   <target name="generate-code">
-                    <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath"/>
-                    <fmpp configuration="src/main/codegen/config.fmpp"
-                        sourceRoot="src/main/codegen/templates"
-                        outputRoot="${project.build.directory}/generated-sources/"/>
+                    <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath" />
+                    <fmpp configuration="src/main/codegen/config.fmpp" sourceRoot="src/main/codegen/templates" outputRoot="${project.build.directory}/generated-sources/" />
                   </target>
                 </configuration>
               </execution>

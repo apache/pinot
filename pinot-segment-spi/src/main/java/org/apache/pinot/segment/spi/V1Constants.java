@@ -46,7 +46,9 @@ public class V1Constants {
     public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
     public static final String BITMAP_RANGE_INDEX_FILE_EXTENSION = ".bitmap.range";
     public static final String JSON_INDEX_FILE_EXTENSION = ".json.idx";
-    public static final String NATIVE_TEXT_INDEX_FILE_EXTENSION = ".nativetext.idx";
+    /** @deprecated Legacy native text index file extension kept only for cleanup and migration logic. */
+    @Deprecated
+    public static final String DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION = ".nativetext.idx";
     public static final String H3_INDEX_FILE_EXTENSION = ".h3.idx";
     public static final String BLOOM_FILTER_FILE_EXTENSION = ".bloom";
     public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
@@ -69,6 +71,8 @@ public class V1Constants {
     public static final String VECTOR_V912_INDEX_FILE_EXTENSION = ".vector.v912.index";
     public static final String VECTOR_V912_HNSW_INDEX_FILE_EXTENSION = ".vector.v912.hnsw.index";
     public static final String VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".vector.hnsw.mapping";
+    public static final String VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION = ".vector.ivfflat.index";
+    public static final String VECTOR_IVF_PQ_INDEX_FILE_EXTENSION = ".vector.ivfpq.index";
   }
 
   public static class MetadataKeys {

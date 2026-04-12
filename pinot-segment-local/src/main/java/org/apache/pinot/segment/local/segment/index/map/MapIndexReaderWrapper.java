@@ -58,7 +58,7 @@ public class MapIndexReaderWrapper implements org.apache.pinot.segment.spi.index
 
   @Override
   public FieldSpec.DataType getKeyStoredType(String key) {
-    return _mapFieldSpec.getValueFieldSpec().getDataType();
+    return _mapFieldSpec.getValueFieldSpec().getDataType().getStoredType();
   }
 
   @Override

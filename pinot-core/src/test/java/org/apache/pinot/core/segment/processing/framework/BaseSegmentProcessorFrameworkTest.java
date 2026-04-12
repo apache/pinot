@@ -80,6 +80,7 @@ public abstract class BaseSegmentProcessorFrameworkTest {
   protected List<File> _multiValueSegments;
 
   protected TableConfig _tableConfig;
+  protected TableConfig _tableConfigWithComplexType;
   protected TableConfig _tableConfigWithoutTimeColumn;
   protected TableConfig _tableConfigNullValueEnabled;
   protected TableConfig _tableConfigSegmentNameGeneratorEnabled;
@@ -126,6 +127,14 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     _tableConfigWithFixedSegmentName =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
     _tableConfigWithFixedSegmentName.getIndexingConfig().setSegmentNameGeneratorType("fixed");
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    List<String> fieldsToUnnest = new ArrayList<>();
+    fieldsToUnnest.add("targetusers");
+    ingestionConfig.setComplexTypeConfig(
+        new ComplexTypeConfig(fieldsToUnnest, ".", null, null));
+    _tableConfigWithComplexType = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTableComplex")
+        .setTimeColumnName("time").setIngestionConfig(ingestionConfig).build();
 
     _schema =
         new Schema.SchemaBuilder().setSchemaName("mySchema")
@@ -237,20 +246,12 @@ public abstract class BaseSegmentProcessorFrameworkTest {
 
     List<GenericRow> inputRows = List.of(genericRow);
 
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    List<String> fieldsToUnnest = new ArrayList<>();
-    fieldsToUnnest.add("targetusers");
-
-    ingestionConfig.setComplexTypeConfig(
-        new ComplexTypeConfig(fieldsToUnnest, ".", null, null));
-    _tableConfig.setIngestionConfig(ingestionConfig);
-
     // Create a segment with this data
     File complexTypeInputDir = new File(TEMP_DIR, "complex_type_input");
     FileUtils.forceMkdir(complexTypeInputDir);
     RecordReader recordReader = new GenericRowRecordReader(inputRows);
     SegmentGeneratorConfig segmentGeneratorConfig =
-        new SegmentGeneratorConfig(_tableConfig, _schemaWithComplexType);
+        new SegmentGeneratorConfig(_tableConfigWithComplexType, _schemaWithComplexType);
     segmentGeneratorConfig.setOutDir(complexTypeInputDir.getPath());
     segmentGeneratorConfig.setSequenceId(0);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -259,8 +260,8 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     List<File> segmentDirs = List.of(driver.getOutputDirectory());
 
     // Default configs
-    SegmentProcessorConfig config =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schemaWithComplexType).build();
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder()
+        .setTableConfig(_tableConfigWithComplexType).setSchema(_schemaWithComplexType).build();
 
     List<File> outputSegments = processSegments(segmentDirs, config, workingDir);
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);

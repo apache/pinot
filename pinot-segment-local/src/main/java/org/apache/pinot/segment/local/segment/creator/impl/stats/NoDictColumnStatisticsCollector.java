@@ -19,11 +19,11 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
+import com.google.common.base.Utf8;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.commons.lang3.NotImplementedException;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Column statistics collector for no-dictionary columns that avoids storing unique values and thus reduces memory
  * Behavior:
- * - getUniqueValuesSet() throws NotImplementedException
+ * - getUniqueValuesSet() returns null
  * - getCardinality() returns approximate cardinality using HLL++
  * - Doesn't handle cases where values are of different types (e.g. int and long). This is expected.
  *   Individual type collectors (e.g. IntColumnPreIndexStatsCollector) also don't handle this case.
@@ -171,7 +171,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       return ((byte[]) value).length;
     }
     if (value instanceof CharSequence) {
-      return ((CharSequence) value).toString().getBytes(StandardCharsets.UTF_8).length;
+      return Utf8.encodedLength((CharSequence) value);
     }
     if (value instanceof BigDecimal) {
       return BigDecimalUtils.byteSize((BigDecimal) value);
@@ -198,9 +198,10 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
     throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
 
+  @Nullable
   @Override
   public Object getUniqueValuesSet() {
-    throw new NotImplementedException("getUniqueValuesSet is not supported in NoDictColumnStatisticsCollector");
+    return null;
   }
 
   @Override

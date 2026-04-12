@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.vector;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Document;
@@ -33,9 +34,11 @@ import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.XKnnFloatVectorField;
 import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.VectorIndexConfigProvider;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
@@ -49,12 +52,15 @@ import org.slf4j.LoggerFactory;
  * Since there is no good mutable vector index implementation for topK search, we just do brute force search.
  * <p>This class is thread-safe for single writer multiple readers.
  */
-public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
+public class MutableVectorIndex implements VectorIndexReader, MutableIndex, VectorIndexConfigProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableVectorIndex.class);
+  private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
+      RealtimeLuceneTextIndexSearcherPool.getInstance();
   public static final String VECTOR_INDEX_DOC_ID_COLUMN_NAME = "DocID";
   public static final long DEFAULT_COMMIT_INTERVAL_MS = 10_000L;
   public static final long DEFAULT_COMMIT_DOCS = 1000L;
   private final int _vectorDimension;
+  private final VectorIndexConfig _vectorIndexConfig;
   private final VectorSimilarityFunction _vectorSimilarityFunction;
   private final IndexWriter _indexWriter;
   private final String _vectorColumn;
@@ -70,6 +76,7 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
 
   public MutableVectorIndex(String segmentName, String vectorColumn, VectorIndexConfig vectorIndexConfig) {
     _vectorColumn = vectorColumn;
+    _vectorIndexConfig = vectorIndexConfig;
     _vectorDimension = vectorIndexConfig.getVectorDimension();
     _segmentName = segmentName;
     _commitIntervalMs = Long.parseLong(
@@ -125,16 +132,35 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
 
   @Override
   public MutableRoaringBitmap getDocIds(float[] vector, int topK) {
-    MutableRoaringBitmap docIds;
+    // Search is executed in SEARCHER_POOL which is wrapped with contextAwareExecutorService(executor, false).
+    // This propagates QueryThreadContext for CPU/memory tracking without registering the task for cancellation,
+    // preventing Thread.interrupt() during Lucene search which could corrupt FSDirectory.
+    // See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
+    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(
+        () -> executeVectorSearch(vector, topK));
     try {
-      IndexSearcher indexSearcher = new IndexSearcher(DirectoryReader.open(_indexDirectory));
-      Query query = new KnnFloatVectorQuery(_vectorColumn, vector, topK);
-      docIds = new MutableRoaringBitmap();
-      TopDocs search = indexSearcher.search(query, topK);
-      Arrays.stream(search.scoreDocs).map(scoreDoc -> scoreDoc.doc).forEach(docIds::add);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+      return searchFuture.get();
+    } catch (InterruptedException e) {
+      searchFuture.cancel(false);
+      throw new RuntimeException("VECTOR_SIMILARITY query interrupted for segment " + _segmentName
+          + " column " + _vectorColumn, e);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed while searching vector index for segment " + _segmentName
+          + " column " + _vectorColumn, e);
     }
+  }
+
+  @Override
+  public VectorIndexConfig getVectorIndexConfig() {
+    return _vectorIndexConfig;
+  }
+
+  private MutableRoaringBitmap executeVectorSearch(float[] vector, int topK) throws IOException {
+    IndexSearcher indexSearcher = new IndexSearcher(DirectoryReader.open(_indexDirectory));
+    Query query = new KnnFloatVectorQuery(_vectorColumn, vector, topK);
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    TopDocs search = indexSearcher.search(query, topK);
+    Arrays.stream(search.scoreDocs).map(scoreDoc -> scoreDoc.doc).forEach(docIds::add);
     return docIds;
   }
 

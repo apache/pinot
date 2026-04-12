@@ -171,4 +171,42 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
             + "limit 4",
         new Object[][]{{15, Long.MAX_VALUE}, {16, Long.MIN_VALUE}, {17, -100L}, {18, 1000L}});
   }
+
+  @Test
+  public void testNullAsDefaultValueWithNullHandlingDisabled() {
+    checkResult(
+        "SET enableNullHandling=false;"
+            + "SELECT intColumn, jsonextractscalar(" + JSON_COLUMN + ", '$.longVal', 'long', null) "
+            + "FROM testTable "
+            + "where intColumn >= 15 and intColumn <= 19 "
+            + "group by 1, 2 "
+            + "order by 1, 2 ",
+        new Object[][]{
+            {15, Long.MAX_VALUE},
+            {16, Long.MIN_VALUE},
+            {17, -100L},
+            {18, 1000L},
+            {19, 0L} // when enableNullHandling is false, null is treated as 0 for LONG type
+        }
+    );
+  }
+
+  @Test
+  public void testNullAsDefaultValueWithNullHandlingEnabled() {
+    checkResult(
+        "SET enableNullHandling=true;"
+            + "SELECT intColumn, jsonextractscalar(" + JSON_COLUMN + ", '$.longVal', 'long', null) "
+            + "FROM testTable "
+            + "where intColumn >= 15 and intColumn <= 19 "
+            + "group by 1, 2 "
+            + "order by 1, 2 ",
+        new Object[][]{
+            {15, Long.MAX_VALUE},
+            {16, Long.MIN_VALUE},
+            {17, -100L},
+            {18, 1000L},
+            {19, null} // when enableNullHandling is true, null is treated as null
+        }
+    );
+  }
 }

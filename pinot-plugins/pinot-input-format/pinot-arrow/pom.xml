@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-arrow</artifactId>
@@ -39,27 +39,22 @@
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-compression</artifactId>
-      <version>${arrow.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-format</artifactId>
-      <version>${arrow.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-memory-core</artifactId>
-      <version>${arrow.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-memory-netty</artifactId>
-      <version>${arrow.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.arrow</groupId>
       <artifactId>arrow-vector</artifactId>
-      <version>${arrow.version}</version>
     </dependency>
   </dependencies>
 

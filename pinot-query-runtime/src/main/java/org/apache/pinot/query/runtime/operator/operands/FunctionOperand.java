@@ -41,6 +41,7 @@ public class FunctionOperand implements TransformOperand {
   private final ColumnDataType _resultType;
   private final QueryFunctionInvoker _functionInvoker;
   private final ColumnDataType _functionInvokerResultType;
+  private final boolean _needsConversion;
   private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
 
@@ -78,10 +79,24 @@ public class FunctionOperand implements TransformOperand {
     if (!_functionInvoker.getMethod().isVarArgs()) {
       Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
       PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
+      boolean needsConversion = false;
       for (int i = 0; i < numOperands; i++) {
         Preconditions.checkState(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
             parameterClasses[i], functionInfo.getMethod());
+        if (!needsConversion) {
+          // For array-typed parameters, always require conversion: the runtime Java class may
+          // differ from the canonical stored type (e.g. Double[] vs double[] after DataBlock
+          // deserialization in the multi-stage engine), and Method.invoke does not autobox arrays.
+          ColumnDataType parameterColumnType = FunctionUtils.getColumnDataType(parameterClasses[i]);
+          if (parameterColumnType == null || argumentTypes[i] != parameterColumnType
+              || parameterClasses[i].isArray()) {
+            needsConversion = true;
+          }
+        }
       }
+      _needsConversion = needsConversion;
+    } else {
+      _needsConversion = false;
     }
     ColumnDataType functionInvokerResultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
     // Handle unrecognized result class with STRING
@@ -106,12 +121,13 @@ public class FunctionOperand implements TransformOperand {
       Object value = operand.apply(row);
       _reusableOperandHolder[i] = value != null ? operand.getResultType().toExternal(value) : null;
     }
-    // TODO: Optimize per record conversion
     Object result;
     if (_functionInvoker.getMethod().isVarArgs()) {
       result = _functionInvoker.invoke(new Object[]{_reusableOperandHolder});
     } else {
-      _functionInvoker.convertTypes(_reusableOperandHolder);
+      if (_needsConversion) {
+        _functionInvoker.convertTypes(_reusableOperandHolder);
+      }
       result = _functionInvoker.invoke(_reusableOperandHolder);
     }
     return result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),

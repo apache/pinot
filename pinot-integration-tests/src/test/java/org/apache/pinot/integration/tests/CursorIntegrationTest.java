@@ -94,7 +94,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
-    getControllerRequestClient().addSchema(schema);
+    addSchema(schema);
     TableConfig offlineTableConfig = createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
 
@@ -420,6 +420,6 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
         LOGGER.error(e.getMessage());
         return false;
       }
-    }, 500L, 100_000L, "Failed to load delete query results", true);
+    }, 500L, 100_000L, "Failed to load delete query results");
   }
 }

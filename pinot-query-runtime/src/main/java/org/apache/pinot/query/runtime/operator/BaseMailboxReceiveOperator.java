@@ -34,6 +34,7 @@ import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
 import org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -72,8 +73,9 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
       List<ReadMailboxAsyncStream> asyncStreams = new ArrayList<>(numMailboxes);
       _receivingStats = new ArrayList<>(numMailboxes);
       for (String mailboxId : _mailboxIds) {
-        ReadMailboxAsyncStream asyncStream =
-            new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this);
+        ReceivingMailbox receivingMailbox = _mailboxService.getReceivingMailbox(mailboxId);
+        receivingMailbox.registerReceiveOperatorThreadContext(QueryThreadContext.getIfAvailable());
+        ReadMailboxAsyncStream asyncStream = new ReadMailboxAsyncStream(receivingMailbox, this);
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());
       }

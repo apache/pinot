@@ -84,6 +84,15 @@ public interface RoutingManager {
   List<String> getSegments(BrokerRequest brokerRequest);
 
   /**
+   * Returns the segments that are relevant for the given broker request and optional sampler name.
+   * Returns {@code null} if the table does not exist.
+   */
+  @Nullable
+  default List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
+    return getSegments(brokerRequest);
+  }
+
+  /**
    * Validate routing exist for a table
    *
    * @param tableNameWithType the name of the table.

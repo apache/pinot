@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
@@ -97,6 +98,11 @@ public class InMemoryColumnReader implements ColumnReader {
   }
 
   @Override
+  public boolean isBigDecimal() {
+    return _dataType == BigDecimal.class;
+  }
+
+  @Override
   public boolean isString() {
     return _dataType == String.class;
   }
@@ -124,6 +130,11 @@ public class InMemoryColumnReader implements ColumnReader {
   @Override
   public double nextDouble() {
     return (Double) next();
+  }
+
+  @Override
+  public BigDecimal nextBigDecimal() {
+    return (BigDecimal) next();
   }
 
   @Override
@@ -204,6 +215,11 @@ public class InMemoryColumnReader implements ColumnReader {
   @Override
   public double getDouble(int docId) {
     return (Double) _values[docId];
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int docId) {
+    return (BigDecimal) _values[docId];
   }
 
   @Override

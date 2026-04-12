@@ -266,7 +266,7 @@ public class QueryLoggerTest {
         .thenAnswer(invocation -> {
           // this one will unblock the tryAcquire, but only after
           // the first thread has reached _droppedRateLimiter#tryAcquire()
-          logLatch.await();
+          logLatch.await(5, TimeUnit.SECONDS);
           return true;
         });
 
@@ -275,8 +275,7 @@ public class QueryLoggerTest {
     final CountDownLatch dropLogLatch = new CountDownLatch(3);
     Mockito.when(_droppedRateLimiter.tryAcquire()).thenAnswer(invocation -> {
       logLatch.countDown();
-      dropLogLatch.await();
-      return true;
+      return dropLogLatch.await(5, TimeUnit.SECONDS);
     }).thenReturn(true);
 
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);

@@ -19,9 +19,10 @@
 package org.apache.pinot.segment.local.segment.readers;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
 
@@ -40,13 +41,10 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   private final PinotSegmentColumnReader _segmentColumnReader;
   private final String _columnName;
   private final int _numDocs;
-  private final FieldSpec.DataType _dataType;
+  private final DataType _dataType;
   private final boolean _skipDefaultNullValues;
 
-  private int _currentIndex;
-
-  // Reusable variables to avoid garbage collection on every next() call
-  private Object _reuseValue;
+  private int _nextDocId;
 
   /**
    * Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
@@ -87,18 +85,17 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
    *                              the segment's stored value (which contains the default).
    */
   public PinotSegmentColumnReaderImpl(PinotSegmentColumnReader segmentColumnReader, String columnName,
-      int numDocs, FieldSpec.DataType dataType, boolean skipDefaultNullValues) {
+      int numDocs, DataType dataType, boolean skipDefaultNullValues) {
     _segmentColumnReader = segmentColumnReader;
     _columnName = columnName;
     _numDocs = numDocs;
     _dataType = dataType;
-    _currentIndex = 0;
     _skipDefaultNullValues = skipDefaultNullValues;
   }
 
   @Override
   public boolean hasNext() {
-    return _currentIndex < _numDocs;
+    return _nextDocId < _numDocs;
   }
 
   @Override
@@ -110,19 +107,12 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     }
 
     // Return null if the value is null and skipDefaultNullValues is true
-    if (_skipDefaultNullValues && _segmentColumnReader.isNull(_currentIndex)) {
-      _currentIndex++;
-      return null;
-    }
-    _reuseValue = _segmentColumnReader.getValue(_currentIndex);
-    _currentIndex++;
-
-    // Return null if the value is null
-    if (_reuseValue == null) {
+    if (_skipDefaultNullValues && _segmentColumnReader.isNull(_nextDocId)) {
+      _nextDocId++;
       return null;
     }
 
-    return _reuseValue;
+    return _segmentColumnReader.getValue(_nextDocId++);
   }
 
   @Override
@@ -130,7 +120,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    return _segmentColumnReader.isNull(_currentIndex);
+    return _segmentColumnReader.isNull(_nextDocId);
   }
 
   @Override
@@ -138,7 +128,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    _currentIndex++;
+    _nextDocId++;
   }
 
   @Override
@@ -148,32 +138,37 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
 
   @Override
   public boolean isInt() {
-    return _dataType == FieldSpec.DataType.INT;
+    return _dataType == DataType.INT;
   }
 
   @Override
   public boolean isLong() {
-    return _dataType == FieldSpec.DataType.LONG;
+    return _dataType == DataType.LONG;
   }
 
   @Override
   public boolean isFloat() {
-    return _dataType == FieldSpec.DataType.FLOAT;
+    return _dataType == DataType.FLOAT;
   }
 
   @Override
   public boolean isDouble() {
-    return _dataType == FieldSpec.DataType.DOUBLE;
+    return _dataType == DataType.DOUBLE;
+  }
+
+  @Override
+  public boolean isBigDecimal() {
+    return _dataType == DataType.BIG_DECIMAL;
   }
 
   @Override
   public boolean isString() {
-    return _dataType == FieldSpec.DataType.STRING;
+    return _dataType == DataType.STRING;
   }
 
   @Override
   public boolean isBytes() {
-    return _dataType == FieldSpec.DataType.BYTES;
+    return _dataType == DataType.BYTES;
   }
 
   @Override
@@ -181,9 +176,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    int value = _segmentColumnReader.getInt(_currentIndex);
-    _currentIndex++;
-    return value;
+    return _segmentColumnReader.getInt(_nextDocId++);
   }
 
   @Override
@@ -191,9 +184,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    long value = _segmentColumnReader.getLong(_currentIndex);
-    _currentIndex++;
-    return value;
+    return _segmentColumnReader.getLong(_nextDocId++);
   }
 
   @Override
@@ -201,9 +192,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    float value = _segmentColumnReader.getFloat(_currentIndex);
-    _currentIndex++;
-    return value;
+    return _segmentColumnReader.getFloat(_nextDocId++);
   }
 
   @Override
@@ -211,9 +200,15 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    double value = _segmentColumnReader.getDouble(_currentIndex);
-    _currentIndex++;
-    return value;
+    return _segmentColumnReader.getDouble(_nextDocId++);
+  }
+
+  @Override
+  public BigDecimal nextBigDecimal() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    return _segmentColumnReader.getBigDecimal(_nextDocId++);
   }
 
   @Override
@@ -221,9 +216,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    String value = _segmentColumnReader.getString(_currentIndex);
-    _currentIndex++;
-    return value;
+    return _segmentColumnReader.getString(_nextDocId++);
   }
 
   @Override
@@ -231,9 +224,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    byte[] value = _segmentColumnReader.getBytes(_currentIndex);
-    _currentIndex++;
-    return value;
+    return _segmentColumnReader.getBytes(_nextDocId++);
   }
 
   // For all multi-value primitive type methods (nextIntMV, nextLongMV, nextFloatMV, nextDoubleMV,
@@ -244,9 +235,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    int[] value = _segmentColumnReader.getIntMV(_currentIndex);
-    _currentIndex++;
-    return MultiValueResult.of(value, null);
+    return MultiValueResult.of(_segmentColumnReader.getIntMV(_nextDocId++), null);
   }
 
   @Override
@@ -254,9 +243,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    long[] value = _segmentColumnReader.getLongMV(_currentIndex);
-    _currentIndex++;
-    return MultiValueResult.of(value, null);
+    return MultiValueResult.of(_segmentColumnReader.getLongMV(_nextDocId++), null);
   }
 
   @Override
@@ -264,9 +251,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    float[] value = _segmentColumnReader.getFloatMV(_currentIndex);
-    _currentIndex++;
-    return MultiValueResult.of(value, null);
+    return MultiValueResult.of(_segmentColumnReader.getFloatMV(_nextDocId++), null);
   }
 
   @Override
@@ -274,9 +259,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    double[] value = _segmentColumnReader.getDoubleMV(_currentIndex);
-    _currentIndex++;
-    return MultiValueResult.of(value, null);
+    return MultiValueResult.of(_segmentColumnReader.getDoubleMV(_nextDocId++), null);
   }
 
   @Override
@@ -284,9 +267,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    String[] value = _segmentColumnReader.getStringMV(_currentIndex);
-    _currentIndex++;
-    return value;
+    return _segmentColumnReader.getStringMV(_nextDocId++);
   }
 
   @Override
@@ -294,16 +275,13 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
     }
-    byte[][] value = _segmentColumnReader.getBytesMV(_currentIndex);
-    _currentIndex++;
-    return value;
+    return _segmentColumnReader.getBytesMV(_nextDocId++);
   }
 
   @Override
   public void rewind()
       throws IOException {
-    _currentIndex = 0;
-    _reuseValue = null;
+    _nextDocId = 0;
   }
 
   @Override
@@ -342,6 +320,11 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   @Override
   public double getDouble(int docId) {
     return _segmentColumnReader.getDouble(docId);
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int docId) {
+    return _segmentColumnReader.getBigDecimal(docId);
   }
 
   @Override

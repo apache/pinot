@@ -70,10 +70,10 @@ public class PinotConfigUtils {
         : TMP_DIR + String.format("Controller_%s_%s/controller/data", controllerHost, controllerPort));
     properties.put(ControllerConf.CONTROLLER_VIP_HOST, controllerHost);
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, tenantIsolation);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_RETENTION_MANAGER_FREQUENCY_IN_SECONDS, 3600 * 6);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS, 3600);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, 3600);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, 3600);
+    properties.put(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_PERIOD, "6h");
+    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD, "1h");
+    properties.put(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD, "1h");
+    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD, "1h");
     properties.put(ControllerConf.CONTROLLER_MODE, controllerMode.toString());
 
     return properties;
@@ -99,6 +99,7 @@ public class PinotConfigUtils {
       return null;
     }
 
+    CommonsConfigurationUtils.validateNoDuplicateKeys(configFile);
     Configurations configs = new Configurations();
     Map<String, Object> properties = CommonsConfigurationUtils.toMap(configs.properties(configFile));
     ControllerConf conf = new ControllerConf(properties);
@@ -144,10 +145,10 @@ public class PinotConfigUtils {
     }
     File configFile = new File(configFileName);
     if (configFile.exists()) {
+      CommonsConfigurationUtils.validateNoDuplicateKeys(configFile);
       Configurations configs = new Configurations();
       return CommonsConfigurationUtils.toMap(configs.properties(configFile));
     }
-
     return null;
   }
 

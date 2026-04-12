@@ -18,11 +18,19 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import com.google.common.base.Preconditions;
+import java.io.IOException;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -33,6 +41,14 @@ public class OfflineTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doInit() {
+    Pair<TableConfig, Schema> tableConfigAndSchema = getCachedTableConfigAndSchema();
+    TableConfig tableConfig = tableConfigAndSchema.getLeft();
+    Schema schema = tableConfigAndSchema.getRight();
+    if (tableConfig.isUpsertEnabled()) {
+      _tableUpsertMetadataManager =
+          TableUpsertMetadataManagerFactory.create(_instanceDataManagerConfig.getUpsertConfig(), tableConfig, schema,
+              this, _segmentOperationsThrottlerSet);
+    }
   }
 
   @Override
@@ -41,7 +57,17 @@ public class OfflineTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doShutdown() {
+    if (_tableUpsertMetadataManager != null) {
+      _tableUpsertMetadataManager.stop();
+    }
     releaseAndRemoveAllSegments();
+    if (_tableUpsertMetadataManager != null) {
+      try {
+        _tableUpsertMetadataManager.close();
+      } catch (IOException e) {
+        _logger.warn("Caught exception while closing upsert metadata manager", e);
+      }
+    }
   }
 
   protected void doAddOnlineSegment(String segmentName)
@@ -55,6 +81,19 @@ public class OfflineTableDataManager extends BaseTableDataManager {
     } else {
       replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
     }
+  }
+
+  @Override
+  public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
+    String segmentName = immutableSegment.getSegmentName();
+    Preconditions.checkState(!_shutDown,
+        "Table data manager is already shut down, cannot add segment: %s to table: %s",
+        segmentName, _tableNameWithType);
+    if (isUpsertEnabled()) {
+      handleUpsert(immutableSegment, zkMetadata);
+      return;
+    }
+    super.addSegment(immutableSegment, zkMetadata);
   }
 
   @Override

@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
@@ -99,14 +100,16 @@ public class ProtoBufRecordReader implements RecordReader {
   public GenericRow next(GenericRow reuse)
       throws IOException {
     Message message;
+    // Record fetch: read next protobuf message from stream.
     try {
       _builder.mergeDelimitedFrom(_inputStream);
       message = _builder.build();
     } catch (Exception e) {
-      throw new IOException("Caught exception while reading protobuf object", e);
+      throw new RecordFetchException("Caught exception while reading protobuf object", e);
     } finally {
       _builder.clear();
     }
+    // Data parsing: extract into GenericRow.
     _recordExtractor.extract(message, reuse);
     _hasNext = hasMoreToRead();
     return reuse;

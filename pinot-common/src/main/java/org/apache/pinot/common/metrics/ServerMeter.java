@@ -123,6 +123,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+  NETTY_CONNECTION_SEND_RESPONSE_FAILURES("nettyConnection", true),
 
   // GRPC related metrics
   GRPC_QUERIES("grpcQueries", true),
@@ -140,6 +141,13 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RESPONSE_SER_MEM_ALLOCATED_BYTES("bytes", false),
   TOTAL_MEM_ALLOCATED_BYTES("bytes", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
+  /**
+   * Size of the initially serialized query response in bytes.
+   * Note: This may differ from the final response actually sent to the broker if the response
+   * is later replaced (for example, when exceeding the configured max response size).
+   */
+  QUERY_RESPONSE_SIZE("bytes", false,
+      "Size of the initially serialized query response in bytes (may differ from final response sent to broker)"),
 
   GRPC_MEMORY_REJECTIONS("rejections", true, "Number of grpc requests rejected due to memory pressure"),
 

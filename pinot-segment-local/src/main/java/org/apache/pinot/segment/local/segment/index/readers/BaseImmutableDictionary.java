@@ -278,6 +278,14 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     return _valueReader.getBytes(dictId, _numBytesPerValue);
   }
 
+  protected int getUnpaddedByteSize(int dictId) {
+    return _valueReader.getUnpaddedByteSize(dictId, _numBytesPerValue);
+  }
+
+  protected int getByteSize(int dictId) {
+    return _valueReader.getByteSize(dictId, _numBytesPerValue);
+  }
+
   public int get32BitsMurmur3Hash(int dictId, byte[] buffer) {
     return _valueReader.get32BitsMurmur3Hash(dictId, _numBytesPerValue, buffer);
   }
