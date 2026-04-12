@@ -186,9 +186,7 @@ public class BenchmarkTextMatchQueriesSSQE extends BaseQueriesTest {
       private final String _namePrefix;
 
       {
-        @SuppressWarnings("removal")
-        SecurityManager s = System.getSecurityManager();
-        _group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
+        _group = Thread.currentThread().getThreadGroup();
         _namePrefix = "thread-";
       }
 
