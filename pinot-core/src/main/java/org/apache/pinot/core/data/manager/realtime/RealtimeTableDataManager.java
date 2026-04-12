@@ -310,7 +310,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param segmentName                      name of the consuming segment
    * @param partitionId                      partition id of the consuming segment (directly passed in to avoid parsing
    *                                         the segment name)
-   * @param streamTopicName                  stream topic for this consumer (e.g. Kafka topic); used for ingestion 
+   * @param streamTopicName                  stream topic for this consumer (e.g. Kafka topic); used for ingestion
    *                                         delay metric labels
    * @param ingestionTimeMs                  ingestion time of the last consumed message (from
    *                                         {@link StreamMessageMetadata})
