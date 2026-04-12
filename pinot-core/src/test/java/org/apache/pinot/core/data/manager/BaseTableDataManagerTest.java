@@ -1094,7 +1094,7 @@ public class BaseTableDataManagerTest {
       return indexLoadingConfig;
     }
   }
-  
+
   private static OfflineTableDataManagerForParallelReloadTest createParallelReloadTestTableManager() {
     OfflineTableDataManagerForParallelReloadTest tableDataManager = new OfflineTableDataManagerForParallelReloadTest();
     tableDataManager.init(createDefaultInstanceDataManagerConfig(), mock(HelixManager.class), new SegmentLocks(),
