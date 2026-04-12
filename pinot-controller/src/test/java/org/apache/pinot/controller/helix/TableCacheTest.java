@@ -218,7 +218,8 @@ public class TableCacheTest {
     logicalTableConfig = ControllerTest.getDummyLogicalTableConfig(LOGICAL_TABLE_NAME,
         List.of(OFFLINE_TABLE_NAME, ANOTHER_TABLE_OFFLINE), "DefaultTenant");
     logicalTableConfig.setQueryConfig(new QueryConfig(
-        1L, false, false, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), 1L, 1L
+        1L, false, false, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), 1L, 1L,
+        null, null, null
     ));
     TEST_INSTANCE.getHelixResourceManager().updateLogicalTableConfig(logicalTableConfig);
     TestUtils.waitForCondition(

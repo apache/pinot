@@ -456,7 +456,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   @Test
   public void testDisableGroovyQueryTableConfigOverride()
       throws Exception {
-    QueryConfig queryConfig = new QueryConfig(null, false, null, null, null, null);
+    QueryConfig queryConfig = new QueryConfig(null, false, null, null, null, null, null, null, null);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
@@ -468,7 +468,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     postQuery(groovyQuery);
 
     // Disable groovy explicitly
-    queryConfig = new QueryConfig(null, true, null, null, null, null);
+    queryConfig = new QueryConfig(null, true, null, null, null, null, null, null, null);
 
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
@@ -490,7 +490,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       throws Exception {
     String starQuery = "SELECT * from mytable";
 
-    QueryConfig queryConfig = new QueryConfig(null, null, null, null, 100L, null);
+    QueryConfig queryConfig = new QueryConfig(null, null, null, null, 100L, null, null, null, null);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
@@ -501,7 +501,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
         && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId());
 
     // Query Succeeds with a high limit.
-    queryConfig = new QueryConfig(null, null, null, null, 1000000L, null);
+    queryConfig = new QueryConfig(null, null, null, null, 1000000L, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
@@ -509,7 +509,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
 
     //Reset to null.
-    queryConfig = new QueryConfig(null, null, null, null, null, null);
+    queryConfig = new QueryConfig(null, null, null, null, null, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
@@ -522,7 +522,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       throws Exception {
     String starQuery = "SELECT * from mytable";
 
-    QueryConfig queryConfig = new QueryConfig(null, null, null, null, null, 1000L);
+    QueryConfig queryConfig = new QueryConfig(null, null, null, null, null, 1000L, null, null, null);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
@@ -532,7 +532,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
         && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId());
 
     // Query Succeeds with a high limit.
-    queryConfig = new QueryConfig(null, null, null, null, null, 1000000L);
+    queryConfig = new QueryConfig(null, null, null, null, null, 1000000L, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
@@ -540,7 +540,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
 
     //Reset to null.
-    queryConfig = new QueryConfig(null, null, null, null, null, null);
+    queryConfig = new QueryConfig(null, null, null, null, null, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
@@ -552,7 +552,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   public void testQueryTimeOut()
       throws Exception {
     String starQuery = "SELECT * from mytable";
-    QueryConfig queryConfig = new QueryConfig(1L, null, null, null, null, null);
+    QueryConfig queryConfig = new QueryConfig(1L, null, null, null, null, null, null, null, null);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
@@ -564,7 +564,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
             || exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.SERVER_NOT_RESPONDING.getId()));
 
     // Query Succeeds with a high limit.
-    queryConfig = new QueryConfig(1000000L, null, null, null, null, null);
+    queryConfig = new QueryConfig(1000000L, null, null, null, null, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
@@ -572,7 +572,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
 
     //Reset to null.
-    queryConfig = new QueryConfig(null, null, null, null, null, null);
+    queryConfig = new QueryConfig(null, null, null, null, null, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);

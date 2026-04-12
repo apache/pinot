@@ -371,7 +371,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     // Set timeout as 5ms so that query will timeout
     TableConfig tableConfig = createOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(5L, null, null, null, null, null));
+    tableConfig.setQueryConfig(new QueryConfig(5L, null, null, null, null, null, null, null, null));
     updateTableConfig(tableConfig);
 
     // Wait for at most 1 minute for broker to receive and process the table config refresh message
@@ -725,7 +725,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testMaxQueryResponseSizeTableConfig()
       throws Exception {
     TableConfig tableConfig = createOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, 1000L, null));
+    tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, 1000L, null, null, null, null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -757,7 +757,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testMaxServerResponseSizeTableConfig()
       throws Exception {
     TableConfig tableConfig = createOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, null, 1000L));
+    tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, null, 1000L, null, null, null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -789,7 +789,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testMaxResponseSizeTableConfigOrdering()
       throws Exception {
     TableConfig tableConfig = createOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, 1000000L, 1000L));
+    tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, 1000000L, 1000L, null, null, null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -2288,7 +2288,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Add expression override
     TableConfig tableConfig = createOfflineTableConfig();
     tableConfig.setQueryConfig(
-        new QueryConfig(null, null, null, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), null, null));
+        new QueryConfig(null, null, null, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), null, null,
+            null, null, null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {

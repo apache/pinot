@@ -20,11 +20,21 @@ package org.apache.pinot.core.accounting;
 
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class QueryMonitorConfig {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryMonitorConfig.class);
+
+  private static final Set<String> VALID_SCAN_KILLING_MODES = Set.of(
+      CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_DISABLED,
+      CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_LOG_ONLY,
+      CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_ENFORCE);
+
   private final long _maxHeapSize;
 
   // don't kill a query if its memory footprint is below some ratio of _maxHeapSize
@@ -65,6 +75,16 @@ public class QueryMonitorConfig {
   private final int _workloadSleepTimeMs;
 
   private final boolean _workloadCostEnforcementEnabled;
+
+  private final String _scanBasedKillingMode;
+
+  private final long _scanBasedKillingMaxEntriesScannedInFilter;
+
+  private final long _scanBasedKillingMaxDocsScanned;
+
+  private final long _scanBasedKillingMaxEntriesScannedPostFilter;
+
+  private final String _scanBasedKillingStrategyFactoryClassName;
 
   public QueryMonitorConfig(PinotConfiguration config, long maxHeapSize) {
     _maxHeapSize = maxHeapSize;
@@ -117,6 +137,22 @@ public class QueryMonitorConfig {
     _workloadCostEnforcementEnabled =
         config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
             CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
+
+    _scanBasedKillingMode = validateScanKillingMode(config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE,
+        CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MODE));
+    _scanBasedKillingMaxEntriesScannedInFilter = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER,
+        CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER);
+    _scanBasedKillingMaxDocsScanned = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED,
+        CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_DOCS_SCANNED);
+    _scanBasedKillingMaxEntriesScannedPostFilter = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER,
+        CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER);
+    _scanBasedKillingStrategyFactoryClassName = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME,
+        (String) null);
   }
 
   QueryMonitorConfig(QueryMonitorConfig oldConfig, Set<String> changedConfigs, Map<String, String> clusterConfigs) {
@@ -280,6 +316,72 @@ public class QueryMonitorConfig {
     } else {
       _workloadCostEnforcementEnabled = oldConfig._workloadCostEnforcementEnabled;
     }
+
+    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE)) {
+      _scanBasedKillingMode = validateScanKillingMode(clusterConfigs.getOrDefault(
+          CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE,
+          CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MODE));
+    } else {
+      _scanBasedKillingMode = oldConfig.getScanBasedKillingMode();
+    }
+
+    if (changedConfigs.contains(
+        CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER)) {
+      _scanBasedKillingMaxEntriesScannedInFilter = Long.parseLong(
+          clusterConfigs.getOrDefault(
+              CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER,
+              String.valueOf(
+                  CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER)));
+    } else {
+      _scanBasedKillingMaxEntriesScannedInFilter =
+          oldConfig.getScanBasedKillingMaxEntriesScannedInFilter();
+    }
+
+    if (changedConfigs.contains(
+        CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED)) {
+      _scanBasedKillingMaxDocsScanned = Long.parseLong(
+          clusterConfigs.getOrDefault(
+              CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED,
+              String.valueOf(CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_DOCS_SCANNED)));
+    } else {
+      _scanBasedKillingMaxDocsScanned = oldConfig.getScanBasedKillingMaxDocsScanned();
+    }
+
+    if (changedConfigs.contains(
+        CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER)) {
+      _scanBasedKillingMaxEntriesScannedPostFilter = Long.parseLong(
+          clusterConfigs.getOrDefault(
+              CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER,
+              String.valueOf(
+                  CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER)));
+    } else {
+      _scanBasedKillingMaxEntriesScannedPostFilter =
+          oldConfig.getScanBasedKillingMaxEntriesScannedPostFilter();
+    }
+
+    if (changedConfigs.contains(
+        CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME)) {
+      _scanBasedKillingStrategyFactoryClassName = clusterConfigs.getOrDefault(
+          CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME, null);
+    } else {
+      _scanBasedKillingStrategyFactoryClassName = oldConfig.getScanBasedKillingStrategyFactoryClassName();
+    }
+  }
+
+  /**
+   * Validates the scan-based killing mode. If the value is not one of the recognized modes
+   * (disabled, logOnly, enforce), logs an error and falls back to "disabled" so the server
+   * continues to start normally.
+   */
+  private static String validateScanKillingMode(String mode) {
+    if (VALID_SCAN_KILLING_MODES.contains(mode)) {
+      return mode;
+    }
+    LOGGER.error("Invalid value '{}' for config '{}'. Valid values are: {}. "
+            + "Defaulting to '{}'. Scan-based killing will be disabled.",
+        mode, CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE,
+        VALID_SCAN_KILLING_MODES, CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_DISABLED);
+    return CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_DISABLED;
   }
 
   public long getMaxHeapSize() {
@@ -336,5 +438,34 @@ public class QueryMonitorConfig {
 
   public boolean isWorkloadCostEnforcementEnabled() {
     return _workloadCostEnforcementEnabled;
+  }
+
+  public String getScanBasedKillingMode() {
+    return _scanBasedKillingMode;
+  }
+
+  public boolean isScanBasedKillingEnabled() {
+    return !CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_DISABLED.equals(_scanBasedKillingMode);
+  }
+
+  public boolean isScanBasedKillingLogOnly() {
+    return CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_LOG_ONLY.equals(_scanBasedKillingMode);
+  }
+
+  public long getScanBasedKillingMaxEntriesScannedInFilter() {
+    return _scanBasedKillingMaxEntriesScannedInFilter;
+  }
+
+  public long getScanBasedKillingMaxDocsScanned() {
+    return _scanBasedKillingMaxDocsScanned;
+  }
+
+  public long getScanBasedKillingMaxEntriesScannedPostFilter() {
+    return _scanBasedKillingMaxEntriesScannedPostFilter;
+  }
+
+  @Nullable
+  public String getScanBasedKillingStrategyFactoryClassName() {
+    return _scanBasedKillingStrategyFactoryClassName;
   }
 }
