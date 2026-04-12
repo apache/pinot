@@ -246,4 +246,27 @@ public class IndexLoadingConfigTest {
     assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), ForwardIndexConfig.getDefaultTargetMaxChunkSize());
     assertEquals(forwardIndexConfig.getTargetDocsPerChunk(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
+
+  @Test
+  public void testCopySharesTableConfigAndIndependentSegmentTier() {
+    InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
+    when(idmCfg.getConfig()).thenReturn(new PinotConfiguration());
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.INT)
+            .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    IndexLoadingConfig base = new IndexLoadingConfig(idmCfg, tableConfig, schema);
+    base.setTableDataDir("/tmp/table");
+    base.setSegmentTier("hot");
+
+    IndexLoadingConfig copy = base.copy();
+    assertSame(copy.getTableConfig(), base.getTableConfig());
+    assertSame(copy.getSchema(), base.getSchema());
+    assertEquals(copy.getTableDataDir(), base.getTableDataDir());
+    assertNull(copy.getSegmentTier());
+
+    copy.setSegmentTier("cold");
+    assertEquals(base.getSegmentTier(), "hot");
+    assertEquals(copy.getSegmentTier(), "cold");
+  }
 }
