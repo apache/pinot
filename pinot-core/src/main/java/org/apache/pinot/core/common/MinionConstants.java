@@ -347,4 +347,28 @@ public class MinionConstants {
 
     public static final String MAX_ZK_CREATION_TIME_MILLIS_KEY = "maxZKCreationTimeMillis";
   }
+
+  /**
+   * Materializes pre-aggregated data into an OFFLINE table based on a user-defined SQL query.
+   * The generator computes a time window and appends it to the SQL; the executor generates
+   * (currently mock) data and builds segments for the MV table.
+   *
+   * <p>User-facing config keys: {@code definedSQL}, {@code bucketTimePeriod},
+   * {@code maxNumRecordsPerSegment} (optional, default 4000).
+   */
+  public static class MaterializedViewTask {
+    public static final String TASK_TYPE = "MaterializedViewTask";
+
+    public static final String DEFINED_SQL_KEY = "definedSQL";
+    public static final String BUCKET_TIME_PERIOD_KEY = "bucketTimePeriod";
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+    public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+
+    public static final String ORIGINAL_DEFINED_SQL_KEY = "originalDefinedSQL";
+    public static final String WINDOW_START_MS_KEY = "windowStartMs";
+    public static final String WINDOW_END_MS_KEY = "windowEndMs";
+    public static final String SOURCE_TABLE_NAME_KEY = "sourceTableName";
+
+    public static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 4000;
+  }
 }

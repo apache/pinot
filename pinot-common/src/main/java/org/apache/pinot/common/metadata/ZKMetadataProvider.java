@@ -84,6 +84,7 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
   private static final String PROPERTYSTORE_SEGMENT_LINEAGE = "/SEGMENT_LINEAGE";
   private static final String PROPERTYSTORE_MINION_TASK_METADATA_PREFIX = "/MINION_TASK_METADATA";
+  private static final String PROPERTYSTORE_MATERIALIZED_VIEW_METADATA_PREFIX = "/CONFIGS/MATERIALIZED_VIEW";
   private static final String PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX = "/CONFIGS/QUERYWORKLOAD";
   private static final String PROPERTYSTORE_TASK_LOCK_SUFFIX = "-Lock";
 
@@ -326,6 +327,10 @@ public class ZKMetadataProvider {
   public static String constructPropertyStorePathForMinionTaskMetadataDeprecated(String taskType,
       String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, taskType, tableNameWithType);
+  }
+
+  public static String constructPropertyStorePathForMaterializedViewMetadata(String mvTableNameWithType) {
+    return StringUtil.join("/", PROPERTYSTORE_MATERIALIZED_VIEW_METADATA_PREFIX, mvTableNameWithType);
   }
 
   public static String constructPropertyStorePathForLogical(String tableName) {
