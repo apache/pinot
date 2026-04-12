@@ -696,7 +696,7 @@ public class PinotTableRestletResource {
     }
     if (tableConfigChanged) {
       try {
-        pinotHelixResourceManager.updateTableConfig(tableConfig);
+        pinotHelixResourceManager.updateTableConfig(tableConfig, false);
       } catch (Exception e) {
         LOGGER.warn("Unable to remove the task schedules, going ahead with table deletion anyways. "
             + "Reason for failure : {}", e.getMessage());

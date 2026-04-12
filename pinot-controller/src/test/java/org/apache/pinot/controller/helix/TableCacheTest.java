@@ -170,7 +170,7 @@ public class TableCacheTest {
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
 
-    TEST_INSTANCE.getHelixResourceManager().updateTableConfig(tableConfig);
+    TEST_INSTANCE.getHelixResourceManager().updateTableConfig(tableConfig, false);
     // Wait for at most 10 seconds for the callback to update the table config in the cache
     // NOTE:
     // - Table config should never be null during the transitioning
