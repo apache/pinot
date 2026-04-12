@@ -163,6 +163,10 @@ public class ServerSegmentMetadataReader {
         List<ColumnCompressionStatsInfo> serverColStats = tableMetadataInfo.getColumnCompressionStats();
         if (serverColStats != null) {
           for (ColumnCompressionStatsInfo info : serverColStats) {
+            // Skip columns with no meaningful compression data (old raw segments without persisted codec)
+            if (info.getCodec() == null && !info.isHasDictionary()) {
+              continue;
+            }
             String col = info.getColumn();
             long[] accum = columnCompressionAccum.computeIfAbsent(col, k -> new long[2]);
             accum[0] += info.getUncompressedSizeInBytes();
