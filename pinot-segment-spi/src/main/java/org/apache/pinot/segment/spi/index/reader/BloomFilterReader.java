@@ -27,6 +27,11 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 public interface BloomFilterReader extends IndexReader {
 
   /**
+   * @return The False Positive Probability (FPP) of this bloom filter, or -1.0 if not available (version 1 filters)
+   */
+  double getFPP();
+
+  /**
    * Returns {@code true} if the given value might have been put in this bloom filer, {@code false} otherwise.
    */
   boolean mightContain(String value);
