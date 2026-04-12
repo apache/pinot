@@ -51,7 +51,7 @@ public class FlatQuantizerTest {
   }
 
   @Test
-  public void testCosineDistanceUsesFlatDefaultForZeroNormQueries() {
+  public void testCosineDistanceUsesFiniteFallbackForZeroNormQueries() {
     FlatQuantizer quantizer = new FlatQuantizer(2);
     byte[] encoded = quantizer.encode(new float[]{1.0f, 0.0f});
 

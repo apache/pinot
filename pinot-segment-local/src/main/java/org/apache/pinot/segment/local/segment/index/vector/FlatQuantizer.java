@@ -31,7 +31,7 @@ import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
  *
  * <p>This is the trivial quantizer: {@link #encode} serializes each float as 4 bytes in
  * little-endian order, and {@link #decode} deserializes them back. Distance computation
- * decodes first and then delegates to standard float32 distance functions.</p>
+ * decodes first and then applies the quantizer distance semantics used across the ANN stack.</p>
  *
  * <p>This class is thread-safe and immutable after construction.</p>
  */
@@ -133,6 +133,7 @@ public final class FlatQuantizer implements VectorQuantizer {
       docNorm += docValue * docValue;
     }
     if (queryNorm == 0.0d || docNorm == 0.0d) {
+      // Quantizer code paths use a finite cosine fallback to keep candidate ordering stable.
       return defaultValue;
     }
     return 1.0d - (dotProduct / (Math.sqrt(queryNorm) * Math.sqrt(docNorm)));
