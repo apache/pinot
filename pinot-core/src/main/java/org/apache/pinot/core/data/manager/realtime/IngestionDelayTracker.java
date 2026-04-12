@@ -430,8 +430,8 @@ public class IngestionDelayTracker {
    * @param segmentName                name of the consuming segment
    * @param partitionId                partition id of the consuming segment (directly passed in to avoid parsing the
    *                                   segment name)
-   * @param streamTopicName            stream topic name for this consumer (e.g. Kafka topic); when blank, metrics use the legacy
-   *                                   name without a topic label
+   * @param streamTopicName            stream topic name for this consumer (e.g. Kafka topic); when blank, metrics use
+   *                                   the legacy name without a topic label
    * @param ingestionTimeMs            ingestion time of the last consumed message (from {@link StreamMessageMetadata})
    * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
    * {@link StreamMessageMetadata})
