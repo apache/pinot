@@ -22,15 +22,18 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorCustomConfigs;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -91,7 +94,7 @@ public class SegmentPurger {
         return null;
       }
 
-      initSegmentGeneratorConfig(segmentName);
+      initSegmentGeneratorConfig(segmentName, segmentMetadata);
 
       // Keep index creation time the same as original segment because both segments use the same raw data.
       // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
@@ -120,10 +123,23 @@ public class SegmentPurger {
   }
 
   @VisibleForTesting
-  void initSegmentGeneratorConfig(String segmentName) {
+  void initSegmentGeneratorConfig(String segmentName, SegmentMetadataImpl segmentMetadata) {
     _segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     _segmentGeneratorConfig.setInstanceType(InstanceType.MINION);
     _segmentGeneratorConfig.setOutDir(_workingDir.getPath());
+
+    // When enableDynamicStarTreeCreation is false, preserve the original segment's star-tree state exactly,
+    // consistent with SegmentPreProcessor which skips all star-tree additions, deletions, and modifications.
+    // When enableDynamicStarTreeCreation is true, use the table config to allow star-tree changes.
+    if (!_tableConfig.getIndexingConfig().isEnableDynamicStarTreeCreation()) {
+      List<StarTreeV2Metadata> starTreeV2MetadataList = segmentMetadata.getStarTreeV2MetadataList();
+      if (starTreeV2MetadataList == null) {
+        _segmentGeneratorConfig.setStarTreeIndexConfigs(null);
+      } else {
+        _segmentGeneratorConfig.setStarTreeIndexConfigs(StarTreeUtils.toStarTreeIndexConfigs(starTreeV2MetadataList));
+      }
+      _segmentGeneratorConfig.setEnableDefaultStarTree(false);
+    }
 
     if (_segmentGeneratorCustomConfigs != null && StringUtils.isNotEmpty(
         _segmentGeneratorCustomConfigs.getSegmentName())) {
