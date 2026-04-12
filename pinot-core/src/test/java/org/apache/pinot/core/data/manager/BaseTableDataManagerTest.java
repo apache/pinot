@@ -24,13 +24,16 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -41,6 +44,7 @@ import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -90,6 +94,7 @@ public class BaseTableDataManagerTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final File TABLE_DATA_DIR = new File(TEMP_DIR, OFFLINE_TABLE_NAME);
   private static final String SEGMENT_NAME = "testSegment";
+  private static final String SEGMENT_NAME_2 = "testSegment2";
   private static final String TIER_SEGMENT_DIRECTORY_LOADER = "tierBased";
   private static final String TIER_NAME = "coolTier";
   private static final String STRING_COLUMN = "col1";
@@ -869,6 +874,68 @@ public class BaseTableDataManagerTest {
     assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
   }
 
+    @Test
+  public void testReloadAllSegmentsInvokesParallelReload()
+      throws Exception {
+    OfflineTableDataManagerForParallelReloadTest mgr = createParallelReloadTestTableManager();
+    try {
+      File indexDir = createSegment(SegmentVersion.v3, 5);
+      registerOfflineSegment(mgr, SEGMENT_NAME, indexDir);
+      mgr.reloadAllSegments(false);
+      assertEquals(mgr.getNumSegments(), 1);
+      assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
+    } finally {
+      mgr.shutDown();
+    }
+  }
+
+  @Test
+  public void testReloadSegmentsByNameInvokesParallelReload()
+      throws Exception {
+    OfflineTableDataManagerForParallelReloadTest mgr = createParallelReloadTestTableManager();
+    try {
+      File indexDir = createSegment(SegmentVersion.v3, 5);
+      registerOfflineSegment(mgr, SEGMENT_NAME, indexDir);
+      mgr.reloadSegments(List.of(SEGMENT_NAME), false);
+      assertEquals(mgr.getNumSegments(), 1);
+      assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
+    } finally {
+      mgr.shutDown();
+    }
+  }
+
+  @Test
+  public void testReloadSegmentsWithMissingNamesCoversWarnBranch()
+      throws Exception {
+    OfflineTableDataManagerForParallelReloadTest mgr = createParallelReloadTestTableManager();
+    try {
+      File indexDir = createSegment(SegmentVersion.v3, 5);
+      registerOfflineSegment(mgr, SEGMENT_NAME, indexDir);
+      mgr.reloadSegments(Arrays.asList(SEGMENT_NAME, "missingSegment"), false);
+      assertEquals(mgr.getNumSegments(), 1);
+    } finally {
+      mgr.shutDown();
+    }
+  }
+
+  @Test
+  public void testReloadAllSegmentsParallelWithTwoSegments()
+      throws Exception {
+    OfflineTableDataManagerForParallelReloadTest mgr = createParallelReloadTestTableManager();
+    try {
+      File indexDir1 = createSegment(SEGMENT_NAME, SegmentVersion.v3, 5);
+      File indexDir2 = createSegment(SEGMENT_NAME_2, SegmentVersion.v3, 5);
+      registerOfflineSegment(mgr, SEGMENT_NAME, indexDir1);
+      registerOfflineSegment(mgr, SEGMENT_NAME_2, indexDir2);
+      mgr.reloadAllSegments(false);
+      assertEquals(mgr.getNumSegments(), 2);
+      assertEquals(new SegmentMetadataImpl(indexDir1).getTotalDocs(), 5);
+      assertEquals(new SegmentMetadataImpl(indexDir2).getTotalDocs(), 5);
+    } finally {
+      mgr.shutDown();
+    }
+  }
+
   // Has to be public class for the class loader to work.
   public static class FakePinotCrypter implements PinotCrypter {
     private File _origFile;
@@ -925,9 +992,14 @@ public class BaseTableDataManagerTest {
 
   private static File createSegment(SegmentVersion segmentVersion, int numRows)
       throws Exception {
+    return createSegment(SEGMENT_NAME, segmentVersion, numRows);
+  }
+
+  private static File createSegment(String segmentName, SegmentVersion segmentVersion, int numRows)
+      throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(DEFAULT_TABLE_CONFIG, SCHEMA);
     config.setOutDir(TABLE_DATA_DIR.getAbsolutePath());
-    config.setSegmentName(SEGMENT_NAME);
+    config.setSegmentName(segmentName);
     config.setSegmentVersion(segmentVersion);
     List<GenericRow> rows = new ArrayList<>(3);
     for (int i = 0; i < numRows; i++) {
@@ -939,7 +1011,7 @@ public class BaseTableDataManagerTest {
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
-    return new File(TABLE_DATA_DIR, SEGMENT_NAME);
+    return new File(TABLE_DATA_DIR, segmentName);
   }
 
   private static SegmentZKMetadata createRawSegment(SegmentVersion segmentVersion, int numRows)
@@ -997,5 +1069,51 @@ public class BaseTableDataManagerTest {
     File indexMapFile =
         new File(new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME), V1Constants.INDEX_MAP_FILE_NAME);
     return FileUtils.readFileToString(indexMapFile, StandardCharsets.UTF_8).contains(columnName + ".inverted_index");
+  }
+
+  private static final class OfflineTableDataManagerForParallelReloadTest extends OfflineTableDataManager {
+    private final Map<String, SegmentZKMetadata> _segmentZkMetadata = new ConcurrentHashMap<>();
+
+    void putZKMetadata(String segmentName, SegmentZKMetadata zkMetadata) {
+      _segmentZkMetadata.put(segmentName, zkMetadata);
+    }
+
+    @Override
+    public SegmentZKMetadata fetchZKMetadata(String segmentName) {
+      SegmentZKMetadata zkMetadata = _segmentZkMetadata.get(segmentName);
+      Preconditions.checkState(zkMetadata != null, "No ZK metadata for segment: %s", segmentName);
+      return zkMetadata;
+    }
+
+    @Override
+    public IndexLoadingConfig fetchIndexLoadingConfig() {
+      Pair<TableConfig, Schema> cached = getCachedTableConfigAndSchema();
+      IndexLoadingConfig indexLoadingConfig =
+          new IndexLoadingConfig(_instanceDataManagerConfig, cached.getLeft(), cached.getRight());
+      indexLoadingConfig.setTableDataDir(getTableDataDir().getAbsolutePath());
+      return indexLoadingConfig;
+    }
+  }
+  
+  private static OfflineTableDataManagerForParallelReloadTest createParallelReloadTestTableManager() {
+    OfflineTableDataManagerForParallelReloadTest tableDataManager = new OfflineTableDataManagerForParallelReloadTest();
+    tableDataManager.init(createDefaultInstanceDataManagerConfig(), mock(HelixManager.class), new SegmentLocks(),
+        DEFAULT_TABLE_CONFIG, SCHEMA, new SegmentReloadSemaphore(1), Executors.newFixedThreadPool(2), null, null,
+        SEGMENT_OPERATIONS_THROTTLER);
+    return tableDataManager;
+  }
+
+  private static void registerOfflineSegment(OfflineTableDataManagerForParallelReloadTest tableDataManager,
+      String segmentName, File indexDir)
+      throws Exception {
+    long crc = getCRC(indexDir);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(segmentName);
+    zkMetadata.setCrc(crc);
+    tableDataManager.putZKMetadata(segmentName, zkMetadata);
+    IndexLoadingConfig loadConfig = new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA);
+    loadConfig.setTableDataDir(tableDataManager.getTableDataDir().getAbsolutePath());
+    ImmutableSegment immutableSegment =
+        ImmutableSegmentLoader.load(indexDir, loadConfig, SEGMENT_OPERATIONS_THROTTLER);
+    tableDataManager.addSegment(immutableSegment, zkMetadata);
   }
 }
