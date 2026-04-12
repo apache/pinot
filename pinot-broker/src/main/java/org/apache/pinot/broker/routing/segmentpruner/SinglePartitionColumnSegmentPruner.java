@@ -35,6 +35,8 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.sql.FilterKind;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,6 +44,8 @@ import org.apache.pinot.sql.FilterKind;
  * pruner supports queries with filter (or nested filter) of EQUALITY and IN predicates.
  */
 public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SinglePartitionColumnSegmentPruner.class);
+
   private final String _tableNameWithType;
   private final String _partitionColumn;
   private final Map<String, SegmentPartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
@@ -129,8 +133,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       case EQUALS: {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
-          return partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
-              .getPartition(RequestContextUtils.getStringValue(operands.get(1))));
+          return isPartitionMatch(partitionInfo, RequestContextUtils.getStringValue(operands.get(1)));
         } else {
           return true;
         }
@@ -140,8 +143,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
-            if (partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
-                .getPartition(RequestContextUtils.getStringValue(operands.get(i))))) {
+            if (isPartitionMatch(partitionInfo, RequestContextUtils.getStringValue(operands.get(i)))) {
               return true;
             }
           }
@@ -152,6 +154,16 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       }
       default:
         return true;
+    }
+  }
+
+  private boolean isPartitionMatch(SegmentPartitionInfo partitionInfo, String value) {
+    try {
+      return partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction().getPartition(value));
+    } catch (RuntimeException e) {
+      LOGGER.debug("Failed to evaluate partition function for table: {}, partition column: {}; skipping partition "
+          + "pruning", _tableNameWithType, _partitionColumn, e);
+      return true;
     }
   }
 }

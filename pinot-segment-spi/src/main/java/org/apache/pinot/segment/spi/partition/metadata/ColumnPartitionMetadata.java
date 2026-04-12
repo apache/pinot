@@ -33,6 +33,7 @@ import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -48,6 +49,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @JsonDeserialize(using = ColumnPartitionMetadata.ColumnPartitionMetadataDeserializer.class)
 public class ColumnPartitionMetadata {
   private final String _functionName;
+  private final String _functionExpr;
+  private final String _partitionIdNormalizer;
   private final int _numPartitions;
   private final Map<String, String> _functionConfig;
   private final Set<Integer> _partitions;
@@ -60,12 +63,34 @@ public class ColumnPartitionMetadata {
    * @param partitions Set of partitions the column contains
    * @param functionConfig Configuration required by partition function.
    */
+  @Deprecated
   public ColumnPartitionMetadata(String functionName, int numPartitions, Set<Integer> partitions,
       @Nullable Map<String, String> functionConfig) {
+    this(functionName, numPartitions, partitions, functionConfig, null, null);
+  }
+
+  @Deprecated
+  public ColumnPartitionMetadata(String functionName, int numPartitions, Set<Integer> partitions,
+      @Nullable Map<String, String> functionConfig, @Nullable String functionExpr) {
+    this(functionName, numPartitions, partitions, functionConfig, functionExpr, null);
+  }
+
+  @Deprecated
+  public ColumnPartitionMetadata(String functionName, int numPartitions, Set<Integer> partitions,
+      @Nullable Map<String, String> functionConfig, @Nullable String functionExpr,
+      @Nullable String partitionIdNormalizer) {
     _functionName = functionName;
+    _functionExpr = normalizeOptionalText(functionExpr);
+    _partitionIdNormalizer = normalizeOptionalText(partitionIdNormalizer);
     _numPartitions = numPartitions;
     _partitions = partitions;
     _functionConfig = functionConfig;
+  }
+
+  public ColumnPartitionMetadata(PartitionFunction partitionFunction, Set<Integer> partitions) {
+    this(partitionFunction.getName(), partitionFunction.getNumPartitions(), partitions,
+        partitionFunction.getFunctionConfig(), partitionFunction.getFunctionExpr(),
+        partitionFunction.getPartitionIdNormalizer());
   }
 
   public String getFunctionName() {
@@ -74,6 +99,16 @@ public class ColumnPartitionMetadata {
 
   public int getNumPartitions() {
     return _numPartitions;
+  }
+
+  @Nullable
+  public String getFunctionExpr() {
+    return _functionExpr;
+  }
+
+  @Nullable
+  public String getPartitionIdNormalizer() {
+    return _partitionIdNormalizer;
   }
 
   public Set<Integer> getPartitions() {
@@ -92,7 +127,8 @@ public class ColumnPartitionMetadata {
     if (obj instanceof ColumnPartitionMetadata) {
       ColumnPartitionMetadata that = (ColumnPartitionMetadata) obj;
       return _functionName.equals(that._functionName) && _numPartitions == that._numPartitions && _partitions.equals(
-          that._partitions) && Objects.equals(_functionConfig, that._functionConfig);
+          that._partitions) && Objects.equals(_functionConfig, that._functionConfig) && Objects.equals(_functionExpr,
+          that._functionExpr) && Objects.equals(_partitionIdNormalizer, that._partitionIdNormalizer);
     }
     return false;
   }
@@ -100,7 +136,8 @@ public class ColumnPartitionMetadata {
   @Override
   public int hashCode() {
     return 37 * 37 * _functionName.hashCode() + 37 * _numPartitions + _partitions.hashCode()
-        + Objects.hashCode(_functionConfig);
+        + Objects.hashCode(_functionConfig) + Objects.hashCode(_functionExpr)
+        + Objects.hashCode(_partitionIdNormalizer);
   }
 
   /**
@@ -139,6 +176,11 @@ public class ColumnPartitionMetadata {
     }
   }
 
+  @Nullable
+  private static String normalizeOptionalText(@Nullable String value) {
+    return StringUtils.isBlank(value) || "null".equalsIgnoreCase(value) ? null : value;
+  }
+
   /**
    * Custom deserializer for {@link ColumnPartitionMetadata}.
    * <p>
@@ -149,6 +191,8 @@ public class ColumnPartitionMetadata {
     private static final String FUNCTION_NAME_KEY = "functionName";
     private static final String NUM_PARTITIONS_KEY = "numPartitions";
     private static final String FUNCTION_CONFIG_KEY = "functionConfig";
+    private static final String FUNCTION_EXPR_KEY = "functionExpr";
+    private static final String PARTITION_ID_NORMALIZER_KEY = "partitionIdNormalizer";
     private static final String PARTITIONS_KEY = "partitions";
 
     // DO NOT CHANGE: for backward-compatibility
@@ -180,8 +224,16 @@ public class ColumnPartitionMetadata {
             });
       }
 
+      JsonNode functionExprNode = jsonMetadata.get(FUNCTION_EXPR_KEY);
+      JsonNode partitionIdNormalizerNode = jsonMetadata.get(PARTITION_ID_NORMALIZER_KEY);
       return new ColumnPartitionMetadata(jsonMetadata.get(FUNCTION_NAME_KEY).asText(),
-          jsonMetadata.get(NUM_PARTITIONS_KEY).asInt(), partitions, functionConfig);
+          jsonMetadata.get(NUM_PARTITIONS_KEY).asInt(), partitions, functionConfig,
+          readOptionalText(functionExprNode), readOptionalText(partitionIdNormalizerNode));
+    }
+
+    @Nullable
+    private static String readOptionalText(@Nullable JsonNode node) {
+      return node != null && !node.isNull() ? normalizeOptionalText(node.asText()) : null;
     }
   }
 }

@@ -87,8 +87,18 @@ public class StatsCollectorConfig {
   }
 
   @Nullable
+  public String getPartitionFunctionExpr(String column) {
+    return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getFunctionExpr(column) : null;
+  }
+
+  @Nullable
   public Map<String, String> getPartitionFunctionConfig(String column) {
     return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getFunctionConfig(column) : null;
+  }
+
+  @Nullable
+  public String getPartitionIdNormalizer(String column) {
+    return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getPartitionIdNormalizer(column) : null;
   }
 
   public Schema getSchema() {

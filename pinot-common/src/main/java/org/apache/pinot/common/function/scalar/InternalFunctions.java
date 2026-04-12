@@ -33,7 +33,7 @@ public class InternalFunctions {
   /// input.
   ///
   /// This is mostly useful for test and internal usage
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static String cid(String input) {
     return QueryThreadContext.get().getExecutionContext().getCid();
   }
@@ -45,7 +45,7 @@ public class InternalFunctions {
   /// input.
   ///
   /// This is mostly useful for test and internal usage
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static long reqId(String input) {
     return QueryThreadContext.get().getExecutionContext().getRequestId();
   }
@@ -57,7 +57,7 @@ public class InternalFunctions {
   /// input.
   ///
   /// This is mostly useful for test and internal usage and should be close to now()
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static long startTime(String input) {
     return QueryThreadContext.get().getExecutionContext().getStartTimeMs();
   }
@@ -69,7 +69,7 @@ public class InternalFunctions {
   /// input.
   ///
   /// This is mostly useful for test and internal usage
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static long endTime(String input) {
     return QueryThreadContext.get().getExecutionContext().getActiveDeadlineMs();
   }
@@ -81,7 +81,7 @@ public class InternalFunctions {
   /// input.
   ///
   /// This is mostly useful for test and internal usage
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static String brokerId(String input) {
     return QueryThreadContext.get().getExecutionContext().getBrokerId();
   }
@@ -89,7 +89,7 @@ public class InternalFunctions {
   /// Returns the query engine of the query.
   ///
   /// This is mostly useful for test and internal usage
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static String queryEngine(String input) {
     return QueryThreadContext.get().getExecutionContext().getQueryType().name();
   }
@@ -102,7 +102,7 @@ public class InternalFunctions {
   /// input.
   ///
   /// This is mostly useful for test and internal usage
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static int stageId(String input) {
     QueryThreadContext.MseWorkerInfo mseWorkerInfo = QueryThreadContext.get().getMseWorkerInfo();
     return mseWorkerInfo != null ? mseWorkerInfo.getStageId() : -1;
@@ -116,7 +116,7 @@ public class InternalFunctions {
   /// input.
   ///
   /// This is mostly useful for test and internal usage
-  @ScalarFunction
+  @ScalarFunction(isDeterministic = false)
   public static int workerId(String input) {
     QueryThreadContext.MseWorkerInfo mseWorkerInfo = QueryThreadContext.get().getMseWorkerInfo();
     return mseWorkerInfo != null ? mseWorkerInfo.getWorkerId() : -1;

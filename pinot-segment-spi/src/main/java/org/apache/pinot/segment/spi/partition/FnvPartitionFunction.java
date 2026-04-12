@@ -140,6 +140,11 @@ public class FnvPartitionFunction implements PartitionFunction {
     return _functionConfig;
   }
 
+  @Override
+  public String getPartitionIdNormalizer() {
+    return _negativePartitionHandling.name();
+  }
+
   // Keep it for backward-compatibility, use getName() instead
   @Override
   public String toString() {

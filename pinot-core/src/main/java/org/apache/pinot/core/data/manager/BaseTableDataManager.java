@@ -103,6 +103,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -1558,6 +1559,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     String partitionColumn = null;
     ColumnPartitionConfig partitionConfig = null;
+    PartitionFunction expectedPartitionFunction = null;
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     // NOTE: Partition can only be enabled on a single column
     if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap().size() == 1) {
@@ -1565,6 +1567,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           segmentPartitionConfig.getColumnPartitionMap().entrySet().iterator().next();
       partitionColumn = entry.getKey();
       partitionConfig = entry.getValue();
+      expectedPartitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionColumn, partitionConfig);
     }
 
     Set<String> columnsInSegment = segmentMetadata.getAllColumns();
@@ -1764,12 +1767,23 @@ public abstract class BaseTableDataManager implements TableDataManager {
               tableNameWithType, columnName, segmentName);
           return new StaleSegment(segmentName, true, "partition function added: " + columnName);
         }
-        if (!partitionFunction.getName().equalsIgnoreCase(partitionConfig.getFunctionName())) {
+        if (!partitionFunction.getName().equalsIgnoreCase(expectedPartitionFunction.getName())) {
           LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function name",
               tableNameWithType, columnName, segmentName);
           return new StaleSegment(segmentName, true, "partition function name changed: " + columnName);
         }
-        if (partitionFunction.getNumPartitions() != partitionConfig.getNumPartitions()) {
+        if (!Objects.equals(partitionFunction.getFunctionExpr(), expectedPartitionFunction.getFunctionExpr())) {
+          LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function expr",
+              tableNameWithType, columnName, segmentName);
+          return new StaleSegment(segmentName, true, "partition function expr changed: " + columnName);
+        }
+        if (!Objects.equals(partitionFunction.getPartitionIdNormalizer(),
+            expectedPartitionFunction.getPartitionIdNormalizer())) {
+          LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition id normalizer",
+              tableNameWithType, columnName, segmentName);
+          return new StaleSegment(segmentName, true, "partition id normalizer changed: " + columnName);
+        }
+        if (partitionFunction.getNumPartitions() != expectedPartitionFunction.getNumPartitions()) {
           LOGGER.debug("tableNameWithType: {}, columnName: {},, segmentName: {}, change: num partitions",
               tableNameWithType, columnName, segmentName);
           return new StaleSegment(segmentName, true, "num partitions changed: " + columnName);

@@ -66,11 +66,13 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     }
 
     String partitionFunctionName = statsCollectorConfig.getPartitionFunctionName(column);
+    String partitionFunctionExpr = statsCollectorConfig.getPartitionFunctionExpr(column);
     _numPartitions = statsCollectorConfig.getNumPartitions(column);
     _partitionFunctionConfig = statsCollectorConfig.getPartitionFunctionConfig(column);
-    _partitionFunction =
-        (partitionFunctionName != null) ? PartitionFunctionFactory.getPartitionFunction(partitionFunctionName,
-            _numPartitions, _partitionFunctionConfig) : null;
+    String partitionIdNormalizer = statsCollectorConfig.getPartitionIdNormalizer(column);
+    _partitionFunction = (partitionFunctionName != null || partitionFunctionExpr != null) ? PartitionFunctionFactory
+        .getPartitionFunction(column, partitionFunctionName, _numPartitions, _partitionFunctionConfig,
+            partitionFunctionExpr, partitionIdNormalizer) : null;
     if (_partitionFunction != null) {
       _partitions = new HashSet<>();
     } else {

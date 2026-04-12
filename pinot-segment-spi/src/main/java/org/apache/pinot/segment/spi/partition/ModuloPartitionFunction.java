@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionIntNormalizer;
 
 
 /**
@@ -61,6 +62,11 @@ public class ModuloPartitionFunction implements PartitionFunction {
   @Override
   public int getNumPartitions() {
     return _numPartitions;
+  }
+
+  @Override
+  public String getPartitionIdNormalizer() {
+    return PartitionIntNormalizer.POSITIVE_MODULO.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead

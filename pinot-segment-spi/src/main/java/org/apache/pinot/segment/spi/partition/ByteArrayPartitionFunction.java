@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionIntNormalizer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -54,6 +55,11 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   @Override
   public int getNumPartitions() {
     return _numPartitions;
+  }
+
+  @Override
+  public String getPartitionIdNormalizer() {
+    return PartitionIntNormalizer.ABS.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead

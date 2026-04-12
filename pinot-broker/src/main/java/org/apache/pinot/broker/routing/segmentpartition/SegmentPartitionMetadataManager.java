@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -39,6 +40,8 @@ import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.PartitionInfo;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +64,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
 
   // static content, if anything changes for the following. a rebuild of routing table is needed.
   private final String _partitionColumn;
-  private final String _partitionFunctionName;
+  private final PartitionFunction _partitionFunction;
   private final int _numPartitions;
 
   // cache-able content, only follow changes if onlineSegments list (of ideal-state) is changed.
@@ -71,12 +74,12 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private transient TablePartitionInfo _tablePartitionInfo;
   private transient TablePartitionReplicatedServersInfo _tablePartitionReplicatedServersInfo;
 
-  public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
-      int numPartitions) {
+  public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn,
+      ColumnPartitionConfig columnPartitionConfig) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
-    _partitionFunctionName = partitionFunctionName;
-    _numPartitions = numPartitions;
+    _partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionColumn, columnPartitionConfig);
+    _numPartitions = _partitionFunction.getNumPartitions();
   }
 
   @Override
@@ -103,7 +106,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       return INVALID_PARTITION_ID;
     }
     PartitionFunction partitionFunction = segmentPartitionInfo.getPartitionFunction();
-    if (!_partitionFunctionName.equalsIgnoreCase(partitionFunction.getName())) {
+    if (!isMatchingPartitionFunction(partitionFunction)) {
       return INVALID_PARTITION_ID;
     }
     if (_numPartitions != partitionFunction.getNumPartitions()) {
@@ -114,6 +117,13 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       return INVALID_PARTITION_ID;
     }
     return partitions.iterator().next();
+  }
+
+  private boolean isMatchingPartitionFunction(PartitionFunction partitionFunction) {
+    return _partitionFunction.getName().equalsIgnoreCase(partitionFunction.getName())
+        && Objects.equals(_partitionFunction.getFunctionConfig(), partitionFunction.getFunctionConfig())
+        && Objects.equals(_partitionFunction.getFunctionExpr(), partitionFunction.getFunctionExpr())
+        && Objects.equals(_partitionFunction.getPartitionIdNormalizer(), partitionFunction.getPartitionIdNormalizer());
   }
 
   private static long getCreationTimeMs(@Nullable ZNRecord znRecord) {
@@ -306,7 +316,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       }
     }
     _tablePartitionReplicatedServersInfo =
-        new TablePartitionReplicatedServersInfo(_tableNameWithType, _partitionColumn, _partitionFunctionName,
+        new TablePartitionReplicatedServersInfo(_tableNameWithType, _partitionColumn, _partitionFunction.getName(),
             _numPartitions, partitionInfoMap, segmentsWithInvalidPartition);
   }
 
@@ -337,7 +347,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
           _tableNameWithType);
     }
     _tablePartitionInfo =
-        new TablePartitionInfo(_tableNameWithType, _partitionColumn, _partitionFunctionName, _numPartitions,
+        new TablePartitionInfo(_tableNameWithType, _partitionColumn, _partitionFunction.getName(), _numPartitions,
             segmentsByPartition, segmentsWithInvalidPartition);
   }
 

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionIntNormalizer;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
@@ -79,6 +80,11 @@ public class MurmurPartitionFunction implements PartitionFunction {
   @Override
   public Map<String, String> getFunctionConfig() {
     return _functionConfig;
+  }
+
+  @Override
+  public String getPartitionIdNormalizer() {
+    return PartitionIntNormalizer.MASK.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead

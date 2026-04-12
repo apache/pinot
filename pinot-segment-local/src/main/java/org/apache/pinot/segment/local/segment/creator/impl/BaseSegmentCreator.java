@@ -586,6 +586,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     PartitionFunction partitionFunction = columnStatistics.getPartitionFunction();
     if (partitionFunction != null) {
       properties.setProperty(getKeyFor(column, PARTITION_FUNCTION), partitionFunction.getName());
+      if (partitionFunction.getFunctionExpr() != null) {
+        properties.setProperty(getKeyFor(column, PARTITION_FUNCTION_EXPR), partitionFunction.getFunctionExpr());
+      }
+      if (partitionFunction.getPartitionIdNormalizer() != null) {
+        properties.setProperty(getKeyFor(column, PARTITION_ID_NORMALIZER),
+            partitionFunction.getPartitionIdNormalizer());
+      }
       properties.setProperty(getKeyFor(column, NUM_PARTITIONS), columnStatistics.getNumPartitions());
       properties.setProperty(getKeyFor(column, PARTITION_VALUES), columnStatistics.getPartitions());
       if (columnStatistics.getPartitionFunctionConfig() != null) {

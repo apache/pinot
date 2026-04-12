@@ -601,9 +601,13 @@ public class MutableSegmentImpl implements MutableSegment {
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
     if (_partitionColumn != null) {
+      ColumnPartitionConfig columnPartitionConfig = _partitionFunction.getFunctionExpr() != null
+          ? ColumnPartitionConfig.forFunctionExpr(_partitionFunction.getFunctionExpr(),
+              _partitionFunction.getNumPartitions(), _partitionFunction.getPartitionIdNormalizer())
+          : new ColumnPartitionConfig(_partitionFunction.getName(), _partitionFunction.getNumPartitions(),
+              _partitionFunction.getFunctionConfig());
       return new SegmentPartitionConfig(Collections.singletonMap(_partitionColumn,
-          new ColumnPartitionConfig(_partitionFunction.getName(), _partitionFunction.getNumPartitions(),
-              _partitionFunction.getFunctionConfig())));
+          columnPartitionConfig));
     } else {
       return null;
     }
