@@ -29,9 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  * Utility class for creating column statistics collectors.
  */
 public final class StatsCollectorUtil {
-
   private StatsCollectorUtil() {
-    // Utility class
   }
 
   /**
@@ -67,7 +65,7 @@ public final class StatsCollectorUtil {
       case STRING:
         return new StringColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       case BYTES:
-        return new BytesColumnPredIndexStatsCollector(columnName, statsCollectorConfig);
+        return new BytesColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       case MAP:
         return new MapColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       default:

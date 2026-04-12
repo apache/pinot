@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.ColumnarSegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
-import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
+import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -58,14 +58,9 @@ public class ColumnarSegmentCreationDataSource implements SegmentCreationDataSou
   }
 
   @Override
-  public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
+  public SegmentPreIndexStatsContainer gatherStats(StatsCollectorConfig statsCollectorConfig) {
     LOGGER.info("Gathering stats using columnar approach for {} columns", _columnReaders.size());
-
-    // Use columnar stats container that efficiently collects statistics column-wise
-    ColumnarSegmentPreIndexStatsContainer columnarSegmentPreIndexStatsContainer =
-        new ColumnarSegmentPreIndexStatsContainer(_columnReaders, statsCollectorConfig);
-    columnarSegmentPreIndexStatsContainer.init();
-    return columnarSegmentPreIndexStatsContainer;
+    return new ColumnarSegmentPreIndexStatsContainer(statsCollectorConfig, _columnReaders);
   }
 
   @Override

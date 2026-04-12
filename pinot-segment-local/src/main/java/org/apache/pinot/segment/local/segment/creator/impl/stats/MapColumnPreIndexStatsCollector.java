@@ -115,7 +115,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
           keyStats.collect(value);
           continue;
         }
-        if (keyStats instanceof BytesColumnPredIndexStatsCollector) {
+        if (keyStats instanceof BytesColumnPreIndexStatsCollector) {
           keyStats.collect(value);
           continue;
         }
@@ -232,11 +232,11 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
   @Override
   public int getLengthOfShortestElement() {
-    return _minLength;
+    return _minLength != Integer.MAX_VALUE ? _minLength : 0;
   }
 
   @Override
-  public int getLengthOfLargestElement() {
+  public int getLengthOfLongestElement() {
     return _maxLength;
   }
 
@@ -304,7 +304,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       case BIG_DECIMAL:
         return new BigDecimalColumnPreIndexStatsCollector(key, config);
       case BYTES:
-        return new BytesColumnPredIndexStatsCollector(key, config);
+        return new BytesColumnPreIndexStatsCollector(key, config);
       case STRING:
       case MAP:
         return new StringColumnPreIndexStatsCollector(key, config);
