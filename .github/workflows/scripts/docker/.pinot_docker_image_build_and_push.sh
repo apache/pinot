@@ -18,6 +18,8 @@
 # under the License.
 #
 
+set -e
+
 if [ -z "${DOCKER_IMAGE_NAME}" ]; then
   DOCKER_IMAGE_NAME="apachepinot/pinot"
 fi
@@ -28,42 +30,36 @@ if [ -z "${PINOT_BRANCH}" ]; then
   PINOT_BRANCH="master"
 fi
 if [ -z "${BUILD_PLATFORM}" ]; then
-  BUILD_PLATFORM="linux/arm64,linux/amd64"
+  echo "BUILD_PLATFORM must be set" >&2
+  exit 1
+fi
+if [ -z "${TAGS}" ]; then
+  echo "TAGS must be set" >&2
+  exit 1
 fi
 
-# Get pinot commit id
-ROOT_DIR=`pwd`
-rm -rf /tmp/pinot
-git clone -b ${PINOT_BRANCH} --single-branch ${PINOT_GIT_URL} /tmp/pinot
-cd /tmp/pinot
-COMMIT_ID=`git rev-parse --short HEAD`
-VERSION=`mvn help:evaluate -Dexpression=project.version -q -DforceStdout`
-rm -rf /tmp/pinot
-DATE=`date +%Y%m%d`
-cd ${ROOT_DIR}
+platformTag=${BUILD_PLATFORM/\//-}
 
 tags=()
-if [ -z "${TAGS}" ]; then
-  tags=("${VERSION}-${COMMIT_ID}-${DATE}")
-  tags+=("latest")
-else
-  declare -a tags=($(echo ${TAGS} | tr "," " "))
-fi
+declare -a tags=($(echo ${TAGS} | tr "," " "))
 
 DOCKER_BUILD_TAGS=""
 for tag in "${tags[@]}"
 do
-  echo "Plan to build and push docker images for: ${DOCKER_IMAGE_NAME}:${tag}"
-  DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag} "
+  echo "Plan to build and push docker images for: ${DOCKER_IMAGE_NAME}:${tag}-${platformTag}"
+  DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-${platformTag} "
 done
 
 cd ${DOCKER_FILE_BASE_DIR}
 
-docker buildx build \
+docker build \
     --no-cache \
-    --platform=${BUILD_PLATFORM} \
     --file Dockerfile \
     --build-arg PINOT_GIT_URL=${PINOT_GIT_URL} --build-arg PINOT_BRANCH=${PINOT_BRANCH} \
     ${DOCKER_BUILD_TAGS} \
-    --push \
     .
+
+for tag in "${tags[@]}"
+do
+  docker push ${DOCKER_IMAGE_NAME}:${tag}-${platformTag}
+done

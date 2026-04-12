@@ -20,21 +20,17 @@
 
 set -e
 
-if [ -z "${BUILD_PLATFORM}" ]; then
-  exit 1
-fi
-
 if [ -z "${BASE_IMAGE_TYPE}" ]; then
   exit 1
 fi
 
 cd docker/images/pinot-base/pinot-base-${BASE_IMAGE_TYPE}
 
-docker buildx build \
+docker build \
   --no-cache \
-  --platform=${BUILD_PLATFORM} \
   --file ${OPEN_JDK_DIST}.dockerfile \
   --tag apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG} \
   --build-arg JAVA_VERSION=${JDK_VERSION:-11} \
-  --push \
   .
+
+docker push apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}

@@ -19,46 +19,38 @@
 #
 
 set -e
+set -x
 
 if [ -z "${DOCKER_IMAGE_NAME}" ]; then
-  DOCKER_IMAGE_NAME="apachepinot/pinot-superset"
+  DOCKER_IMAGE_NAME="apachepinot/pinot"
 fi
-if [ -z "${SUPERSET_IMAGE_TAG}" ]; then
-  SUPERSET_IMAGE_TAG="latest"
+if [ -z "${TAGS}" ]; then
+  echo "TAGS must be set" >&2
+  exit 1
 fi
 if [ -z "${BUILD_PLATFORM}" ]; then
-  BUILD_PLATFORM="linux/amd64"
+  echo "BUILD_PLATFORM must be set" >&2
+  exit 1
 fi
-
-DATE=`date +%Y%m%d`
-docker pull apache/superset:${SUPERSET_IMAGE_TAG}
-COMMIT_ID=`docker images apache/superset:${SUPERSET_IMAGE_TAG} --format "{{.ID}}"`
 
 tags=()
-if [ -z "${TAGS}" ]; then
-  tags=("${COMMIT_ID}-${DATE}")
-  tags+=("latest")
-else
-  declare -a tags=($(echo ${TAGS} | tr "," " "))
-fi
+declare -a tags=($(echo ${TAGS} | tr "," " "))
 
-DOCKER_BUILD_TAGS=""
-for tag in "${tags[@]}"
-do
-  echo "Plan to build and push docker images for: ${DOCKER_IMAGE_NAME}:${tag}"
-  DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag} "
-done
+platforms=()
+declare -a platforms=($(echo ${BUILD_PLATFORM} | tr "," " "))
 
-cd ${DOCKER_FILE_BASE_DIR}
+for tag in "${tags[@]}"; do
+  DOCKER_AMEND_TAGS_CMD=""
+  for platform in "${platforms[@]}"; do
+    platformTag=${platform/\//-}
+    DOCKER_AMEND_TAGS_CMD+=" --amend ${DOCKER_IMAGE_NAME}:${tag}-${platformTag}"
+  done
 
-docker build \
-    --no-cache \
-    --file Dockerfile \
-    --build-arg SUPERSET_IMAGE_TAG=${SUPERSET_IMAGE_TAG} \
-    ${DOCKER_BUILD_TAGS} \
-    .
+  echo "Creating manifest for tag: ${tag}"
+  docker manifest create \
+    ${DOCKER_IMAGE_NAME}:${tag} \
+    ${DOCKER_AMEND_TAGS_CMD}
 
-for tag in "${tags[@]}"
-do
-  docker push ${DOCKER_IMAGE_NAME}:${tag}
+  docker manifest push \
+    ${DOCKER_IMAGE_NAME}:${tag}
 done
