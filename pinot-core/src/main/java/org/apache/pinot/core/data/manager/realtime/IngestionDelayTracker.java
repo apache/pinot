@@ -35,6 +35,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -98,12 +99,15 @@ public class IngestionDelayTracker {
     @Nullable
     volatile StreamPartitionMsgOffset _currentOffset;
     volatile long _firstStreamIngestionTimeMs;
+    @Nullable
+    final String _streamTopicName;
 
     IngestionInfo(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
-        long firstStreamIngestionTimeMs) {
+        long firstStreamIngestionTimeMs, @Nullable String streamTopicName) {
       _ingestionTimeMs = ingestionTimeMs;
       _currentOffset = currentOffset;
       _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
+      _streamTopicName = streamTopicName;
     }
 
     void update(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
@@ -394,7 +398,7 @@ public class IngestionDelayTracker {
     LOGGER.info("Successfully created ingestion metrics for partition id: {}", partitionId);
   }
 
-  private void removeMetrics(int partitionId) {
+  private void removeMetrics(int partitionId, @Nullable String streamTopicName) {
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
     StreamMetadataProvider streamMetadataProvider =
         _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
@@ -410,6 +414,12 @@ public class IngestionDelayTracker {
         ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
     _serverMetrics.removePartitionGauge(_metricName, partitionId,
         ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS);
+    if (StringUtils.isNotBlank(streamTopicName)) {
+      _serverMetrics.removePartitionGaugeForStreamTopic(_metricName, streamTopicName, partitionId,
+          ServerGauge.REALTIME_INGESTION_DELAY_MS);
+      _serverMetrics.removePartitionGaugeForStreamTopic(_metricName, streamTopicName, partitionId,
+          ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
+    }
 
     LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
   }
@@ -420,12 +430,14 @@ public class IngestionDelayTracker {
    * @param segmentName                name of the consuming segment
    * @param partitionId                partition id of the consuming segment (directly passed in to avoid parsing the
    *                                   segment name)
+   * @param streamTopicName            stream topic name for this consumer (e.g. Kafka topic); when blank, metrics use the legacy
+   *                                   name without a topic label
    * @param ingestionTimeMs            ingestion time of the last consumed message (from {@link StreamMessageMetadata})
    * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
    * {@link StreamMessageMetadata})
    * @param currentOffset              offset of the last consumed message (from {@link StreamMessageMetadata})
    */
-  public void updateMetrics(String segmentName, int partitionId, long ingestionTimeMs,
+  public void updateMetrics(String segmentName, int partitionId, @Nullable String streamTopicName, long ingestionTimeMs,
       long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
     if (!_isServerReadyToServeQueries.getAsBoolean() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
@@ -444,7 +456,7 @@ public class IngestionDelayTracker {
         return v;
       }
       if (v == null) {
-        return new IngestionInfo(ingestionTimeMs, currentOffset, firstStreamIngestionTimeMs);
+        return new IngestionInfo(ingestionTimeMs, currentOffset, firstStreamIngestionTimeMs, streamTopicName);
       }
       v.update(ingestionTimeMs, currentOffset, firstStreamIngestionTimeMs);
       return v;
