@@ -314,7 +314,7 @@ public class IngestionDelayTrackerTest {
         (partition0Delay1 + partition0Offset1Ms));
 
     ingestionTimeMs = offsetClock.millis() - partition1Delay0;
-    ingestionDelayTracker.updateMetrics(segment1, partition1, ingestionTimeMs, ingestionTimeMs, null);
+    ingestionDelayTracker.updateMetrics(segment1, partition1, null, ingestionTimeMs, ingestionTimeMs, null);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition1), partition1Delay0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition1), partition1Delay0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition1), ingestionTimeMs);
@@ -540,17 +540,17 @@ public class IngestionDelayTrackerTest {
 
   @Test
   public void testStreamTopicRegistersTopicTaggedGauges() {
-    IngestionDelayTracker tracker = createTracker();
+    IngestionDelayTracker ingestionDelayTracker = createTracker();
     Instant now = Instant.now();
-    tracker.setClock(Clock.fixed(now, ZoneId.systemDefault()));
+    ingestionDelayTracker.setClock(Clock.fixed(now, ZoneId.systemDefault()));
     String segment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, 123).getSegmentName();
     long ts = now.toEpochMilli();
-    tracker.updateIngestionMetrics(segment, 0, "test_topic", ts, ts, null, null);
+    ingestionDelayTracker.updateMetrics(segment, 0, "test_topic", ts, ts, null, null);
     verify(_serverMetrics).setOrUpdatePartitionGaugeForStreamTopic(eq(REALTIME_TABLE_NAME), eq("test_topic"), eq(0),
         eq(ServerGauge.REALTIME_INGESTION_DELAY_MS), any());
     verify(_serverMetrics).setOrUpdatePartitionGaugeForStreamTopic(eq(REALTIME_TABLE_NAME), eq("test_topic"), eq(0),
         eq(ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS), any());
-    tracker.shutdown();
+    ingestionDelayTracker.shutdown();
   }
 
   private void verifyMetrics(Map<Integer, Map<String, List<Long>>> partitionToMetricToValues) {
