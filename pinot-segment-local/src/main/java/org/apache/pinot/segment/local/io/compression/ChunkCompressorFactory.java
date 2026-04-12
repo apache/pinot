@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.io.compression;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
@@ -39,7 +40,7 @@ public class ChunkCompressorFactory {
    * @return Compressor for the specified type.
    */
   public static ChunkCompressor getCompressor(ChunkCompressionType compressionType) {
-    return getCompressor(compressionType, false);
+    return getCompressor(compressionType, null, false);
   }
 
   /**
@@ -51,30 +52,49 @@ public class ChunkCompressorFactory {
    * @return Compressor for the specified type.
    */
   public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, boolean upgradeToLengthPrefixed) {
+    return getCompressor(compressionType, null, upgradeToLengthPrefixed);
+  }
+
+  /**
+   * Returns the chunk compressor for the specified name and optional compression level.
+   */
+  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, @Nullable Integer compressionLevel,
+      boolean upgradeToLengthPrefixed) {
     switch (compressionType) {
 
       case PASS_THROUGH:
+        validateUnsupportedLevel(compressionType, compressionLevel);
         return PassThroughCompressor.INSTANCE;
 
       case SNAPPY:
+        validateUnsupportedLevel(compressionType, compressionLevel);
         return SnappyCompressor.INSTANCE;
 
       case ZSTANDARD:
-        return ZstandardCompressor.INSTANCE;
+        return compressionLevel != null ? new ZstandardCompressor(compressionLevel) : ZstandardCompressor.INSTANCE;
 
       case LZ4:
+        if (compressionLevel != null) {
+          return upgradeToLengthPrefixed ? new LZ4WithLengthCompressor(compressionLevel)
+              : new LZ4Compressor(compressionLevel);
+        }
         return upgradeToLengthPrefixed ? LZ4WithLengthCompressor.INSTANCE : LZ4Compressor.INSTANCE;
 
       case LZ4_LENGTH_PREFIXED:
+        if (compressionLevel != null) {
+          return new LZ4WithLengthCompressor(compressionLevel);
+        }
         return LZ4WithLengthCompressor.INSTANCE;
 
       case GZIP:
-        return new GzipCompressor();
+        return compressionLevel != null ? new GzipCompressor(compressionLevel) : new GzipCompressor();
 
       case DELTA:
+        validateUnsupportedLevel(compressionType, compressionLevel);
         return DeltaCompressor.INSTANCE;
 
       case DELTADELTA:
+        validateUnsupportedLevel(compressionType, compressionLevel);
         return DeltaDeltaCompressor.INSTANCE;
 
       default:
@@ -116,6 +136,14 @@ public class ChunkCompressorFactory {
 
       default:
         throw new IllegalArgumentException("Illegal decompressor name " + compressionType);
+    }
+  }
+
+  private static void validateUnsupportedLevel(ChunkCompressionType compressionType,
+      @Nullable Integer compressionLevel) {
+    if (compressionLevel != null) {
+      throw new IllegalArgumentException(
+          String.format("Compression type %s does not support an explicit compression level", compressionType));
     }
   }
 }

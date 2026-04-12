@@ -60,7 +60,11 @@ public class SegmentMetadataUtils {
     SegmentMetadata segmentMetadata = segmentDirectory.getSegmentMetadata();
     PropertiesConfiguration propertiesConfiguration = SegmentMetadataUtils.getPropertiesConfiguration(segmentMetadata);
     for (Map.Entry<String, String> entry : metadataProperties.entrySet()) {
-      propertiesConfiguration.setProperty(entry.getKey(), entry.getValue());
+      if (entry.getValue() != null) {
+        propertiesConfiguration.setProperty(entry.getKey(), entry.getValue());
+      } else {
+        propertiesConfiguration.clearProperty(entry.getKey());
+      }
     }
     savePropertiesConfiguration(propertiesConfiguration, segmentMetadata.getIndexDir());
     // TODO: Revisit if we can save the overhead of reloading the metadata when invoked from ForwardIndexHandler

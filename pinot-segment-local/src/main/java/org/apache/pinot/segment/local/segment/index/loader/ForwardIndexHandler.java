@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
@@ -200,6 +201,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     Set<String> existingAllColumns = _segmentDirectory.getSegmentMetadata().getSchema().getPhysicalColumnNames();
     Set<String> existingDictColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.dictionary());
     Set<String> existingForwardIndexColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.forward());
+    PropertiesConfiguration metadataProperties =
+        SegmentMetadataUtils.getPropertiesConfiguration(_segmentDirectory.getSegmentMetadata());
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     for (String column : existingAllColumns) {
       if (!_schema.hasColumn(column)) {
@@ -315,7 +318,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       } else if (!existingHasDict) {
         // Both existing and new column is RAW forward index encoded. Check if compression needs to be changed.
         // TODO: Also check if raw index version needs to be changed
-        if (shouldChangeRawCompressionType(column, segmentReader)) {
+        if (shouldChangeRawCompressionType(column, segmentReader, metadataProperties)) {
           columnOperationsMap.put(column, Collections.singletonList(Operation.CHANGE_INDEX_COMPRESSION_TYPE));
         }
       } else {
@@ -374,7 +377,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     return true;
   }
 
-  private boolean shouldChangeRawCompressionType(String column, SegmentDirectory.Reader segmentReader)
+  private boolean shouldChangeRawCompressionType(String column, SegmentDirectory.Reader segmentReader,
+      PropertiesConfiguration metadataProperties)
       throws Exception {
     // The compression type for an existing segment can only be determined by reading the forward index header.
     ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
@@ -390,8 +394,26 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
 
     // Get the new compression type.
-    ChunkCompressionType newCompressionType =
-        _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).getChunkCompressionType();
+    ForwardIndexConfig forwardIndexConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+    ChunkCompressionType newCompressionType = forwardIndexConfig.getChunkCompressionType();
+    String existingCompressionCodecSpec =
+        metadataProperties.getString(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), null);
+    if (forwardIndexConfig.getCompressionCodecSpec() != null
+        && forwardIndexConfig.getCompressionCodecSpec().hasLevel()) {
+      // Segments written before explicit codec metadata was introduced have an unknown level. Rewrite them when the
+      // table config now specifies an explicit level so the persisted forward index matches the configured codec spec.
+      if (existingCompressionCodecSpec == null) {
+        return true;
+      }
+      String newCompressionCodecSpec = forwardIndexConfig.getCompressionCodecSpec().toConfigString();
+      if (!newCompressionCodecSpec.equals(existingCompressionCodecSpec)) {
+        return true;
+      }
+    } else if (existingCompressionCodecSpec != null) {
+      // Persisted codec specs are only used for explicit levels. If an existing segment has one and the new
+      // configuration does not, rewrite the forward index to restore the plain codec behavior.
+      return true;
+    }
 
     // Note that default compression type (PASS_THROUGH for metric and LZ4 for dimension) is not considered if the
     // compressionType is not explicitly provided in tableConfig. This is to avoid incorrectly rewriting all the
@@ -460,6 +482,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // called during segmentWriter.close().
     segmentWriter.removeIndex(column, StandardIndexes.forward());
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
+    updateForwardIndexCompressionCodecMetadata(column,
+        _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()), hasDictionary);
 
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
@@ -897,6 +921,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT),
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), null);
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
@@ -949,12 +974,17 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     LOGGER.info("Created raw forwardIndex. Updating metadata properties for segment={} and column={}", segmentName,
         column);
-    Map<String, String> metadataProperties = new HashMap<>();
-    metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
-    metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
+    PropertiesConfiguration metadataProperties =
+        SegmentMetadataUtils.getPropertiesConfiguration(_segmentDirectory.getSegmentMetadata());
+    metadataProperties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
+    metadataProperties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
+    updateForwardIndexCompressionCodecMetadata(metadataProperties, column,
+        _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()), false);
     // TODO: See https://github.com/apache/pinot/pull/16921 for details
-    // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), String.valueOf(-1));
-    SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+    // metadataProperties.setProperty(getKeyFor(column, BITS_PER_ELEMENT), String.valueOf(-1));
+    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, _segmentDirectory.getSegmentMetadata()
+        .getIndexDir());
+    _segmentDirectory.reloadMetadata();
 
     // Remove range index, inverted index and FST index.
     removeDictRelatedIndexes(column, segmentWriter);
@@ -963,6 +993,28 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     FileUtils.deleteQuietly(inProgress);
 
     LOGGER.info("Created raw based forward index for segment: {}, column: {}", segmentName, column);
+  }
+
+  private void updateForwardIndexCompressionCodecMetadata(String column,
+      @Nullable ForwardIndexConfig forwardIndexConfig, boolean hasDictionary)
+      throws Exception {
+    PropertiesConfiguration metadataProperties =
+        SegmentMetadataUtils.getPropertiesConfiguration(_segmentDirectory.getSegmentMetadata());
+    updateForwardIndexCompressionCodecMetadata(metadataProperties, column, forwardIndexConfig, hasDictionary);
+    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, _segmentDirectory.getSegmentMetadata()
+        .getIndexDir());
+    _segmentDirectory.reloadMetadata();
+  }
+
+  private static void updateForwardIndexCompressionCodecMetadata(PropertiesConfiguration metadataProperties,
+      String column, @Nullable ForwardIndexConfig forwardIndexConfig, boolean hasDictionary) {
+    String metadataKey = getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC);
+    if (!hasDictionary && forwardIndexConfig != null && forwardIndexConfig.getCompressionCodecSpec() != null
+        && forwardIndexConfig.getCompressionCodecSpec().hasLevel()) {
+      metadataProperties.setProperty(metadataKey, forwardIndexConfig.getCompressionCodecSpec().toConfigString());
+    } else {
+      metadataProperties.clearProperty(metadataKey);
+    }
   }
 
   private void rewriteDictToRawForwardIndex(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter,

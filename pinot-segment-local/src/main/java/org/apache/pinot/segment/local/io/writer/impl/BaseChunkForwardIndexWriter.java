@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
@@ -88,11 +89,18 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   protected BaseChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, long chunkSize, int sizeOfEntry, int version, boolean fixed)
       throws IOException {
+    this(file, compressionType, null, totalDocs, numDocsPerChunk, chunkSize, sizeOfEntry, version, fixed);
+  }
+
+  protected BaseChunkForwardIndexWriter(File file, ChunkCompressionType compressionType,
+      @Nullable Integer compressionLevel, int totalDocs, int numDocsPerChunk, long chunkSize, int sizeOfEntry,
+      int version, boolean fixed)
+      throws IOException {
     Preconditions.checkArgument(version == 2 || version == 3 || (fixed && version >= 4),
         "Illegal version: %s for %s bytes values", version, fixed ? "fixed" : "variable");
     Preconditions.checkArgument(chunkSize <= Integer.MAX_VALUE, "Chunk size limited to 2GB");
     _chunkSize = (int) chunkSize;
-    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
+    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType, compressionLevel, false);
     _headerEntryChunkOffsetSize = version == 2 ? Integer.BYTES : Long.BYTES;
     _dataOffset = writeHeader(compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, version);
     _chunkBuffer = ByteBuffer.allocateDirect(_chunkSize);

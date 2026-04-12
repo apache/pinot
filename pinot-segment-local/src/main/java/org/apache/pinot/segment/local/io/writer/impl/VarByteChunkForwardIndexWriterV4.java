@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
@@ -95,10 +96,16 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
 
   public VarByteChunkForwardIndexWriterV4(File file, ChunkCompressionType compressionType, int chunkSize)
       throws IOException {
+    this(file, compressionType, null, chunkSize);
+  }
+
+  public VarByteChunkForwardIndexWriterV4(File file, ChunkCompressionType compressionType,
+      @Nullable Integer compressionLevel, int chunkSize)
+      throws IOException {
     _dataBuffer = new File(file.getParentFile(), file.getName() + DATA_BUFFER_SUFFIX);
     _output = new RandomAccessFile(file, "rw");
     _dataChannel = new RandomAccessFile(_dataBuffer, "rw").getChannel();
-    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType, true);
+    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType, compressionLevel, true);
     _chunkBuffer = ByteBuffer.allocateDirect(chunkSize).order(ByteOrder.LITTLE_ENDIAN);
     _compressionBuffer =
         ByteBuffer.allocateDirect(_chunkCompressor.maxCompressedSize(chunkSize)).order(ByteOrder.LITTLE_ENDIAN);

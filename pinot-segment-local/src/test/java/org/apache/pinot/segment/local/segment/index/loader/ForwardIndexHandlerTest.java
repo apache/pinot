@@ -34,6 +34,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -59,6 +60,8 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.table.CompressionCodecSpec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -1030,6 +1033,110 @@ public class ForwardIndexHandlerTest {
             metadata.getMaxValue(), false);
       }
     }
+  }
+
+  @Test
+  public void testChangeCompressionLevelForSingleColumn()
+      throws Exception {
+    String column = RAW_LZ4_COLUMNS.get(0);
+    String metadataKey = V1Constants.MetadataKeys.Column.getKeyFor(column,
+        V1Constants.MetadataKeys.Column.FORWARD_INDEX_COMPRESSION_CODEC);
+    PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(INDEX_DIR);
+    assertNull(metadataProperties.getProperty(metadataKey));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(column, new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW)
+          .withCompressionCodecSpec(CompressionCodecSpec.fromString("LZ4(12)")).build());
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertTrue(handler.needUpdateIndices(writer));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(INDEX_DIR);
+    assertEquals(metadataProperties.getString(metadataKey), "LZ4(12)");
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(column, new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW)
+          .withCompressionCodecSpec(CompressionCodecSpec.fromString("LZ4(12)")).build());
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertFalse(handler.needUpdateIndices(writer));
+    }
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(column, new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW)
+          .withCompressionCodecSpec(CompressionCodecSpec.fromString("LZ4")).build());
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertTrue(handler.needUpdateIndices(writer));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(INDEX_DIR);
+    assertNull(metadataProperties.getProperty(metadataKey));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(column, new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW)
+          .withCompressionCodecSpec(CompressionCodecSpec.fromString("LZ4")).build());
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertFalse(handler.needUpdateIndices(writer));
+    }
+  }
+
+  @Test
+  public void testEnableDictionaryClearsRawCompressionLevelMetadata()
+      throws Exception {
+    String column = RAW_LZ4_COLUMNS.get(0);
+    String metadataKey = V1Constants.MetadataKeys.Column.getKeyFor(column,
+        V1Constants.MetadataKeys.Column.FORWARD_INDEX_COMPRESSION_CODEC);
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(column, new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW)
+          .withCompressionCodecSpec(CompressionCodecSpec.fromString("LZ4(12)")).build());
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertTrue(handler.needUpdateIndices(writer));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(INDEX_DIR);
+    assertEquals(metadataProperties.getString(metadataKey), "LZ4(12)");
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _noDictionaryColumns.remove(column);
+      _fieldConfigMap.remove(column);
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertTrue(handler.needUpdateIndices(writer));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(INDEX_DIR);
+    assertNull(metadataProperties.getProperty(metadataKey));
   }
 
   @Test

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.BaseSegmentCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.inverted.InvertedIndexType;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
@@ -279,15 +280,18 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       writeToForwardIndex(dictionary, context);
 
       // Setup and return the metadata properties to update
+      Map<String, String> metadataProperties = new HashMap<>();
       if (_dictionaryEnabled) {
-        return Map.of();
+        metadataProperties.put(getKeyFor(_columnName, FORWARD_INDEX_COMPRESSION_CODEC), null);
+        return metadataProperties;
       } else {
-        return Map.of(
-            getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false),
-            getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0)
-            // TODO: See https://github.com/apache/pinot/pull/16921 for details
-            // getKeyFor(_columnName, BITS_PER_ELEMENT), String.valueOf(-1)
-        );
+        metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false));
+        metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
+        BaseSegmentCreator.addForwardIndexCompressionCodecInfo(metadataProperties, _columnName, _forwardIndexConfig,
+            false);
+        // TODO: See https://github.com/apache/pinot/pull/16921 for details
+        // metadataProperties.put(getKeyFor(_columnName, BITS_PER_ELEMENT), String.valueOf(-1));
+        return metadataProperties;
       }
     }
   }
@@ -375,9 +379,13 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       metadataProperties.put(getKeyFor(_columnName, MAX_MULTI_VALUE_ELEMENTS),
           String.valueOf(maxNumberOfMultiValues[0]));
       metadataProperties.put(getKeyFor(_columnName, TOTAL_NUMBER_OF_ENTRIES), String.valueOf(_nextValueId));
-      if (!_dictionaryEnabled) {
+      if (_dictionaryEnabled) {
+        metadataProperties.put(getKeyFor(_columnName, FORWARD_INDEX_COMPRESSION_CODEC), null);
+      } else {
         metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false));
         metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
+        BaseSegmentCreator.addForwardIndexCompressionCodecInfo(metadataProperties, _columnName, _forwardIndexConfig,
+            false);
         // TODO: See https://github.com/apache/pinot/pull/16921 for details
         // metadataProperties.put(getKeyFor(_columnName, BITS_PER_ELEMENT), String.valueOf(-1));
       }
