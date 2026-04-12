@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
@@ -881,7 +882,7 @@ public class BaseTableDataManagerTest {
     try {
       File indexDir = createSegment(SegmentVersion.v3, 5);
       registerOfflineSegment(mgr, SEGMENT_NAME, indexDir);
-      mgr.reloadAllSegments(false);
+      mgr.reloadAllSegments(false, null);
       assertEquals(mgr.getNumSegments(), 1);
       assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
     } finally {
@@ -896,7 +897,7 @@ public class BaseTableDataManagerTest {
     try {
       File indexDir = createSegment(SegmentVersion.v3, 5);
       registerOfflineSegment(mgr, SEGMENT_NAME, indexDir);
-      mgr.reloadSegments(List.of(SEGMENT_NAME), false);
+      mgr.reloadSegments(List.of(SEGMENT_NAME), false, null);
       assertEquals(mgr.getNumSegments(), 1);
       assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
     } finally {
@@ -911,7 +912,7 @@ public class BaseTableDataManagerTest {
     try {
       File indexDir = createSegment(SegmentVersion.v3, 5);
       registerOfflineSegment(mgr, SEGMENT_NAME, indexDir);
-      mgr.reloadSegments(Arrays.asList(SEGMENT_NAME, "missingSegment"), false);
+      mgr.reloadSegments(Arrays.asList(SEGMENT_NAME, "missingSegment"), false, null);
       assertEquals(mgr.getNumSegments(), 1);
     } finally {
       mgr.shutDown();
@@ -927,7 +928,7 @@ public class BaseTableDataManagerTest {
       File indexDir2 = createSegment(SEGMENT_NAME_2, SegmentVersion.v3, 5);
       registerOfflineSegment(mgr, SEGMENT_NAME, indexDir1);
       registerOfflineSegment(mgr, SEGMENT_NAME_2, indexDir2);
-      mgr.reloadAllSegments(false);
+      mgr.reloadAllSegments(false, null);
       assertEquals(mgr.getNumSegments(), 2);
       assertEquals(new SegmentMetadataImpl(indexDir1).getTotalDocs(), 5);
       assertEquals(new SegmentMetadataImpl(indexDir2).getTotalDocs(), 5);
@@ -1099,7 +1100,7 @@ public class BaseTableDataManagerTest {
     OfflineTableDataManagerForParallelReloadTest tableDataManager = new OfflineTableDataManagerForParallelReloadTest();
     tableDataManager.init(createDefaultInstanceDataManagerConfig(), mock(HelixManager.class), new SegmentLocks(),
         DEFAULT_TABLE_CONFIG, SCHEMA, new SegmentReloadSemaphore(1), Executors.newFixedThreadPool(2), null, null,
-        SEGMENT_OPERATIONS_THROTTLER);
+        SEGMENT_OPERATIONS_THROTTLER, false, null);
     return tableDataManager;
   }
 
