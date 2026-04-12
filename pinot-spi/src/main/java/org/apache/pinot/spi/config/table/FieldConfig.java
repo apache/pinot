@@ -62,9 +62,6 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_DEFAULT_LUCENE_QUERY_PARSER_CLASS =
       "org.apache.lucene.queryparser.classic.QueryParser";
   public static final String TEXT_INDEX_STOP_WORD_SEPERATOR = ",";
-  // "native" for native, default is Lucene
-  public static final String TEXT_FST_TYPE = "fstType";
-  public static final String TEXT_NATIVE_FST_LITERAL = "native";
   // Config to disable forward index
   public static final String FORWARD_INDEX_DISABLED = "forwardIndexDisabled";
   public static final String DEFAULT_FORWARD_INDEX_DISABLED = Boolean.FALSE.toString();

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.distinct.dictionary;
 
-import it.unimi.dsi.fastutil.ints.IntIterator;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -27,18 +26,10 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.distinct.BaseSingleColumnDistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
-import org.apache.pinot.core.query.distinct.table.BigDecimalDistinctTable;
-import org.apache.pinot.core.query.distinct.table.BytesDistinctTable;
 import org.apache.pinot.core.query.distinct.table.DictIdDistinctTable;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
-import org.apache.pinot.core.query.distinct.table.DoubleDistinctTable;
-import org.apache.pinot.core.query.distinct.table.FloatDistinctTable;
-import org.apache.pinot.core.query.distinct.table.IntDistinctTable;
-import org.apache.pinot.core.query.distinct.table.LongDistinctTable;
-import org.apache.pinot.core.query.distinct.table.StringDistinctTable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -120,92 +111,6 @@ public class DictionaryBasedSingleColumnDistinctExecutor
 
   @Override
   public DistinctTable getResult() {
-    DataSchema dataSchema = _distinctTable.getDataSchema();
-    int limit = _distinctTable.getLimit();
-    boolean nullHandlingEnabled = _distinctTable.isNullHandlingEnabled();
-    OrderByExpressionContext orderByExpression = _distinctTable.getOrderByExpression();
-    IntIterator dictIdIterator = _distinctTable.getValueSet().iterator();
-    boolean hasNull = _distinctTable.hasNull();
-    switch (_dictionary.getValueType()) {
-      case INT: {
-        IntDistinctTable distinctTable =
-            new IntDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
-        while (dictIdIterator.hasNext()) {
-          distinctTable.addUnbounded(_dictionary.getIntValue(dictIdIterator.nextInt()));
-        }
-        if (hasNull) {
-          distinctTable.addNull();
-        }
-        return distinctTable;
-      }
-      case LONG: {
-        LongDistinctTable distinctTable =
-            new LongDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
-        while (dictIdIterator.hasNext()) {
-          distinctTable.addUnbounded(_dictionary.getLongValue(dictIdIterator.nextInt()));
-        }
-        if (hasNull) {
-          distinctTable.addNull();
-        }
-        return distinctTable;
-      }
-      case FLOAT: {
-        FloatDistinctTable distinctTable =
-            new FloatDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
-        while (dictIdIterator.hasNext()) {
-          distinctTable.addUnbounded(_dictionary.getFloatValue(dictIdIterator.nextInt()));
-        }
-        if (hasNull) {
-          distinctTable.addNull();
-        }
-        return distinctTable;
-      }
-      case DOUBLE: {
-        DoubleDistinctTable distinctTable =
-            new DoubleDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
-        while (dictIdIterator.hasNext()) {
-          distinctTable.addUnbounded(_dictionary.getDoubleValue(dictIdIterator.nextInt()));
-        }
-        if (hasNull) {
-          distinctTable.addNull();
-        }
-        return distinctTable;
-      }
-      case BIG_DECIMAL: {
-        BigDecimalDistinctTable distinctTable =
-            new BigDecimalDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
-        while (dictIdIterator.hasNext()) {
-          distinctTable.addUnbounded(_dictionary.getBigDecimalValue(dictIdIterator.nextInt()));
-        }
-        if (hasNull) {
-          distinctTable.addNull();
-        }
-        return distinctTable;
-      }
-      case STRING: {
-        StringDistinctTable distinctTable =
-            new StringDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
-        while (dictIdIterator.hasNext()) {
-          distinctTable.addUnbounded(_dictionary.getStringValue(dictIdIterator.nextInt()));
-        }
-        if (hasNull) {
-          distinctTable.addNull();
-        }
-        return distinctTable;
-      }
-      case BYTES: {
-        BytesDistinctTable distinctTable =
-            new BytesDistinctTable(dataSchema, limit, nullHandlingEnabled, orderByExpression);
-        while (dictIdIterator.hasNext()) {
-          distinctTable.addUnbounded(new ByteArray(_dictionary.getBytesValue(dictIdIterator.nextInt())));
-        }
-        if (hasNull) {
-          distinctTable.addNull();
-        }
-        return distinctTable;
-      }
-      default:
-        throw new IllegalStateException("Unsupported data type: " + _dataType);
-    }
+    return _distinctTable.toTypedDistinctTable(_dictionary, _distinctTable.hasNull());
   }
 }

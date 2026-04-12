@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
-import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -28,21 +28,17 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Comprehensive tests for DefaultValueColumnReader.
- *
- * <p>This test validates:
- * <ul>
- *   <li>Single-value fields for all data types (INT, LONG, FLOAT, DOUBLE, STRING, BYTES)</li>
- *   <li>Multi-value fields for all data types</li>
- *   <li>Sequential access methods (next*, hasNext, skipNext, isNextNull)</li>
- *   <li>Random access methods (get*, isNull)</li>
- *   <li>Type indicator methods (isInt, isLong, etc.)</li>
- *   <li>Rewind functionality</li>
- *   <li>Boundary conditions and exception handling</li>
- *   <li>Array reuse optimization for multi-value fields</li>
- * </ul>
- */
+/// Comprehensive tests for [DefaultValueColumnReader].
+///
+/// This test validates:
+/// - Single-value fields for all data types (INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, STRING, BYTES)
+/// - Multi-value fields for all data types
+/// - Sequential access methods (next*, hasNext, skipNext, isNextNull)
+/// - Random access methods (get*, isNull)
+/// - Type indicator methods (isInt, isLong, isBigDecimal, etc.)
+/// - Rewind functionality
+/// - Boundary conditions and exception handling
+/// - Array reuse optimization for multi-value fields
 public class DefaultValueColumnReaderTest {
 
   private static final int NUM_DOCS = 100;
@@ -51,7 +47,7 @@ public class DefaultValueColumnReaderTest {
   // ========== Single-Value Field Tests ==========
 
   @Test
-  public void testSingleValueIntColumn() throws IOException {
+  public void testSingleValueIntColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -88,7 +84,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testSingleValueLongColumn() throws IOException {
+  public void testSingleValueLongColumn() {
     FieldSpec fieldSpec = new MetricFieldSpec(COLUMN_NAME, FieldSpec.DataType.LONG);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -113,7 +109,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testSingleValueFloatColumn() throws IOException {
+  public void testSingleValueFloatColumn() {
     FieldSpec fieldSpec = new MetricFieldSpec(COLUMN_NAME, FieldSpec.DataType.FLOAT);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -137,7 +133,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testSingleValueDoubleColumn() throws IOException {
+  public void testSingleValueDoubleColumn() {
     FieldSpec fieldSpec = new MetricFieldSpec(COLUMN_NAME, FieldSpec.DataType.DOUBLE);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -161,7 +157,42 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testSingleValueStringColumn() throws IOException {
+  public void testSingleValueBigDecimalColumn() {
+    FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.BIG_DECIMAL, true);
+    DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
+
+    // Test type indicators
+    Assert.assertFalse(reader.isDouble());
+    Assert.assertTrue(reader.isBigDecimal());
+    Assert.assertFalse(reader.isString());
+
+    // Test sequential access with nextBigDecimal
+    BigDecimal expectedValue = (BigDecimal) fieldSpec.getDefaultNullValue();
+    for (int i = 0; i < NUM_DOCS; i++) {
+      Assert.assertTrue(reader.hasNext());
+      Assert.assertFalse(reader.isNextNull());
+      Assert.assertEquals(reader.nextBigDecimal().compareTo(expectedValue), 0);
+    }
+    Assert.assertFalse(reader.hasNext());
+
+    // Test rewind and next()
+    reader.rewind();
+    for (int i = 0; i < NUM_DOCS; i++) {
+      Assert.assertEquals(((BigDecimal) reader.next()).compareTo(expectedValue), 0);
+    }
+
+    // Test random access
+    reader.rewind();
+    for (int i = 0; i < NUM_DOCS; i++) {
+      Assert.assertFalse(reader.isNull(i));
+      Assert.assertEquals(reader.getBigDecimal(i).compareTo(expectedValue), 0);
+    }
+
+    reader.close();
+  }
+
+  @Test
+  public void testSingleValueStringColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.STRING, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -185,7 +216,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testSingleValueBytesColumn() throws IOException {
+  public void testSingleValueBytesColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.BYTES, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -211,7 +242,7 @@ public class DefaultValueColumnReaderTest {
   // ========== Multi-Value Field Tests ==========
 
   @Test
-  public void testMultiValueIntColumn() throws IOException {
+  public void testMultiValueIntColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, false);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -246,7 +277,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testMultiValueLongColumn() throws IOException {
+  public void testMultiValueLongColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.LONG, false);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -273,7 +304,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testMultiValueFloatColumn() throws IOException {
+  public void testMultiValueFloatColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.FLOAT, false);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -296,7 +327,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testMultiValueDoubleColumn() throws IOException {
+  public void testMultiValueDoubleColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.DOUBLE, false);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -319,7 +350,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testMultiValueStringColumn() throws IOException {
+  public void testMultiValueStringColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.STRING, false);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -341,7 +372,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testMultiValueBytesColumn() throws IOException {
+  public void testMultiValueBytesColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.BYTES, false);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -366,7 +397,7 @@ public class DefaultValueColumnReaderTest {
   // ========== Edge Cases and Error Handling ==========
 
   @Test(expectedExceptions = IllegalStateException.class)
-  public void testNextPastEnd() throws IOException {
+  public void testNextPastEnd() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, 5, fieldSpec);
 
@@ -381,7 +412,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
-  public void testIsNextNullPastEnd() throws IOException {
+  public void testIsNextNullPastEnd() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, 5, fieldSpec);
 
@@ -396,7 +427,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
-  public void testSkipNextPastEnd() throws IOException {
+  public void testSkipNextPastEnd() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, 5, fieldSpec);
 
@@ -411,7 +442,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test(expectedExceptions = IndexOutOfBoundsException.class)
-  public void testRandomAccessOutOfBounds() throws IOException {
+  public void testRandomAccessOutOfBounds() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -421,7 +452,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test(expectedExceptions = IndexOutOfBoundsException.class)
-  public void testRandomAccessNegativeIndex() throws IOException {
+  public void testRandomAccessNegativeIndex() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -431,7 +462,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testIsNullAlwaysReturnsFalse() throws IOException {
+  public void testIsNullAlwaysReturnsFalse() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, NUM_DOCS, fieldSpec);
 
@@ -446,7 +477,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testSkipNext() throws IOException {
+  public void testSkipNext() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, 10, fieldSpec);
 
@@ -463,7 +494,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testRewind() throws IOException {
+  public void testRewind() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, 10, fieldSpec);
 
@@ -487,7 +518,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testNextObjectMethod() throws IOException {
+  public void testNextObjectMethod() {
     // Test single-value field
     FieldSpec svFieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader svReader = new DefaultValueColumnReader(COLUMN_NAME, 5, svFieldSpec);
@@ -514,7 +545,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testGetTotalDocs() throws IOException {
+  public void testGetTotalDocs() {
     for (int numDocs : new int[]{0, 1, 10, 100, 1000}) {
       FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
       DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, numDocs, fieldSpec);
@@ -524,7 +555,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testEmptyColumn() throws IOException {
+  public void testEmptyColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, 0, fieldSpec);
 
@@ -535,7 +566,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testSingleDocColumn() throws IOException {
+  public void testSingleDocColumn() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, 1, fieldSpec);
 
@@ -552,7 +583,7 @@ public class DefaultValueColumnReaderTest {
   }
 
   @Test
-  public void testAllTypeIndicators() throws IOException {
+  public void testAllTypeIndicators() {
     // Test INT
     FieldSpec intSpec = new DimensionFieldSpec("int_col", FieldSpec.DataType.INT, true);
     DefaultValueColumnReader intReader = new DefaultValueColumnReader("int_col", 1, intSpec);
@@ -560,6 +591,7 @@ public class DefaultValueColumnReaderTest {
     Assert.assertFalse(intReader.isLong());
     Assert.assertFalse(intReader.isFloat());
     Assert.assertFalse(intReader.isDouble());
+    Assert.assertFalse(intReader.isBigDecimal());
     Assert.assertFalse(intReader.isString());
     Assert.assertFalse(intReader.isBytes());
     intReader.close();
@@ -585,6 +617,14 @@ public class DefaultValueColumnReaderTest {
     Assert.assertTrue(doubleReader.isDouble());
     doubleReader.close();
 
+    // Test BIG_DECIMAL
+    FieldSpec bigDecimalSpec = new DimensionFieldSpec("big_decimal_col", FieldSpec.DataType.BIG_DECIMAL, true);
+    DefaultValueColumnReader bigDecimalReader = new DefaultValueColumnReader("big_decimal_col", 1, bigDecimalSpec);
+    Assert.assertFalse(bigDecimalReader.isDouble());
+    Assert.assertTrue(bigDecimalReader.isBigDecimal());
+    Assert.assertFalse(bigDecimalReader.isString());
+    bigDecimalReader.close();
+
     // Test STRING
     FieldSpec stringSpec = new DimensionFieldSpec("string_col", FieldSpec.DataType.STRING, true);
     DefaultValueColumnReader stringReader = new DefaultValueColumnReader("string_col", 1, stringSpec);
@@ -597,11 +637,12 @@ public class DefaultValueColumnReaderTest {
     DefaultValueColumnReader bytesReader = new DefaultValueColumnReader("bytes_col", 1, bytesSpec);
     Assert.assertFalse(bytesReader.isString());
     Assert.assertTrue(bytesReader.isBytes());
+    Assert.assertFalse(bytesReader.isBigDecimal());
     bytesReader.close();
   }
 
   @Test
-  public void testMultipleReadsFromSamePosition() throws IOException {
+  public void testMultipleReadsFromSamePosition() {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
     DefaultValueColumnReader reader = new DefaultValueColumnReader(COLUMN_NAME, 10, fieldSpec);
 

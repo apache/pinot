@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -205,6 +206,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(intDictionary.getFloatValue(i), (float) _intValues[i]);
       assertEquals(intDictionary.getDoubleValue(i), (double) _intValues[i]);
       Assert.assertEquals(Integer.parseInt(intDictionary.getStringValue(i)), _intValues[i]);
+      assertEquals(intDictionary.getValueSize(i), Integer.BYTES);
 
       assertEquals(intDictionary.indexOf(String.valueOf(_intValues[i])), i);
 
@@ -242,6 +244,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(longDictionary.getFloatValue(i), (float) _longValues[i]);
       assertEquals(longDictionary.getDoubleValue(i), (double) _longValues[i]);
       Assert.assertEquals(Long.parseLong(longDictionary.getStringValue(i)), _longValues[i]);
+      assertEquals(longDictionary.getValueSize(i), Long.BYTES);
 
       assertEquals(longDictionary.indexOf(String.valueOf(_longValues[i])), i);
 
@@ -279,6 +282,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(floatDictionary.getFloatValue(i), _floatValues[i]);
       assertEquals(floatDictionary.getDoubleValue(i), (double) _floatValues[i]);
       Assert.assertEquals(Float.parseFloat(floatDictionary.getStringValue(i)), _floatValues[i], 0.0f);
+      assertEquals(floatDictionary.getValueSize(i), Float.BYTES);
 
       assertEquals(floatDictionary.indexOf(String.valueOf(_floatValues[i])), i);
 
@@ -316,6 +320,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(doubleDictionary.getFloatValue(i), (float) _doubleValues[i]);
       assertEquals(doubleDictionary.getDoubleValue(i), _doubleValues[i]);
       Assert.assertEquals(Double.parseDouble(doubleDictionary.getStringValue(i)), _doubleValues[i], 0.0);
+      assertEquals(doubleDictionary.getValueSize(i), Double.BYTES);
 
       assertEquals(doubleDictionary.indexOf(String.valueOf(_doubleValues[i])), i);
 
@@ -356,6 +361,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(bigDecimalDictionary.getDoubleValue(i), _bigDecimalValues[i].doubleValue());
       assertEquals(bigDecimalDictionary.getBigDecimalValue(i), _bigDecimalValues[i]);
       Assert.assertEquals(new BigDecimal(bigDecimalDictionary.getStringValue(i)), _bigDecimalValues[i]);
+      assertEquals(bigDecimalDictionary.getValueSize(i), BigDecimalUtils.byteSize(_bigDecimalValues[i]));
 
       assertEquals(bigDecimalDictionary.indexOf(String.valueOf(_bigDecimalValues[i])), i);
 
@@ -401,6 +407,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
     for (int i = 0; i < NUM_VALUES; i++) {
       assertEquals(stringDictionary.get(i), _stringValues[i]);
       assertEquals(stringDictionary.getStringValue(i), _stringValues[i]);
+      assertEquals(stringDictionary.getValueSize(i), Utf8.encodedLength(_stringValues[i]));
 
       assertEquals(stringDictionary.indexOf(_stringValues[i]), i);
 
@@ -448,6 +455,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(bytesDictionary.get(i), _bytesValues[i].getBytes());
       assertEquals(bytesDictionary.getStringValue(i), _bytesValues[i].toHexString());
       assertEquals(bytesDictionary.getBytesValue(i), _bytesValues[i].getBytes());
+      assertEquals(bytesDictionary.getValueSize(i), BYTES_LENGTH);
 
       assertEquals(bytesDictionary.indexOf(_bytesValues[i].toHexString()), i);
 

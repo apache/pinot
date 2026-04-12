@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import com.google.common.base.Preconditions;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -30,7 +29,6 @@ import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -39,19 +37,22 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
  * TODO: Gather more info on the fly to avoid scanning the segment
  */
 public class MutableColumnStatistics implements ColumnStatistics {
-  private final DataSource _dataSource;
-  private final int[] _sortedDocIdIterationOrder;
+  protected final DataSource _dataSource;
+  @Nullable
+  protected final int[] _sortedDocIds;
+  protected final boolean _isSortedColumn;
 
   // NOTE: For new added columns during the ingestion, this will be constant value dictionary instead of mutable
   //       dictionary.
-  private final Dictionary _dictionary;
+  protected final Dictionary _dictionary;
 
   private int _minElementLength = -1;
   private int _maxElementLength = -1;
 
-  public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIdIterationOrder) {
+  public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSource = dataSource;
-    _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
+    _sortedDocIds = sortedDocIds;
+    _isSortedColumn = isSortedColumn;
     _dictionary = dataSource.getDictionary();
   }
 
@@ -92,46 +93,31 @@ public class MutableColumnStatistics implements ColumnStatistics {
       return;
     }
 
-    DataType storedType = _dictionary.getValueType();
-    if (storedType.isFixedWidth()) {
-      _minElementLength = storedType.size();
-      _maxElementLength = storedType.size();
-      return;
-    }
-
-    // If the stored type is not fixed width, iterate over the dictionary to find the min/max element length
-    _minElementLength = Integer.MAX_VALUE;
-    _maxElementLength = 0;
-    int length = _dictionary.length();
-    switch (storedType) {
-      case BIG_DECIMAL:
-        for (int i = 0; i < length; i++) {
-          int elementLength = BigDecimalUtils.byteSize(_dictionary.getBigDecimalValue(i));
-          _minElementLength = Math.min(_minElementLength, elementLength);
-          _maxElementLength = Math.max(_maxElementLength, elementLength);
-        }
-        break;
-      case STRING:
-        for (int i = 0; i < length; i++) {
-          int elementLength = _dictionary.getStringValue(i).getBytes(StandardCharsets.UTF_8).length;
-          _minElementLength = Math.min(_minElementLength, elementLength);
-          _maxElementLength = Math.max(_maxElementLength, elementLength);
-        }
-        break;
-      case BYTES:
-        for (int i = 0; i < length; i++) {
-          int elementLength = _dictionary.getBytesValue(i).length;
-          _minElementLength = Math.min(_minElementLength, elementLength);
-          _maxElementLength = Math.max(_maxElementLength, elementLength);
-        }
-        break;
-      default:
-        throw new IllegalStateException("Unsupported stored type: " + storedType);
+    DataType valueType = _dictionary.getValueType();
+    if (valueType.isFixedWidth()) {
+      int length = valueType.size();
+      _minElementLength = length;
+      _maxElementLength = length;
+    } else {
+      // If the stored type is not fixed width, iterate over the dictionary to find the min/max element length
+      _minElementLength = Integer.MAX_VALUE;
+      _maxElementLength = 0;
+      int length = _dictionary.length();
+      for (int i = 0; i < length; i++) {
+        int elementLength = _dictionary.getValueSize(i);
+        _minElementLength = Math.min(_minElementLength, elementLength);
+        _maxElementLength = Math.max(_maxElementLength, elementLength);
+      }
     }
   }
 
   @Override
   public boolean isSorted() {
+    // Sorted column is guaranteed to be sorted by construction — no scan needed
+    if (_isSortedColumn) {
+      return true;
+    }
+
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
 
     // Multi-valued column cannot be sorted
@@ -140,7 +126,7 @@ public class MutableColumnStatistics implements ColumnStatistics {
     }
 
     // If there is only one distinct value, then it is sorted
-    if (getCardinality() == 1) {
+    if (getCardinality() <= 1) {
       return true;
     }
 
@@ -150,10 +136,10 @@ public class MutableColumnStatistics implements ColumnStatistics {
         String.format("Forward index should not be null for column: %s", dataSourceMetadata.getFieldSpec().getName()));
     int numDocs = dataSourceMetadata.getNumDocs();
     // Iterate with the sorted order if provided
-    if (_sortedDocIdIterationOrder != null) {
-      int previousDictId = mutableForwardIndex.getDictId(_sortedDocIdIterationOrder[0]);
+    if (_sortedDocIds != null) {
+      int previousDictId = mutableForwardIndex.getDictId(_sortedDocIds[0]);
       for (int i = 1; i < numDocs; i++) {
-        int currentDictId = mutableForwardIndex.getDictId(_sortedDocIdIterationOrder[i]);
+        int currentDictId = mutableForwardIndex.getDictId(_sortedDocIds[i]);
         if (_dictionary.compare(previousDictId, currentDictId) > 0) {
           return false;
         }
@@ -184,13 +170,13 @@ public class MutableColumnStatistics implements ColumnStatistics {
   }
 
   @Override
-  public PartitionFunction getPartitionFunction() {
-    return _dataSource.getDataSourceMetadata().getPartitionFunction();
+  public int getMaxRowLengthInBytes() {
+    return _dataSource.getDataSourceMetadata().getMaxRowLengthInBytes();
   }
 
   @Override
-  public int getMaxRowLengthInBytes() {
-    return _dataSource.getDataSourceMetadata().getMaxRowLengthInBytes();
+  public PartitionFunction getPartitionFunction() {
+    return _dataSource.getDataSourceMetadata().getPartitionFunction();
   }
 
   @Override

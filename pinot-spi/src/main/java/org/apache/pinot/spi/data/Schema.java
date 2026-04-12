@@ -34,6 +34,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -41,6 +42,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -67,6 +70,10 @@ public final class Schema implements Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
   private String _schemaName;
+  @Nullable
+  private String _description;
+  @Nullable
+  private List<String> _tags;
   private boolean _enableColumnBasedNullHandling;
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
@@ -169,6 +176,24 @@ public final class Schema implements Serializable {
 
   public void setSchemaName(String schemaName) {
     _schemaName = schemaName;
+  }
+
+  @Nullable
+  public String getDescription() {
+    return _description;
+  }
+
+  public void setDescription(@Nullable String description) {
+    _description = description;
+  }
+
+  @Nullable
+  public List<String> getTags() {
+    return _tags;
+  }
+
+  public void setTags(@Nullable List<String> tags) {
+    _tags = tags;
   }
 
   public boolean isEnableColumnBasedNullHandling() {
@@ -389,6 +414,8 @@ public final class Schema implements Serializable {
   public Schema withoutVirtualColumns() {
     Schema newSchema = new Schema();
     newSchema.setSchemaName(getSchemaName());
+    newSchema.setDescription(_description);
+    newSchema.setTags(_tags);
     newSchema.setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling());
     List<String> primaryKeyColumns = getPrimaryKeyColumns();
     if (primaryKeyColumns != null) {
@@ -508,6 +535,16 @@ public final class Schema implements Serializable {
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("schemaName", _schemaName);
+    if (StringUtils.isNotBlank(_description)) {
+      jsonObject.put("description", _description);
+    }
+    if (_tags != null && !_tags.isEmpty()) {
+      ArrayNode tagsArray = JsonUtils.newArrayNode();
+      for (String tag : _tags) {
+        tagsArray.add(tag);
+      }
+      jsonObject.set("tags", tagsArray);
+    }
     jsonObject.set("enableColumnBasedNullHandling", JsonUtils.objectToJsonNode(_enableColumnBasedNullHandling));
     if (!_dimensionFieldSpecs.isEmpty()) {
       ArrayNode jsonArray = JsonUtils.newArrayNode();
@@ -599,6 +636,16 @@ public final class Schema implements Serializable {
 
     public SchemaBuilder setSchemaName(String schemaName) {
       _schema.setSchemaName(schemaName);
+      return this;
+    }
+
+    public SchemaBuilder setDescription(@Nullable String description) {
+      _schema.setDescription(description);
+      return this;
+    }
+
+    public SchemaBuilder setTags(@Nullable List<String> tags) {
+      _schema.setTags(tags);
       return this;
     }
 
@@ -804,6 +851,8 @@ public final class Schema implements Serializable {
     Schema that = (Schema) o;
     //@formatter:off
     return EqualityUtils.isEqual(_schemaName, that._schemaName)
+        && EqualityUtils.isEqual(_description, that._description)
+        && EqualityUtils.isEqual(_tags, that._tags)
         && EqualityUtils.isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs)
         && EqualityUtils.isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs)
         && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec)
@@ -840,10 +889,20 @@ public final class Schema implements Serializable {
    * Backward compatibility requires
    * (1) all columns in oldSchema should be retained.
    * (2) all column fieldSpecs should be backward compatible with the old ones.
+   * (3) primary key columns should not be changed if present(used in dimension tables, upsert, and dedup).
    *
    * @param oldSchema old schema
    */
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
+    List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
+    List<String> newPrimaryKeys = getPrimaryKeyColumns();
+    // Allow adding primary keys if not present. Helps add upsert and dedup configs to existing tables.
+    if (CollectionUtils.isNotEmpty(oldPrimaryKeys)) {
+      if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
+        return false;
+      }
+    }
+
     Set<String> columnNames = getColumnNames();
     for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
       String oldSchemaColumnName = entry.getKey();
@@ -863,6 +922,8 @@ public final class Schema implements Serializable {
   @Override
   public int hashCode() {
     int result = EqualityUtils.hashCodeOf(_schemaName);
+    result = EqualityUtils.hashCodeOf(result, _description);
+    result = EqualityUtils.hashCodeOf(result, _tags);
     result = EqualityUtils.hashCodeOf(result, _dimensionFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _metricFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
@@ -882,11 +943,24 @@ public final class Schema implements Serializable {
   public Schema clone() {
     Schema cloned = new SchemaBuilder()
         .setSchemaName(getSchemaName())
+        .setDescription(getDescription())
+        .setTags(getTags())
         .setPrimaryKeyColumns(getPrimaryKeyColumns())
         .setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling())
         .build();
     getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
     return cloned;
+  }
+
+  public static Schema cloneSchemaWithName(Schema source, String newName) {
+    try {
+      String json = JsonUtils.objectToString(source);
+      Schema cloned = JsonUtils.stringToObject(json, Schema.class);
+      cloned.setSchemaName(newName);
+      return cloned;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to clone schema", e);
+    }
   }
 
   /**

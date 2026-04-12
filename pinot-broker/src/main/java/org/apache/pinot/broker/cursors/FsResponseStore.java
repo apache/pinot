@@ -159,11 +159,17 @@ public class FsResponseStore extends AbstractResponseStore {
       throws Exception {
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     URI queryDir = combinePath(_dataDir, requestId);
-    if (pinotFS.exists(queryDir)) {
+    try {
       pinotFS.delete(queryDir, true);
       return true;
+    } catch (Exception e) {
+      // Directory may have been deleted concurrently. If it's gone, treat as success.
+      if (!pinotFS.exists(queryDir)) {
+        LOGGER.debug("Directory already deleted for requestId={} (likely concurrent deletion)", requestId);
+        return true;
+      }
+      throw e;
     }
-    return false;
   }
 
   @Override

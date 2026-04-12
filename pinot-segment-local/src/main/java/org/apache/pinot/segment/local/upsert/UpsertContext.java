@@ -192,6 +192,16 @@ public class UpsertContext {
     return _tableIndexDir;
   }
 
+  /**
+   * Returns true if the table configuration has settings that can lead to inconsistent upsert metadata
+   * during segment replacement after force commit. This happens when:
+   * - Partial upsert is enabled (records need to be merged with previous values)
+   * - dropOutOfOrderRecord is enabled with NONE consistency mode (records may have been dropped)
+   */
+  public boolean isTableTypeInconsistentDuringConsumption() {
+    return _dropOutOfOrderRecord || _outOfOrderRecordColumn != null || _partialUpsertHandler != null;
+  }
+
   @Override
   public String toString() {
     return new ToStringBuilder(this)
@@ -352,7 +362,7 @@ public class UpsertContext {
       Preconditions.checkState(_schema != null, "Schema must be set");
       Preconditions.checkState(CollectionUtils.isNotEmpty(_primaryKeyColumns), "Primary key columns must be set");
       Preconditions.checkState(_hashFunction != null, "Hash function must be set");
-      Preconditions.checkState(CollectionUtils.isNotEmpty(_comparisonColumns), "Comparison columns must be set");
+      Preconditions.checkState(_comparisonColumns != null, "Comparison columns must be set");
       Preconditions.checkState(_consistencyMode != null, "Consistency mode must be set");
       if (_tableIndexDir == null) {
         Preconditions.checkState(_tableDataManager != null, "Either table data manager or table index dir must be set");

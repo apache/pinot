@@ -75,9 +75,17 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       LOGGER.error(message);
       throw new IllegalStateException(message);
     }
+
+    // Executor-only: read comparison mode string from task config (no auth resolution or URL hits).
+    Map<String, String> taskConfigs =
+        tableConfig.getTaskConfig() != null ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
+    String consensusMode =
+        taskConfigs != null ? taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+            UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
+            : UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
     RoaringBitmap validDocIds =
         MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
-            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator);
+            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator, consensusMode);
     if (validDocIds == null) {
       // no valid crc match found or no validDocIds obtained from all servers
       // error out the task instead of silently failing so that we can track it via task-error metrics
@@ -105,7 +113,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
           getSchema(tableNameWithType));
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, compactedRecordReader, InstanceType.MINION);
+      driver.init(config, compactedRecordReader);
       driver.build();
       _eventObserver.notifyProgress(pinotTaskConfig,
           "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
@@ -133,8 +141,10 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
   private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
       SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.MINION);
     config.setOutDir(workingDir.getPath());
     config.setSegmentName(segmentName);
+
     // Keep index creation time the same as original segment because both segments use the same raw data.
     // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
     // identify if the new pushed segment has newer data than the existing one.

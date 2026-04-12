@@ -18,10 +18,17 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import org.apache.datasketches.cpc.CpcSketch;
+import org.apache.datasketches.memory.Memory;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
+import org.apache.pinot.segment.local.customobject.SerializedCPCSketch;
 import org.apache.pinot.segment.spi.Constants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -59,5 +66,76 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "14")));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 13)));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "13")));
+  }
+
+  /// Tests the empty result path used by BROKER_EVALUATE when all segments are pruned.
+  /// The sequence createAggregationResultHolder → extractAggregationResult → extractFinalResult
+  /// must produce a value that is convertible to the declared final result column type.
+  @Test
+  public void testEmptyResultProducesConvertibleFinalResult() {
+    DistinctCountCPCSketchAggregationFunction function =
+        new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")));
+
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    CpcSketchAccumulator accumulator = function.extractAggregationResult(holder);
+    Assert.assertTrue(accumulator.isEmpty());
+
+    // extractFinalResult should return 0 for an empty accumulator
+    Comparable result = function.extractFinalResult(accumulator);
+    Assert.assertEquals(result, 0L);
+
+    // The result must be convertible via the declared column type
+    Object converted = function.getFinalResultColumnType().convert(result);
+    Assert.assertEquals(converted, 0L);
+  }
+
+  @Test
+  public void testEmptyResultProducesConvertibleRawFinalResult() {
+    DistinctCountRawCPCSketchAggregationFunction function =
+        new DistinctCountRawCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")));
+
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    CpcSketchAccumulator accumulator = function.extractAggregationResult(holder);
+    Assert.assertTrue(accumulator.isEmpty());
+
+    // extractFinalResult should return a SerializedCPCSketch
+    SerializedCPCSketch rawResult = function.extractFinalResult(accumulator);
+    Assert.assertNotNull(rawResult);
+
+    // The declared column type is STRING; convert() must produce a String
+    Assert.assertEquals(function.getFinalResultColumnType(), ColumnDataType.STRING);
+    Object converted = function.getFinalResultColumnType().convert(rawResult);
+    Assert.assertTrue(converted instanceof String);
+
+    // The string should be a valid Base64-encoded CPC sketch that round-trips
+    String base64 = (String) converted;
+    byte[] bytes = Base64.getDecoder().decode(base64);
+    CpcSketch deserialized = CpcSketch.heapify(Memory.wrap(bytes));
+    Assert.assertEquals(deserialized.getEstimate(), 0.0);
+  }
+
+  @Test
+  public void testMergeWithEmptyAccumulators() {
+    DistinctCountCPCSketchAggregationFunction function =
+        new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")));
+
+    CpcSketchAccumulator empty1 = new CpcSketchAccumulator(12, 2);
+    CpcSketchAccumulator empty2 = new CpcSketchAccumulator(12, 2);
+    CpcSketchAccumulator nonEmpty = new CpcSketchAccumulator(12, 2);
+    CpcSketch sketch = new CpcSketch(12);
+    sketch.update("hello");
+    nonEmpty.apply(sketch);
+
+    // merge(empty, non-empty) should return non-empty
+    CpcSketchAccumulator result = function.merge(empty1, nonEmpty);
+    Assert.assertSame(result, nonEmpty);
+
+    // merge(non-empty, empty) should return non-empty
+    result = function.merge(nonEmpty, empty2);
+    Assert.assertSame(result, nonEmpty);
+
+    // merge(empty, empty) should return empty
+    result = function.merge(new CpcSketchAccumulator(12, 2), new CpcSketchAccumulator(12, 2));
+    Assert.assertTrue(result.isEmpty());
   }
 }

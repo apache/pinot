@@ -22,6 +22,7 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -620,9 +621,10 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Long extractFinalResult(HyperLogLogPlus intermediateResult) {
-    return intermediateResult.cardinality();
+  public Long extractFinalResult(@Nullable HyperLogLogPlus intermediateResult) {
+    return intermediateResult == null ? 0L : intermediateResult.cardinality();
   }
 
   @Override

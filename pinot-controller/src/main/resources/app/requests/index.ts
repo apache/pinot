@@ -233,6 +233,15 @@ export const getQueryTables = (type?: string): Promise<AxiosResponse<QueryTables
 export const getLogicalTables = (): Promise<AxiosResponse<string[]>> =>
   baseApi.get(`/logicalTables`);
 
+export const getLogicalTable = (name: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/logicalTables/${name}`);
+
+export const putLogicalTable = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/logicalTables/${name}`, params, { headers });
+
+export const deleteLogicalTable = (name: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`/logicalTables/${name}`, { headers });
+
 export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>> =>
   baseApi.get(`/tables/${name}/schema`);
 

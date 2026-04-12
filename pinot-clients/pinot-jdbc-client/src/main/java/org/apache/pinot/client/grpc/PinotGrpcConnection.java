@@ -27,10 +27,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.pinot.client.SimpleBrokerSelector;
 import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
+import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -72,7 +74,11 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
     } else {
       brokers = getBrokerGrpcList(controllerURL, tenant);
     }
-    _session = new GrpcConnection(properties, brokers);
+
+
+    // Extract headers.* prefixed properties first (same behavior as HTTP path)
+    // This enables consistent header propagation across both HTTP and gRPC paths
+    _metadataMap.putAll(ConnectionUtils.getHeadersFromProperties(properties));
 
     for (String possibleQueryOption : POSSIBLE_QUERY_OPTIONS) {
       Object property = properties.getProperty(possibleQueryOption);
@@ -80,6 +86,7 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
         _queryOptions.put(possibleQueryOption, DriverUtils.parseOptionValue(property));
       }
     }
+
     for (String possibleMetadataMapOption : POSSIBLE_METADATA_MAP_OPTIONS) {
       for (Object key : properties.keySet()) {
         if (key.toString().equalsIgnoreCase(possibleMetadataMapOption)) {
@@ -90,6 +97,7 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
       }
     }
     DriverUtils.handleAuth(properties, _metadataMap);
+    _session = new GrpcConnection(properties, new SimpleBrokerSelector(brokers), _metadataMap);
   }
 
   public GrpcConnection getSession() {

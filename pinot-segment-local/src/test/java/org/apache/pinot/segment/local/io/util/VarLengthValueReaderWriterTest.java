@@ -83,6 +83,8 @@ public class VarLengthValueReaderWriterTest implements PinotBuffersAfterMethodCh
         byte[] buffer = new byte[MAX_STRING_LENGTH];
         assertEquals(reader.getUnpaddedString(0, MAX_STRING_LENGTH, buffer), value);
         assertEquals(reader.getBytes(0, MAX_STRING_LENGTH), valueBytes);
+        assertEquals(reader.getByteSize(0, MAX_STRING_LENGTH), valueBytes.length);
+        assertEquals(reader.getUnpaddedByteSize(0, MAX_STRING_LENGTH), valueBytes.length);
       }
     }
   }
@@ -111,6 +113,8 @@ public class VarLengthValueReaderWriterTest implements PinotBuffersAfterMethodCh
         for (int i = 0; i < NUM_VALUES; i++) {
           assertEquals(reader.getUnpaddedString(i, MAX_STRING_LENGTH, buffer), values[i]);
           assertEquals(reader.getBytes(i, MAX_STRING_LENGTH), valueBytesArray[i]);
+          assertEquals(reader.getByteSize(i, MAX_STRING_LENGTH), valueBytesArray[i].length);
+          assertEquals(reader.getUnpaddedByteSize(i, MAX_STRING_LENGTH), valueBytesArray[i].length);
         }
       }
     }

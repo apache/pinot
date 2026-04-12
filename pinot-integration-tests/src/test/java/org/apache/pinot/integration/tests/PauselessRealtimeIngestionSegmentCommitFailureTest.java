@@ -92,6 +92,8 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
 
     // Start the Pinot cluster
     startZk();
+    // Start Kafka
+    startKafka();
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
@@ -99,7 +101,6 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
 
     // load data in kafka
     List<File> avroFiles = unpackAvroData(_tempDir);
-    startKafka();
     pushAvroIntoKafka(avroFiles);
 
     setMaxSegmentCompletionTimeMillis();
@@ -115,7 +116,7 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     tableConfig2.getValidationConfig().setRetentionTimeValue("100000");
     addTableConfig(tableConfig2);
 
-    waitForDocsLoaded(600_000L, true, tableConfig2.getTableName());
+    waitForAllDocsLoaded(tableConfig2.getTableName(), 600_000L);
 
     // create schema for pauseless table
     schema.setSchemaName(getPauselessTableName());

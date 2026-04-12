@@ -101,6 +101,34 @@ public final class FixedByteValueReaderWriter implements ValueReader {
   }
 
   @Override
+  public int getUnpaddedByteSize(int index, int numBytesPerValue) {
+    // Based on the ZeroInWord algorithm: http://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
+    long startOffset = (long) index * numBytesPerValue;
+    boolean littleEndian = _dataBuffer.order() == ByteOrder.LITTLE_ENDIAN;
+    int endIndex = numBytesPerValue & 0xFFFFFFF8;
+    int i = 0;
+    for (; i < endIndex; i += Long.BYTES) {
+      long word = _dataBuffer.getLong(startOffset + i);
+      long tmp = ~(((word & 0x7F7F7F7F7F7F7F7FL) + 0x7F7F7F7F7F7F7F7FL) | word | 0x7F7F7F7F7F7F7F7FL);
+      if (tmp != 0) {
+        return i + ((littleEndian ? Long.numberOfTrailingZeros(tmp) : Long.numberOfLeadingZeros(tmp)) >>> 3);
+      }
+    }
+    for (; i < numBytesPerValue; i++) {
+      byte b = _dataBuffer.getByte(startOffset + i);
+      if (b == 0) {
+        break;
+      }
+    }
+    return i;
+  }
+
+  @Override
+  public int getByteSize(int index, int numBytesPerValue) {
+    return numBytesPerValue;
+  }
+
+  @Override
   public int compareUtf8Bytes(int index, int numBytesPerValue, byte[] bytes) {
     long startOffset = (long) index * numBytesPerValue;
     return ValueReaderComparisons.compareUtf8Bytes(_dataBuffer, startOffset, numBytesPerValue, true, bytes);

@@ -36,7 +36,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
@@ -412,6 +411,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     assertTrue(Long.parseLong(result.path("totalDocs").asText()) > 0);
     assertTrue(Long.parseLong(result.path("numDocsScanned").asText()) > 0);
     assertTrue(Long.parseLong(result.path("numSegmentsQueried").asText()) > 0);
+    assertTrue(Long.parseLong(result.path("timeUsedMs").asText()) > 0);
   }
 
   private List<String> extractStrings(JsonNode arrayNode) {
@@ -472,9 +472,6 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    if (_controllerRequestURLBuilder == null) {
-      _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl("http://localhost:" + getControllerPort());
-    }
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     // create & upload schema AND table config
     Schema schema = createSchema();

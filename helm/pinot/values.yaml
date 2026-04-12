@@ -754,17 +754,20 @@ minionStateless:
 # ------------------------------------------------------------------------------
 
 zookeeper:
-  ## If true, install the Zookeeper chart alongside Pinot
-  ## ref: https://github.com/bitnami/charts/tree/master/bitnami/zookeeper
+  ## If true, install the ZooKeeper StatefulSet alongside Pinot
+  ## Uses the official Apache ZooKeeper Docker image
+  ## ref: https://hub.docker.com/_/zookeeper
   enabled: true
 
-  ## If the Zookeeper Chart is disabled a URL override is required to connect
+  ## If ZooKeeper is disabled a URL override is required to connect
   urlOverride: "my-zookeeper:2181/my-pinot"
 
-  ## Zookeeper port
+  ## ZooKeeper ports
   port: 2181
+  followerPort: 2888
+  electionPort: 3888
 
-  ## Configure Zookeeper resource requests and limits
+  ## Configure ZooKeeper resource requests and limits
   ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
   resources:
     requests:
@@ -784,31 +787,61 @@ zookeeper:
     snapRetainCount: 5
 
   ## Size (in MB) for the Java Heap options (Xmx and Xms)
-  ## This env var is ignored if Xmx an Xms are configured via `zookeeper.jvmFlags`
   heapSize: "1024"
 
-  ## Extra JVM Flags for Zookeeper
+  ## Extra JVM Flags for ZooKeeper
   jvmFlags: "-Djute.maxbuffer=4000000"
+
+  ## ZooKeeper configuration parameters
+  tickTime: 2000
+  initLimit: 10
+  syncLimit: 5
+  maxClientCnxns: 60
+
+  ## Whitelist of 4-letter-word commands
+  fourLetterWordsWhitelist: "srvr,mntr,ruok,conf"
+
+  ## ZooKeeper AdminServer configuration
+  adminServer:
+    enabled: false
+    port: 8080
+
+  ## Probes configuration
+  probes:
+    livenessEnabled: true
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+    readinessEnabled: true
+    readiness:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
 
   persistence:
     enabled: true
+    accessMode: "ReadWriteOnce"
     storageClass: ""
     #storageClass: "ssd"
 
-    ## The amount of PV storage allocated to each Zookeeper pod in the statefulset
+    ## The amount of PV storage allocated to each ZooKeeper pod
     size: "8Gi"
 
-  ## Specify a Zookeeper imagePullPolicy
-  ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
-  image:
-    registry: "docker.io"
-    repository: "bitnamilegacy/zookeeper"
-    tag: "3.9.3-debian-12-r22"
-    pullPolicy: "IfNotPresent"
+    ## Fine-grained data/datalog sizing (defaults to size above)
+    data:
+      size: "8Gi"
+    datalog:
+      size: "8Gi"
 
-  global:
-    security:
-      allowInsecureImages: true
+  ## ZooKeeper Docker image (official Apache ZooKeeper image)
+  ## ref: https://hub.docker.com/_/zookeeper
+  image:
+    repository: "zookeeper"
+    tag: "3.9.3"
+    pullPolicy: "IfNotPresent"
 
   ## Pod scheduling preferences (by default keep pods within a release on separate nodes).
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
@@ -820,3 +853,21 @@ zookeeper:
   #       labelSelector:
   #         matchLabels:
   #           release: zookeeper
+
+  ## Node selector for ZooKeeper pods
+  nodeSelector: {}
+
+  ## Tolerations for ZooKeeper pods
+  tolerations: []
+
+  ## Pod annotations
+  podAnnotations: {}
+
+  ## Pod security context
+  podSecurityContext: {}
+
+  ## Container security context
+  containerSecurityContext: {}
+
+  ## Extra environment variables
+  extraEnv: []

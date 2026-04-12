@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
+import com.google.common.base.Utf8;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -53,10 +53,10 @@ public class MutableColumnStatisticsTest {
     when(dataSource.getDictionary()).thenReturn(dictionary);
     when(dictionary.getValueType()).thenReturn(DataType.STRING);
     when(dictionary.length()).thenReturn(numElements);
-    when(dictionary.getStringValue(anyInt())).thenAnswer(
-        (Answer<String>) invocation -> elements[(int) invocation.getArgument(0)]);
+    when(dictionary.getValueSize(anyInt())).thenAnswer(
+        invocation -> Utf8.encodedLength(elements[(int) invocation.getArgument(0)]));
 
-    MutableColumnStatistics columnStatistics = new MutableColumnStatistics(dataSource, null);
+    MutableColumnStatistics columnStatistics = new MutableColumnStatistics(dataSource, null, false);
     assertEquals(columnStatistics.getLengthOfShortestElement(), minElementLength);
     assertEquals(columnStatistics.getLengthOfLargestElement(), maxElementLength);
   }

@@ -63,6 +63,7 @@ public class CommonConstants {
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
+  public static final String CONFIG_OF_PINOT_MD5_DISABLED = "pinot.md5.disabled";
   @Deprecated
   public static final String DEFAULT_PINOT_INSECURE_MODE = "false";
 
@@ -385,6 +386,11 @@ public class CommonConstants {
     public static final long DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS = 100L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_INSTANCE_TAGS = "pinot.broker.instance.tags";
+    // When enabled, brokers must have pinot.broker.instance.tags configured to start.
+    // Prevents misconfigured brokers from joining multi-tenant clusters without tenant tags.
+    public static final String CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS =
+        "pinot.broker.enforce.instance.tags";
+    public static final boolean DEFAULT_BROKER_ENFORCE_INSTANCE_TAGS = false;
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Comma separated list of packages that contains javax service resources.
@@ -648,6 +654,18 @@ public class CommonConstants {
         public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
         public static final String USE_STAR_TREE = "useStarTree";
+        /**
+         * When true, use index-based distinct operators when applicable. This enables both
+         * JsonIndexDistinctOperator (for JSON columns) and InvertedIndexDistinctOperator
+         * (for dictionary + inverted index columns with cost heuristic).
+         */
+        public static final String USE_INDEX_BASED_DISTINCT_OPERATOR = "useIndexBasedDistinctOperator";
+        /**
+         * Cost ratio for the inverted-index-based distinct heuristic. The inverted index path is chosen when
+         * dictionaryCardinality * costRatio <= filteredDocCount. Default is cardinality-dependent:
+         * 30 for dictCard <= 1K, 10 for dictCard <= 10K, 6 for dictCard > 10K.
+         */
+        public static final String INVERTED_INDEX_DISTINCT_COST_RATIO = "invertedIndexDistinctCostRatio";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String TABLE_SAMPLER = "sampler";
@@ -698,6 +716,9 @@ public class CommonConstants {
 
         /** Number of threads used in the final reduce at broker level. */
         public static final String CHUNK_SIZE_EXTRACT_FINAL_RESULT = "chunkSizeExtractFinalResult";
+
+        /// Flush threshold for streaming group-by on MSE leaf stages.
+        public static final String STREAMING_GROUP_BY_FLUSH_THRESHOLD = "streamingGroupByFlushThreshold";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
@@ -782,6 +803,15 @@ public class CommonConstants {
         // Handle JOIN Overflow
         public static final String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
         public static final String JOIN_OVERFLOW_MODE = "joinOverflowMode";
+
+        // Early terminate DISTINCT queries based on wall-clock execution time on server
+        public static final String MAX_EXECUTION_TIME_MS_IN_DISTINCT = "maxExecutionTimeMsInDistinct";
+
+        // Handle DISTINCT early termination
+        // Early terminate after scanning this many rows, regardless of whether the DISTINCT limit is satisfied.
+        public static final String MAX_ROWS_IN_DISTINCT = "maxRowsInDistinct";
+        // Early terminate after seeing no new distinct keys for this many scanned rows.
+        public static final String MAX_ROWS_WITHOUT_CHANGE_IN_DISTINCT = "maxRowsWithoutChangeInDistinct";
 
         // Handle WINDOW Overflow
         public static final String MAX_ROWS_IN_WINDOW = "maxRowsInWindow";
@@ -883,6 +913,31 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
+
+        // Vector search query options
+
+        /** Number of inverted-list probes for IVF-based vector indexes. Higher values improve recall
+         *  at the cost of latency. Only relevant when the segment's vector index uses IVF_FLAT or IVF_PQ. */
+        public static final String VECTOR_NPROBE = "vectorNprobe";
+
+        /** When true, ANN results are re-scored using exact distance from the forward index and
+         *  re-sorted before returning top-K. Improves accuracy at the cost of latency. */
+        public static final String VECTOR_EXACT_RERANK = "vectorExactRerank";
+
+        /** Maximum number of ANN candidates to retrieve before applying exact rerank or final
+         *  top-K selection. Defaults to topK * 10 if not set. */
+        public static final String VECTOR_MAX_CANDIDATES = "vectorMaxCandidates";
+
+        /** Distance threshold for vector search. When set, only results within this distance are
+         *  returned. The threshold is compared against the raw distance value from the configured
+         *  distance function: EUCLIDEAN/L2 uses squared L2 (sum of squared diffs, no sqrt),
+         *  COSINE uses 1 - cosine_similarity, INNER_PRODUCT/DOT_PRODUCT uses negated dot product. */
+        public static final String VECTOR_DISTANCE_THRESHOLD = "vectorDistanceThreshold";
+
+        /** efSearch parameter for HNSW vector indexes. Reserved for future use — currently parsed
+         *  and included in explain output but does not yet affect Lucene HNSW graph traversal.
+         *  A future release will wire this through a custom KnnVectorQuery implementation. */
+        public static final String VECTOR_EF_SEARCH = "vectorEfSearch";
       }
 
       public static class QueryOptionValue {
@@ -1728,21 +1783,18 @@ public class CommonConstants {
      *  - Instance Config: enableThreadAllocatedBytesMeasurement = true
      */
 
-    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION =
-        "accounting.workload.enable.cost.collection";
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION = "accounting.workload.enable.cost.collection";
     public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION = false;
 
     public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT =
         "accounting.workload.enable.cost.enforcement";
     public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT = false;
 
-    public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS =
-        "accounting.workload.enforcement.window.ms";
+    public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS = "accounting.workload.enforcement.window.ms";
     public static final long DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS = 60_000L;
 
-    public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS =
-        "accounting.workload.sleep.time.ms";
-    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
+    public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS = "accounting.workload.sleep.time.ms";
+    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 100;
 
     public static final String DEFAULT_WORKLOAD_NAME = "default";
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";
@@ -2180,15 +2232,14 @@ public class CommonConstants {
    */
   public static class ConfigChangeListenerConstants {
     /**
-     * Cluster config key to control whether force commit/reload is allowed for upsert tables
-     * with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true
-     * with consistency mode NONE and replication > 1).
+     * Cluster config key to control how to handle inconsistency during consuming segment commit
+     * for upsert/dedup tables (partial upsert or dropOutOfOrderRecord=true with consistency mode).
+     *
+     * Supported values:
+     * - RESTRICTED: Force commit is disabled for tables with inconsistent state table configurations
+     * - PROTECTED: Force commit is enabled with metadata reversion on inconsistencies
+     * - UNSAFE: Force commit is enabled without metadata reversion (Can lead to inconsistencies)
      */
-    public static final String FORCE_COMMIT_RELOAD_CONFIG = "pinot.server.upsert.force.commit.reload";
-
-    /**
-     * Default value: true (force commit/reload is allowed by default).
-     */
-    public static final boolean DEFAULT_FORCE_COMMIT_RELOAD = true;
+    public static final String CONSUMING_SEGMENT_CONSISTENCY_MODE = "pinot.server.consuming.segment.consistency.mode";
   }
 }

@@ -77,8 +77,7 @@ public class DictionaryIndexConfig extends IndexConfig {
     return _onHeap;
   }
 
-  // TODO: Rename it to isUseVarLengthDictionary
-  public boolean getUseVarLengthDictionary() {
+  public boolean isUseVarLengthDictionary() {
     return _useVarLengthDictionary;
   }
 

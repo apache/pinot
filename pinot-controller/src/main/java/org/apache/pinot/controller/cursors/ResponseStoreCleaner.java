@@ -63,6 +63,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResponseStoreCleaner.class);
+  private static final String TASK_NAME = "ResponseStoreCleaner";
   // Increased timeout to handle large response stores
   private static final int GET_TIMEOUT_MS = 60_000;
   private static final int DELETE_TIMEOUT_MS = 10_000;
@@ -78,7 +79,7 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
   public ResponseStoreCleaner(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics, Executor executor,
       PoolingHttpClientConnectionManager connectionManager) {
-    super("ResponseStoreCleaner", getFrequencyInSeconds(config), getInitialDelayInSeconds(config),
+    super(TASK_NAME, getFrequencyInSeconds(config), getInitialDelayInSeconds(config),
         pinotHelixResourceManager, leadControllerManager, controllerMetrics);
     _controllerConf = config;
     _executor = executor;
@@ -110,6 +111,16 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
     }
 
     return frequencyInSeconds;
+  }
+
+  /**
+   * Returns a singleton list with the task name as a pseudo-table so that the standard leadership gating in
+   * {@link ControllerPeriodicTask#runTask} ensures exactly one controller runs cleanup, independent of actual
+   * table distribution.
+   */
+  @Override
+  protected List<String> getTablesToProcess(Properties periodicTaskProperties) {
+    return List.of(TASK_NAME);
   }
 
   @Override
@@ -226,7 +237,8 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
     }
 
     if (!errMessages.isEmpty()) {
-      throw new RuntimeException("Some delete operations failed: " + StringUtils.join(errMessages, ", "));
+      LOGGER.warn("Some delete operations failed ({}): {}", errMessages.size(),
+          StringUtils.join(errMessages, ", "));
     }
     return responseMap;
   }

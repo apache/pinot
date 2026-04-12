@@ -24,17 +24,12 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.utils.CsvParser;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 
 
 public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
   public TextIndexConfigBuilder() {
-    super((FSTType) null);
-  }
-
-  public TextIndexConfigBuilder(@Nullable FSTType fstType) {
-    super(fstType);
+    super();
   }
 
   public TextIndexConfigBuilder(TextIndexConfig other) {
@@ -97,14 +92,6 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
       if (textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_NRT_CACHING_DIRECTORY_BUFFER_SIZE) != null) {
         _luceneNRTCachingDirectoryMaxBufferSizeMB =
             Integer.parseInt(textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_NRT_CACHING_DIRECTORY_BUFFER_SIZE));
-      }
-
-      for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
-        if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
-          _fstType = FSTType.NATIVE;
-        } else {
-          _fstType = FSTType.LUCENE;
-        }
       }
 
       if (textIndexProperties.get("storeInSegmentFile") != null) {

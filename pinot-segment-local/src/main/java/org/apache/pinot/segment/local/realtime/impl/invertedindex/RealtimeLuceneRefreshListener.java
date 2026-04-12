@@ -129,6 +129,10 @@ public class RealtimeLuceneRefreshListener implements ReferenceManager.RefreshLi
     _realtimeLuceneIndexingDelayTracker.clear(_tableName, _segmentName, _columnName, _partition);
   }
 
+  public int getLastRefreshNumDocs() {
+    return _lastRefreshNumDocs;
+  }
+
   @VisibleForTesting
   public Supplier<Integer> getNumDocsDelaySupplier() {
     return _numDocsDelaySupplier;

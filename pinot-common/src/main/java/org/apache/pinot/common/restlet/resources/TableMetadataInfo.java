@@ -43,7 +43,9 @@ public class TableMetadataInfo {
   private final Map<String, Double> _columnCardinalityMap;
   private final Map<String, Double> _maxNumMultiValuesMap;
   private final Map<String, Map<String, Double>> _columnIndexSizeMap;
-  private final Map<Integer, Map<String, Long>> _upsertPartitionToServerPrimaryKeyCountMap;
+  // JSON property name kept as "upsertPartitionToServerPrimaryKeyCountMap" to avoid silent data loss during rolling
+  // upgrades where servers and controllers may temporarily run different versions of this class.
+  private final Map<Integer, Map<String, Long>> _partitionToServerPrimaryKeyCountMap;
 
   @JsonCreator
   public TableMetadataInfo(@JsonProperty("tableName") String tableName,
@@ -53,7 +55,7 @@ public class TableMetadataInfo {
       @JsonProperty("maxNumMultiValuesMap") Map<String, Double> maxNumMultiValuesMap,
       @JsonProperty("columnIndexSizeMap") Map<String, Map<String, Double>> columnIndexSizeMap,
       @JsonProperty("upsertPartitionToServerPrimaryKeyCountMap")
-      Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap) {
+      Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap) {
     _tableName = tableName;
     _diskSizeInBytes = sizeInBytes;
     _numSegments = numSegments;
@@ -62,7 +64,7 @@ public class TableMetadataInfo {
     _columnCardinalityMap = columnCardinalityMap;
     _maxNumMultiValuesMap = maxNumMultiValuesMap;
     _columnIndexSizeMap = columnIndexSizeMap;
-    _upsertPartitionToServerPrimaryKeyCountMap = upsertPartitionToServerPrimaryKeyCountMap;
+    _partitionToServerPrimaryKeyCountMap = partitionToServerPrimaryKeyCountMap;
   }
 
   public String getTableName() {
@@ -97,7 +99,8 @@ public class TableMetadataInfo {
     return _columnIndexSizeMap;
   }
 
-  public Map<Integer, Map<String, Long>> getUpsertPartitionToServerPrimaryKeyCountMap() {
-    return _upsertPartitionToServerPrimaryKeyCountMap;
+  @JsonProperty("upsertPartitionToServerPrimaryKeyCountMap")
+  public Map<Integer, Map<String, Long>> getPartitionToServerPrimaryKeyCountMap() {
+    return _partitionToServerPrimaryKeyCountMap;
   }
 }

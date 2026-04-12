@@ -57,7 +57,6 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -157,8 +156,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // create the realtime table
     TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
     addTableConfig(tableConfig);
-    _kafkaStarters.get(0)
-        .createTopic(PROCESS_ALL_MODE_KAFKA_TOPIC, KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
+    createKafkaTopic(PROCESS_ALL_MODE_KAFKA_TOPIC, getNumKafkaPartitions());
     schema.setSchemaName(MULTI_LEVEL_CONCAT_PROCESS_ALL_REALTIME_TABLE);
     addSchema(schema);
     TableConfig singleLevelConcatProcessAllRealtimeTableConfig =

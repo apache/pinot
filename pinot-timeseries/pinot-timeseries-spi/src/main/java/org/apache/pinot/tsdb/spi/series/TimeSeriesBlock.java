@@ -19,7 +19,7 @@
 package org.apache.pinot.tsdb.spi.series;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -59,7 +59,7 @@ public class TimeSeriesBlock {
       Map<String, String> metadata) {
     _timeBuckets = timeBuckets;
     _seriesMap = seriesMap;
-    _metadata = Collections.unmodifiableMap(metadata);
+    _metadata = new HashMap<>(metadata);
     _exceptions = new ArrayList<>();
   }
 

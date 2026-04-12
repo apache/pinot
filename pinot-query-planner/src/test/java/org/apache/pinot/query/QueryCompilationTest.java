@@ -726,6 +726,95 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return null;
   }
 
+  /**
+   * Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
+   * correctness of unmatched row tracking. With multiple workers, the broadcast right table would be on each worker
+   * but each worker only sees a subset of left rows, leading to incorrect unmatched-right-rows output.
+   */
+  @Test
+  public void testFullOuterNonEquiJoinUsesSingletonWorker() {
+    String query = "SELECT * FROM a FULL OUTER JOIN b ON a.col3 > b.col3";
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+
+    DispatchablePlanFragment joinStage = findJoinStage(dispatchableSubPlan);
+    assertNotNull(joinStage, "Should have a join stage");
+
+    // FULL OUTER with non-equi conditions must use a singleton worker for correctness
+    assertEquals(joinStage.getWorkerMetadataList().size(), 1,
+        "FULL OUTER non-equi join should use singleton worker for join stage");
+  }
+
+  /**
+   * Tests that RIGHT JOIN with only non-equi conditions uses BROADCAST for the left side and RANDOM for the right
+   * side. This inverted distribution (compared to the default RANDOM left + BROADCAST right) ensures that each worker
+   * has the complete left table so it can correctly determine unmatched right rows for its local right partition.
+   */
+  @Test
+  public void testRightNonEquiJoinUsesBroadcastLeftRandomRight() {
+    String query = "SELECT * FROM a RIGHT JOIN b ON a.col3 > b.col3";
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+
+    JoinNode joinNode = findJoinNode(dispatchableSubPlan);
+    assertNotNull(joinNode, "Should have a join node");
+
+    MailboxReceiveNode leftInput = (MailboxReceiveNode) joinNode.getInputs().get(0);
+    MailboxReceiveNode rightInput = (MailboxReceiveNode) joinNode.getInputs().get(1);
+    assertEquals(leftInput.getDistributionType(), RelDistribution.Type.BROADCAST_DISTRIBUTED,
+        "LEFT side of RIGHT non-equi join should be BROADCAST");
+    assertEquals(rightInput.getDistributionType(), RelDistribution.Type.RANDOM_DISTRIBUTED,
+        "RIGHT side of RIGHT non-equi join should be RANDOM");
+  }
+
+  /**
+   * Finds the DispatchablePlanFragment containing a JoinNode (non-leaf, non-root stage).
+   */
+  private DispatchablePlanFragment findJoinStage(DispatchableSubPlan dispatchableSubPlan) {
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      int stageId = fragment.getPlanFragment().getFragmentId();
+      if (stageId > 0 && fragment.getTableName() == null) {
+        PlanNode node = fragment.getPlanFragment().getFragmentRoot();
+        if (containsNodeOfType(node, JoinNode.class)) {
+          return fragment;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Finds the JoinNode in the plan.
+   */
+  private JoinNode findJoinNode(DispatchableSubPlan dispatchableSubPlan) {
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      JoinNode joinNode = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(), JoinNode.class);
+      if (joinNode != null) {
+        return joinNode;
+      }
+    }
+    return null;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T extends PlanNode> T findNodeOfType(PlanNode node, Class<T> type) {
+    if (node == null) {
+      return null;
+    }
+    if (type.isInstance(node)) {
+      return (T) node;
+    }
+    for (PlanNode child : node.getInputs()) {
+      T result = findNodeOfType(child, type);
+      if (result != null) {
+        return result;
+      }
+    }
+    return null;
+  }
+
+  private static boolean containsNodeOfType(PlanNode node, Class<? extends PlanNode> type) {
+    return findNodeOfType(node, type) != null;
+  }
+
   // --------------------------------------------------------------------------
   // Test Utils.
   // --------------------------------------------------------------------------

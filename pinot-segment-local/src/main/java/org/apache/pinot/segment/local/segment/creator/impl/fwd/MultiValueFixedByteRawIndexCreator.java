@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -83,7 +84,13 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
           new VarByteChunkForwardIndexWriter(indexFile, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
               writerVersion);
     } else {
-      if (writerVersion == VarByteChunkForwardIndexWriterV5.VERSION) {
+      if (writerVersion == VarByteChunkForwardIndexWriterV6.VERSION) {
+        // V6: delta-encoded chunk header, store only the values (implicit length)
+        int totalMaxLength = maxNumberOfMultiValueElements * valueType.getStoredType().size();
+        int chunkSize =
+            ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
+        _indexWriter = new VarByteChunkForwardIndexWriterV6(indexFile, compressionType, chunkSize);
+      } else if (writerVersion == VarByteChunkForwardIndexWriterV5.VERSION) {
         // Store only the values
         int totalMaxLength = maxNumberOfMultiValueElements * valueType.getStoredType().size();
         int chunkSize =

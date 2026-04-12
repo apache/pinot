@@ -129,12 +129,12 @@ public final class Obfuscator {
       node.fieldNames().forEachRemaining(field -> {
         if (_patterns.stream().anyMatch(pattern -> pattern.matcher(field).matches())) {
           ((ObjectNode) node).put(field, _maskedValue);
-        } else if (node.isArray()) {
-          IntStream.range(0, node.size()).forEach(i -> ((ArrayNode) node).set(i, toJsonRecursive(node.get(i))));
-        } else if (node.isObject()) {
-          ((ObjectNode) node).put(field, toJsonRecursive(node.get(field)));
+        } else {
+          ((ObjectNode) node).set(field, toJsonRecursive(node.get(field)));
         }
       });
+    } else if (node.isArray()) {
+      IntStream.range(0, node.size()).forEach(i -> ((ArrayNode) node).set(i, toJsonRecursive(node.get(i))));
     }
 
     return node;

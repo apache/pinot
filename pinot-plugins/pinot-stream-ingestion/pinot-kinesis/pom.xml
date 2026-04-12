@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-kinesis</artifactId>
@@ -55,7 +55,6 @@
     <dependency>
       <groupId>cloud.localstack</groupId>
       <artifactId>localstack-utils</artifactId>
-      <version>${localstack-utils.version}</version>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>

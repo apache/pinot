@@ -339,8 +339,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     }, {
         "withFstIndex", getTableConfigBuilder().setFieldConfigList(List.of(
         new FieldConfig(FST_TEST_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
-            Map.of(FieldConfig.TEXT_FST_TYPE,
-                FieldConfig.TEXT_NATIVE_FST_LITERAL)))).build(), "fst index changed: DestCityName"
+            null))).build(), "fst index changed: DestCityName"
     }, {
         "withRangeFilter", getTableConfigBuilder().setRangeIndexColumns(
         List.of(MS_SINCE_EPOCH_COLUMN_NAME)).build(), "range index changed: MilliSecondsSinceEpoch"

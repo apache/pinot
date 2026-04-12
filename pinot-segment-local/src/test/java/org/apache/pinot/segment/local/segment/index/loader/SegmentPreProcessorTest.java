@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.file.Files;
@@ -42,11 +43,8 @@ import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3For
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
-import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
-import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
-import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
-import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -151,10 +149,10 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private static final String NEW_HLL_BYTE_METRIC_COLUMN_NAME = "newHLLByteMetric";
   private static final String NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME = "newTDigestByteMetric";
 
-  private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER =
-      new SegmentOperationsThrottler(new SegmentAllIndexPreprocessThrottler(2, 4, true),
-          new SegmentStarTreePreprocessThrottler(1, 2, true), new SegmentDownloadThrottler(2, 4, true),
-          new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
+  private static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER =
+      new SegmentOperationsThrottlerSet(new SegmentOperationsThrottler(2, 4, true),
+          new SegmentOperationsThrottler(1, 2, true), new SegmentOperationsThrottler(2, 4, true),
+          new SegmentOperationsThrottler(1, 2, true));
 
   private final File _avroFile;
   private final Schema _schema;
@@ -267,10 +265,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, TEMP_DIR, RAW_TABLE_NAME, createTableConfig(),
             _schema);
+    config.setInstanceType(InstanceType.SERVER);
     config.setOutDir(TEMP_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, InstanceType.SERVER);
+    driver.init(config);
     driver.build();
   }
 
@@ -290,7 +289,6 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         .setTimeColumnName("daysSinceEpoch")
         .setNoDictionaryColumns(new ArrayList<>(_noDictionaryColumns))
         .setInvertedIndexColumns(new ArrayList<>(_invertedIndexColumns))
-        .setCreateInvertedIndexDuringSegmentGeneration(true)
         .setRangeIndexColumns(new ArrayList<>(_rangeIndexColumns))
         .setFieldConfigList(new ArrayList<>(_fieldConfigMap.values()))
         .setNullHandlingEnabled(true)
@@ -1342,6 +1340,70 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   }
 
   @Test
+  public void testV1ReplaceLegacyNativeFstIndex()
+      throws Exception {
+    buildV1Segment();
+
+    String strColumn = "column3";
+    _fieldConfigMap.put(strColumn, new FieldConfig(strColumn, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.FST), null, null));
+
+    File fstFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
+
+    runPreProcessor();
+    assertTrue(fstFile.exists());
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "rw")) {
+      randomAccessFile.seek(0);
+      // Write the legacy native FST magic header: '\fsa'
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      randomAccessFile.writeInt(nativeFstMagic);
+    }
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      assertEquals(randomAccessFile.readInt(), nativeFstMagic);
+    }
+
+    runPreProcessor();
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      assertNotEquals(randomAccessFile.readInt(), nativeFstMagic);
+    }
+  }
+
+  @Test
+  public void testV3ReplaceLegacyNativeTextIndex()
+      throws Exception {
+    buildV3Segment();
+
+    String strColumn = "column3";
+    _fieldConfigMap.put(strColumn, new FieldConfig(strColumn, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.TEXT), null, Map.of("storeInSegmentFile", "false")));
+
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(INDEX_DIR, SegmentVersion.v3);
+    File nativeTextFile =
+        new File(segmentDirectory, strColumn + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION);
+    File luceneTextFile =
+        new File(segmentDirectory, strColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
+    File staleLuceneFile = new File(luceneTextFile, "leftover.tmp");
+
+    runPreProcessor();
+    assertTrue(luceneTextFile.exists());
+
+    Files.writeString(staleLuceneFile.toPath(), "stale");
+    Files.writeString(nativeTextFile.toPath(), "legacy native text");
+    assertTrue(nativeTextFile.exists());
+
+    runPreProcessor();
+
+    assertFalse(nativeTextFile.exists());
+    assertFalse(staleLuceneFile.exists());
+    assertTrue(luceneTextFile.exists());
+  }
+
+  @Test
   public void testV3CleanupIndices()
       throws Exception {
     buildV3Segment();
@@ -1937,6 +1999,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     FileUtils.deleteQuietly(TEMP_DIR);
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.SERVER);
     config.setOutDir(TEMP_DIR.getAbsolutePath());
     config.setSegmentName(SEGMENT_NAME);
 
@@ -1949,7 +2012,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows), InstanceType.SERVER);
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
   }
 

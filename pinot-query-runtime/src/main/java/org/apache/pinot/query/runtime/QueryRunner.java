@@ -37,7 +37,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Worker;
@@ -47,25 +46,19 @@ import org.apache.pinot.core.executor.ThrottleOnCriticalHeapUsageExecutor;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.mailbox.SendingMailbox;
-import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
-import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.MailboxInfo;
-import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
-import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
@@ -74,8 +67,6 @@ import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.HardLimitExecutor;
 import org.apache.pinot.spi.executor.MetricsExecutor;
@@ -111,6 +102,7 @@ public class QueryRunner {
   private ExecutorService _executorService;
   private OpChainSchedulerService _opChainScheduler;
   private MailboxService _mailboxService;
+  private boolean _ownsMailboxService = true;
   private QueryExecutor _leafQueryExecutor;
 
   // Group-by settings
@@ -143,10 +135,14 @@ public class QueryRunner {
   private BooleanSupplier _keepPipelineBreakerStats;
 
   /**
-   * Initializes the query executor.
+   * Initializes the query runner.
    * <p>Should be called only once and before calling any other method.
+   *
+   * @param instanceDataManager when non-null, the leaf query executor and time series visitor are initialized
+   *                            for processing leaf-stage queries. When null, only intermediate-stage execution
+   *                            is supported.
    */
-  public void init(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
+  public void init(PinotConfiguration serverConf, String instanceId, @Nullable InstanceDataManager instanceDataManager,
       @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats) {
     String hostname = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
@@ -221,19 +217,25 @@ public class QueryRunner {
     _executorService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
         _executorService, serverConf, "multi-stage executor");
 
-    _opChainScheduler = new OpChainSchedulerService(instanceDataManager.getInstanceId(), _executorService, serverConf);
-    _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
-    try {
-      _leafQueryExecutor = new ServerQueryExecutorV1Impl();
-      _leafQueryExecutor.init(serverConf.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
-          serverMetrics);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    _opChainScheduler = new OpChainSchedulerService(instanceId, _executorService, serverConf);
+    if (_mailboxService == null) {
+      _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
     }
-    if (StringUtils.isNotBlank(serverConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
-      _timeSeriesPhysicalPlanVisitor =
-          new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService, serverMetrics);
-      TimeSeriesBuilderFactoryProvider.init(serverConf);
+
+    if (instanceDataManager != null) {
+      try {
+        _leafQueryExecutor = new ServerQueryExecutorV1Impl();
+        _leafQueryExecutor.init(serverConf.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
+            serverMetrics);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      if (StringUtils.isNotBlank(
+          serverConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
+        _timeSeriesPhysicalPlanVisitor =
+            new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService, serverMetrics);
+        TimeSeriesBuilderFactoryProvider.init(serverConf);
+      }
     }
 
     _sendStats = sendStats;
@@ -242,14 +244,35 @@ public class QueryRunner {
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
   }
 
+  /**
+   * Initializes the query runner with a shared {@link MailboxService}.
+   */
+  public void init(PinotConfiguration serverConf, String instanceId, @Nullable InstanceDataManager instanceDataManager,
+      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats,
+      @Nullable MailboxService sharedMailboxService) {
+    if (sharedMailboxService != null) {
+      _mailboxService = sharedMailboxService;
+      _ownsMailboxService = false;
+    }
+    init(serverConf, instanceId, instanceDataManager, tlsConfig, sendStats, keepPipelineBreakerStats);
+  }
+
   public void start() {
-    _mailboxService.start();
-    _leafQueryExecutor.start();
+    if (_ownsMailboxService) {
+      _mailboxService.start();
+    }
+    if (_leafQueryExecutor != null) {
+      _leafQueryExecutor.start();
+    }
   }
 
   public void shutDown() {
-    _leafQueryExecutor.shutDown();
-    _mailboxService.shutdown();
+    if (_leafQueryExecutor != null) {
+      _leafQueryExecutor.shutDown();
+    }
+    if (_ownsMailboxService) {
+      _mailboxService.shutdown();
+    }
     ExecutorServiceUtils.close(_executorService);
   }
 
@@ -266,7 +289,8 @@ public class QueryRunner {
   /// Executes a {@link StagePlan} pseudo-synchronously.
   ///
   /// First, the pipeline breaker is executed on the current thread. This is the blocking part of the method.
-  /// If the pipeline breaker execution fails, the current thread will send the error block to the receivers mailboxes.
+  /// If the pipeline breaker execution fails, the query runner delegates downstream error propagation to the active
+  /// OpChainConverter.
   ///
   /// If the pipeline breaker success, the rest of the stage is asynchronously executed on the [#_opChainScheduler].
   private void processQueryBlocking(WorkerMetadata workerMetadata, StagePlan stagePlan,
@@ -282,7 +306,8 @@ public class QueryRunner {
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
       ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
-      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
+      tryPropagateErrorViaOpChainConverter(workerMetadata, stagePlan, opChainMetadata, pipelineBreakerResult,
+          errorBlock);
       return;
     }
 
@@ -298,59 +323,37 @@ public class QueryRunner {
             ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
                 rlsFilters);
       } else {
-        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+        opChain = OpChainConverterDispatcher.convert(stagePlan.getRootNode(), executionContext);
       }
       // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
     } catch (RuntimeException e) {
       ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
-      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
+      tryPropagateErrorViaOpChainConverter(workerMetadata, stagePlan, opChainMetadata, pipelineBreakerResult,
+          errorBlock);
     }
   }
 
-  private void notifyErrorAfterSubmission(int stageId, ErrorMseBlock errorBlock, WorkerMetadata workerMetadata,
-      StagePlan stagePlan) {
-    QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
-    long requestId = executionContext.getRequestId();
-    LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
-        stageId, errorBlock);
-    MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
-    List<RoutingInfo> routingInfos = new ArrayList<>();
-    for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
-      List<MailboxInfo> receiverMailboxInfos =
-          workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
-      List<RoutingInfo> stageRoutingInfos =
-          MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
-              receiverMailboxInfos);
-      routingInfos.addAll(stageRoutingInfos);
-    }
-    long deadlineMs = executionContext.getPassiveDeadlineMs();
-    for (RoutingInfo routingInfo : routingInfos) {
-      String mailboxId = routingInfo.getMailboxId();
-      StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
-      try (SendingMailbox sendingMailbox = _mailboxService.getSendingMailbox(routingInfo.getHostname(),
-          routingInfo.getPort(), mailboxId, deadlineMs, statMap)) {
-        // TODO: Here we are breaking the stats invariants, sending errors without including the stats of the
-        //  current stage. We will need to fix this in future, but for now, we are sending the error block without
-        //  the stats.
-        sendingMailbox.send(errorBlock, Collections.emptyList());
-      } catch (QueryException e) {
-        QueryErrorCode errorCode = e.getErrorCode();
-        switch (errorCode) {
-          case EXECUTION_TIMEOUT:
-            LOGGER.warn("Timed out sending error block to mailbox: {}", mailboxId, e);
-            break;
-          case QUERY_CANCELLATION:
-            LOGGER.info("Query cancelled while offering blocks to mailbox: {}", mailboxId);
-            break;
-          default:
-            LOGGER.error("{} exception while exception sending error block to mailbox: {}", errorCode, mailboxId, e);
-            break;
-        }
-      } catch (Exception e) {
-        LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
-            mailboxId, requestId, stageId, e);
-      }
+  /**
+   * Attempts to propagate stage failures through the active {@link OpChainConverter}.
+   */
+  private void tryPropagateErrorViaOpChainConverter(WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> opChainMetadata, @Nullable PipelineBreakerResult pipelineBreakerResult,
+      ErrorMseBlock errorBlock) {
+    StageMetadata stageMetadata = stagePlan.getStageMetadata();
+    QueryExecutionContext queryContext = QueryThreadContext.get().getExecutionContext();
+    long requestId = queryContext.getRequestId();
+    LOGGER.error("Error executing stage for request: {}, stage: {}, sending error block: {}", requestId,
+        stageMetadata.getStageId(), errorBlock);
+    try {
+      OpChainExecutionContext executionContext =
+          OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
+              pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+      OpChain errorOpChain = OpChainConverterDispatcher.sendEarlyError(executionContext, stagePlan, errorBlock);
+      _opChainScheduler.register(errorOpChain);
+    } catch (RuntimeException e) {
+      LOGGER.warn("Failed to propagate stage error via OpChainConverter for request: {}, stage: {}",
+          requestId, stageMetadata.getStageId(), e);
     }
   }
 
@@ -514,6 +517,10 @@ public class QueryRunner {
     }
 
     return opChainMetadata;
+  }
+
+  public MailboxService getMailboxService() {
+    return _mailboxService;
   }
 
   public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {

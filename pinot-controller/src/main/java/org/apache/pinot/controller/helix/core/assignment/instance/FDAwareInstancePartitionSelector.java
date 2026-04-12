@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -190,7 +191,7 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       // preprocess the problem of numReplicaGroups >= numFaultDomains to a problem
       replicaGroupBasedAssignmentState.normalize(faultDomainToCandidateInstancesMap);
 
-      // fill the remaining vacant seats
+      // fill the remaining vacant seats if any
       replicaGroupBasedAssignmentState.fill(faultDomainToCandidateInstancesMap);
 
       // adjust the instance assignment to achieve the invariant state
@@ -389,6 +390,11 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
      * Fill the vacant instances
      */
     public void fill(Map<Integer, LinkedHashSet<String>> faultDomainToCandidateInstancesMap) {
+      // skip filling if there is no candidate instance, which can happen when minimize data movement is enabled and
+      // no new instances are added to any pool
+      if (faultDomainToCandidateInstancesMap.values().stream().allMatch(Set::isEmpty)) {
+        return;
+      }
       // convert set to que and start to assign
       CandidateQueue candidateQueue = new CandidateQueue(faultDomainToCandidateInstancesMap);
       if (_numReplicaGroups != 0) { // uplift instance per replica group first if not a fresh new assignment

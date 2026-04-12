@@ -22,13 +22,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /**
@@ -241,6 +245,72 @@ public class PartitionFunctionTest {
     }
   }
 
+  /**
+   * Unit test for {@link FnvPartitionFunction}.
+   * <ul>
+   *   <li> Tests that default and explicit-default configs behave identically. </li>
+   *   <li> Tests that all supported variants return partitions in the expected range. </li>
+   * </ul>
+   */
+  @Test
+  public void testFnvPartitioner() {
+    long seed = System.currentTimeMillis();
+    Random random = new Random(seed);
+
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
+      String functionName = "FnV";
+      String valueTobeHashed = String.valueOf(random.nextInt());
+
+      PartitionFunction partitionFunction1 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
+      int partitionNumWithNullConfig = partitionFunction1.getPartition(valueTobeHashed);
+
+      Map<String, String> emptyFunctionConfig = new HashMap<>();
+      PartitionFunction partitionFunction2 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, emptyFunctionConfig);
+      assertEquals(partitionFunction2.getPartition(valueTobeHashed), partitionNumWithNullConfig);
+
+      Map<String, String> defaultVariantConfig = new HashMap<>();
+      defaultVariantConfig.put("variant", "fnv1a_32");
+      PartitionFunction partitionFunction3 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, defaultVariantConfig);
+      assertEquals(partitionFunction3.getPartition(valueTobeHashed), partitionNumWithNullConfig);
+
+      Map<String, String> fnv132Config = new HashMap<>();
+      fnv132Config.put("variant", "fnv1_32");
+      PartitionFunction partitionFunction4 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, fnv132Config);
+
+      Map<String, String> fnv164Config = new HashMap<>();
+      fnv164Config.put("variant", "fnv1_64");
+      PartitionFunction partitionFunction5 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, fnv164Config);
+
+      Map<String, String> fnv1a64Config = new HashMap<>();
+      fnv1a64Config.put("variant", "fnv1a_64");
+      PartitionFunction partitionFunction6 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, fnv1a64Config);
+
+      testBasicProperties(partitionFunction1, functionName, numPartitions);
+      testBasicProperties(partitionFunction2, functionName, numPartitions, emptyFunctionConfig);
+      testBasicProperties(partitionFunction3, functionName, numPartitions, defaultVariantConfig);
+      testBasicProperties(partitionFunction4, functionName, numPartitions, fnv132Config);
+      testBasicProperties(partitionFunction5, functionName, numPartitions, fnv164Config);
+      testBasicProperties(partitionFunction6, functionName, numPartitions, fnv1a64Config);
+
+      for (int j = 0; j < NUM_ROUNDS; j++) {
+        int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
+        testPartitionInExpectedRange(partitionFunction1, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction2, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction3, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction4, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction5, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction6, value, numPartitions);
+      }
+    }
+  }
+
   @Test
   public void testMurmur3Equivalence() {
 
@@ -440,6 +510,187 @@ public class PartitionFunctionTest {
   }
 
   @Test
+  public void testMurmurPartitionFunctionUseRawBytes() {
+    int numPartitions = 5;
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("useRawBytes", "true");
+    MurmurPartitionFunction partitionFunction = new MurmurPartitionFunction(numPartitions, functionConfig);
+
+    // When useRawBytes is true, the hex-encoded value should be decoded back to raw bytes before hashing.
+    // This means getPartition(hexString) should produce the same result as hashing the original raw bytes.
+    byte[] rawBytes = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05};
+    String hexValue = BytesUtils.toHexString(rawBytes);
+
+    int expectedPartition =
+        (MurmurHashFunctions.murmurHash2(rawBytes) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(partitionFunction.getPartition(hexValue), expectedPartition);
+
+    // Without useRawBytes, the same hex string should be treated as UTF-8 text (different result).
+    MurmurPartitionFunction defaultPartitionFunction = new MurmurPartitionFunction(numPartitions, null);
+    int defaultPartition =
+        (MurmurHashFunctions.murmurHash2(hexValue.getBytes(UTF_8)) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(defaultPartitionFunction.getPartition(hexValue), defaultPartition);
+  }
+
+  @Test
+  public void testMurmur3PartitionFunctionUseRawBytes() {
+    int numPartitions = 5;
+    byte[] rawBytes = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05};
+    String hexValue = BytesUtils.toHexString(rawBytes);
+
+    // Test x86_32 variant with useRawBytes
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("useRawBytes", "true");
+    Murmur3PartitionFunction partitionFunction = new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+    int expectedPartition =
+        (MurmurHashFunctions.murmurHash3X86Bit32(rawBytes, 0) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(partitionFunction.getPartition(hexValue), expectedPartition);
+
+    // Test x64_32 variant with useRawBytes
+    functionConfig.put("variant", "x64_32");
+    Murmur3PartitionFunction partitionFunctionX64 = new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+    int expectedPartitionX64 =
+        (MurmurHashFunctions.murmurHash3X64Bit32(rawBytes, 0) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(partitionFunctionX64.getPartition(hexValue), expectedPartitionX64);
+
+    // Test x86_32 variant with useRawBytes and non-zero seed
+    functionConfig.remove("variant");
+    functionConfig.put("seed", "9001");
+    Murmur3PartitionFunction partitionFunctionWithSeed = new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+    int expectedPartitionWithSeed =
+        (MurmurHashFunctions.murmurHash3X86Bit32(rawBytes, 9001) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(partitionFunctionWithSeed.getPartition(hexValue), expectedPartitionWithSeed);
+
+    // Without useRawBytes, the same hex string should be treated as UTF-8 text.
+    Murmur3PartitionFunction defaultPartitionFunction = new Murmur3PartitionFunction(numPartitions, null);
+    int defaultPartition =
+        (MurmurHashFunctions.murmurHash3X86Bit32(hexValue.getBytes(UTF_8), 0) & Integer.MAX_VALUE) % numPartitions;
+    assertEquals(defaultPartitionFunction.getPartition(hexValue), defaultPartition);
+  }
+
+  @Test
+  public void testFnvPartitionFunctionUseRawBytes() {
+    int numPartitions = 5;
+    byte[] rawBytes = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05};
+    String hexValue = BytesUtils.toHexString(rawBytes);
+
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("useRawBytes", "true");
+    FnvPartitionFunction defaultPartitionFunction = new FnvPartitionFunction(numPartitions, functionConfig);
+
+    int expectedPartition = getMaskPartition(FnvHashFunctions.fnv1aHash32(rawBytes), numPartitions);
+    assertEquals(defaultPartitionFunction.getPartition(hexValue), expectedPartition);
+
+    functionConfig.put("variant", "fnv1_32");
+    FnvPartitionFunction fnv132PartitionFunction = new FnvPartitionFunction(numPartitions, functionConfig);
+    int expectedPartitionFnv132 = getMaskPartition(FnvHashFunctions.fnv1Hash32(rawBytes), numPartitions);
+    assertEquals(fnv132PartitionFunction.getPartition(hexValue), expectedPartitionFnv132);
+
+    functionConfig.put("variant", "fnv1_64");
+    FnvPartitionFunction fnv164PartitionFunction = new FnvPartitionFunction(numPartitions, functionConfig);
+    int expectedPartitionFnv164 = getMaskPartition(FnvHashFunctions.fnv1Hash64(rawBytes), numPartitions);
+    assertEquals(fnv164PartitionFunction.getPartition(hexValue), expectedPartitionFnv164);
+
+    functionConfig.put("variant", "fnv1a_64");
+    FnvPartitionFunction fnv1a64PartitionFunction = new FnvPartitionFunction(numPartitions, functionConfig);
+    int expectedPartitionFnv1a64 = getMaskPartition(FnvHashFunctions.fnv1aHash64(rawBytes), numPartitions);
+    assertEquals(fnv1a64PartitionFunction.getPartition(hexValue), expectedPartitionFnv1a64);
+
+    FnvPartitionFunction utf8PartitionFunction = new FnvPartitionFunction(numPartitions, null);
+    int expectedUtf8Partition = getMaskPartition(FnvHashFunctions.fnv1aHash32(hexValue.getBytes(UTF_8)),
+        numPartitions);
+    assertEquals(utf8PartitionFunction.getPartition(hexValue), expectedUtf8Partition);
+  }
+
+  @Test
+  public void testFnvPartitionFunctionNegativePartitionHandlingConfig() {
+    int numPartitions = 16;
+    String value = "";
+    int hash = FnvHashFunctions.fnv1aHash32(value.getBytes(UTF_8));
+    int saramaCompatPartition = getSaramaCompatPartition(hash, numPartitions);
+    int javaCompatiblePartition = (hash & Integer.MAX_VALUE) % numPartitions;
+
+    assertNotEquals(saramaCompatPartition, javaCompatiblePartition);
+
+    assertEquals(new FnvPartitionFunction(numPartitions, null).getPartition(value), javaCompatiblePartition);
+
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("negativePartitionHandling", "abs");
+    assertEquals(new FnvPartitionFunction(numPartitions, functionConfig).getPartition(value), saramaCompatPartition);
+  }
+
+  @Test
+  public void testFnvPartitionFunctionNegativePartitionHandlingFor64BitVariants() {
+    int numPartitions = 16;
+    String value = "";
+    long hash = FnvHashFunctions.fnv1aHash64(value.getBytes(UTF_8));
+    int saramaCompatPartition = getSaramaCompatPartition(hash, numPartitions);
+    int javaCompatiblePartition = getMaskPartition(hash, numPartitions);
+
+    assertNotEquals(saramaCompatPartition, javaCompatiblePartition);
+
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("variant", "fnv1a_64");
+    assertEquals(new FnvPartitionFunction(numPartitions, functionConfig).getPartition(value), javaCompatiblePartition);
+
+    functionConfig.put("negativePartitionHandling", "abs");
+    assertEquals(new FnvPartitionFunction(numPartitions, functionConfig).getPartition(value), saramaCompatPartition);
+  }
+
+  @Test
+  public void testFnvPartitionFunctionRejectsInvalidNegativePartitionHandling() {
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("negativePartitionHandling", "saramaCompat");
+
+    IllegalArgumentException exception =
+        expectThrows(IllegalArgumentException.class, () -> new FnvPartitionFunction(4, functionConfig));
+    assertEquals(exception.getMessage(),
+        "FNV negative partition handling must be mask or abs, but was: 'saramaCompat'");
+  }
+
+  @Test
+  public void testUseRawBytesThroughFactory() {
+    int numPartitions = 5;
+    byte[] rawBytes = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05};
+    String hexValue = BytesUtils.toHexString(rawBytes);
+    int expectedPartition =
+        (MurmurHashFunctions.murmurHash2(rawBytes) & Integer.MAX_VALUE) % numPartitions;
+
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("useRawBytes", "true");
+
+    // Test Murmur alias through factory
+    PartitionFunction murmurFn =
+        PartitionFunctionFactory.getPartitionFunction("Murmur", numPartitions, functionConfig);
+    assertEquals(murmurFn.getPartition(hexValue), expectedPartition);
+    assertEquals(murmurFn.getFunctionConfig().get("useRawBytes"), "true");
+
+    // Test Murmur2 alias through factory
+    PartitionFunction murmur2Fn =
+        PartitionFunctionFactory.getPartitionFunction("Murmur2", numPartitions, functionConfig);
+    assertEquals(murmur2Fn.getPartition(hexValue), expectedPartition);
+    assertEquals(murmur2Fn.getFunctionConfig().get("useRawBytes"), "true");
+
+    // Test Murmur3 through factory
+    int expectedPartitionMurmur3 =
+        (MurmurHashFunctions.murmurHash3X86Bit32(rawBytes, 0) & Integer.MAX_VALUE) % numPartitions;
+    PartitionFunction murmur3Fn =
+        PartitionFunctionFactory.getPartitionFunction("Murmur3", numPartitions, functionConfig);
+    assertEquals(murmur3Fn.getPartition(hexValue), expectedPartitionMurmur3);
+    assertEquals(murmur3Fn.getFunctionConfig().get("useRawBytes"), "true");
+
+    // Test FNV through factory with the default fnv1a_32 variant
+    int expectedPartitionFnv = getMaskPartition(FnvHashFunctions.fnv1aHash32(rawBytes), numPartitions);
+    PartitionFunction fnvFn =
+        PartitionFunctionFactory.getPartitionFunction("FNV", numPartitions, functionConfig);
+    assertEquals(fnvFn.getPartition(hexValue), expectedPartitionFnv);
+    assertEquals(fnvFn.getFunctionConfig().get("useRawBytes"), "true");
+  }
+
+  @Test
   public void testMurmur3PartitionFunctionEquivalence() {
 
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
@@ -559,5 +810,23 @@ public class PartitionFunctionTest {
           : MurmurHashFunctions.murmurHash3X86Bit32(bytes, hashSeed);
       assertEquals(actualHashValue, expectedHashValue);
     }
+  }
+
+  private int getSaramaCompatPartition(int hash, int numPartitions) {
+    int partition = hash % numPartitions;
+    return partition < 0 ? -partition : partition;
+  }
+
+  private int getSaramaCompatPartition(long hash, int numPartitions) {
+    long partition = hash % numPartitions;
+    return (int) (partition < 0 ? -partition : partition);
+  }
+
+  private int getMaskPartition(int hash, int numPartitions) {
+    return (hash & Integer.MAX_VALUE) % numPartitions;
+  }
+
+  private int getMaskPartition(long hash, int numPartitions) {
+    return (int) ((hash & Long.MAX_VALUE) % numPartitions);
   }
 }

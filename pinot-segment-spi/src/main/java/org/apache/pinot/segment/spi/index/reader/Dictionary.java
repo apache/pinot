@@ -192,15 +192,22 @@ public interface Dictionary extends IndexReader {
 
   String getStringValue(int dictId);
 
-  /**
-   * NOTE: Should be overridden for STRING, BIG_DECIMAL and BYTES dictionary.
-   */
+  /// Returns the bytes representation of the value.
+  /// Should be overridden for variable sized types, i.e. BIG_DECIMAL, STRING, BYTES.
   default byte[] getBytesValue(int dictId) {
     throw new UnsupportedOperationException();
   }
 
   default ByteArray getByteArrayValue(int dictId) {
     return new ByteArray(getBytesValue(dictId));
+  }
+
+  /// Returns the size of the value in bytes.
+  /// Should be overridden for variable sized types, i.e. BIG_DECIMAL, STRING, BYTES.
+  /// - For BIG_DECIMAL, returns the length of the serialized bytes
+  /// - For STRING, returns the length of the UTF_8 encoded bytes
+  default int getValueSize(int dictId) {
+    return getValueType().size();
   }
 
   default int get32BitsMurmur3HashValue(int dictId) {

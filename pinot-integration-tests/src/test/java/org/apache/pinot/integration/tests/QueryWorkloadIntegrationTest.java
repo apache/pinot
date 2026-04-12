@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -43,6 +44,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -57,6 +59,12 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   protected void overrideBrokerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
+    try {
+      configuration.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
+          org.apache.pinot.spi.utils.NetUtils.findOpenPort());
+    } catch (java.io.IOException e) {
+      throw new RuntimeException("Failed to allocate mailbox port", e);
+    }
   }
 
   @Override
@@ -72,10 +80,10 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Start Zk, Kafka and Pinot
     startZk();
+    startKafka();
     startController();
     startBroker();
     startServer();
-    startKafka();
 
     List<File> avroFiles = getAllAvroFiles();
     List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
@@ -115,6 +123,22 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     waitForAllDocsLoaded(100_000L);
   }
 
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    try {
+      dropOfflineTable(getTableName());
+      dropRealtimeTable(getTableName());
+      stopServer();
+      stopBroker();
+      stopController();
+      stopKafka();
+      stopZk();
+    } finally {
+      FileUtils.deleteQuietly(_tempDir);
+    }
+  }
+
   // TODO: Expand tests to cover more scenarios for workload enforcement
   @Test
   public void testQueryWorkloadConfig() throws Exception {
@@ -124,10 +148,12 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
     QueryWorkloadConfig queryWorkloadConfig = new QueryWorkloadConfig("testWorkload", List.of(nodeConfig));
     try {
-      getControllerRequestClient().updateQueryWorkloadConfig(queryWorkloadConfig);
+      getOrCreateAdminClient().getQueryWorkloadClient()
+          .updateQueryWorkloadConfig(JsonUtils.objectToString(queryWorkloadConfig));
       TestUtils.waitForCondition(aVoid -> {
         try {
-          QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig("testWorkload");
+          QueryWorkloadConfig retrievedConfig =
+              getOrCreateAdminClient().getQueryWorkloadClient().getQueryWorkloadConfigObject("testWorkload");
           return retrievedConfig != null && retrievedConfig.equals(queryWorkloadConfig);
         } catch (Exception e) {
           throw new RuntimeException(e);
@@ -143,7 +169,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
         testServerQueryWorkloadEndpoints(serverInstance, "testWorkload", expectedCpuCostNs, expectedMemoryCostBytes);
       }
     } finally {
-      getControllerRequestClient().deleteQueryWorkloadConfig("testWorkload");
+      getOrCreateAdminClient().getQueryWorkloadClient().deleteQueryWorkloadConfig("testWorkload");
     }
   }
 
@@ -178,8 +204,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
    */
   private Set<String> getServerInstancesForTable(String tableName) throws Exception {
     // Use the controller API to get server instances for the specific table
-    String url = _controllerRequestURLBuilder.forTableGetServerInstances(tableName);
-    String response = sendGetRequest(url);
+    String response = getOrCreateAdminClient().getTableClient().getTableInstances(tableName, "server");
 
     // Parse the JSON response to extract server instance names
     JsonNode responseJson = JsonUtils.stringToJsonNode(response);

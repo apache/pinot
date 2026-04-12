@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.tuple.Sketch;
@@ -281,8 +282,12 @@ public class IntegerTupleSketchAggregationFunction
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public Comparable extractFinalResult(TupleIntSketchAccumulator accumulator) {
+  public Comparable extractFinalResult(@Nullable TupleIntSketchAccumulator accumulator) {
+    if (accumulator == null) {
+      return null;
+    }
     accumulator.setNominalEntries(_nominalEntries);
     accumulator.setSetOperations(_setOps);
     accumulator.setThreshold(_accumulatorThreshold);

@@ -36,6 +36,7 @@ import ZookeeperPage from './pages/ZookeeperPage';
 import SchemaPageDetails from './pages/SchemaPageDetails';
 import LoginPage from './pages/LoginPage';
 import UserPage from "./pages/UserPage";
+import LogicalTableDetails from './pages/LogicalTableDetails';
 
 export default [
   // TODO: make async
@@ -48,6 +49,7 @@ export default [
   { path: '/servers', Component: InstanceListingPage },
   { path: '/minions', Component: InstanceListingPage },
   { path: '/tables', Component: TablesListingPage },
+  { path: '/logical-tables/:logicalTableName', Component: LogicalTableDetails },
   { path: '/minion-task-manager', Component: MinionTaskManager },
   { path: '/task-queue/:taskType', Component: TaskQueue },
   { path: '/task-queue/:taskType/tables/:queueTableName', Component: TaskQueueTable },

@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Arrays;

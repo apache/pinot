@@ -183,7 +183,7 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
   @Override
   public LongArrayList extractFinalResult(I intermediateResult) {
     if (intermediateResult == null) {
-      return new LongArrayList(_numSteps);
+      return LongArrayList.wrap(new long[_numSteps]);
     }
     return _mergeStrategy.extractFinalResult(intermediateResult);
   }

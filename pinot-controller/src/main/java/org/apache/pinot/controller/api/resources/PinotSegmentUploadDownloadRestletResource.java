@@ -96,7 +96,9 @@ import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
+import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
+import org.apache.pinot.controller.validation.UtilizationChecker;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -158,6 +160,9 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ResourceUtilizationManager _resourceUtilizationManager;
 
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -405,6 +410,27 @@ public class PinotSegmentUploadDownloadRestletResource {
       }
       SegmentValidationUtils.checkStorageQuota(segmentName, segmentSizeInBytes, untarredSegmentSizeInBytes, tableConfig,
           _storageQuotaChecker);
+
+      // Perform resource utilization checks
+      UtilizationChecker.CheckResult isResourceUtilizationWithinLimits =
+          _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+              UtilizationChecker.CheckPurpose.OFFLINE_SEGMENT_UPLOAD);
+      if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
+        _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+            1L);
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Resource utilization limit exceeded for table: %s, rejecting upload for segment: %s",
+                tableNameWithType,
+                segmentName),
+            Response.Status.FORBIDDEN);
+      } else if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) {
+        LOGGER.warn(
+            "Resource utilization status could not be determined for table: {}. Will allow segment upload to "
+                + "proceed.",
+            tableNameWithType);
+      }
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+          0L);
 
       // Encrypt segment
       String crypterNameInTableConfig = tableConfig.getValidationConfig().getCrypterClassName();

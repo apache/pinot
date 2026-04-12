@@ -34,12 +34,12 @@ public enum FilterKind {
   NOT_IN,
   LIKE,
   REGEXP_LIKE,
-  TEXT_CONTAINS,
   TEXT_MATCH,
   JSON_MATCH,
   IS_NULL,
   IS_NOT_NULL,
-  VECTOR_SIMILARITY;
+  VECTOR_SIMILARITY,
+  VECTOR_SIMILARITY_RADIUS;
 
   /**
    * Helper method that returns true if the enum maps to a Range.

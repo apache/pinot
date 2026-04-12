@@ -56,14 +56,14 @@ public class VarByteChunkForwardIndexReaderV4
   private static final int METADATA_ENTRY_SIZE = 8;
 
   private final FieldSpec.DataType _storedType;
-  private final int _targetDecompressedChunkSize;
-  private final ChunkDecompressor _chunkDecompressor;
-  private final ChunkCompressionType _chunkCompressionType;
+  protected final int _targetDecompressedChunkSize;
+  protected final ChunkDecompressor _chunkDecompressor;
+  protected final ChunkCompressionType _chunkCompressionType;
 
-  private final PinotDataBuffer _metadata;
-  private final PinotDataBuffer _chunks;
+  protected final PinotDataBuffer _metadata;
+  protected final PinotDataBuffer _chunks;
   private final boolean _isSingleValue;
-  private final long _chunksStartOffset;
+  protected final long _chunksStartOffset;
 
   public VarByteChunkForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
       boolean isSingleValue) {
@@ -336,7 +336,7 @@ public class VarByteChunkForwardIndexReaderV4
     }
   }
 
-  private static final class UncompressedReaderContext extends ReaderContext {
+  protected static class UncompressedReaderContext extends ReaderContext {
 
     private ByteBuffer _chunk;
 
@@ -378,9 +378,9 @@ public class VarByteChunkForwardIndexReaderV4
     }
   }
 
-  private static final class CompressedReaderContext extends ReaderContext {
+  protected static class CompressedReaderContext extends ReaderContext {
 
-    private final ByteBuffer _decompressedBuffer;
+    protected final ByteBuffer _decompressedBuffer;
     private final ChunkDecompressor _chunkDecompressor;
     private final ChunkCompressionType _chunkCompressionType;
     private boolean _closed;
@@ -399,12 +399,21 @@ public class VarByteChunkForwardIndexReaderV4
       _decompressedBuffer.clear();
       ByteBuffer compressed = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
       if (_regularChunk) {
-        _chunkDecompressor.decompress(compressed, _decompressedBuffer);
-        _numDocsInCurrentChunk = _decompressedBuffer.getInt(0);
+        decompressChunk(compressed);
         return readSmallUncompressedValue(docId);
       }
       // huge value, no benefit from buffering, return the whole thing
       return readHugeCompressedValue(compressed, _chunkDecompressor.decompressedLength(compressed));
+    }
+
+    /**
+     * Decompresses a regular chunk and reads the number of docs. Subclasses (e.g. V6) can override
+     * to perform additional transformations (e.g. converting sizes to offsets) after decompression.
+     */
+    protected void decompressChunk(ByteBuffer compressed)
+        throws IOException {
+      _chunkDecompressor.decompress(compressed, _decompressedBuffer);
+      _numDocsInCurrentChunk = _decompressedBuffer.getInt(0);
     }
 
     @Override

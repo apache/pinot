@@ -44,8 +44,16 @@ public interface PlanMaker {
   /**
    * Returns an instance level {@link Plan} which contains the logical execution plan for multiple segments.
    */
-  Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
-      ExecutorService executorService, ServerMetrics serverMetrics);
+  default Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
+      ExecutorService executorService) {
+    return makeInstancePlan(segmentContexts, queryContext, executorService, ServerMetrics.get());
+  }
+
+  @Deprecated
+  default Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
+      ExecutorService executorService, ServerMetrics serverMetrics) {
+    return makeInstancePlan(segmentContexts, queryContext, executorService);
+  }
 
   /**
    * Returns a segment level {@link PlanNode} which contains the logical execution plan for one segment.
@@ -56,8 +64,16 @@ public interface PlanMaker {
    * Returns an instance level {@link Plan} for a streaming query which contains the logical execution plan for multiple
    * segments.
    */
-  Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
-      ExecutorService executorService, ResultsBlockStreamer streamer, ServerMetrics serverMetrics);
+  default Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
+      ExecutorService executorService, ResultsBlockStreamer streamer) {
+    return makeStreamingInstancePlan(segmentContexts, queryContext, executorService, streamer, ServerMetrics.get());
+  }
+
+  @Deprecated
+  default Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
+      ExecutorService executorService, ResultsBlockStreamer streamer, ServerMetrics serverMetrics) {
+    return makeStreamingInstancePlan(segmentContexts, queryContext, executorService, streamer);
+  }
 
   /**
    * Returns a segment level {@link PlanNode} for a streaming query which contains the logical execution plan for one

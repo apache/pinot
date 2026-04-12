@@ -40,6 +40,7 @@ import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
@@ -48,6 +49,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -534,22 +536,24 @@ public class HelixHelper {
   }
 
   public static Set<String> getTablesForBrokerTag(HelixManager helixManager, String brokerTag) {
-    Set<String> tablesForBrokerTag = new HashSet<>();
-    List<TableConfig> tableConfigs = ZKMetadataProvider.getAllTableConfigs(helixManager.getHelixPropertyStore());
-    for (TableConfig tableConfig : tableConfigs) {
-      if (TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker()).equals(brokerTag)) {
-        tablesForBrokerTag.add(tableConfig.getTableName());
-      }
-    }
-    return tablesForBrokerTag;
+    return getTablesForBrokerTags(helixManager, List.of(brokerTag));
   }
 
   public static Set<String> getTablesForBrokerTags(HelixManager helixManager, List<String> brokerTags) {
     Set<String> tablesForBrokerTags = new HashSet<>();
-    List<TableConfig> tableConfigs = ZKMetadataProvider.getAllTableConfigs(helixManager.getHelixPropertyStore());
+    ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
+    List<TableConfig> tableConfigs = ZKMetadataProvider.getAllTableConfigs(propertyStore);
     for (TableConfig tableConfig : tableConfigs) {
       if (brokerTags.contains(TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker()))) {
         tablesForBrokerTags.add(tableConfig.getTableName());
+      }
+    }
+    // Include logical tables that use any of these broker tenants
+    for (LogicalTableConfig logicalTableConfig : ZKMetadataProvider.getAllLogicalTableConfigs(propertyStore)) {
+      String logicalBrokerTag =
+          TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant());
+      if (brokerTags.contains(logicalBrokerTag)) {
+        tablesForBrokerTags.add(logicalTableConfig.getTableName());
       }
     }
     return tablesForBrokerTags;

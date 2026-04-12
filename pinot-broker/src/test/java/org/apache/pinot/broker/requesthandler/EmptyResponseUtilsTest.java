@@ -141,6 +141,40 @@ public class EmptyResponseUtilsTest {
   }
 
   @Test
+  public void testBuildEmptyResultTableWithPostAggregation() {
+    // Aggregation with post-aggregation expression and aliases
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT SUM(a) * 1.0 / COUNT(*) AS rate, SUM(a) AS total FROM testTable WHERE foo = 'bar'");
+    ResultTable resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    DataSchema dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"rate", "total"});
+    assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+
+    // Aggregation with post-aggregation expression without alias
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT SUM(a) + MAX(b) FROM testTable WHERE foo = 'bar'");
+    resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.size(), 1);
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.DOUBLE});
+    rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+
+    // Group-by with post-aggregation expression
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT c, SUM(a) * 1.0 / COUNT(*) AS rate FROM testTable WHERE foo = 'bar' GROUP BY c");
+    resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"c", "rate"});
+    assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE});
+    assertTrue(resultTable.getRows().isEmpty());
+  }
+
+  @Test
   public void testBuildEmptyResultTableWithDistinctCountRawHLL() {
     // Test DISTINCTCOUNTRAWHLL aggregation with empty results
     // This should not throw a Jackson serialization error

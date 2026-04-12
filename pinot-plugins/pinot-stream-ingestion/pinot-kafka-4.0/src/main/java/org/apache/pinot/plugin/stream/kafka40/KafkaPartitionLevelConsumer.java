@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.kafka40;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,8 +70,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       _consumer.seek(_topicPartition, startOffset);
     }
 
-    ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
-    List<ConsumerRecord<String, Bytes>> records = consumerRecords.records(_topicPartition);
+    ConsumerRecords<Bytes, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
+    List<ConsumerRecord<Bytes, Bytes>> records = consumerRecords.records(_topicPartition);
     List<BytesStreamMessage> filteredRecords = new ArrayList<>(records.size());
     long firstOffset = -1;
     long offsetOfNextBatch = startOffset;
@@ -82,12 +81,12 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       firstOffset = records.get(0).offset();
       _lastFetchedOffset = records.get(records.size() - 1).offset();
       offsetOfNextBatch = _lastFetchedOffset + 1;
-      for (ConsumerRecord<String, Bytes> record : records) {
+      for (ConsumerRecord<Bytes, Bytes> record : records) {
         StreamMessageMetadata messageMetadata = extractMessageMetadata(record);
         Bytes message = record.value();
         if (message != null) {
-          String key = record.key();
-          byte[] keyBytes = key != null ? key.getBytes(StandardCharsets.UTF_8) : null;
+          Bytes key = record.key();
+          byte[] keyBytes = key != null ? key.get() : null;
           filteredRecords.add(new BytesStreamMessage(keyBytes, message.get(), messageMetadata));
           if (messageMetadata.getRecordSerializedSize() > 0) {
             batchSizeInBytes += messageMetadata.getRecordSerializedSize();
@@ -111,7 +110,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         hasDataLoss, batchSizeInBytes);
   }
 
-  private StreamMessageMetadata extractMessageMetadata(ConsumerRecord<String, Bytes> record) {
+  private StreamMessageMetadata extractMessageMetadata(ConsumerRecord<Bytes, Bytes> record) {
     long timestamp = record.timestamp();
     long offset = record.offset();
 

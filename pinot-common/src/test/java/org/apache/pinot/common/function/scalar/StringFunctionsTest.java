@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.util.Random;
+import org.apache.commons.lang3.StringUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -42,6 +44,8 @@ public class StringFunctionsTest {
         {"org.apache.pinot.common.function", ".", 3, 3, "common", "null"},
         {"+++++", "+", 0, 100, "", ""},
         {"+++++", "+", 1, 100, "null", "null"},
+        {"+++++org++apache++", "", 1, 100, "null", "null"},
+        {"+++++org++apache++", "", 0, 100, "+++++org++apache++", "+++++org++apache++"},
         // note that splitPart will split with limit first, then lookup by index from START or END.
         {"org.apache.pinot.common.function", ".", -1, 100, "function", "function"},
         {"org.apache.pinot.common.function", ".", -10, 100, "null", "null"},
@@ -64,6 +68,89 @@ public class StringFunctionsTest {
         {"org.apache.pinot.common.function", ".", -6, 6, "null", "null"},
         {"+++++", "+", -1, 100, "", ""},
         {"+++++", "+", -2, 100, "null", "null"},
+
+        // Empty delimiter: index=-1 returns input, other negative indices return "null"
+        {"hello", "", -1, 100, "hello", "hello"},
+        {"hello", "", -2, 100, "null", "null"},
+
+        // Single field with no delimiter present
+        {"abc", ".", 0, 100, "abc", "abc"},
+        {"abc", ".", 1, 100, "null", "null"},
+        {"abc", ".", -1, 100, "abc", "abc"},
+        {"abc", ".", -2, 100, "null", "null"},
+
+        // Input equals delimiter
+        {".", ".", 0, 100, "", ""},
+        {".", ".", 1, 100, "null", "null"},
+        {".", ".", -1, 100, "", ""},
+
+        // Trailing delimiters with content (single-char): exercises splitPartNegativeIdxSingleCharDelim
+        // trailing-delimiter handling (resultIdx decrement, empty trailing field)
+        {"org++apache++", "+", 0, 100, "org", "org"},
+        {"org++apache++", "+", 1, 100, "apache", "apache"},
+        {"org++apache++", "+", 2, 100, "", ""},
+        {"org++apache++", "+", 3, 100, "null", "null"},
+        {"org++apache++", "+", -1, 100, "", ""},
+        {"org++apache++", "+", -2, 100, "apache", "apache"},
+        {"org++apache++", "+", -3, 100, "org", "org"},
+        {"org++apache++", "+", -4, 100, "null", "null"},
+
+        // Leading AND trailing delimiters (single-char): exercises backward scan with
+        // both leading delimiter skip and trailing delimiter adjustment
+        {"++org++apache++", "+", 0, 100, "org", "org"},
+        {"++org++apache++", "+", 1, 100, "apache", "apache"},
+        {"++org++apache++", "+", -1, 100, "", ""},
+        {"++org++apache++", "+", -2, 100, "apache", "apache"},
+        {"++org++apache++", "+", -3, 100, "org", "org"},
+        {"++org++apache++", "+", -4, 100, "null", "null"},
+
+        // Single field surrounded by delimiters
+        {"++abc++", "+", 0, 100, "abc", "abc"},
+        {"++abc++", "+", -1, 100, "", ""},
+        {"++abc++", "+", -2, 100, "abc", "abc"},
+        {"++abc++", "+", -3, 100, "null", "null"},
+
+        // Multi-char delimiter: exercises forward scan and multi-char negative index
+        // path (totalFields counting + adjustedIndex conversion) which is separate from
+        // the single-char optimized path
+        {"org::apache::pinot", "::", 0, 100, "org", "org"},
+        {"org::apache::pinot", "::", 1, 100, "apache", "apache"},
+        {"org::apache::pinot", "::", 2, 100, "pinot", "pinot"},
+        {"org::apache::pinot", "::", 3, 100, "null", "null"},
+        {"org::apache::pinot", "::", -1, 100, "pinot", "pinot"},
+        {"org::apache::pinot", "::", -2, 100, "apache", "apache"},
+        {"org::apache::pinot", "::", -3, 100, "org", "org"},
+        {"org::apache::pinot", "::", -4, 100, "null", "null"},
+
+        // Multi-char delimiter with consecutive delimiters: exercises the consecutive
+        // delimiter skip in both leading-skip loop and the totalFields counting loop
+        {"::::org::::apache", "::", 0, 100, "org", "org"},
+        {"::::org::::apache", "::", 1, 100, "apache", "apache"},
+        {"::::org::::apache", "::", 2, 100, "null", "null"},
+        {"::::org::::apache", "::", -1, 100, "apache", "apache"},
+        {"::::org::::apache", "::", -2, 100, "org", "org"},
+        {"::::org::::apache", "::", -3, 100, "null", "null"},
+
+        // Multi-char delimiter with leading AND trailing delimiters: exercises the
+        // trailing empty field in the multi-char totalFields counting path
+        {"::org::apache::", "::", 0, 100, "org", "org"},
+        {"::org::apache::", "::", 1, 100, "apache", "apache"},
+        {"::org::apache::", "::", 2, 100, "", ""},
+        {"::org::apache::", "::", -1, 100, "", ""},
+        {"::org::apache::", "::", -2, 100, "apache", "apache"},
+        {"::org::apache::", "::", -3, 100, "org", "org"},
+        {"::org::apache::", "::", -4, 100, "null", "null"},
+
+        // Empty input with non-empty delimiter
+        {"", ".", 0, 100, "null", "null"},
+        {"", ".", -1, 100, "null", "null"},
+        {"", ".", -2, 100, "null", "null"},
+
+        // Empty input with multi-char delimiter and negative index
+        {"", "::", -1, 100, "null", "null"},
+
+        // Integer.MIN_VALUE: negating it overflows (remains negative), guard must return "null"
+        {"org.apache.pinot", ".", Integer.MIN_VALUE, 100, "null", "null"},
     };
   }
 
@@ -91,6 +178,59 @@ public class StringFunctionsTest {
         {"", 3, new String[]{}, new String[]{}, new String[]{}, new String[]{}},
         {"", 0, new String[]{}, new String[]{}, new String[]{}, new String[]{}},
         {"", 9, new String[]{}, new String[]{}, new String[]{}, new String[]{}}
+    };
+  }
+
+  @DataProvider(name = "initcapTestCases")
+  public static Object[][] initcapTestCases() {
+    return new Object[][]{
+        // Basic test cases
+        {"hello world", "Hello World"},
+        {"HELLO WORLD", "Hello World"},
+        {"hello WORLD", "Hello World"},
+        {"HeLLo WoRLd", "Hello World"},
+
+        // Single word
+        {"hello", "Hello"},
+        {"HELLO", "Hello"},
+        {"hELLO", "Hello"},
+
+        // Multiple spaces
+        {"hello  world", "Hello  World"},
+        {"hello   world   test", "Hello   World   Test"},
+
+        // Leading and trailing spaces
+        {" hello world", " Hello World"},
+        {"hello world ", "Hello World "},
+        {" hello world ", " Hello World "},
+
+        // Special characters and numbers
+        {"hello-world", "Hello-world"},
+        {"hello_world", "Hello_world"},
+        {"hello123world", "Hello123world"},
+        {"123hello world", "123hello World"},
+
+        // Mixed whitespace characters
+        {"hello\tworld", "Hello\tWorld"},
+        {"hello\nworld", "Hello\nWorld"},
+        {"hello\rworld", "Hello\rWorld"},
+
+        // Edge cases
+        {"", ""},
+        {" ", " "},
+        {"a", "A"},
+        {"A", "A"},
+
+        // Real-world examples
+        {"apache pinot", "Apache Pinot"},
+        {"the quick brown fox", "The Quick Brown Fox"},
+        {"SQL is AWESOME", "Sql Is Awesome"},
+        {"new york city", "New York City"},
+
+        // Unicode and special characters
+        {"café résumé", "Café Résumé"},
+        {"hello@world.com", "Hello@world.com"},
+        {"one,two,three", "One,two,three"}
     };
   }
 
@@ -151,6 +291,31 @@ public class StringFunctionsTest {
     assertEquals(StringFunctions.splitPart(input, delimiter, limit, index), expectedTokenWithLimitCounts);
   }
 
+  @Test
+  public void testSplitPartRandomized() {
+    String chars = "abcdefg.,:;+-_/";
+    String[] delimiters = {".", ",", ":", "::", "++", "ab", "///"};
+    Random random = new Random();
+    int numIterations = 10_000;
+
+    for (int iter = 0; iter < numIterations; iter++) {
+      int len = random.nextInt(50);
+      StringBuilder sb = new StringBuilder(len);
+      for (int i = 0; i < len; i++) {
+        sb.append(chars.charAt(random.nextInt(chars.length())));
+      }
+      String input = sb.toString();
+      String delimiter = delimiters[random.nextInt(delimiters.length)];
+      int index = random.nextInt(21) - 10; // range [-10, 10]
+
+      String expected = StringFunctions.splitPartArrayBased(
+          StringUtils.splitByWholeSeparator(input, delimiter), index);
+      String actual = StringFunctions.splitPart(input, delimiter, index);
+      assertEquals(actual, expected,
+          String.format("Mismatch for input='%s', delimiter='%s', index=%d", input, delimiter, index));
+    }
+  }
+
   @Test(dataProvider = "prefixAndSuffixTestCases")
   public void testPrefixAndSuffix(String input, int length, String[] expectedPrefix, String[] expectedSuffix,
       String[] expectedPrefixWithRegexChar, String[] expectedSuffixWithRegexChar) {
@@ -158,6 +323,11 @@ public class StringFunctionsTest {
     assertEquals(StringFunctions.suffixes(input, length), expectedSuffix);
     assertEquals(StringFunctions.prefixesWithPrefix(input, length, "^"), expectedPrefixWithRegexChar);
     assertEquals(StringFunctions.suffixesWithSuffix(input, length, "$"), expectedSuffixWithRegexChar);
+  }
+
+  @Test(dataProvider = "initcapTestCases")
+  public void testInitcap(String input, String expected) {
+    assertEquals(StringFunctions.initcap(input), expected);
   }
 
   @Test(dataProvider = "levenshteinDistanceTestCases")

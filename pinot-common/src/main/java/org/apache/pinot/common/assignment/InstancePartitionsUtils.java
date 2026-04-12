@@ -57,6 +57,14 @@ public class InstancePartitionsUtils {
   }
 
   /**
+   * Returns the name of the instance partitions for the given table name (with or without type suffix) and instance
+   * partitions type.
+   */
+  public static String getInstancePartitionsName(String tableName, InstancePartitionsType instancePartitionsType) {
+    return getInstancePartitionsName(tableName, instancePartitionsType.name());
+  }
+
+  /**
    * Fetches the instance partitions from Helix property store if it exists, or computes it for backward-compatibility.
    */
   public static InstancePartitions fetchOrComputeInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
@@ -73,8 +81,8 @@ public class InstancePartitionsUtils {
 
     // Fetch the instance partitions from property store if it exists
     ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
-    InstancePartitions instancePartitions = fetchInstancePartitions(propertyStore,
-        getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+    InstancePartitions instancePartitions =
+        fetchInstancePartitions(propertyStore, getInstancePartitionsName(tableNameWithType, instancePartitionsType));
     if (instancePartitions != null) {
       return instancePartitions;
     }

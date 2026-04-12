@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import jwtDecode from "jwt-decode";
+import jwtDecode from 'jwt-decode';
 import { get, each, isEqual, isArray, keys, union } from 'lodash';
 import {
   DataTable,
@@ -118,13 +118,17 @@ import {
   resumeConsumption,
   getPauseStatus,
   getVersions,
-  getLogicalTables
+  getLogicalTables,
+  getLogicalTable,
+  putLogicalTable,
+  deleteLogicalTable
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
-import { matchPath } from 'react-router';
+import { matchPath } from 'react-router-dom';
 import RouterData from '../router';
-const JSONbig = require('json-bigint')({'storeAsString': true})
+import JSONbigBase from 'json-bigint';
+const JSONbig = JSONbigBase({ storeAsString: true });
 
 // This method is used to display tenants listing on cluster manager home page
 // API: /tenants
@@ -1458,6 +1462,33 @@ const getPackageVersionsData = () => {
   });
 };
 
+const getLogicalTablesData = async (columnHeader: string) => {
+  const { data } = await getLogicalTables();
+  return {
+    columns: [columnHeader],
+    records: data.map((name) => [name])
+  };
+};
+
+const getLogicalTablesList = async () => {
+  return getLogicalTablesData('Logical Table Name');
+};
+
+const getLogicalTableConfig = async (tableName: string) => {
+  const { data } = await getLogicalTable(tableName);
+  return data;
+};
+
+const updateLogicalTableConfig = async (tableName: string, config: string) => {
+  const { data } = await putLogicalTable(tableName, config);
+  return data;
+};
+
+const deleteLogicalTableOp = async (tableName: string) => {
+  const { data } = await deleteLogicalTable(tableName);
+  return data;
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -1558,7 +1589,11 @@ export default {
   getPauseStatusData,
   fetchServerToSegmentsCountData,
   getConsumingSegmentsInfoData,
-  getPackageVersionsData
+  getPackageVersionsData,
+  getLogicalTablesList,
+  getLogicalTableConfig,
+  updateLogicalTableConfig,
+  deleteLogicalTableOp
 };
 
 // Named exports for shared constants and utilities

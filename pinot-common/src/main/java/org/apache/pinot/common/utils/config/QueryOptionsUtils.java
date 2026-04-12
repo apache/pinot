@@ -125,6 +125,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Long getMaxExecutionTimeMsInDistinct(Map<String, String> queryOptions) {
+    String maxExecutionTimeMs = queryOptions.get(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT);
+    return checkedParseLongPositive(QueryOptionKey.MAX_EXECUTION_TIME_MS_IN_DISTINCT, maxExecutionTimeMs);
+  }
+
+  @Nullable
   public static Long getMaxServerResponseSizeBytes(Map<String, String> queryOptions) {
     String responseSize = queryOptions.get(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES);
     return checkedParseLongPositive(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, responseSize);
@@ -163,6 +169,26 @@ public class QueryOptionsUtils {
 
   public static boolean isSkipStarTree(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
+  }
+
+  /**
+   * When true, use index-based distinct operators when applicable:
+   * {@link org.apache.pinot.core.operator.query.JsonIndexDistinctOperator} for JSON columns and
+   * {@link org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator} for dictionary + inverted index columns.
+   * Set via query option useIndexBasedDistinctOperator=true.
+   */
+  public static boolean isUseIndexBasedDistinctOperator(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR));
+  }
+
+  /**
+   * Returns the cost ratio for the inverted-index-based distinct heuristic, or null if not set.
+   * The inverted index path is chosen when dictionaryCardinality * costRatio <= filteredDocCount.
+   */
+  @Nullable
+  public static Double getInvertedIndexDistinctCostRatio(Map<String, String> queryOptions) {
+    return checkedParseDoublePositive(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO,
+        queryOptions.get(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO));
   }
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
@@ -336,6 +362,12 @@ public class QueryOptionsUtils {
     return checkedParseInt(QueryOptionKey.CHUNK_SIZE_EXTRACT_FINAL_RESULT, chunkSizeExtractFinalResultString, 1);
   }
 
+  @Nullable
+  public static Integer getStreamingGroupByFlushThreshold(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD);
+    return checkedParseIntNonNegative(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD, value);
+  }
+
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_NULL_HANDLING));
   }
@@ -423,6 +455,19 @@ public class QueryOptionsUtils {
   public static Integer getMaxRowsInJoin(Map<String, String> queryOptions) {
     String maxRowsInJoin = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_JOIN);
     return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_JOIN, maxRowsInJoin);
+  }
+
+  @Nullable
+  public static Integer getMaxRowsInDistinct(Map<String, String> queryOptions) {
+    String maxRowsInDistinct = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_DISTINCT);
+    return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_IN_DISTINCT, maxRowsInDistinct);
+  }
+
+  @Nullable
+  public static Integer getMaxRowsWithoutChangeInDistinct(Map<String, String> queryOptions) {
+    String maxRowsWithoutChange =
+        queryOptions.get(QueryOptionKey.MAX_ROWS_WITHOUT_CHANGE_IN_DISTINCT);
+    return checkedParseIntPositive(QueryOptionKey.MAX_ROWS_WITHOUT_CHANGE_IN_DISTINCT, maxRowsWithoutChange);
   }
 
   @Nullable
@@ -558,6 +603,25 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  private static Double checkedParseDoublePositive(String optionName, @Nullable String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    double value;
+    try {
+      value = Double.parseDouble(optionValue.trim());
+    } catch (NumberFormatException nfe) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a positive number, got: %s", optionName, optionValue));
+    }
+    if (!Double.isFinite(value) || value <= 0) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a positive number, got: %s", optionName, optionValue));
+    }
+    return value;
+  }
+
+  @Nullable
   private static Long checkedParseLongPositive(String optionName, @Nullable String optionValue) {
     return checkedParseLong(optionName, optionValue, 1);
   }
@@ -607,6 +671,73 @@ public class QueryOptionsUtils {
     String regexDictSizeThreshold = queryOptions.get(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD);
     return uncheckedParseInt(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, regexDictSizeThreshold);
   }
+
+  // --- Vector search query option accessors ---
+
+  /**
+   * Returns the configured nprobe value for IVF_FLAT vector search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Integer getVectorNprobe(Map<String, String> queryOptions) {
+    String nprobe = queryOptions.get(QueryOptionKey.VECTOR_NPROBE);
+    return checkedParseIntPositive(QueryOptionKey.VECTOR_NPROBE, nprobe);
+  }
+
+  /**
+   * Returns whether exact rerank is enabled for vector search. Defaults to {@code false}.
+   */
+  public static boolean isVectorExactRerank(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK));
+  }
+
+  @Nullable
+  public static Boolean getVectorExactRerank(Map<String, String> queryOptions) {
+    String exactRerank = queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK);
+    return exactRerank != null ? Boolean.parseBoolean(exactRerank) : null;
+  }
+
+  /**
+   * Returns the maximum number of ANN candidates for vector search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Integer getVectorMaxCandidates(Map<String, String> queryOptions) {
+    String maxCandidates = queryOptions.get(QueryOptionKey.VECTOR_MAX_CANDIDATES);
+    return checkedParseIntPositive(QueryOptionKey.VECTOR_MAX_CANDIDATES, maxCandidates);
+  }
+
+  /**
+   * Returns the distance threshold for vector radius/threshold search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Float getVectorDistanceThreshold(Map<String, String> queryOptions) {
+    String threshold = queryOptions.get(QueryOptionKey.VECTOR_DISTANCE_THRESHOLD);
+    if (threshold == null) {
+      return null;
+    }
+    try {
+      float value = Float.parseFloat(threshold.trim());
+      if (Float.isNaN(value) || Float.isInfinite(value)) {
+        throw new IllegalArgumentException(
+            QueryOptionKey.VECTOR_DISTANCE_THRESHOLD + " must be a finite number, got: " + threshold);
+      }
+      // Negative thresholds are valid for dot-product/inner-product distance functions
+      // where VectorDistanceUtils.computeDistance returns negated dot product.
+      return value;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          QueryOptionKey.VECTOR_DISTANCE_THRESHOLD + " must be a valid number, got: " + threshold);
+    }
+  }
+
+  /**
+   * Returns the configured efSearch value for HNSW vector search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Integer getVectorEfSearch(Map<String, String> queryOptions) {
+    String efSearch = queryOptions.get(QueryOptionKey.VECTOR_EF_SEARCH);
+    return checkedParseIntPositive(QueryOptionKey.VECTOR_EF_SEARCH, efSearch);
+  }
+
 
   public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
     String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);

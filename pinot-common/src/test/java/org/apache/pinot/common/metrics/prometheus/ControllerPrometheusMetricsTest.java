@@ -178,6 +178,10 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
             String.format("%s.%s", ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC, TaskState.IN_PROGRESS));
         assertGaugeExportedCorrectly(ControllerGauge.TASK_STATUS.getGaugeName(),
             ExportedLabels.JOBSTATUS_CONTROLLER_TASKTYPE, EXPORTED_METRIC_PREFIX);
+      } else if (controllerGauge == ControllerGauge.TASKS_TRACKED_FOR_TASK_TYPE) {
+        addGaugeWithLabels(controllerGauge, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC);
+        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(),
+            List.of(LABEL_KEY_TASK_TYPE, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC), EXPORTED_METRIC_PREFIX);
       } else {
         addGaugeWithLabels(controllerGauge, TABLE_NAME_WITH_TYPE);
         assertGaugeExportedCorrectly(controllerGauge.getGaugeName(), ExportedLabels.TABLENAME_TABLETYPE,

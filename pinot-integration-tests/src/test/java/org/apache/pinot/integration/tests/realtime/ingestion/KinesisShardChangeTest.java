@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.integration.tests.realtime.ingestion;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -28,7 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.pinot.controller.api.resources.TableViews;
+import org.apache.pinot.common.restlet.resources.TableView;
 import org.apache.pinot.integration.tests.realtime.ingestion.utils.KinesisUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -323,7 +322,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
 
   private void validateSegmentStates(String tableName, int expectedOnlineSegments, int expectedConsumingSegments)
       throws IOException {
-    TableViews.TableView tableView = getExternalView(tableName, TableType.REALTIME);
+    TableView tableView = getExternalView(tableName, TableType.REALTIME);
     Assert.assertEquals(tableView._realtime.size(), expectedOnlineSegments + expectedConsumingSegments);
 
     List<String> onlineSegments = tableView._realtime.entrySet().stream()
