@@ -161,6 +161,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
   protected BrokerRoutingManager _routingManager;
+  protected MultiClusterRoutingContext _multiClusterRoutingContext;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
   protected SqlQueryExecutor _sqlQueryExecutor;
@@ -403,8 +404,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(threadAccountantListener);
     }
 
-    // TODO: Hook multiClusterRoutingContext into request handlers subsequently.
-    MultiClusterRoutingContext multiClusterRoutingContext = getMultiClusterRoutingContext();
+    _multiClusterRoutingContext = getMultiClusterRoutingContext();
 
     // Create Broker request handler.
     String brokerId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
@@ -416,7 +416,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       singleStageBrokerRequestHandler =
           new GrpcBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _failureDetector, _threadAccountant,
-              multiClusterRoutingContext);
+              _multiClusterRoutingContext);
     } else {
       // Default request handler type, i.e. netty
       NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
@@ -441,7 +441,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       singleStageBrokerRequestHandler =
           new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, nettyDefaults, tlsDefaults,
-              _serverRoutingStatsManager, _failureDetector, _threadAccountant, multiClusterRoutingContext);
+              _serverRoutingStatsManager, _failureDetector, _threadAccountant, _multiClusterRoutingContext);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
@@ -455,16 +455,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       WorkerManager workerManager =
           createWorkerManager(brokerId, queryRunnerHostname, queryRunnerPort, _routingManager);
       WorkerManager multiClusterWorkerManager;
-      if (multiClusterRoutingContext != null) {
+      if (_multiClusterRoutingContext != null) {
         multiClusterWorkerManager = createWorkerManager(brokerId, queryRunnerHostname, queryRunnerPort,
-            multiClusterRoutingContext.getMultiClusterRoutingManager());
+            _multiClusterRoutingContext.getMultiClusterRoutingManager());
       } else {
         multiClusterWorkerManager = workerManager;
       }
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
-              _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager);
+              _threadAccountant, _multiClusterRoutingContext, workerManager, multiClusterWorkerManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
@@ -474,7 +474,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       timeSeriesRequestHandler =
           new TimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _threadAccountant,
-              multiClusterRoutingContext);
+              _multiClusterRoutingContext);
     }
 
     LOGGER.info("Initializing PinotFSFactory");
@@ -868,7 +868,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager, _threadAccountant, _responseStore);
+            _queryQuotaManager, _threadAccountant, _responseStore, _multiClusterRoutingContext, _tableCache);
     brokerAdminApiApplication.register(
         new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _brokerMetrics));
     registerExtraComponents(brokerAdminApiApplication);
