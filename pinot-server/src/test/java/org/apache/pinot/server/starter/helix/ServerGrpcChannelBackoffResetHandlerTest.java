@@ -206,6 +206,37 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     verify(_mailboxService).resetConnectBackoff(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
 
+  @Test
+  public void testFinalizeCallbackClearsTrackedStateWithoutTouchingMailboxService() {
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
+    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+
+    _handler.onInstanceConfigChange(Collections.emptyList(), createFinalizeContext());
+
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+
+    verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
+  }
+
+  @Test
+  public void testNullPathCallbackFallsBackToFullScan() {
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
+    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+
+    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
+        .thenReturn(Arrays.asList(SELF_INSTANCE_ID, OTHER_SERVER_ID));
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+
+    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextWithoutPath());
+
+    verify(_mailboxService).resetConnectBackoff(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
   private InstanceConfig createServerConfig(String instanceId, String hostname, int mailboxPort,
       boolean shutdownInProgress) {
     ZNRecord record = new ZNRecord(instanceId);
@@ -232,6 +263,18 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
   private NotificationContext createInitContext() {
     NotificationContext context = new NotificationContext(_helixManager);
     context.setType(NotificationContext.Type.INIT);
+    return context;
+  }
+
+  private NotificationContext createFinalizeContext() {
+    NotificationContext context = new NotificationContext(_helixManager);
+    context.setType(NotificationContext.Type.FINALIZE);
+    return context;
+  }
+
+  private NotificationContext createCallbackContextWithoutPath() {
+    NotificationContext context = new NotificationContext(_helixManager);
+    context.setType(NotificationContext.Type.CALLBACK);
     return context;
   }
 }
