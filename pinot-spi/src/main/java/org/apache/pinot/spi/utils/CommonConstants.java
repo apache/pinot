@@ -1667,7 +1667,16 @@ public class CommonConstants {
      * Service token for accessing protected controller APIs.
      * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
      */
-    public static final String CONFIG_TASK_AUTH_NAMESPACE = "task.auth";
+    public static final String CONFIG_TASK_AUTH_NAMESPACE = "pinot.minion.task.auth";
+    /**
+     * Legacy config namespace for task auth settings, superseded by {@link #CONFIG_TASK_AUTH_NAMESPACE}.
+     * Kept for backward compatibility: if no config is found under the new namespace, the minion
+     * starter will fall back to this namespace and emit a deprecation warning.
+     *
+     * @deprecated Use {@link #CONFIG_TASK_AUTH_NAMESPACE} instead.
+     */
+    @Deprecated
+    public static final String DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE = "task.auth";
     public static final String MINION_TLS_PREFIX = "pinot.minion.tls";
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.minion.logger.root.dir";
