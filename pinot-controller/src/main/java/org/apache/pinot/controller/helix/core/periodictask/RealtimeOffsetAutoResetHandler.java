@@ -28,31 +28,29 @@ public interface RealtimeOffsetAutoResetHandler {
 
   /**
    * Initialize the handler with the PinotLLCRealtimeSegmentManager and PinotHelixResourceManager.
-   * This is called once in constructor.
+   * This is called once after instantiation.
    */
-  public abstract void init(
-      PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, PinotHelixResourceManager pinotHelixResourceManager);
+  void init(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
+      PinotHelixResourceManager pinotHelixResourceManager);
 
   /**
    * Trigger the job to backfill the skipped interval due to offset auto reset.
    * It is expected to backfill the [fromOffset, toOffset) interval.
    * @return if successfully started the backfill job
    */
-  public abstract boolean triggerBackfillJob(
-      String tableNameWithType, StreamConfig streamConfig, String topicName, int partitionId, long fromOffset,
-      long toOffset);
+  boolean triggerBackfillJob(String tableNameWithType, StreamConfig streamConfig, String topicName, int partitionId,
+      long fromOffset, long toOffset);
 
   /**
    * Ensure all topics under the table are being backfilled. It is the caller's responsibility to figure out what
    * topic set it should check.
    */
-  public abstract void ensureBackfillJobsRunning(String tableNameWithType, Collection<String> topicNames);
+  void ensureBackfillJobsRunning(String tableNameWithType, Collection<String> topicNames);
 
   /**
    * Return the Collection of completed and cleaned up topicNames from the input.
    */
-  public abstract Collection<String> cleanupCompletedBackfillJobs(
-      String tableNameWithType, Collection<String> topicNames);
+  Collection<String> cleanupCompletedBackfillJobs(String tableNameWithType, Collection<String> topicNames);
 
-  public abstract void close();
+  void close();
 }

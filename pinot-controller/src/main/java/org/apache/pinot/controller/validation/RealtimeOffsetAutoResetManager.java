@@ -191,6 +191,7 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
   protected void nonLeaderCleanup(List<String> tableNamesWithType) {
     for (String tableNameWithType : tableNamesWithType) {
       _tableTopicsUnderBackfill.remove(tableNameWithType);
+      _tableBackfillTopics.remove(tableNameWithType);
       _tableToHandler.remove(tableNameWithType);
     }
   }
@@ -214,13 +215,22 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
     try {
       Class<?> clazz = Class.forName(className);
       if (!RealtimeOffsetAutoResetHandler.class.isAssignableFrom(clazz)) {
-        String exceptionMessage = "Custom analyzer must be a child of "
-            + RealtimeOffsetAutoResetHandler.class.getCanonicalName();
-        throw new ReflectiveOperationException(exceptionMessage);
+        throw new ReflectiveOperationException("Custom handler must implement "
+            + RealtimeOffsetAutoResetHandler.class.getCanonicalName());
       }
-      handler = (RealtimeOffsetAutoResetHandler) clazz.getConstructor(
-          PinotLLCRealtimeSegmentManager.class, PinotHelixResourceManager.class).newInstance(
-          _llcRealtimeSegmentManager, _pinotHelixResourceManager);
+      try {
+        // Preferred: no-arg constructor + explicit init()
+        handler = (RealtimeOffsetAutoResetHandler) clazz.getConstructor().newInstance();
+        handler.init(_llcRealtimeSegmentManager, _pinotHelixResourceManager);
+      } catch (NoSuchMethodException e) {
+        // Backward-compatibility fallback: 2-arg constructor (deprecated SPI contract).
+        // Handlers compiled against the previous contract called init() from their own constructor.
+        LOGGER.warn("Handler class {} has no no-arg constructor; falling back to deprecated 2-arg constructor. "
+            + "Please migrate to a no-arg constructor + init() pattern.", className);
+        handler = (RealtimeOffsetAutoResetHandler) clazz.getConstructor(
+            PinotLLCRealtimeSegmentManager.class, PinotHelixResourceManager.class)
+            .newInstance(_llcRealtimeSegmentManager, _pinotHelixResourceManager);
+      }
       _tableToHandler.put(tableConfig.getTableName(), handler);
       return handler;
     } catch (Exception e) {

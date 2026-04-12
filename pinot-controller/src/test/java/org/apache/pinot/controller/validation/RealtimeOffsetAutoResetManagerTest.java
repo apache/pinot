@@ -57,6 +57,8 @@ public class RealtimeOffsetAutoResetManagerTest {
   private static final String TOPIC_NAME = "testTopic";
   private static final String TEST_HANDLER_CLASS_NAME =
       "org.apache.pinot.controller.validation.RealtimeOffsetAutoResetManagerTest$TestRealtimeOffsetAutoResetHandler";
+  private static final String LEGACY_HANDLER_CLASS_NAME =
+      "org.apache.pinot.controller.validation.RealtimeOffsetAutoResetManagerTest$LegacyRealtimeOffsetAutoResetHandler";
 
   @Mock
   private PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
@@ -208,12 +210,18 @@ public class RealtimeOffsetAutoResetManagerTest {
 
   @Test
   public void testNonLeaderCleanup() {
-    List<String> tableNames = Arrays.asList(REALTIME_TABLE_NAME, OFFLINE_TABLE_NAME);
+    // Populate a handler for the realtime table
+    TableConfig tableConfig = createTableConfigWithValidHandlerClass();
+    RealtimeOffsetAutoResetManager.Context context = _realtimeOffsetAutoResetManager.preprocess(new Properties());
+    when(_pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    _realtimeOffsetAutoResetManager.processTable(REALTIME_TABLE_NAME, context);
+    Assert.assertNotNull(_realtimeOffsetAutoResetManager.getTableHandler(REALTIME_TABLE_NAME));
 
+    // nonLeaderCleanup should remove the handler and all state for those tables
+    List<String> tableNames = Arrays.asList(REALTIME_TABLE_NAME, OFFLINE_TABLE_NAME);
     _realtimeOffsetAutoResetManager.nonLeaderCleanup(tableNames);
 
-    // The cleanup should remove the tables from internal maps
-    // This is tested indirectly by verifying the method completes without exception
+    Assert.assertNull(_realtimeOffsetAutoResetManager.getTableHandler(REALTIME_TABLE_NAME));
   }
 
   @Test
@@ -296,6 +304,39 @@ public class RealtimeOffsetAutoResetManagerTest {
     return tableConfig;
   }
 
+  @Test
+  public void testGetOrConstructHandlerWithLegacyConstructorFallback() {
+    // Verify that handlers compiled against the old 2-arg constructor contract still load correctly
+    TableConfig tableConfig = createTableConfigWithLegacyHandlerClass();
+    RealtimeOffsetAutoResetManager.Context context = _realtimeOffsetAutoResetManager.preprocess(new Properties());
+    when(_pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+
+    _realtimeOffsetAutoResetManager.processTable(REALTIME_TABLE_NAME, context);
+
+    RealtimeOffsetAutoResetHandler handler = _realtimeOffsetAutoResetManager.getTableHandler(REALTIME_TABLE_NAME);
+    Assert.assertNotNull(handler, "Legacy handler should be instantiated via 2-arg constructor fallback");
+    Assert.assertTrue(handler instanceof LegacyRealtimeOffsetAutoResetHandler);
+    LegacyRealtimeOffsetAutoResetHandler legacyHandler = (LegacyRealtimeOffsetAutoResetHandler) handler;
+    Assert.assertNotNull(legacyHandler._llcRealtimeSegmentManager, "init() should have been called via constructor");
+    Assert.assertNotNull(legacyHandler._pinotHelixResourceManager, "init() should have been called via constructor");
+  }
+
+  private TableConfig createTableConfigWithLegacyHandlerClass() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(REALTIME_TABLE_NAME).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", "kafka");
+    streamConfigMap.put("stream.kafka.topic.name", TOPIC_NAME);
+    streamConfigMap.put("stream.kafka.consumer.type", "simple");
+    streamConfigMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
+    streamConfigMap.put("stream.kafka.decoder.class.name", "testDecoder");
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigMap));
+    streamIngestionConfig.setRealtimeOffsetAutoResetHandlerClass(LEGACY_HANDLER_CLASS_NAME);
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    tableConfig.setIngestionConfig(ingestionConfig);
+    return tableConfig;
+  }
+
   /**
    * Test implementation of RealtimeOffsetAutoResetHandler for testing purposes
    */
@@ -305,9 +346,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     public PinotHelixResourceManager _pinotHelixResourceManager;
     public boolean _triggedBackfillJob = false;
 
-    public TestRealtimeOffsetAutoResetHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-        PinotHelixResourceManager pinotHelixResourceManager) {
-      init(llcRealtimeSegmentManager, pinotHelixResourceManager);
+    public TestRealtimeOffsetAutoResetHandler() {
     }
 
     @Override
@@ -332,6 +371,47 @@ public class RealtimeOffsetAutoResetManagerTest {
     @Override
     public Collection<String> cleanupCompletedBackfillJobs(String tableNameWithType, Collection<String> topicNames) {
       // Test implementation - return empty collection
+      return Collections.emptyList();
+    }
+
+    @Override
+    public void close() {
+    }
+  }
+
+  /**
+   * Legacy handler that only has a 2-arg constructor (the old SPI contract).
+   * Used to verify backward-compatibility fallback in getOrConstructHandler().
+   */
+  public static class LegacyRealtimeOffsetAutoResetHandler implements RealtimeOffsetAutoResetHandler {
+
+    public PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
+    public PinotHelixResourceManager _pinotHelixResourceManager;
+
+    public LegacyRealtimeOffsetAutoResetHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
+        PinotHelixResourceManager pinotHelixResourceManager) {
+      init(llcRealtimeSegmentManager, pinotHelixResourceManager);
+    }
+
+    @Override
+    public void init(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
+        PinotHelixResourceManager pinotHelixResourceManager) {
+      _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
+      _pinotHelixResourceManager = pinotHelixResourceManager;
+    }
+
+    @Override
+    public boolean triggerBackfillJob(String tableNameWithType, StreamConfig streamConfig, String topicName,
+        int partitionId, long fromOffset, long toOffset) {
+      return true;
+    }
+
+    @Override
+    public void ensureBackfillJobsRunning(String tableNameWithType, Collection<String> topicNames) {
+    }
+
+    @Override
+    public Collection<String> cleanupCompletedBackfillJobs(String tableNameWithType, Collection<String> topicNames) {
       return Collections.emptyList();
     }
 
