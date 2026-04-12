@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -29,6 +30,7 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
@@ -77,6 +79,46 @@ public class FilterPlanNodeTest {
     }
 
     updater.join();
+  }
+
+  @Test
+  public void testMutableVectorFallbackReasonForUnsupportedBackend()
+      throws Exception {
+    Method method = FilterPlanNode.class.getDeclaredMethod("getVectorFallbackReason", VectorIndexConfig.class,
+        boolean.class);
+    method.setAccessible(true);
+
+    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_FLAT", 4, 1,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, java.util.Map.of("nlist", "2"));
+
+    String reason = (String) method.invoke(null, config, true);
+    assertEquals(reason, "ivf_flat_mutable_segment_unavailable");
+  }
+
+  @Test
+  public void testMutableIvfPqVectorFallbackReasonForUnsupportedBackend()
+      throws Exception {
+    Method method = FilterPlanNode.class.getDeclaredMethod("getVectorFallbackReason", VectorIndexConfig.class,
+        boolean.class);
+    method.setAccessible(true);
+
+    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 4, 1,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
+        java.util.Map.of("nlist", "2", "pqM", "2", "pqNbits", "8"));
+
+    String reason = (String) method.invoke(null, config, true);
+    assertEquals(reason, "ivf_pq_mutable_segment_unavailable");
+  }
+
+  @Test
+  public void testMutableVectorFallbackReasonForMissingIndex()
+      throws Exception {
+    Method method = FilterPlanNode.class.getDeclaredMethod("getVectorFallbackReason", VectorIndexConfig.class,
+        boolean.class);
+    method.setAccessible(true);
+
+    String reason = (String) method.invoke(null, null, true);
+    assertEquals(reason, "vector_index_missing_on_mutable_segment");
   }
 
   private int getNumberOfFilteredDocs(SegmentContext segmentContext, QueryContext queryContext) {

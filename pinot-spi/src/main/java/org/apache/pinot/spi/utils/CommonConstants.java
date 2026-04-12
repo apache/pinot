@@ -934,10 +934,17 @@ public class CommonConstants {
          *  COSINE uses 1 - cosine_similarity, INNER_PRODUCT/DOT_PRODUCT uses negated dot product. */
         public static final String VECTOR_DISTANCE_THRESHOLD = "vectorDistanceThreshold";
 
-        /** efSearch parameter for HNSW vector indexes. Reserved for future use — currently parsed
-         *  and included in explain output but does not yet affect Lucene HNSW graph traversal.
-         *  A future release will wire this through a custom KnnVectorQuery implementation. */
+        /** efSearch parameter for HNSW vector indexes. Higher values improve recall at the cost
+         *  of latency by allowing the graph search to visit more candidates. */
         public static final String VECTOR_EF_SEARCH = "vectorEfSearch";
+
+        /** Controls whether HNSW uses relative-distance competitive checks during traversal.
+         *  Defaults to true. Setting false disables score-threshold pruning. */
+        public static final String VECTOR_USE_RELATIVE_DISTANCE = "vectorUseRelativeDistance";
+
+        /** Controls whether HNSW uses a bounded top-K collector queue. Defaults to true.
+         *  Setting false uses an unbounded per-query collector and requires vectorEfSearch. */
+        public static final String VECTOR_USE_BOUNDED_QUEUE = "vectorUseBoundedQueue";
       }
 
       public static class QueryOptionValue {
