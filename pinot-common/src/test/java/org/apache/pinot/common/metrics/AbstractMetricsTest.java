@@ -457,6 +457,23 @@ public class AbstractMetricsTest {
   }
 
   @Test
+  public void testPartitionGaugesWithStreamTopic() {
+    ControllerMetrics controllerMetrics = buildTestMetrics();
+    String tableWithType = "myTable_REALTIME";
+    String topic = "events";
+    int partitionGroupId = 3;
+    String compositeKey = tableWithType + "-" + topic + "-" + partitionGroupId;
+
+    controllerMetrics.setOrUpdatePartitionGaugeForStreamTopic(tableWithType, topic, partitionGroupId,
+        ControllerGauge.VERSION, () -> 7L);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+        ControllerGauge.VERSION.getGaugeName() + "." + compositeKey), 7);
+
+    controllerMetrics.removePartitionGaugeForStreamTopic(tableWithType, topic, partitionGroupId, ControllerGauge.VERSION);
+    Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+  }
+
+  @Test
   public void testAddCallbackGauges() {
     ControllerMetrics controllerMetrics = buildTestMetrics();
     String table = "test_table";
