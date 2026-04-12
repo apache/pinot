@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.parsers.ParserUtils;
 
 
@@ -124,7 +125,13 @@ public class CalciteRexExpressionParser {
     if (rexNode instanceof RexExpression.InputRef) {
       return inputRefToIdentifier((RexExpression.InputRef) rexNode, selectList);
     } else if (rexNode instanceof RexExpression.Literal) {
-      return RequestUtils.getLiteralExpression(toLiteral((RexExpression.Literal) rexNode));
+      RexExpression.Literal literal = (RexExpression.Literal) rexNode;
+      if (literal.getDataType() == ColumnDataType.UUID) {
+        return RequestUtils.getFunctionExpression("cast",
+            RequestUtils.getLiteralExpression(UuidUtils.toString((ByteArray) literal.getValue())),
+            RequestUtils.getLiteralExpression("UUID"));
+      }
+      return RequestUtils.getLiteralExpression(toLiteral(literal));
     } else {
       assert rexNode instanceof RexExpression.FunctionCall;
       return compileFunctionExpression((RexExpression.FunctionCall) rexNode, selectList);
@@ -146,6 +153,8 @@ public class CalciteRexExpressionParser {
     ColumnDataType dataType = literal.getDataType();
     if (dataType == ColumnDataType.BOOLEAN) {
       value = BooleanUtils.isTrueInternalValue(value);
+    } else if (dataType == ColumnDataType.UUID) {
+      value = UuidUtils.toString((ByteArray) value);
     } else if (dataType == ColumnDataType.BYTES) {
       value = ((ByteArray) value).getBytes();
     }

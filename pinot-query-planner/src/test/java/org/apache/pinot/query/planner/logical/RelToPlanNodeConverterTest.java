@@ -50,6 +50,7 @@ import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.physical.v2.PRelToPlanNodeConverter;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -126,6 +127,13 @@ public class RelToPlanNodeConverterTest {
   }
 
   @Test
+  public void testConvertToColumnDataTypeForUUID() {
+    RelDataType uuidType = new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.UUID);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(uuidType), DataSchema.ColumnDataType.UUID);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(uuidType), DataSchema.ColumnDataType.UUID);
+  }
+
+  @Test
   public void testConvertToColumnDataTypeForArray() {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.BOOLEAN, SqlIdentifier.STAR, true, null, null), true)),
@@ -160,6 +168,20 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.VARBINARY, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.BYTES_ARRAY);
+  }
+
+  @Test
+  public void testConvertToColumnDataTypeForUUIDArrayRejected() {
+    RelDataType uuidArrayType =
+        new ArraySqlType(new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.UUID), true);
+
+    IllegalArgumentException logicalException = Assert.expectThrows(IllegalArgumentException.class,
+        () -> RelToPlanNodeConverter.convertToColumnDataType(uuidArrayType));
+    Assert.assertTrue(logicalException.getMessage().contains("UUID arrays are not supported"));
+
+    IllegalArgumentException physicalException = Assert.expectThrows(IllegalArgumentException.class,
+        () -> PRelToPlanNodeConverter.convertToColumnDataType(uuidArrayType));
+    Assert.assertTrue(physicalException.getMessage().contains("UUID arrays are not supported"));
   }
 
   @Test

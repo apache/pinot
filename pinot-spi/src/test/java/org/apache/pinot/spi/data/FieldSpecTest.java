@@ -28,7 +28,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -44,6 +46,8 @@ public class FieldSpecTest {
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final String ERROR_MESSAGE = "Random seed is: " + RANDOM_SEED;
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
+  private static final String LARGER_UUID_VALUE = "550e8400-e29b-41d4-a716-446655440001";
 
   /**
    * Test all {@link FieldSpec.DataType}.
@@ -60,6 +64,7 @@ public class FieldSpecTest {
     Assert.assertEquals(STRING.getStoredType(), STRING);
     Assert.assertEquals(JSON.getStoredType(), STRING);
     Assert.assertEquals(BYTES.getStoredType(), BYTES);
+    Assert.assertEquals(UUID.getStoredType(), BYTES);
 
     Assert.assertEquals(INT.size(), Integer.BYTES);
     Assert.assertEquals(LONG.size(), Long.BYTES);
@@ -67,6 +72,7 @@ public class FieldSpecTest {
     Assert.assertEquals(DOUBLE.size(), Double.BYTES);
     Assert.assertEquals(BOOLEAN.size(), Integer.BYTES);
     Assert.assertEquals(TIMESTAMP.size(), Long.BYTES);
+    Assert.assertEquals(UUID.size(), UuidUtils.UUID_NUM_BYTES);
   }
 
   /**
@@ -175,6 +181,11 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), BigDecimal.ZERO);
 
+    // Single-value BigDecimal type dimension field with numeric default null value.
+    fieldSpec1 = new DimensionFieldSpec("bigDecimalDimension", BIG_DECIMAL, true, -1);
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), new BigDecimal("-1"));
+    Assert.assertEquals(fieldSpec1.getDefaultNullValueString(), "-1");
+
     // Metric field with default null value for byte column.
     fieldSpec1 = new MetricFieldSpec();
     fieldSpec1.setName("byteMetric");
@@ -185,6 +196,58 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.toJsonObject(), fieldSpec2.toJsonObject());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), fieldSpec2.getDefaultNullValue());
+
+    // Single-value uuid type dimension field with default null value.
+    fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("uuidDimension");
+    fieldSpec1.setDataType(UUID);
+    fieldSpec1.setDefaultNullValue(UUID_VALUE);
+    fieldSpec2 = new DimensionFieldSpec("uuidDimension", UUID, true, UUID_VALUE);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toJsonObject(), fieldSpec2.toJsonObject());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    assertThat((byte[]) fieldSpec1.getDefaultNullValue()).isEqualTo(UuidUtils.toBytes(UUID_VALUE));
+    Assert.assertEquals(fieldSpec1.getDefaultNullValueString(), UUID_VALUE);
+
+    FieldSpec uuidBytesFieldSpec =
+        new DimensionFieldSpec("uuidBytesDimension", UUID, true, UuidUtils.toBytes(UUID_VALUE));
+    assertThat((byte[]) uuidBytesFieldSpec.getDefaultNullValue()).isEqualTo(UuidUtils.toBytes(UUID_VALUE));
+    Assert.assertEquals(uuidBytesFieldSpec.getDefaultNullValueString(), UUID_VALUE);
+
+    FieldSpec defaultUuidFieldSpec = new DimensionFieldSpec("defaultUuidDimension", UUID, true);
+    byte[] firstDefaultNullValue = (byte[]) defaultUuidFieldSpec.getDefaultNullValue();
+    byte[] secondDefaultNullValue = (byte[]) defaultUuidFieldSpec.getDefaultNullValue();
+    assertThat(firstDefaultNullValue).isEqualTo(UuidUtils.nullUuidBytes());
+    assertThat(secondDefaultNullValue).isEqualTo(UuidUtils.nullUuidBytes());
+    Assert.assertNotSame(firstDefaultNullValue, secondDefaultNullValue);
+    Assert.assertEquals(defaultUuidFieldSpec.getDefaultNullValueString(), "00000000-0000-0000-0000-000000000000");
+  }
+
+  @Test
+  public void testUUIDConversions() {
+    byte[] uuidBytes = UuidUtils.toBytes(UUID_VALUE);
+    byte[] largerUuidBytes = UuidUtils.toBytes(LARGER_UUID_VALUE);
+    String mixedCaseUuidValue = UUID_VALUE.toUpperCase();
+    ByteArray uuidInternal = new ByteArray(uuidBytes);
+
+    assertThat((byte[]) UUID.convert(UUID_VALUE)).isEqualTo(uuidBytes);
+    assertThat((byte[]) UUID.convert(mixedCaseUuidValue)).isEqualTo(uuidBytes);
+    Assert.assertEquals(UUID.convertInternal(UUID_VALUE), uuidInternal);
+    Assert.assertEquals(UUID.convertInternal(mixedCaseUuidValue), uuidInternal);
+    Assert.assertEquals(UUID.toString(uuidBytes), UUID_VALUE);
+    Assert.assertEquals(UUID.toString(uuidInternal), UUID_VALUE);
+    Assert.assertTrue(UUID.equals(uuidBytes, uuidInternal));
+    Assert.assertEquals(UUID.hashCode(uuidBytes), uuidInternal.hashCode());
+    Assert.assertEquals(UUID.compare(uuidBytes, uuidInternal), 0);
+    Assert.assertTrue(UUID.compare(uuidBytes, largerUuidBytes) < 0);
+    Assert.assertTrue(UUID.compare(largerUuidBytes, uuidBytes) > 0);
+  }
+
+  @Test
+  public void testInvalidUUIDConversion() {
+    IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
+        () -> UUID.convert("not-a-uuid"));
+    assertThat(exception).hasMessageContaining("Invalid UUID");
   }
 
   /**

@@ -31,8 +31,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MultiValueVisitor;
 import org.apache.pinot.spi.data.SingleValueVisitor;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -84,6 +86,8 @@ public class EqualsPredicateEvaluatorFactory {
         return new StringRawValueBasedEqPredicateEvaluator(eqPredicate, value);
       case BYTES:
         return new BytesRawValueBasedEqPredicateEvaluator(eqPredicate, BytesUtils.toBytes(value));
+      case UUID:
+        return new BytesRawValueBasedEqPredicateEvaluator(eqPredicate, UuidUtils.toBytes(value), DataType.UUID);
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -95,8 +99,12 @@ public class EqualsPredicateEvaluatorFactory {
 
     DictionaryBasedEqPredicateEvaluator(EqPredicate eqPredicate, Dictionary dictionary, DataType dataType) {
       super(eqPredicate, dictionary);
-      String predicateValue = PredicateUtils.getStoredValue(eqPredicate.getValue(), dataType);
-      _matchingDictId = dictionary.indexOf(predicateValue);
+      if (dataType == DataType.UUID) {
+        _matchingDictId = dictionary.indexOf(new ByteArray(UuidUtils.toBytes(eqPredicate.getValue())));
+      } else {
+        String predicateValue = PredicateUtils.getStoredValue(eqPredicate.getValue(), dataType);
+        _matchingDictId = dictionary.indexOf(predicateValue);
+      }
       if (_matchingDictId >= 0) {
         _matchingDictIds = new int[]{_matchingDictId};
         if (dictionary.length() == 1) {
@@ -416,10 +424,16 @@ public class EqualsPredicateEvaluatorFactory {
 
   private static final class BytesRawValueBasedEqPredicateEvaluator extends EqRawPredicateEvaluator {
     final byte[] _matchingValue;
+    final DataType _dataType;
 
     BytesRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, byte[] matchingValue) {
+      this(eqPredicate, matchingValue, DataType.BYTES);
+    }
+
+    BytesRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, byte[] matchingValue, DataType dataType) {
       super(eqPredicate);
       _matchingValue = matchingValue;
+      _dataType = dataType;
     }
 
     @Override
@@ -434,7 +448,7 @@ public class EqualsPredicateEvaluatorFactory {
 
     @Override
     public DataType getDataType() {
-      return DataType.BYTES;
+      return _dataType;
     }
 
     @Override

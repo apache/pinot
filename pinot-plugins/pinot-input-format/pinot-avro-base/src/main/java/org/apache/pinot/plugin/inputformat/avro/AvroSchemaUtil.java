@@ -98,6 +98,17 @@ public class AvroSchemaUtil {
   }
 
   /**
+   * Returns the Pinot data type associated with the given Avro schema, including logical types.
+   */
+  public static DataType valueOf(Schema schema) {
+    LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(schema);
+    if (logicalType != null && UUID.equals(logicalType.getName()) && schema.getType() == Schema.Type.STRING) {
+      return DataType.UUID;
+    }
+    return valueOf(schema.getType());
+  }
+
+  /**
    * @return if the given avro type is a primitive type.
    */
   public static boolean isPrimitiveType(Schema.Type avroType) {
@@ -118,7 +129,8 @@ public class AvroSchemaUtil {
   public static ObjectNode toAvroSchemaJsonObject(FieldSpec fieldSpec) {
     ObjectNode jsonSchema = JsonUtils.newObjectNode();
     jsonSchema.put("name", fieldSpec.getName());
-    switch (fieldSpec.getDataType().getStoredType()) {
+    DataType dataType = fieldSpec.getDataType();
+    switch (dataType.getStoredType()) {
       case INT:
         jsonSchema.set("type", convertStringsToJsonArray("null", "int"));
         return jsonSchema;
@@ -136,7 +148,14 @@ public class AvroSchemaUtil {
         jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
         return jsonSchema;
       case BYTES:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
+        if (dataType == DataType.UUID) {
+          ObjectNode uuidType = JsonUtils.newObjectNode();
+          uuidType.put("type", "string");
+          uuidType.put("logicalType", UUID);
+          jsonSchema.set("type", convertToJsonArray("null", uuidType));
+        } else {
+          jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
+        }
         return jsonSchema;
       default:
         throw new UnsupportedOperationException();
@@ -148,6 +167,13 @@ public class AvroSchemaUtil {
     for (String string : strings) {
       jsonArray.add(string);
     }
+    return jsonArray;
+  }
+
+  private static ArrayNode convertToJsonArray(String string, ObjectNode objectNode) {
+    ArrayNode jsonArray = JsonUtils.newArrayNode();
+    jsonArray.add(string);
+    jsonArray.add(objectNode);
     return jsonArray;
   }
 

@@ -32,10 +32,12 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RawValueBitmapInvertedIndexCreator;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.readers.RawValueBitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -79,6 +81,10 @@ public class RawValueBitmapInvertedIndexTest {
       case STRING:
         return IntStream.range(0, NUM_VALUES)
             .mapToObj(i -> "value_" + RANDOM.nextInt(100000))
+            .collect(Collectors.toList());
+      case UUID:
+        return IntStream.range(0, NUM_VALUES)
+            .mapToObj(i -> String.format("550e8400-e29b-41d4-a716-%012x", i))
             .collect(Collectors.toList());
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
@@ -126,6 +132,12 @@ public class RawValueBitmapInvertedIndexTest {
           stringValues[i] = (String) values[i];
         }
         return new Object[]{stringValues, values.length};
+      case UUID:
+        byte[][] uuidValues = new byte[values.length][];
+        for (int i = 0; i < values.length; i++) {
+          uuidValues[i] = UuidUtils.toBytes((String) values[i]);
+        }
+        return new Object[]{uuidValues, values.length};
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -163,6 +175,9 @@ public class RawValueBitmapInvertedIndexTest {
           case STRING:
             creator.add((String) value);
             break;
+          case UUID:
+            creator.add(UuidUtils.toBytes((String) value));
+            break;
           default:
             throw new IllegalStateException("Unsupported data type: " + dataType);
         }
@@ -177,7 +192,7 @@ public class RawValueBitmapInvertedIndexTest {
           new RawValueBitmapInvertedIndexReader(dataBuffer, dataType)) {
         // Test all values
         for (Object value : values) {
-          ImmutableRoaringBitmap actualBitmap = getBitmap(reader, value);
+          ImmutableRoaringBitmap actualBitmap = getBitmap(reader, value, dataType);
           Set<Integer> expectedDocIds = valueToDocIds.getOrDefault(value, Collections.emptySet());
 
           // Convert bitmap to docIds for comparison
@@ -189,9 +204,37 @@ public class RawValueBitmapInvertedIndexTest {
 
         // Test non-existent values
         Object nonExistentValue = getNonExistentValue(dataType);
-        ImmutableRoaringBitmap bitmap = getBitmap(reader, nonExistentValue);
+        ImmutableRoaringBitmap bitmap = getBitmap(reader, nonExistentValue, dataType);
         Assert.assertTrue(bitmap.isEmpty(), "Bitmap should be empty for non-existent value");
       }
+    }
+  }
+
+  @Test
+  public void testUuidSingleValueInvertedIndexViaGenericApi()
+      throws IOException {
+    File indexDir = Files.createTempDirectory("inverted-index").toFile();
+    indexDir.deleteOnExit();
+    File indexFile = new File(indexDir, "col" + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+    indexFile.deleteOnExit();
+    String uuid = "550e8400-e29b-41d4-a716-446655440000";
+    byte[] uuidBytes = UuidUtils.toBytes(uuid);
+
+    try (RawValueBitmapInvertedIndexCreator creator =
+        new RawValueBitmapInvertedIndexCreator(DataType.UUID, "col", indexDir)) {
+      creator.add(uuidBytes, -1);
+    }
+
+    Assert.assertFalse(new File(indexDir, "col" + DictionaryIndexType.getFileExtension()).exists(),
+        "Raw-value inverted index creation should not leave a segment dictionary file behind");
+
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(indexFile, true, 0,
+        indexFile.length(), ByteOrder.BIG_ENDIAN, "");
+        RawValueBitmapInvertedIndexReader reader = new RawValueBitmapInvertedIndexReader(dataBuffer, DataType.UUID)) {
+      ImmutableRoaringBitmap bitmap = reader.getDocIdsForBytes(uuidBytes);
+      Set<Integer> actualDocIds = new HashSet<>();
+      bitmap.forEach((int docId) -> actualDocIds.add(docId));
+      Assert.assertEquals(actualDocIds, Set.of(0));
     }
   }
 
@@ -228,6 +271,9 @@ public class RawValueBitmapInvertedIndexTest {
           case STRING:
             creator.add((String[]) typedArray[0], (int) typedArray[1]);
             break;
+          case UUID:
+            creator.add((byte[][]) typedArray[0], (int) typedArray[1]);
+            break;
           default:
             throw new IllegalStateException("Unsupported data type: " + dataType);
         }
@@ -246,7 +292,7 @@ public class RawValueBitmapInvertedIndexTest {
           new RawValueBitmapInvertedIndexReader(dataBuffer, dataType)) {
         // Test all values
         for (Object value : values) {
-          ImmutableRoaringBitmap actualBitmap = getBitmap(reader, value);
+          ImmutableRoaringBitmap actualBitmap = getBitmap(reader, value, dataType);
           Set<Integer> expectedDocIds = valueToDocIds.getOrDefault(value, Collections.emptySet());
 
           // Convert bitmap to docIds for comparison
@@ -260,26 +306,28 @@ public class RawValueBitmapInvertedIndexTest {
 
         // Test non-existent values
         Object nonExistentValue = getNonExistentValue(dataType);
-        ImmutableRoaringBitmap bitmap = getBitmap(reader, nonExistentValue);
+        ImmutableRoaringBitmap bitmap = getBitmap(reader, nonExistentValue, dataType);
         Assert.assertTrue(bitmap.isEmpty(), "Bitmap should be empty for non-existent value");
       }
     }
   }
 
-  private ImmutableRoaringBitmap getBitmap(RawValueBitmapInvertedIndexReader reader, Object value) {
-    switch (value.getClass().getSimpleName()) {
-      case "Integer":
+  private ImmutableRoaringBitmap getBitmap(RawValueBitmapInvertedIndexReader reader, Object value, DataType dataType) {
+    switch (dataType) {
+      case INT:
         return reader.getDocIdsForInt((Integer) value);
-      case "Long":
+      case LONG:
         return reader.getDocIdsForLong((Long) value);
-      case "Float":
+      case FLOAT:
         return reader.getDocIdsForFloat((Float) value);
-      case "Double":
+      case DOUBLE:
         return reader.getDocIdsForDouble((Double) value);
-      case "String":
+      case STRING:
         return reader.getDocIdsForString((String) value);
+      case UUID:
+        return reader.getDocIdsForBytes(UuidUtils.toBytes((String) value));
       default:
-        throw new IllegalStateException("Unsupported value type: " + value.getClass());
+        throw new IllegalStateException("Unsupported data type: " + dataType);
     }
   }
 
@@ -295,6 +343,8 @@ public class RawValueBitmapInvertedIndexTest {
         return Double.MAX_VALUE;
       case STRING:
         return "non_existent_value";
+      case UUID:
+        return "550e8400-e29b-41d4-a716-ffffffffffff";
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }

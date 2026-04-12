@@ -291,12 +291,13 @@ public class BytesDistinctTable extends DistinctTable {
       rows = new ArrayList<>(numValues);
       addRows(sortedValues, numValues, rows);
     }
+    formatRows(rows);
     return new ResultTable(_dataSchema, rows);
   }
 
   private static void addRows(ByteArray[] values, int length, List<Object[]> rows) {
     for (int i = 0; i < length; i++) {
-      rows.add(new Object[]{values[i].toHexString()});
+      rows.add(new Object[]{values[i]});
     }
   }
 
@@ -312,12 +313,23 @@ public class BytesDistinctTable extends DistinctTable {
       rows = new ArrayList<>(numValues);
       addRows(_valueSet, rows);
     }
+    formatRows(rows);
     return new ResultTable(_dataSchema, rows);
   }
 
   private static void addRows(HashSet<ByteArray> values, List<Object[]> rows) {
     for (ByteArray value : values) {
-      rows.add(new Object[]{value.toHexString()});
+      rows.add(new Object[]{value});
+    }
+  }
+
+  private void formatRows(List<Object[]> rows) {
+    DataSchema.ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
+    for (Object[] row : rows) {
+      Object value = row[0];
+      if (value != null) {
+        row[0] = columnDataType.convertAndFormat(value);
+      }
     }
   }
 }
