@@ -162,7 +162,8 @@ public class TableSizeResource {
               segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes,
                   rawFwdIndexSize, compressedFwdIndexSize, immutableSegment.getTier(), columnCompressionStats));
             } else {
-              segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes));
+              segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes,
+                  -1, -1, immutableSegment.getTier()));
             }
           }
           tableSizeInBytes += segmentSizeBytes;
