@@ -144,6 +144,56 @@ public class DistinctCountHLLAggregationFunctionTest {
         "Direct HLL path cardinality should be close to " + numDistinct);
   }
 
+  /**
+   * Simulates a consuming (realtime) segment where the dictionary grows between two aggregate() calls. The first call
+   * sees a dictionary below the threshold and writes a DictIdsWrapper; the second call sees the grown dictionary above
+   * the threshold and must convert the existing DictIdsWrapper to a HyperLogLog without throwing ClassCastException.
+   */
+  @Test
+  public void testDictIdsWrapperToHyperLogLogConversionOnThresholdCrossing() {
+    // Threshold = 100; first batch dictionary size = 50 (below), second batch = 150 (above)
+    int threshold = 100;
+    DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
+        List.of(ExpressionContext.forIdentifier("col"),
+            ExpressionContext.forLiteral(Literal.intValue(12)),
+            ExpressionContext.forLiteral(Literal.intValue(threshold))));
+
+    ObjectAggregationResultHolder holder = new ObjectAggregationResultHolder();
+
+    // First batch: dictionary size 50 → bitmap path → holder gets DictIdsWrapper
+    int smallDictSize = 50;
+    Dictionary smallDict = mock(Dictionary.class);
+    when(smallDict.length()).thenReturn(smallDictSize);
+    for (int i = 0; i < smallDictSize; i++) {
+      when(smallDict.get(i)).thenReturn("value_" + i);
+    }
+    int[] firstBatchDictIds = new int[]{0, 1, 2, 3, 4};
+    DistinctCountHLLAggregationFunction.getDictIdBitmap(holder, smallDict).addN(firstBatchDictIds, 0,
+        firstBatchDictIds.length);
+    Assert.assertTrue(holder.getResult() instanceof org.roaringbitmap.RoaringBitmap
+        || holder.getResult().getClass().getSimpleName().equals("DictIdsWrapper"),
+        "After first batch, holder should contain DictIdsWrapper");
+
+    // Second batch: same holder, but dictionary has grown past the threshold → direct HLL path
+    int largeDictSize = 150;
+    Dictionary largeDict = mock(Dictionary.class);
+    when(largeDict.length()).thenReturn(largeDictSize);
+    for (int i = 0; i < largeDictSize; i++) {
+      when(largeDict.get(i)).thenReturn("value_" + i);
+    }
+    int[] secondBatchDictIds = new int[]{5, 6, 7, 8, 9};
+    // This must NOT throw ClassCastException — getHyperLogLog must convert DictIdsWrapper first
+    HyperLogLog hll = function.getHyperLogLog(holder);
+    for (int dictId : secondBatchDictIds) {
+      hll.offer(largeDict.get(dictId));
+    }
+
+    // Extract result — should contain all values from both batches (5 + 5 = 10 unique)
+    HyperLogLog result = function.extractAggregationResult(holder);
+    Assert.assertTrue(result.cardinality() >= 8,
+        "Expected at least 8 unique values after both batches, got: " + result.cardinality());
+  }
+
   @Test
   public void testCanUseStarTreeCustomLog2m() {
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
