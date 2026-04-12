@@ -51,7 +51,6 @@ public class ConsistentDataPushUtils {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsistentDataPushUtils.class);
-  private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 10_000L, 2.0);
   public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
 
@@ -108,6 +107,8 @@ public class ConsistentDataPushUtils {
   public static Map<URI, String> startReplaceSegments(SegmentGenerationJobSpec spec,
       Map<URI, List<String>> uriToSegmentsFrom, List<String> segmentsTo)
       throws Exception {
+    FileUploadDownloadClient fileUploadDownloadClient =
+        SegmentPushUtils.getFileUploadDownloadClient(spec.getTlsSpec());
     Map<URI, String> uriToLineageEntryIdMap = new HashMap<>();
     String rawTableName = spec.getTableSpec().getTableName();
     Map<URI, URI> segmentsUris = getStartReplaceSegmentUris(spec, rawTableName);
@@ -124,7 +125,7 @@ public class ConsistentDataPushUtils {
       DEFAULT_RETRY_POLICY.attempt(() -> {
         try {
           SimpleHttpResponse response =
-              FILE_UPLOAD_DOWNLOAD_CLIENT.startReplaceSegments(startSegmentUri, startReplaceSegmentsRequest,
+              fileUploadDownloadClient.startReplaceSegments(startSegmentUri, startReplaceSegmentsRequest,
                   authProvider);
           String responseString = response.getResponse();
           LOGGER.info(
@@ -158,6 +159,8 @@ public class ConsistentDataPushUtils {
    */
   public static void endReplaceSegments(SegmentGenerationJobSpec spec, Map<URI, String> uriToLineageEntryIdMap)
       throws Exception {
+    FileUploadDownloadClient fileUploadDownloadClient =
+        SegmentPushUtils.getFileUploadDownloadClient(spec.getTlsSpec());
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
     String rawTableName = spec.getTableSpec().getTableName();
     for (URI controllerUri : uriToLineageEntryIdMap.keySet()) {
@@ -168,7 +171,7 @@ public class ConsistentDataPushUtils {
       DEFAULT_RETRY_POLICY.attempt(() -> {
         try {
           SimpleHttpResponse response =
-              FILE_UPLOAD_DOWNLOAD_CLIENT.endReplaceSegments(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS,
+              fileUploadDownloadClient.endReplaceSegments(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS,
                   null, authProvider);
           LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURI: {}",
               response.getStatusCode(), response.getResponse(), rawTableName, uri);
@@ -196,6 +199,8 @@ public class ConsistentDataPushUtils {
       Exception exception) {
     if (uriToLineageEntryIdMap != null) {
       LOGGER.error("Exception when pushing segments. Marking segment lineage entry to 'REVERTED'.", exception);
+      FileUploadDownloadClient fileUploadDownloadClient =
+          SegmentPushUtils.getFileUploadDownloadClient(spec.getTlsSpec());
       String rawTableName = spec.getTableSpec().getTableName();
       AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
       for (Map.Entry<URI, String> entry : uriToLineageEntryIdMap.entrySet()) {
@@ -203,7 +208,7 @@ public class ConsistentDataPushUtils {
         try {
           URI uri = FileUploadDownloadClient.getRevertReplaceSegmentsURI(entry.getKey(), rawTableName,
               TableType.OFFLINE.name(), segmentLineageEntryId, true);
-          SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.revertReplaceSegments(uri, authProvider);
+          SimpleHttpResponse response = fileUploadDownloadClient.revertReplaceSegments(uri, authProvider);
           LOGGER.info("Got response {}: {} while sending revert replace segment request for table: {}, uploadURI: {}",
               response.getStatusCode(), response.getResponse(), rawTableName, entry.getKey());
         } catch (URISyntaxException | HttpErrorStatusException | IOException e) {
@@ -230,6 +235,8 @@ public class ConsistentDataPushUtils {
    */
   public static Map<URI, List<String>> getSegmentsToReplace(SegmentGenerationJobSpec spec, String rawTableName)
       throws Exception {
+    FileUploadDownloadClient fileUploadDownloadClient =
+        SegmentPushUtils.getFileUploadDownloadClient(spec.getTlsSpec());
     Map<URI, List<String>> uriToOfflineSegments = new HashMap<>();
     for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
       URI controllerURI;
@@ -238,7 +245,7 @@ public class ConsistentDataPushUtils {
         controllerURI = new URI(pinotClusterSpec.getControllerURI());
         AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
         Map<String, List<String>> segments =
-            FILE_UPLOAD_DOWNLOAD_CLIENT.getSegments(controllerURI, rawTableName, TableType.OFFLINE, true, authProvider);
+            fileUploadDownloadClient.getSegments(controllerURI, rawTableName, TableType.OFFLINE, true, authProvider);
         offlineSegments = segments.get(TableType.OFFLINE.toString());
         uriToOfflineSegments.put(controllerURI, offlineSegments);
       } catch (URISyntaxException e) {
