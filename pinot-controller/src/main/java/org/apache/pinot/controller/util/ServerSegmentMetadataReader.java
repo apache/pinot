@@ -169,7 +169,10 @@ public class ServerSegmentMetadataReader {
             }
             String col = info.getColumn();
             long[] accum = columnCompressionAccum.computeIfAbsent(col, k -> new long[2]);
-            accum[0] += info.getUncompressedSizeInBytes();
+            // Only accumulate uncompressed size when it is a real value (not the -1 sentinel from dict columns)
+            if (info.getUncompressedSizeInBytes() >= 0) {
+              accum[0] += info.getUncompressedSizeInBytes();
+            }
             accum[1] += info.getCompressedSizeInBytes();
             if (info.getCodec() != null) {
               columnCodecMap.merge(col, info.getCodec(),
@@ -228,10 +231,11 @@ public class ServerSegmentMetadataReader {
       for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
         String col = entry.getKey();
         long[] accum = entry.getValue();
-        long uncompressed = accum[0] / numReplica;
+        boolean hasDictionary = Boolean.TRUE.equals(columnHasDictMap.get(col));
+        // Dict columns have no uncompressed size; preserve -1 sentinel instead of dividing 0
+        long uncompressed = (hasDictionary && accum[0] == 0) ? -1 : accum[0] / numReplica;
         long compressed = accum[1] / numReplica;
         double ratio = (uncompressed > 0 && compressed > 0) ? (double) uncompressed / compressed : 0;
-        boolean hasDictionary = Boolean.TRUE.equals(columnHasDictMap.get(col));
         Set<String> idxNames = columnIndexNamesMap.get(col);
         List<String> indexes = idxNames != null ? new ArrayList<>(idxNames) : null;
         columnCompressionStats.add(new ColumnCompressionStatsInfo(
@@ -249,9 +253,11 @@ public class ServerSegmentMetadataReader {
           ? (double) rawPerReplica / compressedPerReplica : 0;
       int segmentsWithStats = aggSegmentsWithStats / numReplica;
       int totalSegments = aggTotalSegments / numReplica;
-      boolean isPartialCoverage = segmentsWithStats < totalSegments;
-      compressionStatsSummary = new CompressionStatsSummary(rawPerReplica, compressedPerReplica, ratio,
-          segmentsWithStats, totalSegments, isPartialCoverage);
+      if (segmentsWithStats > 0) {
+        boolean isPartialCoverage = segmentsWithStats < totalSegments;
+        compressionStatsSummary = new CompressionStatsSummary(rawPerReplica, compressedPerReplica, ratio,
+            segmentsWithStats, totalSegments, isPartialCoverage);
+      }
     }
 
     // Build aggregated storage breakdown (divide by numReplica to avoid double counting)
