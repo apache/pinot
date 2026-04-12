@@ -38,9 +38,13 @@ public class PinotAdminClient implements AutoCloseable {
   private final PinotAdminTransport _transport;
   private final String _controllerAddress;
   private final Map<String, String> _headers;
+  // Whether this instance owns (and is responsible for closing) the transport.
+  // False when a shared transport is injected from outside (e.g. SqlQueryExecutor).
+  private final boolean _ownsTransport;
 
   // Service clients
   private TableAdminClient _tableClient;
+  private PinotDatabaseAdminClient _databaseClient;
   private SchemaAdminClient _schemaClient;
   private InstanceAdminClient _instanceClient;
   private SegmentAdminClient _segmentClient;
@@ -108,6 +112,7 @@ public class PinotAdminClient implements AutoCloseable {
     _controllerAddress = controllerAddress;
     _transport = new PinotAdminTransport(properties, authHeaders, sslContext);
     _headers = authHeaders != null ? authHeaders : Map.of();
+    _ownsTransport = true;
     LOGGER.info("Created Pinot admin client for controller at {}", controllerAddress);
   }
 
@@ -128,15 +133,26 @@ public class PinotAdminClient implements AutoCloseable {
     Map<String, String> authHeaders = PinotAdminAuthentication.createAuthHeaders(authType, authConfig);
     _transport = new PinotAdminTransport(properties, authHeaders);
     _headers = authHeaders;
+    _ownsTransport = true;
     LOGGER.info("Created Pinot admin client for controller at {} with {} authentication",
         controllerAddress, authType);
   }
 
-  // Package-private constructor for tests to inject a mocked transport
-  PinotAdminClient(String controllerAddress, PinotAdminTransport transport, @Nullable Map<String, String> headers) {
+  /**
+   * Creates a PinotAdminClient with a pre-existing (shared) transport.
+   * The transport is NOT closed when this client is closed — the caller retains ownership.
+   * Use this constructor when sharing a single transport across many per-request clients.
+   *
+   * @param controllerAddress The address of the Pinot controller (e.g., "localhost:9000")
+   * @param transport Pre-existing transport to reuse; caller is responsible for its lifecycle
+   * @param headers Per-request headers (e.g., auth, database context)
+   */
+  public PinotAdminClient(String controllerAddress, PinotAdminTransport transport,
+      @Nullable Map<String, String> headers) {
     _controllerAddress = controllerAddress;
     _transport = transport;
     _headers = headers != null ? headers : Map.of();
+    _ownsTransport = false;
   }
 
   /**
@@ -149,6 +165,18 @@ public class PinotAdminClient implements AutoCloseable {
       _tableClient = new TableAdminClient(_transport, _controllerAddress, _headers);
     }
     return _tableClient;
+  }
+
+  /**
+   * Gets the database administration client.
+   *
+   * @return Database administration operations
+   */
+  public PinotDatabaseAdminClient getDatabaseClient() {
+    if (_databaseClient == null) {
+      _databaseClient = new PinotDatabaseAdminClient(_transport, _controllerAddress, _headers);
+    }
+    return _databaseClient;
   }
 
   /**
@@ -302,10 +330,8 @@ public class PinotAdminClient implements AutoCloseable {
   @Override
   public void close()
       throws IOException {
-    try {
+    if (_ownsTransport) {
       _transport.close();
-    } catch (PinotClientException e) {
-      throw new IOException("Failed to close admin client transport", e);
     }
   }
 

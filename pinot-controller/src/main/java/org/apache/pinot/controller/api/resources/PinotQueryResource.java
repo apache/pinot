@@ -69,6 +69,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.http.HttpProxyUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -414,6 +415,13 @@ public class PinotQueryResource {
         return output -> {
           try (OutputStream os = output) {
             _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers).toOutputStream(os);
+          }
+        };
+      case METADATA:
+        Map<String, String> metadataHeaders = extractHeaders(httpHeaders);
+        return output -> {
+          try (OutputStream os = output) {
+            _sqlQueryExecutor.executeMetadataStatement(sqlNodeAndOptions, metadataHeaders).toOutputStream(os);
           }
         };
       default:
@@ -802,9 +810,10 @@ public class PinotQueryResource {
   }
 
   private Map<String, String> extractHeaders(HttpHeaders httpHeaders) {
-    return httpHeaders.getRequestHeaders().entrySet().stream()
-      .filter(entry -> !entry.getValue().isEmpty())
-      .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().get(0)));
+    Map<String, String> all = httpHeaders.getRequestHeaders().entrySet().stream()
+        .filter(entry -> !entry.getValue().isEmpty())
+        .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().get(0)));
+    return HttpProxyUtils.copyForwardableHeaders(all);
   }
 
   private InstanceConfig getInstanceConfig(String instanceId) {

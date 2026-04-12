@@ -75,4 +75,23 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>skip-invoker-its-when-skipTests</id>
+      <!--
+        The root PR build uses -DskipTests, but maven-invoker-plugin does not honor that flag by default.
+        Propagate the intent to invoker.skip so assembly-descriptor sample-project ITs are skipped as well.
+      -->
+      <activation>
+        <property>
+          <name>skipTests</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <properties>
+        <invoker.skip>true</invoker.skip>
+      </properties>
+    </profile>
+  </profiles>
 </project>

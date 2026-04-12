@@ -55,6 +55,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -66,6 +67,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -194,6 +196,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, List.of(), CompressionCodec.MV_ENTRY_DICT,
             null));
     return fieldConfigs;
+  }
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    super.overrideControllerConf(properties);
+    // The controller advertises its host via Helix instance config; use an explicit IPv4 loopback address to avoid
+    // environment-dependent 'localhost' IPv6 resolution in broker -> controller calls (e.g. metadata SHOW queries).
+    properties.put(ControllerConf.CONTROLLER_HOST, "127.0.0.1");
   }
 
   @BeforeClass
@@ -347,6 +357,80 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(_serviceStatusCallbacks.size(), getNumBrokers() + getNumServers());
     for (ServiceStatus.ServiceStatusCallback serviceStatusCallback : _serviceStatusCallbacks) {
       assertEquals(serviceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD);
+    }
+  }
+
+  @Test
+  public void testShowTablesMatchesPinotAdminClient()
+      throws Exception {
+    JsonNode response = postQuery("SHOW TABLES");
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+
+    // Validate result schema column name
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "tableName");
+
+    List<String> showTables = new ArrayList<>();
+    response.get("resultTable").get("rows").forEach(row -> showTables.add(row.get(0).asText()));
+    Collections.sort(showTables);
+
+    try (PinotAdminClient adminClient = new PinotAdminClient("127.0.0.1:" + getControllerPort())) {
+      List<String> adminTables = adminClient.getTableClient().listTables(null, null, null);
+      Collections.sort(adminTables);
+      assertEquals(showTables, adminTables);
+    }
+
+    // SHOW TABLES FROM <database> should return the same results as SHOW TABLES in the default database
+    JsonNode responseFromDb = postQuery("SHOW TABLES FROM " + CommonConstants.DEFAULT_DATABASE);
+    assertTrue(responseFromDb.get("exceptions").isEmpty(), responseFromDb.toString());
+    List<String> showTablesFromDb = new ArrayList<>();
+    responseFromDb.get("resultTable").get("rows").forEach(row -> showTablesFromDb.add(row.get(0).asText()));
+    Collections.sort(showTablesFromDb);
+    assertEquals(showTablesFromDb, showTables);
+  }
+
+  @Test
+  public void testShowDatabasesIncludesDefault()
+      throws Exception {
+    JsonNode response = postQuery("SHOW DATABASES");
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+
+    // Validate result schema column name
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "databaseName");
+
+    List<String> databases = new ArrayList<>();
+    response.get("resultTable").get("rows").forEach(row -> databases.add(row.get(0).asText()));
+    assertTrue(databases.contains(CommonConstants.DEFAULT_DATABASE),
+        "SHOW DATABASES should include '" + CommonConstants.DEFAULT_DATABASE + "', got: " + databases);
+  }
+
+  @Test
+  public void testShowSchemasMatchesPinotAdminClient()
+      throws Exception {
+    JsonNode response = postQuery("SHOW SCHEMAS");
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+
+    // Validate result schema column name
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "schemaName");
+
+    List<String> showSchemas = new ArrayList<>();
+    response.get("resultTable").get("rows").forEach(row -> showSchemas.add(row.get(0).asText()));
+    Collections.sort(showSchemas);
+
+    try (PinotAdminClient adminClient = new PinotAdminClient("127.0.0.1:" + getControllerPort())) {
+      List<String> adminSchemas = adminClient.getSchemaClient().listSchemaNames();
+      Collections.sort(adminSchemas);
+      assertEquals(showSchemas, adminSchemas);
+    }
+
+    // SHOW SCHEMAS LIKE 'pattern' should return a subset that matches
+    String schemaName = getTableName(); // schemas are named after tables in test setup
+    JsonNode likeResponse = postQuery("SHOW SCHEMAS LIKE '" + schemaName.charAt(0) + "%'");
+    assertTrue(likeResponse.get("exceptions").isEmpty(), likeResponse.toString());
+    List<String> likeSchemas = new ArrayList<>();
+    likeResponse.get("resultTable").get("rows").forEach(row -> likeSchemas.add(row.get(0).asText()));
+    for (String schema : likeSchemas) {
+      assertTrue(schema.toLowerCase().startsWith(String.valueOf(schemaName.charAt(0)).toLowerCase()),
+          "Schema '" + schema + "' should match LIKE pattern");
     }
   }
 

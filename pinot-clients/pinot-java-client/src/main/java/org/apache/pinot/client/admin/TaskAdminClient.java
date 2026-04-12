@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client.admin;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,6 +26,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +37,8 @@ import org.slf4j.LoggerFactory;
  */
 public class TaskAdminClient extends BaseServiceAdminClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskAdminClient.class);
+  private static final TypeReference<Map<String, String>> MAP_STRING_STRING_TYPE_REF =
+      new TypeReference<Map<String, String>>() { };
 
   public TaskAdminClient(PinotAdminTransport transport, String controllerAddress,
       Map<String, String> headers) {
@@ -319,6 +323,20 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     JsonNode response =
         _transport.executeDelete(_controllerAddress, "/tasks/task/" + taskName, queryParams, _headers);
     return response.toString();
+  }
+
+  /**
+   * Executes an adhoc task on minion.
+   *
+   * @param adhocTaskConfig Adhoc task configuration
+   * @return Map of table names to task IDs
+   * @throws PinotAdminException If the request fails
+   */
+  public Map<String, String> executeTask(AdhocTaskConfig adhocTaskConfig)
+      throws PinotAdminException {
+    JsonNode response = _transport.executePost(_controllerAddress, "/tasks/execute",
+        adhocTaskConfig.toJsonString(), null, _headers);
+    return PinotAdminTransport.getObjectMapper().convertValue(response, MAP_STRING_STRING_TYPE_REF);
   }
 
   // Async versions of key methods

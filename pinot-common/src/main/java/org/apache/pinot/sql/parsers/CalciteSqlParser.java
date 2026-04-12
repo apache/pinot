@@ -66,6 +66,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
+import org.apache.pinot.sql.parsers.parser.SqlShowDatabases;
+import org.apache.pinot.sql.parsers.parser.SqlShowSchemas;
+import org.apache.pinot.sql.parsers.parser.SqlShowTables;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -143,6 +146,14 @@ public class CalciteSqlParser {
         SqlIdentifier key = (SqlIdentifier) operandList.get(1);
         SqlLiteral value = (SqlLiteral) operandList.get(2);
         options.put(key.getSimple(), value.toValue());
+      } else if (sqlNode instanceof SqlShowDatabases || sqlNode instanceof SqlShowTables
+          || sqlNode instanceof SqlShowSchemas) {
+        if (sqlType == null) {
+          sqlType = PinotSqlType.METADATA;
+          statementNode = sqlNode;
+        } else {
+          throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
+        }
       } else {
         // default extract query statement (execution statement)
         if (sqlType == null) {
