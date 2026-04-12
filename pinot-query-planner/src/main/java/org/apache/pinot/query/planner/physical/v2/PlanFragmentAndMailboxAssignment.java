@@ -44,6 +44,7 @@ import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
+import org.apache.pinot.spi.config.table.TableType;
 
 
 /**
@@ -87,11 +88,15 @@ public class PlanFragmentAndMailboxAssignment {
       processTableScan((PhysicalTableScan) pRelNode.unwrap(), currentFragmentId, context);
     }
     if (pRelNode.unwrap() instanceof PhysicalExchange) {
+      PhysicalExchange physicalExchange = (PhysicalExchange) pRelNode.unwrap();
+      if (physicalExchange.getExchangeStrategy() == ExchangeStrategy.LOOKUP_LOCAL_EXCHANGE) {
+        processLookupLocalExchange(pRelNode, parent, currentFragmentId, context);
+        return;
+      }
       // Split an exchange into two fragments: one for the sender and one for the receiver.
       // The sender fragment will have a MailboxSendNode and receiver a MailboxReceiveNode.
       // It is possible that the receiver fragment doesn't exist yet (e.g. when PhysicalExchange is the root node).
       // In that case, we also create it here. If it exists already, we simply re-use it.
-      PhysicalExchange physicalExchange = (PhysicalExchange) pRelNode.unwrap();
       PlanFragment receiverFragment = context._planFragmentMap.get(currentFragmentId);
       int senderFragmentId = context._planFragmentMap.size() + (receiverFragment == null ? 1 : 0);
       final DataSchema inputFragmentSchema = PRelToPlanNodeConverter.toDataSchema(
@@ -173,6 +178,77 @@ public class PlanFragmentAndMailboxAssignment {
     }
   }
 
+  /**
+   * Handles LOOKUP_LOCAL_EXCHANGE: a pseudo-exchange that does NOT split fragments. The dim table
+   * stays in the join's fragment. This method:
+   * <ol>
+   *   <li>Registers the dim table name so the fragment is classified as a leaf stage</li>
+   *   <li>Sets fake empty segments per worker (the dim table is accessed via
+   *       {@code DimensionTableDataManager} at runtime, not via segment routing)</li>
+   *   <li>Converts children to PlanNodes in the same fragment (no MailboxSend/Receive)</li>
+   * </ol>
+   * This matches V1's behavior in {@code WorkerManager.assignWorkersToNonRootFragment} where
+   * lookup joins are detected and the dim table is registered with empty segments.
+   */
+  private void processLookupLocalExchange(PRelNode pRelNode, @Nullable PlanNode parent, int currentFragmentId,
+      Context context) {
+    // Find the dim table scan in the exchange's children and register it with empty segments.
+    DispatchablePlanMetadata fragmentMetadata = context._fragmentMetadataMap.get(currentFragmentId);
+    for (PRelNode child : pRelNode.getPRelInputs()) {
+      registerDimTableInFragment(child, fragmentMetadata);
+    }
+    // Process children in the same fragment (no MailboxSend/Receive), but skip processTableScan
+    // by converting PRelNodes to PlanNodes directly. The right side of a lookup join is always
+    // [Project →] TableScan (at most 2 levels deep) — Calcite pushes dim-side filters to post-join.
+    for (PRelNode child : pRelNode.getPRelInputs()) {
+      PlanNode planNode = PRelToPlanNodeConverter.toPlanNode(child, currentFragmentId);
+      for (PRelNode grandChild : child.getPRelInputs()) {
+        Preconditions.checkState(grandChild.getPRelInputs().isEmpty(),
+            "LOOKUP_LOCAL_EXCHANGE right side deeper than 2 levels: found children under %s. "
+                + "Expected [Project →] TableScan only.", grandChild.unwrap().getClass().getSimpleName());
+        PlanNode grandChildNode = PRelToPlanNodeConverter.toPlanNode(grandChild, currentFragmentId);
+        planNode.getInputs().add(grandChildNode);
+      }
+      if (parent != null) {
+        parent.getInputs().add(planNode);
+      }
+    }
+  }
+
+  /**
+   * Recursively find TableScan nodes and register the dim table name in the fragment metadata with
+   * fake empty segments per worker, matching V1's {@code WorkerManager.assignWorkersToNonRootFragment}
+   * behavior for lookup joins.
+   */
+  private void registerDimTableInFragment(PRelNode pRelNode, DispatchablePlanMetadata fragmentMetadata) {
+    if (pRelNode.unwrap() instanceof TableScan) {
+      PhysicalTableScan tableScan = (PhysicalTableScan) pRelNode.unwrap();
+      TableScanMetadata tableScanMetadata = Objects.requireNonNull(tableScan.getTableScanMetadata(),
+          "No metadata in table scan PRelNode");
+      String tableName = tableScanMetadata.getScannedTables().stream().findFirst().orElseThrow();
+      fragmentMetadata.addScannedTable(tableName);
+      // Set fake empty segments for each worker so isLeafStageWorker() returns true.
+      // The actual dim table data comes from DimensionTableDataManager at runtime.
+      // Use putIfAbsent rather than overwrite to be defensive if called multiple times.
+      Map<Integer, QueryServerInstance> workers = fragmentMetadata.getWorkerIdToServerInstanceMap();
+      if (workers != null) {
+        Map<Integer, Map<String, List<String>>> existing = fragmentMetadata.getWorkerIdToSegmentsMap();
+        Map<Integer, Map<String, List<String>>> fakeSegmentsMap =
+            existing != null ? new HashMap<>(existing) : new HashMap<>();
+        for (Integer workerId : workers.keySet()) {
+          fakeSegmentsMap.putIfAbsent(workerId, Map.of(TableType.OFFLINE.name(), List.of()));
+        }
+        fragmentMetadata.setWorkerIdToSegmentsMap(fakeSegmentsMap);
+      }
+      NodeHint nodeHint = NodeHint.fromRelHints(tableScan.getHints());
+      fragmentMetadata.setTableOptions(nodeHint.getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));
+      return;
+    }
+    for (PRelNode child : pRelNode.getPRelInputs()) {
+      registerDimTableInFragment(child, fragmentMetadata);
+    }
+  }
+
   private PlanFragment createFragment(int fragmentId, PlanNode planNode, List<PlanFragment> inputFragments,
       Context context, List<String> workers) {
     // track new plan fragment
@@ -248,6 +324,9 @@ public class PlanFragmentAndMailboxAssignment {
         }
         break;
       }
+      case LOOKUP_LOCAL_EXCHANGE:
+        throw new IllegalStateException("LOOKUP_LOCAL_EXCHANGE should not reach computeMailboxInfos — "
+            + "it must be handled as transparent in process() before fragment splitting");
       default:
         throw new UnsupportedOperationException("exchange desc not supported yet: " + exchangeDesc);
     }

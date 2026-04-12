@@ -66,4 +66,13 @@ public class ExchangeStrategyTest {
       ExchangeStrategy.getRelDistribution(ExchangeStrategy.IDENTITY_EXCHANGE, List.of(1));
     });
   }
+
+  @Test
+  public void testLookupLocalExchangeRelDistribution() {
+    // LOOKUP_LOCAL_EXCHANGE maps to RANDOM_DISTRIBUTED — a placeholder for the Calcite Exchange
+    // superclass constructor (which rejects ANY). Has no runtime significance.
+    assertEquals(
+        ExchangeStrategy.getRelDistribution(ExchangeStrategy.LOOKUP_LOCAL_EXCHANGE, List.of()).getType(),
+        RelDistribution.Type.RANDOM_DISTRIBUTED);
+  }
 }
