@@ -16,33 +16,39 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.compression;
+package org.apache.pinot.segment.local.io.codec.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import net.jpountz.lz4.LZ4DecompressorWithLength;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
-import org.xerial.snappy.Snappy;
 
 
 /**
- * Implementation of {@link ChunkDecompressor} using Snappy.
+ * Identical to {@code LZ4Decompressor} but can determine the length of
+ * the decompressed output
  */
-class SnappyDecompressor implements ChunkDecompressor {
+class LZ4WithLengthDecompressor implements ChunkDecompressor {
 
-  static final SnappyDecompressor INSTANCE = new SnappyDecompressor();
+  static final LZ4WithLengthDecompressor INSTANCE = new LZ4WithLengthDecompressor();
 
-  private SnappyDecompressor() {
+  private final LZ4DecompressorWithLength _decompressor;
+
+  private LZ4WithLengthDecompressor() {
+    // safeDecompressor is used to avoid reading past input buffer limit, which is not guaranteed with fastDecompressor
+    _decompressor = new LZ4DecompressorWithLength(LZ4Compressor.LZ4_FACTORY.safeDecompressor());
   }
 
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
-    return Snappy.uncompress(compressedInput, decompressedOutput);
+    _decompressor.decompress(compressedInput, decompressedOutput);
+    decompressedOutput.flip();
+    return decompressedOutput.limit();
   }
 
   @Override
-  public int decompressedLength(ByteBuffer compressedInput)
-      throws IOException {
-    return Snappy.uncompressedLength(compressedInput);
+  public int decompressedLength(ByteBuffer compressedInput) {
+    return LZ4DecompressorWithLength.getDecompressedLength(compressedInput);
   }
 }

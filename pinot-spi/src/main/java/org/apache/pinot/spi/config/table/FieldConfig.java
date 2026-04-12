@@ -77,25 +77,35 @@ public class FieldConfig extends BaseJsonConfig {
   private final JsonNode _indexes;
   private final JsonNode _tierOverwrites;
   private final CompressionCodec _compressionCodec;
+  private final List<String> _codecPipeline;
   private final Map<String, String> _properties;
   private final TimestampConfig _timestampConfig;
 
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
       @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
-    this(name, encodingType, indexType, null, compressionCodec, null, null, properties, null);
+    this(name, encodingType, indexType, null, compressionCodec, null, null, null, properties, null);
   }
 
   public FieldConfig(String name, EncodingType encodingType, @Nullable List<IndexType> indexTypes,
       @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
-    this(name, encodingType, null, indexTypes, compressionCodec, null, null, properties, null);
+    this(name, encodingType, null, indexTypes, compressionCodec, null, null, null, properties, null);
   }
 
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
       @Nullable List<IndexType> indexTypes, @Nullable CompressionCodec compressionCodec,
       @Nullable TimestampConfig timestampConfig, @Nullable Map<String, String> properties) {
-    this(name, encodingType, indexType, indexTypes, compressionCodec, timestampConfig, null, properties, null);
+    this(name, encodingType, indexType, indexTypes, compressionCodec, timestampConfig, null, null, properties, null);
+  }
+
+  // Backward-compatible 9-arg constructor (without codecPipeline)
+  public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
+      @Nullable List<IndexType> indexTypes, @Nullable CompressionCodec compressionCodec,
+      @Nullable TimestampConfig timestampConfig, @Nullable JsonNode indexes,
+      @Nullable Map<String, String> properties, @Nullable JsonNode tierOverwrites) {
+    this(name, encodingType, indexType, indexTypes, compressionCodec, timestampConfig, indexes, null, properties,
+        tierOverwrites);
   }
 
   @JsonCreator
@@ -106,14 +116,21 @@ public class FieldConfig extends BaseJsonConfig {
       @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
       @JsonProperty(value = "timestampConfig") @Nullable TimestampConfig timestampConfig,
       @JsonProperty(value = "indexes") @Nullable JsonNode indexes,
+      @JsonProperty(value = "codecPipeline") @Nullable List<String> codecPipeline,
       @JsonProperty(value = "properties") @Nullable Map<String, String> properties,
       @JsonProperty(value = "tierOverwrites") @Nullable JsonNode tierOverwrites) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
+    Preconditions.checkArgument(codecPipeline == null || !codecPipeline.isEmpty(),
+        "'codecPipeline' must be non-empty if specified for column '%s'", name);
+    Preconditions.checkArgument(compressionCodec == null || codecPipeline == null,
+        "'compressionCodec' and 'codecPipeline' cannot both be set for column '%s'. "
+            + "Use 'codecPipeline' for new configs; 'compressionCodec' is deprecated.", name);
     _name = name;
     _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
     _indexTypes =
         indexTypes != null ? indexTypes : (indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
     _compressionCodec = compressionCodec;
+    _codecPipeline = codecPipeline;
     _timestampConfig = timestampConfig;
     _properties = properties;
     _indexes = indexes == null ? NullNode.getInstance() : indexes;
@@ -197,9 +214,24 @@ public class FieldConfig extends BaseJsonConfig {
     return _tierOverwrites;
   }
 
+  /**
+   * @deprecated Use {@code codecPipeline} instead. This field is retained for backward compatibility
+   *     with existing table configs. Setting both {@code compressionCodec} and a non-empty
+   *     {@code codecPipeline} is rejected at construction time.
+   */
+  @Deprecated
   @Nullable
   public CompressionCodec getCompressionCodec() {
     return _compressionCodec;
+  }
+
+  /**
+   * Returns the codec pipeline as an ordered list of codec names (e.g., ["DELTA", "ZSTANDARD"]).
+   * Mutually exclusive with {@link #getCompressionCodec()} — setting both is rejected at construction time.
+   */
+  @Nullable
+  public List<String> getCodecPipeline() {
+    return _codecPipeline;
   }
 
   @Nullable
@@ -218,6 +250,7 @@ public class FieldConfig extends BaseJsonConfig {
     private List<IndexType> _indexTypes;
     private JsonNode _indexes;
     private CompressionCodec _compressionCodec;
+    private List<String> _codecPipeline;
     private Map<String, String> _properties;
     private TimestampConfig _timestampConfig;
     private JsonNode _tierOverwrites;
@@ -232,6 +265,7 @@ public class FieldConfig extends BaseJsonConfig {
       _indexTypes = other._indexTypes;
       _indexes = other._indexes;
       _compressionCodec = other._compressionCodec;
+      _codecPipeline = other._codecPipeline;
       _properties = other._properties;
       _timestampConfig = other._timestampConfig;
       _tierOverwrites = other._tierOverwrites;
@@ -262,6 +296,11 @@ public class FieldConfig extends BaseJsonConfig {
       return this;
     }
 
+    public Builder withCodecPipeline(List<String> codecPipeline) {
+      _codecPipeline = codecPipeline;
+      return this;
+    }
+
     public Builder withProperties(Map<String, String> properties) {
       _properties = properties;
       return this;
@@ -279,7 +318,7 @@ public class FieldConfig extends BaseJsonConfig {
 
     public FieldConfig build() {
       return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig, _indexes,
-          _properties, _tierOverwrites);
+          _codecPipeline, _properties, _tierOverwrites);
     }
   }
 }

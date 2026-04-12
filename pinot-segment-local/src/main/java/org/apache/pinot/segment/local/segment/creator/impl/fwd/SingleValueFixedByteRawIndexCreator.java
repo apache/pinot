@@ -20,8 +20,10 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.codec.ChunkCodecPipeline;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
@@ -67,10 +69,29 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType, int writerVersion, int targetDocsPerChunk)
       throws IOException {
+    this(baseIndexDir, compressionType, null, column, totalDocs, valueType, writerVersion, targetDocsPerChunk);
+  }
+
+  /**
+   * Constructor with optional codec pipeline.
+   *
+   * @param baseIndexDir Index directory
+   * @param compressionType Type of compression (used when pipeline is null)
+   * @param codecPipeline Optional codec pipeline (requires writerVersion 7)
+   * @param column Name of column to index
+   * @param totalDocs Total number of documents to index
+   * @param valueType Type of the values
+   * @param writerVersion writer format version (7 required when codecPipeline is set)
+   * @param targetDocsPerChunk target number of docs per chunk
+   */
+  public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
+      @Nullable ChunkCodecPipeline codecPipeline, String column, int totalDocs, DataType valueType, int writerVersion,
+      int targetDocsPerChunk)
+      throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     _indexWriter =
-        new FixedByteChunkForwardIndexWriter(file, compressionType, totalDocs, targetDocsPerChunk, valueType.size(),
-            writerVersion);
+        new FixedByteChunkForwardIndexWriter(file, compressionType, codecPipeline, totalDocs, targetDocsPerChunk,
+            valueType.size(), writerVersion);
     _valueType = valueType;
   }
 

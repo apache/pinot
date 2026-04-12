@@ -21,7 +21,9 @@ package org.apache.pinot.segment.local.io.writer.impl;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.pinot.segment.spi.codec.ChunkCodecPipeline;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
 
@@ -49,6 +51,27 @@ public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWrite
       int numDocsPerChunk, int sizeOfEntry, int writerVersion)
       throws IOException {
     super(file, compressionType, totalDocs, normalizeDocsPerChunk(writerVersion, numDocsPerChunk),
+        (long) sizeOfEntry * normalizeDocsPerChunk(writerVersion, numDocsPerChunk), sizeOfEntry, writerVersion, true);
+    _chunkDataOffset = 0;
+  }
+
+  /**
+   * Constructor with codec pipeline support.
+   *
+   * @param file File to write to
+   * @param compressionType Type of compression (used when pipeline is null)
+   * @param codecPipeline Optional codec pipeline (requires writerVersion 7)
+   * @param totalDocs Total number of docs to write
+   * @param numDocsPerChunk Number of documents per chunk
+   * @param sizeOfEntry Size of entry (in bytes)
+   * @param writerVersion writer format version
+   */
+  public FixedByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType,
+      @Nullable ChunkCodecPipeline codecPipeline, int totalDocs, int numDocsPerChunk, int sizeOfEntry,
+      int writerVersion)
+      throws IOException {
+    super(file, compressionType, codecPipeline, sizeOfEntry, totalDocs,
+        normalizeDocsPerChunk(writerVersion, numDocsPerChunk),
         (long) sizeOfEntry * normalizeDocsPerChunk(writerVersion, numDocsPerChunk), sizeOfEntry, writerVersion, true);
     _chunkDataOffset = 0;
   }
