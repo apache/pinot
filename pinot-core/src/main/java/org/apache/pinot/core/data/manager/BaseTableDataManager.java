@@ -622,7 +622,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Reloading all segments with forceDownload: {}", forceDownload);
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
     if (!segmentDataManagers.isEmpty()) {
-      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
+      reloadSegments(segmentDataManagers, forceDownload, reloadJobId);
     }
     _logger.info("Reloaded all {} segments with forceDownload: {}", segmentDataManagers.size(), forceDownload);
   }
@@ -645,7 +645,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
     if (!segmentDataManagers.isEmpty()) {
-      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
+      reloadSegments(segmentDataManagers, forceDownload, reloadJobId);
     }
     if (missingSegments.isEmpty()) {
       _logger.info("Reloaded segments: {} with forceDownload: {}", segmentNames, forceDownload);
@@ -926,9 +926,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private void reloadSegments(List<SegmentDataManager> segmentDataManagers, IndexLoadingConfig indexLoadingConfig,
-      boolean forceDownload, String reloadJobId)
+  private void reloadSegments(List<SegmentDataManager> segmentDataManagers, boolean forceDownload, String reloadJobId)
       throws Exception {
+    IndexLoadingConfig indexLoadingConfigTemplate = fetchIndexLoadingConfig();
     List<String> failedSegments = new ArrayList<>();
     AtomicReference<Throwable> sampleException = new AtomicReference<>();
     CompletableFuture.allOf(segmentDataManagers.stream().map(segmentDataManager -> CompletableFuture.runAsync(() -> {
@@ -936,7 +936,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       try {
         _segmentReloadSemaphore.acquire(segmentName, _logger);
         try {
-          reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
+          reloadSegment(segmentDataManager, indexLoadingConfigTemplate.copy(), forceDownload);
         } finally {
           _segmentReloadSemaphore.release();
         }
