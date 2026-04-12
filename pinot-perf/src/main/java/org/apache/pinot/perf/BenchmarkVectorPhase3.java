@@ -26,36 +26,35 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
 /**
- * Benchmark harness for Phase 3 vector query semantics: filtered ANN, threshold search,
- * and compound retrieval patterns.
+ * Compatibility entry point for the vector benchmark suite's {@code phase3} mode.
+ * Covers filtered ANN, threshold search, and compound retrieval patterns.
  *
  * <p>This benchmark operates at the vector-level (no full segment/query engine) to measure
  * the isolated cost of execution mode selection, filtered candidate reduction, and threshold
  * refinement.</p>
  *
- * <h3>Usage</h3>
- * <pre>
- *   ./mvnw -pl pinot-perf -am compile
- *   java -cp pinot-perf/target/classes:... org.apache.pinot.perf.BenchmarkVectorPhase3
- * </pre>
+ * <p>Prefer {@link BenchmarkVectorIndex} with
+ * {@code -Dpinot.perf.vector.mode=phase3}. This class remains so older scripts continue to work.</p>
  */
 public final class BenchmarkVectorPhase3 {
 
   private static final long SEED = 42L;
   private static final int NUM_QUERIES = 200;
   private static final int WARMUP_QUERIES = 50;
-  private static final PrintStream OUT = System.out;
-
   private BenchmarkVectorPhase3() {
   }
 
   public static void main(String[] args) {
+    run(System.out);
+  }
+
+  static void run(PrintStream out) {
     int n = Integer.getInteger("pinot.perf.vector.n", 50000);
     int dim = Integer.getInteger("pinot.perf.vector.dim", 128);
     int topK = Integer.getInteger("pinot.perf.vector.topK", 10);
 
-    OUT.println("=== Phase 3 Vector Query Semantics Benchmark ===");
-    OUT.printf("Corpus: %d vectors, dimension: %d, topK: %d%n%n", n, dim, topK);
+    out.println("=== Phase 3 Vector Query Semantics Benchmark ===");
+    out.printf("Corpus: %d vectors, dimension: %d, topK: %d%n%n", n, dim, topK);
 
     float[][] corpus = BenchmarkVectorIndex.generateGaussianVectors(n, dim, SEED);
     float[][] queries = BenchmarkVectorIndex.generateGaussianVectors(NUM_QUERIES, dim, SEED + 1000);
@@ -64,33 +63,33 @@ public final class BenchmarkVectorPhase3 {
     VectorIndexConfig.VectorDistanceFunction distFunc = VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN;
 
     // 1. Exact scan baseline
-    benchmarkExactScan(corpus, queries, topK, distFunc);
+    benchmarkExactScan(out, corpus, queries, topK, distFunc);
 
     // 2. Filtered exact scan at various selectivities
     for (double selectivity : new double[]{0.01, 0.1, 0.5, 0.9}) {
       boolean[] selectiveFilter = generateSelectiveFilter(n, selectivity, SEED + 3000);
-      benchmarkFilteredExactScan(corpus, queries, topK, distFunc, selectiveFilter, selectivity);
+      benchmarkFilteredExactScan(out, corpus, queries, topK, distFunc, selectiveFilter, selectivity);
     }
 
     // 3. Threshold scan baseline
     // For 128-dim Gaussian vectors, L2 squared distances are ~256 on average.
     // Use thresholds that produce meaningful result counts.
     for (float threshold : new float[]{200.0f, 240.0f, 260.0f}) {
-      benchmarkThresholdScan(corpus, queries, threshold, distFunc);
+      benchmarkThresholdScan(out, corpus, queries, threshold, distFunc);
     }
 
     // 4. Filtered threshold scan
     for (float threshold : new float[]{240.0f}) {
       for (double selectivity : new double[]{0.1, 0.5}) {
         boolean[] selectiveFilter = generateSelectiveFilter(n, selectivity, SEED + 3000);
-        benchmarkFilteredThresholdScan(corpus, queries, threshold, distFunc, selectiveFilter, selectivity);
+        benchmarkFilteredThresholdScan(out, corpus, queries, threshold, distFunc, selectiveFilter, selectivity);
       }
     }
 
-    OUT.println("\n=== Benchmark complete ===");
+    out.println("\n=== Benchmark complete ===");
   }
 
-  private static void benchmarkExactScan(float[][] corpus, float[][] queries, int topK,
+  private static void benchmarkExactScan(PrintStream out, float[][] corpus, float[][] queries, int topK,
       VectorIndexConfig.VectorDistanceFunction distFunc) {
     // Warmup
     for (int i = 0; i < WARMUP_QUERIES; i++) {
@@ -105,11 +104,11 @@ public final class BenchmarkVectorPhase3 {
     }
 
     Arrays.sort(latencies);
-    OUT.printf("Exact scan (topK=%d): p50=%.2fms p95=%.2fms%n",
+    out.printf("Exact scan (topK=%d): p50=%.2fms p95=%.2fms%n",
         topK, latencies[NUM_QUERIES / 2] / 1e6, latencies[(int) (NUM_QUERIES * 0.95)] / 1e6);
   }
 
-  private static void benchmarkFilteredExactScan(float[][] corpus, float[][] queries, int topK,
+  private static void benchmarkFilteredExactScan(PrintStream out, float[][] corpus, float[][] queries, int topK,
       VectorIndexConfig.VectorDistanceFunction distFunc, boolean[] filter, double selectivity) {
     // Warmup
     for (int i = 0; i < WARMUP_QUERIES; i++) {
@@ -126,12 +125,12 @@ public final class BenchmarkVectorPhase3 {
     }
 
     Arrays.sort(latencies);
-    OUT.printf("Filtered exact scan (selectivity=%.0f%%, topK=%d): p50=%.2fms p95=%.2fms avgResults=%.1f%n",
+    out.printf("Filtered exact scan (selectivity=%.0f%%, topK=%d): p50=%.2fms p95=%.2fms avgResults=%.1f%n",
         selectivity * 100, topK, latencies[NUM_QUERIES / 2] / 1e6, latencies[(int) (NUM_QUERIES * 0.95)] / 1e6,
         totalResults / (double) NUM_QUERIES);
   }
 
-  private static void benchmarkThresholdScan(float[][] corpus, float[][] queries, float threshold,
+  private static void benchmarkThresholdScan(PrintStream out, float[][] corpus, float[][] queries, float threshold,
       VectorIndexConfig.VectorDistanceFunction distFunc) {
     // Warmup
     for (int i = 0; i < WARMUP_QUERIES; i++) {
@@ -148,12 +147,13 @@ public final class BenchmarkVectorPhase3 {
     }
 
     Arrays.sort(latencies);
-    OUT.printf("Threshold scan (threshold=%.1f): p50=%.2fms p95=%.2fms avgResults=%.1f%n",
+    out.printf("Threshold scan (threshold=%.1f): p50=%.2fms p95=%.2fms avgResults=%.1f%n",
         threshold, latencies[NUM_QUERIES / 2] / 1e6, latencies[(int) (NUM_QUERIES * 0.95)] / 1e6,
         totalResults / (double) NUM_QUERIES);
   }
 
-  private static void benchmarkFilteredThresholdScan(float[][] corpus, float[][] queries, float threshold,
+  private static void benchmarkFilteredThresholdScan(PrintStream out, float[][] corpus, float[][] queries,
+      float threshold,
       VectorIndexConfig.VectorDistanceFunction distFunc, boolean[] filter, double selectivity) {
     // Warmup
     for (int i = 0; i < WARMUP_QUERIES; i++) {
@@ -170,7 +170,7 @@ public final class BenchmarkVectorPhase3 {
     }
 
     Arrays.sort(latencies);
-    OUT.printf("Filtered threshold scan (threshold=%.1f, selectivity=%.0f%%): "
+    out.printf("Filtered threshold scan (threshold=%.1f, selectivity=%.0f%%): "
             + "p50=%.2fms p95=%.2fms avgResults=%.1f%n",
         threshold, selectivity * 100, latencies[NUM_QUERIES / 2] / 1e6,
         latencies[(int) (NUM_QUERIES * 0.95)] / 1e6, totalResults / (double) NUM_QUERIES);

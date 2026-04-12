@@ -50,6 +50,10 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
  * <p>This benchmark measures build time, index size, query latency (p50/p99), and recall@K
  * for each index type across synthetic datasets of configurable size and dimensionality.</p>
  *
+ * <p>This class is also the canonical entry point for the broader vector benchmark suite.
+ * Set {@code -Dpinot.perf.vector.mode=} to one of {@code matrix}, {@code quick},
+ * {@code phase3}, {@code closeout}, or {@code all} to select the scenario to run.</p>
+ *
  * <h3>Usage</h3>
  * <pre>
  *   # Build the pinot-perf module:
@@ -99,6 +103,12 @@ public class BenchmarkVectorIndex {
 
   /** Backend name used for IVF_PQ sweeps. */
   private static final String IVF_PQ_INDEX_TYPE = "IVF_PQ";
+
+  /** System property selecting which vector benchmark mode to run. */
+  private static final String MODE_PROPERTY = "pinot.perf.vector.mode";
+
+  /** Default benchmark mode when no explicit mode is supplied. */
+  private static final String DEFAULT_MODE = "matrix";
 
   /** Fully qualified creator class name for IVF_PQ. */
   private static final String IVF_PQ_CREATOR_CLASS =
@@ -966,19 +976,58 @@ public class BenchmarkVectorIndex {
   /**
    * Runs the complete benchmark suite and prints results to stdout.
    *
-   * <p>The benchmark is organized in three parts:
+   * <p>The default {@code matrix} mode is organized in four parts:
    * <ol>
    *   <li>Dataset A (L2/Euclidean) at multiple sizes: 1K, 10K, 100K</li>
    *   <li>Dataset B (Cosine) at multiple sizes: 1K, 10K, 100K</li>
-   *   <li>IVF_FLAT parameter sweep on 10K vectors, 128 dimensions</li>
+   *   <li>Dataset C (inner product with magnitude skew) at multiple sizes</li>
+   *   <li>IVF_FLAT parameter sweep on a fixed dataset</li>
    * </ol>
    */
   public static void main(String[] args)
       throws Exception {
-    PrintStream out = System.out;
+    String mode = args.length > 0 ? args[0] : System.getProperty(MODE_PROPERTY, DEFAULT_MODE);
+    runMode(mode, System.out);
+  }
+
+  static void runMode(String mode, PrintStream out)
+      throws Exception {
+    String normalizedMode = mode == null ? DEFAULT_MODE : mode.trim().toLowerCase();
+    switch (normalizedMode) {
+      case "matrix":
+        runMatrixBenchmark(out);
+        return;
+      case "quick":
+        BenchmarkVectorIndexRunner.run(out);
+        return;
+      case "phase3":
+        BenchmarkVectorPhase3.run(out);
+        return;
+      case "closeout":
+        BenchmarkVectorCloseoutFeatures.run(out);
+        return;
+      case "all":
+        runMatrixBenchmark(out);
+        out.println();
+        BenchmarkVectorIndexRunner.run(out);
+        out.println();
+        BenchmarkVectorPhase3.run(out);
+        out.println();
+        BenchmarkVectorCloseoutFeatures.run(out);
+        return;
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported vector benchmark mode: " + mode
+                + ". Expected one of: matrix, quick, phase3, closeout, all");
+    }
+  }
+
+  static void runMatrixBenchmark(PrintStream out)
+      throws Exception {
     out.println("========================================");
     out.println("  Apache Pinot Vector Index Benchmark");
     out.println("========================================");
+    out.printf("Mode: %s%n", DEFAULT_MODE);
     out.printf("JDK: %s%n", System.getProperty("java.version"));
     out.printf("OS: %s %s%n", System.getProperty("os.name"), System.getProperty("os.arch"));
     out.printf("Seed: %d%n", SEED);

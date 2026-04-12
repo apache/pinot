@@ -30,10 +30,11 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
 /**
- * Quick validation runner for the vector index benchmark. Runs a small-scale test
- * to verify correctness before a full benchmark run.
+ * Compatibility entry point for the vector benchmark suite's {@code quick} mode.
+ * Runs a small-scale validation before a full benchmark run.
  *
- * <p>Usage: {@code java org.apache.pinot.perf.BenchmarkVectorIndexRunner}</p>
+ * <p>Prefer {@link BenchmarkVectorIndex} with
+ * {@code -Dpinot.perf.vector.mode=quick}. This class remains so older scripts continue to work.</p>
  */
 public final class BenchmarkVectorIndexRunner {
 
@@ -45,7 +46,11 @@ public final class BenchmarkVectorIndexRunner {
    */
   public static void main(String[] args)
       throws Exception {
-    PrintStream out = System.out;
+    run(System.out);
+  }
+
+  static void run(PrintStream out)
+      throws Exception {
     out.println("=== Quick validation run ===");
 
     int n = 5000;

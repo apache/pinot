@@ -29,10 +29,10 @@ Note: this package will pull `org.openjdk.jmh:jmh-core`, which is based on `GPL 
 
 1. Build the source
 ```
-$ cd <root_source_code>/pinot-perf
-$ ./mvnw package -DskipTests
+$ cd <root_source_code>
+$ ./mvnw -f pinot-perf/pom.xml -am package -DskipTests
 ```
-2. The above cmd will generate `target/pinot-perf-pkg`
+2. The above cmd will generate `pinot-perf/target/pinot-perf-pkg`
 
 3. Run benchmark using generated scripts
 ```
@@ -40,9 +40,27 @@ $ cd target/pinot-perf-pkg/bin
 $ ./pinot-BenchmarkDictionary.sh
 ```
 
-# Vector index benchmark
+# Vector benchmark suite
 
-`org.apache.pinot.perf.BenchmarkVectorIndex` compares Exact Scan, HNSW, IVF_FLAT, and IVF_PQ on synthetic datasets.
+`org.apache.pinot.perf.BenchmarkVectorIndex` is the canonical entry point for Pinot's vector
+benchmark suite. Run it from the repository root with
+`./mvnw -f pinot-perf/pom.xml -am ...`, then use `-Dpinot.perf.vector.mode=...` to select the
+scenario:
+
+- `matrix` (default): broad backend matrix comparing Exact Scan, HNSW, `IVF_FLAT`, and `IVF_PQ`
+- `quick`: small validation run to sanity-check recall and latency before a larger benchmark
+- `phase3`: filtered exact scan and threshold-search semantics benchmark
+- `closeout`: final vector close-out benchmark for quantizers, HNSW runtime controls,
+  `IVF_ON_DISK` filter-aware ANN, approximate radius, and mixed mutable/immutable HNSW
+- `all`: run every mode in sequence
+
+The older entry-point classes remain for compatibility, but new usage should go through
+`BenchmarkVectorIndex`.
+
+## Matrix mode
+
+This is the default mode and compares Exact Scan, HNSW, `IVF_FLAT`, and `IVF_PQ` on synthetic
+datasets.
 
 What it reports:
 - Build time
@@ -60,8 +78,7 @@ Datasets:
 Run it with Maven:
 
 ```bash
-cd pinot-perf
-../mvnw exec:java \
+./mvnw -f pinot-perf/pom.xml -am exec:java \
   -Dexec.mainClass=org.apache.pinot.perf.BenchmarkVectorIndex
 ```
 
@@ -85,8 +102,7 @@ Useful tuning properties:
 Small smoke run:
 
 ```bash
-cd pinot-perf
-../mvnw exec:java \
+./mvnw -f pinot-perf/pom.xml -am exec:java \
   -Dexec.mainClass=org.apache.pinot.perf.BenchmarkVectorIndex \
   -Dpinot.perf.vector.dimension=16 \
   -Dpinot.perf.vector.datasetSizes=100 \
@@ -97,4 +113,74 @@ cd pinot-perf
   -Dpinot.perf.vector.pqM=4,8 \
   -Dpinot.perf.vector.pqNbits=4 \
   -Dpinot.perf.vector.skipSweep=true
+```
+
+## Closeout mode
+
+This mode targets the final vector-search feature gaps that were closed after the broad backend
+matrix benchmark was added.
+
+What it reports:
+- IVF_FLAT real-path quantizer comparisons for `FLAT`, `SQ8`, `SQ4`, plus `IVF_PQ`
+- HNSW runtime-control sweeps for `vectorEfSearch`, relative-distance pruning, and bounded-queue mode
+- `IVF_ON_DISK` `FILTER_THEN_ANN` versus post-filter behavior at different filter selectivities
+- Backend-native approximate radius behavior for Euclidean and cosine workloads
+- Mixed immutable plus mutable HNSW candidate recall and latency
+
+Run it from the repository root with the module-scoped Maven invocation below. On JDK 21+, use
+`MAVEN_OPTS` to open the Pinot plugin-loader access that the HNSW reader path needs:
+
+```bash
+MAVEN_OPTS='--add-opens=java.base/java.net=ALL-UNNAMED --enable-native-access=ALL-UNNAMED --add-modules=jdk.incubator.vector' \
+./mvnw -f pinot-perf/pom.xml -am -Ppinot-fastdev exec:java \
+  -Dexec.mainClass=org.apache.pinot.perf.BenchmarkVectorIndex \
+  -Dpinot.perf.vector.mode=closeout
+```
+
+Useful tuning properties:
+
+```bash
+-Dpinot.perf.vector.closeout.size=10000
+-Dpinot.perf.vector.closeout.dimension=128
+-Dpinot.perf.vector.closeout.queries=80
+-Dpinot.perf.vector.closeout.warmupQueries=20
+-Dpinot.perf.vector.closeout.nlist=128
+-Dpinot.perf.vector.closeout.nprobe=8
+-Dpinot.perf.vector.closeout.topK=10
+-Dpinot.perf.vector.closeout.radiusTargetMatches=20
+-Dpinot.perf.vector.closeout.radiusMaxCandidates=256
+-Dpinot.perf.vector.closeout.mutablePercent=10
+-Dpinot.perf.vector.closeout.hnswEfSearch=64
+```
+
+Small smoke run:
+
+```bash
+MAVEN_OPTS='--add-opens=java.base/java.net=ALL-UNNAMED --enable-native-access=ALL-UNNAMED --add-modules=jdk.incubator.vector' \
+./mvnw -f pinot-perf/pom.xml -am -Ppinot-fastdev exec:java \
+  -Dexec.mainClass=org.apache.pinot.perf.BenchmarkVectorIndex \
+  -Dpinot.perf.vector.mode=closeout \
+  -Dpinot.perf.vector.closeout.size=2000 \
+  -Dpinot.perf.vector.closeout.dimension=32 \
+  -Dpinot.perf.vector.closeout.queries=20 \
+  -Dpinot.perf.vector.closeout.warmupQueries=5 \
+  -Dpinot.perf.vector.closeout.nlist=32 \
+  -Dpinot.perf.vector.closeout.nprobe=4 \
+  -Dpinot.perf.vector.closeout.topK=5 \
+  -Dpinot.perf.vector.closeout.radiusTargetMatches=10 \
+  -Dpinot.perf.vector.closeout.radiusMaxCandidates=64
+```
+
+## Quick and phase3 compatibility modes
+
+These older specialized benchmarks are also reachable through the canonical entry point:
+
+```bash
+./mvnw -f pinot-perf/pom.xml -am -Ppinot-fastdev exec:java \
+  -Dexec.mainClass=org.apache.pinot.perf.BenchmarkVectorIndex \
+  -Dpinot.perf.vector.mode=quick
+
+./mvnw -f pinot-perf/pom.xml -am -Ppinot-fastdev exec:java \
+  -Dexec.mainClass=org.apache.pinot.perf.BenchmarkVectorIndex \
+  -Dpinot.perf.vector.mode=phase3
 ```
