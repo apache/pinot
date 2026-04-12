@@ -242,8 +242,8 @@ public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTes
 
   private UuidQueryResults fetchQueryResults()
       throws Exception {
-    return new UuidQueryResults(postQuery(COUNT_QUERY), postQuery(RAW_COUNT_QUERY), postQuery(ORDERED_ROWS_QUERY),
-        postQuery(FILTER_QUERY));
+    return new UuidQueryResults(queryBrokerHttpEndpoint(COUNT_QUERY), queryBrokerHttpEndpoint(RAW_COUNT_QUERY),
+        queryBrokerHttpEndpoint(ORDERED_ROWS_QUERY), queryBrokerHttpEndpoint(FILTER_QUERY));
   }
 
   private boolean matchesExpectedQueryResults(UuidQueryResults queryResults) {
