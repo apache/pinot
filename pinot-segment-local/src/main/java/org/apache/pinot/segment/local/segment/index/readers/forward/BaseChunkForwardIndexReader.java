@@ -283,6 +283,11 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   }
 
   @Override
+  public int getNumDocsPerChunk() {
+    return _numDocsPerChunk;
+  }
+
+  @Override
   public void readValuesSV(int[] docIds, int length, int[] values, ChunkReaderContext context) {
     if (_storedType.isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
       switch (_storedType) {
