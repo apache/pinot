@@ -96,6 +96,21 @@ public class FilterPlanNodeTest {
   }
 
   @Test
+  public void testMutableIvfPqVectorFallbackReasonForUnsupportedBackend()
+      throws Exception {
+    Method method = FilterPlanNode.class.getDeclaredMethod("getVectorFallbackReason", VectorIndexConfig.class,
+        boolean.class);
+    method.setAccessible(true);
+
+    VectorIndexConfig config = new VectorIndexConfig(false, "IVF_PQ", 4, 1,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
+        java.util.Map.of("nlist", "2", "pqM", "2", "pqNbits", "8"));
+
+    String reason = (String) method.invoke(null, config, true);
+    assertEquals(reason, "ivf_pq_mutable_segment_unavailable");
+  }
+
+  @Test
   public void testMutableVectorFallbackReasonForMissingIndex()
       throws Exception {
     Method method = FilterPlanNode.class.getDeclaredMethod("getVectorFallbackReason", VectorIndexConfig.class,

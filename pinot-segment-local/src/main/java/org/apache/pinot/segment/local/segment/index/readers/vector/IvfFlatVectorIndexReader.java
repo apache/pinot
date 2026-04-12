@@ -151,7 +151,7 @@ public class IvfFlatVectorIndexReader
       } else {
         // Legacy v1 files contain raw big-endian float vectors only.
         _quantizerType = VectorQuantizerType.FLAT;
-        _quantizer = null;
+        _quantizer = VectorQuantizationUtils.createReadQuantizer(_quantizerType, _dimension, new byte[0]);
       }
 
       // Clamp nprobe to valid range

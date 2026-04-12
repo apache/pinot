@@ -172,7 +172,7 @@ public class IvfOnDiskVectorIndexReader
         centroidsOffset = 32L + quantizerParamsLength;
       } else {
         _quantizerType = VectorQuantizerType.FLAT;
-        _quantizer = null;
+        _quantizer = VectorQuantizationUtils.createReadQuantizer(_quantizerType, _dimension, new byte[0]);
         _legacyFloatEncoding = true;
         _encodedBytesPerVector = _dimension * Float.BYTES;
       }

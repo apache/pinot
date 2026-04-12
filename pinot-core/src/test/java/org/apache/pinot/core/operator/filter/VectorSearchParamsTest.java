@@ -201,8 +201,8 @@ public class VectorSearchParamsTest {
   public void testHnswRuntimeControlsFromQueryOptions() {
     Map<String, String> opts = new HashMap<>();
     opts.put(QueryOptionKey.VECTOR_EF_SEARCH, "64");
-    opts.put(QueryOptionKey.VECTOR_HNSW_USE_RELATIVE_DISTANCE, "false");
-    opts.put(QueryOptionKey.VECTOR_HNSW_USE_BOUNDED_QUEUE, "false");
+    opts.put(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE, "false");
+    opts.put(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE, "false");
 
     VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
 
@@ -212,5 +212,29 @@ public class VectorSearchParamsTest {
     Assert.assertTrue(params.toString().contains("efSearch=64"));
     Assert.assertTrue(params.toString().contains("hnswUseRelativeDistance=false"));
     Assert.assertTrue(params.toString().contains("hnswUseBoundedQueue=false"));
+  }
+
+  @Test
+  public void testLegacyHnswRuntimeControlAliasesRemainSupported() {
+    Map<String, String> opts = new HashMap<>();
+    opts.put(QueryOptionKey.VECTOR_HNSW_USE_RELATIVE_DISTANCE, "false");
+    opts.put(QueryOptionKey.VECTOR_HNSW_USE_BOUNDED_QUEUE, "false");
+
+    VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
+
+    Assert.assertEquals(params.getHnswUseRelativeDistance(), Boolean.FALSE);
+    Assert.assertEquals(params.getHnswUseBoundedQueue(), Boolean.FALSE);
+  }
+
+  @Test
+  public void testConflictingHnswRuntimeControlAliasesAreRejected() {
+    Map<String, String> opts = new HashMap<>();
+    opts.put(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE, "true");
+    opts.put(QueryOptionKey.VECTOR_HNSW_USE_RELATIVE_DISTANCE, "false");
+
+    IllegalArgumentException error =
+        Assert.expectThrows(IllegalArgumentException.class, () -> VectorSearchParams.fromQueryOptions(opts));
+    Assert.assertTrue(error.getMessage().contains(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE));
+    Assert.assertTrue(error.getMessage().contains(QueryOptionKey.VECTOR_HNSW_USE_RELATIVE_DISTANCE));
   }
 }

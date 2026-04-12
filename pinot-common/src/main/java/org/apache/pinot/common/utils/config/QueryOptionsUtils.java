@@ -743,7 +743,9 @@ public class QueryOptionsUtils {
    */
   @Nullable
   public static Boolean getVectorHnswUseRelativeDistance(Map<String, String> queryOptions) {
-    return checkedParseBooleanNullable(QueryOptionKey.VECTOR_HNSW_USE_RELATIVE_DISTANCE,
+    return checkedParseBooleanAliasNullable(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE,
+        queryOptions.get(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE),
+        QueryOptionKey.VECTOR_HNSW_USE_RELATIVE_DISTANCE,
         queryOptions.get(QueryOptionKey.VECTOR_HNSW_USE_RELATIVE_DISTANCE));
   }
 
@@ -752,7 +754,9 @@ public class QueryOptionsUtils {
    */
   @Nullable
   public static Boolean getVectorHnswUseBoundedQueue(Map<String, String> queryOptions) {
-    return checkedParseBooleanNullable(QueryOptionKey.VECTOR_HNSW_USE_BOUNDED_QUEUE,
+    return checkedParseBooleanAliasNullable(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE,
+        queryOptions.get(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE),
+        QueryOptionKey.VECTOR_HNSW_USE_BOUNDED_QUEUE,
         queryOptions.get(QueryOptionKey.VECTOR_HNSW_USE_BOUNDED_QUEUE));
   }
 
@@ -769,6 +773,18 @@ public class QueryOptionsUtils {
       return Boolean.FALSE;
     }
     throw new IllegalArgumentException(optionName + " must be either true or false, got: " + optionValue);
+  }
+
+  @Nullable
+  private static Boolean checkedParseBooleanAliasNullable(String canonicalOptionName, @Nullable String canonicalValue,
+      String legacyOptionName, @Nullable String legacyValue) {
+    Boolean parsedCanonical = checkedParseBooleanNullable(canonicalOptionName, canonicalValue);
+    Boolean parsedLegacy = checkedParseBooleanNullable(legacyOptionName, legacyValue);
+    if (parsedCanonical != null && parsedLegacy != null && !parsedCanonical.equals(parsedLegacy)) {
+      throw new IllegalArgumentException(
+          canonicalOptionName + " conflicts with backward-compatible alias " + legacyOptionName);
+    }
+    return parsedCanonical != null ? parsedCanonical : parsedLegacy;
   }
 
 

@@ -940,10 +940,16 @@ public class CommonConstants {
 
         /** Controls whether HNSW uses relative-distance competitive checks during traversal.
          *  Defaults to true. Setting false disables score-threshold pruning. */
+        public static final String VECTOR_USE_RELATIVE_DISTANCE = "vectorUseRelativeDistance";
+        /** @deprecated Use {@link #VECTOR_USE_RELATIVE_DISTANCE}. Retained as a backward-compatible alias. */
+        @Deprecated
         public static final String VECTOR_HNSW_USE_RELATIVE_DISTANCE = "vectorHnswUseRelativeDistance";
 
         /** Controls whether HNSW uses a bounded top-K collector queue. Defaults to true.
          *  Setting false uses an unbounded per-query collector and requires vectorEfSearch. */
+        public static final String VECTOR_USE_BOUNDED_QUEUE = "vectorUseBoundedQueue";
+        /** @deprecated Use {@link #VECTOR_USE_BOUNDED_QUEUE}. Retained as a backward-compatible alias. */
+        @Deprecated
         public static final String VECTOR_HNSW_USE_BOUNDED_QUEUE = "vectorHnswUseBoundedQueue";
       }
 

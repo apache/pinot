@@ -105,7 +105,10 @@ import org.slf4j.LoggerFactory;
  *   offsetToOffsets:        8 bytes (position of the offsets section)
  * </pre>
  *
- * <p>All multi-byte values are written in big-endian order (Java {@link DataOutputStream} default).</p>
+ * <p>Header fields, centroid float32 values, list sizes/doc IDs, offsets, and footer metadata are written in
+ * big-endian order (Java {@link DataOutputStream} default). Version 2 {@code encodedVectors} payload bytes are
+ * emitted verbatim by the selected quantizer and therefore use quantizer-defined encoding semantics; the
+ * {@link FlatQuantizer} currently stores float32 payloads in little-endian order.</p>
  */
 public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfFlatVectorIndexCreator.class);

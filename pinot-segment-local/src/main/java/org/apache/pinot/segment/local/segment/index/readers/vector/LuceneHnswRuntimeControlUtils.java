@@ -63,7 +63,8 @@ public final class LuceneHnswRuntimeControlUtils {
   public static void validateRuntimeControls(String column, int efSearch, boolean useBoundedQueue) {
     if (!useBoundedQueue && efSearch <= 0) {
       throw new IllegalArgumentException(
-          "vectorHnswUseBoundedQueue=false requires vectorEfSearch to be set for column: " + column);
+          "vectorUseBoundedQueue=false requires vectorEfSearch to be set for column: " + column
+              + " (legacy alias: vectorHnswUseBoundedQueue)");
     }
   }
 
