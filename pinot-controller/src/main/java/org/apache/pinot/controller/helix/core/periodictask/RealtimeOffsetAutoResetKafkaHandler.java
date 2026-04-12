@@ -52,6 +52,19 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeOffsetAutoResetKafkaHandler.class);
   private static final String STREAM_TYPE = "kafka";
 
+  /**
+   * @deprecated Use no-arg constructor + {@link #init} instead.
+   *     Kept for backward compatibility with subclasses compiled against the previous constructor-based contract.
+   */
+  @Deprecated
+  protected RealtimeOffsetAutoResetKafkaHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
+      PinotHelixResourceManager pinotHelixResourceManager) {
+    init(llcRealtimeSegmentManager, pinotHelixResourceManager);
+  }
+
+  protected RealtimeOffsetAutoResetKafkaHandler() {
+  }
+
   @Override
   public void init(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
       PinotHelixResourceManager pinotHelixResourceManager) {
