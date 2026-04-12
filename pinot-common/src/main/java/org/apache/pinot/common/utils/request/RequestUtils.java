@@ -242,7 +242,9 @@ public class RequestUtils {
           literal.setLongValue(longValue);
         }
       } else {
-        // TODO: Support exact decimal value
+        // TODO: Change to setBigDecimalValue() in the next release once all servers support BIG_DECIMAL_VALUE.
+        //       Server side already handles BIG_DECIMAL_VALUE in LiteralContext, but older servers may not.
+        //       For now, keep using setDoubleValue() for backward compatibility.
         literal.setDoubleValue(bigDecimalValue.doubleValue());
       }
     } else {
