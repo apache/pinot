@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers.dml;
 
+import org.apache.calcite.sql.SqlDialect;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -92,6 +93,28 @@ public class InsertIntoValuesTest {
     InsertIntoValues stmt = InsertIntoValues.parse(sqlNodeAndOptions);
     Assert.assertEquals(stmt.getTableName(), "myDb.myTable");
     Assert.assertEquals(stmt.getRows().size(), 1);
+  }
+
+  @Test
+  public void testQualifiedInsertValuesUnparseDoesNotAddWhitespaceAroundDot() {
+    String sql = "INSERT INTO myDb.myTable (id, name) VALUES (1, 'hello')";
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+
+    String unparsed = sqlNodeAndOptions.getSqlNode().toSqlString((SqlDialect) null).toString();
+
+    Assert.assertTrue(unparsed.contains("`myDb`.`myTable`"), unparsed);
+    Assert.assertFalse(unparsed.contains("`myDb` . `myTable`"), unparsed);
+  }
+
+  @Test
+  public void testQualifiedInsertFromFileUnparseDoesNotAddWhitespaceAroundDot() {
+    String sql = "INSERT INTO myDb.myTable FROM FILE 's3://my-bucket/path/to/data/'";
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+
+    String unparsed = sqlNodeAndOptions.getSqlNode().toSqlString((SqlDialect) null).toString();
+
+    Assert.assertTrue(unparsed.contains("`myDb`.`myTable`"), unparsed);
+    Assert.assertFalse(unparsed.contains("`myDb` . `myTable`"), unparsed);
   }
 
   @Test

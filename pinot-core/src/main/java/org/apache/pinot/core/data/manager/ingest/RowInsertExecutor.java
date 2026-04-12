@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.ingest;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,6 +63,8 @@ public class RowInsertExecutor implements InsertExecutor {
   private final ShardLogProvider _shardLogProvider;
   private final PreparedStore _preparedStore;
   private final ConcurrentHashMap<String, InsertStatementState> _statementStates = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, StatementExecutionContext> _statementContexts =
+      new ConcurrentHashMap<>();
   private final ConcurrentHashMap<String, TableConfig> _tableConfigs;
 
   /**
@@ -109,6 +112,7 @@ public class RowInsertExecutor implements InsertExecutor {
 
     // Route rows to partitions
     Map<Integer, List<GenericRow>> partitionedRows = router.routeRows(rows);
+    List<Integer> preparedPartitions = new ArrayList<>(partitionedRows.size());
 
     _statementStates.put(statementId, InsertStatementState.ACCEPTED);
 
@@ -130,9 +134,11 @@ public class RowInsertExecutor implements InsertExecutor {
 
         // Mark the offset range as prepared in the shard log
         shardLog.prepare(statementId, startOffset, endOffset);
+        preparedPartitions.add(partitionId);
       }
 
       _statementStates.put(statementId, InsertStatementState.PREPARED);
+      _statementContexts.put(statementId, new StatementExecutionContext(tableName, preparedPartitions));
 
       LOGGER.info("INSERT statement {} prepared with {} partition(s)", statementId, partitionedRows.size());
 
@@ -145,6 +151,7 @@ public class RowInsertExecutor implements InsertExecutor {
     } catch (Exception e) {
       LOGGER.error("Failed to execute INSERT for statement {}", statementId, e);
       _statementStates.put(statementId, InsertStatementState.ABORTED);
+      rollbackStatement(tableName, statementId, preparedPartitions);
       return buildErrorResult(statementId, "Failed to write rows: " + e.getMessage(), "WRITE_ERROR");
     }
   }
@@ -177,7 +184,16 @@ public class RowInsertExecutor implements InsertExecutor {
     }
 
     _statementStates.put(statementId, InsertStatementState.ABORTED);
-    _preparedStore.cleanup(statementId);
+    StatementExecutionContext context = _statementContexts.remove(statementId);
+    if (context != null) {
+      rollbackStatement(context._tableNameWithType, statementId, context._preparedPartitions);
+    } else {
+      try {
+        _preparedStore.cleanup(statementId);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to clean prepared data for aborted statement {}", statementId, e);
+      }
+    }
 
     LOGGER.info("Aborted INSERT statement {}", statementId);
 
@@ -202,5 +218,30 @@ public class RowInsertExecutor implements InsertExecutor {
         .setMessage(message)
         .setErrorCode(errorCode)
         .build();
+  }
+
+  private void rollbackStatement(String tableNameWithType, String statementId, List<Integer> preparedPartitions) {
+    for (int partitionId : preparedPartitions) {
+      try {
+        _shardLogProvider.getShardLog(tableNameWithType, partitionId).abort(statementId);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to abort shard log state for statement {} partition {}", statementId, partitionId, e);
+      }
+    }
+    try {
+      _preparedStore.cleanup(statementId);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to clean prepared data for statement {}", statementId, e);
+    }
+  }
+
+  private static final class StatementExecutionContext {
+    private final String _tableNameWithType;
+    private final List<Integer> _preparedPartitions;
+
+    private StatementExecutionContext(String tableNameWithType, List<Integer> preparedPartitions) {
+      _tableNameWithType = tableNameWithType;
+      _preparedPartitions = List.copyOf(preparedPartitions);
+    }
   }
 }

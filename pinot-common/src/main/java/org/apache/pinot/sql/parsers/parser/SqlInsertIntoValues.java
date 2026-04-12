@@ -89,10 +89,7 @@ public class SqlInsertIntoValues extends SqlCall {
   public void unparse(SqlWriter writer, int leftPrec, int rightPrec) {
     UnparseUtils u = new UnparseUtils(writer, leftPrec, rightPrec);
     u.keyword("INSERT", "INTO");
-    if (_dbName != null) {
-      u.node(_dbName).keyword(".");
-    }
-    u.node(_tableName);
+    u.node(_dbName != null ? UnparseUtils.combineIdentifiers(_dbName, _tableName) : _tableName);
     if (_columnList != null) {
       u.nodeList(_columnList);
     }

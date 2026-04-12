@@ -20,18 +20,27 @@ package org.apache.pinot.core.data.manager.ingest;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingest.InsertRequest;
 import org.apache.pinot.spi.ingest.InsertResult;
 import org.apache.pinot.spi.ingest.InsertStatementState;
 import org.apache.pinot.spi.ingest.InsertType;
+import org.apache.pinot.spi.ingest.PreparedStore;
+import org.apache.pinot.spi.ingest.ShardLog;
+import org.apache.pinot.spi.ingest.ShardLogProvider;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -39,6 +48,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -202,10 +212,14 @@ public class RowInsertExecutorTest {
         .build();
 
     _executor.execute(request);
+    LocalShardLog shardLog = (LocalShardLog) _shardLogProvider.getShardLog("testTable_OFFLINE", 0);
+    assertEquals(shardLog.getStatementMeta("stmt-6").getStatus(), LocalShardLog.StatementStatus.PREPARED);
 
     InsertResult abortResult = _executor.abort("stmt-6");
     assertEquals(abortResult.getStatementId(), "stmt-6");
     assertEquals(abortResult.getState(), InsertStatementState.ABORTED);
+    assertNull(_preparedStore.load("stmt-6", 0, 0));
+    assertEquals(shardLog.getStatementMeta("stmt-6").getStatus(), LocalShardLog.StatementStatus.ABORTED);
 
     // Verify the state is persisted
     InsertResult statusAfterAbort = _executor.getStatus("stmt-6");
@@ -241,5 +255,153 @@ public class RowInsertExecutorTest {
     List<String> statements = _preparedStore.listPreparedStatements();
     assertEquals(statements.size(), 1);
     assertEquals(statements.get(0), "stmt-7");
+  }
+
+  @Test
+  public void testExecuteRollbackOnFailureAfterPrepare() {
+    RecordingShardLogProvider shardLogProvider = new RecordingShardLogProvider();
+    FailingPreparedStore preparedStore = new FailingPreparedStore(2);
+    ConcurrentHashMap<String, TableConfig> tableConfigs = new ConcurrentHashMap<>();
+    tableConfigs.put("partitionedTable_OFFLINE", buildPartitionedTableConfig());
+    RowInsertExecutor executor = new RowInsertExecutor(shardLogProvider, preparedStore, tableConfigs);
+
+    GenericRow row0 = new GenericRow();
+    row0.putValue("id", "0");
+    GenericRow row1 = new GenericRow();
+    row1.putValue("id", "1");
+
+    InsertRequest request = new InsertRequest.Builder()
+        .setStatementId("stmt-rollback")
+        .setTableName("partitionedTable_OFFLINE")
+        .setTableType(TableType.OFFLINE)
+        .setInsertType(InsertType.ROW)
+        .setRows(Arrays.asList(row0, row1))
+        .build();
+
+    InsertResult result = executor.execute(request);
+
+    assertEquals(result.getState(), InsertStatementState.ABORTED);
+    assertEquals(result.getErrorCode(), "WRITE_ERROR");
+    assertEquals(shardLogProvider.getPrepareCount(), 1);
+    assertEquals(shardLogProvider.getAbortCount(), 1);
+    assertTrue(preparedStore.isCleanedUp("stmt-rollback"));
+    assertEquals(executor.getStatus("stmt-rollback").getState(), InsertStatementState.ABORTED);
+  }
+
+  private static TableConfig buildPartitionedTableConfig() {
+    ConcurrentHashMap<String, ColumnPartitionConfig> partitionMap = new ConcurrentHashMap<>();
+    partitionMap.put("id", new ColumnPartitionConfig("HashCode", 2));
+    SegmentPartitionConfig partitionConfig = new SegmentPartitionConfig(partitionMap);
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setSegmentPartitionConfig(partitionConfig);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("partitionedTable")
+        .build();
+    tableConfig.setIndexingConfig(indexingConfig);
+    return tableConfig;
+  }
+
+  private static final class FailingPreparedStore implements PreparedStore {
+    private final int _failureCall;
+    private final List<String> _cleanedStatements = new ArrayList<>();
+    private int _storeCalls;
+
+    private FailingPreparedStore(int failureCall) {
+      _failureCall = failureCall;
+    }
+
+    @Override
+    public void init(PinotConfiguration config, File dataDir) {
+    }
+
+    @Override
+    public void store(String statementId, int partitionId, long sequenceNo, byte[] data) {
+      _storeCalls++;
+      if (_storeCalls == _failureCall) {
+        throw new RuntimeException("simulated prepared-store failure");
+      }
+    }
+
+    @Override
+    public byte[] load(String statementId, int partitionId, long sequenceNo) {
+      return null;
+    }
+
+    @Override
+    public List<String> listPreparedStatements() {
+      return Collections.emptyList();
+    }
+
+    @Override
+    public void cleanup(String statementId) {
+      _cleanedStatements.add(statementId);
+    }
+
+    private boolean isCleanedUp(String statementId) {
+      return _cleanedStatements.contains(statementId);
+    }
+  }
+
+  private static final class RecordingShardLogProvider implements ShardLogProvider {
+    private final ConcurrentHashMap<Integer, RecordingShardLog> _logs = new ConcurrentHashMap<>();
+
+    @Override
+    public void init(PinotConfiguration config) {
+    }
+
+    @Override
+    public ShardLog getShardLog(String tableNameWithType, int partitionId) {
+      return _logs.computeIfAbsent(partitionId, ignored -> new RecordingShardLog());
+    }
+
+    @Override
+    public void close() {
+    }
+
+    private int getPrepareCount() {
+      int prepareCount = 0;
+      for (RecordingShardLog log : _logs.values()) {
+        prepareCount += log._prepareCount;
+      }
+      return prepareCount;
+    }
+
+    private int getAbortCount() {
+      int abortCount = 0;
+      for (RecordingShardLog log : _logs.values()) {
+        abortCount += log._abortCount;
+      }
+      return abortCount;
+    }
+  }
+
+  private static final class RecordingShardLog implements ShardLog {
+    private int _prepareCount;
+    private int _abortCount;
+
+    @Override
+    public long append(byte[] data) {
+      return 0;
+    }
+
+    @Override
+    public void prepare(String statementId, long startOffset, long endOffset) {
+      _prepareCount++;
+    }
+
+    @Override
+    public void commit(String statementId) {
+    }
+
+    @Override
+    public void abort(String statementId) {
+      _abortCount++;
+    }
+
+    @Override
+    public Iterator<byte[]> read(long fromOffset) {
+      return Collections.emptyIterator();
+    }
   }
 }

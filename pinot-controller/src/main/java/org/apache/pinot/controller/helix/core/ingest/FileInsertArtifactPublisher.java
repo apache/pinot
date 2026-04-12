@@ -24,6 +24,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -61,7 +62,7 @@ public class FileInsertArtifactPublisher implements ArtifactPublisher {
   public void init(PinotConfiguration config) {
     String deepStoreUri = config.getProperty(DEEP_STORE_URI_KEY);
     if (deepStoreUri != null) {
-      _deepStoreBaseUri = URI.create(deepStoreUri);
+      _deepStoreBaseUri = URIUtils.getUri(deepStoreUri);
     }
   }
 
@@ -69,13 +70,13 @@ public class FileInsertArtifactPublisher implements ArtifactPublisher {
    * Sets the deep store base URI directly. Useful for testing.
    */
   public void setDeepStoreBaseUri(URI deepStoreBaseUri) {
-    _deepStoreBaseUri = deepStoreBaseUri;
+    _deepStoreBaseUri = URIUtils.getUri(deepStoreBaseUri.toString());
   }
 
   @Override
   public URI stageArtifact(String statementId, String artifactName, InputStream data) {
     URI stagingDir = getStagingDir(statementId);
-    URI artifactUri = URI.create(stagingDir.toString() + "/" + artifactName);
+    URI artifactUri = URIUtils.getUri(stagingDir.toString(), artifactName);
 
     try {
       PinotFS pinotFS = PinotFSFactory.create(stagingDir.getScheme());
@@ -133,7 +134,7 @@ public class FileInsertArtifactPublisher implements ArtifactPublisher {
     if (_deepStoreBaseUri == null) {
       throw new IllegalStateException("Deep store base URI is not configured");
     }
-    return URI.create(_deepStoreBaseUri.toString() + "/" + STAGING_DIR_PREFIX + "/" + statementId);
+    return URIUtils.getUri(_deepStoreBaseUri.toString(), STAGING_DIR_PREFIX, statementId);
   }
 
   /**

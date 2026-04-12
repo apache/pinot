@@ -21,12 +21,13 @@ package org.apache.pinot.core.data.manager.ingest;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.util.HashSet;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingest.PreparedStore;
 import org.slf4j.Logger;
@@ -142,7 +143,8 @@ public class InsertRowApplier {
   private void markApplied(String applyKey) {
     synchronized (_fileLock) {
       _appliedStatements.add(applyKey);
-      try (BufferedWriter writer = new BufferedWriter(new FileWriter(_appliedStatementsFile, true))) {
+      try (BufferedWriter writer = Files.newBufferedWriter(_appliedStatementsFile.toPath(), StandardCharsets.UTF_8,
+          StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
         writer.write(applyKey);
         writer.newLine();
         writer.flush();
@@ -175,7 +177,8 @@ public class InsertRowApplier {
    * Must be called under {@code _fileLock}.
    */
   private void rewriteAppliedStatementsFile() {
-    try (BufferedWriter writer = new BufferedWriter(new FileWriter(_appliedStatementsFile, false))) {
+    try (BufferedWriter writer = Files.newBufferedWriter(_appliedStatementsFile.toPath(), StandardCharsets.UTF_8,
+        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
       for (String key : _appliedStatements) {
         writer.write(key);
         writer.newLine();
@@ -187,11 +190,11 @@ public class InsertRowApplier {
   }
 
   private Set<String> loadAppliedStatements() {
-    Set<String> applied = new HashSet<>();
-    if (!_appliedStatementsFile.exists()) {
+    Set<String> applied = ConcurrentHashMap.newKeySet();
+    if (!Files.exists(_appliedStatementsFile.toPath())) {
       return applied;
     }
-    try (BufferedReader reader = new BufferedReader(new FileReader(_appliedStatementsFile))) {
+    try (BufferedReader reader = Files.newBufferedReader(_appliedStatementsFile.toPath(), StandardCharsets.UTF_8)) {
       String line;
       while ((line = reader.readLine()) != null) {
         line = line.trim();

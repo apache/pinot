@@ -21,11 +21,12 @@ package org.apache.pinot.core.data.manager.ingest;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -115,8 +116,8 @@ public class LocalShardLog implements ShardLog {
   @Override
   public void prepare(String statementId, long startOffset, long endOffset) {
     StatementMeta meta = new StatementMeta(statementId, startOffset, endOffset, StatementStatus.PREPARED);
-    _statementMetas.put(statementId, meta);
     persistMetaEntry(statementId, startOffset, endOffset, StatementStatus.PREPARED);
+    _statementMetas.put(statementId, meta);
   }
 
   @Override
@@ -128,8 +129,8 @@ public class LocalShardLog implements ShardLog {
     }
     StatementMeta committed = new StatementMeta(
         statementId, existing._startOffset, existing._endOffset, StatementStatus.COMMITTED);
-    _statementMetas.put(statementId, committed);
     persistMetaEntry(statementId, existing._startOffset, existing._endOffset, StatementStatus.COMMITTED);
+    _statementMetas.put(statementId, committed);
   }
 
   @Override
@@ -138,8 +139,8 @@ public class LocalShardLog implements ShardLog {
     long startOffset = existing != null ? existing._startOffset : -1;
     long endOffset = existing != null ? existing._endOffset : -1;
     StatementMeta aborted = new StatementMeta(statementId, startOffset, endOffset, StatementStatus.ABORTED);
-    _statementMetas.put(statementId, aborted);
     persistMetaEntry(statementId, startOffset, endOffset, StatementStatus.ABORTED);
+    _statementMetas.put(statementId, aborted);
   }
 
   @Override
@@ -162,16 +163,21 @@ public class LocalShardLog implements ShardLog {
   }
 
   private void persistMetaEntry(String statementId, long startOffset, long endOffset, StatementStatus status) {
-    try (FileOutputStream fos = new FileOutputStream(_metaFile, true);
-         FileChannel channel = fos.getChannel()) {
-      byte[] line = (statementId + "," + startOffset + "," + endOffset + "," + status.name() + "\n")
-          .getBytes(java.nio.charset.StandardCharsets.UTF_8);
-      channel.write(ByteBuffer.wrap(line));
-      channel.force(true);
-    } catch (IOException e) {
-      String message = "Failed to persist metadata for statement: " + statementId;
-      LOGGER.error(message, e);
-      throw new IllegalStateException(message, e);
+    _lock.writeLock().lock();
+    try {
+      try (FileOutputStream fos = new FileOutputStream(_metaFile, true);
+           FileChannel channel = fos.getChannel()) {
+        byte[] line = (statementId + "," + startOffset + "," + endOffset + "," + status.name() + "\n")
+            .getBytes(StandardCharsets.UTF_8);
+        channel.write(ByteBuffer.wrap(line));
+        channel.force(true);
+      } catch (IOException e) {
+        String message = "Failed to persist metadata for statement: " + statementId;
+        LOGGER.error(message, e);
+        throw new IllegalStateException(message, e);
+      }
+    } finally {
+      _lock.writeLock().unlock();
     }
   }
 
@@ -179,7 +185,7 @@ public class LocalShardLog implements ShardLog {
     if (!_metaFile.exists()) {
       return;
     }
-    try (BufferedReader reader = new BufferedReader(new FileReader(_metaFile))) {
+    try (BufferedReader reader = Files.newBufferedReader(_metaFile.toPath(), StandardCharsets.UTF_8)) {
       String line;
       while ((line = reader.readLine()) != null) {
         line = line.trim();

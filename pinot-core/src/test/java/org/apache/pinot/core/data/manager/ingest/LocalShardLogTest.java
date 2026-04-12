@@ -145,6 +145,22 @@ public class LocalShardLogTest {
   }
 
   @Test
+  public void testRecoveryReadsUtf8Metadata()
+      throws IOException {
+    String statementId = "stmt-\u4f60\u597d";
+    byte[] data = "persistent data".getBytes(StandardCharsets.UTF_8);
+    long offset = _shardLog.append(data);
+    _shardLog.prepare(statementId, offset, offset);
+
+    LocalShardLog recovered = new LocalShardLog(_tempDir);
+
+    LocalShardLog.StatementMeta meta = recovered.getStatementMeta(statementId);
+    assertNotNull(meta);
+    assertEquals(meta.getStatus(), LocalShardLog.StatementStatus.PREPARED);
+    assertEquals(meta.getStartOffset(), offset);
+  }
+
+  @Test
   public void testMultipleAppends() {
     long prevOffset = -1;
     for (int i = 0; i < 100; i++) {
