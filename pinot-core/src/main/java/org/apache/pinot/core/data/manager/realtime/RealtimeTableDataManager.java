@@ -310,17 +310,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param segmentName                      name of the consuming segment
    * @param partitionId                      partition id of the consuming segment (directly passed in to avoid parsing
    *                                         the segment name)
-   * @param streamTopicName                  stream topic for this consumer (e.g. Kafka topic); used for ingestion delay metric labels
+   * @param streamTopicName                  stream topic for this consumer (e.g. Kafka topic); used for ingestion 
+   *                                         delay metric labels
    * @param ingestionTimeMs                  ingestion time of the last consumed message (from
    *                                         {@link StreamMessageMetadata})
    * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
    * {@link StreamMessageMetadata})
    * @param currentOffset                    offset of the last consumed message (from {@link StreamMessageMetadata})
    */
-  public void updateIngestionMetrics(String segmentName, int partitionId, @Nullable String streamTopicName, long ingestionTimeMs,
-      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
-    _ingestionDelayTracker.updateMetrics(segmentName, partitionId, streamTopicName, ingestionTimeMs, firstStreamIngestionTimeMs,
-        currentOffset);
+  public void updateIngestionMetrics(String segmentName, int partitionId, @Nullable String streamTopicName,
+      long ingestionTimeMs, long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
+    _ingestionDelayTracker.updateMetrics(segmentName, partitionId, streamTopicName, ingestionTimeMs,
+        firstStreamIngestionTimeMs, currentOffset);
   }
 
   /**
