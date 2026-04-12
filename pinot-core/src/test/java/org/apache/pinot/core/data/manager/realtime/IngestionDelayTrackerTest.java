@@ -545,7 +545,7 @@ public class IngestionDelayTrackerTest {
     ingestionDelayTracker.setClock(Clock.fixed(now, ZoneId.systemDefault()));
     String segment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, 123).getSegmentName();
     long ts = now.toEpochMilli();
-    ingestionDelayTracker.updateMetrics(segment, 0, "test_topic", ts, ts, null, null);
+    ingestionDelayTracker.updateMetrics(segment, 0, "test_topic", ts, ts, null);
     verify(_serverMetrics).setOrUpdatePartitionGaugeForStreamTopic(eq(REALTIME_TABLE_NAME), eq("test_topic"), eq(0),
         eq(ServerGauge.REALTIME_INGESTION_DELAY_MS), any());
     verify(_serverMetrics).setOrUpdatePartitionGaugeForStreamTopic(eq(REALTIME_TABLE_NAME), eq("test_topic"), eq(0),
