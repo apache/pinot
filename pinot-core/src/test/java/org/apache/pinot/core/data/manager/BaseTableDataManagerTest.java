@@ -1100,7 +1100,7 @@ public class BaseTableDataManagerTest {
     OfflineTableDataManagerForParallelReloadTest tableDataManager = new OfflineTableDataManagerForParallelReloadTest();
     tableDataManager.init(createDefaultInstanceDataManagerConfig(), mock(HelixManager.class), new SegmentLocks(),
         DEFAULT_TABLE_CONFIG, SCHEMA, new SegmentReloadSemaphore(1), Executors.newFixedThreadPool(2), null, null,
-        SEGMENT_OPERATIONS_THROTTLER, false, null);
+        SEGMENT_OPERATIONS_THROTTLER, false, mock(ServerReloadJobStatusCache.class));
     return tableDataManager;
   }
 
