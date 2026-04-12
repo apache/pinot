@@ -119,6 +119,12 @@ public class IndexLoadingConfig {
     this(null, null, null);
   }
 
+  public IndexLoadingConfig copy() {
+    IndexLoadingConfig copy = new IndexLoadingConfig(_instanceDataManagerConfig, _tableConfig, _schema);
+    copy.setTableDataDir(_tableDataDir);
+    return copy;
+  }
+
   @Nullable
   public InstanceDataManagerConfig getInstanceDataManagerConfig() {
     return _instanceDataManagerConfig;
