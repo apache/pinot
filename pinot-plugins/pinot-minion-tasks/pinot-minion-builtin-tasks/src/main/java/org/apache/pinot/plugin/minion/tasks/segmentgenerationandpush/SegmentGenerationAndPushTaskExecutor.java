@@ -154,6 +154,19 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     LOGGER.info("Moved generated segment from [{}] to location: [{}]", localSegmentTarFile, outputSegmentTarURI);
 
     resultBuilder.setSegmentName(segmentName);
+
+    // When invoked from the INSERT INTO flow, skip the push step. The controller's
+    // FileInsertExecutor.completeFileInsert() handles segment visibility via the segment
+    // replacement protocol (startReplaceSegments/endReplaceSegments) to guarantee atomic
+    // publication. Pushing here would make segments queryable before the statement completes.
+    boolean skipPush = Boolean.parseBoolean(taskConfigs.getOrDefault("insert.skipPush", "false"));
+    if (skipPush) {
+      LOGGER.info("Skipping segment push for INSERT INTO statement (insert.skipPush=true). "
+          + "Segment {} staged at {}", segmentName, outputSegmentTarURI);
+      resultBuilder.setSucceed(true);
+      return resultBuilder.build();
+    }
+
     // Segment push task
     // TODO: Make this use SegmentUploader
     _eventObserver.notifyProgress(_pinotTaskConfig, "Pushing segment: " + segmentName);

@@ -226,7 +226,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // HTTP thread utilization
   HTTP_THREAD_UTILIZATION("httpThreadUtilization", true),
   // Track the concurrent executions of the API resources that use @ManagedAsync
-  MANAGED_ASYNC_ACTIVE_THREADS("threads", true);
+  MANAGED_ASYNC_ACTIVE_THREADS("threads", true),
+
+  // Insert statement metrics
+  INSERT_STATEMENTS_ACTIVE("InsertStatementsActive", true);
 
 
   private final String _gaugeName;

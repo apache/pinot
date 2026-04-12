@@ -1,5 +1,6 @@
 cscope.*
 .classpath
+.claude
 .project
 .svn
 .java-version
@@ -22,6 +23,7 @@ pinot-broker/test-output/
 pinot-core/test-output/
 *.log
 .doppelganger
+docs/
 docs/_build
 *.ipr
 *.iws

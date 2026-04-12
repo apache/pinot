@@ -46,31 +46,90 @@ SqlNodeList DataFileDefList() :
 }
 
 /**
+ * Parses a single VALUES row: (expr, expr, ...)
+ */
+private SqlNodeList ValuesRow() :
+{
+    SqlParserPos pos;
+    List<SqlNode> list = new ArrayList<SqlNode>();
+    SqlNode e;
+}
+{
+    <LPAREN> { pos = getPos(); }
+    e = Expression(ExprContext.ACCEPT_NON_QUERY) { list.add(e); }
+    ( <COMMA> e = Expression(ExprContext.ACCEPT_NON_QUERY) { list.add(e); } )*
+    <RPAREN>
+    {
+        return new SqlNodeList(list, pos.plus(getPos()));
+    }
+}
+
+/**
  * INSERT INTO [db_name.]table_name
  *   FROM [ FILE | ARCHIVE ] 'file_uri' [, [ FILE | ARCHIVE ] 'file_uri' ]
+ *
+ * INSERT INTO [db_name.]table_name [(col1, col2, ...)]
+ *   VALUES (val1, val2, ...) [, (val1, val2, ...)]
  */
-SqlInsertFromFile SqlInsertFromFile() :
+SqlNode SqlInsertStatement() :
 {
     SqlParserPos pos;
     SqlIdentifier dbName = null;
     SqlIdentifier tableName;
     SqlNodeList fileList = null;
+    SqlNodeList columnList = null;
+    List<SqlNodeList> valuesList = null;
+    SqlNodeList row;
 }
 {
     <INSERT> { pos = getPos(); }
     <INTO>
     [
+        LOOKAHEAD(2)
         dbName = SimpleIdentifier()
         <DOT>
     ]
 
     tableName = SimpleIdentifier()
-    [
+    (
+        LOOKAHEAD(<VALUES>)
+        <VALUES>
+        {
+            valuesList = new ArrayList<SqlNodeList>();
+        }
+        row = ValuesRow() { valuesList.add(row); }
+        ( <COMMA> row = ValuesRow() { valuesList.add(row); } )*
+        {
+            return new SqlInsertIntoValues(pos, dbName, tableName, null, valuesList);
+        }
+    |
+        LOOKAHEAD(<LPAREN>)
+        <LPAREN>
+        {
+            List<SqlNode> cols = new ArrayList<SqlNode>();
+            SqlParserPos colPos = getPos();
+        }
+        {
+            cols.add(SimpleIdentifier());
+        }
+        ( <COMMA> { cols.add(SimpleIdentifier()); } )*
+        <RPAREN>
+        <VALUES>
+        {
+            columnList = new SqlNodeList(cols, colPos.plus(getPos()));
+            valuesList = new ArrayList<SqlNodeList>();
+        }
+        row = ValuesRow() { valuesList.add(row); }
+        ( <COMMA> row = ValuesRow() { valuesList.add(row); } )*
+        {
+            return new SqlInsertIntoValues(pos, dbName, tableName, columnList, valuesList);
+        }
+    |
         fileList = DataFileDefList()
-    ]
-    {
-        return new SqlInsertFromFile(pos, dbName, tableName, fileList);
-    }
+        {
+            return new SqlInsertFromFile(pos, dbName, tableName, fileList);
+        }
+    )
 }
 
 void SqlAtTimeZone(List<Object> list, ExprContext exprContext, Span s) :
