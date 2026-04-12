@@ -360,6 +360,8 @@ public class PinotTableRestletResource {
 
       _pinotHelixResourceManager.addSchema(schema, true, false);
       LOGGER.info("[copyTable] Successfully added schema for table: {}", tableName);
+      TableConfigValidationUtils.validateTableConfig(
+          realtimeTableConfig, schema, null, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
       // Add the table with designated starting kafka offset and segment sequence number to create consuming segments
       _pinotHelixResourceManager.addTable(realtimeTableConfig, streamMetadataList);
       LOGGER.info("[copyTable] Successfully added table config: {} with designated high watermark", tableName);

@@ -65,6 +65,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.exception.ConfigValidationException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -246,6 +247,8 @@ public class PinotInstanceRestletResource {
       return new SuccessResponse(response.getMessage());
     } catch (ClientErrorException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+    } catch (ConfigValidationException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to create instance: " + instanceId,
           Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -416,6 +419,8 @@ public class PinotInstanceRestletResource {
       return new SuccessResponse(response.getMessage());
     } catch (ClientErrorException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+    } catch (ConfigValidationException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to update instance: " + instanceName,
           Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -453,6 +458,8 @@ public class PinotInstanceRestletResource {
       return new SuccessResponse(response.getMessage());
     } catch (ClientErrorException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+    } catch (ConfigValidationException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to update instance: %s with tags: %s", instanceName, tags),
