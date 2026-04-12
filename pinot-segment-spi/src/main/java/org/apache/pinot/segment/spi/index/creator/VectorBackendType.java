@@ -121,13 +121,13 @@ public enum VectorBackendType {
             .supportsFilterAwareSearch(true)
             .supportsApproximateRadius(false)
             .supportsExactRerank(true)
-            .supportsRuntimeSearchParams(false)
+            .supportsRuntimeSearchParams(true)
             .build();
       case "IVF_FLAT":
         return new VectorBackendCapabilities.Builder()
             .supportsTopKAnn(true)
             .supportsFilterAwareSearch(true)
-            .supportsApproximateRadius(false)
+            .supportsApproximateRadius(true)
             .supportsExactRerank(true)
             .supportsRuntimeSearchParams(true)
             .build();
@@ -135,16 +135,15 @@ public enum VectorBackendType {
         return new VectorBackendCapabilities.Builder()
             .supportsTopKAnn(true)
             .supportsFilterAwareSearch(true)
-            .supportsApproximateRadius(false)
+            .supportsApproximateRadius(true)
             .supportsExactRerank(true)
             .supportsRuntimeSearchParams(true)
             .build();
       case "IVF_ON_DISK":
-        // IVF_ON_DISK does not implement FilterAwareVectorIndexReader yet
         return new VectorBackendCapabilities.Builder()
             .supportsTopKAnn(true)
-            .supportsFilterAwareSearch(false)
-            .supportsApproximateRadius(false)
+            .supportsFilterAwareSearch(true)
+            .supportsApproximateRadius(true)
             .supportsExactRerank(true)
             .supportsRuntimeSearchParams(true)
             .build();

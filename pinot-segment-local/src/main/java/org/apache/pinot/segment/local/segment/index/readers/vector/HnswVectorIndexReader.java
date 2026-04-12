@@ -29,15 +29,15 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.ConstantScoreWeight;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -64,8 +64,9 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   private final IndexSearcher _indexSearcher;
   private final String _column;
   private final HnswVectorIndexReader.DocIdTranslator _docIdTranslator;
-  private boolean _useANDForMultiTermQueries = false;
   private final ThreadLocal<Integer> _efSearchOverride = new ThreadLocal<>();
+  private final ThreadLocal<Boolean> _useRelativeDistanceOverride = new ThreadLocal<>();
+  private final ThreadLocal<Boolean> _useBoundedQueueOverride = new ThreadLocal<>();
 
   public HnswVectorIndexReader(String column, File indexDir, int numDocs, VectorIndexConfig config) {
     _column = column;
@@ -120,6 +121,26 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     _efSearchOverride.remove();
   }
 
+  @Override
+  public void setUseRelativeDistance(boolean useRelativeDistance) {
+    _useRelativeDistanceOverride.set(useRelativeDistance);
+  }
+
+  @Override
+  public void clearUseRelativeDistance() {
+    _useRelativeDistanceOverride.remove();
+  }
+
+  @Override
+  public void setUseBoundedQueue(boolean useBoundedQueue) {
+    _useBoundedQueueOverride.set(useBoundedQueue);
+  }
+
+  @Override
+  public void clearUseBoundedQueue() {
+    _useBoundedQueueOverride.remove();
+  }
+
   /**
    * Returns the efSearch value for debug/explain output, or 0 if not set.
    */
@@ -128,22 +149,22 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     return efSearch != null ? efSearch : 0;
   }
 
+  boolean getEffectiveUseRelativeDistance() {
+    Boolean useRelativeDistance = _useRelativeDistanceOverride.get();
+    return useRelativeDistance != null ? useRelativeDistance : true;
+  }
+
+  boolean getEffectiveUseBoundedQueue() {
+    Boolean useBoundedQueue = _useBoundedQueueOverride.get();
+    return useBoundedQueue != null ? useBoundedQueue : true;
+  }
+
   @Override
   public MutableRoaringBitmap getDocIds(float[] searchQuery, int topK) {
-    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
-    Collector docIDCollector = new HnswDocIdCollector(docIds, _docIdTranslator);
     try {
-      // Lucene Query Parser is JavaCC based. It is stateful and should
-      // be instantiated per query. Analyzer on the other hand is stateless
-      // and can be created upfront.
-      QueryParser parser = new QueryParser(_column, null);
-
-      if (_useANDForMultiTermQueries) {
-        parser.setDefaultOperator(QueryParser.Operator.AND);
-      }
-      KnnFloatVectorQuery knnFloatVectorQuery = new KnnFloatVectorQuery(_column, searchQuery, topK);
-      _indexSearcher.search(knnFloatVectorQuery, docIDCollector);
-      return docIds;
+      return translateTopDocs(search(searchQuery, topK, null));
+    } catch (RuntimeException e) {
+      throw e;
     } catch (Exception e) {
       String msg = "Caught exception while searching the HNSW index for column: " + _column + ", search query: "
           + Arrays.toString(searchQuery);
@@ -153,15 +174,11 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
 
   @Override
   public ImmutableRoaringBitmap getDocIds(float[] searchQuery, int topK, ImmutableRoaringBitmap preFilterBitmap) {
-    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
-    Collector docIDCollector = new HnswDocIdCollector(docIds, _docIdTranslator);
     try {
-      // Build a Lucene filter query that restricts HNSW traversal to pre-filtered doc IDs.
-      // We need to translate Pinot doc IDs to Lucene doc IDs for the filter.
       Query filterQuery = new RoaringBitmapFilterQuery(preFilterBitmap, _docIdTranslator, _indexReader.numDocs());
-      KnnFloatVectorQuery knnQuery = new KnnFloatVectorQuery(_column, searchQuery, topK, filterQuery);
-      _indexSearcher.search(knnQuery, docIDCollector);
-      return docIds;
+      return translateTopDocs(search(searchQuery, topK, filterQuery));
+    } catch (RuntimeException e) {
+      throw e;
     } catch (Exception e) {
       String msg = "Caught exception while searching the HNSW index with pre-filter for column: " + _column
           + ", search query: " + Arrays.toString(searchQuery);
@@ -183,6 +200,10 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     info.put("numDocs", _indexReader.numDocs());
     info.put("numDeletedDocs", _indexReader.numDeletedDocs());
     info.put("luceneSegments", _indexReader.leaves().size());
+    info.put("effectiveEfSearch", getEffectiveEfSearch());
+    info.put("effectiveHnswUseRelativeDistance", getEffectiveUseRelativeDistance());
+    info.put("effectiveHnswUseBoundedQueue", getEffectiveUseBoundedQueue());
+    info.put("supportsPreFilter", true);
     return info;
   }
 
@@ -192,6 +213,21 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     _indexReader.close();
     _indexDirectory.close();
     _docIdTranslator.close();
+  }
+
+  private TopDocs search(float[] searchQuery, int topK, Query filterQuery)
+      throws IOException {
+    KnnFloatVectorQuery query = LuceneHnswRuntimeControlUtils.createQuery(_column, searchQuery, topK,
+        getEffectiveEfSearch(), getEffectiveUseRelativeDistance(), getEffectiveUseBoundedQueue(), filterQuery);
+    return _indexSearcher.search(query, topK);
+  }
+
+  private MutableRoaringBitmap translateTopDocs(TopDocs topDocs) {
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
+      docIds.add(_docIdTranslator.getPinotDocId(scoreDoc.doc));
+    }
+    return docIds;
   }
 
   /**

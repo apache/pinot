@@ -30,14 +30,26 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
 /**
- * Quick validation runner for the vector index benchmark. Runs a small-scale test
- * to verify correctness before a full benchmark run.
+ * Fast sanity check for the vector benchmark suite.
  *
- * <p>Usage: {@code java org.apache.pinot.perf.BenchmarkVectorIndexRunner}</p>
+ * <p>This mode intentionally stays small so benchmark changes can be smoke-tested before running
+ * the heavier workload suites.</p>
  */
-public final class BenchmarkVectorIndexRunner {
+public final class BenchmarkVectorSanity {
+  private static final int NUM_VECTORS =
+      Integer.getInteger("pinot.perf.vector.sanity.size", 5_000);
+  private static final int DIMENSION =
+      Integer.getInteger("pinot.perf.vector.sanity.dimension", 128);
+  private static final int NUM_QUERIES =
+      Integer.getInteger("pinot.perf.vector.sanity.queries", 100);
+  private static final int TOP_K =
+      Integer.getInteger("pinot.perf.vector.sanity.topK", 10);
+  private static final int NLIST =
+      Integer.getInteger("pinot.perf.vector.sanity.nlist", 64);
+  private static final int[] NPROBE_VALUES =
+      BenchmarkVectorIndex.parseIntListProperty("pinot.perf.vector.sanity.nprobe", new int[]{1, 4, 8, 16, 32, 64});
 
-  private BenchmarkVectorIndexRunner() {
+  private BenchmarkVectorSanity() {
   }
 
   /**
@@ -45,23 +57,24 @@ public final class BenchmarkVectorIndexRunner {
    */
   public static void main(String[] args)
       throws Exception {
-    PrintStream out = System.out;
-    out.println("=== Quick validation run ===");
+    run(System.out);
+  }
 
-    int n = 5000;
-    int dim = 128;
+  static void run(PrintStream out)
+      throws Exception {
+    out.println("=== Sanity validation run ===");
     VectorIndexConfig.VectorDistanceFunction distFunc = VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN;
 
-    float[][] corpus = BenchmarkVectorIndex.generateGaussianVectors(n, dim, 42L);
-    float[][] queries = BenchmarkVectorIndex.generateGaussianVectors(100, dim, 1042L);
+    float[][] corpus = BenchmarkVectorIndex.generateGaussianVectors(NUM_VECTORS, DIMENSION, 42L);
+    float[][] queries = BenchmarkVectorIndex.generateGaussianVectors(NUM_QUERIES, DIMENSION, 1042L);
 
     // Ground truth
-    int[][] gt10 = BenchmarkVectorIndex.computeGroundTruth(corpus, queries, 10, distFunc);
+    int[][] gt10 = BenchmarkVectorIndex.computeGroundTruth(corpus, queries, TOP_K, distFunc);
 
     // Sanity: exact scan
     double exactRecall = 0;
     for (int q = 0; q < queries.length; q++) {
-      int[] exact = BenchmarkVectorIndex.exactTopK(corpus, queries[q], 10, distFunc);
+      int[] exact = BenchmarkVectorIndex.exactTopK(corpus, queries[q], TOP_K, distFunc);
       Set<Integer> exactSet = new HashSet<>();
       for (int id : exact) {
         exactSet.add(id);
@@ -71,29 +84,30 @@ public final class BenchmarkVectorIndexRunner {
     exactRecall /= queries.length;
     out.printf("Exact scan recall@10: %.4f (expected 1.0)%n", exactRecall);
 
-    // IVF_FLAT with nlist=64
-    int nlist = 64;
     File ivfDir = Files.createTempDirectory("bench_validate_").toFile();
     try {
-      BenchmarkVectorIndex.buildIvfFlatIndex(ivfDir, corpus, dim, nlist, distFunc);
+      BenchmarkVectorIndex.buildIvfFlatIndex(ivfDir, corpus, DIMENSION, NLIST, distFunc);
 
-      for (int nprobe : new int[]{1, 4, 8, 16, 32, 64}) {
+      for (int nprobe : NPROBE_VALUES) {
+        if (nprobe > NLIST) {
+          continue;
+        }
         try (IvfFlatVectorIndexReader reader =
-            BenchmarkVectorIndex.openIvfReader(ivfDir, dim, nlist, nprobe, distFunc)) {
+            BenchmarkVectorIndex.openIvfReader(ivfDir, DIMENSION, NLIST, nprobe, distFunc)) {
           reader.setNprobe(nprobe);
 
           double recall = 0;
           for (int q = 0; q < queries.length; q++) {
-            Set<Integer> r = BenchmarkVectorIndex.bitmapToSet(reader.getDocIds(queries[q], 10));
+            Set<Integer> r = BenchmarkVectorIndex.bitmapToSet(reader.getDocIds(queries[q], TOP_K));
             recall += BenchmarkVectorIndex.computeRecall(gt10[q], r);
           }
           recall /= queries.length;
 
-          long[] latencies = BenchmarkVectorIndex.measureIvfLatencies(reader, queries, 10);
+          long[] latencies = BenchmarkVectorIndex.measureIvfLatencies(reader, queries, TOP_K);
           Arrays.sort(latencies);
 
           out.printf("IVF_FLAT nlist=%d nprobe=%d  recall@10=%.4f  p50=%.1fus  p99=%.1fus%n",
-              nlist, nprobe, recall,
+              NLIST, nprobe, recall,
               BenchmarkVectorIndex.percentile(latencies, 50) / 1000.0,
               BenchmarkVectorIndex.percentile(latencies, 99) / 1000.0);
         }
@@ -109,28 +123,31 @@ public final class BenchmarkVectorIndexRunner {
       int pqM = 16;
       int pqNbits = 8;
       VectorIndexConfig pqConfig =
-          BenchmarkVectorIndex.createIvfPqConfig(dim, corpus.length, nlist, pqM, pqNbits, distFunc);
+          BenchmarkVectorIndex.createIvfPqConfig(DIMENSION, corpus.length, NLIST, pqM, pqNbits, distFunc);
       File pqDir = Files.createTempDirectory("bench_validate_pq_").toFile();
       try {
         BenchmarkVectorIndex.buildVectorIndexReflectively(ivfPqCreator, pqDir, corpus, pqConfig);
 
-        for (int nprobe : new int[]{1, 4, 8, 16, 32, 64}) {
+        for (int nprobe : NPROBE_VALUES) {
+          if (nprobe > NLIST) {
+            continue;
+          }
           try (BenchmarkVectorIndex.ReflectiveVectorReader reader = BenchmarkVectorIndex.openReflectiveVectorReader(
               ivfPqReader, pqDir, corpus.length, pqConfig)) {
             reader.setNprobe(nprobe);
 
             double recall = 0;
             for (int q = 0; q < queries.length; q++) {
-              Set<Integer> r = BenchmarkVectorIndex.bitmapToSet(reader.getDocIds(queries[q], 10));
+              Set<Integer> r = BenchmarkVectorIndex.bitmapToSet(reader.getDocIds(queries[q], TOP_K));
               recall += BenchmarkVectorIndex.computeRecall(gt10[q], r);
             }
             recall /= queries.length;
 
-            long[] latencies = BenchmarkVectorIndex.measureReflectiveLatencies(reader, queries, 10);
+            long[] latencies = BenchmarkVectorIndex.measureReflectiveLatencies(reader, queries, TOP_K);
             Arrays.sort(latencies);
 
             out.printf("IVF_PQ nlist=%d nprobe=%d pqM=%d pqNbits=%d  recall@10=%.4f  p50=%.1fus  p99=%.1fus%n",
-                nlist, nprobe, pqM, pqNbits, recall,
+                NLIST, nprobe, pqM, pqNbits, recall,
                 BenchmarkVectorIndex.percentile(latencies, 50) / 1000.0,
                 BenchmarkVectorIndex.percentile(latencies, 99) / 1000.0);
           }

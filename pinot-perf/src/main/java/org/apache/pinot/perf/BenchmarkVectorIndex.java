@@ -42,6 +42,7 @@ import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVector
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 
 
 /**
@@ -49,6 +50,10 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
  *
  * <p>This benchmark measures build time, index size, query latency (p50/p99), and recall@K
  * for each index type across synthetic datasets of configurable size and dimensionality.</p>
+ *
+ * <p>This class is also the canonical entry point for the broader vector benchmark suite.
+ * Set {@code -Dpinot.perf.vector.mode=} to one of {@code frontier}, {@code sanity},
+ * {@code filters}, {@code features}, or {@code suite} to select the scenario to run.</p>
  *
  * <h3>Usage</h3>
  * <pre>
@@ -97,8 +102,14 @@ public class BenchmarkVectorIndex {
   /** Poll interval for heap sampling during index builds. */
   private static final long MEMORY_POLL_INTERVAL_MS = Long.getLong("pinot.perf.vector.memoryPollMs", 10L);
 
-  /** Backend name used for IVF_PQ sweeps. */
+  /** Backend name used for IVF_PQ frontier runs. */
   private static final String IVF_PQ_INDEX_TYPE = "IVF_PQ";
+
+  /** System property selecting which vector benchmark mode to run. */
+  private static final String MODE_PROPERTY = "pinot.perf.vector.mode";
+
+  /** Default benchmark mode when no explicit mode is supplied. */
+  private static final String DEFAULT_MODE = "frontier";
 
   /** Fully qualified creator class name for IVF_PQ. */
   private static final String IVF_PQ_CREATOR_CLASS =
@@ -249,13 +260,19 @@ public class BenchmarkVectorIndex {
 
   static VectorIndexConfig createIvfConfig(int dimension, int nlist,
       VectorIndexConfig.VectorDistanceFunction distFunc) {
+    return createIvfConfig("IVF_FLAT", dimension, nlist, distFunc, VectorQuantizerType.FLAT);
+  }
+
+  static VectorIndexConfig createIvfConfig(String indexType, int dimension, int nlist,
+      VectorIndexConfig.VectorDistanceFunction distFunc, VectorQuantizerType quantizerType) {
     Map<String, String> props = new HashMap<>();
-    props.put("vectorIndexType", "IVF_FLAT");
+    props.put("vectorIndexType", indexType);
     props.put("vectorDimension", String.valueOf(dimension));
     props.put("vectorDistanceFunction", distFunc.name());
     props.put("nlist", String.valueOf(nlist));
     props.put("trainingSeed", String.valueOf(SEED));
-    return new VectorIndexConfig(false, "IVF_FLAT", dimension, 1, distFunc, props);
+    props.put("quantizer", quantizerType.name());
+    return new VectorIndexConfig(false, indexType, dimension, 1, distFunc, props);
   }
 
   /**
@@ -540,6 +557,17 @@ public class BenchmarkVectorIndex {
     return sorted[Math.max(0, Math.min(idx, sorted.length - 1))];
   }
 
+  /**
+   * Converts a set of single-threaded query latencies into batch queries-per-second.
+   */
+  static double queriesPerSecond(long[] latencies) {
+    long totalLatencyNs = 0L;
+    for (long latency : latencies) {
+      totalLatencyNs += latency;
+    }
+    return totalLatencyNs > 0 ? (latencies.length * 1_000_000_000.0d) / totalLatencyNs : 0.0d;
+  }
+
   // ---------------------------------------------------------------------------
   // Index size measurement
   // ---------------------------------------------------------------------------
@@ -590,10 +618,12 @@ public class BenchmarkVectorIndex {
     final long _p50LatencyNs;
     final long _p95LatencyNs;
     final long _p99LatencyNs;
+    final double _queriesPerSecond;
 
     BenchmarkResult(String indexType, String params, long buildTimeNs, double buildDocsPerSecond, long peakHeapBytes,
         long indexSizeBytes,
-        double recallAt10, double recallAt100, long p50LatencyNs, long p95LatencyNs, long p99LatencyNs) {
+        double recallAt10, double recallAt100, long p50LatencyNs, long p95LatencyNs, long p99LatencyNs,
+        double queriesPerSecond) {
       _indexType = indexType;
       _params = params;
       _buildTimeNs = buildTimeNs;
@@ -605,6 +635,24 @@ public class BenchmarkVectorIndex {
       _p50LatencyNs = p50LatencyNs;
       _p95LatencyNs = p95LatencyNs;
       _p99LatencyNs = p99LatencyNs;
+      _queriesPerSecond = queriesPerSecond;
+    }
+  }
+
+  static final class DatasetScenario {
+    final String _name;
+    final float[][] _corpus;
+    final float[][] _queries;
+    final int _dimension;
+    final VectorIndexConfig.VectorDistanceFunction _distanceFunction;
+
+    DatasetScenario(String name, float[][] corpus, float[][] queries, int dimension,
+        VectorIndexConfig.VectorDistanceFunction distanceFunction) {
+      _name = name;
+      _corpus = corpus;
+      _queries = queries;
+      _dimension = dimension;
+      _distanceFunction = distanceFunction;
     }
   }
 
@@ -645,7 +693,8 @@ public class BenchmarkVectorIndex {
     long[] exactLat = measureExactLatencies(corpus, queries, 10, distFunc);
     Arrays.sort(exactLat);
     results.add(new BenchmarkResult("Exact Scan", "-", 0, 0.0, 0, 0,
-        1.0, 1.0, percentile(exactLat, 50), percentile(exactLat, 95), percentile(exactLat, 99)));
+        1.0, 1.0, percentile(exactLat, 50), percentile(exactLat, 95), percentile(exactLat, 99),
+        queriesPerSecond(exactLat)));
 
     // 2. HNSW benchmark
     File hnswDir = null;
@@ -678,7 +727,7 @@ public class BenchmarkVectorIndex {
         results.add(new BenchmarkResult("HNSW", "M=16,ef=100", hnswBuildMetrics._buildTimeNs,
             hnswBuildMetrics._buildDocsPerSecond, hnswBuildMetrics._peakHeapBytes, hnswSize,
             recall10, recall100, percentile(hnswLat, 50), percentile(hnswLat, 95),
-            percentile(hnswLat, 99)));
+            percentile(hnswLat, 99), queriesPerSecond(hnswLat)));
       }
     } catch (Throwable e) {
       // HNSW reader requires PinotDataBuffer/PluginManager which may not be available
@@ -691,54 +740,62 @@ public class BenchmarkVectorIndex {
       }
     }
 
-    // 3. IVF_FLAT benchmark for each (nlist, nprobe) combination
-    for (int nlist : nlistValues) {
-      if (nlist > corpus.length) {
-        continue;
-      }
-      File ivfDir = Files.createTempDirectory("bench_ivf_").toFile();
-      try {
-        out.printf("Building IVF_FLAT index (nlist=%d)...%n", nlist);
-        BuildMetrics ivfBuildMetrics = buildIvfFlatIndex(ivfDir, corpus, dimension, nlist, distFunc);
-        long ivfSize = ivfIndexSize(ivfDir);
-
-        for (int nprobe : nprobeValues) {
-          if (nprobe > nlist) {
-            continue;
-          }
-          try (IvfFlatVectorIndexReader reader = openIvfReader(
-              ivfDir, dimension, nlist, nprobe, distFunc)) {
-            reader.setNprobe(nprobe);
-
-            // Measure recall
-            double recall10 = 0;
-            double recall100 = 0;
-            for (int q = 0; q < queries.length; q++) {
-              Set<Integer> r10 = bitmapToSet(reader.getDocIds(queries[q], 10));
-              recall10 += computeRecall(gt10[q], r10);
-              if (corpus.length >= 100) {
-                Set<Integer> r100 = bitmapToSet(reader.getDocIds(queries[q], Math.min(100, corpus.length)));
-                recall100 += computeRecall(gt100[q], r100);
-              } else {
-                recall100 += 1.0;
-              }
-            }
-            recall10 /= queries.length;
-            recall100 /= queries.length;
-
-            // Measure latency
-            long[] ivfLat = measureIvfLatencies(reader, queries, 10);
-            Arrays.sort(ivfLat);
-
-            String paramStr = String.format("nlist=%d,nprobe=%d", nlist, nprobe);
-            results.add(new BenchmarkResult("IVF_FLAT", paramStr, ivfBuildMetrics._buildTimeNs,
-                ivfBuildMetrics._buildDocsPerSecond, ivfBuildMetrics._peakHeapBytes, ivfSize,
-                recall10, recall100, percentile(ivfLat, 50), percentile(ivfLat, 95),
-                percentile(ivfLat, 99)));
-          }
+    // 3. IVF_FLAT benchmark for each (quantizer, nlist, nprobe) combination
+    for (VectorQuantizerType quantizerType
+        : Arrays.asList(VectorQuantizerType.FLAT, VectorQuantizerType.SQ8, VectorQuantizerType.SQ4)) {
+      for (int nlist : nlistValues) {
+        if (nlist > corpus.length) {
+          continue;
         }
-      } finally {
-        FileUtils.deleteQuietly(ivfDir);
+        File ivfDir = Files.createTempDirectory("bench_ivf_").toFile();
+        try {
+          VectorIndexConfig config = createIvfConfig("IVF_FLAT", dimension, nlist, distFunc, quantizerType);
+          out.printf("Building IVF_FLAT index (quantizer=%s, nlist=%d)...%n", quantizerType.name(), nlist);
+          BuildMetrics ivfBuildMetrics = measureBuild(corpus.length, () -> {
+            try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator(COLUMN_NAME, ivfDir, config)) {
+              for (float[] vector : corpus) {
+                creator.add(vector);
+              }
+              creator.seal();
+            }
+          });
+          long ivfSize = ivfIndexSize(ivfDir);
+
+          for (int nprobe : nprobeValues) {
+            if (nprobe > nlist) {
+              continue;
+            }
+            try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, ivfDir, config)) {
+              reader.setNprobe(nprobe);
+
+              double recall10 = 0;
+              double recall100 = 0;
+              for (int q = 0; q < queries.length; q++) {
+                Set<Integer> r10 = bitmapToSet(reader.getDocIds(queries[q], 10));
+                recall10 += computeRecall(gt10[q], r10);
+                if (corpus.length >= 100) {
+                  Set<Integer> r100 = bitmapToSet(reader.getDocIds(queries[q], Math.min(100, corpus.length)));
+                  recall100 += computeRecall(gt100[q], r100);
+                } else {
+                  recall100 += 1.0;
+                }
+              }
+              recall10 /= queries.length;
+              recall100 /= queries.length;
+
+              long[] ivfLat = measureIvfLatencies(reader, queries, 10);
+              Arrays.sort(ivfLat);
+
+              String paramStr = String.format("q=%s,nlist=%d,nprobe=%d", quantizerType.name(), nlist, nprobe);
+              results.add(new BenchmarkResult("IVF_FLAT", paramStr, ivfBuildMetrics._buildTimeNs,
+                  ivfBuildMetrics._buildDocsPerSecond, ivfBuildMetrics._peakHeapBytes, ivfSize,
+                  recall10, recall100, percentile(ivfLat, 50), percentile(ivfLat, 95),
+                  percentile(ivfLat, 99), queriesPerSecond(ivfLat)));
+            }
+          }
+        } finally {
+          FileUtils.deleteQuietly(ivfDir);
+        }
       }
     }
 
@@ -798,7 +855,7 @@ public class BenchmarkVectorIndex {
                   results.add(new BenchmarkResult(IVF_PQ_INDEX_TYPE, paramStr, pqBuildMetrics._buildTimeNs,
                       pqBuildMetrics._buildDocsPerSecond, pqBuildMetrics._peakHeapBytes, pqSize,
                       recall10, recall100, percentile(pqLat, 50), percentile(pqLat, 95),
-                      percentile(pqLat, 99)));
+                      percentile(pqLat, 99), queriesPerSecond(pqLat)));
                 }
               }
             } finally {
@@ -812,82 +869,13 @@ public class BenchmarkVectorIndex {
     return results;
   }
 
-  /**
-   * Runs the IVF_FLAT parameter sweep: all (nlist, nprobe) combinations on a fixed dataset.
-   */
-  static List<BenchmarkResult> runParameterSweep(PrintStream out)
-      throws IOException {
-    int numVectors = Integer.getInteger("pinot.perf.vector.sweepSize", 10_000);
-    int dimension = Integer.getInteger("pinot.perf.vector.sweepDimension",
-        Integer.getInteger("pinot.perf.vector.dimension", 128));
-    VectorIndexConfig.VectorDistanceFunction distFunc = VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN;
-
-    out.println("\n========================================");
-    out.println("  IVF_FLAT Parameter Sweep");
-    out.printf("  N=%d, dim=%d, distance=%s%n", numVectors, dimension, distFunc);
-    out.println("========================================");
-
-    float[][] corpus = generateGaussianVectors(numVectors, dimension, SEED);
-    float[][] queries = generateGaussianVectors(NUM_QUERIES, dimension, SEED + 1000);
-
-    int[][] gt10 = computeGroundTruth(corpus, queries, 10, distFunc);
-
-    int[] nlistValues = parseIntListProperty("pinot.perf.vector.nlist", new int[]{16, 32, 64, 128, 256});
-    int[] nprobeValues = parseIntListProperty("pinot.perf.vector.nprobe", new int[]{1, 2, 4, 8, 16, 32});
-
-    List<BenchmarkResult> results = new ArrayList<>();
-
-    for (int nlist : nlistValues) {
-      File ivfDir = Files.createTempDirectory("bench_sweep_").toFile();
-      try {
-        out.printf("Building IVF_FLAT (nlist=%d)...%n", nlist);
-        BuildMetrics buildMetrics = buildIvfFlatIndex(ivfDir, corpus, dimension, nlist, distFunc);
-        long indexSize = ivfIndexSize(ivfDir);
-
-        for (int nprobe : nprobeValues) {
-          if (nprobe > nlist) {
-            continue;
-          }
-          try (IvfFlatVectorIndexReader reader = openIvfReader(
-              ivfDir, dimension, nlist, nprobe, distFunc)) {
-            reader.setNprobe(nprobe);
-
-            double recall10 = 0;
-            for (int q = 0; q < queries.length; q++) {
-              Set<Integer> r = bitmapToSet(reader.getDocIds(queries[q], 10));
-              recall10 += computeRecall(gt10[q], r);
-            }
-            recall10 /= queries.length;
-
-            long[] latencies = measureIvfLatencies(reader, queries, 10);
-            Arrays.sort(latencies);
-
-            String params = String.format("nlist=%d,nprobe=%d", nlist, nprobe);
-            results.add(new BenchmarkResult("IVF_FLAT", params, buildMetrics._buildTimeNs,
-                buildMetrics._buildDocsPerSecond, buildMetrics._peakHeapBytes, indexSize,
-                recall10, 0, percentile(latencies, 50), percentile(latencies, 95),
-                percentile(latencies, 99)));
-          }
-        }
-      } finally {
-        FileUtils.deleteQuietly(ivfDir);
-      }
-    }
-
-    return results;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Output formatting
-  // ---------------------------------------------------------------------------
-
   static void printResultsTable(List<BenchmarkResult> results, PrintStream out) {
-    out.printf("%-14s %-22s %10s %12s %12s %10s %10s %10s %10s %10s %10s%n",
+    out.printf("%-14s %-22s %10s %12s %12s %10s %10s %10s %10s %10s %10s %10s%n",
         "Index", "Parameters", "Build(ms)", "Build(K/s)", "PeakHeap(MB)", "Size(KB)", "Recall@10", "Recall@100",
-        "p50(us)", "p95(us)", "p99(us)");
-    out.println("-".repeat(146));
+        "p50(us)", "p95(us)", "p99(us)", "QPS");
+    out.println("-".repeat(158));
     for (BenchmarkResult r : results) {
-      out.printf("%-14s %-22s %10.1f %12.1f %12.1f %10.1f %10.4f %10.4f %10.1f %10.1f %10.1f%n",
+      out.printf("%-14s %-22s %10.1f %12.1f %12.1f %10.1f %10.4f %10.4f %10.1f %10.1f %10.1f %10.1f%n",
           r._indexType, r._params,
           r._buildTimeNs / 1_000_000.0,
           r._buildDocsPerSecond / 1000.0,
@@ -896,25 +884,13 @@ public class BenchmarkVectorIndex {
           r._recallAt10, r._recallAt100,
           r._p50LatencyNs / 1000.0,
           r._p95LatencyNs / 1000.0,
-          r._p99LatencyNs / 1000.0);
-    }
-  }
-
-  static void printSweepTable(List<BenchmarkResult> results, PrintStream out) {
-    out.printf("%-22s %10s %10s %10s %10s%n",
-        "Parameters", "Recall@10", "p50(us)", "p95(us)", "p99(us)");
-    out.println("-".repeat(75));
-    for (BenchmarkResult r : results) {
-      out.printf("%-22s %10.4f %10.1f %10.1f %10.1f%n",
-          r._params, r._recallAt10,
-          r._p50LatencyNs / 1000.0,
-          r._p95LatencyNs / 1000.0,
-          r._p99LatencyNs / 1000.0);
+          r._p99LatencyNs / 1000.0,
+          r._queriesPerSecond);
     }
   }
 
   /**
-   * Prints a small backend-oriented summary so the larger matrix stays readable.
+   * Prints a small backend-oriented summary so the frontier output stays readable.
    */
   static void printBackendSummary(List<BenchmarkResult> results, PrintStream out) {
     Map<String, List<BenchmarkResult>> byBackend = new LinkedHashMap<>();
@@ -937,9 +913,39 @@ public class BenchmarkVectorIndex {
           best = candidate;
         }
       }
-      out.printf("  %-10s : %s | recall@10=%.4f | p50=%.1fus | build=%.1fK docs/s | peakHeap=%.1fMB | size=%.1fKB%n",
-          backend, best._params, best._recallAt10, best._p50LatencyNs / 1000.0, best._buildDocsPerSecond / 1000.0,
-          best._peakHeapBytes / (1024.0 * 1024.0), best._indexSizeBytes / 1024.0);
+      out.printf(
+          "  %-10s : %s | recall@10=%.4f | p50=%.1fus | qps=%.1f"
+              + " | build=%.1fK docs/s | peakHeap=%.1fMB | size=%.1fKB%n",
+          backend, best._params, best._recallAt10, best._p50LatencyNs / 1000.0, best._queriesPerSecond,
+          best._buildDocsPerSecond / 1000.0, best._peakHeapBytes / (1024.0 * 1024.0),
+          best._indexSizeBytes / 1024.0);
+    }
+  }
+
+  /**
+   * Prints the fastest configuration per backend that satisfies a target recall.
+   */
+  static void printRecallTargetSummary(List<BenchmarkResult> results, double recallTarget, PrintStream out) {
+    out.printf("%nTarget recall summary (recall@10 >= %.2f):%n", recallTarget);
+    for (String backend : Arrays.asList("Exact Scan", "HNSW", "IVF_FLAT", IVF_PQ_INDEX_TYPE)) {
+      BenchmarkResult best = null;
+      for (BenchmarkResult result : results) {
+        if (!backend.equals(result._indexType) || result._recallAt10 < recallTarget) {
+          continue;
+        }
+        if (best == null
+            || result._queriesPerSecond > best._queriesPerSecond
+            || (result._queriesPerSecond == best._queriesPerSecond && result._p50LatencyNs < best._p50LatencyNs)) {
+          best = result;
+        }
+      }
+      if (best == null) {
+        out.printf("  %-10s : no configuration reached the target%n", backend);
+      } else {
+        out.printf("  %-10s : %s | qps=%.1f | p50=%.1fus | p95=%.1fus%n",
+            backend, best._params, best._queriesPerSecond, best._p50LatencyNs / 1000.0,
+            best._p95LatencyNs / 1000.0);
+      }
     }
   }
 
@@ -965,172 +971,117 @@ public class BenchmarkVectorIndex {
 
   /**
    * Runs the complete benchmark suite and prints results to stdout.
-   *
-   * <p>The benchmark is organized in three parts:
-   * <ol>
-   *   <li>Dataset A (L2/Euclidean) at multiple sizes: 1K, 10K, 100K</li>
-   *   <li>Dataset B (Cosine) at multiple sizes: 1K, 10K, 100K</li>
-   *   <li>IVF_FLAT parameter sweep on 10K vectors, 128 dimensions</li>
-   * </ol>
    */
   public static void main(String[] args)
       throws Exception {
-    PrintStream out = System.out;
+    String mode = args.length > 0 ? args[0] : System.getProperty(MODE_PROPERTY, DEFAULT_MODE);
+    runMode(mode, System.out);
+  }
+
+  static void runMode(String mode, PrintStream out)
+      throws Exception {
+    String normalizedMode = mode == null ? DEFAULT_MODE : mode.trim().toLowerCase();
+    switch (normalizedMode) {
+      case "frontier":
+        runFrontierBenchmark(out);
+        return;
+      case "sanity":
+        BenchmarkVectorSanity.run(out);
+        return;
+      case "filters":
+        BenchmarkVectorFilterWorkloads.run(out);
+        return;
+      case "features":
+        BenchmarkVectorFeatureWorkloads.run(out);
+        return;
+      case "suite":
+        runFrontierBenchmark(out);
+        out.println();
+        BenchmarkVectorSanity.run(out);
+        out.println();
+        BenchmarkVectorFilterWorkloads.run(out);
+        out.println();
+        BenchmarkVectorFeatureWorkloads.run(out);
+        return;
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported vector benchmark mode: " + mode
+                + ". Expected one of: frontier, sanity, filters, features, suite");
+    }
+  }
+
+  static List<DatasetScenario> createFrontierScenarios() {
+    List<DatasetScenario> scenarios = new ArrayList<>();
+
+    int l2Dimension = Integer.getInteger("pinot.perf.vector.frontier.l2.dimension", 128);
+    int l2Size = Integer.getInteger("pinot.perf.vector.frontier.l2.size", 10_000);
+    scenarios.add(new DatasetScenario(
+        "l2-gaussian-" + l2Dimension + "d-" + l2Size,
+        generateGaussianVectors(l2Size, l2Dimension, SEED),
+        generateGaussianVectors(NUM_QUERIES, l2Dimension, SEED + 1_000L),
+        l2Dimension,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
+
+    int cosine768Size = Integer.getInteger("pinot.perf.vector.frontier.cosine768.size", 10_000);
+    scenarios.add(new DatasetScenario(
+        "cosine-normalized-768d-" + cosine768Size,
+        generateNormalizedVectors(cosine768Size, 768, SEED + 2_000L),
+        generateNormalizedVectors(NUM_QUERIES, 768, SEED + 3_000L),
+        768,
+        VectorIndexConfig.VectorDistanceFunction.COSINE));
+
+    int cosine1536Size = Integer.getInteger("pinot.perf.vector.frontier.cosine1536.size", 5_000);
+    scenarios.add(new DatasetScenario(
+        "cosine-normalized-1536d-" + cosine1536Size,
+        generateNormalizedVectors(cosine1536Size, 1536, SEED + 4_000L),
+        generateNormalizedVectors(NUM_QUERIES, 1536, SEED + 5_000L),
+        1536,
+        VectorIndexConfig.VectorDistanceFunction.COSINE));
+
+    int dotSize = Integer.getInteger("pinot.perf.vector.frontier.dot768.size", 10_000);
+    scenarios.add(new DatasetScenario(
+        "inner-product-skew-768d-" + dotSize,
+        generateMagnitudeSkewedVectors(dotSize, 768, SEED + 6_000L),
+        generateMagnitudeSkewedVectors(NUM_QUERIES, 768, SEED + 7_000L),
+        768,
+        VectorIndexConfig.VectorDistanceFunction.INNER_PRODUCT));
+
+    return scenarios;
+  }
+
+  static void runFrontierBenchmark(PrintStream out)
+      throws Exception {
     out.println("========================================");
-    out.println("  Apache Pinot Vector Index Benchmark");
+    out.println("  Apache Pinot Vector ANN Frontier");
     out.println("========================================");
+    out.println("Mode: frontier");
     out.printf("JDK: %s%n", System.getProperty("java.version"));
     out.printf("OS: %s %s%n", System.getProperty("os.name"), System.getProperty("os.arch"));
     out.printf("Seed: %d%n", SEED);
     out.printf("Queries: %d (warmup: %d)%n", NUM_QUERIES, WARMUP_QUERIES);
-    int[] nlistValues = parseIntListProperty("pinot.perf.vector.nlist", new int[]{16, 32, 64, 128, 256});
-    int[] nprobeValues = parseIntListProperty("pinot.perf.vector.nprobe", new int[]{1, 2, 4, 8, 16, 32});
-    int[] pqMValues = parseIntListProperty("pinot.perf.vector.pqM", new int[]{8, 16});
-    int[] pqNbitsValues = parseIntListProperty("pinot.perf.vector.pqNbits", new int[]{8});
+    int[] nlistValues = parseIntListProperty("pinot.perf.vector.frontier.nlist", new int[]{32, 64, 128});
+    int[] nprobeValues = parseIntListProperty("pinot.perf.vector.frontier.nprobe", new int[]{1, 2, 4, 8, 16});
+    int[] pqMValues = parseIntListProperty("pinot.perf.vector.frontier.pqM", new int[]{16, 32});
+    int[] pqNbitsValues = parseIntListProperty("pinot.perf.vector.frontier.pqNbits", new int[]{8});
     out.printf("IVF knobs: nlist=%s nprobe=%s pqM=%s pqNbits=%s%n",
         Arrays.toString(nlistValues), Arrays.toString(nprobeValues),
         Arrays.toString(pqMValues), Arrays.toString(pqNbitsValues));
     out.println();
 
-    int dimension = Integer.getInteger("pinot.perf.vector.dimension", 128);
-    int[] datasetSizes = parseIntListProperty("pinot.perf.vector.datasetSizes", new int[]{1_000, 10_000, 100_000});
-
-    List<List<BenchmarkResult>> allResults = new ArrayList<>();
-
-    // --- Dataset A: L2 Synthetic ---
-    out.println("\n########################################");
-    out.println("# Dataset A: L2 Synthetic (Gaussian)");
-    out.println("########################################");
-
-    for (int n : datasetSizes) {
-      float[][] corpus = generateGaussianVectors(n, dimension, SEED);
-      float[][] queries = generateGaussianVectors(NUM_QUERIES, dimension, SEED + 1000);
-
-      List<BenchmarkResult> results = runDatasetBenchmark(
-          "L2-" + n, corpus, queries, dimension,
-          VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
-          nlistValues, nprobeValues, pqMValues, pqNbitsValues, out);
-      allResults.add(results);
-
-      out.println();
-      printResultsTable(results, out);
-      printBackendSummary(results, out);
-    }
-
-    // --- Dataset B: Cosine Normalized ---
-    out.println("\n########################################");
-    out.println("# Dataset B: Cosine Normalized");
-    out.println("########################################");
-
-    for (int n : datasetSizes) {
-      float[][] corpus = generateNormalizedVectors(n, dimension, SEED + 2000);
-      float[][] queries = generateNormalizedVectors(NUM_QUERIES, dimension, SEED + 3000);
-
-      List<BenchmarkResult> results = runDatasetBenchmark(
-          "Cosine-" + n, corpus, queries, dimension,
-          VectorIndexConfig.VectorDistanceFunction.COSINE,
-          nlistValues, nprobeValues, pqMValues, pqNbitsValues, out);
-      allResults.add(results);
-
-      out.println();
-      printResultsTable(results, out);
-      printBackendSummary(results, out);
-    }
-
-    // --- Dataset C: Inner Product with magnitude skew ---
-    out.println("\n########################################");
-    out.println("# Dataset C: Inner Product Magnitude Skew");
-    out.println("########################################");
-
-    for (int n : datasetSizes) {
-      float[][] corpus = generateMagnitudeSkewedVectors(n, dimension, SEED + 4000);
-      float[][] queries = generateMagnitudeSkewedVectors(NUM_QUERIES, dimension, SEED + 5000);
-
-      List<BenchmarkResult> results = runDatasetBenchmark(
-          "InnerProduct-" + n, corpus, queries, dimension,
-          VectorIndexConfig.VectorDistanceFunction.INNER_PRODUCT,
-          nlistValues, nprobeValues, pqMValues, pqNbitsValues, out);
-      allResults.add(results);
-
-      out.println();
-      printResultsTable(results, out);
-      printBackendSummary(results, out);
-    }
-
-    // --- Parameter Sweep ---
-    if (Boolean.getBoolean("pinot.perf.vector.skipSweep")) {
+    for (DatasetScenario scenario : createFrontierScenarios()) {
       out.println("\n########################################");
-      out.println("# IVF_FLAT Parameter Sweep skipped");
+      out.printf("# Scenario: %s%n", scenario._name);
       out.println("########################################");
-    } else {
-      out.println("\n########################################");
-      out.printf("# IVF_FLAT Parameter Sweep (%d, dim=%d, EUCLIDEAN)%n",
-          Integer.getInteger("pinot.perf.vector.sweepSize", 10_000),
-          Integer.getInteger("pinot.perf.vector.sweepDimension",
-              Integer.getInteger("pinot.perf.vector.dimension", 128)));
-      out.println("########################################");
-
-      List<BenchmarkResult> sweepResults = runParameterSweep(out);
+      List<BenchmarkResult> results = runDatasetBenchmark(
+          scenario._name, scenario._corpus, scenario._queries, scenario._dimension,
+          scenario._distanceFunction, nlistValues, nprobeValues, pqMValues, pqNbitsValues, out);
       out.println();
-      printSweepTable(sweepResults, out);
-      printBackendSummary(sweepResults, out);
-
-      // --- Summary recommendations ---
-      out.println("\n========================================");
-      out.println("  Recommended Defaults");
-      out.println("========================================");
-      printRecommendations(sweepResults, out);
+      printResultsTable(results, out);
+      printBackendSummary(results, out);
+      printRecallTargetSummary(results, 0.95d, out);
     }
 
-    out.println("\nBenchmark complete.");
-  }
-
-  /**
-   * Derives and prints recommended defaults from parameter sweep results.
-   */
-  static void printRecommendations(List<BenchmarkResult> sweepResults, PrintStream out) {
-    // Find the best nlist/nprobe combination that achieves recall@10 >= 0.90
-    // with the lowest p50 latency
-    BenchmarkResult bestBalanced = null;
-    for (BenchmarkResult r : sweepResults) {
-      if (r._recallAt10 >= 0.90) {
-        if (bestBalanced == null || r._p50LatencyNs < bestBalanced._p50LatencyNs) {
-          bestBalanced = r;
-        }
-      }
-    }
-
-    // Find the best for recall >= 0.95
-    BenchmarkResult bestHighRecall = null;
-    for (BenchmarkResult r : sweepResults) {
-      if (r._recallAt10 >= 0.95) {
-        if (bestHighRecall == null || r._p50LatencyNs < bestHighRecall._p50LatencyNs) {
-          bestHighRecall = r;
-        }
-      }
-    }
-
-    out.println("Target: recall@10 >= 0.90 with lowest latency:");
-    if (bestBalanced != null) {
-      out.printf("  %s  (recall@10=%.4f, p50=%.1fus)%n",
-          bestBalanced._params, bestBalanced._recallAt10, bestBalanced._p50LatencyNs / 1000.0);
-    } else {
-      out.println("  No configuration achieves recall@10 >= 0.90");
-    }
-
-    out.println("Target: recall@10 >= 0.95 with lowest latency:");
-    if (bestHighRecall != null) {
-      out.printf("  %s  (recall@10=%.4f, p50=%.1fus)%n",
-          bestHighRecall._params, bestHighRecall._recallAt10, bestHighRecall._p50LatencyNs / 1000.0);
-    } else {
-      out.println("  No configuration achieves recall@10 >= 0.95");
-    }
-
-    out.println();
-    out.println("General guidance:");
-    out.println("  nlist = sqrt(N)  (e.g., 100 for N=10K, 316 for N=100K)");
-    out.println("  nprobe = nlist/10 to nlist/4  (start with 4-8, increase for higher recall)");
-    out.println("  trainSampleSize = min(65536, N)  (full dataset for N <= 65K)");
+    out.println("\nFrontier benchmark complete.");
   }
 
   // ---------------------------------------------------------------------------
@@ -1266,6 +1217,18 @@ public class BenchmarkVectorIndex {
       _buildTimeNs = buildTimeNs;
       _buildDocsPerSecond = buildTimeNs > 0 ? (numDocs * 1_000_000_000.0) / buildTimeNs : 0.0;
       _peakHeapBytes = peakHeapBytes;
+    }
+  }
+
+  static final class LatencySummary {
+    final long _p50Ns;
+    final long _p95Ns;
+    final long _p99Ns;
+
+    LatencySummary(long p50Ns, long p95Ns, long p99Ns) {
+      _p50Ns = p50Ns;
+      _p95Ns = p95Ns;
+      _p99Ns = p99Ns;
     }
   }
 }

@@ -32,6 +32,7 @@ import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfPqVectorIndexReader;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -313,6 +314,33 @@ public class IvfPqVectorIndexTest {
     try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
       reader.setNprobe(100);
       Assert.assertEquals(reader.getNprobe(), nlist);
+    }
+  }
+
+  @Test
+  public void testApproximateRadiusSearchRespectsCandidateCap()
+      throws IOException {
+    int dimension = 8;
+    int nlist = 8;
+    int pqM = 8;
+    int pqNbits = 8;
+    float[][] vectors = generateClusteredVectors(8, 20, dimension, 0.03f, TEST_SEED);
+    VectorIndexConfig config = createConfig(VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, dimension, nlist, pqM,
+        pqNbits, vectors.length, TEST_SEED);
+
+    try (IvfPqVectorIndexCreator creator = new IvfPqVectorIndexCreator(COLUMN_NAME, _tempDir, config)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+
+    try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+      reader.setNprobe(nlist);
+      ImmutableRoaringBitmap result =
+          reader.getDocIdsWithinApproximateRadius(vectors[0], Float.POSITIVE_INFINITY, 5);
+      Assert.assertTrue(result.getCardinality() <= 5, "radius search should obey maxCandidates cap");
+      Assert.assertTrue(result.getCardinality() > 0, "radius search should return at least one candidate");
     }
   }
 

@@ -60,7 +60,7 @@ public class IvfPqVectorRealtimeTest extends IvfPqVectorTest {
         "Realtime IVF_PQ should fall back to exact scan: " + explain);
     assertExplainContains(explain, "backend", "IVF_PQ");
     assertExplainContains(explain, "distanceFunction", "EUCLIDEAN");
-    assertExplainContains(explain, "fallbackReason", "ivf_pq_index_unavailable");
+    assertExplainContains(explain, "fallbackReason", "ivf_pq_mutable_segment_unavailable");
   }
 
   @Override
@@ -74,6 +74,6 @@ public class IvfPqVectorRealtimeTest extends IvfPqVectorTest {
     assertTrue(explain.contains("VECTOR_SIMILARITY_EXACT_SCAN") || explain.contains("VectorSimilarityExactScan"),
         "Realtime IVF_PQ should still use exact scan when query options are present: " + explain);
     assertExplainContains(explain, "backend", "IVF_PQ");
-    assertExplainContains(explain, "fallbackReason", "ivf_pq_index_unavailable");
+    assertExplainContains(explain, "fallbackReason", "ivf_pq_mutable_segment_unavailable");
   }
 }

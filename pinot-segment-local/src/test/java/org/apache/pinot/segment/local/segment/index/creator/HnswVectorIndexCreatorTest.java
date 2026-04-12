@@ -92,4 +92,42 @@ public class HnswVectorIndexCreatorTest {
       Assert.assertEquals(matchedDocIds[0], 2);
     }
   }
+
+  @Test
+  public void testEfSearchChangesRuntimeSearchBehavior()
+      throws IOException {
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader("foo", INDEX_DIR, 4, _config)) {
+      reader.setEfSearch(1);
+      int[] matchedDocIds = reader.getDocIds(new float[]{5.0F, 42.0F, 54.33333F, 42.24F, 3413.4F}, 3).toArray();
+      Assert.assertEquals(matchedDocIds.length, 1,
+          "efSearch=1 should cap the Lucene HNSW visit budget and reduce the returned result set");
+      Assert.assertEquals(reader.getIndexDebugInfo().get("effectiveEfSearch"), 1);
+    }
+  }
+
+  @Test
+  public void testDisableBoundedQueueRequiresEfSearch()
+      throws IOException {
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader("foo", INDEX_DIR, 4, _config)) {
+      reader.setUseBoundedQueue(false);
+      IllegalArgumentException error = Assert.expectThrows(IllegalArgumentException.class,
+          () -> reader.getDocIds(new float[]{1.0F, 2.0F, 3.0F, 4.0F, 5.0F}, 2));
+      Assert.assertTrue(error.getMessage().contains("vectorEfSearch"));
+    }
+  }
+
+  @Test
+  public void testRuntimeControlDebugInfoReflectsOverrides()
+      throws IOException {
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader("foo", INDEX_DIR, 4, _config)) {
+      reader.setEfSearch(6);
+      reader.setUseRelativeDistance(false);
+      reader.setUseBoundedQueue(false);
+
+      Map<String, Object> debugInfo = reader.getIndexDebugInfo();
+      Assert.assertEquals(debugInfo.get("effectiveEfSearch"), 6);
+      Assert.assertEquals(debugInfo.get("effectiveHnswUseRelativeDistance"), Boolean.FALSE);
+      Assert.assertEquals(debugInfo.get("effectiveHnswUseBoundedQueue"), Boolean.FALSE);
+    }
+  }
 }

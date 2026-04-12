@@ -397,6 +397,7 @@ public class FilterPlanNode implements PlanNode {
       VectorSimilarityPredicate predicate, String column, int numDocs, boolean hasMetadataFilter) {
     VectorIndexReader vectorIndex = dataSource.getVectorIndex();
     VectorIndexConfig vectorIndexConfig = dataSource.getVectorIndexConfig();
+    boolean isMutableSegment = _indexSegment.getSegmentMetadata().isMutableSegment();
     VectorSearchParams searchParams = VectorSearchParams.fromQueryOptions(_queryContext.getQueryOptions());
 
     if (vectorIndex != null) {
@@ -418,7 +419,7 @@ public class FilterPlanNode implements PlanNode {
     Preconditions.checkState(forwardIndexReader != null,
         "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
     return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs, vectorIndexConfig,
-        getVectorFallbackReason(vectorIndexConfig), searchParams);
+        getVectorFallbackReason(vectorIndexConfig, isMutableSegment), searchParams);
   }
 
   /**
@@ -593,12 +594,16 @@ public class FilterPlanNode implements PlanNode {
     }
   }
 
-  private static String getVectorFallbackReason(@Nullable VectorIndexConfig vectorIndexConfig) {
+  private static String getVectorFallbackReason(@Nullable VectorIndexConfig vectorIndexConfig,
+      boolean isMutableSegment) {
     if (vectorIndexConfig == null || vectorIndexConfig.isDisabled()) {
-      return "vector_index_missing";
+      return isMutableSegment ? "vector_index_missing_on_mutable_segment" : "vector_index_missing";
     }
-    return vectorIndexConfig.resolveBackendType().supportsMutableSegments()
-        ? "vector_index_missing"
-        : vectorIndexConfig.resolveBackendType().name().toLowerCase() + "_index_unavailable";
+    VectorBackendType backendType = vectorIndexConfig.resolveBackendType();
+    if (isMutableSegment && !backendType.supportsMutableSegments()) {
+      return backendType.name().toLowerCase() + "_mutable_segment_unavailable";
+    }
+    return backendType.supportsMutableSegments() ? "vector_index_missing"
+        : backendType.name().toLowerCase() + "_index_unavailable";
   }
 }
