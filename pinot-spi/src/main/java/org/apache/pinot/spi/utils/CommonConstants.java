@@ -1752,6 +1752,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
     public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
 
+    public static final String CONFIG_OF_OOM_PAUSE_ENABLED = "accounting.oom.critical.query.pause.enabled";
+    public static final boolean DEFAULT_OOM_PAUSE_ENABLED = false;
+
+    public static final String CONFIG_OF_OOM_PAUSE_TIMEOUT_MS = "accounting.oom.critical.query.pause.timeout.ms";
+    public static final long DEFAULT_OOM_PAUSE_TIMEOUT_MS = 1000;
+
     /**
      * QUERY WORKLOAD ISOLATION Configs
      *
