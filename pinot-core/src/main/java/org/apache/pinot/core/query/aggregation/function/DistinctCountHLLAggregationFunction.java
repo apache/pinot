@@ -722,14 +722,23 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   /**
    * Returns the HyperLogLog from the result holder or creates a new one if it does not exist.
+   * If the holder currently contains a {@link DictIdsWrapper} (e.g. because a prior block of a consuming segment used
+   * the bitmap path before the dictionary grew past the threshold), it is converted to a HyperLogLog first so that the
+   * holder always ends up holding a consistent type.
    */
   protected HyperLogLog getHyperLogLog(AggregationResultHolder aggregationResultHolder) {
-    HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
-    if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(_log2m);
+    Object result = aggregationResultHolder.getResult();
+    if (result == null) {
+      HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
       aggregationResultHolder.setValue(hyperLogLog);
+      return hyperLogLog;
     }
-    return hyperLogLog;
+    if (result instanceof DictIdsWrapper) {
+      HyperLogLog hyperLogLog = convertToHyperLogLog((DictIdsWrapper) result);
+      aggregationResultHolder.setValue(hyperLogLog);
+      return hyperLogLog;
+    }
+    return (HyperLogLog) result;
   }
 
   /**
@@ -747,14 +756,22 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   /**
    * Returns the HyperLogLog for the given group key or creates a new one if it does not exist.
+   * If the holder currently contains a {@link DictIdsWrapper} for this group key, it is converted to a HyperLogLog
+   * first (same reasoning as {@link #getHyperLogLog(AggregationResultHolder)}).
    */
   protected HyperLogLog getHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey) {
-    HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-    if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(_log2m);
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result == null) {
+      HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
       groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
+      return hyperLogLog;
     }
-    return hyperLogLog;
+    if (result instanceof DictIdsWrapper) {
+      HyperLogLog hyperLogLog = convertToHyperLogLog((DictIdsWrapper) result);
+      groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
+      return hyperLogLog;
+    }
+    return (HyperLogLog) result;
   }
 
   /**
