@@ -83,10 +83,14 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
     NotificationContext.Type type = context.getType();
     if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {
       handleFullScan();
-    } else {
+    } else if (type == NotificationContext.Type.CALLBACK) {
       // An existing instance's config changed (e.g. IS_SHUTDOWN_IN_PROGRESS toggled).
       // pathChanged is the ZK path of the specific instance that changed.
       String pathChanged = context.getPathChanged();
+      if (pathChanged == null) {
+        // Shouldn't happen, but be defensive.
+        return;
+      }
       String instanceName = pathChanged.substring(pathChanged.lastIndexOf('/') + 1);
       handleSingleInstanceChange(instanceName);
     }

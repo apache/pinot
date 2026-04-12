@@ -229,6 +229,24 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     return context;
   }
 
+  @Test
+  public void testNullPathChangedIsNoOp() {
+    // Simulate a CALLBACK notification where pathChanged is null (defensive null-check).
+    // A null pathChanged is unexpected, so the handler should silently return without
+    // any interactions rather than NPE on pathChanged.substring().
+    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextWithNullPath());
+
+    verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
+    verify(_helixAdmin, never()).getInstancesInCluster(any());
+  }
+
+  private NotificationContext createCallbackContextWithNullPath() {
+    NotificationContext context = new NotificationContext(_helixManager);
+    context.setType(NotificationContext.Type.CALLBACK);
+    // pathChanged is not set, so getPathChanged() returns null
+    return context;
+  }
+
   private NotificationContext createInitContext() {
     NotificationContext context = new NotificationContext(_helixManager);
     context.setType(NotificationContext.Type.INIT);
