@@ -469,7 +469,8 @@ public class AbstractMetricsTest {
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
         ControllerGauge.VERSION.getGaugeName() + "." + compositeKey), 7);
 
-    controllerMetrics.removePartitionGaugeForStreamTopic(tableWithType, topic, partitionGroupId, ControllerGauge.VERSION);
+    controllerMetrics.removePartitionGaugeForStreamTopic(tableWithType, topic, partitionGroupId,
+        ControllerGauge.VERSION);
     Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
   }
 
