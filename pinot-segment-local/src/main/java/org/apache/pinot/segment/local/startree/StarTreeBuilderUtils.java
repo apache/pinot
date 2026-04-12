@@ -34,6 +34,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -395,6 +396,12 @@ public class StarTreeBuilderUtils {
           expressionContexts.add(ExpressionContext.forLiteral(
               Literal.intValue(Integer.parseInt(String.valueOf(
                   functionParameters.get(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY))))));
+        } else {
+          // Always inject the default compression so it is stored in star-tree metadata.
+          // This allows canUseStarTree() to distinguish old segments (no metadata, built with compression=100)
+          // from new segments (metadata present, built with the current default).
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.intValue(PercentileTDigestValueAggregator.DEFAULT_TDIGEST_COMPRESSION)));
         }
         break;
       }

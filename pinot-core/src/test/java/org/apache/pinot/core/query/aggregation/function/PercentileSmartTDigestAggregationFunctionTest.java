@@ -34,39 +34,26 @@ public class PercentileSmartTDigestAggregationFunctionTest {
       return "PERCENTILESMARTTDIGEST(" + column + ", " + percent + ", 'THRESHOLD=1')";
     }
 
+    // t-digest 3.3 changed interpolation for small datasets: values snap to integers
+    // instead of interpolating between adjacent values (e.g., p10 returns 1.0 not 0.5)
     @Override
     String expectedAggrWithNull10(Scenario scenario) {
-      return "0.5";
+      return "1.0";
     }
 
     @Override
     String expectedAggrWithNull30(Scenario scenario) {
-      return "2.5";
+      return "3.0";
     }
 
     @Override
     String expectedAggrWithNull50(Scenario scenario) {
-      return "4.5";
+      return "5.0";
     }
 
     @Override
     String expectedAggrWithNull70(Scenario scenario) {
-      return "6.5";
-    }
-
-    @Override
-    String expectedAggrWithoutNull55(Scenario scenario) {
-      switch (scenario.getDataType()) {
-        case INT:
-          return "-6.442450943999939E8";
-        case LONG:
-          return "-2.7670116110564065E18";
-        case FLOAT:
-        case DOUBLE:
-          return "-Infinity";
-        default:
-          throw new IllegalArgumentException("Unsupported datatype " + scenario.getDataType());
-      }
+      return "7.0";
     }
 
     @Override
@@ -76,7 +63,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
 
     @Override
     String expectedAggrWithoutNull90(Scenario scenario) {
-      return "7.100000000000001";
+      return "7.0";
     }
   }
 }

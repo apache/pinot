@@ -32,8 +32,10 @@ import java.util.TreeSet;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
@@ -80,7 +82,8 @@ public class StarTreeV2BuilderConfig {
             AggregationFunctionColumnPair.resolveToStoredType(aggregationFunctionColumnPair);
         // If there is already an equivalent functionColumnPair in the map, do not load another.
         // This prevents the duplication of the aggregation when the StarTree is constructed.
-        aggregationSpecs.putIfAbsent(storedType, AggregationSpec.DEFAULT);
+        aggregationSpecs.putIfAbsent(storedType,
+            getDefaultAggregationSpec(aggregationFunctionColumnPair.getFunctionType()));
       }
     }
     if (indexConfig.getAggregationConfigs() != null) {
@@ -322,5 +325,23 @@ public class StarTreeV2BuilderConfig {
     return new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE).append("splitOrder", _dimensionsSplitOrder)
         .append("skipStarNodeCreation", _skipStarNodeCreationForDimensions)
         .append("aggregationSpecs", _aggregationSpecs).append("maxLeafRecords", _maxLeafRecords).toString();
+  }
+
+  /**
+   * Returns the default {@link AggregationSpec} for the given function type. For PERCENTILETDIGEST and
+   * PERCENTILERAWTDIGEST, the default compression factor is explicitly included in the function parameters so that
+   * it is persisted in star-tree metadata. This allows {@code canUseStarTree()} to distinguish old segments (built
+   * with the previous default of 100, which have no compression metadata) from new segments.
+   */
+  private static AggregationSpec getDefaultAggregationSpec(AggregationFunctionType functionType) {
+    switch (functionType) {
+      case PERCENTILETDIGEST:
+      case PERCENTILERAWTDIGEST:
+        return new AggregationSpec(null, null, null, null, null,
+            Map.of(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY,
+                PercentileTDigestValueAggregator.DEFAULT_TDIGEST_COMPRESSION));
+      default:
+        return AggregationSpec.DEFAULT;
+    }
   }
 }
