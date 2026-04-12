@@ -427,6 +427,11 @@ public class QueryOptionsUtils {
     return checkedParseIntPositive(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY, minInitialIndexedTableCapacity);
   }
 
+  @Nullable
+  public static String getGroupByAlgorithm(Map<String, String> queryOptions) {
+    return queryOptions.get(QueryOptionKey.GROUP_BY_ALGORITHM);
+  }
+
   public static boolean shouldDropResults(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.DROP_RESULTS));
   }

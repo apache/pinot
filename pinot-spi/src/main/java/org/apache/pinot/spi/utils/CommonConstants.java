@@ -853,6 +853,7 @@ public class CommonConstants {
         // possible.
         public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
             "optimizeMaxInitialResultHolderCapacity";
+        public static final String GROUP_BY_ALGORITHM = "groupByAlgorithm";
 
         // Set to true if a cursor should be returned instead of the complete result set
         public static final String GET_CURSOR = "getCursor";
@@ -1308,6 +1309,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + GROUPBY_TRIM_THRESHOLD;
     public static final int DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD = 1_000_000;
+    // Server-level default group-by combine algorithm; can be overridden per query via groupByAlgorithm option
+    public static final String GROUP_BY_ALGORITHM = "group.by.algorithm";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_GROUP_BY_ALGORITHM =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + GROUP_BY_ALGORITHM;
+    public static final String DEFAULT_QUERY_EXECUTOR_GROUP_BY_ALGORITHM = "NON-BLOCKING";
     // Do sort-aggregation when LIMIT is below this threshold
     public static final int DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD = 10_000;
     // Use sequential instead of pair-wise combine for sort-aggr when numSegments is below this threshold
