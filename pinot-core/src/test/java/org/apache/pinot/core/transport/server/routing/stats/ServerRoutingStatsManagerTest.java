@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -311,6 +312,91 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(score, 10.0);
     score = manager.fetchHybridScoreForServer("server1");
     assertEquals(score, 54.0);
+  }
+
+  @Test
+  public void testStatsMetricExportEnabled() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT, true);
+    // Use a short export interval so the test doesn't wait long.
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, 50L);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+    // Submit a query and then record a response with 100ms latency, leaving 0 in-flight requests.
+    manager.recordStatsForQuerySubmission(requestId++, "metricExportServer1");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "metricExportServer1", 100);
+    waitForStatsUpdate(manager, requestId);
+
+    String numInFlightKey = BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS.getGaugeName()
+        + ".server.metricExportServer1";
+    String latencyKey = BrokerGauge.ADAPTIVE_SERVER_LATENCY_EMA.getGaugeName() + ".server.metricExportServer1";
+    String hybridScoreKey = BrokerGauge.ADAPTIVE_SERVER_HYBRID_SCORE.getGaugeName() + ".server.metricExportServer1";
+
+    // Wait for the periodic export task to fire and populate the gauges.
+    TestUtils.waitForCondition(aVoid -> _brokerMetrics.getGaugeValue(numInFlightKey) != null,
+        50L, 5000, "Timed out waiting for adaptive server stats metrics to be exported");
+
+    // alpha=1.0 means EMA equals the last observed value.
+    assertEquals((long) _brokerMetrics.getGaugeValue(numInFlightKey), 0L);
+    assertEquals((long) _brokerMetrics.getGaugeValue(latencyKey), 100L);
+    assertNotNull(_brokerMetrics.getGaugeValue(hybridScoreKey));
+  }
+
+  @Test
+  public void testStatsMetricExportWhenStatsCollectionDisabled() throws InterruptedException {
+    // When stats collection is off, init() returns early — no executor is created and no metrics are exported,
+    // regardless of the enable.stats.metric.export flag.
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, false);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    Thread.sleep(200);
+    String numInFlightKey = BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS.getGaugeName()
+        + ".server.statsCollectionDisabledServer";
+    assertNull(_brokerMetrics.getGaugeValue(numInFlightKey));
+  }
+
+  @Test
+  public void testStatsMetricExportDisabled() throws InterruptedException {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT, false);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+    manager.recordStatsForQuerySubmission(requestId++, "metricExportDisabledServer");
+    waitForStatsUpdate(manager, requestId);
+
+    // Wait briefly and confirm that no gauges were exported.
+    Thread.sleep(200);
+    String numInFlightKey = BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS.getGaugeName()
+        + ".server.metricExportDisabledServer";
+    assertNull(_brokerMetrics.getGaugeValue(numInFlightKey));
+  }
+
+  private void assertStatsNullForInstance(ServerRoutingStatsManager manager, String instanceId) {
+    Integer numInFlightReq = manager.fetchNumInFlightRequestsForServer(instanceId);
+    assertNull(numInFlightReq);
+
+    Double latency = manager.fetchEMALatencyForServer(instanceId);
+    assertNull(latency);
+
+    Double score = manager.fetchHybridScoreForServer(instanceId);
+    assertNull(score);
   }
 
   private void waitForStatsUpdate(ServerRoutingStatsManager serverRoutingStatsManager, long taskCount) {
