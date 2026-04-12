@@ -78,12 +78,20 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
 
   /// Processes all segments sequentially on the calling thread when only one task is needed.
   /// Avoids all concurrency overhead: no ExecutorService submission, no Phaser, no BlockingQueue, no atomics.
+  /// Respects the query deadline: if the timeout is exceeded before a segment operator is invoked, a timeout
+  /// results block is returned immediately rather than blocking indefinitely on a stalled operator.
   @SuppressWarnings("unchecked")
   private BaseResultsBlock getNextBlockSingleThread() {
     ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
     T mergedBlock = null;
+    long endTimeMs = _queryContext.getEndTimeMs();
     try {
       for (int i = 0; i < _numOperators; i++) {
+        // Check timeout before invoking each segment operator so we respect the query deadline
+        // even if a segment operator blocks for a long time (mirrors mergeResults() timeout logic).
+        if (System.currentTimeMillis() >= endTimeMs) {
+          return attachExecutionStats(getTimeoutResultsBlock(i));
+        }
         Operator operator = _operators.get(i);
         T resultsBlock;
         try {
