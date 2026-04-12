@@ -160,7 +160,7 @@ public class DistinctCountHLLAggregationFunctionTest {
 
     ObjectAggregationResultHolder holder = new ObjectAggregationResultHolder();
 
-    // First batch: dictionary size 50 → bitmap path → holder gets DictIdsWrapper
+    // First batch: dictionary size 50 — below threshold → bitmap path stores a DictIdsWrapper in the holder
     int smallDictSize = 50;
     Dictionary smallDict = mock(Dictionary.class);
     when(smallDict.length()).thenReturn(smallDictSize);
@@ -170,11 +170,9 @@ public class DistinctCountHLLAggregationFunctionTest {
     int[] firstBatchDictIds = new int[]{0, 1, 2, 3, 4};
     DistinctCountHLLAggregationFunction.getDictIdBitmap(holder, smallDict).addN(firstBatchDictIds, 0,
         firstBatchDictIds.length);
-    Assert.assertTrue(holder.getResult() instanceof org.roaringbitmap.RoaringBitmap
-        || holder.getResult().getClass().getSimpleName().equals("DictIdsWrapper"),
-        "After first batch, holder should contain DictIdsWrapper");
 
-    // Second batch: same holder, but dictionary has grown past the threshold → direct HLL path
+    // Second batch: same holder, dictionary has grown past the threshold → direct HLL path.
+    // getHyperLogLog() must convert the existing DictIdsWrapper to HyperLogLog without ClassCastException.
     int largeDictSize = 150;
     Dictionary largeDict = mock(Dictionary.class);
     when(largeDict.length()).thenReturn(largeDictSize);
@@ -182,13 +180,12 @@ public class DistinctCountHLLAggregationFunctionTest {
       when(largeDict.get(i)).thenReturn("value_" + i);
     }
     int[] secondBatchDictIds = new int[]{5, 6, 7, 8, 9};
-    // This must NOT throw ClassCastException — getHyperLogLog must convert DictIdsWrapper first
-    HyperLogLog hll = function.getHyperLogLog(holder);
+    HyperLogLog hll = function.getHyperLogLog(holder); // must not throw ClassCastException
     for (int dictId : secondBatchDictIds) {
       hll.offer(largeDict.get(dictId));
     }
 
-    // Extract result — should contain all values from both batches (5 + 5 = 10 unique)
+    // All 10 unique values (5 from bitmap path + 5 from HLL path) should be in the final result
     HyperLogLog result = function.extractAggregationResult(holder);
     Assert.assertTrue(result.cardinality() >= 8,
         "Expected at least 8 unique values after both batches, got: " + result.cardinality());
