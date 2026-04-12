@@ -57,42 +57,6 @@ public final class VectorSearchParams {
   private final Boolean _hnswUseBoundedQueue;
 
   /**
-   * Backward-compatible constructor that uses only the original three parameters.
-   *
-   * @param nprobe number of IVF probes, or null for default
-   * @param exactRerankOverride whether to re-score ANN candidates with exact distance, or null to use the backend
-   *                           default
-   * @param maxCandidates max candidates before final top-K, or null for default (topK * 10)
-   */
-  public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
-      @Nullable Integer maxCandidates) {
-    this(nprobe, exactRerankOverride, maxCandidates, null, null, null, null);
-  }
-
-  /**
-   * Backward-compatible constructor with distance threshold (Phase 3).
-   */
-  public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
-      @Nullable Integer maxCandidates, @Nullable Float distanceThreshold) {
-    this(nprobe, exactRerankOverride, maxCandidates, distanceThreshold, null, null, null);
-  }
-
-  /**
-   * Full constructor with all query option values.
-   *
-   * @param nprobe number of IVF probes, or null for default
-   * @param exactRerankOverride whether to re-score ANN candidates with exact distance, or null to use the backend
-   *                           default
-   * @param maxCandidates max candidates before final top-K, or null for default (topK * 10)
-   * @param distanceThreshold distance threshold for radius search, or null for top-K mode
-   * @param efSearch HNSW efSearch parameter, or null to use default
-   */
-  public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
-      @Nullable Integer maxCandidates, @Nullable Float distanceThreshold, @Nullable Integer efSearch) {
-    this(nprobe, exactRerankOverride, maxCandidates, distanceThreshold, efSearch, null, null);
-  }
-
-  /**
    * Full constructor with all query option values.
    *
    * @param nprobe number of IVF probes, or null for default

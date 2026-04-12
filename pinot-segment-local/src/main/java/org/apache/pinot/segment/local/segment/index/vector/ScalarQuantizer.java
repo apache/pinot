@@ -382,7 +382,7 @@ public class ScalarQuantizer implements VectorQuantizer {
       docNorm += decodedValue * decodedValue;
     }
     if (queryNorm == 0.0d || docNorm == 0.0d) {
-      return Double.NaN;
+      return 1.0d;
     }
     return 1.0d - (dotProduct / (Math.sqrt(queryNorm) * Math.sqrt(docNorm)));
   }

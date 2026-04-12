@@ -143,15 +143,14 @@ public class ScalarQuantizerTest {
   }
 
   @Test
-  public void testCosineDistanceWithZeroNormQueryReturnsNaN() {
+  public void testCosineDistanceWithZeroNormQueryReturnsFiniteFallback() {
     float[][] vectors = generateRandomVectors(1000, DIMENSION, 42);
     ScalarQuantizer sq = ScalarQuantizer.train(vectors, DIMENSION, ScalarQuantizer.BitWidth.SQ8);
 
     float[] zeroQuery = new float[DIMENSION];
     byte[] encodedDoc = sq.encode(vectors[0]);
 
-    assertTrue(Float.isNaN(
-        sq.computeDistance(zeroQuery, encodedDoc, VectorIndexConfig.VectorDistanceFunction.COSINE)));
+    assertEquals(sq.computeDistance(zeroQuery, encodedDoc, VectorIndexConfig.VectorDistanceFunction.COSINE), 1.0f);
   }
 
   @Test
@@ -358,7 +357,7 @@ public class ScalarQuantizerTest {
           normB += b[d] * b[d];
         }
         float denom = (float) (Math.sqrt(normA) * Math.sqrt(normB));
-        return denom > 0 ? 1.0f - dot / denom : Float.NaN;
+        return denom > 0 ? 1.0f - dot / denom : 1.0f;
       case INNER_PRODUCT:
       case DOT_PRODUCT:
         for (int d = 0; d < a.length; d++) {

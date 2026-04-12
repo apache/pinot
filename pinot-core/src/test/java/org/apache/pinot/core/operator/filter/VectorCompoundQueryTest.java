@@ -136,7 +136,7 @@ public class VectorCompoundQueryTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
 
-    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f);
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(
         mockReader, predicate, 100, params, mockForward,
         createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN), true);

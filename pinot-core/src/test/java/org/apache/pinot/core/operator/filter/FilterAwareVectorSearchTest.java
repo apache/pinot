@@ -275,8 +275,7 @@ public class FilterAwareVectorSearchTest {
     VectorExplainContext context = new VectorExplainContext(
         org.apache.pinot.segment.spi.index.creator.VectorBackendType.HNSW,
         VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
-        0, false, 10, null, null, 0, -1f,
-        VectorSearchMode.FILTER_THEN_ANN, 0.15);
+        null, 0, false, 10, null, null, 0, -1f, VectorSearchMode.FILTER_THEN_ANN, 0.15, null, null);
 
     Assert.assertEquals(context.getVectorSearchMode(), VectorSearchMode.FILTER_THEN_ANN);
     Assert.assertEquals(context.getFilterSelectivity(), 0.15, 0.001);
@@ -287,7 +286,7 @@ public class FilterAwareVectorSearchTest {
     VectorExplainContext context = new VectorExplainContext(
         org.apache.pinot.segment.spi.index.creator.VectorBackendType.HNSW,
         VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
-        0, false, 10, null);
+        null, 0, false, 10, null, null, 0, -1f, VectorSearchMode.POST_FILTER_ANN, -1.0, null, null);
 
     Assert.assertEquals(context.getVectorSearchMode(), VectorSearchMode.POST_FILTER_ANN);
     Assert.assertEquals(context.getFilterSelectivity(), -1.0, 0.001);

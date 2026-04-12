@@ -82,7 +82,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
-    VectorSearchParams params = new VectorSearchParams(16, false, null);
+    VectorSearchParams params = new VectorSearchParams(16, false, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null);
 
@@ -105,7 +105,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
 
-    VectorSearchParams params = new VectorSearchParams(16, false, null);
+    VectorSearchParams params = new VectorSearchParams(16, false, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null);
 
@@ -141,7 +141,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
-    VectorSearchParams params = new VectorSearchParams(null, true, null);
+    VectorSearchParams params = new VectorSearchParams(null, true, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         10, params, mockForward);
 
@@ -170,7 +170,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 5);
 
-    VectorSearchParams params = new VectorSearchParams(null, true, 50);
+    VectorSearchParams params = new VectorSearchParams(null, true, 50, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         40, params, mockForward);
 
@@ -192,7 +192,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
-    VectorSearchParams params = new VectorSearchParams(null, false, null);
+    VectorSearchParams params = new VectorSearchParams(null, false, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null);
 
@@ -213,7 +213,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
-    VectorSearchParams params = new VectorSearchParams(null, true, null);
+    VectorSearchParams params = new VectorSearchParams(null, true, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null);
 
@@ -259,7 +259,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, new float[]{1.0f, 2.0f}, 5);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
-        100, new VectorSearchParams(16, false, null), null,
+        100, new VectorSearchParams(16, false, null, null, null, null, null), null,
         createVectorIndexConfig("IVF_FLAT", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
 
     String explain = operator.toExplainString();
@@ -285,7 +285,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
 
-    VectorSearchParams params = new VectorSearchParams(8, true, 20);
+    VectorSearchParams params = new VectorSearchParams(8, true, 20, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, mockForward);
 
@@ -307,7 +307,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
-    VectorSearchParams params = new VectorSearchParams(16, false, null);
+    VectorSearchParams params = new VectorSearchParams(16, false, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null);
 
@@ -361,7 +361,8 @@ public class VectorSimilarityFilterOperatorTest {
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 10,
-        new VectorSearchParams(null, false, null), createMockForwardIndexReader(new float[][]{{1.0f, 0.0f}}),
+        new VectorSearchParams(null, false, null, null, null, null, null),
+        createMockForwardIndexReader(new float[][]{{1.0f, 0.0f}}),
         createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
 
     operator.getBitmaps();
@@ -386,7 +387,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 10,
-        new VectorSearchParams(null, true, null), createMockForwardIndexReader(vectors),
+        new VectorSearchParams(null, true, null, null, null, null, null), createMockForwardIndexReader(vectors),
         createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.COSINE));
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
@@ -437,7 +438,7 @@ public class VectorSimilarityFilterOperatorTest {
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
 
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
-        100, new VectorSearchParams(null, true, null), mockForward, null, true);
+        100, new VectorSearchParams(null, true, null, null, null, null, null), mockForward, null, true);
     String explain = operator.toExplainString();
     Assert.assertTrue(explain.contains("executionMode:ANN_THEN_FILTER_THEN_RERANK"),
         "Expected ANN_THEN_FILTER_THEN_RERANK but got: " + explain);
@@ -467,7 +468,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
 
-    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f);
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, mockForward,
         createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN), false);
@@ -490,7 +491,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
 
-    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f);
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null, null, false);
 
@@ -511,7 +512,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
 
-    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f);
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null, null, true);
 
