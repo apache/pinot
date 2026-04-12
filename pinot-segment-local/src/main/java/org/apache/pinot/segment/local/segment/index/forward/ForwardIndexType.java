@@ -129,6 +129,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
       for (ChunkCodec transformCodec : codecPipeline.getTransforms()) {
         ChunkTransformFactory.getTransform(transformCodec).validateStoredType(storedType, column);
       }
+      Preconditions.checkState(forwardIndexConfig.getRawIndexWriterVersion() == 7,
+          "codecPipeline with transforms requires rawIndexWriterVersion=7 for column: %s. "
+              + "Transform pipelines emit V7 forward indexes and should only be enabled after all readers in the "
+              + "cluster support V7.", column);
     }
 
     if (dictionaryConfig.isEnabled()) {

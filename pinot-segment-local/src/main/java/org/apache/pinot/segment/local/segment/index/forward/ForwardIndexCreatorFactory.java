@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
@@ -97,9 +98,10 @@ public class ForwardIndexCreatorFactory {
       int targetMaxChunkSize = indexConfig.getTargetMaxChunkSizeBytes();
       int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
 
-      // Auto-bump writer version to 7 when pipeline has transforms
-      if (codecPipeline != null && codecPipeline.hasTransforms() && writerVersion < 7) {
-        writerVersion = 7;
+      if (codecPipeline != null && codecPipeline.hasTransforms()) {
+        Preconditions.checkState(writerVersion == 7,
+            "codecPipeline with transforms requires rawIndexWriterVersion=7 for column: %s, got: %s", columnName,
+            writerVersion);
       }
 
       if (fieldSpec.isSingleValueField()) {

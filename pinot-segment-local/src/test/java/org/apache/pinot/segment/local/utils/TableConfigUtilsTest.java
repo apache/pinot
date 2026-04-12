@@ -1235,11 +1235,25 @@ public class TableConfigUtilsTest {
           "Expected XOR type validation error, got: " + e.getMessage());
     }
 
-    // Validate codecPipeline with transforms on valid SV INT column passes
+    // Validate codecPipeline with transforms requires an explicit V7 writer version
     try {
       FieldConfig fieldConfig =
           new FieldConfig("intCol", FieldConfig.EncodingType.RAW, null, null, null, null, null,
               Arrays.asList("DELTA", "ZSTANDARD"), null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for codecPipeline with transforms when rawIndexWriterVersion is not explicitly set to 7");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("rawIndexWriterVersion=7"),
+          "Expected writer version validation error, got: " + e.getMessage());
+    }
+
+    // Validate codecPipeline with transforms on valid SV INT column passes with explicit V7 opt-in
+    try {
+      Map<String, String> properties = Collections.singletonMap(FieldConfig.RAW_INDEX_WRITER_VERSION, "7");
+      FieldConfig fieldConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, null, null, null, null, null,
+              Arrays.asList("DELTA", "ZSTANDARD"), properties, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
