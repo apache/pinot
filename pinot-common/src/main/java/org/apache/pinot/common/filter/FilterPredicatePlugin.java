@@ -26,7 +26,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 /**
  * SPI interface for registering custom filter predicates into Pinot.
  *
- * <p>A plugin implementing this interface can introduce a new filter predicate (e.g., SEMANTIC_MATCH)
+ * <p>A plugin implementing this interface can introduce a new filter predicate (for example, anyLike)
  * without modifying Pinot core code. The plugin handles three layers:
  * <ol>
  *   <li><b>SQL Parsing</b> — validation and rewriting of the Thrift expression tree</li>
@@ -42,7 +42,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 public interface FilterPredicatePlugin {
 
   /**
-   * Returns the canonical name of this filter predicate (e.g., "SEMANTIC_MATCH").
+   * Returns the canonical name of this filter predicate (for example, "LIKE_ANY").
    * Must be unique across all registered plugins and built-in filter kinds.
    * The name is case-insensitive and will be canonicalized for matching.
    */
@@ -79,8 +79,8 @@ public interface FilterPredicatePlugin {
    * Returns the operand type families for Calcite SQL operator registration.
    * Each element corresponds to one operand and specifies its expected SQL type family.
    *
-   * <p>Example for SEMANTIC_MATCH(column, 'query', topK):
-   * {@code List.of(OperandType.STRING, OperandType.STRING, OperandType.INTEGER)}
+   * <p>Example for anyLike(column, 'foo%', '%bar'):
+   * {@code List.of(OperandType.STRING, OperandType.STRING, OperandType.STRING)}
    */
   List<OperandType> getOperandTypes();
 

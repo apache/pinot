@@ -41,7 +41,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public interface CustomFilterOperatorFactory {
 
   /**
-   * Returns the predicate name this factory handles (e.g., "SEMANTIC_MATCH").
+   * Returns the predicate name this factory handles (for example, "LIKE_ANY").
    * Must match the name returned by the corresponding
    * {@link org.apache.pinot.common.request.context.predicate.CustomPredicate#getCustomTypeName()}.
    */

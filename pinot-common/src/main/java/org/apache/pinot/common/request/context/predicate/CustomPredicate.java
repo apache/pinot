@@ -25,20 +25,18 @@ import org.apache.pinot.common.request.context.ExpressionContext;
  * Base class for custom filter predicates registered via the plugin system.
  *
  * <p>Plugin authors should extend this class to define their own predicate types
- * (e.g., SemanticMatchPredicate). The {@link #getCustomTypeName()} method returns
+ * (for example, AnyLikePredicate). The {@link #getCustomTypeName()} method returns
  * the unique predicate name used to look up the corresponding filter operator factory
  * at query execution time.
  *
  * <p>Example:
  * <pre>
- * public class SemanticMatchPredicate extends CustomPredicate {
- *     private final String _queryText;
- *     private final int _topK;
+ * public class AnyLikePredicate extends CustomPredicate {
+ *     private final List<String> _patterns;
  *
- *     public SemanticMatchPredicate(ExpressionContext lhs, String queryText, int topK) {
- *         super(lhs, "SEMANTIC_MATCH");
- *         _queryText = queryText;
- *         _topK = topK;
+ *     public AnyLikePredicate(ExpressionContext lhs, List<String> patterns) {
+ *         super(lhs, "LIKE_ANY");
+ *         _patterns = patterns;
  *     }
  *     // ... getters, equals, hashCode, toString
  * }
@@ -59,7 +57,7 @@ public abstract class CustomPredicate extends BasePredicate {
   }
 
   /**
-   * Returns the unique name of this custom predicate type (e.g., "SEMANTIC_MATCH").
+   * Returns the unique name of this custom predicate type (for example, "LIKE_ANY").
    * Used to look up the corresponding filter operator factory at execution time.
    */
   public String getCustomTypeName() {
