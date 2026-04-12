@@ -25,9 +25,11 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
 /**
- * Base class for polymorphic binary arithmetic scalar functions
+ * Base class for binary arithmetic scalar functions.
+ *
+ * <p>Instances are immutable and thread-safe.
  */
-public abstract class PolymorphicBinaryArithmeticScalarFunction implements PinotScalarFunction {
+public abstract class BaseBinaryArithmeticScalarFunction implements PinotScalarFunction {
 
   @Nullable
   @Override
@@ -51,17 +53,32 @@ public abstract class PolymorphicBinaryArithmeticScalarFunction implements Pinot
   }
 
   private FunctionInfo functionInfoForTypes(ColumnDataType argumentType1, ColumnDataType argumentType2) {
-    if ((argumentType1 == ColumnDataType.LONG || argumentType1 == ColumnDataType.INT) && (
-        argumentType2 == ColumnDataType.LONG || argumentType2 == ColumnDataType.INT)) {
-      return functionInfoForType(ColumnDataType.LONG);
+    if (argumentType1.isNumber() && argumentType2.isNumber()) {
+      if (argumentType1 == argumentType2) {
+        return functionInfoForType(argumentType1);
+      }
+      if (argumentType1.isWholeNumber() && argumentType2.isWholeNumber()) {
+        return functionInfoForType(ColumnDataType.LONG);
+      }
+      if (argumentType1 == ColumnDataType.BIG_DECIMAL || argumentType2 == ColumnDataType.BIG_DECIMAL) {
+        return functionInfoForType(ColumnDataType.BIG_DECIMAL);
+      }
+      if (argumentType1.ordinal() > argumentType2.ordinal()) {
+        return functionInfoForType(argumentType1);
+      }
+      return functionInfoForType(argumentType2);
     }
 
-    // Fall back to double based comparison by default
-    return functionInfoForType(ColumnDataType.DOUBLE);
+    // Fall back to double based arithmetic by default so legacy coercions (e.g. STRING -> DOUBLE) still work.
+    return defaultFunctionInfo();
   }
 
   /**
    * Get the binary arithmetic scalar function's {@link FunctionInfo} for the given argument type.
    */
   protected abstract FunctionInfo functionInfoForType(ColumnDataType argumentType);
+
+  protected FunctionInfo defaultFunctionInfo() {
+    return functionInfoForType(ColumnDataType.DOUBLE);
+  }
 }

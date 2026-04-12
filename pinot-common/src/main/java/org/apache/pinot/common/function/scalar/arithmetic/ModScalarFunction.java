@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar.arithmetic;
 
+import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.Map;
 import org.apache.pinot.common.function.FunctionInfo;
@@ -25,19 +26,33 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-@ScalarFunction(names = {"sub", "minus"})
-public class MinusScalarFunction extends BaseBinaryArithmeticScalarFunction {
+/**
+ * Polymorphic modulo scalar function implementation.
+ *
+ * <p>Instances are immutable and thread-safe.
+ */
+@ScalarFunction
+public class ModScalarFunction extends BaseBinaryArithmeticScalarFunction {
 
   private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new EnumMap<>(ColumnDataType.class);
 
   static {
     try {
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.INT,
+          new FunctionInfo(ModScalarFunction.class.getMethod("intMod", int.class, int.class), ModScalarFunction.class,
+              false));
       TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.LONG,
-          new FunctionInfo(MinusScalarFunction.class.getMethod("longMinus", long.class, long.class),
-              MinusScalarFunction.class, false));
+          new FunctionInfo(ModScalarFunction.class.getMethod("longMod", long.class, long.class),
+              ModScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.FLOAT,
+          new FunctionInfo(ModScalarFunction.class.getMethod("floatMod", float.class, float.class),
+              ModScalarFunction.class, false));
       TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.DOUBLE,
-          new FunctionInfo(MinusScalarFunction.class.getMethod("doubleMinus", double.class, double.class),
-              MinusScalarFunction.class, false));
+          new FunctionInfo(ModScalarFunction.class.getMethod("doubleMod", double.class, double.class),
+              ModScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.BIG_DECIMAL,
+          new FunctionInfo(ModScalarFunction.class.getMethod("bigDecimalMod", BigDecimal.class, BigDecimal.class),
+              ModScalarFunction.class, false));
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
@@ -46,21 +61,31 @@ public class MinusScalarFunction extends BaseBinaryArithmeticScalarFunction {
   @Override
   protected FunctionInfo functionInfoForType(ColumnDataType argumentType) {
     FunctionInfo functionInfo = TYPE_FUNCTION_INFO_MAP.get(argumentType);
-
-    // Fall back to double based comparison by default
-    return functionInfo != null ? functionInfo : TYPE_FUNCTION_INFO_MAP.get(ColumnDataType.DOUBLE);
+    return functionInfo != null ? functionInfo : defaultFunctionInfo();
   }
 
   @Override
   public String getName() {
-    return "minus";
+    return "mod";
   }
 
-  public static long longMinus(long a, long b) {
-    return a - b;
+  public static int intMod(int a, int b) {
+    return a % b;
   }
 
-  public static double doubleMinus(double a, double b) {
-    return a - b;
+  public static long longMod(long a, long b) {
+    return a % b;
+  }
+
+  public static float floatMod(float a, float b) {
+    return a % b;
+  }
+
+  public static double doubleMod(double a, double b) {
+    return a % b;
+  }
+
+  public static BigDecimal bigDecimalMod(BigDecimal a, BigDecimal b) {
+    return a.remainder(b);
   }
 }
