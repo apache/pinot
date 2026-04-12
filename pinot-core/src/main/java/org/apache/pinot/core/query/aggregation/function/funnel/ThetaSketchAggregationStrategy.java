@@ -38,7 +38,7 @@ class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdateSketch[]>
   }
 
   @Override
-  public UpdateSketch[] createAggregationResult(Dictionary dictionary) {
+  public UpdateSketch[] createAggregationResult(Dictionary[] dictionaries) {
     final UpdateSketch[] stepsSketches = new UpdateSketch[_numSteps];
     for (int n = 0; n < _numSteps; n++) {
       stepsSketches[n] = _updateSketchBuilder.build();
@@ -47,8 +47,16 @@ class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdateSketch[]>
   }
 
   @Override
-  void add(Dictionary dictionary, UpdateSketch[] stepsSketches, int step, int correlationId) {
+  void add(UpdateSketch[] stepsSketches, int step, Dictionary[] dictionaries, int[] correlationDictIds) {
     final UpdateSketch sketch = stepsSketches[step];
+    if (dictionaries.length == 1) {
+      addSingleKey(sketch, dictionaries[0], correlationDictIds[0]);
+    } else {
+      addCompositeKey(sketch, dictionaries, correlationDictIds);
+    }
+  }
+
+  private void addSingleKey(UpdateSketch sketch, Dictionary dictionary, int correlationId) {
     switch (dictionary.getValueType()) {
       case INT:
         sketch.update(dictionary.getIntValue(correlationId));
@@ -66,8 +74,13 @@ class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdateSketch[]>
         sketch.update(dictionary.getStringValue(correlationId));
         break;
       default:
-        throw new IllegalStateException("Illegal CORRELATED_BY column data type for FUNNEL_COUNT aggregation function: "
-            + dictionary.getValueType());
+        throw new IllegalStateException(
+            "Illegal CORRELATED_BY column data type for FUNNEL_COUNT aggregation function: "
+                + dictionary.getValueType());
     }
+  }
+
+  private void addCompositeKey(UpdateSketch sketch, Dictionary[] dictionaries, int[] correlationDictIds) {
+    sketch.update(DictIdsWrapper.toCompositeString(dictionaries, correlationDictIds));
   }
 }
