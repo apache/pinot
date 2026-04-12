@@ -874,7 +874,7 @@ public class BaseTableDataManagerTest {
     assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
   }
 
-    @Test
+  @Test
   public void testReloadAllSegmentsInvokesParallelReload()
       throws Exception {
     OfflineTableDataManagerForParallelReloadTest mgr = createParallelReloadTestTableManager();
