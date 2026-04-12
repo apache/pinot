@@ -21,9 +21,12 @@ package org.apache.pinot.core.query.scheduler.resources;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.pinot.core.executor.ThrottleOnCriticalHeapUsageExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
@@ -59,6 +62,14 @@ public abstract class ResourceManager {
     DEFAULT_QUERY_WORKER_THREADS = 2 * numCores;
   }
 
+  /**
+   * Listener notified after thread pools have been resized.
+   */
+  @FunctionalInterface
+  public interface ThreadPoolResizeListener {
+    void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads);
+  }
+
   // set the main query runner priority higher than NORM but lower than MAX
   // because if a query is complete we want to deserialize and return response as soon
   // as possible
@@ -67,15 +78,21 @@ public abstract class ResourceManager {
   // including planning, distributing operators across threads, waiting and
   // reducing the results from the parallel set of operators (CombineOperator)
   //
+  protected final PinotConfiguration _config;
   protected final ListeningExecutorService _queryRunners;
   protected final ListeningExecutorService _queryWorkers;
-  protected final int _numQueryRunnerThreads;
-  protected final int _numQueryWorkerThreads;
+  protected final ThreadPoolExecutor _queryRunnerPool;
+  protected final ThreadPoolExecutor _queryWorkerPool;
+  protected volatile int _numQueryRunnerThreads;
+  protected volatile int _numQueryWorkerThreads;
+
+  private final List<ThreadPoolResizeListener> _resizeListeners = new CopyOnWriteArrayList<>();
 
   /**
    * @param config configuration for initializing resource manager
    */
   public ResourceManager(PinotConfiguration config) {
+    _config = config;
     _numQueryRunnerThreads = config.getProperty(QUERY_RUNNER_CONFIG_KEY, DEFAULT_QUERY_RUNNER_THREADS);
     _numQueryWorkerThreads = config.getProperty(QUERY_WORKER_CONFIG_KEY, DEFAULT_QUERY_WORKER_THREADS);
 
@@ -85,18 +102,92 @@ public abstract class ResourceManager {
     ThreadFactory queryRunnerFactory = new TracedThreadFactory(QUERY_RUNNER_THREAD_PRIORITY, false,
         CommonConstants.ExecutorService.PINOT_QUERY_RUNNER_NAME_FORMAT);
 
-    ExecutorService runnerService = Executors.newFixedThreadPool(_numQueryRunnerThreads, queryRunnerFactory);
-    runnerService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
-        runnerService, config, "query runner");
+    _queryRunnerPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(_numQueryRunnerThreads, queryRunnerFactory);
+    ExecutorService runnerService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
+        _queryRunnerPool, config, "query runner");
     _queryRunners = MoreExecutors.listeningDecorator(runnerService);
 
     // pqw -> pinot query workers
     ThreadFactory queryWorkersFactory = new TracedThreadFactory(Thread.NORM_PRIORITY, false,
         CommonConstants.ExecutorService.PINOT_QUERY_WORKER_NAME_FORMAT);
-    ExecutorService workerService = Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory);
-    workerService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
-        workerService, config, "query worker");
+    _queryWorkerPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory);
+    ExecutorService workerService = ThrottleOnCriticalHeapUsageExecutor.maybeWrap(
+        _queryWorkerPool, config, "query worker");
     _queryWorkers = MoreExecutors.listeningDecorator(workerService);
+  }
+
+  /**
+   * Dynamically resizes the query runner and worker thread pools. Resizing is performed on the underlying
+   * {@link ThreadPoolExecutor} instances, which is transparent to any decorator wrappers.
+   *
+   * @param newRunnerThreads desired number of query runner threads (must be &gt; 0)
+   * @param newWorkerThreads desired number of query worker threads (must be &gt; 0)
+   */
+  public synchronized void resizeThreadPools(int newRunnerThreads, int newWorkerThreads) {
+    if (newRunnerThreads <= 0 || newWorkerThreads <= 0) {
+      LOGGER.warn("Invalid thread pool sizes: runnerThreads={}, workerThreads={}. Sizes must be > 0. Skipping resize.",
+          newRunnerThreads, newWorkerThreads);
+      return;
+    }
+
+    int oldRunnerThreads = _numQueryRunnerThreads;
+    int oldWorkerThreads = _numQueryWorkerThreads;
+
+    if (oldRunnerThreads == newRunnerThreads && oldWorkerThreads == newWorkerThreads) {
+      LOGGER.debug("Thread pool sizes unchanged (runner={}, worker={}). Skipping resize.",
+          newRunnerThreads, newWorkerThreads);
+      return;
+    }
+
+    resizePool(_queryRunnerPool, oldRunnerThreads, newRunnerThreads, "queryRunner");
+    _numQueryRunnerThreads = newRunnerThreads;
+
+    resizePool(_queryWorkerPool, oldWorkerThreads, newWorkerThreads, "queryWorker");
+    _numQueryWorkerThreads = newWorkerThreads;
+
+    LOGGER.info("Resized thread pools: runner {} -> {}, worker {} -> {}",
+        oldRunnerThreads, newRunnerThreads, oldWorkerThreads, newWorkerThreads);
+
+    onThreadPoolsResized(newRunnerThreads, newWorkerThreads);
+    for (ThreadPoolResizeListener listener : _resizeListeners) {
+      listener.onThreadPoolsResized(newRunnerThreads, newWorkerThreads);
+    }
+  }
+
+  /**
+   * Registers a listener to be notified after thread pools are resized.
+   */
+  public void addThreadPoolResizeListener(ThreadPoolResizeListener listener) {
+    _resizeListeners.add(listener);
+  }
+
+  /**
+   * Hook for subclasses to update dependent state (e.g. resource limit policies) after thread pools are resized.
+   * Called before external listeners are notified.
+   */
+  protected void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads) {
+  }
+
+  private synchronized void resizePool(ThreadPoolExecutor pool, int oldSize, int newSize, String poolName) {
+    if (oldSize == newSize) {
+      return;
+    }
+    // Scale up:
+    // Increase maximumPoolSize first, then corePoolSize.
+    // If corePoolSize is increased first, it may temporarily exceed maximumPoolSize,
+    // which would cause an IllegalArgumentException.
+    if (newSize > oldSize) {
+      pool.setMaximumPoolSize(newSize);
+      pool.setCorePoolSize(newSize);
+    } else {
+      // Scale down:
+      // Decrease corePoolSize first, then maximumPoolSize.
+      // If maximumPoolSize is decreased first, it may become smaller than corePoolSize,
+      // which would also cause an IllegalArgumentException.
+      pool.setCorePoolSize(newSize);
+      pool.setMaximumPoolSize(newSize);
+    }
+    LOGGER.info("Resized {} pool: {} -> {}", poolName, oldSize, newSize);
   }
 
   public void stop() {
