@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -387,8 +388,9 @@ public class AbstractColumnStatisticsCollectorTest {
       }
       collector.seal();
 
-      assertNotNull(collector.getPartitionFunction());
-      assertEquals(collector.getNumPartitions(), NUM_PARTITIONS);
+      PartitionFunction partitionFunction = collector.getPartitionFunction();
+      assertNotNull(partitionFunction);
+      assertEquals(partitionFunction.getNumPartitions(), NUM_PARTITIONS);
 
       Set<Integer> partitions = collector.getPartitions();
       assertNotNull(partitions);
@@ -414,7 +416,6 @@ public class AbstractColumnStatisticsCollectorTest {
       collector.seal();
 
       assertNull(collector.getPartitionFunction());
-      assertEquals(collector.getNumPartitions(), -1);
       assertNull(collector.getPartitions());
     }
   }

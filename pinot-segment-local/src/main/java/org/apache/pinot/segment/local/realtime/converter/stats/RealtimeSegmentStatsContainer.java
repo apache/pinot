@@ -71,7 +71,8 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
         dataSourceMetadata.getFieldSpec().getName());
 
     if (dataSourceMetadata.getNumDocs() == 0 || (validDocIds != null && validDocIds.isEmpty())) {
-      return new EmptyColumnStatistics(dataSourceMetadata.getFieldSpec());
+      return new EmptyColumnStatistics(dataSourceMetadata.getFieldSpec(), dataSourceMetadata.getPartitionFunction(),
+          dataSourceMetadata.getPartitions());
     }
     // TODO: Add compaction support to MAP
     if (dataSource instanceof MutableMapDataSource) {

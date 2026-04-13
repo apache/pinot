@@ -134,14 +134,20 @@ public interface ColumnStatistics extends Serializable {
   @Nullable
   PartitionFunction getPartitionFunction();
 
-  /// Returns the total number of partitions.
-  int getNumPartitions();
-
-  /// Returns the config for the partition function.
-  @Nullable
-  Map<String, String> getPartitionFunctionConfig();
-
   /// Returns the partitions within which the values exist.
   @Nullable
   Set<Integer> getPartitions();
+
+  @Deprecated
+  default int getNumPartitions() {
+    PartitionFunction partitionFunction = getPartitionFunction();
+    return partitionFunction != null ? partitionFunction.getNumPartitions() : 0;
+  }
+
+  @Deprecated
+  @Nullable
+  default Map<String, String> getPartitionFunctionConfig() {
+    PartitionFunction partitionFunction = getPartitionFunction();
+    return partitionFunction != null ? partitionFunction.getFunctionConfig() : null;
+  }
 }

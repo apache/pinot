@@ -70,7 +70,10 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
       }
     } else {
       for (Map.Entry<String, ColumnStatistics> entry : _columnStatisticsMap.entrySet()) {
-        entry.setValue(new EmptyColumnStatistics(entry.getValue().getFieldSpec()));
+        ColumnStatistics columnStatistics = entry.getValue();
+        entry.setValue(
+            new EmptyColumnStatistics(columnStatistics.getFieldSpec(), columnStatistics.getPartitionFunction(),
+                columnStatistics.getPartitions()));
       }
     }
   }

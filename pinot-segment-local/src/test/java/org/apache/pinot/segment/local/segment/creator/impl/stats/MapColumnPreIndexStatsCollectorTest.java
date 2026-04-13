@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import org.apache.pinot.segment.local.segment.index.map.MapIndexReaderWrapper;
 import org.apache.pinot.segment.local.segment.index.map.MapKeyIndexReader;
@@ -232,10 +231,8 @@ public class MapColumnPreIndexStatsCollectorTest {
       assertNull(pfDict);
     } else {
       assertEquals(pfNoDict.getName(), pfDict.getName());
-      assertEquals(mapNoDict.getNumPartitions(), mapDict.getNumPartitions());
-      Set<Integer> partsNoDict = mapNoDict.getPartitions();
-      Set<Integer> partsDict = mapDict.getPartitions();
-      assertEquals(partsNoDict, partsDict);
+      assertEquals(pfNoDict.getNumPartitions(), pfDict.getNumPartitions());
+      assertEquals(mapNoDict.getPartitions(), mapDict.getPartitions());
     }
 
     // Compare per-key collectors exposed via getKeyStatistics

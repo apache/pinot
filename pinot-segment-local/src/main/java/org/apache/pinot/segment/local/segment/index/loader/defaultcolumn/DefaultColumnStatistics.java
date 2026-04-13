@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
 import com.google.common.base.Utf8;
 import java.math.BigDecimal;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -151,17 +150,6 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   @Nullable
   @Override
   public PartitionFunction getPartitionFunction() {
-    return null;
-  }
-
-  @Override
-  public int getNumPartitions() {
-    return 0;
-  }
-
-  @Nullable
-  @Override
-  public Map<String, String> getPartitionFunctionConfig() {
     return null;
   }
 

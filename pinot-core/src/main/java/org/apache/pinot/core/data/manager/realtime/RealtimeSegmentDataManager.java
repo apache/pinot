@@ -1225,7 +1225,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _defaultNullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");
       try {
-        converter.build(_segmentVersion, _serverMetrics);
+        converter.build(_segmentVersion);
       } catch (Exception e) {
         String errorMessage = "Could not build segment";
         FileUtils.deleteQuietly(tempSegmentFolder);

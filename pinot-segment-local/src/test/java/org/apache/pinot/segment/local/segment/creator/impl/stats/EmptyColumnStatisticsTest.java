@@ -59,7 +59,7 @@ public class EmptyColumnStatisticsTest {
   public void testEmptyColumnStatistics(DataType type, boolean sv) {
     FieldSpec fieldSpec = type != DataType.MAP ? new DimensionFieldSpec("col", type, sv)
         : new ComplexFieldSpec("col", DataType.MAP, true, Map.of());
-    EmptyColumnStatistics stats = new EmptyColumnStatistics(fieldSpec);
+    EmptyColumnStatistics stats = new EmptyColumnStatistics(fieldSpec, null, null);
     DataType storedType = type.getStoredType();
 
     // Identity
@@ -92,8 +92,6 @@ public class EmptyColumnStatisticsTest {
 
     // Partition: empty
     assertNull(stats.getPartitionFunction());
-    assertEquals(stats.getNumPartitions(), 0);
-    assertNull(stats.getPartitionFunctionConfig());
     assertNull(stats.getPartitions());
   }
 }

@@ -20,13 +20,11 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import com.google.common.base.Preconditions;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -48,9 +46,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   protected final FieldSpec _fieldSpec;
   protected final DataType _valueType;
   protected final FieldConfig _fieldConfig;
-  protected final Map<String, String> _partitionFunctionConfig;
   protected final PartitionFunction _partitionFunction;
-  protected final int _numPartitions;
   protected final Set<Integer> _partitions;
 
   protected int _totalNumberOfEntries = 0;
@@ -64,17 +60,8 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     _valueType = _fieldSpec.getDataType().getStoredType();
     _sorted = _fieldSpec.isSingleValueField();
     _fieldConfig = statsCollectorConfig.getFieldConfigForColumn(column);
-    String partitionFunctionName = statsCollectorConfig.getPartitionFunctionName(column);
-    _numPartitions = statsCollectorConfig.getNumPartitions(column);
-    _partitionFunctionConfig = statsCollectorConfig.getPartitionFunctionConfig(column);
-    _partitionFunction =
-        (partitionFunctionName != null) ? PartitionFunctionFactory.getPartitionFunction(partitionFunctionName,
-            _numPartitions, _partitionFunctionConfig) : null;
-    if (_partitionFunction != null) {
-      _partitions = new HashSet<>();
-    } else {
-      _partitions = null;
-    }
+    _partitionFunction = statsCollectorConfig.getPartitionFunction(column);
+    _partitions = _partitionFunction != null ? new HashSet<>() : null;
   }
 
   /**
@@ -147,17 +134,6 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   @Override
   public PartitionFunction getPartitionFunction() {
     return _partitionFunction;
-  }
-
-  @Override
-  public int getNumPartitions() {
-    return _numPartitions;
-  }
-
-  @Nullable
-  @Override
-  public Map<String, String> getPartitionFunctionConfig() {
-    return _partitionFunctionConfig;
   }
 
   @Nullable

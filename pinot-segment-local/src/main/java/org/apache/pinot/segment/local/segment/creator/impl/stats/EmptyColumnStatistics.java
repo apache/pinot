@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -31,9 +30,15 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 @SuppressWarnings("rawtypes")
 public class EmptyColumnStatistics implements ColumnStatistics {
   private final FieldSpec _fieldSpec;
+  private final PartitionFunction _partitionFunction;
+  private final Set<Integer> _partitions;
 
-  public EmptyColumnStatistics(FieldSpec fieldSpec) {
+  // TODO: Revisit if we need to maintain partition info for empty columns
+  public EmptyColumnStatistics(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
+      @Nullable Set<Integer> partitions) {
     _fieldSpec = fieldSpec;
+    _partitionFunction = partitionFunction;
+    _partitions = partitions;
   }
 
   @Override
@@ -99,23 +104,12 @@ public class EmptyColumnStatistics implements ColumnStatistics {
   @Nullable
   @Override
   public PartitionFunction getPartitionFunction() {
-    return null;
-  }
-
-  @Override
-  public int getNumPartitions() {
-    return 0;
-  }
-
-  @Nullable
-  @Override
-  public Map<String, String> getPartitionFunctionConfig() {
-    return null;
+    return _partitionFunction;
   }
 
   @Nullable
   @Override
   public Set<Integer> getPartitions() {
-    return null;
+    return _partitions;
   }
 }

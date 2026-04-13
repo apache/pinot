@@ -23,11 +23,13 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
@@ -73,7 +75,10 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
     if (_totalDocCount == 0) {
       for (FieldSpec fieldSpec : fieldSpecs) {
         if (!fieldSpec.isVirtualColumn()) {
-          _columnStatisticsMap.put(fieldSpec.getName(), new EmptyColumnStatistics(fieldSpec));
+          String columnName = fieldSpec.getName();
+          PartitionFunction partitionFunction = statsCollectorConfig.getPartitionFunction(columnName);
+          Set<Integer> partitions = partitionFunction != null ? Set.of() : null;
+          _columnStatisticsMap.put(columnName, new EmptyColumnStatistics(fieldSpec, partitionFunction, partitions));
         }
       }
     } else {
