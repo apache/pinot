@@ -28,6 +28,10 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 /**
  * Identical to {@code LZ4Compressor} but prefixes the chunk with the
  * decompressed length.
+ *
+ * <p>The default singleton {@link #INSTANCE} wraps the LZ4 fast compressor. Instances created
+ * via {@link #LZ4WithLengthCompressor(int)} wrap an LZ4HC (high compression) compressor at the
+ * specified level.
  */
 class LZ4WithLengthCompressor implements ChunkCompressor {
 
@@ -37,6 +41,16 @@ class LZ4WithLengthCompressor implements ChunkCompressor {
 
   private LZ4WithLengthCompressor() {
     _compressor = new LZ4CompressorWithLength(LZ4Compressor.LZ4_FACTORY.fastCompressor());
+  }
+
+  /**
+   * Creates a length-prefixed compressor using LZ4HC (high compression) at the specified level.
+   *
+   * @param compressionLevel the LZ4HC compression level
+   */
+  LZ4WithLengthCompressor(int compressionLevel) {
+    _compressor = new LZ4CompressorWithLength(
+        LZ4Compressor.LZ4_FACTORY.highCompressor(compressionLevel));
   }
 
   @Override

@@ -27,19 +27,42 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 /**
  * Implementation of {@link ChunkCompressor} using Zstandard(Zstd) compression algorithm.
- * Zstd.compress(destinationBuffer, sourceBuffer)
+ *
+ * <p>The default singleton {@link #INSTANCE} uses the library's default compression level.
+ * Instances created via {@link #ZstandardCompressor(int)} use the specified level, which
+ * must be in the range 1..22.
  */
 class ZstandardCompressor implements ChunkCompressor {
 
   static final ZstandardCompressor INSTANCE = new ZstandardCompressor();
 
+  private final int _compressionLevel;
+  private final boolean _hasExplicitLevel;
+
   private ZstandardCompressor() {
+    _compressionLevel = 0;
+    _hasExplicitLevel = false;
+  }
+
+  /**
+   * Creates a compressor with an explicit Zstandard compression level.
+   *
+   * @param compressionLevel the compression level (1..22)
+   */
+  ZstandardCompressor(int compressionLevel) {
+    _compressionLevel = compressionLevel;
+    _hasExplicitLevel = true;
   }
 
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
-    int compressedSize = Zstd.compress(outCompressed, inUncompressed);
+    int compressedSize;
+    if (_hasExplicitLevel) {
+      compressedSize = Zstd.compress(outCompressed, inUncompressed, _compressionLevel);
+    } else {
+      compressedSize = Zstd.compress(outCompressed, inUncompressed);
+    }
     // When the compress method returns successfully,
     // dstBuf's position() will be set to its current position() plus the compressed size of the data.
     // and srcBuf's position() will be set to its limit()

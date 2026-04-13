@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.io.writer.impl;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.OptionalInt;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
@@ -48,8 +49,28 @@ public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWrite
   public FixedByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, int sizeOfEntry, int writerVersion)
       throws IOException {
+    this(file, compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, writerVersion, OptionalInt.empty());
+  }
+
+  /**
+   * Constructor for the class.
+   *
+   * @param file File to write to.
+   * @param compressionType Type of compression to use.
+   * @param totalDocs Total number of docs to write.
+   * @param numDocsPerChunk Number of documents per chunk.
+   * @param sizeOfEntry Size of entry (in bytes)
+   * @param writerVersion writer format version
+   * @param compressionLevel optional compression level to pass to the compressor
+   * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
+   * @throws IOException Throws {@link IOException} if there are any errors mapping the underlying ByteBuffer.
+   */
+  public FixedByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
+      int numDocsPerChunk, int sizeOfEntry, int writerVersion, OptionalInt compressionLevel)
+      throws IOException {
     super(file, compressionType, totalDocs, normalizeDocsPerChunk(writerVersion, numDocsPerChunk),
-        (long) sizeOfEntry * normalizeDocsPerChunk(writerVersion, numDocsPerChunk), sizeOfEntry, writerVersion, true);
+        (long) sizeOfEntry * normalizeDocsPerChunk(writerVersion, numDocsPerChunk), sizeOfEntry, writerVersion, true,
+        compressionLevel);
     _chunkDataOffset = 0;
   }
 

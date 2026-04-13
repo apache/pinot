@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.OptionalInt;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
@@ -78,20 +79,44 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
       int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion,
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, deriveNumDocsPerChunk, writerVersion,
+        targetMaxChunkSizeBytes, targetDocsPerChunk, OptionalInt.empty());
+  }
+
+  /**
+   * Create a var-byte raw index creator for the given column
+   * @param baseIndexDir Index directory
+   * @param compressionType Type of compression to use
+   * @param column Name of column to index
+   * @param totalDocs Total number of documents to index
+   * @param valueType Type of the values
+   * @param maxLength length of longest entry (in bytes)
+   * @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
+   * @param writerVersion writer format version
+   * @param targetMaxChunkSizeBytes target max chunk size in bytes, applicable only for V4 or when
+   *                                deriveNumDocsPerChunk is true
+   * @param targetDocsPerChunk target number of docs per chunk
+   * @param compressionLevel optional compression level
+   * @throws IOException
+   */
+  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
+      int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion,
+      int targetMaxChunkSizeBytes, int targetDocsPerChunk, OptionalInt compressionLevel)
+      throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
       int numDocsPerChunk =
           deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength, targetMaxChunkSizeBytes) : targetDocsPerChunk;
       _indexWriter = new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, maxLength,
-          writerVersion);
+          writerVersion, compressionLevel);
     } else if (writerVersion == VarByteChunkForwardIndexWriterV6.VERSION) {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(maxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-      _indexWriter = new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize);
+      _indexWriter = new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize, compressionLevel);
     } else {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(maxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-      _indexWriter = new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
+      _indexWriter = new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize, compressionLevel);
     }
     _valueType = valueType;
   }

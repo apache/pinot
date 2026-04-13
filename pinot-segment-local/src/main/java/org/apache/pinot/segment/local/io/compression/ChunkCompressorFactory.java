@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.io.compression;
 
+import java.util.OptionalInt;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
@@ -51,6 +52,21 @@ public class ChunkCompressorFactory {
    * @return Compressor for the specified type.
    */
   public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, boolean upgradeToLengthPrefixed) {
+    return getCompressor(compressionType, upgradeToLengthPrefixed, OptionalInt.empty());
+  }
+
+  /**
+   * Returns the chunk compressor for the specified name, optionally using an explicit compression level.
+   *
+   * @param compressionType Type of compressor.
+   * @param upgradeToLengthPrefixed if true, guarantee the compressed chunk contains metadata about the decompressed
+   *                                size. Most formats do this anyway, but LZ4 requires a length prefix.
+   * @param compressionLevel optional compression level; when present, used by compressors that support
+   *                         tunable levels (ZSTANDARD, GZIP, LZ4)
+   * @return Compressor for the specified type.
+   */
+  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, boolean upgradeToLengthPrefixed,
+      OptionalInt compressionLevel) {
     switch (compressionType) {
 
       case PASS_THROUGH:
@@ -60,16 +76,27 @@ public class ChunkCompressorFactory {
         return SnappyCompressor.INSTANCE;
 
       case ZSTANDARD:
-        return ZstandardCompressor.INSTANCE;
+        return compressionLevel.isPresent()
+            ? new ZstandardCompressor(compressionLevel.getAsInt())
+            : ZstandardCompressor.INSTANCE;
 
       case LZ4:
+        if (compressionLevel.isPresent()) {
+          return upgradeToLengthPrefixed
+              ? new LZ4WithLengthCompressor(compressionLevel.getAsInt())
+              : new LZ4Compressor(compressionLevel.getAsInt());
+        }
         return upgradeToLengthPrefixed ? LZ4WithLengthCompressor.INSTANCE : LZ4Compressor.INSTANCE;
 
       case LZ4_LENGTH_PREFIXED:
-        return LZ4WithLengthCompressor.INSTANCE;
+        return compressionLevel.isPresent()
+            ? new LZ4WithLengthCompressor(compressionLevel.getAsInt())
+            : LZ4WithLengthCompressor.INSTANCE;
 
       case GZIP:
-        return new GzipCompressor();
+        return compressionLevel.isPresent()
+            ? new GzipCompressor(compressionLevel.getAsInt())
+            : new GzipCompressor();
 
       case DELTA:
         return DeltaCompressor.INSTANCE;

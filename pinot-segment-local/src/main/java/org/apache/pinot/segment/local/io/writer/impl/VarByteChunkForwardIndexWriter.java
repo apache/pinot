@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.OptionalInt;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -66,10 +67,29 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
   public VarByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion)
       throws IOException {
+    this(file, compressionType, totalDocs, numDocsPerChunk, lengthOfLongestEntry, writerVersion, OptionalInt.empty());
+  }
+
+  /**
+   * Constructor for the class.
+   *
+   * @param file File to write to.
+   * @param compressionType Type of compression to use.
+   * @param totalDocs Total number of docs to write.
+   * @param numDocsPerChunk Number of documents per chunk.
+   * @param lengthOfLongestEntry Length of longest entry (in bytes)
+   * @param writerVersion writer format version
+   * @param compressionLevel optional compression level to pass to the compressor
+   * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is
+   *     not found.
+   */
+  public VarByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
+      int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion, OptionalInt compressionLevel)
+      throws IOException {
     super(file, compressionType, totalDocs, numDocsPerChunk,
         numDocsPerChunk * (CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + (long) lengthOfLongestEntry),
         // chunkSize
-        lengthOfLongestEntry, writerVersion, false);
+        lengthOfLongestEntry, writerVersion, false, compressionLevel);
 
     _chunkHeaderOffset = 0;
     _chunkHeaderSize = numDocsPerChunk * CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;

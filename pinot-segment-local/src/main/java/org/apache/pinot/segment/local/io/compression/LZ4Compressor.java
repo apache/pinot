@@ -27,7 +27,10 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 /**
  * Implementation of {@link ChunkCompressor} using LZ4 compression algorithm.
- * LZ4Factory.fastestInstance().fastCompressor().compress(sourceBuffer, destinationBuffer)
+ *
+ * <p>The default singleton {@link #INSTANCE} uses the LZ4 fast compressor. Instances created
+ * via {@link #LZ4Compressor(int)} use LZ4HC (high compression) at the specified level, which
+ * trades compression speed for smaller output.
  */
 class LZ4Compressor implements ChunkCompressor {
 
@@ -35,13 +38,28 @@ class LZ4Compressor implements ChunkCompressor {
 
   static final LZ4Compressor INSTANCE = new LZ4Compressor();
 
+  private final net.jpountz.lz4.LZ4Compressor _compressor;
+
   private LZ4Compressor() {
+    _compressor = LZ4_FACTORY.fastCompressor();
+  }
+
+  /**
+   * Creates a compressor using LZ4HC (high compression) at the specified level.
+   *
+   * <p>Higher levels produce smaller output at the cost of slower compression.
+   * Decompression speed is unaffected by the compression level.
+   *
+   * @param compressionLevel the LZ4HC compression level
+   */
+  LZ4Compressor(int compressionLevel) {
+    _compressor = LZ4_FACTORY.highCompressor(compressionLevel);
   }
 
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
-    LZ4_FACTORY.fastCompressor().compress(inUncompressed, outCompressed);
+    _compressor.compress(inUncompressed, outCompressed);
     // When the compress method returns successfully,
     // dstBuf's position() will be set to its current position() plus the compressed size of the data.
     // and srcBuf's position() will be set to its limit()
@@ -52,7 +70,7 @@ class LZ4Compressor implements ChunkCompressor {
 
   @Override
   public int maxCompressedSize(int uncompressedSize) {
-    return LZ4_FACTORY.fastCompressor().maxCompressedLength(uncompressedSize);
+    return _compressor.maxCompressedLength(uncompressedSize);
   }
 
   @Override

@@ -27,6 +27,9 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 /**
  * Implementation of {@link ChunkCompressor} using GZIP compression algorithm.
+ *
+ * <p>The no-arg constructor uses the JDK default compression level. The constructor accepting
+ * an explicit level passes it directly to the {@link Deflater}; valid levels are 0..9.
  */
 class GzipCompressor implements ChunkCompressor {
 
@@ -34,6 +37,15 @@ class GzipCompressor implements ChunkCompressor {
 
   public GzipCompressor() {
     _compressor = new Deflater();
+  }
+
+  /**
+   * Creates a compressor with an explicit GZIP/Deflate compression level.
+   *
+   * @param compressionLevel the compression level (0..9)
+   */
+  public GzipCompressor(int compressionLevel) {
+    _compressor = new Deflater(compressionLevel);
   }
 
   @Override
