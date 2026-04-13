@@ -154,8 +154,9 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
   public MultiValueFixedByteRawIndexCreator getMultiValueFixedByteRawIndexCreator(ChunkCompressionType compressionType,
       String column, int numDocs, DataType dataType, int maxElements, int writerVersion)
       throws IOException {
-    return new MultiValueFixedByteRawIndexCreator(new File(_outputDir), compressionType, column, numDocs, dataType,
-        maxElements, false, writerVersion, 1024 * 1024, 1000);
+    return new MultiValueFixedByteRawIndexCreator(
+        new File(_outputDir, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION), compressionType, null, numDocs,
+        dataType, maxElements, false, writerVersion, 1024 * 1024, 1000);
   }
 
   public <T> void testMV(DataType dataType, List<T> inputs, ToIntFunction<T> sizeof, IntFunction<T> constructor,

@@ -93,13 +93,12 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     }
 
     FieldConfig nullableTextConfig =
-        new FieldConfig(TEXT_COLUMN_NULL_NAME, FieldConfig.EncodingType.RAW, null, null, null, null, textColumnIndexes,
-            null,
-            null);
+        new FieldConfig.Builder(TEXT_COLUMN_NULL_NAME).withEncodingType(FieldConfig.EncodingType.RAW)
+            .withIndexes(textColumnIndexes).build();
 
     FieldConfig textColumnFieldConfig =
-        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, null, null, null, null, textColumnIndexes, null,
-            null);
+        new FieldConfig.Builder(TEXT_COLUMN_NAME).withEncodingType(FieldConfig.EncodingType.RAW)
+            .withIndexes(textColumnIndexes).build();
 
     ObjectNode textColumnCaseSensitiveIndexes;
     try {
@@ -115,8 +114,8 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
       throw new RuntimeException(e);
     }
     FieldConfig textColumnCaseSensitiveFieldConfig =
-        new FieldConfig(TEXT_COLUMN_NAME_CASE_SENSITIVE, FieldConfig.EncodingType.RAW, null, null, null, null,
-            textColumnCaseSensitiveIndexes, null, null);
+        new FieldConfig.Builder(TEXT_COLUMN_NAME_CASE_SENSITIVE).withEncodingType(FieldConfig.EncodingType.RAW)
+            .withIndexes(textColumnCaseSensitiveIndexes).build();
     return Arrays.asList(nullableTextConfig, textColumnFieldConfig, textColumnCaseSensitiveFieldConfig);
   }
 

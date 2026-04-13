@@ -1487,7 +1487,8 @@ public class TableConfigUtilsTest {
     ObjectNode indexesNode = JsonNodeFactory.instance.objectNode();
     indexesNode.putObject("bloom");
     FieldConfig fieldConfig =
-        new FieldConfig("MyCol", FieldConfig.EncodingType.DICTIONARY, null, null, null, null, indexesNode, null, null);
+        new FieldConfig.Builder("MyCol").withEncodingType(FieldConfig.EncodingType.DICTIONARY).withIndexes(indexesNode)
+            .build();
     tableconfig3.setFieldConfigList(Arrays.asList(fieldConfig));
     assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig3, schema));
   }

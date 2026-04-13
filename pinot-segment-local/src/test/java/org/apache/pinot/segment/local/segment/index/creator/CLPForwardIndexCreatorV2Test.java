@@ -37,6 +37,7 @@ import org.apache.pinot.segment.local.segment.index.forward.mutable.VarByteSVMut
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV2;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -123,8 +124,11 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
     // Create a raw string immutable forward index
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
     try (SingleValueVarByteRawIndexCreator index =
-        new SingleValueVarByteRawIndexCreator(TEMP_DIR, chunkCompressionType, COLUMN_NAME, _logMessages.size(),
-            FieldSpec.DataType.STRING, maxLength)) {
+        new SingleValueVarByteRawIndexCreator(TEMP_DIR, chunkCompressionType, null, COLUMN_NAME,
+            _logMessages.size(), FieldSpec.DataType.STRING, maxLength, false,
+            ForwardIndexConfig.getDefaultRawWriterVersion(),
+            ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(),
+            ForwardIndexConfig.getDefaultTargetDocsPerChunk())) {
       for (String logMessage : _logMessages) {
         index.putString(logMessage);
       }

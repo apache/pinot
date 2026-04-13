@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.spi.config.table.CompletionConfig;
+import org.apache.pinot.spi.config.table.CompressionCodecSpec;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
@@ -240,7 +241,9 @@ public class TableConfigSerDeUtilsTest {
               Lists.newArrayList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null, properties),
           new FieldConfig("column2", null, Collections.emptyList(), null, null),
           new FieldConfig("column3", FieldConfig.EncodingType.RAW, Collections.emptyList(),
-              FieldConfig.CompressionCodec.SNAPPY, null));
+              FieldConfig.CompressionCodec.SNAPPY, null),
+          new FieldConfig.Builder("column4").withEncodingType(FieldConfig.EncodingType.RAW)
+              .withCompressionCodecSpec(CompressionCodecSpec.fromString("zstd(3)")).build());
       TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(fieldConfigList).build();
 
       checkFieldConfig(tableConfig);
@@ -546,7 +549,7 @@ public class TableConfigSerDeUtilsTest {
   private void checkFieldConfig(TableConfig tableConfig) {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigList);
-    assertEquals(fieldConfigList.size(), 3);
+    assertEquals(fieldConfigList.size(), 4);
 
     FieldConfig firstFieldConfig = fieldConfigList.get(0);
     assertEquals(firstFieldConfig.getName(), "column1");
@@ -571,6 +574,14 @@ public class TableConfigSerDeUtilsTest {
     assertNull(thirdFieldConfig.getIndexType());
     assertEquals(thirdFieldConfig.getCompressionCodec(), FieldConfig.CompressionCodec.SNAPPY);
     assertNull(thirdFieldConfig.getProperties());
+
+    FieldConfig fourthFieldConfig = fieldConfigList.get(3);
+    assertEquals(fourthFieldConfig.getName(), "column4");
+    assertEquals(fourthFieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+    assertEquals(fourthFieldConfig.getCompressionCodec(), FieldConfig.CompressionCodec.ZSTANDARD);
+    assertEquals(fourthFieldConfig.getCompressionCodecSpec(), CompressionCodecSpec.of(
+        FieldConfig.CompressionCodec.ZSTANDARD, 3));
+    assertNull(fourthFieldConfig.getProperties());
   }
 
   private void checkTableConfigWithUpsertConfig(TableConfig tableConfig) {

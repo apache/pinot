@@ -138,8 +138,8 @@ public class BenchmarkRawForwardIndexWriter {
   public void writeV4(BytesCounter counter)
       throws IOException {
     try (
-        VarByteChunkForwardIndexWriterV4 writer = new VarByteChunkForwardIndexWriterV4(_file, _chunkCompressionType,
-            _maxChunkSize)) {
+        VarByteChunkForwardIndexWriterV4 writer =
+            new VarByteChunkForwardIndexWriterV4(_file, _chunkCompressionType, null, _maxChunkSize)) {
       for (int i = 0; i < _records; i++) {
         writer.putBytes(_bytes[i]);
       }
@@ -152,7 +152,7 @@ public class BenchmarkRawForwardIndexWriter {
   public void writeV3(BytesCounter counter)
       throws IOException {
     try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(_file, _chunkCompressionType,
-        _records, _maxChunkSize / _maxLength, _maxLength, 3)) {
+        null, _records, _maxChunkSize / _maxLength, _maxLength, 3)) {
       for (int i = 0; i < _records; i++) {
         writer.putBytes(_bytes[i]);
       }

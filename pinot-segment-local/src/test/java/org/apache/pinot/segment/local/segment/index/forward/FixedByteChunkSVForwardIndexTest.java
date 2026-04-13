@@ -77,9 +77,9 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
     try (FixedByteChunkForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkForwardIndexWriter(outFileFourByte,
-        compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Integer.BYTES, version);
+        compressionType, null, NUM_VALUES, NUM_DOCS_PER_CHUNK, Integer.BYTES, version);
         FixedByteChunkForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkForwardIndexWriter(outFileEightByte,
-            compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Integer.BYTES, version)) {
+            compressionType, null, NUM_VALUES, NUM_DOCS_PER_CHUNK, Integer.BYTES, version)) {
       for (int value : expected) {
         fourByteOffsetWriter.putInt(value);
         eightByteOffsetWriter.putInt(value);
@@ -140,9 +140,9 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
     try (FixedByteChunkForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkForwardIndexWriter(outFileFourByte,
-        compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES, version);
+        compressionType, null, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES, version);
         FixedByteChunkForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkForwardIndexWriter(outFileEightByte,
-            compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES, version)) {
+            compressionType, null, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES, version)) {
       for (long value : expected) {
         fourByteOffsetWriter.putLong(value);
         eightByteOffsetWriter.putLong(value);
@@ -202,9 +202,9 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
     try (FixedByteChunkForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkForwardIndexWriter(outFileFourByte,
-        compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Float.BYTES, version);
+        compressionType, null, NUM_VALUES, NUM_DOCS_PER_CHUNK, Float.BYTES, version);
         FixedByteChunkForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkForwardIndexWriter(outFileEightByte,
-            compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Float.BYTES, version)) {
+            compressionType, null, NUM_VALUES, NUM_DOCS_PER_CHUNK, Float.BYTES, version)) {
       for (float value : expected) {
         fourByteOffsetWriter.putFloat(value);
         eightByteOffsetWriter.putFloat(value);
@@ -263,9 +263,9 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
     try (FixedByteChunkForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkForwardIndexWriter(outFileFourByte,
-        compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Double.BYTES, version);
+        compressionType, null, NUM_VALUES, NUM_DOCS_PER_CHUNK, Double.BYTES, version);
         FixedByteChunkForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkForwardIndexWriter(outFileEightByte,
-            compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Double.BYTES, version)) {
+            compressionType, null, NUM_VALUES, NUM_DOCS_PER_CHUNK, Double.BYTES, version)) {
       for (double value : expected) {
         fourByteOffsetWriter.putDouble(value);
         eightByteOffsetWriter.putDouble(value);

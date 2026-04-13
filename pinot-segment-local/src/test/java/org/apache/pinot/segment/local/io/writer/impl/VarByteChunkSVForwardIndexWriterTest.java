@@ -87,8 +87,8 @@ public class VarByteChunkSVForwardIndexWriterTest implements PinotBuffersAfterMe
     int maxEntryLengthInBytes = arrays.stream().mapToInt(
             array -> Integer.BYTES + Arrays.stream(array).mapToInt(
                 str -> Integer.BYTES + str.getBytes(UTF_8).length).sum()).max().orElse(0);
-    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs,
-        numDocsPerChunk, maxEntryLengthInBytes, version)) {
+    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file, compressionType, null,
+        totalDocs, numDocsPerChunk, maxEntryLengthInBytes, version)) {
       for (String[] array : arrays) {
         writer.putStringMV(array);
       }
@@ -122,8 +122,8 @@ public class VarByteChunkSVForwardIndexWriterTest implements PinotBuffersAfterMe
     int maxEntryLengthInBytes = arrays.stream().mapToInt(
             array -> Integer.BYTES + Arrays.stream(array).mapToInt(
                 str -> Integer.BYTES + str.getBytes(UTF_8).length).sum()).max().orElse(0);
-    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs,
-        numDocsPerChunk, maxEntryLengthInBytes, version)) {
+    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file, compressionType, null,
+        totalDocs, numDocsPerChunk, maxEntryLengthInBytes, version)) {
       for (String[] array : arrays) {
         writer.putBytesMV(Arrays.stream(array).map(str -> str.getBytes(UTF_8)).toArray(byte[][]::new));
       }

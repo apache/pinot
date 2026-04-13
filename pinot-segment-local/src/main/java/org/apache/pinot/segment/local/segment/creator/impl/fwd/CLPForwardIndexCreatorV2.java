@@ -266,7 +266,8 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
   private void initializeRawEncodingMode(ChunkCompressionType chunkCompressionType)
       throws IOException {
     _rawMsgFwdIndexFile = new File(_intermediateFilesDir, _column + ".rawMsg");
-    _rawMsgFwdIndex = new VarByteChunkForwardIndexWriterV5(_rawMsgFwdIndexFile, chunkCompressionType, _targetChunkSize);
+    _rawMsgFwdIndex =
+        new VarByteChunkForwardIndexWriterV5(_rawMsgFwdIndexFile, chunkCompressionType, null, _targetChunkSize);
   }
 
   /**
@@ -285,19 +286,19 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
     _logtypeDict = new VarLengthValueWriter(_logtypeDictFile, logtypeDictSize);
     _logtypeDictSize = logtypeDictSize;
     _logtypeIdFwdIndexFile = new File(_intermediateFilesDir, _column + ".lt.id");
-    _logtypeIdFwdIndex = new FixedByteChunkForwardIndexWriter(_logtypeIdFwdIndexFile, chunkCompressionType, _numDoc,
-        _targetChunkSize / FieldSpec.DataType.INT.size(), FieldSpec.DataType.INT.size(),
+    _logtypeIdFwdIndex = new FixedByteChunkForwardIndexWriter(_logtypeIdFwdIndexFile, chunkCompressionType, null,
+        _numDoc, _targetChunkSize / FieldSpec.DataType.INT.size(), FieldSpec.DataType.INT.size(),
         VarByteChunkForwardIndexWriterV5.VERSION);
     _dictVarDictFile = new File(_intermediateFilesDir, _column + ".var.dict");
     _dictVarDict = new VarLengthValueWriter(_dictVarDictFile, dictVarDictSize);
     _dictVarDictSize = dictVarDictSize;
     _dictVarIdFwdIndexFile = new File(_intermediateFilesDir, _column + ".dictVars");
     _dictVarIdFwdIndex =
-        new VarByteChunkForwardIndexWriterV5(_dictVarIdFwdIndexFile, chunkCompressionType, _targetChunkSize);
+        new VarByteChunkForwardIndexWriterV5(_dictVarIdFwdIndexFile, chunkCompressionType, null, _targetChunkSize);
 
     _encodedVarFwdIndexFile = new File(_intermediateFilesDir, _column + ".encodedVars");
     _encodedVarFwdIndex =
-        new VarByteChunkForwardIndexWriterV5(_encodedVarFwdIndexFile, chunkCompressionType, _targetChunkSize);
+        new VarByteChunkForwardIndexWriterV5(_encodedVarFwdIndexFile, chunkCompressionType, null, _targetChunkSize);
   }
 
   public void putLogtypeDict(BytesOffHeapMutableDictionary logtypeDict)
