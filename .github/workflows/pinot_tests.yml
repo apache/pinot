@@ -66,6 +66,7 @@ jobs:
           mvn clean install \
           -pl pinot-dependency-verifier \
           -am \
+          -Psqlparser \
           -DskipTests
       - name: Linter Test
         env:
