@@ -186,7 +186,11 @@ public class InstanceUtils {
     }
 
     // Read host/port from ZNRecord simple fields (source of truth, updated by updateHelixInstanceConfig)
+    // Backward-compatible with legacy hostname of format 'Server_<hostname>'
     String host = instanceConfig.getHostName();
+    if (type == InstanceType.SERVER && host.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      host = host.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    }
     int port = Integer.parseInt(instanceConfig.getPort());
 
     // Extract tags

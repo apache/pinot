@@ -140,6 +140,16 @@ public class InstanceUtilsTest {
     Instance rtMinion = InstanceUtils.toInstance(InstanceUtils.toHelixInstanceConfig(minion));
     assertInstanceEquals(rtMinion, minion);
 
+    // Server with legacy 'Server_<hostname>' format in hostName field
+    InstanceConfig legacyServerConfig = new InstanceConfig("Server_localhost_3456");
+    legacyServerConfig.setHostName("Server_localhost");
+    legacyServerConfig.setPort("3456");
+    legacyServerConfig.addTag("T1_OFFLINE");
+    Instance legacyServer = InstanceUtils.toInstance(legacyServerConfig);
+    assertEquals(legacyServer.getHost(), "localhost");
+    assertEquals(legacyServer.getPort(), 3456);
+    assertEquals(legacyServer.getType(), InstanceType.SERVER);
+
     // Unknown instance type prefix
     InstanceConfig unknownConfig = new InstanceConfig("Unknown_localhost_1234");
     unknownConfig.setHostName("localhost");
