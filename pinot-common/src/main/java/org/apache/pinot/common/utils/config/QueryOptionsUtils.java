@@ -742,7 +742,7 @@ public class QueryOptionsUtils {
    * Returns whether HNSW should use relative-distance competitive checks, or {@code null} if not set.
    */
   @Nullable
-  public static Boolean getVectorHnswUseRelativeDistance(Map<String, String> queryOptions) {
+  public static Boolean getVectorUseRelativeDistance(Map<String, String> queryOptions) {
     return checkedParseBooleanNullable(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE,
         queryOptions.get(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE));
   }
@@ -751,7 +751,7 @@ public class QueryOptionsUtils {
    * Returns whether HNSW should use a bounded collector queue, or {@code null} if not set.
    */
   @Nullable
-  public static Boolean getVectorHnswUseBoundedQueue(Map<String, String> queryOptions) {
+  public static Boolean getVectorUseBoundedQueue(Map<String, String> queryOptions) {
     return checkedParseBooleanNullable(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE,
         queryOptions.get(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE));
   }

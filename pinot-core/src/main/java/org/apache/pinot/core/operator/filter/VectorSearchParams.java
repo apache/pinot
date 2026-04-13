@@ -99,8 +99,8 @@ public final class VectorSearchParams {
     Integer maxCandidates = QueryOptionsUtils.getVectorMaxCandidates(queryOptions);
     Float distanceThreshold = QueryOptionsUtils.getVectorDistanceThreshold(queryOptions);
     Integer efSearch = QueryOptionsUtils.getVectorEfSearch(queryOptions);
-    Boolean hnswUseRelativeDistance = QueryOptionsUtils.getVectorHnswUseRelativeDistance(queryOptions);
-    Boolean hnswUseBoundedQueue = QueryOptionsUtils.getVectorHnswUseBoundedQueue(queryOptions);
+    Boolean hnswUseRelativeDistance = QueryOptionsUtils.getVectorUseRelativeDistance(queryOptions);
+    Boolean hnswUseBoundedQueue = QueryOptionsUtils.getVectorUseBoundedQueue(queryOptions);
 
     if (nprobe == null && exactRerank == null && maxCandidates == null && distanceThreshold == null
         && efSearch == null && hnswUseRelativeDistance == null && hnswUseBoundedQueue == null) {
