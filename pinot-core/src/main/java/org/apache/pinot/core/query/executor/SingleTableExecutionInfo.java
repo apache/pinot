@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -185,7 +186,7 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
 
   @Override
   public List<String> getOptionalSegments() {
-    return _optionalSegments;
+    return _optionalSegments != null ? _optionalSegments : Collections.emptyList();
   }
 
   @Override
