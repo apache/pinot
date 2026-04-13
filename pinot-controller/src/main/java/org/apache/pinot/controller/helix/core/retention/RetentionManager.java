@@ -62,6 +62,7 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -168,7 +169,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       // hybrid table check should be performed before the realtime table check.
       if (_isHybridTableRetentionStrategyEnabled && offlineTableConfig != null) {
         // TODO: handle the orphan segment deletion for hybrid table
-        manageRetentionForHybridTable(tableConfig, offlineTableConfig);
+        manageRetentionForHybridTable(tableConfig, offlineTableConfig, retentionStrategy);
       } else {
         manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize,
             untrackedSegmentsRetentionStrategy);
@@ -236,7 +237,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   @VisibleForTesting
-  void manageRetentionForHybridTable(TableConfig realtimeTableConfig, TableConfig offlineTableConfig) {
+  void manageRetentionForHybridTable(TableConfig realtimeTableConfig, TableConfig offlineTableConfig,
+      RetentionStrategy retentionStrategy) {
     LOGGER.info("Managing retention for hybrid table: {}", realtimeTableConfig.getTableName());
     List<String> segmentsToDelete = new ArrayList<>();
     String realtimeTableName = realtimeTableConfig.getTableName();
@@ -271,8 +273,20 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             || segmentZKMetadata.getStatus() == Status.COMMITTING) {
           continue;
         }
-        // The segment should be older than the calculated time boundary
-        if (segmentZKMetadata.getEndTimeMs() < timeBoundaryMs) {
+        long endTimeMs = segmentZKMetadata.getEndTimeMs();
+        // Guard against segments with missing or invalid end time metadata (e.g. endTimeMs = -1).
+        // Without this check, an invalid value like -1 would satisfy (endTimeMs < timeBoundaryMs) and cause
+        // premature deletion. TimeRetentionStrategy applies the same guard for non-hybrid tables.
+        if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
+          LOGGER.warn("Segment: {} of table: {} has invalid end time in millis: {}, skipping retention check",
+              segmentZKMetadata.getSegmentName(), realtimeTableName, endTimeMs);
+          continue;
+        }
+        // The segment must be covered by offline data (older than time boundary) AND beyond the configured retention
+        // period. Checking retention here prevents premature deletion of segments that are still within the retention
+        // window even if offline data already covers them, and also ensures segments are eventually deleted via the
+        // retention strategy when the time boundary is stale (not advancing).
+        if (endTimeMs < timeBoundaryMs && retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
           segmentsToDelete.add(segmentZKMetadata.getSegmentName());
         }
       }
