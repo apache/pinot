@@ -22,12 +22,15 @@ import com.tdunning.math.stats.TDigest;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class PercentileTDigestAggregatorTest {
@@ -135,5 +138,19 @@ public class PercentileTDigestAggregatorTest {
     assertEquals(result, value1);
     TDigest resultDigest = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(result);
     assertEquals(resultDigest.size(), 50);
+  }
+
+  @Test
+  public void testFactoryReturnsAggregatorForNonRawType() {
+    ValueAggregator aggregator = ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.PERCENTILETDIGEST, DataType.BYTES);
+    assertTrue(aggregator instanceof PercentileTDigestAggregator);
+  }
+
+  @Test
+  public void testFactoryReturnsAggregatorForRawType() {
+    ValueAggregator aggregator = ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.PERCENTILERAWTDIGEST, DataType.BYTES);
+    assertTrue(aggregator instanceof PercentileTDigestAggregator);
   }
 }

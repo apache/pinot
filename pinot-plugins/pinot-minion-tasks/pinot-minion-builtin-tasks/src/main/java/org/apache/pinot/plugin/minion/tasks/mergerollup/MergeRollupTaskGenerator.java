@@ -518,7 +518,6 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         Preconditions.checkState(allowedFunctionParameterNames.contains(functionParameterName.toLowerCase()),
             "Aggregation function parameter name must be one of [lgK, samplingProbability, nominalEntries,"
                 + " compressionFactor]!");
-        // check that function parameter value is valid for nominal entries
         if (functionParameterName.equalsIgnoreCase(Constants.CPCSKETCH_LGK_KEY)
             || functionParameterName.equalsIgnoreCase(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)
             || functionParameterName.equalsIgnoreCase(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY)) {

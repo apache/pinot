@@ -513,7 +513,7 @@ public class MergeRollupTDigestTaskExecutorTest {
   private static List<List<GenericRow>> buildStandardSegmentData() {
     List<List<GenericRow>> segments = new ArrayList<>();
 
-    // Segment 0: group1=[1..100], group2=[500..600]
+    // Segment 0: group1=[1..100], group2=[500..599]
     List<GenericRow> seg0 = new ArrayList<>();
     seg0.add(makeRow(GROUP_1, createTDigest(1, 101)));
     seg0.add(makeRow(GROUP_2, createTDigest(500, 600)));
