@@ -82,7 +82,8 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
     // Both require a full scan to rebuild _shuttingDownServers from the current cluster state.
     NotificationContext.Type type = context.getType();
     if (type == NotificationContext.Type.FINALIZE) {
-      _shuttingDownServers.clear();
+      // Helix also emits FINALIZE during session reset before the next INIT. Preserve tracked shutdown
+      // state so the next full scan can still detect a server that finished startup while we were reconnecting.
       return;
     }
     if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {

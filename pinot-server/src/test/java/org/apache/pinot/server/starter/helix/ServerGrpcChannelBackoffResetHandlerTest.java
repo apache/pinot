@@ -207,18 +207,20 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
   }
 
   @Test
-  public void testFinalizeCallbackClearsTrackedStateWithoutTouchingMailboxService() {
+  public void testFinalizePreservesTrackedStateForReconnectInit() {
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
     _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
 
     _handler.onInstanceConfigChange(Collections.emptyList(), createFinalizeContext());
 
+    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
+        .thenReturn(Arrays.asList(SELF_INSTANCE_ID, OTHER_SERVER_ID));
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
-    _handler.onInstanceConfigChange(Collections.emptyList(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    _handler.onInstanceConfigChange(Collections.emptyList(), createInitContext());
 
-    verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
+    verify(_mailboxService).resetConnectBackoff(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
 
   @Test
