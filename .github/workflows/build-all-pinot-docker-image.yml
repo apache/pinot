@@ -16,25 +16,17 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-name: 1. Pinot Release All Java Distro Docker Image Build and Publish
+name: Pinot Release All Java Distro Docker Image Build and Publish
 
 on:
   workflow_dispatch:
     inputs:
-      gitUrl:
-        description: "The Pinot git repo to check out to build, use https."
-        default: "https://github.com/apache/pinot.git"
-        required: true
       commit:
-        description: "The branch/commit to check out to build Pinot image."
+        description: "The branch/tag/commit to build the Pinot image from."
         default: "master"
         required: true
-      dockerImageName:
-        description: "The docker image name, default to 'apachepinot/pinot'."
-        default: "apachepinot/pinot"
-        required: true
       tags:
-        description: "Tags to push of the image, comma separated, e.g. tag1,tag2,tag3"
+        description: "Tags to push, comma separated, e.g. tag1,tag2,tag3"
         default: ""
 
 jobs:
@@ -49,14 +41,15 @@ jobs:
       - name: Generate Build Info
         id: generate-build-info
         env:
-          PINOT_GIT_URL: ${{ github.event.inputs.gitUrl }}
-          PINOT_BRANCH: ${{ github.event.inputs.commit }}
-          TAGS: ${{ github.event.inputs.tags }}
+          PINOT_GIT_URL: "https://github.com/apache/pinot.git"
+          PINOT_BRANCH: "${{ github.event.inputs.commit }}"
+          TAGS: "${{ github.event.inputs.tags }}"
         run: |
           .github/workflows/scripts/docker/.pinot_build_info_gen.sh
   compile-pinot:
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         java-disto: ["ms-openjdk", "amazoncorretto"]
         java-version: ["11", "17", "21", "25"]
@@ -68,22 +61,21 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/setup-buildx-action@v4
-        name: Set up Docker Buildx
       - uses: actions/checkout@v5
       - name: Compile Pinot and push build image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
-          DOCKER_IMAGE_NAME: ${{ github.event.inputs.dockerImageName }}
+          DOCKER_IMAGE_NAME: "apachepinot/pinot"
           BASE_IMAGE_TAG: "${{ matrix.java-version }}-${{ matrix.java-disto }}"
-          PINOT_GIT_URL: ${{ github.event.inputs.gitUrl }}
-          PINOT_BRANCH: "${{needs.generate-build-info.outputs.commit-id}}"
+          PINOT_GIT_URL: "https://github.com/apache/pinot.git"
+          PINOT_BRANCH: "${{ needs.generate-build-info.outputs.commit-id }}"
           JDK_VERSION: ${{ matrix.java-version }}
         run: .github/workflows/scripts/docker/.pinot_compile_and_push_build_image.sh
         timeout-minutes: 240
   package-pinot-docker-image:
     runs-on: ${{ matrix.runner }}
     strategy:
+      fail-fast: false
       matrix:
         java-disto: ["ms-openjdk", "amazoncorretto"]
         java-version: ["11", "17", "21", "25"]
@@ -101,22 +93,22 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/setup-buildx-action@v4
-        name: Set up Docker Buildx
       - uses: actions/checkout@v5
       - name: Package and push the Docker image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
-          DOCKER_IMAGE_NAME: ${{ github.event.inputs.dockerImageName }}
+          DOCKER_IMAGE_NAME: "apachepinot/pinot"
           BASE_IMAGE_TAG: "${{ matrix.java-version }}-${{ matrix.java-disto }}"
           RUNTIME_IMAGE_TAGS: "${{ matrix.java-version }}-${{ matrix.java-disto }}"
+          PINOT_BRANCH: "${{ needs.generate-build-info.outputs.commit-id }}"
           BUILD_ARCH: ${{ matrix.arch }}
-          TAGS: "${{needs.generate-build-info.outputs.tags}}"
+          TAGS: "${{ needs.generate-build-info.outputs.tags }}"
         run: .github/workflows/scripts/docker/.pinot_package_single_platform.sh
         timeout-minutes: 60
   create-multi-arch-manifest:
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         java-disto: ["ms-openjdk", "amazoncorretto"]
         java-version: ["11", "17", "21", "25"]
@@ -131,7 +123,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: Create Multi-Arch Manifest
         env:
-          TAGS: "${{needs.generate-build-info.outputs.tags}}"
+          TAGS: "${{ needs.generate-build-info.outputs.tags }}"
           BUILD_PLATFORM: "linux/arm64,linux/amd64"
           BASE_IMAGE_TAGS: "${{ matrix.java-version }}-${{ matrix.java-disto }}"
         run: .github/workflows/scripts/docker/.pinot_multi_arch_docker_image_manifest_package.sh

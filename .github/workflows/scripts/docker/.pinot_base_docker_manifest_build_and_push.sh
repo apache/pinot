@@ -20,8 +20,14 @@
 
 set -e
 
-docker manifest create apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG} \
-    --amend apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-amd64 \
-    --amend apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-arm64
+MANIFEST_TAG="apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}"
 
-docker manifest push apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}
+# Remove any existing local manifest so re-runs of a failed workflow don't fail
+# with "manifest already exists".
+docker manifest rm "${MANIFEST_TAG}" 2>/dev/null || true
+
+docker manifest create "${MANIFEST_TAG}" \
+    --amend "apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-amd64" \
+    --amend "apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-arm64"
+
+docker manifest push "${MANIFEST_TAG}"

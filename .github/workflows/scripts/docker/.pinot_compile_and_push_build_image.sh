@@ -21,7 +21,6 @@
 # so that per-arch package jobs can pull it.
 
 set -e
-set -x
 
 if [ -z "${DOCKER_IMAGE_NAME}" ]; then
   DOCKER_IMAGE_NAME="apachepinot/pinot"
@@ -29,24 +28,30 @@ fi
 if [ -z "${PINOT_GIT_URL}" ]; then
   PINOT_GIT_URL="https://github.com/apache/pinot.git"
 fi
+if [ -z "${DOCKER_FILE_BASE_DIR}" ]; then
+  echo "DOCKER_FILE_BASE_DIR is required" >&2
+  exit 1
+fi
 
-cd ${DOCKER_FILE_BASE_DIR}
+cd "${DOCKER_FILE_BASE_DIR}"
 
-PINOT_BUILD_IMAGE_TAG=${BASE_IMAGE_TAG}-amd64
-BUILD_IMAGE_REMOTE_TAG="${DOCKER_IMAGE_NAME}:build-${BASE_IMAGE_TAG}"
+# Include PINOT_BRANCH (commit SHA) in the build image tag to avoid collisions
+# between concurrent workflow runs that target different commits.
+PINOT_BUILD_IMAGE_TAG="${BASE_IMAGE_TAG}-amd64"
+BUILD_IMAGE_REMOTE_TAG="${DOCKER_IMAGE_NAME}:build-${BASE_IMAGE_TAG}-${PINOT_BRANCH}"
 
 echo "Building docker image for platform: amd64 with tag: pinot-build:${PINOT_BUILD_IMAGE_TAG}"
 docker build \
   --no-cache \
   --platform amd64 \
   --file Dockerfile.build \
-  --build-arg PINOT_GIT_URL=${PINOT_GIT_URL} \
-  --build-arg PINOT_BRANCH=${PINOT_BRANCH} \
-  --build-arg JDK_VERSION=${JDK_VERSION} \
-  --build-arg PINOT_BASE_IMAGE_TAG=${BASE_IMAGE_TAG} \
-  --tag pinot-build:${PINOT_BUILD_IMAGE_TAG} \
-  --tag ${BUILD_IMAGE_REMOTE_TAG} \
+  --build-arg "PINOT_GIT_URL=${PINOT_GIT_URL}" \
+  --build-arg "PINOT_BRANCH=${PINOT_BRANCH}" \
+  --build-arg "JDK_VERSION=${JDK_VERSION}" \
+  --build-arg "PINOT_BASE_IMAGE_TAG=${BASE_IMAGE_TAG}" \
+  --tag "pinot-build:${PINOT_BUILD_IMAGE_TAG}" \
+  --tag "${BUILD_IMAGE_REMOTE_TAG}" \
   .
 
 echo "Pushing build image to DockerHub as ${BUILD_IMAGE_REMOTE_TAG}"
-docker push ${BUILD_IMAGE_REMOTE_TAG}
+docker push "${BUILD_IMAGE_REMOTE_TAG}"

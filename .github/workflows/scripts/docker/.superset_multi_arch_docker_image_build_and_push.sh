@@ -22,10 +22,10 @@ if [ -z "${DOCKER_IMAGE_NAME}" ]; then
   DOCKER_IMAGE_NAME="apachepinot/pinot-superset"
 fi
 if [ -z "${SUPERSET_IMAGE_TAG}" ]; then
-  SUPERSET_IMAGE_TAG="master-py310"
+  SUPERSET_IMAGE_TAG="latest"
 fi
-if [ -z "${SUPERSET_ARM64_SUFFIX}" ]; then
-  SUPERSET_ARM64_SUFFIX="arm"
+if [ -z "${BUILD_PLATFORM}" ]; then
+  BUILD_PLATFORM="linux/amd64"
 fi
 
 DATE=`date +%Y%m%d`
@@ -40,40 +40,20 @@ else
   declare -a tags=($(echo ${TAGS} | tr "," " "))
 fi
 
-DOCKER_BUILD_AMD64_TAGS=""
-DOCKER_BUILD_ARM64_TAGS=""
-DOCKER_AMEND_TAGS_CMD=""
+DOCKER_BUILD_TAGS=""
 for tag in "${tags[@]}"
 do
   echo "Plan to build and push docker images for: ${DOCKER_IMAGE_NAME}:${tag}"
-  DOCKER_BUILD_AMD64_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-amd64 "
-  DOCKER_BUILD_ARM64_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-arm64 "
-  DOCKER_AMEND_TAGS_CMD=" --amend ${DOCKER_IMAGE_NAME}:${tag}-amd64 --amend ${DOCKER_IMAGE_NAME}:${tag}-arm64 "
+  DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag} "
 done
 
 cd ${DOCKER_FILE_BASE_DIR}
 
 docker build \
     --no-cache \
-    --platform=linux/amd64 \
+    --platform=${BUILD_PLATFORM} \
     --file Dockerfile \
     --build-arg SUPERSET_IMAGE_TAG=${SUPERSET_IMAGE_TAG} \
-    ${DOCKER_BUILD_AMD64_TAGS} \
+    ${DOCKER_BUILD_TAGS} \
     --push \
     .
-
-docker build \
-    --no-cache \
-    --platform=linux/arm64 \
-    --file Dockerfile \
-    --build-arg SUPERSET_IMAGE_TAG=${SUPERSET_IMAGE_TAG}-${SUPERSET_ARM64_SUFFIX} \
-    ${DOCKER_BUILD_ARM64_TAGS} \
-    --push \
-    .
-
-for tag in "${tags[@]}"
-do
-  echo "Plan to push docker manifest for: ${DOCKER_IMAGE_NAME}:${tag}"
-  docker manifest create ${DOCKER_IMAGE_NAME}:${tag} ${DOCKER_AMEND_TAGS_CMD}
-  docker manifest push ${DOCKER_IMAGE_NAME}:${tag}
-done

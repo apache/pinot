@@ -21,37 +21,41 @@
 # tags it locally, then builds and pushes the platform-specific package image.
 
 set -e
-set -x
 
 if [ -z "${DOCKER_IMAGE_NAME}" ]; then
   DOCKER_IMAGE_NAME="apachepinot/pinot"
 fi
 if [ -z "${BUILD_ARCH}" ]; then
-  echo "BUILD_ARCH is required (amd64 or arm64)"
+  echo "BUILD_ARCH is required (amd64 or arm64)" >&2
+  exit 1
+fi
+if [ -z "${DOCKER_FILE_BASE_DIR}" ]; then
+  echo "DOCKER_FILE_BASE_DIR is required" >&2
   exit 1
 fi
 
-cd ${DOCKER_FILE_BASE_DIR}
+cd "${DOCKER_FILE_BASE_DIR}"
 
-# Pull the build image from DockerHub and tag it locally
-PINOT_BUILD_IMAGE_TAG=${BASE_IMAGE_TAG}-amd64
-BUILD_IMAGE_REMOTE_TAG="${DOCKER_IMAGE_NAME}:build-${BASE_IMAGE_TAG}"
+# Pull the commit-scoped build image from DockerHub and tag it locally.
+# PINOT_BRANCH is the short commit SHA resolved by generate-build-info; including
+# it in the tag prevents concurrent nightly runs from overwriting each other.
+PINOT_BUILD_IMAGE_TAG="${BASE_IMAGE_TAG}-amd64"
+BUILD_IMAGE_REMOTE_TAG="${DOCKER_IMAGE_NAME}:build-${BASE_IMAGE_TAG}-${PINOT_BRANCH}"
 echo "Pulling build image: ${BUILD_IMAGE_REMOTE_TAG}"
-docker pull --platform linux/amd64 ${BUILD_IMAGE_REMOTE_TAG}
-docker tag ${BUILD_IMAGE_REMOTE_TAG} pinot-build:${PINOT_BUILD_IMAGE_TAG}
+docker pull --platform linux/amd64 "${BUILD_IMAGE_REMOTE_TAG}"
+docker tag "${BUILD_IMAGE_REMOTE_TAG}" "pinot-build:${PINOT_BUILD_IMAGE_TAG}"
 
-tags=()
-declare -a tags=($(echo ${TAGS} | tr "," " "))
-
-runtimeImages=()
-declare -a runtimeImages=($(echo ${RUNTIME_IMAGE_TAGS} | tr "," " "))
+declare -a tags=($(echo "${TAGS}" | tr "," " "))
+declare -a runtimeImages=($(echo "${RUNTIME_IMAGE_TAGS}" | tr "," " "))
 
 for runtimeImage in "${runtimeImages[@]}"; do
   DOCKER_BUILD_TAGS=""
   for tag in "${tags[@]}"; do
     DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-${runtimeImage}-linux-${BUILD_ARCH} "
 
-    if [ "${runtimeImage}" == "17-amazoncorretto" ]; then
+    # 21-ms-openjdk is the canonical default runtime; promote it as the bare
+    # latest-linux-<arch> tag so multi-arch manifests can reference it.
+    if [ "${runtimeImage}" == "21-ms-openjdk" ]; then
       if [ "${tag}" == "latest" ]; then
         DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:latest-linux-${BUILD_ARCH} "
       fi
@@ -61,19 +65,19 @@ for runtimeImage in "${runtimeImages[@]}"; do
   echo "Building docker image for platform: ${BUILD_ARCH} with tags: ${DOCKER_BUILD_TAGS}"
   docker build \
     --no-cache \
-    --platform linux/${BUILD_ARCH} \
+    --platform "linux/${BUILD_ARCH}" \
     --file Dockerfile.package \
-    --build-arg PINOT_BUILD_IMAGE_TAG=${PINOT_BUILD_IMAGE_TAG} \
-    --build-arg PINOT_RUNTIME_IMAGE_TAG=${runtimeImage} \
+    --build-arg "PINOT_BUILD_IMAGE_TAG=${PINOT_BUILD_IMAGE_TAG}" \
+    --build-arg "PINOT_RUNTIME_IMAGE_TAG=${runtimeImage}" \
     ${DOCKER_BUILD_TAGS} \
     .
 
   for tag in "${tags[@]}"; do
-    docker push ${DOCKER_IMAGE_NAME}:${tag}-${runtimeImage}-linux-${BUILD_ARCH}
+    docker push "${DOCKER_IMAGE_NAME}:${tag}-${runtimeImage}-linux-${BUILD_ARCH}"
 
-    if [ "${runtimeImage}" == "17-amazoncorretto" ]; then
+    if [ "${runtimeImage}" == "21-ms-openjdk" ]; then
       if [ "${tag}" == "latest" ]; then
-        docker push ${DOCKER_IMAGE_NAME}:${tag}-linux-${BUILD_ARCH}
+        docker push "${DOCKER_IMAGE_NAME}:latest-linux-${BUILD_ARCH}"
       fi
     fi
   done

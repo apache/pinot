@@ -49,7 +49,7 @@ for tag in "${tags[@]}"; do
     docker manifest push \
       ${DOCKER_IMAGE_NAME}:${tag}-${baseImageTag}
 
-    if [ "${baseImageTag}" == "17-amazoncorretto" ]; then
+    if [ "${baseImageTag}" == "21-ms-openjdk" ]; then
         echo "Creating manifest for tag: ${tag}"
         docker manifest create \
           ${DOCKER_IMAGE_NAME}:${tag} \

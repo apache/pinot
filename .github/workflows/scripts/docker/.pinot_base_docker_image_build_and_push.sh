@@ -37,5 +37,6 @@ docker build \
   --tag apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-${ARCH} \
   --build-arg JAVA_VERSION=${JDK_VERSION:-11} \
   --build-arg ARCH=${ARCH} \
-  --push \
   .
+
+docker push apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-${ARCH}
