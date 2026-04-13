@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.CompressionCodecSpec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
@@ -227,6 +228,27 @@ public class ForwardIndexTypeTest {
                 .withDeriveNumDocsPerChunk(false)
                 .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
                 .build()
+      );
+    }
+
+    @Test
+    public void oldConfEnableRawWithParameterizedCompression()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"RAW\",\n"
+          + "    \"compressionCodec\": \"zstd(3)\"\n"
+          + " }"
+      );
+
+      assertEquals(
+          new ForwardIndexConfig.Builder()
+              .withCompressionCodecSpec(CompressionCodecSpec.of(FieldConfig.CompressionCodec.ZSTANDARD, 3))
+              .withCompressionType(ChunkCompressionType.ZSTANDARD)
+              .withDeriveNumDocsPerChunk(false)
+              .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
+              .build()
       );
     }
 

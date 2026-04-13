@@ -35,13 +35,20 @@ class LZ4Compressor implements ChunkCompressor {
 
   static final LZ4Compressor INSTANCE = new LZ4Compressor();
 
+  private final net.jpountz.lz4.LZ4Compressor _compressor;
+
   private LZ4Compressor() {
+    _compressor = LZ4_FACTORY.fastCompressor();
+  }
+
+  LZ4Compressor(int compressionLevel) {
+    _compressor = LZ4_FACTORY.highCompressor(compressionLevel);
   }
 
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
-    LZ4_FACTORY.fastCompressor().compress(inUncompressed, outCompressed);
+    _compressor.compress(inUncompressed, outCompressed);
     // When the compress method returns successfully,
     // dstBuf's position() will be set to its current position() plus the compressed size of the data.
     // and srcBuf's position() will be set to its limit()
@@ -52,7 +59,7 @@ class LZ4Compressor implements ChunkCompressor {
 
   @Override
   public int maxCompressedSize(int uncompressedSize) {
-    return LZ4_FACTORY.fastCompressor().maxCompressedLength(uncompressedSize);
+    return _compressor.maxCompressedLength(uncompressedSize);
   }
 
   @Override

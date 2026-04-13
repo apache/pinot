@@ -202,7 +202,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig) {
     ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder();
-    builder.withCompressionCodec(fieldConfig.getCompressionCodec());
+    builder.withCompressionCodecSpec(fieldConfig.getCompressionCodecSpec());
     Map<String, String> properties = fieldConfig.getProperties();
     if (properties != null) {
       builder.withLegacyProperties(properties);

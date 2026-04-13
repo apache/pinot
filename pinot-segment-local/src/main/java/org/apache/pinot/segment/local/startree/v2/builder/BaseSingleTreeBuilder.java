@@ -491,13 +491,13 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       ChunkCompressionType compressionType = ChunkCompressionType.valueOf(aggregationSpec.getCompressionCodec().name());
       if (valueType == BYTES) {
         metricIndexCreators[i] =
-            new SingleValueVarByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, BYTES,
+            new SingleValueVarByteRawIndexCreator(_outputDir, compressionType, null, metric, _numDocs, BYTES,
                 valueAggregator.getMaxAggregatedValueByteSize(), aggregationSpec.isDeriveNumDocsPerChunk(),
                 aggregationSpec.getIndexVersion(), aggregationSpec.getTargetMaxChunkSizeBytes(),
                 aggregationSpec.getTargetDocsPerChunk());
       } else {
         metricIndexCreators[i] =
-            new SingleValueFixedByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, valueType,
+            new SingleValueFixedByteRawIndexCreator(_outputDir, compressionType, null, metric, _numDocs, valueType,
                 aggregationSpec.getIndexVersion(), aggregationSpec.getTargetDocsPerChunk());
       }
     }

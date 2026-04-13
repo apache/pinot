@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedBy
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV6;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
@@ -51,7 +52,7 @@ public class VarByteChunkV6Test extends VarByteChunkV5Test {
   @Override
   protected VarByteChunkWriter createWriter(File file, ChunkCompressionType compressionType, int chunkSize)
       throws IOException {
-    return new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize);
+    return new VarByteChunkForwardIndexWriterV6(file, compressionType, null, chunkSize);
   }
 
   @Override
@@ -82,13 +83,15 @@ public class VarByteChunkV6Test extends VarByteChunkV5Test {
     FileUtils.deleteQuietly(v6FwdIndexFile);
 
     try (MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(v4FwdIndexFile,
-        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, maxMVRowSize, true, 4)) {
+        ChunkCompressionType.ZSTANDARD, null, numDocs, FieldSpec.DataType.LONG, maxMVRowSize, true, 4,
+        ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(), ForwardIndexConfig.getDefaultTargetDocsPerChunk())) {
       for (long[] mvRow : inputData) {
         creator.putLongMV(mvRow);
       }
     }
     try (MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(v6FwdIndexFile,
-        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, maxMVRowSize, true, 6)) {
+        ChunkCompressionType.ZSTANDARD, null, numDocs, FieldSpec.DataType.LONG, maxMVRowSize, true, 6,
+        ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(), ForwardIndexConfig.getDefaultTargetDocsPerChunk())) {
       for (long[] mvRow : inputData) {
         creator.putLongMV(mvRow);
       }

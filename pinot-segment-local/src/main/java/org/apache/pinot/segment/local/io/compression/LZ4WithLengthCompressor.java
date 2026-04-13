@@ -39,6 +39,10 @@ class LZ4WithLengthCompressor implements ChunkCompressor {
     _compressor = new LZ4CompressorWithLength(LZ4Compressor.LZ4_FACTORY.fastCompressor());
   }
 
+  LZ4WithLengthCompressor(int compressionLevel) {
+    _compressor = new LZ4CompressorWithLength(LZ4Compressor.LZ4_FACTORY.highCompressor(compressionLevel));
+  }
+
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {

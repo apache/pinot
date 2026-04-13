@@ -70,11 +70,11 @@ public class BenchmarkFixedByteSVForwardIndexReader {
     _doubleBuffer = new double[_blockSize];
     _longBuffer = new long[_blockSize];
     try (FixedByteChunkForwardIndexWriter writer = new FixedByteChunkForwardIndexWriter(compressedIndexFile,
-        ChunkCompressionType.LZ4, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
+        ChunkCompressionType.LZ4, null, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
         FixedByteChunkForwardIndexWriter passThroughWriter = new FixedByteChunkForwardIndexWriter(uncompressedIndexFile,
-            ChunkCompressionType.PASS_THROUGH, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
+            ChunkCompressionType.PASS_THROUGH, null, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
         FixedByteChunkForwardIndexWriter pow2Writer = new FixedByteChunkForwardIndexWriter(pow2CompressedIndexFile,
-            ChunkCompressionType.LZ4, _numBlocks * _blockSize, 1000, Long.BYTES, 4)) {
+            ChunkCompressionType.LZ4, null, _numBlocks * _blockSize, 1000, Long.BYTES, 4)) {
       for (int i = 0; i < _numBlocks * _blockSize; i++) {
         long next = ThreadLocalRandom.current().nextLong();
         writer.putLong(next);

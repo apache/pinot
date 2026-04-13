@@ -81,8 +81,9 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testOverflowElementCount()
       throws IOException {
-    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, "column", 10000,
-        DataType.STRING, 1, Integer.MAX_VALUE / 2);
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, null, "column", 10000,
+        DataType.STRING, ForwardIndexConfig.getDefaultRawWriterVersion(), 1, Integer.MAX_VALUE / 2,
+        ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -90,7 +91,7 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
       throws IOException {
     // Contrived to produce a positive chunk size > Integer.MAX_VALUE but not fail num elements checks
     // This check only applies to v2/v3
-    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, "column", 10000,
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, null, "column", 10000,
         DataType.STRING, 2, Integer.MAX_VALUE - Integer.BYTES - 2 * Integer.BYTES, 2,
         ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
@@ -128,7 +129,7 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
       inputs.add(values);
     }
     try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
-        column, numDocs, DataType.STRING, maxTotalLength, maxElements, writerVersion, 1024 * 1024, 1000)) {
+        null, column, numDocs, DataType.STRING, writerVersion, maxTotalLength, maxElements, 1024 * 1024, 1000)) {
       for (String[] input : inputs) {
         creator.putStringMV(input);
       }
@@ -181,7 +182,7 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
       inputs.add(values);
     }
     try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
-        column, numDocs, DataType.BYTES, writerVersion, maxTotalLength, maxElements, 1024 * 1024, 1000)) {
+        null, column, numDocs, DataType.BYTES, writerVersion, maxTotalLength, maxElements, 1024 * 1024, 1000)) {
       for (byte[][] input : inputs) {
         creator.putBytesMV(input);
       }

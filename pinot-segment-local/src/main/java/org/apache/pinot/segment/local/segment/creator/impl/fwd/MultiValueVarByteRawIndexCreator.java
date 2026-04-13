@@ -21,13 +21,13 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -41,40 +41,9 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
   private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
 
-  /**
-   * Create a var-byte raw index creator for the given column
-   *
-   * @param baseIndexDir Index directory
-   * @param compressionType Type of compression to use
-   * @param column Name of column to index
-   * @param totalDocs Total number of documents to index
-   * @param valueType Type of the values
-   * @param maxRowLengthInBytes the length in bytes of the largest row
-   * @param maxNumberOfElements the maximum number of elements in a row
-   */
-  public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
-      int totalDocs, DataType valueType, int maxRowLengthInBytes, int maxNumberOfElements)
-      throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.getDefaultRawWriterVersion(),
-        maxRowLengthInBytes, maxNumberOfElements, ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(),
-        ForwardIndexConfig.getDefaultTargetDocsPerChunk());
-  }
-
-  /**
-   * Create a var-byte raw index creator for the given column
-   *
-   * @param baseIndexDir Index directory
-   * @param compressionType Type of compression to use
-   * @param column Name of column to index
-   * @param totalDocs Total number of documents to index
-   * @param valueType Type of the values
-   * @param maxRowLengthInBytes the size in bytes of the largest row, the chunk size cannot be smaller than this
-   * @param maxNumberOfElements the maximum number of elements in a row
-   * @param writerVersion writer format version
-   */
-  public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
-      int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes, int maxNumberOfElements,
-      int targetMaxChunkSizeBytes, int targetDocsPerChunk)
+  public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
+      @Nullable Integer compressionLevel, String column, int totalDocs, DataType valueType, int writerVersion,
+      int maxRowLengthInBytes, int maxNumberOfElements, int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
     File file = new File(baseIndexDir, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     // We will prepend the actual content with numElements and length array containing length of each element
@@ -82,17 +51,16 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
     if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
       int numDocsPerChunk = Math.max(targetMaxChunkSizeBytes / (totalMaxLength
           + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1);
-      _indexWriter =
-          new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
-              writerVersion);
+      _indexWriter = new VarByteChunkForwardIndexWriter(file, compressionType, compressionLevel, totalDocs,
+          numDocsPerChunk, totalMaxLength, writerVersion);
     } else if (writerVersion == VarByteChunkForwardIndexWriterV6.VERSION) {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-      _indexWriter = new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize);
+      _indexWriter = new VarByteChunkForwardIndexWriterV6(file, compressionType, compressionLevel, chunkSize);
     } else {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-      _indexWriter = new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
+      _indexWriter = new VarByteChunkForwardIndexWriterV4(file, compressionType, compressionLevel, chunkSize);
     }
     _valueType = valueType;
   }

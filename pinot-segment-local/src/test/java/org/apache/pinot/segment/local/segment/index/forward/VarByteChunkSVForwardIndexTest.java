@@ -112,9 +112,9 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
     try (VarByteChunkForwardIndexWriter fourByteOffsetWriter = new VarByteChunkForwardIndexWriter(outFileFourByte,
-        compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes, 2);
+        compressionType, null, NUM_ENTRIES, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes, 2);
         VarByteChunkForwardIndexWriter eightByteOffsetWriter = new VarByteChunkForwardIndexWriter(outFileEightByte,
-            compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes, 3)) {
+            compressionType, null, NUM_ENTRIES, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes, 3)) {
       // NOTE: No need to test BYTES explicitly because STRING is handled as UTF-8 encoded bytes
       for (int i = 0; i < NUM_ENTRIES; i++) {
         fourByteOffsetWriter.putString(expected[i]);
@@ -241,8 +241,8 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
     }
 
     int numDocsPerChunk = SingleValueVarByteRawIndexCreator.getNumDocsPerChunk(maxStringLengthInBytes, 1024 * 1024);
-    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(outFile, compressionType, numDocs,
-        numDocsPerChunk, maxStringLengthInBytes, 3)) {
+    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(outFile, compressionType, null,
+        numDocs, numDocsPerChunk, maxStringLengthInBytes, 3)) {
       // NOTE: No need to test BYTES explicitly because STRING is handled as UTF-8 encoded bytes
       for (int i = 0; i < numDocs; i++) {
         writer.putString(expected[i]);
@@ -288,7 +288,7 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
     int docSize = 21475;
     byte[] value = StringUtils.repeat("a", docSize).getBytes(UTF_8);
     try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file,
-        ChunkCompressionType.PASS_THROUGH, 100_001, 1000, docSize, 2)) {
+        ChunkCompressionType.PASS_THROUGH, null, 100_001, 1000, docSize, 2)) {
       try {
         for (int i = 0; i < 100_000; i++) {
           writer.putBytes(value);

@@ -158,7 +158,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
 
   protected VarByteChunkWriter createWriter(File file, ChunkCompressionType compressionType, int chunkSize)
       throws IOException {
-    return new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
+    return new VarByteChunkForwardIndexWriterV4(file, compressionType, null, chunkSize);
   }
 
   protected VarByteChunkForwardIndexReaderV4 createReader(PinotDataBuffer buffer, FieldSpec.DataType dataType,

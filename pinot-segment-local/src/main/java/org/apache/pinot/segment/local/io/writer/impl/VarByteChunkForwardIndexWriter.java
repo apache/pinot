@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigDecimal;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -63,10 +64,11 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is
    *     not found.
    */
-  public VarByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion)
+  public VarByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType,
+      @Nullable Integer compressionLevel, int totalDocs, int numDocsPerChunk, int lengthOfLongestEntry,
+      int writerVersion)
       throws IOException {
-    super(file, compressionType, totalDocs, numDocsPerChunk,
+    super(file, compressionType, compressionLevel, totalDocs, numDocsPerChunk,
         numDocsPerChunk * (CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + (long) lengthOfLongestEntry),
         // chunkSize
         lengthOfLongestEntry, writerVersion, false);

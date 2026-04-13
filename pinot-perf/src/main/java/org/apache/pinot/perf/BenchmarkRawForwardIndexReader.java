@@ -138,7 +138,7 @@ public class BenchmarkRawForwardIndexReader {
       super.setup();
       _file = new File(TARGET_DIR, UUID.randomUUID().toString());
       try (VarByteChunkForwardIndexWriterV4 writer = new VarByteChunkForwardIndexWriterV4(_file,
-          _chunkCompressionType, _maxChunkSize)) {
+          _chunkCompressionType, null, _maxChunkSize)) {
         for (int i = 0; i < _records; i++) {
           writer.putBytes(_bytes[i]);
         }
@@ -164,7 +164,7 @@ public class BenchmarkRawForwardIndexReader {
       super.setup();
       _file = new File(TARGET_DIR, UUID.randomUUID().toString());
       try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(_file, _chunkCompressionType,
-          _records, _maxChunkSize / _maxLength, _maxLength, 3)) {
+          null, _records, _maxChunkSize / _maxLength, _maxLength, 3)) {
         for (int i = 0; i < _records; i++) {
           writer.putBytes(_bytes[i]);
         }

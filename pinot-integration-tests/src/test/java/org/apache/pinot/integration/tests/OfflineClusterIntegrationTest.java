@@ -71,6 +71,7 @@ import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.table.CompressionCodecSpec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -1601,6 +1602,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
     assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
     assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v4rawIndexSize);
+
+    // Explicit ZSTD level should continue to flow through the raw forward index path.
+    forwardIndexConfig = new ForwardIndexConfig.Builder()
+        .withCompressionCodecSpec(CompressionCodecSpec.fromString("zstd(3)"))
+        .build();
+    indexes.set("forward", forwardIndexConfig.toJsonNode());
+    fieldConfig =
+        new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+    fieldConfigs.set(fieldConfigs.size() - 1, fieldConfig);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
+    columnIndexSize = getColumnIndexSize(column);
+    assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
+    assertTrue(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble() > 0);
 
     resetForwardIndex(dictionarySize, forwardIndexSize);
   }

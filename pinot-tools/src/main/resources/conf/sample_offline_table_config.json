@@ -21,6 +21,13 @@
       "column2"
     ]
   },
+  "fieldConfigList": [
+    {
+      "name": "column1",
+      "encodingType": "RAW",
+      "compressionCodec": "ZSTD(3)"
+    }
+  },
   "metadata": {
     "customConfigs": {
     }
