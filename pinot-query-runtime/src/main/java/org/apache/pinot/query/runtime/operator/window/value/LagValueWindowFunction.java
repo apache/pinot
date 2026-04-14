@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator.window.value;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -28,9 +29,10 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
 
-/**
- * The LAG window function doesn't allow custom window frames (and this is enforced by Calcite).
- */
+/// Window function that returns the value of a column from a preceding row within the partition.
+/// Supports an optional offset (default 1), an optional default value for when no row exists at
+/// that offset, and IGNORE NULLS mode which skips null values when scanning backward.
+/// Custom window frames are not allowed (enforced by Calcite).
 public class LagValueWindowFunction extends ValueWindowFunction {
   private final int _offset;
   private final Object _defaultValue;
@@ -75,6 +77,9 @@ public class LagValueWindowFunction extends ValueWindowFunction {
 
   @Override
   public List<Object> processRows(List<Object[]> rows) {
+    if (_ignoreNulls) {
+      return processRowsIgnoreNulls(rows);
+    }
     int numRows = rows.size();
     Object[] result = new Object[numRows];
     if (_defaultValue != null) {
@@ -85,6 +90,30 @@ public class LagValueWindowFunction extends ValueWindowFunction {
     }
     for (int i = _offset; i < numRows; i++) {
       result[i] = extractValueFromRow(rows.get(i - _offset));
+    }
+    return Arrays.asList(result);
+  }
+
+  /**
+   * LAG with IGNORE NULLS: for each row, find the offset-th non-null value scanning backward.
+   * Uses a bounded deque of size {@code _offset} for O(N) time and O(offset) memory.
+   * Scans left-to-right, maintaining a sliding window of preceding non-null values. The oldest
+   * element in the deque (peekFirst) is always the offset-th non-null value behind the current
+   * row.
+   */
+  private List<Object> processRowsIgnoreNulls(List<Object[]> rows) {
+    int numRows = rows.size();
+    Object[] result = new Object[numRows];
+    ArrayDeque<Object> window = new ArrayDeque<>(_offset);
+    for (int i = 0; i < numRows; i++) {
+      result[i] = (window.size() == _offset) ? window.peekFirst() : _defaultValue;
+      Object val = extractValueFromRow(rows.get(i));
+      if (val != null) {
+        window.addLast(val);
+        if (window.size() > _offset) {
+          window.pollFirst();
+        }
+      }
     }
     return Arrays.asList(result);
   }
