@@ -127,11 +127,6 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   }
 
   @Override
-  public Object getSortedValues() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public DataType getValueType() {
     throw new UnsupportedOperationException();
   }

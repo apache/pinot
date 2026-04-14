@@ -16,58 +16,57 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.mutable;
+package org.apache.pinot.segment.local.segment.index.readers;
 
+import it.unimi.dsi.fastutil.ints.IntSet;
+import java.io.IOException;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * Interface for mutable dictionary (for CONSUMING segment).
- */
-public interface MutableDictionary extends Dictionary {
-
-  /**
-   * Indexes a single-value entry (a value of the dictionary type) into the dictionary, and returns the dictId of the
-   * value.
-   */
-  int index(Object value);
-
-  /**
-   * Indexes a multi-value entry (an array of values of the dictionary type) into the dictionary, and returns an array
-   * of dictIds for each value.
-   */
-  int[] index(Object[] values);
+/// Base class for constant-value (single-value) dictionaries.
+///
+/// Unlike [BaseImmutableDictionary] which is backed by a segment data buffer, constant-value dictionaries hold exactly
+/// one value in memory and support the stats-collection APIs needed when sealing a consuming segment.
+public abstract class BaseConstantValueDictionary implements Dictionary {
 
   @Override
-  default boolean isSorted() {
-    return false;
+  public boolean isSorted() {
+    return true;
   }
 
   @Override
-  default int insertionIndexOf(String stringValue) {
-    // This method should not be called for unsorted dictionary.
+  public int length() {
+    return 1;
+  }
+
+  @Override
+  public IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper) {
+    // This method should not be called for sorted dictionary.
     throw new UnsupportedOperationException();
   }
 
   @Override
-  default int getLengthOfShortestElement() {
+  public int compare(int dictId1, int dictId2) {
+    return 0;
+  }
+
+  @Override
+  public int getLengthOfShortestElement() {
     return getValueType().size();
   }
 
   @Override
-  default int getLengthOfLongestElement() {
+  public int getLengthOfLongestElement() {
     return getValueType().size();
   }
 
   @Override
-  default boolean isAscii() {
+  public boolean isAscii() {
     return false;
   }
 
-  /**
-   * Return true if the mutable dictionary can consume an additional row.
-   */
-  default boolean canAddMore() {
-    return true;
+  @Override
+  public void close()
+      throws IOException {
   }
 }

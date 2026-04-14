@@ -26,12 +26,11 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 /**
  * Dictionary of a single BIG_DECIMAL value.
  */
-public class ConstantValueBigDecimalDictionary extends BaseImmutableDictionary {
+public class ConstantValueBigDecimalDictionary extends BaseConstantValueDictionary {
   private final BigDecimal _value;
   private final byte[] _bytes;
 
   public ConstantValueBigDecimalDictionary(BigDecimal value) {
-    super(1);
     _value = value;
     _bytes = BigDecimalUtils.serialize(_value);
   }
@@ -77,6 +76,16 @@ public class ConstantValueBigDecimalDictionary extends BaseImmutableDictionary {
   @Override
   public BigDecimal[] getSortedValues() {
     return new BigDecimal[]{_value};
+  }
+
+  @Override
+  public int getLengthOfShortestElement() {
+    return _bytes.length;
+  }
+
+  @Override
+  public int getLengthOfLongestElement() {
+    return _bytes.length;
   }
 
   @Override

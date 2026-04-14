@@ -92,6 +92,21 @@ public class SameValueMutableDictionary implements MutableDictionary {
   }
 
   @Override
+  public int getLengthOfShortestElement() {
+    return _valueBytes.length;
+  }
+
+  @Override
+  public int getLengthOfLongestElement() {
+    return _valueBytes.length;
+  }
+
+  @Override
+  public boolean isAscii() {
+    return _valueBytes.length == _actualValue.length();
+  }
+
+  @Override
   public String get(int dictId) {
     return _actualValue;
   }

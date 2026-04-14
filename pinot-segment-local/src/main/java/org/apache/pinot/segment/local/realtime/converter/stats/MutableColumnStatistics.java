@@ -28,14 +28,10 @@ import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.Utf8Utils;
 
 
 /**
  * Column statistics for a column coming from an in-memory realtime segment.
- *
- * TODO: Gather more info on the fly to avoid scanning the segment
  */
 @SuppressWarnings("rawtypes")
 public class MutableColumnStatistics implements ColumnStatistics {
@@ -49,10 +45,6 @@ public class MutableColumnStatistics implements ColumnStatistics {
   // NOTE: For new added columns during the ingestion, this will be constant value dictionary instead of mutable
   //       dictionary.
   protected final Dictionary _dictionary;
-
-  private int _minElementLength = -1;
-  private int _maxElementLength = -1;
-  private boolean _isAscii;
 
   public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSource = dataSource;
@@ -93,53 +85,17 @@ public class MutableColumnStatistics implements ColumnStatistics {
 
   @Override
   public int getLengthOfShortestElement() {
-    collectElementLengthIfNeeded();
-    return _minElementLength;
+    return _dictionary.getLengthOfShortestElement();
   }
 
   @Override
   public int getLengthOfLongestElement() {
-    collectElementLengthIfNeeded();
-    return _maxElementLength;
+    return _dictionary.getLengthOfLongestElement();
   }
 
   @Override
   public boolean isAscii() {
-    collectElementLengthIfNeeded();
-    return _isAscii;
-  }
-
-  private void collectElementLengthIfNeeded() {
-    if (_minElementLength >= 0) {
-      return;
-    }
-
-    DataType valueType = _dictionary.getValueType();
-    if (valueType.isFixedWidth()) {
-      int length = valueType.size();
-      _minElementLength = length;
-      _maxElementLength = length;
-    } else {
-      // If the stored type is not fixed width, iterate over the dictionary to find the min/max element length
-      // TODO: Collect these stats within Dictionary to avoid an extra scan
-      _minElementLength = Integer.MAX_VALUE;
-      _maxElementLength = 0;
-      boolean isAscii = valueType == DataType.STRING;
-      int length = _dictionary.length();
-      for (int i = 0; i < length; i++) {
-        if (isAscii) {
-          byte[] bytes = _dictionary.getBytesValue(i);
-          _minElementLength = Math.min(_minElementLength, bytes.length);
-          _maxElementLength = Math.max(_maxElementLength, bytes.length);
-          isAscii = Utf8Utils.isAscii(bytes);
-        } else {
-          int elementLength = _dictionary.getValueSize(i);
-          _minElementLength = Math.min(_minElementLength, elementLength);
-          _maxElementLength = Math.max(_maxElementLength, elementLength);
-        }
-      }
-      _isAscii = isAscii;
-    }
+    return _dictionary.isAscii();
   }
 
   @Override
