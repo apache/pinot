@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -37,51 +38,26 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.roaringbitmap.PeekableIntIterator;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
-  // When the dictionary size exceeds this threshold, dictionary IDs are offered directly to HyperLogLog
-  // rather than being collected in a RoaringBitmap for deduplication first. For high-cardinality columns,
-  // this avoids the O(n log n) cost of bitmap insertions and provides significant speedup.
-  //
-  // 100K is chosen as the crossover point where direct-HLL becomes faster than bitmap dedup:
-  // - Below 100K: RoaringBitmap is compact (~12KB), insertions are cheap, and pre-deduplication
-  //   marginally improves HLL accuracy by reducing duplicate offers before finalization.
-  // - Above 100K: bitmap memory and insertion cost dominate; HLL's ~0.8% error (log2m=12)
-  //   makes exact pre-deduplication negligible for correctness anyway.
-  // This default matches DISTINCT_COUNT_SMART_HLL's dictThreshold default (see #17411).
-  public static final int DEFAULT_DICT_SIZE_THRESHOLD = 100_000;
-
   protected final int _log2m;
-  protected final int _dictSizeThreshold;
 
   public DistinctCountHLLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
     int numExpressions = arguments.size();
-    // This function expects 1, 2, or 3 arguments.
-    Preconditions.checkArgument(numExpressions <= 3, "DistinctCountHLL expects 1, 2, or 3 arguments, got: %s",
+    // This function expects 1 or 2 arguments.
+    Preconditions.checkArgument(numExpressions <= 2, "DistinctCountHLL expects 1 or 2 arguments, got: %s",
         numExpressions);
-    if (numExpressions >= 2) {
+    if (numExpressions == 2) {
       _log2m = arguments.get(1).getLiteral().getIntValue();
     } else {
       _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
-    }
-    if (numExpressions >= 3) {
-      int dictSizeThreshold = arguments.get(2).getLiteral().getIntValue();
-      _dictSizeThreshold = dictSizeThreshold > 0 ? dictSizeThreshold : Integer.MAX_VALUE;
-    } else {
-      _dictSizeThreshold = DEFAULT_DICT_SIZE_THRESHOLD;
     }
   }
 
   public int getLog2m() {
     return _log2m;
-  }
-
-  public int getDictSizeThreshold() {
-    return _dictSizeThreshold;
   }
 
   @Override
@@ -136,21 +112,13 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
       DataType storedType) {
-    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
+    // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
+    // BitSet gives O(1) insertion with no container-switching overhead (unlike RoaringBitmap), and uses
+    // dictSize/8 bytes of memory (e.g. 128 KB for a 1M-entry dictionary).
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      if (dictionary.length() > _dictSizeThreshold) {
-        // High-cardinality dictionary: bypass RoaringBitmap and offer values directly to HLL.
-        // Avoids O(n log n) bitmap insertion cost at the expense of approximate deduplication,
-        // which is acceptable since DISTINCTCOUNTHLL already returns an approximate result.
-        HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
-        for (int i = 0; i < length; i++) {
-          hyperLogLog.offer(dictionary.get(dictIds[i]));
-        }
-      } else {
-        getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
-      }
+      getDictIdBitSet(aggregationResultHolder, dictionary).addDictIds(dictIds, length);
       return;
     }
 
@@ -194,22 +162,13 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
       DataType storedType) {
-    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
+    // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      if (dictionary.length() > _dictSizeThreshold) {
-        HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
-        for (int i = 0; i < length; i++) {
-          for (int dictId : dictIds[i]) {
-            hyperLogLog.offer(dictionary.get(dictId));
-          }
-        }
-      } else {
-        RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
-        for (int i = 0; i < length; i++) {
-          dictIdBitmap.add(dictIds[i]);
-        }
+      DictIdsWrapper dictIdsWrapper = getDictIdBitSet(aggregationResultHolder, dictionary);
+      for (int i = 0; i < length; i++) {
+        dictIdsWrapper.addDictIds(dictIds[i]);
       }
       return;
     }
@@ -297,18 +256,12 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
+    // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      if (dictionary.length() > _dictSizeThreshold) {
-        for (int i = 0; i < length; i++) {
-          getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(dictionary.get(dictIds[i]));
-        }
-      } else {
-        for (int i = 0; i < length; i++) {
-          getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
-        }
+      for (int i = 0; i < length; i++) {
+        getDictIdBitSet(groupByResultHolder, groupKeyArray[i], dictionary).set(dictIds[i]);
       }
       return;
     }
@@ -352,21 +305,13 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
+    // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      if (dictionary.length() > _dictSizeThreshold) {
-        for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
-          for (int dictId : dictIds[i]) {
-            hyperLogLog.offer(dictionary.get(dictId));
-          }
-        }
-      } else {
-        for (int i = 0; i < length; i++) {
-          getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
-        }
+      for (int i = 0; i < length; i++) {
+        DictIdsWrapper dictIdsWrapper = getDictIdBitSet(groupByResultHolder, groupKeyArray[i], dictionary);
+        dictIdsWrapper.addDictIds(dictIds[i]);
       }
       return;
     }
@@ -461,20 +406,14 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
+    // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      if (dictionary.length() > _dictSizeThreshold) {
-        for (int i = 0; i < length; i++) {
-          Object value = dictionary.get(dictIds[i]);
-          for (int groupKey : groupKeysArray[i]) {
-            getHyperLogLog(groupByResultHolder, groupKey).offer(value);
-          }
-        }
-      } else {
-        for (int i = 0; i < length; i++) {
-          setDictIdForGroupKeys(groupByResultHolder, groupKeysArray[i], dictionary, dictIds[i]);
+      for (int i = 0; i < length; i++) {
+        int dictId = dictIds[i];
+        for (int groupKey : groupKeysArray[i]) {
+          getDictIdBitSet(groupByResultHolder, groupKey, dictionary).set(dictId);
         }
       }
       return;
@@ -519,25 +458,14 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, use adaptive strategy based on dictionary size
+    // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      if (dictionary.length() > _dictSizeThreshold) {
-        for (int i = 0; i < length; i++) {
-          int[] rowDictIds = dictIds[i];
-          for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
-            for (int dictId : rowDictIds) {
-              hyperLogLog.offer(dictionary.get(dictId));
-            }
-          }
-        }
-      } else {
-        for (int i = 0; i < length; i++) {
-          for (int groupKey : groupKeysArray[i]) {
-            getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds[i]);
-          }
+      for (int i = 0; i < length; i++) {
+        int[] rowDictIds = dictIds[i];
+        for (int groupKey : groupKeysArray[i]) {
+          getDictIdBitSet(groupByResultHolder, groupKey, dictionary).addDictIds(rowDictIds);
         }
       }
       return;
@@ -708,80 +636,53 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   }
 
   /**
-   * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
+   * Returns the {@link DictIdsWrapper} from the result holder, creating a new one if absent.
    */
-  protected static RoaringBitmap getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
+  protected static DictIdsWrapper getDictIdBitSet(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
     if (dictIdsWrapper == null) {
       dictIdsWrapper = new DictIdsWrapper(dictionary);
       aggregationResultHolder.setValue(dictIdsWrapper);
     }
-    return dictIdsWrapper._dictIdBitmap;
+    return dictIdsWrapper;
   }
 
   /**
    * Returns the HyperLogLog from the result holder or creates a new one if it does not exist.
-   * If the holder currently contains a {@link DictIdsWrapper} (e.g. because a prior block of a consuming segment used
-   * the bitmap path before the dictionary grew past the threshold), it is converted to a HyperLogLog first so that the
-   * holder always ends up holding a consistent type.
    */
   protected HyperLogLog getHyperLogLog(AggregationResultHolder aggregationResultHolder) {
-    Object result = aggregationResultHolder.getResult();
-    if (result == null) {
-      HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
+    HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
+    if (hyperLogLog == null) {
+      hyperLogLog = new HyperLogLog(_log2m);
       aggregationResultHolder.setValue(hyperLogLog);
-      return hyperLogLog;
     }
-    if (result instanceof DictIdsWrapper) {
-      HyperLogLog hyperLogLog = convertToHyperLogLog((DictIdsWrapper) result);
-      aggregationResultHolder.setValue(hyperLogLog);
-      return hyperLogLog;
-    }
-    return (HyperLogLog) result;
+    return hyperLogLog;
   }
 
   /**
-   * Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
+   * Returns the {@link DictIdsWrapper} for the given group key, creating a new one if absent.
    */
-  protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
+  protected static DictIdsWrapper getDictIdBitSet(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
     if (dictIdsWrapper == null) {
       dictIdsWrapper = new DictIdsWrapper(dictionary);
       groupByResultHolder.setValueForKey(groupKey, dictIdsWrapper);
     }
-    return dictIdsWrapper._dictIdBitmap;
+    return dictIdsWrapper;
   }
 
   /**
    * Returns the HyperLogLog for the given group key or creates a new one if it does not exist.
-   * If the holder currently contains a {@link DictIdsWrapper} for this group key, it is converted to a HyperLogLog
-   * first (same reasoning as {@link #getHyperLogLog(AggregationResultHolder)}).
    */
   protected HyperLogLog getHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey) {
-    Object result = groupByResultHolder.getResult(groupKey);
-    if (result == null) {
-      HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
+    HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+    if (hyperLogLog == null) {
+      hyperLogLog = new HyperLogLog(_log2m);
       groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
-      return hyperLogLog;
     }
-    if (result instanceof DictIdsWrapper) {
-      HyperLogLog hyperLogLog = convertToHyperLogLog((DictIdsWrapper) result);
-      groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
-      return hyperLogLog;
-    }
-    return (HyperLogLog) result;
-  }
-
-  /**
-   * Helper method to set dictionary id for the given group keys into the result holder.
-   */
-  private static void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
-      Dictionary dictionary, int dictId) {
-    for (int groupKey : groupKeys) {
-      getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictId);
-    }
+    return hyperLogLog;
   }
 
   /**
@@ -794,26 +695,46 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   }
 
   /**
-   * Helper method to read dictionary and convert dictionary ids to HyperLogLog for dictionary-encoded expression.
+   * Converts a {@link DictIdsWrapper} to a HyperLogLog by offering each distinct dictionary value exactly once.
    */
   private HyperLogLog convertToHyperLogLog(DictIdsWrapper dictIdsWrapper) {
     HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
     Dictionary dictionary = dictIdsWrapper._dictionary;
-    RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
-    PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
-    while (iterator.hasNext()) {
-      hyperLogLog.offer(dictionary.get(iterator.next()));
+    BitSet bitSet = dictIdsWrapper._bitSet;
+    for (int dictId = bitSet.nextSetBit(0); dictId >= 0; dictId = bitSet.nextSetBit(dictId + 1)) {
+      hyperLogLog.offer(dictionary.get(dictId));
     }
     return hyperLogLog;
   }
 
-  private static final class DictIdsWrapper {
+  /**
+   * Wraps a {@link Dictionary} with a {@link BitSet} to collect and deduplicate dictionary IDs before offering
+   * to HyperLogLog. BitSet gives O(1) insertion with no container-management overhead (unlike RoaringBitmap),
+   * and uses dictSize/8 bytes of memory (e.g. 128 KB for a 1M-entry dictionary).
+   */
+  protected static final class DictIdsWrapper {
     final Dictionary _dictionary;
-    final RoaringBitmap _dictIdBitmap;
+    final BitSet _bitSet;
 
-    private DictIdsWrapper(Dictionary dictionary) {
+    DictIdsWrapper(Dictionary dictionary) {
       _dictionary = dictionary;
-      _dictIdBitmap = new RoaringBitmap();
+      _bitSet = new BitSet(dictionary.length());
+    }
+
+    void set(int dictId) {
+      _bitSet.set(dictId);
+    }
+
+    void addDictIds(int[] dictIds) {
+      for (int dictId : dictIds) {
+        _bitSet.set(dictId);
+      }
+    }
+
+    void addDictIds(int[] dictIds, int length) {
+      for (int i = 0; i < length; i++) {
+        _bitSet.set(dictIds[i]);
+      }
     }
   }
 }
