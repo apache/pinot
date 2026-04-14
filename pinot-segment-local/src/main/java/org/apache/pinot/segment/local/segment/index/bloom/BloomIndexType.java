@@ -74,14 +74,7 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
     BloomFilterConfig bloomFilterConfig = indexConfigs.getConfig(StandardIndexes.bloomFilter());
     if (bloomFilterConfig.isEnabled()) {
       DataType dataType = fieldSpec.getDataType();
-      String column = fieldSpec.getName();
       Preconditions.checkState(dataType != DataType.BOOLEAN, "Cannot create bloom filter on BOOLEAN column: %s",
-          column);
-      Preconditions.checkState(dataType != DataType.BIG_DECIMAL, "Cannot create bloom filter on BIG_DECIMAL column: %s",
-          column);
-      Preconditions.checkState(dataType != DataType.TIMESTAMP, "Cannot create bloom filter on TIMESTAMP column: %s",
-          column);
-      Preconditions.checkState(dataType != DataType.JSON, "Cannot create bloom filter on JSON column: %s",
           column);
       Preconditions.checkState(dataType != DataType.MAP, "Cannot create bloom filter on MAP column: %s", column);
     }
