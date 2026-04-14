@@ -1,0 +1,41 @@
+package org.apache.pinot.plugin.inputformat.protobuf.decoder;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class ProtobufRecorderMessageExtractor {
+  public static GenericRow execute(byte[] from, GenericRow to) throws Exception {
+    org.apache.pinot.plugin.inputformat.protobuf.NestedBatchSample.NestedBatchRecord wrapper = org.apache.pinot.plugin.inputformat.protobuf.NestedBatchSample.NestedBatchRecord.parseFrom(from);
+    List<GenericRow> multipleRecords = new ArrayList<>();
+    for (org.apache.pinot.plugin.inputformat.protobuf.NestedBatchSample.InnerBatch lvl0 : wrapper.getBatchesList()) {
+      for (org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecord innerMsg : lvl0.getRecordsList()) {
+        Map<String, Object> msgMap = decodeorg_apache_pinot_plugin_inputformat_protobuf_Sample_SampleRecordMessage(innerMsg);
+        GenericRow row = new GenericRow();
+        row.putValue("name", msgMap.getOrDefault("name", null));
+        row.putValue("id", msgMap.getOrDefault("id", null));
+        row.putValue("email", msgMap.getOrDefault("email", null));
+        row.putValue("friends", msgMap.getOrDefault("friends", null));
+        row.putValue("optionalField", msgMap.getOrDefault("optionalField", null));
+        multipleRecords.add(row);
+      }
+    }
+    to.putValue(GenericRow.MULTIPLE_RECORDS_KEY, multipleRecords);
+    return to;
+  }
+
+  public static Map<String, Object> decodeorg_apache_pinot_plugin_inputformat_protobuf_Sample_SampleRecordMessage(org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecord msg) {
+    Map<String, Object> msgMap = new HashMap<>();
+    msgMap.put("name", msg.getName());
+    msgMap.put("id", msg.getId());
+    msgMap.put("email", msg.getEmail());
+    if (msg.getFriendsCount() > 0) {
+      msgMap.put("friends", msg.getFriendsList().toArray());
+    }
+    if (msg.hasOptionalField()) {
+      msgMap.put("optionalField", msg.getOptionalField());
+    }
+    return msgMap;
+  }
+}

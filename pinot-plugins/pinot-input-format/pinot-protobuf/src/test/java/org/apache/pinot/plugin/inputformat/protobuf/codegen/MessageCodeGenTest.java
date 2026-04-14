@@ -33,8 +33,10 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.pinot.plugin.inputformat.protobuf.BatchSample;
 import org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes;
 import org.apache.pinot.plugin.inputformat.protobuf.CompositeTypes;
+import org.apache.pinot.plugin.inputformat.protobuf.NestedBatchSample;
 import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufUtils;
 import org.apache.pinot.plugin.inputformat.protobuf.Sample;
 import org.testng.annotations.DataProvider;
@@ -354,6 +356,56 @@ public class MessageCodeGenTest {
         assertEquals(messageCodeGen.codegen(ComplexTypes.TestMessage.getDescriptor(),
                 Set.of(STRING_FIELD, COMPLEX_MAP, REPEATED_NESTED_MESSAGES, REPEATED_BYTES, NULLABLE_DOUBLE_FIELD,
                     "does_not_exist_in_desc")),
+            expectedCodeOutput);
+    }
+
+    @Test
+    public void testBatchCodeGen()
+        throws URISyntaxException, IOException {
+        MessageCodeGen messageCodeGen = new MessageCodeGen();
+
+        URL resource = getClass().getClassLoader()
+            .getResource("codegen_output/batch_sample_record_extractor.txt");
+        String expectedCodeOutput = new String(Files.readAllBytes(Paths.get(resource.toURI())));
+        assertEquals(messageCodeGen.codegen(
+            BatchSample.BatchSampleRecord.getDescriptor(), new HashSet<>(), "records"),
+            expectedCodeOutput);
+    }
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void testBatchCodeGenNonExistentField() {
+        new MessageCodeGen().codegen(
+            Sample.SampleRecord.getDescriptor(), new HashSet<>(), "nonexistent");
+    }
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void testBatchCodeGenNonRepeatedField() {
+        new MessageCodeGen().codegen(
+            Sample.SampleRecord.getDescriptor(), new HashSet<>(), "name");
+    }
+
+    @Test(expectedExceptions = NullPointerException.class)
+    public void testBatchCodeGenNullFieldThrows() {
+        new MessageCodeGen().codegen(
+            Sample.SampleRecord.getDescriptor(), new HashSet<>(), null);
+    }
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void testBatchCodeGenEmptyFieldThrows() {
+        new MessageCodeGen().codegen(
+            Sample.SampleRecord.getDescriptor(), new HashSet<>(), "");
+    }
+
+    @Test
+    public void testBatchCodeGenNestedPath()
+        throws URISyntaxException, IOException {
+        MessageCodeGen messageCodeGen = new MessageCodeGen();
+
+        URL resource = getClass().getClassLoader()
+            .getResource("codegen_output/nested_batch_sample_record_extractor.txt");
+        String expectedCodeOutput = new String(Files.readAllBytes(Paths.get(resource.toURI())));
+        assertEquals(messageCodeGen.codegen(
+            NestedBatchSample.NestedBatchRecord.getDescriptor(), new HashSet<>(), "batches.records"),
             expectedCodeOutput);
     }
 }

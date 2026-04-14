@@ -24,6 +24,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -31,6 +32,7 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufCodeGenMessageDecoder.BATCH_MESSAGE_FIELD;
 import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufCodeGenMessageDecoder.PROTOBUF_JAR_FILE_PATH;
 import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufCodeGenMessageDecoder.PROTO_CLASS_NAME;
 import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufTestDataGenerator.*;
@@ -357,5 +359,107 @@ public class ProtoBufCodeGenMessageDecoderTest {
     ProtoBufCodeGenMessageDecoder messageDecoder = new ProtoBufCodeGenMessageDecoder();
     messageDecoder.init(decoderProps, sourceFieldsForComplexType, "");
     return messageDecoder;
+  }
+
+  private ProtoBufCodeGenMessageDecoder setupBatchDecoder(String jarName, String protoClassName,
+      String batchField, Set<String> fieldsToRead)
+      throws Exception {
+    Map<String, String> decoderProps = new HashMap<>();
+    URL jarFile = getClass().getClassLoader().getResource(jarName);
+    decoderProps.put(PROTOBUF_JAR_FILE_PATH, jarFile.toURI().toString());
+    decoderProps.put(PROTO_CLASS_NAME, protoClassName);
+    decoderProps.put(BATCH_MESSAGE_FIELD, batchField);
+    ProtoBufCodeGenMessageDecoder messageDecoder = new ProtoBufCodeGenMessageDecoder();
+    messageDecoder.init(decoderProps, fieldsToRead, "");
+    return messageDecoder;
+  }
+
+  @Test
+  public void testBatchMode()
+      throws Exception {
+    ProtoBufCodeGenMessageDecoder decoder = setupBatchDecoder("batch_sample.jar",
+        "org.apache.pinot.plugin.inputformat.protobuf.BatchSample$BatchSampleRecord",
+        "records", getFieldsInSampleRecord());
+
+    Sample.SampleRecord r1 = Sample.SampleRecord.newBuilder()
+        .setName("Alice").setId(1).setEmail("alice@test.com").build();
+    Sample.SampleRecord r2 = Sample.SampleRecord.newBuilder()
+        .setName("Bob").setId(2).setEmail("bob@test.com").build();
+    Sample.SampleRecord r3 = Sample.SampleRecord.newBuilder()
+        .setName("Charlie").setId(3).setEmail("charlie@test.com").build();
+
+    BatchSample.BatchSampleRecord batch = BatchSample.BatchSampleRecord.newBuilder()
+        .addRecords(r1).addRecords(r2).addRecords(r3).build();
+
+    GenericRow destination = new GenericRow();
+    decoder.decode(batch.toByteArray(), destination);
+
+    @SuppressWarnings("unchecked")
+    List<GenericRow> rows = (List<GenericRow>) destination.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    assertNotNull(rows);
+    assertEquals(rows.size(), 3);
+
+    assertEquals(rows.get(0).getValue("name"), "Alice");
+    assertEquals(rows.get(0).getValue("id"), 1);
+    assertEquals(rows.get(0).getValue("email"), "alice@test.com");
+
+    assertEquals(rows.get(1).getValue("name"), "Bob");
+    assertEquals(rows.get(1).getValue("id"), 2);
+
+    assertEquals(rows.get(2).getValue("name"), "Charlie");
+    assertEquals(rows.get(2).getValue("id"), 3);
+  }
+
+  @Test
+  public void testBatchModeEmptyBatch()
+      throws Exception {
+    ProtoBufCodeGenMessageDecoder decoder = setupBatchDecoder("batch_sample.jar",
+        "org.apache.pinot.plugin.inputformat.protobuf.BatchSample$BatchSampleRecord",
+        "records", getFieldsInSampleRecord());
+
+    BatchSample.BatchSampleRecord emptyBatch = BatchSample.BatchSampleRecord.newBuilder().build();
+
+    GenericRow destination = new GenericRow();
+    decoder.decode(emptyBatch.toByteArray(), destination);
+
+    @SuppressWarnings("unchecked")
+    List<GenericRow> rows = (List<GenericRow>) destination.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    assertNotNull(rows);
+    assertEquals(rows.size(), 0);
+  }
+
+  @Test
+  public void testBatchModeNestedPath()
+      throws Exception {
+    ProtoBufCodeGenMessageDecoder decoder = setupBatchDecoder("nested_batch_sample.jar",
+        "org.apache.pinot.plugin.inputformat.protobuf.NestedBatchSample$NestedBatchRecord",
+        "batches.records", getFieldsInSampleRecord());
+
+    Sample.SampleRecord r1 = Sample.SampleRecord.newBuilder()
+        .setName("Alice").setId(1).setEmail("alice@test.com").build();
+    Sample.SampleRecord r2 = Sample.SampleRecord.newBuilder()
+        .setName("Bob").setId(2).setEmail("bob@test.com").build();
+    Sample.SampleRecord r3 = Sample.SampleRecord.newBuilder()
+        .setName("Charlie").setId(3).setEmail("charlie@test.com").build();
+
+    // Two batches: first has 2 records, second has 1
+    NestedBatchSample.InnerBatch batch1 = NestedBatchSample.InnerBatch.newBuilder()
+        .addRecords(r1).addRecords(r2).build();
+    NestedBatchSample.InnerBatch batch2 = NestedBatchSample.InnerBatch.newBuilder()
+        .addRecords(r3).build();
+    NestedBatchSample.NestedBatchRecord nested = NestedBatchSample.NestedBatchRecord.newBuilder()
+        .addBatches(batch1).addBatches(batch2).build();
+
+    GenericRow destination = new GenericRow();
+    decoder.decode(nested.toByteArray(), destination);
+
+    @SuppressWarnings("unchecked")
+    List<GenericRow> rows = (List<GenericRow>) destination.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    assertNotNull(rows);
+    assertEquals(rows.size(), 3);
+
+    assertEquals(rows.get(0).getValue("name"), "Alice");
+    assertEquals(rows.get(1).getValue("name"), "Bob");
+    assertEquals(rows.get(2).getValue("name"), "Charlie");
   }
 }
