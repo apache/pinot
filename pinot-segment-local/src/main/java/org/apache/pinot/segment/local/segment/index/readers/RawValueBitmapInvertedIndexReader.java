@@ -23,6 +23,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -143,6 +144,14 @@ public class RawValueBitmapInvertedIndexReader implements InvertedIndexReader<Im
    */
   public ImmutableRoaringBitmap getDocIdsForString(String value) {
     int dictId = _dictionary.indexOf(value);
+    return dictId >= 0 ? getDocIds(dictId) : new MutableRoaringBitmap();
+  }
+
+  /**
+   * Returns the document IDs for the given raw BYTES value.
+   */
+  public ImmutableRoaringBitmap getDocIdsForBytes(byte[] value) {
+    int dictId = _dictionary.indexOf(new ByteArray(value));
     return dictId >= 0 ? getDocIds(dictId) : new MutableRoaringBitmap();
   }
 

@@ -24,6 +24,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public class StringFunctionsTest {
@@ -232,6 +233,15 @@ public class StringFunctionsTest {
         {"hello@world.com", "Hello@world.com"},
         {"one,two,three", "One,two,three"}
     };
+  }
+
+  @Test
+  public void testToUuidBytesAcceptsMixedCaseInput() {
+    String mixedCaseUuid = "550E8400-E29B-41D4-A716-446655440000";
+    byte[] uuidBytes = StringFunctions.toUUIDBytes(mixedCaseUuid);
+
+    assertNotNull(uuidBytes);
+    assertEquals(StringFunctions.fromUUIDBytes(uuidBytes), "550e8400-e29b-41d4-a716-446655440000");
   }
 
   @DataProvider(name = "levenshteinDistanceTestCases")

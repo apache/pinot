@@ -132,6 +132,7 @@ public final class Schema implements Serializable {
           case TIMESTAMP:
           case STRING:
           case JSON:
+          case UUID:
           case BYTES:
             break;
           default:
@@ -609,20 +610,32 @@ public final class Schema implements Serializable {
    * Validates a pinot schema.
    * <p>The following validations are performed:
    * <ul>
-   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BOOLEAN,
-   *   TIMESTAMP, STRING, BYTES</li>
-   *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BYTES</li>
+   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL,
+   *   BOOLEAN, TIMESTAMP, STRING, JSON, UUID, BYTES</li>
+   *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, BYTES</li>
+   *   <li>BIG_DECIMAL and UUID fields only support single-value columns</li>
    * </ul>
    */
   public void validate() {
     for (FieldSpec fieldSpec : _fieldSpecMap.values()) {
-      FieldType fieldType = fieldSpec.getFieldType();
-      DataType dataType = fieldSpec.getDataType();
       String fieldName = fieldSpec.getName();
       try {
-        validate(fieldType, dataType);
+        validate(fieldSpec);
       } catch (IllegalStateException e) {
         throw new IllegalStateException(e.getMessage() + ": " + fieldName);
+      }
+    }
+  }
+
+  public static void validate(FieldSpec fieldSpec) {
+    DataType dataType = fieldSpec.getDataType();
+    validate(fieldSpec.getFieldType(), dataType);
+    if (!fieldSpec.isSingleValueField()) {
+      if (dataType == DataType.BIG_DECIMAL) {
+        throw new IllegalStateException("BIG_DECIMAL data type only supports single-value fields");
+      }
+      if (dataType == DataType.UUID) {
+        throw new IllegalStateException("UUID data type only supports single-value fields");
       }
     }
   }

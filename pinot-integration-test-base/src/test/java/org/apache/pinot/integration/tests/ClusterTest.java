@@ -783,6 +783,7 @@ public abstract class ClusterTest extends ControllerTest {
         object = jsonValue.asDouble();
         break;
       case STRING:
+      case UUID:
       case BYTES:
       case TIMESTAMP:
       case JSON:

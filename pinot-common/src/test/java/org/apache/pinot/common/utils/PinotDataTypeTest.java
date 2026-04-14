@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -37,6 +38,7 @@ import static org.testng.Assert.fail;
 
 
 public class PinotDataTypeTest {
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
   private static final PinotDataType[] SOURCE_TYPES = {
       BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_DECIMAL, STRING, JSON,
       BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
@@ -202,6 +204,20 @@ public class PinotDataTypeTest {
   }
 
   @Test
+  public void testUUID() {
+    java.util.UUID uuid = java.util.UUID.fromString(UUID_VALUE);
+    byte[] uuidBytes = UuidUtils.toBytes(UUID_VALUE);
+    String mixedCaseUuid = UUID_VALUE.toUpperCase();
+
+    assertEquals(UUID.convert(UUID_VALUE, STRING), uuid);
+    assertEquals(UUID.convert(mixedCaseUuid, STRING), uuid);
+    assertEquals(UUID.convert(uuid, UUID), uuid);
+    assertEquals(UUID.convert(uuidBytes, BYTES), uuid);
+    assertEquals(STRING.convert(uuid, UUID), UUID_VALUE);
+    assertEquals(BYTES.convert(uuid, UUID), uuidBytes);
+  }
+
+  @Test
   public void testTimestamp() {
     Timestamp timestamp = new Timestamp(System.currentTimeMillis());
     assertEquals(TIMESTAMP.convert(timestamp.getTime(), LONG), timestamp);
@@ -278,6 +294,7 @@ public class PinotDataTypeTest {
     testCases.put(Timestamp.class, TIMESTAMP);
     testCases.put(String.class, STRING);
     testCases.put(byte[].class, BYTES);
+    testCases.put(java.util.UUID.class, UUID);
 
     for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
       assertEquals(getSingleValueType(tc.getKey()), tc.getValue());
@@ -327,7 +344,7 @@ public class PinotDataTypeTest {
   public void testInvalidConversion() {
     for (PinotDataType sourceType : values()) {
       if (sourceType.isSingleValue() && sourceType != STRING && sourceType != BYTES && sourceType != JSON
-          && sourceType != BIG_DECIMAL) {
+          && sourceType != BIG_DECIMAL && sourceType != UUID) {
         assertInvalidConversion(null, sourceType, BYTES, UnsupportedOperationException.class);
       }
     }

@@ -44,6 +44,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.RawValueBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
@@ -166,7 +167,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     boolean dictEnabledColumn = createDictionaryForColumn(columnStatistics, _config, fieldSpec);
     if (originalConfig.getConfig(StandardIndexes.inverted()).isEnabled()) {
-      Preconditions.checkState(dictEnabledColumn,
+      Preconditions.checkState(dictEnabledColumn || supportsRawValueInvertedIndex(fieldSpec),
           "Cannot create inverted index for raw index column: %s", columnName);
     }
     IndexCreationContext.Common context = getIndexCreationContext(fieldSpec, dictEnabledColumn);
@@ -255,6 +256,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       if (index.getIndexBuildLifecycle() != IndexType.BuildLifecycle.DURING_SEGMENT_CREATION) {
         continue;
       }
+      if (index == StandardIndexes.inverted() && !dictEnabledColumn && supportsRawValueInvertedIndex(fieldSpec)) {
+        creatorsByIndex.put(index, new RawValueBitmapInvertedIndexCreator(context));
+        continue;
+      }
       tryCreateIndexCreator(creatorsByIndex, index, context, config);
     }
 
@@ -270,6 +275,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       }
     }
     return new ArrayList<>(creatorsByIndex.values());
+  }
+
+  private boolean supportsRawValueInvertedIndex(FieldSpec fieldSpec) {
+    return fieldSpec.isSingleValueField() && fieldSpec.getDataType() == FieldSpec.DataType.UUID;
   }
 
   private NullValueVectorCreator getNullValueCreator(FieldSpec fieldSpec) {

@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -51,6 +52,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -77,12 +79,19 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private static final String STRING_COLUMN = "stringColumn";
   private static final String BYTES_COLUMN = "bytesColumn";
   private static final String BYTES_DICT_COLUMN = "bytesDictColumn";
+  private static final String UUID_COLUMN = "uuidColumn";
+  private static final String BOOLEAN_COLUMN = "booleanColumn";
+  private static final String TIMESTAMP_COLUMN = "timestampColumn";
+  private static final String UUID_DICT_COLUMN = "uuidDictColumn";
   private static final List<String> COLUMNS =
       Arrays.asList(INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN, BYTES_COLUMN,
-          BYTES_DICT_COLUMN);
+          BYTES_DICT_COLUMN, UUID_COLUMN, BOOLEAN_COLUMN, TIMESTAMP_COLUMN, UUID_DICT_COLUMN);
   private static final int NUM_COLUMNS = COLUMNS.size();
+  private static final Set<String> UUID_COLUMNS = Set.of(UUID_COLUMN, UUID_DICT_COLUMN);
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-      .setNoDictionaryColumns(COLUMNS.subList(0, NUM_COLUMNS - 1)).build();
+      .setNoDictionaryColumns(
+          List.of(INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN, BYTES_COLUMN, UUID_COLUMN,
+              BOOLEAN_COLUMN, TIMESTAMP_COLUMN)).build();
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
           .addSingleValueDimension(LONG_COLUMN, FieldSpec.DataType.LONG)
@@ -90,7 +99,11 @@ public class NoDictionaryGroupKeyGeneratorTest {
           .addSingleValueDimension(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE)
           .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
           .addSingleValueDimension(BYTES_COLUMN, FieldSpec.DataType.BYTES)
-          .addSingleValueDimension(BYTES_DICT_COLUMN, FieldSpec.DataType.BYTES).build();
+          .addSingleValueDimension(BYTES_DICT_COLUMN, FieldSpec.DataType.BYTES)
+          .addSingleValueDimension(UUID_COLUMN, FieldSpec.DataType.UUID)
+          .addSingleValueDimension(BOOLEAN_COLUMN, FieldSpec.DataType.BOOLEAN)
+          .addSingleValueDimension(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP)
+          .addSingleValueDimension(UUID_DICT_COLUMN, FieldSpec.DataType.UUID).build();
 
   private static final int NUM_RECORDS = 1000;
   private static final int NUM_UNIQUE_RECORDS = 100;
@@ -131,6 +144,19 @@ public class NoDictionaryGroupKeyGeneratorTest {
       record.putValue(BYTES_DICT_COLUMN, bytesValue);
       values[5] = BytesUtils.toHexString(bytesValue);
       values[6] = values[5];
+      byte[] uuidBytes = UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong()));
+      record.putValue(UUID_COLUMN, uuidBytes);
+      values[7] = UuidUtils.toString(uuidBytes);
+      // BOOLEAN stored as INT (0/1) — exercises the logical→stored-type normalization fix
+      int boolIntValue = RANDOM.nextBoolean() ? 1 : 0;
+      record.putValue(BOOLEAN_COLUMN, boolIntValue);
+      values[8] = Integer.toString(boolIntValue);
+      // TIMESTAMP stored as LONG — exercises the logical→stored-type normalization fix
+      long timestampValue = Math.abs(RANDOM.nextLong());
+      record.putValue(TIMESTAMP_COLUMN, timestampValue);
+      values[9] = Long.toString(timestampValue);
+      record.putValue(UUID_DICT_COLUMN, uuidBytes);
+      values[10] = values[7];
       for (int j = 0; j < NUM_RECORDS / NUM_UNIQUE_RECORDS; j++) {
         records.add(record);
       }
@@ -179,9 +205,12 @@ public class NoDictionaryGroupKeyGeneratorTest {
     testGroupKeyGenerator(new int[]{0, 1});
     testGroupKeyGenerator(new int[]{2, 3});
     testGroupKeyGenerator(new int[]{4, 5});
+    testGroupKeyGenerator(new int[]{7, 10});
+    testGroupKeyGenerator(new int[]{8, 9});
     testGroupKeyGenerator(new int[]{1, 2, 3});
     testGroupKeyGenerator(new int[]{4, 5, 0});
-    testGroupKeyGenerator(new int[]{5, 4, 3, 2, 1, 0});
+    testGroupKeyGenerator(new int[]{7, 5, 4});
+    testGroupKeyGenerator(new int[]{7, 5, 4, 3, 2, 1, 0});
   }
 
   /**
@@ -220,7 +249,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     Iterator<GroupKeyGenerator.GroupKey> groupKeys = groupKeyGenerator.getGroupKeys();
     while (groupKeys.hasNext()) {
       GroupKeyGenerator.GroupKey groupKey = groupKeys.next();
-      assertTrue(expectedGroupKeys.contains(getActualGroupKey(groupKey._keys)));
+      assertTrue(expectedGroupKeys.contains(getActualGroupKey(groupKey._keys, groupByColumnIndexes)));
     }
   }
 
@@ -242,13 +271,18 @@ public class NoDictionaryGroupKeyGeneratorTest {
     return groupKeys;
   }
 
-  private String getActualGroupKey(Object[] groupKeys) {
+  private String getActualGroupKey(Object[] groupKeys, int[] groupByColumnIndexes) {
     StringBuilder stringBuilder = new StringBuilder();
     for (int i = 0; i < groupKeys.length; i++) {
       if (i > 0) {
         stringBuilder.append(GroupKeyGenerator.DELIMITER);
       }
-      stringBuilder.append(groupKeys[i]);
+      int columnIndex = groupByColumnIndexes[i];
+      if (UUID_COLUMNS.contains(COLUMNS.get(columnIndex))) {
+        stringBuilder.append(UuidUtils.toString(((org.apache.pinot.spi.utils.ByteArray) groupKeys[i]).getBytes()));
+      } else {
+        stringBuilder.append(groupKeys[i]);
+      }
     }
     return stringBuilder.toString();
   }

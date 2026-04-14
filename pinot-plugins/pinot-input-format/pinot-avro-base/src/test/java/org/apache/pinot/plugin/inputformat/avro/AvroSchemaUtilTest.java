@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -38,6 +39,8 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.joda.time.chrono.ISOChronology;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -144,6 +147,18 @@ public class AvroSchemaUtilTest {
     // Read the Avro file and convert its records to include logical types.
     GenericRecord convertedRecord = readAndConvertRecord(avroFile, schema);
     validateComplexLogicalTypeRecordData(convertedRecord);
+  }
+
+  @Test
+  public void testToAvroSchemaJsonObjectForUuid() {
+    FieldSpec fieldSpec = new DimensionFieldSpec("uuidCol", FieldSpec.DataType.UUID, true);
+
+    JsonNode jsonNode = AvroSchemaUtil.toAvroSchemaJsonObject(fieldSpec);
+
+    Assert.assertEquals(jsonNode.get("name").asText(), "uuidCol");
+    Assert.assertEquals(jsonNode.get("type").get(0).asText(), "null");
+    Assert.assertEquals(jsonNode.get("type").get(1).get("type").asText(), "string");
+    Assert.assertEquals(jsonNode.get("type").get(1).get("logicalType").asText(), "uuid");
   }
 
   private void validateComplexLogicalTypeRecordData(GenericRecord convertedRecord) {

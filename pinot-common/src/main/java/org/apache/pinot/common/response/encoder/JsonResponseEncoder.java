@@ -220,6 +220,7 @@ public class JsonResponseEncoder implements ResponseEncoder {
       case DOUBLE:
         return jsonValue.asDouble();
       case STRING:
+      case UUID:
       case BYTES:
       case TIMESTAMP:
       case JSON:

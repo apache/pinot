@@ -77,6 +77,10 @@ public class TypeFactoryTest {
           basicType = TYPE_FACTORY.createSqlType(SqlTypeName.VARCHAR);
           break;
         }
+        case UUID: {
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.UUID);
+          break;
+        }
         case BYTES: {
           basicType = TYPE_FACTORY.createSqlType(SqlTypeName.VARBINARY);
           break;
@@ -152,6 +156,9 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
+    if (dataType == FieldSpec.DataType.UUID) {
+      return;
+    }
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addMultiValueDimension("col", dataType)
@@ -170,6 +177,9 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
+    if (dataType == FieldSpec.DataType.UUID) {
+      return;
+    }
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
@@ -191,6 +201,9 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNotNullableArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
+    if (dataType == FieldSpec.DataType.UUID) {
+      return;
+    }
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
@@ -216,6 +229,7 @@ public class TypeFactoryTest {
         .addSingleValueDimension("FLOAT_COL", FieldSpec.DataType.FLOAT)
         .addSingleValueDimension("DOUBLE_COL", FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension("STRING_COL", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("UUID_COL", FieldSpec.DataType.UUID)
         .addSingleValueDimension("BYTES_COL", FieldSpec.DataType.BYTES)
         .addSingleValueDimension("JSON_COL", FieldSpec.DataType.JSON)
         .addMultiValueDimension("INT_ARRAY_COL", FieldSpec.DataType.INT)
@@ -254,6 +268,9 @@ public class TypeFactoryTest {
           Assert.assertEquals(field.getType(),
               TYPE_FACTORY.createTypeWithCharsetAndCollation(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARCHAR),
                   StandardCharsets.UTF_8, SqlCollation.IMPLICIT));
+          break;
+        case "UUID_COL":
+          Assert.assertEquals(field.getType(), new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.UUID));
           break;
         case "BYTES_COL":
           Assert.assertEquals(field.getType(), new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARBINARY));

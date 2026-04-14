@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -57,6 +58,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, true, false);
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, true, false);
+  protected static final TransformResultMetadata UUID_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.UUID, true, false);
 
   protected static final TransformResultMetadata INT_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.INT, false, false);
@@ -408,12 +411,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initStringValuesSV(length);
+    DataType resultDataType = getResultMetadata().getDataType();
+    if (resultDataType == DataType.UUID) {
+      byte[][] bytesValues = transformToBytesValuesSV(valueBlock);
+      for (int i = 0; i < length; i++) {
+        _stringValuesSV[i] = UuidUtils.toString(bytesValues[i]);
+      }
+      return _stringValuesSV;
+    }
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(valueBlock);
       dictionary.readStringValues(dictIds, length, _stringValuesSV);
     } else {
-      DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(valueBlock);
@@ -468,6 +478,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
       dictionary.readBytesValues(dictIds, length, _bytesValuesSV);
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
+      if (resultDataType == DataType.UUID) {
+        throw new IllegalStateException("Cannot read SV UUID as BYTES without an override");
+      }
       switch (resultDataType.getStoredType()) {
         case BIG_DECIMAL:
           BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(valueBlock);

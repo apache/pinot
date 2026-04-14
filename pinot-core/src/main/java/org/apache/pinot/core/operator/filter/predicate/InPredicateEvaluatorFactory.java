@@ -41,6 +41,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MultiValueVisitor;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
 
 
 /**
@@ -149,6 +150,14 @@ public class InPredicateEvaluatorFactory {
           matchingValues.add(value);
         }
         return new BytesRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
+      }
+      case UUID: {
+        ByteArray[] uuidValues = inPredicate.getUuidValues();
+        Set<UuidKey> matchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(uuidValues.length));
+        for (ByteArray value : uuidValues) {
+          matchingValues.add(UuidKey.fromByteArray(value));
+        }
+        return new UuidRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
@@ -470,6 +479,36 @@ public class InPredicateEvaluatorFactory {
     @Override
     public <R> R accept(MultiValueVisitor<R> visitor) {
       byte[][] bytes = _matchingValues.stream().map(ByteArray::getBytes).toArray(byte[][]::new);
+      return visitor.visitBytes(bytes);
+    }
+  }
+
+  private static final class UuidRawValueBasedInPredicateEvaluator extends InRawPredicateEvaluator {
+    final Set<UuidKey> _matchingValues;
+
+    UuidRawValueBasedInPredicateEvaluator(InPredicate inPredicate, Set<UuidKey> matchingValues) {
+      super(inPredicate);
+      _matchingValues = matchingValues;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return _matchingValues.size();
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.UUID;
+    }
+
+    @Override
+    public boolean applySV(byte[] value) {
+      return _matchingValues.contains(UuidKey.fromBytes(value));
+    }
+
+    @Override
+    public <R> R accept(MultiValueVisitor<R> visitor) {
+      byte[][] bytes = _matchingValues.stream().map(UuidKey::toBytes).toArray(byte[][]::new);
       return visitor.visitBytes(bytes);
     }
   }

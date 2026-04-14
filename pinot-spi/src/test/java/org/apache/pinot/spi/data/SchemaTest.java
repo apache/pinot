@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -42,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SuppressWarnings("deprecation")
 public class SchemaTest {
   public static final Logger LOGGER = LoggerFactory.getLogger(SchemaTest.class);
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
 
   @Test
   public void testValidation() {
@@ -54,6 +56,10 @@ public class SchemaTest {
 
     schemaToValidate = new Schema();
     schemaToValidate.addField(new DimensionFieldSpec("d", FieldSpec.DataType.STRING, true));
+    schemaToValidate.validate();
+
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new DimensionFieldSpec("uuid", FieldSpec.DataType.UUID, true));
     schemaToValidate.validate();
 
     schemaToValidate = new Schema();
@@ -98,6 +104,24 @@ public class SchemaTest {
     schemaToValidate = new Schema();
     schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.BIG_DECIMAL, BigDecimal.ZERO));
     schemaToValidate.validate();
+  }
+
+  @Test
+  public void testUUIDValidationRejectsMV() {
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("uuidMv", FieldSpec.DataType.UUID, false));
+
+    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class, schema::validate);
+    assertThat(exception).hasMessageContaining("single-value fields");
+  }
+
+  @Test
+  public void testBigDecimalValidationRejectsMV() {
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("bdMv", FieldSpec.DataType.BIG_DECIMAL, false));
+
+    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class, schema::validate);
+    assertThat(exception).hasMessageContaining("single-value fields");
   }
 
   @Test
@@ -354,6 +378,23 @@ public class SchemaTest {
     Assert.assertEquals(actualSchema.getFieldSpecFor("emptyDefault").getDefaultNullValue(), expectedEmptyDefault);
     Assert.assertEquals(actualSchema.getFieldSpecFor("nonEmptyDefault").getDefaultNullValue(), expectedNonEmptyDefault);
 
+    Assert.assertEquals(actualSchema, expectedSchema);
+    Assert.assertEquals(actualSchema.hashCode(), expectedSchema.hashCode());
+  }
+
+  @Test
+  public void testUUIDType()
+      throws Exception {
+    Schema expectedSchema = new Schema();
+    byte[] expectedDefault = UuidUtils.toBytes(UUID_VALUE);
+
+    expectedSchema.setSchemaName("test");
+    expectedSchema.addField(new DimensionFieldSpec("uuidDefault", FieldSpec.DataType.UUID, true, UUID_VALUE));
+
+    String jsonSchema = expectedSchema.toSingleLineJsonString();
+    Schema actualSchema = Schema.fromString(jsonSchema);
+
+    assertThat((byte[]) actualSchema.getFieldSpecFor("uuidDefault").getDefaultNullValue()).isEqualTo(expectedDefault);
     Assert.assertEquals(actualSchema, expectedSchema);
     Assert.assertEquals(actualSchema.hashCode(), expectedSchema.hashCode());
   }

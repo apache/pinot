@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -80,6 +81,8 @@ public class PredicateRowMatcher implements RowMatcher {
         return _predicateEvaluator.applySV((String) value);
       case BYTES:
         return _predicateEvaluator.applySV((byte[]) value);
+      case UUID:
+        return _predicateEvaluator.applySV(UuidUtils.toBytes(value));
       default:
         throw new IllegalStateException();
     }

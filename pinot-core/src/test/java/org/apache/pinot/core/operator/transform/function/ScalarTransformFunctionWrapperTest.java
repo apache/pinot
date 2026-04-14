@@ -24,17 +24,23 @@ import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -1178,6 +1184,28 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testUuidColumnArgumentTransformFunction()
+      throws NoSuchMethodException {
+    byte[][] uuidValues = new byte[NUM_ROWS][];
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      UUID uuid = new UUID(i, i + 1L);
+      uuidValues[i] = UuidUtils.toBytes(uuid);
+      expectedValues[i] = uuid.toString();
+    }
+
+    ScalarTransformFunctionWrapper transformFunction =
+        new ScalarTransformFunctionWrapper(FunctionInfo.fromMethod(
+            ScalarTransformFunctionWrapperTest.class.getDeclaredMethod("uuidToString", UUID.class)));
+    StaticUuidTransformFunction uuidTransformFunction = new StaticUuidTransformFunction(uuidValues);
+    uuidTransformFunction.init(Collections.emptyList(), Collections.emptyMap());
+    transformFunction.init(Arrays.asList(uuidTransformFunction), Collections.emptyMap());
+
+    assertEquals(transformFunction.getName(), "uuidToString");
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
   public void testStringLowerTransformFunctionNullLiteral() {
     ExpressionContext expression =
         RequestContextUtils.getExpression("lower(null)");
@@ -1207,5 +1235,34 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+  }
+
+  public static String uuidToString(UUID uuid) {
+    return uuid.toString();
+  }
+
+  private static class StaticUuidTransformFunction extends BaseTransformFunction {
+    private static final TransformResultMetadata RESULT_METADATA = new TransformResultMetadata(DataType.UUID, true,
+        false);
+    private final byte[][] _uuidValues;
+
+    private StaticUuidTransformFunction(byte[][] uuidValues) {
+      _uuidValues = uuidValues;
+    }
+
+    @Override
+    public String getName() {
+      return "staticUuid";
+    }
+
+    @Override
+    public TransformResultMetadata getResultMetadata() {
+      return RESULT_METADATA;
+    }
+
+    @Override
+    public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+      return _uuidValues;
+    }
   }
 }

@@ -43,6 +43,7 @@ enum ColumnDataType {
   BYTES_ARRAY = 18;
   UNKNOWN = 19;
   MAP = 20;
+  UUID = 21;
 }
 
 message InputRef {

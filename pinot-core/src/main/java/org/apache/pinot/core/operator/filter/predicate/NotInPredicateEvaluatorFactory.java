@@ -41,6 +41,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MultiValueVisitor;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
 
 
 /**
@@ -149,6 +150,14 @@ public class NotInPredicateEvaluatorFactory {
           nonMatchingValues.add(value);
         }
         return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
+      }
+      case UUID: {
+        ByteArray[] uuidValues = notInPredicate.getUuidValues();
+        Set<UuidKey> nonMatchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(uuidValues.length));
+        for (ByteArray value : uuidValues) {
+          nonMatchingValues.add(UuidKey.fromByteArray(value));
+        }
+        return new UuidRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
@@ -471,6 +480,36 @@ public class NotInPredicateEvaluatorFactory {
     @Override
     public <R> R accept(MultiValueVisitor<R> visitor) {
       byte[][] bytes = _nonMatchingValues.stream().map(ByteArray::getBytes).toArray(byte[][]::new);
+      return visitor.visitBytes(bytes);
+    }
+  }
+
+  private static final class UuidRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
+    final Set<UuidKey> _nonMatchingValues;
+
+    UuidRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Set<UuidKey> nonMatchingValues) {
+      super(notInPredicate);
+      _nonMatchingValues = nonMatchingValues;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return -_nonMatchingValues.size();
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.UUID;
+    }
+
+    @Override
+    public boolean applySV(byte[] value) {
+      return !_nonMatchingValues.contains(UuidKey.fromBytes(value));
+    }
+
+    @Override
+    public <R> R accept(MultiValueVisitor<R> visitor) {
+      byte[][] bytes = _nonMatchingValues.stream().map(UuidKey::toBytes).toArray(byte[][]::new);
       return visitor.visitBytes(bytes);
     }
   }

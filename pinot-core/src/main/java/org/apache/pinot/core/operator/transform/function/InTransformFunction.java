@@ -36,6 +36,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -120,7 +121,11 @@ public class InTransformFunction extends BaseTransformFunction {
         case BYTES:
           ObjectOpenHashSet<ByteArray> bytesValues = new ObjectOpenHashSet<>(numValues);
           for (String stringValue : stringValues) {
-            bytesValues.add(BytesUtils.toByteArray(stringValue));
+            if (_mainFunction.getResultMetadata().getDataType() == DataType.UUID) {
+              bytesValues.add(new ByteArray(UuidUtils.toBytes(stringValue)));
+            } else {
+              bytesValues.add(BytesUtils.toByteArray(stringValue));
+            }
           }
           _valueSet = bytesValues;
           break;

@@ -122,6 +122,7 @@ import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
 import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -588,7 +589,7 @@ public class MutableSegmentImpl implements MutableSegment {
     // So to continue aggregating metrics for such cases, we will create dictionary even
     // if the column is part of noDictionary set from table config
     if (fieldSpec instanceof DimensionFieldSpec && isAggregateMetricsEnabled() && (dataType == STRING
-        || dataType == BYTES)) {
+        || dataType.getStoredType() == BYTES)) {
       _logger.info("Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
           column, dataType);
       return false;
@@ -769,7 +770,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private DedupRecordInfo getDedupRecordInfo(GenericRow row) {
-    PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+    PrimaryKey primaryKey = getPrimaryKey(row);
     // it is okay not having dedup time column if metadata ttl is not enabled
     if (_dedupTimeColumn == null) {
       return new DedupRecordInfo(primaryKey);
@@ -779,16 +780,37 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
-    PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+    PrimaryKey primaryKey = getPrimaryKey(row);
     Comparable comparisonValue = getComparisonValue(row);
     boolean deleteRecord = _deleteRecordColumn != null && BooleanUtils.toBoolean(row.getValue(_deleteRecordColumn));
     return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
   }
 
+  private PrimaryKey getPrimaryKey(GenericRow row) {
+    List<String> primaryKeyColumns = _schema.getPrimaryKeyColumns();
+    int numPrimaryKeyColumns = primaryKeyColumns.size();
+    Object[] values = new Object[numPrimaryKeyColumns];
+    for (int i = 0; i < numPrimaryKeyColumns; i++) {
+      String primaryKeyColumn = primaryKeyColumns.get(i);
+      Object value = row.getValue(primaryKeyColumn);
+      DataType dataType = _schema.getFieldSpecFor(primaryKeyColumn).getDataType();
+      values[i] = normalizePrimaryKeyValue(value, dataType);
+    }
+    return new PrimaryKey(values);
+  }
+
+  private Object normalizePrimaryKeyValue(@Nullable Object value, DataType dataType) {
+    if (dataType == DataType.UUID) {
+      return new ByteArray(UuidUtils.toBytes(value));
+    }
+    return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
+  }
+
   private Comparable getComparisonValue(GenericRow row) {
     int numComparisonColumns = _upsertComparisonColumns.size();
     if (numComparisonColumns == 1) {
-      return (Comparable) row.getValue(_upsertComparisonColumns.get(0));
+      String comparisonColumn = _upsertComparisonColumns.get(0);
+      return toComparableValue(row.getValue(comparisonColumn), _schema.getFieldSpecFor(comparisonColumn).getDataType());
     }
 
     Comparable[] comparisonValues = new Comparable[numComparisonColumns];
@@ -807,9 +829,8 @@ public class MutableSegmentImpl implements MutableSegment {
         comparableIndex = i;
 
         Object comparisonValue = row.getValue(columnName);
-        Preconditions.checkState(comparisonValue instanceof Comparable,
-            "Upsert comparison column: %s must be comparable", columnName);
-        comparisonValues[i] = (Comparable) comparisonValue;
+        comparisonValues[i] =
+            toComparableValue(comparisonValue, _schema.getFieldSpecFor(columnName).getDataType(), columnName);
       }
     }
     Preconditions.checkState(comparableIndex != -1, "Documents must have exactly 1 non-null comparison column value");
@@ -956,14 +977,7 @@ public class MutableSegmentImpl implements MutableSegment {
           // Update min/max value from raw value
           // NOTE: Skip updating min/max value for aggregated metrics because the value will change over time.
           if (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
-            Comparable comparable;
-            if (dataType == BYTES) {
-              comparable = new ByteArray((byte[]) value);
-            } else if (dataType == MAP) {
-              comparable = new ByteArray(MapUtils.serializeMap((Map) value));
-            } else {
-              comparable = (Comparable) value;
-            }
+            Comparable comparable = toComparableValue(value, dataType, column);
             if (indexContainer._minValue == null) {
               indexContainer._minValue = comparable;
               indexContainer._maxValue = comparable;
@@ -1014,6 +1028,21 @@ public class MutableSegmentImpl implements MutableSegment {
       _multiColumnTextIndex.add(_multiColumnValues);
       Collections.fill(_multiColumnValues, null);
     }
+  }
+
+  private Comparable toComparableValue(Object value, DataType dataType) {
+    return toComparableValue(value, dataType, null);
+  }
+
+  private Comparable toComparableValue(Object value, DataType dataType, @Nullable String columnName) {
+    if (dataType == MAP) {
+      return new ByteArray(MapUtils.serializeMap((Map) value));
+    }
+    if (dataType.getStoredType() == BYTES) {
+      return new ByteArray((byte[]) value);
+    }
+    Preconditions.checkState(value instanceof Comparable, "Column: %s must be comparable", columnName);
+    return (Comparable) value;
   }
 
   private void updateIndexCapacityThresholdBreached(MutableIndex mutableIndex, IndexType indexType, String column) {
@@ -1430,7 +1459,8 @@ public class MutableSegmentImpl implements MutableSegment {
       docIds[i] = i;
     }
 
-    DataType storedType = indexContainer._fieldSpec.getDataType().getStoredType();
+    DataType dataType = indexContainer._fieldSpec.getDataType();
+    DataType storedType = dataType.getStoredType();
     switch (storedType) {
       case INT:
         IntArrays.quickSort(docIds, (d1, d2) -> Integer.compare(forwardIndex.getInt(d1), forwardIndex.getInt(d2)));
@@ -1452,8 +1482,13 @@ public class MutableSegmentImpl implements MutableSegment {
         IntArrays.quickSort(docIds, (d1, d2) -> forwardIndex.getString(d1).compareTo(forwardIndex.getString(d2)));
         break;
       case BYTES:
-        IntArrays.quickSort(docIds,
-            (d1, d2) -> ByteArray.compare(forwardIndex.getBytes(d1), forwardIndex.getBytes(d2)));
+        if (dataType == DataType.UUID) {
+          IntArrays.quickSort(docIds,
+              (d1, d2) -> UuidUtils.compare(forwardIndex.getBytes(d1), forwardIndex.getBytes(d2)));
+        } else {
+          IntArrays.quickSort(docIds,
+              (d1, d2) -> ByteArray.compare(forwardIndex.getBytes(d1), forwardIndex.getBytes(d2)));
+        }
         break;
       default:
         throw new UnsupportedOperationException(

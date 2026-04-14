@@ -46,6 +46,7 @@ import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -349,13 +350,16 @@ public class ColumnMinMaxValueGenerator {
         case BYTES: {
           byte[] min = null;
           byte[] max = null;
+          boolean useUuidComparison = dataType == DataType.UUID;
           if (isSingleValue) {
             for (int docId = 0; docId < numDocs; docId++) {
               byte[] value = rawIndexReader.getBytes(docId, readerContext);
-              if (min == null || ByteArray.compare(value, min) > 0) {
+              if (min == null || (useUuidComparison ? UuidUtils.compare(value, min) : ByteArray.compare(value, min))
+                  > 0) {
                 min = value;
               }
-              if (max == null || ByteArray.compare(value, max) < 0) {
+              if (max == null || (useUuidComparison ? UuidUtils.compare(value, max) : ByteArray.compare(value, max))
+                  < 0) {
                 max = value;
               }
             }
@@ -363,10 +367,12 @@ public class ColumnMinMaxValueGenerator {
             for (int docId = 0; docId < numDocs; docId++) {
               byte[][] values = rawIndexReader.getBytesMV(docId, readerContext);
               for (byte[] value : values) {
-                if (min == null || ByteArray.compare(value, min) > 0) {
+                if (min == null || (useUuidComparison ? UuidUtils.compare(value, min)
+                    : ByteArray.compare(value, min)) > 0) {
                   min = value;
                 }
-                if (max == null || ByteArray.compare(value, max) < 0) {
+                if (max == null || (useUuidComparison ? UuidUtils.compare(value, max)
+                    : ByteArray.compare(value, max)) < 0) {
                   max = value;
                 }
               }

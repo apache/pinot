@@ -30,6 +30,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -168,7 +169,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
         String.format("CASE WHEN true THEN %s ELSE %s END", INT_SV_COLUMN, BYTES_SV_COLUMN),
         String.format("CASE WHEN true THEN 100 ELSE %s END", TIMESTAMP_COLUMN),
         String.format("CASE WHEN true THEN 100 ELSE %s END", STRING_SV_COLUMN),
-        String.format("CASE WHEN true THEN 100 ELSE %s END", BYTES_SV_COLUMN)
+        String.format("CASE WHEN true THEN 100 ELSE %s END", BYTES_SV_COLUMN),
+        "CASE WHEN true THEN CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID) ELSE 'not-a-uuid' END"
     };
     //@formatter:on
   }
@@ -176,6 +178,42 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
   @Test(dataProvider = "illegalExpressions", expectedExceptions = Exception.class)
   public void testInvalidCaseTransformFunction(String expression) {
     TransformFunctionFactory.get(RequestContextUtils.getExpression(expression), _dataSourceMap);
+  }
+
+  @Test
+  public void testCaseTransformFunctionWithUuidResults() {
+    String uuidValue = "550e8400-e29b-41d4-a716-446655440000";
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        "CASE WHEN true THEN CAST('" + uuidValue.toUpperCase() + "' AS UUID) ELSE '" + uuidValue + "' END");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.UUID);
+    byte[][] expectedValues = new byte[NUM_ROWS][];
+    byte[] uuidBytes = UuidUtils.toBytes(uuidValue);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = uuidBytes;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testCaseTransformFunctionWithUuidStringLiteralBranch() {
+    String whenUuidValue = "550e8400-e29b-41d4-a716-446655440000";
+    String elseUuidValue = "550e8400-e29b-41d4-a716-446655440001";
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("CASE WHEN %s < 2 THEN '%s' ELSE CAST('%s' AS UUID) END", INT_SV_COLUMN,
+            whenUuidValue.toUpperCase(), elseUuidValue));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.UUID);
+
+    byte[][] expectedValues = new byte[NUM_ROWS][];
+    byte[] whenUuidBytes = UuidUtils.toBytes(whenUuidValue);
+    byte[] elseUuidBytes = UuidUtils.toBytes(elseUuidValue);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = _intSVValues[i] < 2 ? whenUuidBytes : elseUuidBytes;
+    }
+    testTransformFunction(transformFunction, expectedValues);
   }
 
   @Test

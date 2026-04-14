@@ -23,6 +23,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -261,6 +262,35 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+  }
+
+  @Test
+  public void testBinaryOperatorTransformFunctionUUID() {
+    String functionName = getFunctionName();
+    String uuidLiteral = UuidUtils.toString(_uuidSVValues[0]);
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, CAST('%s' AS UUID))", functionName, UUID_SV_COLUMN, uuidLiteral));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(UuidUtils.compare(_uuidSVValues[i], _uuidSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testBinaryOperatorTransformFunctionUUIDNoDict() {
+    String functionName = getFunctionName();
+    String uuidLiteral = UuidUtils.toString(_uuidSVValues[0]);
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(CAST(%s AS STRING) AS UUID), CAST('%s' AS UUID))", functionName, UUID_SV_COLUMN,
+            uuidLiteral));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(UuidUtils.compare(_uuidSVValues[i], _uuidSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})

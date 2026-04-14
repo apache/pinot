@@ -185,6 +185,15 @@ public class PredicateUtils {
           }
         }
         break;
+      case UUID:
+        ByteArray[] uuidValues = inPredicate.getUuidValues();
+        for (ByteArray value : uuidValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }

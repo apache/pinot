@@ -36,6 +36,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.segment.index.readers.RawValueBitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -137,6 +139,12 @@ public class RawValueInvertedIndexFilterOperator extends BaseColumnFilterOperato
         break;
       case STRING:
         valueBitmap = _invertedIndexReader.getDocIdsForString(value);
+        break;
+      case BYTES:
+        valueBitmap = _invertedIndexReader.getDocIdsForBytes(BytesUtils.toBytes(value));
+        break;
+      case UUID:
+        valueBitmap = _invertedIndexReader.getDocIdsForBytes(UuidUtils.toBytes(value));
         break;
       default:
         throw new IllegalStateException("Unsupported data type for raw inverted index: " + _dataType);
