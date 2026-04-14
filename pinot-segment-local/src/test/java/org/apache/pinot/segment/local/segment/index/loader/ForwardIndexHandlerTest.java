@@ -45,7 +45,6 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -1142,7 +1141,7 @@ public class ForwardIndexHandlerTest {
             readerFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata);
         assertTrue(forwardIndexReader.isDictionaryEncoded());
         assertFalse(forwardIndexReader.isSingleValue());
-        assertEquals(forwardIndexReader.getDictIdCompressionType(), DictIdCompressionType.MV_ENTRY_DICT);
+        assertTrue(forwardIndexReader.isDictIdCompression());
       }
     }
 
@@ -1172,7 +1171,7 @@ public class ForwardIndexHandlerTest {
             readerFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata);
         assertTrue(forwardIndexReader.isDictionaryEncoded());
         assertFalse(forwardIndexReader.isSingleValue());
-        assertNull(forwardIndexReader.getDictIdCompressionType());
+        assertFalse(forwardIndexReader.isDictIdCompression());
       }
     }
   }

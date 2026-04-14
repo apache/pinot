@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
@@ -85,8 +84,6 @@ public class ForwardIndexConfig extends IndexConfig {
   private final int _targetDocsPerChunk;
 
   @Nullable
-  private final DictIdCompressionType _dictIdCompressionType;
-  @Nullable
   private final Map<String, Object> _configs;
 
   public ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
@@ -103,18 +100,13 @@ public class ForwardIndexConfig extends IndexConfig {
         targetMaxChunkSize == null ? _defaultTargetMaxChunkSizeBytes : (int) DataSizeUtils.toBytes(targetMaxChunkSize);
     _targetDocsPerChunk = targetDocsPerChunk == null ? _defaultTargetDocsPerChunk : targetDocsPerChunk;
     _configs = configs != null ? configs : new HashMap<>();
-    if (compressionCodec != null && compressionCodec.equals(CompressionCodec.MV_ENTRY_DICT)) {
-      _dictIdCompressionType = DictIdCompressionType.MV_ENTRY_DICT;
-    } else {
-      _dictIdCompressionType = null;
-    }
   }
 
   @JsonCreator
   public ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
       @JsonProperty("compressionCodec") @Nullable String compressionCodec,
       @Deprecated @JsonProperty("chunkCompressionType") @Nullable String chunkCompressionType,
-      @Deprecated @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType,
+      @Deprecated @JsonProperty("dictIdCompressionType") @Nullable String dictIdCompressionType,
       @JsonProperty("deriveNumDocsPerChunk") @Nullable Boolean deriveNumDocsPerChunk,
       @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion,
       @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
@@ -125,7 +117,7 @@ public class ForwardIndexConfig extends IndexConfig {
   }
 
   private static CompressionCodec resolveCompressionCodec(@Nullable String compressionCodec,
-      @Nullable String chunkCompressionType, @Nullable DictIdCompressionType dictIdCompressionType) {
+      @Nullable String chunkCompressionType, @Nullable String dictIdCompressionType) {
     if (compressionCodec != null) {
       return CompressionCodec.fromString(compressionCodec);
     }
@@ -137,7 +129,7 @@ public class ForwardIndexConfig extends IndexConfig {
       return CompressionCodec.fromString(chunkCompressionType);
     }
     if (dictIdCompressionType != null) {
-      Preconditions.checkArgument(dictIdCompressionType == DictIdCompressionType.MV_ENTRY_DICT,
+      Preconditions.checkArgument("MV_ENTRY_DICT".equals(dictIdCompressionType),
           "Unsupported dictionary compression type: " + dictIdCompressionType);
       return CompressionCodec.MV_ENTRY_DICT;
     }
@@ -170,10 +162,12 @@ public class ForwardIndexConfig extends IndexConfig {
     return _targetMaxChunkSizeBytes;
   }
 
+  /**
+   * Returns {@code true} if the compression codec is {@link CompressionCodec#MV_ENTRY_DICT}.
+   */
   @JsonIgnore
-  @Nullable
-  public DictIdCompressionType getDictIdCompressionType() {
-    return _dictIdCompressionType;
+  public boolean isDictIdCompression() {
+    return _compressionCodec != null && _compressionCodec.equals(CompressionCodec.MV_ENTRY_DICT);
   }
 
   @JsonIgnore
@@ -250,17 +244,6 @@ public class ForwardIndexConfig extends IndexConfig {
 
     public Builder withTargetDocsPerChunk(int targetDocsPerChunk) {
       _targetDocsPerChunk = targetDocsPerChunk;
-      return this;
-    }
-
-    @Deprecated
-    public Builder withDictIdCompressionType(DictIdCompressionType dictIdCompressionType) {
-      if (dictIdCompressionType == null) {
-        return this;
-      }
-      Preconditions.checkArgument(dictIdCompressionType == DictIdCompressionType.MV_ENTRY_DICT,
-          "Unsupported dictionary compression type: " + dictIdCompressionType);
-      _compressionCodec = CompressionCodec.MV_ENTRY_DICT;
       return this;
     }
 

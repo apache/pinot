@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -67,11 +66,10 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
-   * Returns the compression type for dictionary encoded forward index.
+   * Returns {@code true} if the forward index uses dictionary-id compression (MV_ENTRY_DICT).
    */
-  @Nullable
-  default DictIdCompressionType getDictIdCompressionType() {
-    return null;
+  default boolean isDictIdCompression() {
+    return false;
   }
 
   /**

@@ -23,7 +23,6 @@ import java.util.List;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVEntryDictForwardIndexWriter;
-import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -85,8 +84,8 @@ public final class FixedBitMVEntryDictForwardIndexReader implements ForwardIndex
   }
 
   @Override
-  public DictIdCompressionType getDictIdCompressionType() {
-    return DictIdCompressionType.MV_ENTRY_DICT;
+  public boolean isDictIdCompression() {
+    return true;
   }
 
   @Override

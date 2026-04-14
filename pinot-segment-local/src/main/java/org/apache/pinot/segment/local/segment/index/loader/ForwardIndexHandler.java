@@ -49,7 +49,6 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -403,22 +402,23 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       throws Exception {
     // The compression type for an existing segment can only be determined by reading the forward index header.
     ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-    DictIdCompressionType existingCompressionType;
+    boolean existingIsDictIdCompression;
     // Get the forward index reader factory and create a reader
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
     try (ForwardIndexReader<?> fwdIndexReader = readerFactory.createIndexReader(segmentReader,
         _fieldIndexConfigs.get(column), existingColMetadata)) {
-      existingCompressionType = fwdIndexReader.getDictIdCompressionType();
+      existingIsDictIdCompression = fwdIndexReader.isDictIdCompression();
     }
 
     // Get the new compression type.
-    DictIdCompressionType newCompressionType =
-        _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).getDictIdCompressionType();
-    if (newCompressionType != null && !newCompressionType.isApplicable(existingColMetadata.isSingleValue())) {
-      newCompressionType = null;
+    ForwardIndexConfig forwardIndexConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+    boolean newIsDictIdCompression = forwardIndexConfig.isDictIdCompression();
+    // MV_ENTRY_DICT is only applicable to multi-value columns
+    if (newIsDictIdCompression && existingColMetadata.isSingleValue()) {
+      newIsDictIdCompression = false;
     }
 
-    return existingCompressionType != newCompressionType;
+    return existingIsDictIdCompression != newIsDictIdCompression;
   }
 
   private void rewriteForwardIndexForCompressionChange(String column, SegmentDirectory.Writer segmentWriter)

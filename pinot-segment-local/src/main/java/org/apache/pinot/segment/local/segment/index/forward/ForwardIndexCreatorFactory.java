@@ -31,7 +31,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedB
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
-import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
@@ -61,7 +60,7 @@ public class ForwardIndexCreatorFactory {
           return new SingleValueUnsortedForwardIndexCreator(indexDir, columnName, cardinality, numTotalDocs);
         }
       } else {
-        if (indexConfig.getDictIdCompressionType() == DictIdCompressionType.MV_ENTRY_DICT) {
+        if (indexConfig.isDictIdCompression()) {
           return new MultiValueEntryDictForwardIndexCreator(indexDir, columnName, cardinality, numTotalDocs);
         } else {
           return new MultiValueUnsortedForwardIndexCreator(indexDir, columnName, cardinality, numTotalDocs,

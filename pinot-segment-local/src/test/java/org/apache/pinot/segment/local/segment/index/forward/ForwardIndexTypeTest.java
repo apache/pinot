@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
-import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.CompressionCodec;
@@ -46,12 +45,12 @@ public class ForwardIndexTypeTest {
   @DataProvider(name = "allCompressionCodec")
   public static Object[][] allCompressionCodec() {
     return new Object[][] {
-        new Object[] {"PASS_THROUGH", CompressionCodec.PASS_THROUGH, null},
-        new Object[] {"SNAPPY", CompressionCodec.SNAPPY, null},
-        new Object[] {"ZSTANDARD", CompressionCodec.ZSTANDARD, null},
-        new Object[] {"LZ4", CompressionCodec.LZ4, null},
-        new Object[] {"MV_ENTRY_DICT", null, DictIdCompressionType.MV_ENTRY_DICT},
-        new Object[] {null, null, null}
+        new Object[] {"PASS_THROUGH", CompressionCodec.PASS_THROUGH},
+        new Object[] {"SNAPPY", CompressionCodec.SNAPPY},
+        new Object[] {"ZSTANDARD", CompressionCodec.ZSTANDARD},
+        new Object[] {"LZ4", CompressionCodec.LZ4},
+        new Object[] {"MV_ENTRY_DICT", CompressionCodec.MV_ENTRY_DICT},
+        new Object[] {null, null}
     };
   }
 
@@ -189,7 +188,7 @@ public class ForwardIndexTypeTest {
           + "}"
       );
       assertEquals(
-          new ForwardIndexConfig.Builder().withDictIdCompressionType(DictIdCompressionType.MV_ENTRY_DICT).build());
+          new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.MV_ENTRY_DICT).build());
     }
 
     @Test
@@ -206,8 +205,7 @@ public class ForwardIndexTypeTest {
     }
 
     @Test(dataProvider = "allCompressionCodec", dataProviderClass = ForwardIndexTypeTest.class)
-    public void oldConfEnableRawWithCompression(String compression,
-        CompressionCodec expectedChunkCompression, DictIdCompressionType expectedDictCompression)
+    public void oldConfEnableRawWithCompression(String compression, CompressionCodec expectedCompression)
         throws IOException {
       String valueJson = compression == null ? "null" : "\"" + compression + "\"";
 
@@ -222,8 +220,6 @@ public class ForwardIndexTypeTest {
       assertEquals(
             new ForwardIndexConfig.Builder()
                 .withCompressionCodec(compression == null ? null : CompressionCodec.fromString(compression))
-                .withCompressionCodec(expectedChunkCompression)
-                .withDictIdCompressionType(expectedDictCompression)
                 .withDeriveNumDocsPerChunk(false)
                 .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
                 .build()
@@ -313,12 +309,11 @@ public class ForwardIndexTypeTest {
           + "}"
       );
       assertEquals(
-          new ForwardIndexConfig.Builder().withDictIdCompressionType(DictIdCompressionType.MV_ENTRY_DICT).build());
+          new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.MV_ENTRY_DICT).build());
     }
 
     @Test(dataProvider = "allChunkCompression", dataProviderClass = ForwardIndexTypeTest.class)
-    public void newConfigEnabledWithChunkCompression(String compression,
-        CompressionCodec expectedChunkCompression, DictIdCompressionType expectedDictCompression)
+    public void newConfigEnabledWithChunkCompression(String compression, CompressionCodec expectedCompression)
         throws IOException {
       String valueJson = compression == null ? "null" : "\"" + compression + "\"";
       addFieldIndexConfig(""
@@ -338,8 +333,7 @@ public class ForwardIndexTypeTest {
 
       assertEquals(
           new ForwardIndexConfig.Builder()
-              .withCompressionCodec(expectedChunkCompression)
-              .withDictIdCompressionType(expectedDictCompression)
+              .withCompressionCodec(expectedCompression)
               .withDeriveNumDocsPerChunk(true)
               .withRawIndexWriterVersion(10)
               .withTargetMaxChunkSize(512 * 1024)
@@ -349,8 +343,7 @@ public class ForwardIndexTypeTest {
     }
 
     @Test(dataProvider = "allDictCompression", dataProviderClass = ForwardIndexTypeTest.class)
-    public void newConfigEnabledWithDictCompression(String compression,
-        CompressionCodec expectedChunkCompression, DictIdCompressionType expectedDictCompression)
+    public void newConfigEnabledWithDictCompression(String compression, CompressionCodec expectedCompression)
         throws IOException {
       String valueJson = compression == null ? "null" : "\"" + compression + "\"";
       addFieldIndexConfig(""
@@ -369,20 +362,14 @@ public class ForwardIndexTypeTest {
       assertEquals(
           new ForwardIndexConfig.Builder()
               .withCompressionCodec(compression == null ? null : CompressionCodec.fromString(compression))
-              .withCompressionCodec(expectedChunkCompression)
-              .withDictIdCompressionType(expectedDictCompression)
               .withDeriveNumDocsPerChunk(true)
               .withRawIndexWriterVersion(10)
               .build()
       );
     }
     @Test(dataProvider = "allCompressionCodec", dataProviderClass = ForwardIndexTypeTest.class)
-    public void newConfigEnabledWithCompressionCodec(String compression,
-        CompressionCodec expectedChunkCompression, DictIdCompressionType expectedDictCompression)
+    public void newConfigEnabledWithCompressionCodec(String compression, CompressionCodec expectedCompression)
         throws IOException {
-      CompressionCodec compressionCodec = compression == null ? null
-          : CompressionCodec.fromString(compression);
-
       String valueJson = compression == null ? "null" : "\"" + compression + "\"";
       addFieldIndexConfig(""
           + " {\n"
@@ -399,8 +386,7 @@ public class ForwardIndexTypeTest {
 
       assertEquals(
           new ForwardIndexConfig.Builder()
-              .withCompressionCodec(expectedChunkCompression)
-              .withDictIdCompressionType(expectedDictCompression)
+              .withCompressionCodec(expectedCompression)
               .withDeriveNumDocsPerChunk(true)
               .withRawIndexWriterVersion(10)
               .build()
