@@ -413,6 +413,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
 
     properties.setProperty(SEGMENT_CREATOR_VERSION, _config.getCreatorVersion());
+    // TODO: Remove it after 1.6 release
     properties.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
     properties.setProperty(SEGMENT_NAME, _segmentName);
     properties.setProperty(TABLE_NAME, _config.getTableName());

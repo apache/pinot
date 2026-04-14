@@ -35,7 +35,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.BaseSegmentCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -63,7 +62,6 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER;
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.*;
 
@@ -282,7 +280,6 @@ public class ColumnMetadataTest {
         Map.of("key", new DimensionFieldSpec("key", DataType.STRING, true), "value",
             new DimensionFieldSpec("value", DataType.INT, true)));
     PropertiesConfiguration config = new PropertiesConfiguration();
-    config.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
     BaseSegmentCreator.addColumnMetadataInfo(config, "intMap", mock(ColumnStatistics.class), 1, intMapFieldSpec, false,
         -1, false);
     ColumnMetadataImpl intMapColumnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration("intMap", config);
