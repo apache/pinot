@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
@@ -248,7 +247,7 @@ public class MergeRollupTaskGeneratorTest {
     validConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
     validConfig.put(prefix + "a.compressionFactor", "200");
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, validConfig)))
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, validConfig)))
         .build();
     taskGenerator.validateTaskConfigs(offlineTableConfig, schema, validConfig);
   }
@@ -266,7 +265,7 @@ public class MergeRollupTaskGeneratorTest {
     invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
     invalidConfig.put(prefix + "a.compressionFactor", "0");
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
         .build();
     assertThrows(IllegalStateException.class, () -> {
       taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
