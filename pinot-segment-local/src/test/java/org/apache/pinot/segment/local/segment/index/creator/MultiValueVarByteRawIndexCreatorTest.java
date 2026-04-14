@@ -60,7 +60,9 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
 
   @DataProvider
   public Object[][] params() {
-    return Arrays.stream(new CompressionCodec[]{CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP})
+    return Arrays.stream(new CompressionCodec[]{
+            CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD,
+            CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP})
         .filter(t -> t != CompressionCodec.DELTA && t != CompressionCodec.DELTADELTA)
         .flatMap(chunkCompressionType -> IntStream.rangeClosed(2, 6)
             .boxed()

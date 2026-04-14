@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -49,12 +50,25 @@ public final class CompressionCodec {
 
   // ---------------------------------------------------------------------------
   // Registry and capability maps (must be declared BEFORE the constants that call register())
+  // ConcurrentHashMap for thread-safe plugin registration at runtime
   // ---------------------------------------------------------------------------
 
-  private static final Map<String, CompressionCodec> KNOWN_CODECS = new HashMap<>();
-  private static final Map<String, boolean[]> CAPABILITIES = new HashMap<>();
+  private static final Map<String, CompressionCodec> KNOWN_CODECS = new ConcurrentHashMap<>();
+  private static final Map<String, boolean[]> CAPABILITIES = new ConcurrentHashMap<>();
 
-  private static CompressionCodec register(String name, boolean applicableToRawIndex,
+  /**
+   * Registers a compression codec with its capabilities and returns the canonical instance.
+   *
+   * <p>Built-in codecs are registered at class-load time. Plugins may call this method to
+   * register custom codecs so they are recognized by {@link #of(String)}, {@link #fromString(String)},
+   * and the capability query methods.
+   *
+   * @param name uppercase canonical codec name
+   * @param applicableToRawIndex whether the codec can be used for raw forward indexes
+   * @param applicableToDictEncodedIndex whether the codec can be used for dictionary-encoded indexes
+   * @return the registered {@code CompressionCodec} instance
+   */
+  public static CompressionCodec register(String name, boolean applicableToRawIndex,
       boolean applicableToDictEncodedIndex) {
     CompressionCodec codec = new CompressionCodec(name, Collections.emptyMap());
     KNOWN_CODECS.put(name, codec);
@@ -108,15 +122,26 @@ public final class CompressionCodec {
   }
 
   // ---------------------------------------------------------------------------
-  // Alias map for parser
+  // Alias map for parser (ConcurrentHashMap for thread-safe plugin registration)
   // ---------------------------------------------------------------------------
 
-  private static final Map<String, String> ALIASES;
+  private static final Map<String, String> ALIASES = new ConcurrentHashMap<>();
 
   static {
-    Map<String, String> aliases = new HashMap<>();
-    aliases.put("ZSTD", "ZSTANDARD");
-    ALIASES = Collections.unmodifiableMap(aliases);
+    ALIASES.put("ZSTD", "ZSTANDARD");
+  }
+
+  /**
+   * Registers an alias that the parser will normalize to the given canonical name.
+   *
+   * <p>For example, {@code registerAlias("ZSTD", "ZSTANDARD")} causes {@code fromString("ZSTD")}
+   * to produce a {@code CompressionCodec} with name {@code "ZSTANDARD"}.
+   *
+   * @param alias the alias (will be uppercased)
+   * @param canonicalName the canonical codec name the alias maps to
+   */
+  public static void registerAlias(String alias, String canonicalName) {
+    ALIASES.put(alias.toUpperCase(Locale.ENGLISH), canonicalName.toUpperCase(Locale.ENGLISH));
   }
 
   // ---------------------------------------------------------------------------

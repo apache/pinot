@@ -230,7 +230,10 @@ public class ForwardIndexHandlerTest {
       List.of(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER, DIM_RAW_MV_FORWARD_INDEX_DISABLED_INTEGER);
 
   private static final List<CompressionCodec> RAW_COMPRESSION_TYPES =
-      Arrays.stream(new CompressionCodec[]{CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP}).filter(CompressionCodec::isApplicableToRawIndex)
+      Arrays.stream(new CompressionCodec[]{
+          CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD,
+          CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP})
+          .filter(CompressionCodec::isApplicableToRawIndex)
           .collect(Collectors.toList());
 
   //@formatter:off
@@ -701,7 +704,9 @@ public class ForwardIndexHandlerTest {
       String column = RAW_COLUMNS_WITH_FORWARD_INDEX.get(RANDOM.nextInt(RAW_COLUMNS_WITH_FORWARD_INDEX.size()));
       CompressionCodec compressionCodec = _fieldConfigMap.get(column).getCompressionCodec();
       CompressionCodec newCompressionCodec = null;
-      for (CompressionCodec codec : new CompressionCodec[]{CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP}) {
+      for (CompressionCodec codec : new CompressionCodec[]{
+          CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD,
+          CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP}) {
         if (compressionCodec != codec) {
           newCompressionCodec = codec;
           break;
