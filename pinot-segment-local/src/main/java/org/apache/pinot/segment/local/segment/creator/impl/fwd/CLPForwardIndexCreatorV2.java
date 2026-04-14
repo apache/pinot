@@ -37,9 +37,9 @@ import org.apache.pinot.segment.local.realtime.impl.dictionary.BytesOffHeapMutab
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,7 +125,7 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
 
   private final BytesOffHeapMutableDictionary _mutableLogtypeDict;
   private final BytesOffHeapMutableDictionary _mutableDictVarDict;
-  private final ChunkCompressionType _chunkCompressionType;
+  private final CompressionCodec _codec;
 
   /**
    * Initializes a forward index creator for the given column using the provided base directory, column statistics and
@@ -142,14 +142,14 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
    * @param baseIndexDir The base directory where the forward index files will be stored.
    * @param columnStatistics The column statistics containing the CLP forward index information, including a reference
    *        to the mutable forward index.
-   * @param chunkCompressionType The chunk compressor type used to compress internal data columns
+   * @param codec The chunk compressor type used to compress internal data columns
    * @throws IOException If there is an error during initialization or while accessing the file system.
    */
   public CLPForwardIndexCreatorV2(File baseIndexDir, ColumnStatistics columnStatistics,
-      ChunkCompressionType chunkCompressionType)
+      CompressionCodec codec)
       throws IOException {
     this(baseIndexDir, ((CLPStatsProvider) columnStatistics).getCLPV2Stats().getClpMutableForwardIndexV2(),
-        chunkCompressionType);
+        codec);
   }
 
   /**
@@ -161,7 +161,7 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
    */
   public CLPForwardIndexCreatorV2(File baseIndexDir, ColumnStatistics columnStatistics)
       throws IOException {
-    this(baseIndexDir, columnStatistics, ChunkCompressionType.ZSTANDARD);
+    this(baseIndexDir, columnStatistics, CompressionCodec.ZSTANDARD);
   }
 
   /**
@@ -171,13 +171,13 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
    *
    * @param baseIndexDir The base directory where the forward index files will be stored.
    * @param clpMutableForwardIndex The mutable forward index containing the raw data to be ingested.
-   * @param chunkCompressionType The compression type to be used for encoding the forward index.
+   * @param codec The compression type to be used for encoding the forward index.
    * @throws IOException If there is an error during initialization or while accessing the file system.
    */
   public CLPForwardIndexCreatorV2(File baseIndexDir, CLPMutableForwardIndexV2 clpMutableForwardIndex,
-      ChunkCompressionType chunkCompressionType)
+      CompressionCodec codec)
       throws IOException {
-    this(baseIndexDir, clpMutableForwardIndex, chunkCompressionType, false);
+    this(baseIndexDir, clpMutableForwardIndex, codec, false);
   }
 
   /**
@@ -194,14 +194,14 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
    *
    * @param baseIndexDir The base directory where the forward index files will be stored.
    * @param clpMutableForwardIndex The mutable forward index containing the raw data to be ingested.
-   * @param chunkCompressionType The compression type used for encoding the forward index.
+   * @param codec The compression type used for encoding the forward index.
    * @param forceRawEncoding If true, raw bytes encoding will be used, bypassing CLP encoding.
    * @throws IOException If there is an error during initialization or while accessing the file system.
    */
   public CLPForwardIndexCreatorV2(File baseIndexDir, CLPMutableForwardIndexV2 clpMutableForwardIndex,
-      ChunkCompressionType chunkCompressionType, boolean forceRawEncoding)
+      CompressionCodec codec, boolean forceRawEncoding)
       throws IOException {
-    _chunkCompressionType = chunkCompressionType;
+    _codec = codec;
 
     // Pick up metadata from mutable forward index and use it to initialize the immutable forward index
     _column = clpMutableForwardIndex.getColumnName();
@@ -220,13 +220,13 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
     _mutableLogtypeDict = clpMutableForwardIndex.getLogtypeDict();
     _mutableDictVarDict = clpMutableForwardIndex.getDictVarDict();
     if (_isClpEncoded) {
-      initializeDictionaryEncodingMode(chunkCompressionType, clpMutableForwardIndex.getLogtypeDict().length(),
+      initializeDictionaryEncodingMode(codec, clpMutableForwardIndex.getLogtypeDict().length(),
           clpMutableForwardIndex.getDictVarDict().length());
       putLogtypeDict(clpMutableForwardIndex.getLogtypeDict());
       putDictVarDict(clpMutableForwardIndex.getDictVarDict());
     } else {
       // Raw encoding
-      initializeRawEncodingMode(chunkCompressionType);
+      initializeRawEncodingMode(codec);
     }
 
     _dataFile =
@@ -260,32 +260,32 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
    * Initializes the necessary components for raw encoding mode, including setting up the forward index file for raw
    * message bytes. This method is called when CLP encoding is not used.
    *
-   * @param chunkCompressionType The compression type used for encoding the forward index.
+   * @param codec The compression type used for encoding the forward index.
    * @throws IOException If there is an error during initialization or while accessing the file system.
    */
-  private void initializeRawEncodingMode(ChunkCompressionType chunkCompressionType)
+  private void initializeRawEncodingMode(CompressionCodec codec)
       throws IOException {
     _rawMsgFwdIndexFile = new File(_intermediateFilesDir, _column + ".rawMsg");
-    _rawMsgFwdIndex = new VarByteChunkForwardIndexWriterV5(_rawMsgFwdIndexFile, chunkCompressionType, _targetChunkSize);
+    _rawMsgFwdIndex = new VarByteChunkForwardIndexWriterV5(_rawMsgFwdIndexFile, codec, _targetChunkSize);
   }
 
   /**
    * Initializes the necessary components for dictionary encoding mode, including setting up the forward index files for
    * logtype IDs, dictionary variable IDs, and encoded variables. This method is called when CLP encoding is used.
    *
-   * @param chunkCompressionType The compression type used for encoding the forward index.
+   * @param codec The compression type used for encoding the forward index.
    * @param logtypeDictSize The size of the logtype dictionary.
    * @param dictVarDictSize The size of the variable-length dictionary.
    * @throws IOException If there is an error during initialization or while accessing the file system.
    */
-  private void initializeDictionaryEncodingMode(ChunkCompressionType chunkCompressionType, int logtypeDictSize,
+  private void initializeDictionaryEncodingMode(CompressionCodec codec, int logtypeDictSize,
       int dictVarDictSize)
       throws IOException {
     _logtypeDictFile = new File(_intermediateFilesDir, _column + ".lt.dict");
     _logtypeDict = new VarLengthValueWriter(_logtypeDictFile, logtypeDictSize);
     _logtypeDictSize = logtypeDictSize;
     _logtypeIdFwdIndexFile = new File(_intermediateFilesDir, _column + ".lt.id");
-    _logtypeIdFwdIndex = new FixedByteChunkForwardIndexWriter(_logtypeIdFwdIndexFile, chunkCompressionType, _numDoc,
+    _logtypeIdFwdIndex = new FixedByteChunkForwardIndexWriter(_logtypeIdFwdIndexFile, codec, _numDoc,
         _targetChunkSize / FieldSpec.DataType.INT.size(), FieldSpec.DataType.INT.size(),
         VarByteChunkForwardIndexWriterV5.VERSION);
     _dictVarDictFile = new File(_intermediateFilesDir, _column + ".var.dict");
@@ -293,11 +293,11 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
     _dictVarDictSize = dictVarDictSize;
     _dictVarIdFwdIndexFile = new File(_intermediateFilesDir, _column + ".dictVars");
     _dictVarIdFwdIndex =
-        new VarByteChunkForwardIndexWriterV5(_dictVarIdFwdIndexFile, chunkCompressionType, _targetChunkSize);
+        new VarByteChunkForwardIndexWriterV5(_dictVarIdFwdIndexFile, codec, _targetChunkSize);
 
     _encodedVarFwdIndexFile = new File(_intermediateFilesDir, _column + ".encodedVars");
     _encodedVarFwdIndex =
-        new VarByteChunkForwardIndexWriterV5(_encodedVarFwdIndexFile, chunkCompressionType, _targetChunkSize);
+        new VarByteChunkForwardIndexWriterV5(_encodedVarFwdIndexFile, codec, _targetChunkSize);
   }
 
   public void putLogtypeDict(BytesOffHeapMutableDictionary logtypeDict)

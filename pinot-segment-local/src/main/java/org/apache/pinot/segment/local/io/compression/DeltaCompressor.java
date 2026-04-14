@@ -21,8 +21,8 @@ package org.apache.pinot.segment.local.io.compression;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import net.jpountz.lz4.LZ4Factory;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 
 
 /**
@@ -193,7 +193,7 @@ class DeltaCompressor implements ChunkCompressor {
   }
 
   @Override
-  public ChunkCompressionType compressionType() {
-    return ChunkCompressionType.DELTA;
+  public CompressionCodec compressionCodec() {
+    return CompressionCodec.DELTA;
   }
 }

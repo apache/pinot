@@ -36,8 +36,8 @@ import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -54,16 +54,16 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
   @DataProvider(parallel = true)
   public Object[][] params() {
     Object[][] params = new Object[][]{
-        {null, ChunkCompressionType.LZ4, 20, 1024},
-        {null, ChunkCompressionType.LZ4_LENGTH_PREFIXED, 20, 1024},
-        {null, ChunkCompressionType.PASS_THROUGH, 20, 1024},
-        {null, ChunkCompressionType.SNAPPY, 20, 1024},
-        {null, ChunkCompressionType.ZSTANDARD, 20, 1024},
-        {null, ChunkCompressionType.LZ4, 2048, 1024},
-        {null, ChunkCompressionType.LZ4_LENGTH_PREFIXED, 2048, 1024},
-        {null, ChunkCompressionType.PASS_THROUGH, 2048, 1024},
-        {null, ChunkCompressionType.SNAPPY, 2048, 1024},
-        {null, ChunkCompressionType.ZSTANDARD, 2048, 1024}
+        {null, CompressionCodec.LZ4, 20, 1024},
+        {null, CompressionCodec.LZ4_LENGTH_PREFIXED, 20, 1024},
+        {null, CompressionCodec.PASS_THROUGH, 20, 1024},
+        {null, CompressionCodec.SNAPPY, 20, 1024},
+        {null, CompressionCodec.ZSTANDARD, 20, 1024},
+        {null, CompressionCodec.LZ4, 2048, 1024},
+        {null, CompressionCodec.LZ4_LENGTH_PREFIXED, 2048, 1024},
+        {null, CompressionCodec.PASS_THROUGH, 2048, 1024},
+        {null, CompressionCodec.SNAPPY, 2048, 1024},
+        {null, CompressionCodec.ZSTANDARD, 2048, 1024}
     };
 
     for (int i = 0; i < _dirs.length; i++) {
@@ -95,7 +95,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
   }
 
   @Test(dataProvider = "params")
-  public void testStringSV(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize)
+  public void testStringSV(File file, CompressionCodec compressionType, int longestEntry, int chunkSize)
       throws IOException {
     File stringSVFile = new File(file, "testStringSV");
     testWriteRead(stringSVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING, x -> x,
@@ -104,7 +104,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
   }
 
   @Test(dataProvider = "params")
-  public void testBytesSV(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize)
+  public void testBytesSV(File file, CompressionCodec compressionType, int longestEntry, int chunkSize)
       throws IOException {
     File bytesSVFile = new File(file, "testBytesSV");
     testWriteRead(bytesSVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES,
@@ -114,7 +114,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
   }
 
   @Test(dataProvider = "params")
-  public void testStringMV(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize)
+  public void testStringMV(File file, CompressionCodec compressionType, int longestEntry, int chunkSize)
       throws IOException {
     File stringMVFile = new File(file, "testStringMV");
     testWriteRead(stringMVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING,
@@ -124,7 +124,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
   }
 
   @Test(dataProvider = "params")
-  public void testBytesMV(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize)
+  public void testBytesMV(File file, CompressionCodec compressionType, int longestEntry, int chunkSize)
       throws IOException {
     File bytesMVFile = new File(file, "testBytesMV");
     testWriteRead(bytesMVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES, new ByteSplitterMV(),
@@ -156,7 +156,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
     }
   }
 
-  protected VarByteChunkWriter createWriter(File file, ChunkCompressionType compressionType, int chunkSize)
+  protected VarByteChunkWriter createWriter(File file, CompressionCodec compressionType, int chunkSize)
       throws IOException {
     return new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
   }
@@ -166,7 +166,7 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
     return new VarByteChunkForwardIndexReaderV4(buffer, dataType, isSingleValue);
   }
 
-  protected <T> void testWriteRead(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize,
+  protected <T> void testWriteRead(File file, CompressionCodec compressionType, int longestEntry, int chunkSize,
       FieldSpec.DataType dataType, Function<String, T> forwardMapper,
       BiConsumer<VarByteChunkWriter, T> write,
       Read<T> read)

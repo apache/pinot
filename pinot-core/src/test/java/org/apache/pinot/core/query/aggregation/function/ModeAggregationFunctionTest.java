@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.queries.FluentQueryTest;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.DataProvider;
@@ -55,7 +56,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
           _dictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW;
       return givenSingleNullableFieldTable(_dataType, nullHandlingEnabled, builder -> {
         builder.withEncodingType(encodingType);
-        builder.withCompressionCodec(FieldConfig.CompressionCodec.PASS_THROUGH);
+        builder.withCompressionCodec(CompressionCodec.PASS_THROUGH);
       });
     }
 

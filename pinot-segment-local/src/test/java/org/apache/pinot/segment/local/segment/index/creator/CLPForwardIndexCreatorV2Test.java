@@ -36,9 +36,9 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByt
 import org.apache.pinot.segment.local.segment.index.forward.mutable.VarByteSVMutableForwardIndexTest;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV2;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -97,9 +97,9 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
       }
 
       // LZ4 compression type
-      long rawStringFwdIndexSizeLZ4 = createStringRawForwardIndex(ChunkCompressionType.LZ4, maxLength);
+      long rawStringFwdIndexSizeLZ4 = createStringRawForwardIndex(CompressionCodec.LZ4, maxLength);
       long clpFwdIndexSizeLZ4 =
-          createAndValidateClpImmutableForwardIndex(clpMutableForwardIndexV2, ChunkCompressionType.LZ4);
+          createAndValidateClpImmutableForwardIndex(clpMutableForwardIndexV2, CompressionCodec.LZ4);
       // For LZ4 compression:
       // 1. CLP raw forward index should achieve at least 40x compression
       // 2. at least 25% smaller file size compared to standard raw forward index with LZ4 compression
@@ -107,9 +107,9 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
       Assert.assertTrue((float) rawStringFwdIndexSizeLZ4 / clpFwdIndexSizeLZ4 >= 0.25);
 
       // ZSTD compression type
-      long rawStringFwdIndexSizeZSTD = createStringRawForwardIndex(ChunkCompressionType.ZSTANDARD, maxLength);
+      long rawStringFwdIndexSizeZSTD = createStringRawForwardIndex(CompressionCodec.ZSTANDARD, maxLength);
       long clpFwdIndexSizeZSTD =
-          createAndValidateClpImmutableForwardIndex(clpMutableForwardIndexV2, ChunkCompressionType.ZSTANDARD);
+          createAndValidateClpImmutableForwardIndex(clpMutableForwardIndexV2, CompressionCodec.ZSTANDARD);
       // For ZSTD compression
       // 1. CLP raw forward index should achieve at least 66x compression
       // 2. at least 19% smaller file size compared to standard raw forward index with ZSTD compression
@@ -118,7 +118,7 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
     }
   }
 
-  private long createStringRawForwardIndex(ChunkCompressionType chunkCompressionType, int maxLength)
+  private long createStringRawForwardIndex(CompressionCodec chunkCompressionType, int maxLength)
       throws IOException {
     // Create a raw string immutable forward index
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
@@ -136,7 +136,7 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
   }
 
   private long createAndValidateClpImmutableForwardIndex(CLPMutableForwardIndexV2 clpMutableForwardIndexV2,
-      ChunkCompressionType chunkCompressionType)
+      CompressionCodec chunkCompressionType)
       throws IOException {
     long indexSize = createClpImmutableForwardIndex(clpMutableForwardIndexV2, chunkCompressionType);
 
@@ -158,7 +158,7 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
   }
 
   private long createClpImmutableForwardIndex(CLPMutableForwardIndexV2 clpMutableForwardIndexV2,
-      ChunkCompressionType chunkCompressionType)
+      CompressionCodec chunkCompressionType)
       throws IOException {
     // Create a CLP immutable forward index from mutable forward index
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);

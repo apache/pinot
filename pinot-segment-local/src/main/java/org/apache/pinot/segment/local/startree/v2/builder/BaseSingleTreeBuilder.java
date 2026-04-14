@@ -42,12 +42,12 @@ import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils.TreeNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -488,16 +488,16 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       ValueAggregator valueAggregator = _valueAggregators[i];
       DataType valueType = valueAggregator.getAggregatedValueType();
       AggregationSpec aggregationSpec = _aggregationSpecs[i];
-      ChunkCompressionType compressionType = ChunkCompressionType.valueOf(aggregationSpec.getCompressionCodec().name());
+      CompressionCodec codec = aggregationSpec.getCompressionCodec();
       if (valueType == BYTES) {
         metricIndexCreators[i] =
-            new SingleValueVarByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, BYTES,
+            new SingleValueVarByteRawIndexCreator(_outputDir, codec, metric, _numDocs, BYTES,
                 valueAggregator.getMaxAggregatedValueByteSize(), aggregationSpec.isDeriveNumDocsPerChunk(),
                 aggregationSpec.getIndexVersion(), aggregationSpec.getTargetMaxChunkSizeBytes(),
                 aggregationSpec.getTargetDocsPerChunk());
       } else {
         metricIndexCreators[i] =
-            new SingleValueFixedByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, valueType,
+            new SingleValueFixedByteRawIndexCreator(_outputDir, codec, metric, _numDocs, valueType,
                 aggregationSpec.getIndexVersion(), aggregationSpec.getTargetDocsPerChunk());
       }
     }

@@ -49,7 +49,6 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -68,6 +67,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -378,25 +378,25 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       throws Exception {
     // The compression type for an existing segment can only be determined by reading the forward index header.
     ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-    ChunkCompressionType existingCompressionType;
+    CompressionCodec existingCompressionCodec;
 
     // Get the forward index reader factory and create a reader
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
     try (ForwardIndexReader<?> fwdIndexReader = readerFactory.createIndexReader(segmentReader,
         _fieldIndexConfigs.get(column), existingColMetadata)) {
-      existingCompressionType = fwdIndexReader.getCompressionType();
-      Preconditions.checkState(existingCompressionType != null,
-          "Existing compressionType cannot be null for raw forward index column=" + column);
+      existingCompressionCodec = fwdIndexReader.getCompressionCodec();
+      Preconditions.checkState(existingCompressionCodec != null,
+          "Existing compressionCodec cannot be null for raw forward index column=" + column);
     }
 
-    // Get the new compression type.
-    ChunkCompressionType newCompressionType =
-        _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).getChunkCompressionType();
+    // Get the new compression codec.
+    CompressionCodec newCompressionCodec =
+        _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).getCompressionCodec();
 
     // Note that default compression type (PASS_THROUGH for metric and LZ4 for dimension) is not considered if the
-    // compressionType is not explicitly provided in tableConfig. This is to avoid incorrectly rewriting all the
+    // compressionCodec is not explicitly provided in tableConfig. This is to avoid incorrectly rewriting all the
     // forward indexes during segmentReload when the default compressionType changes.
-    return newCompressionType != null && existingCompressionType != newCompressionType;
+    return newCompressionCodec != null && !existingCompressionCodec.equals(newCompressionCodec);
   }
 
   private boolean shouldChangeDictIdCompressionType(String column, SegmentDirectory.Reader segmentReader)

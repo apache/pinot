@@ -30,8 +30,8 @@ import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWri
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -96,7 +96,8 @@ public class BenchmarkRawForwardIndexReader {
     @Param({"UNIFORM(1000,10000)", "EXP(0.001)"})
     String _distribution;
     @Param({"SNAPPY", "LZ4", "ZSTANDARD"})
-    ChunkCompressionType _chunkCompressionType;
+    String _compressionCodecName;
+    CompressionCodec _chunkCompressionType;
 
     @Param("1048576")
     int _maxChunkSize;
@@ -105,6 +106,7 @@ public class BenchmarkRawForwardIndexReader {
     @Setup(Level.Trial)
     public void setup()
         throws IOException {
+      _chunkCompressionType = CompressionCodec.of(_compressionCodecName);
       FileUtils.forceMkdir(TARGET_DIR);
       LongSupplier supplier = Distribution.createSupplier(42, _distribution);
       SplittableRandom random = new SplittableRandom(42);

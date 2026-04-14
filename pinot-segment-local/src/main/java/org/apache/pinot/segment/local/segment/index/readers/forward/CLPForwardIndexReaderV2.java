@@ -27,10 +27,10 @@ import java.util.Arrays;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV2;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -163,8 +163,8 @@ public class CLPForwardIndexReaderV2 implements ForwardIndexReader<CLPForwardInd
   }
 
   @Override
-  public ChunkCompressionType getCompressionType() {
-    return ChunkCompressionType.PASS_THROUGH;
+  public CompressionCodec getCompressionCodec() {
+    return CompressionCodec.PASS_THROUGH;
   }
 
   @Override

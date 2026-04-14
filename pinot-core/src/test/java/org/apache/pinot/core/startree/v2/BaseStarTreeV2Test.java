@@ -56,7 +56,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
-import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -493,11 +493,18 @@ abstract class BaseStarTreeV2Test<R, A> {
   /**
    * Can be overridden to force the compression codec.
    */
+  private static final CompressionCodec[] RAW_INDEX_CODECS = {
+      CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4,
+      CompressionCodec.GZIP
+  };
+
   @Nullable
   CompressionCodec getCompressionCodec() {
-    CompressionCodec[] compressionCodecs = CompressionCodec.values();
-    CompressionCodec compressionCodec = compressionCodecs[RANDOM.nextInt(compressionCodecs.length)];
-    return compressionCodec.isApplicableToRawIndex() ? compressionCodec : null;
+    // Randomly return a raw-index-applicable codec or null (for dictionary-encoded)
+    if (RANDOM.nextBoolean()) {
+      return RAW_INDEX_CODECS[RANDOM.nextInt(RAW_INDEX_CODECS.length)];
+    }
+    return null;
   }
 
   /**

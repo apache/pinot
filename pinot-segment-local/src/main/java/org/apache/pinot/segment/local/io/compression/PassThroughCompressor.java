@@ -20,8 +20,8 @@ package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 
 
 /**
@@ -52,7 +52,7 @@ class PassThroughCompressor implements ChunkCompressor {
   }
 
   @Override
-  public ChunkCompressionType compressionType() {
-    return ChunkCompressionType.PASS_THROUGH;
+  public CompressionCodec compressionCodec() {
+    return CompressionCodec.PASS_THROUGH;
   }
 }

@@ -30,7 +30,7 @@ import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
-import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 
 
 /**
@@ -68,8 +68,10 @@ public class StarTreeV2Metadata {
               aggregationConfig.getProperty(key));
         }
 
+        String codecStr = aggregationConfig.getString(MetadataKey.COMPRESSION_CODEC, null);
+        CompressionCodec compressionCodec = codecStr != null ? CompressionCodec.fromString(codecStr) : null;
         AggregationSpec aggregationSpec =
-            new AggregationSpec(aggregationConfig.getEnum(MetadataKey.COMPRESSION_CODEC, CompressionCodec.class, null),
+            new AggregationSpec(compressionCodec,
                 aggregationConfig.getBoolean(MetadataKey.DERIVE_NUM_DOCS_PER_CHUNK, null),
                 aggregationConfig.getInteger(MetadataKey.INDEX_VERSION, null),
                 aggregationConfig.getInteger(MetadataKey.TARGET_MAX_CHUNK_SIZE_BYTES, null),

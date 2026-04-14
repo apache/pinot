@@ -27,9 +27,9 @@ import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexW
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
@@ -70,11 +70,11 @@ public class BenchmarkFixedByteSVForwardIndexReader {
     _doubleBuffer = new double[_blockSize];
     _longBuffer = new long[_blockSize];
     try (FixedByteChunkForwardIndexWriter writer = new FixedByteChunkForwardIndexWriter(compressedIndexFile,
-        ChunkCompressionType.LZ4, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
+        CompressionCodec.LZ4, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
         FixedByteChunkForwardIndexWriter passThroughWriter = new FixedByteChunkForwardIndexWriter(uncompressedIndexFile,
-            ChunkCompressionType.PASS_THROUGH, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
+            CompressionCodec.PASS_THROUGH, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
         FixedByteChunkForwardIndexWriter pow2Writer = new FixedByteChunkForwardIndexWriter(pow2CompressedIndexFile,
-            ChunkCompressionType.LZ4, _numBlocks * _blockSize, 1000, Long.BYTES, 4)) {
+            CompressionCodec.LZ4, _numBlocks * _blockSize, 1000, Long.BYTES, 4)) {
       for (int i = 0; i < _numBlocks * _blockSize; i++) {
         long next = ThreadLocalRandom.current().nextLong();
         writer.putLong(next);

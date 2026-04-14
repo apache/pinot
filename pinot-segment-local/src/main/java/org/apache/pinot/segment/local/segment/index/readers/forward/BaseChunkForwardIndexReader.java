@@ -28,10 +28,10 @@ import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +49,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   protected final int _numDocsPerChunk;
   protected final int _lengthOfLongestEntry;
   protected final boolean _isCompressed;
-  protected final ChunkCompressionType _compressionType;
+  protected final CompressionCodec _compressionCodec;
   protected final ChunkDecompressor _chunkDecompressor;
   protected final PinotDataBuffer _dataHeader;
   protected final int _headerEntryChunkOffsetSize;
@@ -83,16 +83,16 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
       _dataBuffer.getInt(headerOffset); // Total docs
       headerOffset += Integer.BYTES;
 
-      _compressionType = ChunkCompressionType.valueOf(_dataBuffer.getInt(headerOffset));
-      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_compressionType);
-      _isCompressed = !_compressionType.equals(ChunkCompressionType.PASS_THROUGH);
+      _compressionCodec = CompressionCodec.fromWireId(_dataBuffer.getInt(headerOffset));
+      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_compressionCodec);
+      _isCompressed = !_compressionCodec.equals(CompressionCodec.PASS_THROUGH);
 
       headerOffset += Integer.BYTES;
       dataHeaderStart = _dataBuffer.getInt(headerOffset);
     } else {
       _isCompressed = true;
-      _compressionType = ChunkCompressionType.SNAPPY;
-      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_compressionType);
+      _compressionCodec = CompressionCodec.SNAPPY;
+      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_compressionCodec);
     }
 
     _headerEntryChunkOffsetSize = version <= 2 ? Integer.BYTES : Long.BYTES;
@@ -217,7 +217,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     decompressedBuffer.clear();
 
     try {
-      if (_compressionType == ChunkCompressionType.DELTA || _compressionType == ChunkCompressionType.DELTADELTA) {
+      if (_compressionCodec.equals(CompressionCodec.DELTA) || _compressionCodec.equals(CompressionCodec.DELTADELTA)) {
         // For delta-based compression, pre-size the output using decompressor's length calculation.
         ByteBuffer compressedBuffer = _dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize);
         int decompressedSize = _chunkDecompressor.decompressedLength(compressedBuffer);
@@ -273,8 +273,8 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   }
 
   @Override
-  public ChunkCompressionType getCompressionType() {
-    return _compressionType;
+  public CompressionCodec getCompressionCodec() {
+    return _compressionCodec;
   }
 
   @Override

@@ -20,8 +20,8 @@ package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.xerial.snappy.Snappy;
 
 
@@ -47,7 +47,7 @@ class SnappyCompressor implements ChunkCompressor {
   }
 
   @Override
-  public ChunkCompressionType compressionType() {
-    return ChunkCompressionType.SNAPPY;
+  public CompressionCodec compressionCodec() {
+    return CompressionCodec.SNAPPY;
   }
 }

@@ -25,9 +25,9 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import net.jpountz.lz4.LZ4Factory;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -117,8 +117,8 @@ public class BenchmarkNoDictionaryIntegerCompression {
     private void initializeCompressors() {
       //Initialize compressors and decompressors for lz4 and gzip
       _factory = LZ4Factory.fastestInstance();
-      _gzipCompressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.GZIP);
-      _gzipDecompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.GZIP);
+      _gzipCompressor = ChunkCompressorFactory.getCompressor(CompressionCodec.GZIP);
+      _gzipDecompressor = ChunkCompressorFactory.getDecompressor(CompressionCodec.GZIP);
     }
 
     private void allocateBufferMemory() {

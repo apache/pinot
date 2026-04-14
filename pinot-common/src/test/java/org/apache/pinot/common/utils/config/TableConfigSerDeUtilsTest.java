@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.spi.config.table.CompletionConfig;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
@@ -240,7 +241,7 @@ public class TableConfigSerDeUtilsTest {
               Lists.newArrayList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null, properties),
           new FieldConfig("column2", null, Collections.emptyList(), null, null),
           new FieldConfig("column3", FieldConfig.EncodingType.RAW, Collections.emptyList(),
-              FieldConfig.CompressionCodec.SNAPPY, null));
+              CompressionCodec.SNAPPY, null));
       TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(fieldConfigList).build();
 
       checkFieldConfig(tableConfig);
@@ -569,7 +570,7 @@ public class TableConfigSerDeUtilsTest {
     assertEquals(thirdFieldConfig.getName(), "column3");
     assertEquals(thirdFieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
     assertNull(thirdFieldConfig.getIndexType());
-    assertEquals(thirdFieldConfig.getCompressionCodec(), FieldConfig.CompressionCodec.SNAPPY);
+    assertEquals(thirdFieldConfig.getCompressionCodec(), CompressionCodec.SNAPPY);
     assertNull(thirdFieldConfig.getProperties());
   }
 

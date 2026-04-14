@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -132,7 +133,7 @@ public class CustomReloadQueriesTest extends BaseQueriesTest {
     // Load segment with no dictionary column and get segment metadata
     List<FieldConfig> fieldConfigs = new ArrayList<>();
     fieldConfigs.add(new FieldConfig(
-        columnName, FieldConfig.EncodingType.RAW, List.of(), FieldConfig.CompressionCodec.SNAPPY, null));
+        columnName, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.SNAPPY, null));
     TableConfig tableConfig = createTableConfig(List.of(), List.of(), List.of(), fieldConfigs);
     ImmutableSegment segment = buildNewSegment(tableConfig, schema, csvFile.getAbsolutePath());
     Map<String, ColumnMetadata> columnMetadataMap = segment.getSegmentMetadata().getColumnMetadataMap();
@@ -149,7 +150,7 @@ public class CustomReloadQueriesTest extends BaseQueriesTest {
     // Make column1 dictionary encoded and reload table
     fieldConfigs = new ArrayList<>();
     fieldConfigs.add(new FieldConfig(
-        columnName, FieldConfig.EncodingType.DICTIONARY, List.of(), FieldConfig.CompressionCodec.SNAPPY, null));
+        columnName, FieldConfig.EncodingType.DICTIONARY, List.of(), CompressionCodec.SNAPPY, null));
     tableConfig = createTableConfig(List.of(), List.of(), List.of(), fieldConfigs);
     segment = reloadSegment(tableConfig, schema);
     columnMetadataMap = segment.getSegmentMetadata().getColumnMetadataMap();

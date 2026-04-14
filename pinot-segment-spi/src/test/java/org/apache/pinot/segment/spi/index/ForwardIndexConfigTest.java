@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
@@ -35,7 +35,7 @@ public class ForwardIndexConfigTest {
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
+    assertNull(config.getCompressionCodec(), "Unexpected compressionCodec");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion(),
         "Unexpected rawIndexWriterVersion");
@@ -48,7 +48,7 @@ public class ForwardIndexConfigTest {
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
+    assertNull(config.getCompressionCodec(), "Unexpected compressionCodec");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion(),
         "Unexpected rawIndexWriterVersion");
@@ -61,7 +61,7 @@ public class ForwardIndexConfigTest {
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
+    assertNull(config.getCompressionCodec(), "Unexpected compressionCodec");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion(),
         "Unexpected rawIndexWriterVersion");
@@ -74,7 +74,7 @@ public class ForwardIndexConfigTest {
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
     assertTrue(config.isDisabled(), "Unexpected disabled");
-    assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
+    assertNull(config.getCompressionCodec(), "Unexpected compressionCodec");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion(),
         "Unexpected rawIndexWriterVersion");
@@ -102,7 +102,7 @@ public class ForwardIndexConfigTest {
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertEquals(config.getChunkCompressionType(), ChunkCompressionType.SNAPPY, "Unexpected chunkCompressionType");
+    assertEquals(config.getCompressionCodec(), CompressionCodec.SNAPPY, "Unexpected compressionCodec");
     assertTrue(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), 10, "Unexpected rawIndexWriterVersion");
     assertEquals(config.getTargetMaxChunkSizeBytes(), 512 * 1024, "Unexpected targetMaxChunkSizeBytes");

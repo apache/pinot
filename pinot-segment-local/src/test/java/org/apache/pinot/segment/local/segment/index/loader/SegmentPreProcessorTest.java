@@ -47,7 +47,6 @@ import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -64,8 +63,8 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -393,11 +392,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
     checkForwardIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
-        false, false, 0, ChunkCompressionType.LZ4,
+        false, false, 0, CompressionCodec.LZ4,
         true, 0, DataType.STRING, 100000);
     // since dictionary is disabled, the cardinality will be approximate cardinality.
     validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, approxCardinality, 16, false, false, false, 0,
-        true, 0, ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+        true, 0, CompressionCodec.LZ4, false, DataType.INT, 100000);
 
     // Convert the segment to V3.
     convertV1SegmentToV3();
@@ -421,7 +420,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     buildV1Segment();
     // since dictionary is disabled, the cardinality will be approximate cardinality.
     checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, approxCardinality, 15, _schema, false, false, false, 0,
-        ChunkCompressionType.LZ4, false, 13, DataType.INT, 106688);
+        CompressionCodec.LZ4, false, 13, DataType.INT, 106688);
 
     // Convert the segment to V3.
     convertV1SegmentToV3();
@@ -479,7 +478,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     buildV3Segment();
     // Since dictionary is disabled, the cardinality will be approximate cardinality.
     validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, approxCardinality, 16, false, false, false, 0, true, 0,
-        ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+        CompressionCodec.LZ4, false, DataType.INT, 100000);
     long oldRangeIndexSize = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW)
         .getIndexSizeFor(StandardIndexes.range());
     // At this point, the segment has range index. Now the reload path should create a dictionary and rewrite the
@@ -517,9 +516,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     buildV3Segment();
     // Since dictionary is disabled, the cardinality will be approximate cardinality.
     validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, approxCardinality, 15, false, false, false, 0,
-        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
+        false, 13, CompressionCodec.LZ4, false, DataType.INT, 106688);
     validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, approxCardinality, 15, false, false, false, 0,
-        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
+        false, 13, CompressionCodec.LZ4, false, DataType.INT, 106688);
 
     // Enable dictionary.
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
@@ -544,12 +543,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     // TEST 2: Disable dictionary for EXISTING_STRING_COL_DICT.
     _noDictionaryColumns.add(EXISTING_STRING_COL_DICT);
-    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
+    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, CompressionCodec.LZ4,
         true, 0, DataType.STRING, 100000);
 
     // TEST 3: Disable dictionary for COLUMN10_NAME
     _noDictionaryColumns.add(COLUMN10_NAME);
-    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4, true,
+    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, CompressionCodec.LZ4, true,
         0, DataType.INT, 100000);
   }
 
@@ -579,10 +578,10 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     long oldRangeIndexSize =
         new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeFor(StandardIndexes.range());
     _noDictionaryColumns.add(COLUMN10_NAME);
-    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4, true,
+    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, CompressionCodec.LZ4, true,
         0, DataType.INT, 100000);
     validateIndex(StandardIndexes.range(), COLUMN10_NAME, 3960, 12, false, false, false, 0, true, 0,
-        ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+        CompressionCodec.LZ4, false, DataType.INT, 100000);
     long newRangeIndexSize =
         new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeFor(StandardIndexes.range());
     assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
@@ -594,7 +593,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_DICT,
         new FieldConfig(EXISTING_STRING_COL_DICT, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
-    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
+    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, CompressionCodec.LZ4,
         true, 0, DataType.STRING, 100000);
     validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4, false, false, false, 0, true, 0, null,
         false, DataType.STRING, 100000);
@@ -648,7 +647,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.ZSTANDARD,
             null));
     checkForwardIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
-        false, false, 0, ChunkCompressionType.LZ4,
+        false, false, 0, CompressionCodec.LZ4,
         true, 0, DataType.STRING, 100000);
 
     // Convert the segment to V3.
@@ -657,7 +656,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Test2: Now forward index will be rewritten with ZSTANDARD compressionType.
     checkForwardIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
         false, false, 0,
-        ChunkCompressionType.ZSTANDARD, true, 0, DataType.STRING, 100000);
+        CompressionCodec.ZSTANDARD, true, 0, DataType.STRING, 100000);
 
     // Test3: Change compression on existing raw index column. Also add text index on same column. Check correctness.
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
@@ -667,7 +666,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         false, false, 0);
     validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, false,
         false, false, 0, true, 0,
-        ChunkCompressionType.SNAPPY, false, DataType.STRING, 100000);
+        CompressionCodec.SNAPPY, false, DataType.STRING, 100000);
 
     // Test4: Change compression on RAW index column. Change another index on another column. Check correctness.
     resetIndexConfigs();
@@ -683,7 +682,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Check forward index.
     validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, false,
         false, false, 0, true, 0,
-        ChunkCompressionType.ZSTANDARD, false, DataType.STRING, 100000);
+        CompressionCodec.ZSTANDARD, false, DataType.STRING, 100000);
 
     // Test5: Change compressionType for an MV column
     _fieldConfigMap.put(EXISTING_INT_COL_RAW_MV,
@@ -691,7 +690,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             null));
     // Since dictionary is disabled, the cardinality will be approximate cardinality.
     checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, approximateCardinality, 15, _schema, false, false, false, 0,
-        ChunkCompressionType.ZSTANDARD, false, 13, DataType.INT, 106688);
+        CompressionCodec.ZSTANDARD, false, 13, DataType.INT, 106688);
   }
 
   /**
@@ -773,7 +772,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
   private void checkForwardIndexCreation(String column, int cardinality, int bits, Schema schema,
       boolean isAutoGenerated, boolean hasDictionary, boolean isSorted, int dictionaryElementSize,
-      ChunkCompressionType expectedCompressionType, boolean isSingleValue, int maxNumberOfMultiValues,
+      CompressionCodec expectedCompressionType, boolean isSingleValue, int maxNumberOfMultiValues,
       DataType dataType, int totalNumberOfEntries)
       throws Exception {
     createAndValidateIndex(StandardIndexes.forward(), column, cardinality, bits, schema, isAutoGenerated, hasDictionary,
@@ -783,7 +782,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
   private void createAndValidateIndex(IndexType<?, ?, ?> indexType, String column, int cardinality, int bits,
       Schema schema, boolean isAutoGenerated, boolean hasDictionary, boolean isSorted, int dictionaryElementSize,
-      boolean isSingleValued, int maxNumberOfMultiValues, ChunkCompressionType expectedCompressionType,
+      boolean isSingleValued, int maxNumberOfMultiValues, CompressionCodec expectedCompressionType,
       boolean forwardIndexDisabled, DataType dataType, int totalNumberOfEntries)
       throws Exception {
     runPreProcessor(schema);
@@ -794,7 +793,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
   private void validateIndex(IndexType<?, ?, ?> indexType, String column, int cardinality, int bits,
       boolean isAutoGenerated, boolean hasDictionary, boolean isSorted, int dictionaryElementSize,
-      boolean isSingleValued, int maxNumberOfMultiValues, ChunkCompressionType expectedCompressionType,
+      boolean isSingleValued, int maxNumberOfMultiValues, CompressionCodec expectedCompressionType,
       boolean forwardIndexDisabled, DataType dataType, int totalNumberOfEntries)
       throws Exception {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
@@ -840,7 +839,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             .build();
         try (ForwardIndexReader fwdIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
             columnMetadata)) {
-          ChunkCompressionType compressionType = fwdIndexReader.getCompressionType();
+          CompressionCodec compressionType = fwdIndexReader.getCompressionCodec();
           assertEquals(compressionType, expectedCompressionType);
         }
 

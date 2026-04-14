@@ -38,9 +38,9 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCrea
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -119,7 +119,7 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
 
     _encodedVarsFwdIndexFile = new File(_intermediateFilesDir, column + "_clp_encodedvars.fwd");
     _encodedVarsFwdIndexWriter =
-        new MultiValueFixedByteRawIndexCreator(_encodedVarsFwdIndexFile, ChunkCompressionType.LZ4, numDocs,
+        new MultiValueFixedByteRawIndexCreator(_encodedVarsFwdIndexFile, CompressionCodec.LZ4, numDocs,
             FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), false,
             VarByteChunkForwardIndexWriterV4.VERSION);
     _clpStats.clear();

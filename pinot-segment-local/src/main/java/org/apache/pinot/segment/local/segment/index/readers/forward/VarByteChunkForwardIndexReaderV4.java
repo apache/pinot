@@ -30,12 +30,12 @@ import java.util.Map;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.MapUtils;
@@ -58,7 +58,7 @@ public class VarByteChunkForwardIndexReaderV4
   private final FieldSpec.DataType _storedType;
   protected final int _targetDecompressedChunkSize;
   protected final ChunkDecompressor _chunkDecompressor;
-  protected final ChunkCompressionType _chunkCompressionType;
+  protected final CompressionCodec _compressionCodec;
 
   protected final PinotDataBuffer _metadata;
   protected final PinotDataBuffer _chunks;
@@ -70,8 +70,8 @@ public class VarByteChunkForwardIndexReaderV4
     validateIndexVersion(dataBuffer);
     _storedType = storedType;
     _targetDecompressedChunkSize = dataBuffer.getInt(4);
-    _chunkCompressionType = ChunkCompressionType.valueOf(dataBuffer.getInt(8));
-    _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_chunkCompressionType);
+    _compressionCodec = CompressionCodec.fromWireId(dataBuffer.getInt(8));
+    _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_compressionCodec);
     int chunksOffset = dataBuffer.getInt(12);
     // the file has a BE header for compatibility reasons (version selection) but the content is LE
     _metadata = dataBuffer.view(16, chunksOffset, ByteOrder.LITTLE_ENDIAN);
@@ -105,17 +105,17 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
-  public ChunkCompressionType getCompressionType() {
-    // NOTE: Treat LZ4_LENGTH_PREFIXED as LZ4 because VarByteChunkForwardIndexWriterV4 implicitly override it
-    return _chunkCompressionType == ChunkCompressionType.LZ4_LENGTH_PREFIXED ? ChunkCompressionType.LZ4
-        : _chunkCompressionType;
+  public CompressionCodec getCompressionCodec() {
+    // NOTE: Treat LZ4_LENGTH_PREFIXED as LZ4 because VarByteChunkForwardIndexWriterV4 implicitly upgrade it
+    return _compressionCodec.equals(CompressionCodec.LZ4_LENGTH_PREFIXED) ? CompressionCodec.LZ4
+        : _compressionCodec;
   }
 
   @Override
   public ReaderContext createContext() {
-    return _chunkCompressionType == ChunkCompressionType.PASS_THROUGH ? new UncompressedReaderContext(_chunks,
+    return _compressionCodec.equals(CompressionCodec.PASS_THROUGH) ? new UncompressedReaderContext(_chunks,
         _metadata, _chunksStartOffset)
-        : new CompressedReaderContext(_metadata, _chunks, _chunksStartOffset, _chunkDecompressor, _chunkCompressionType,
+        : new CompressedReaderContext(_metadata, _chunks, _chunksStartOffset, _chunkDecompressor, _compressionCodec,
             _targetDecompressedChunkSize);
   }
 
@@ -382,14 +382,14 @@ public class VarByteChunkForwardIndexReaderV4
 
     protected final ByteBuffer _decompressedBuffer;
     private final ChunkDecompressor _chunkDecompressor;
-    private final ChunkCompressionType _chunkCompressionType;
+    private final CompressionCodec _compressionCodec;
     private boolean _closed;
 
     CompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset,
-        ChunkDecompressor chunkDecompressor, ChunkCompressionType chunkCompressionType, int targetChunkSize) {
+        ChunkDecompressor chunkDecompressor, CompressionCodec compressionCodec, int targetChunkSize) {
       super(metadata, chunks, chunkStartOffset);
       _chunkDecompressor = chunkDecompressor;
-      _chunkCompressionType = chunkCompressionType;
+      _compressionCodec = compressionCodec;
       _decompressedBuffer = ByteBuffer.allocateDirect(targetChunkSize).order(ByteOrder.LITTLE_ENDIAN);
     }
 
@@ -433,8 +433,8 @@ public class VarByteChunkForwardIndexReaderV4
         throws IOException {
       // huge values don't have length prefixes; they occupy the entire chunk so are unambiguous
       byte[] value = new byte[decompressedLength];
-      if (_chunkCompressionType == ChunkCompressionType.SNAPPY
-          || _chunkCompressionType == ChunkCompressionType.ZSTANDARD) {
+      if (_compressionCodec.equals(CompressionCodec.SNAPPY)
+          || _compressionCodec.equals(CompressionCodec.ZSTANDARD)) {
         // snappy and zstandard don't work without direct buffers
         decompressViaDirectBuffer(compressed, value);
       } else {

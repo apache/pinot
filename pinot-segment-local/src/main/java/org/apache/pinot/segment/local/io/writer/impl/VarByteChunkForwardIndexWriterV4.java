@@ -27,14 +27,13 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.util.OptionalInt;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,24 +93,18 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   private int _metadataSize = 0;
   private long _chunkOffset = 0;
 
-  public VarByteChunkForwardIndexWriterV4(File file, ChunkCompressionType compressionType, int chunkSize)
-      throws IOException {
-    this(file, compressionType, chunkSize, OptionalInt.empty());
-  }
-
-  public VarByteChunkForwardIndexWriterV4(File file, ChunkCompressionType compressionType, int chunkSize,
-      OptionalInt compressionLevel)
+  public VarByteChunkForwardIndexWriterV4(File file, CompressionCodec codec, int chunkSize)
       throws IOException {
     _dataBuffer = new File(file.getParentFile(), file.getName() + DATA_BUFFER_SUFFIX);
     _output = new RandomAccessFile(file, "rw");
     _dataChannel = new RandomAccessFile(_dataBuffer, "rw").getChannel();
-    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType, true, compressionLevel);
+    _chunkCompressor = ChunkCompressorFactory.getCompressor(codec, true);
     _chunkBuffer = ByteBuffer.allocateDirect(chunkSize).order(ByteOrder.LITTLE_ENDIAN);
     _compressionBuffer =
         ByteBuffer.allocateDirect(_chunkCompressor.maxCompressedSize(chunkSize)).order(ByteOrder.LITTLE_ENDIAN);
     // reserve space for numDocs
     _chunkBuffer.position(Integer.BYTES);
-    writeHeader(_chunkCompressor.compressionType(), chunkSize);
+    writeHeader(_chunkCompressor.compressionCodec(), chunkSize);
   }
 
   // Child class must override this class instance method
@@ -119,13 +112,13 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     return VERSION;
   }
 
-  private void writeHeader(ChunkCompressionType compressionType, int targetDecompressedChunkSize)
+  private void writeHeader(CompressionCodec codec, int targetDecompressedChunkSize)
       throws IOException {
     // keep metadata BE for backwards compatibility
     // (e.g. the version needs to be read by a factory which assumes BE)
     _output.writeInt(getVersion());
     _output.writeInt(targetDecompressedChunkSize);
-    _output.writeInt(compressionType.getValue());
+    _output.writeInt(CompressionCodec.toWireId(codec));
     // reserve a slot to write the data offset into
     _output.writeInt(0);
     _metadataSize += 4 * Integer.BYTES;
@@ -193,8 +186,8 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     // for the number of documents in a regular chunk are written as a single value without metadata, and these chunks
     // are detected by marking the MSB in the doc id offset
     final ByteBuffer buffer;
-    if (_chunkCompressor.compressionType() == ChunkCompressionType.SNAPPY
-        || _chunkCompressor.compressionType() == ChunkCompressionType.ZSTANDARD) {
+    if (_chunkCompressor.compressionCodec().equals(CompressionCodec.SNAPPY)
+        || _chunkCompressor.compressionCodec().equals(CompressionCodec.ZSTANDARD)) {
       // SNAPPY and ZSTANDARD libraries don't work with on heap buffers,
       // so the already allocated bytes are not good enough
       buffer = ByteBuffer.allocateDirect(bytes.length);

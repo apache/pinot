@@ -22,10 +22,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.OptionalInt;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -56,7 +55,7 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
    * Constructor for the class.
    *
    * @param file File to write to.
-   * @param compressionType Type of compression to use.
+   * @param codec Compression codec to use.
    * @param totalDocs Total number of docs to write.
    * @param numDocsPerChunk Number of documents per chunk.
    * @param lengthOfLongestEntry Length of longest entry (in bytes)
@@ -64,32 +63,13 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is
    *     not found.
    */
-  public VarByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
+  public VarByteChunkForwardIndexWriter(File file, CompressionCodec codec, int totalDocs,
       int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion)
       throws IOException {
-    this(file, compressionType, totalDocs, numDocsPerChunk, lengthOfLongestEntry, writerVersion, OptionalInt.empty());
-  }
-
-  /**
-   * Constructor for the class.
-   *
-   * @param file File to write to.
-   * @param compressionType Type of compression to use.
-   * @param totalDocs Total number of docs to write.
-   * @param numDocsPerChunk Number of documents per chunk.
-   * @param lengthOfLongestEntry Length of longest entry (in bytes)
-   * @param writerVersion writer format version
-   * @param compressionLevel optional compression level to pass to the compressor
-   * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is
-   *     not found.
-   */
-  public VarByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion, OptionalInt compressionLevel)
-      throws IOException {
-    super(file, compressionType, totalDocs, numDocsPerChunk,
+    super(file, codec, totalDocs, numDocsPerChunk,
         numDocsPerChunk * (CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + (long) lengthOfLongestEntry),
         // chunkSize
-        lengthOfLongestEntry, writerVersion, false, compressionLevel);
+        lengthOfLongestEntry, writerVersion, false);
 
     _chunkHeaderOffset = 0;
     _chunkHeaderSize = numDocsPerChunk * CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;

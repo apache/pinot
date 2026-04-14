@@ -34,7 +34,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeInd
 import org.apache.pinot.segment.local.segment.index.loader.ForwardIndexHandler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
@@ -51,8 +50,8 @@ import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -203,7 +202,6 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig) {
     ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder();
     builder.withCompressionCodec(fieldConfig.getCompressionCodec());
-    builder.withCodecSpec(fieldConfig.getCodecSpec());
     Map<String, String> properties = fieldConfig.getProperties();
     if (properties != null) {
       builder.withLegacyProperties(properties);
@@ -211,11 +209,11 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     return builder.build();
   }
 
-  public static ChunkCompressionType getDefaultCompressionType(FieldSpec.FieldType fieldType) {
+  public static CompressionCodec getDefaultCompressionType(FieldSpec.FieldType fieldType) {
     if (fieldType == FieldSpec.FieldType.METRIC) {
-      return ChunkCompressionType.PASS_THROUGH;
+      return CompressionCodec.PASS_THROUGH;
     } else {
-      return ChunkCompressionType.LZ4;
+      return CompressionCodec.LZ4;
     }
   }
 

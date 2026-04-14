@@ -25,10 +25,9 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.OptionalInt;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,7 +76,7 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
    * Constructor for the class.
    *
    * @param file Data file to write into
-   * @param compressionType Type of compression
+   * @param codec Compression codec
    * @param totalDocs Total docs to write
    * @param numDocsPerChunk Number of docs per data chunk
    * @param chunkSize Size of chunk
@@ -86,37 +85,16 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
    * @param fixed if the data type is fixed width (required for version validation)
    * @throws IOException if the file isn't found or can't be mapped
    */
-  protected BaseChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
+  protected BaseChunkForwardIndexWriter(File file, CompressionCodec codec, int totalDocs,
       int numDocsPerChunk, long chunkSize, int sizeOfEntry, int version, boolean fixed)
-      throws IOException {
-    this(file, compressionType, totalDocs, numDocsPerChunk, chunkSize, sizeOfEntry, version, fixed,
-        OptionalInt.empty());
-  }
-
-  /**
-   * Constructor for the class.
-   *
-   * @param file Data file to write into
-   * @param compressionType Type of compression
-   * @param totalDocs Total docs to write
-   * @param numDocsPerChunk Number of docs per data chunk
-   * @param chunkSize Size of chunk
-   * @param sizeOfEntry Size of entry (in bytes), max size for variable byte implementation.
-   * @param version version of File
-   * @param fixed if the data type is fixed width (required for version validation)
-   * @param compressionLevel optional compression level to pass to the compressor
-   * @throws IOException if the file isn't found or can't be mapped
-   */
-  protected BaseChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, long chunkSize, int sizeOfEntry, int version, boolean fixed, OptionalInt compressionLevel)
       throws IOException {
     Preconditions.checkArgument(version == 2 || version == 3 || (fixed && version >= 4),
         "Illegal version: %s for %s bytes values", version, fixed ? "fixed" : "variable");
     Preconditions.checkArgument(chunkSize <= Integer.MAX_VALUE, "Chunk size limited to 2GB");
     _chunkSize = (int) chunkSize;
-    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType, false, compressionLevel);
+    _chunkCompressor = ChunkCompressorFactory.getCompressor(codec);
     _headerEntryChunkOffsetSize = version == 2 ? Integer.BYTES : Long.BYTES;
-    _dataOffset = writeHeader(compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, version);
+    _dataOffset = writeHeader(codec, totalDocs, numDocsPerChunk, sizeOfEntry, version);
     _chunkBuffer = ByteBuffer.allocateDirect(_chunkSize);
     int maxCompressedChunkSize = _chunkCompressor.maxCompressedSize(_chunkSize); // may exceed original chunk size
     _compressedBuffer = ByteBuffer.allocateDirect(maxCompressedChunkSize);
@@ -142,14 +120,14 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   /**
    * Helper method to write header information.
    *
-   * @param compressionType Compression type for the data
+   * @param codec Compression codec for the data
    * @param totalDocs Total number of records
    * @param numDocsPerChunk Number of documents per chunk
    * @param sizeOfEntry Size of each entry
    * @param version Version of file
    * @return Size of header
    */
-  private int writeHeader(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk, int sizeOfEntry,
+  private int writeHeader(CompressionCodec codec, int totalDocs, int numDocsPerChunk, int sizeOfEntry,
       int version) {
     int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
     int headerSize = (7 * Integer.BYTES) + (numChunks * _headerEntryChunkOffsetSize);
@@ -173,8 +151,8 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
     _header.putInt(totalDocs);
     offset += Integer.BYTES;
 
-    // Write the compressor type
-    _header.putInt(compressionType.getValue());
+    // Write the compressor type as wire ID
+    _header.putInt(CompressionCodec.toWireId(codec));
     offset += Integer.BYTES;
 
     // Start of chunk offsets.

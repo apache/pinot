@@ -58,6 +58,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -554,7 +555,7 @@ public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
     schema.addField(new DimensionFieldSpec("column1", DataType.STRING, true));
     List<FieldConfig> fieldConfigList = new ArrayList<>();
     fieldConfigList.add(new FieldConfig("column1", FieldConfig.EncodingType.RAW, Collections.EMPTY_LIST,
-        FieldConfig.CompressionCodec.CLP, Collections.EMPTY_MAP));
+        CompressionCodec.CLP, Collections.EMPTY_MAP));
     _tableConfig.setFieldConfigList(fieldConfigList);
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, schema, null);
     StringColumnPreIndexStatsCollector statsCollector =

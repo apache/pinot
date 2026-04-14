@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.compression;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 
 
 /**
@@ -47,11 +48,11 @@ public interface ChunkCompressor extends Closeable {
   int maxCompressedSize(int uncompressedSize);
 
   /**
-   * The compression type of this compressor. This may differ from the requested compression type
+   * The compression codec of this compressor. This may differ from the requested compression codec
    * if it has been upgraded.
-   * @return this compressor's type
+   * @return this compressor's codec
    */
-  ChunkCompressionType compressionType();
+  CompressionCodec compressionCodec();
 
   @Override
   default void close() throws IOException {

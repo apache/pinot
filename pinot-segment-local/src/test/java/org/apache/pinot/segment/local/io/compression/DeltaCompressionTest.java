@@ -20,9 +20,9 @@ package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -43,13 +43,13 @@ public class DeltaCompressionTest {
     int numLongs = input.remaining() / Long.BYTES;
     assertEquals(numLongs, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(CompressionCodec.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
       assertEquals(input.limit(), 0);
       int compressedSize = compressor.compress(input.slice(), compressed);
       assertEquals(compressedSize, 5);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(CompressionCodec.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
         int actualSize = decompressor.decompress(compressed, decompressed);
@@ -77,13 +77,13 @@ public class DeltaCompressionTest {
     int numLongs = input.remaining() / Long.BYTES;
     assertEquals(numLongs, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(CompressionCodec.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
       assertEquals(input.limit(), 8);
       int compressedSize = compressor.compress(input.slice(), compressed);
       assertEquals(compressedSize, 13);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(CompressionCodec.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
         assertEquals(decompressedSize, 8);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
@@ -111,11 +111,11 @@ public class DeltaCompressionTest {
     int numLongs = input.remaining() / Long.BYTES;
     assertEquals(numLongs, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(CompressionCodec.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
       int compressedSize = compressor.compress(input.slice(), compressed);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(CompressionCodec.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
         int actualSize = decompressor.decompress(compressed, decompressed);
@@ -141,13 +141,13 @@ public class DeltaCompressionTest {
     int numIntegers = input.remaining() / Integer.BYTES;
     assertEquals(numIntegers, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(CompressionCodec.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
       assertEquals(input.limit(), 0);
       int compressedSize = compressor.compress(input.slice(), compressed);
       assertEquals(compressedSize, 5);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(CompressionCodec.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
         int actualSize = decompressor.decompress(compressed, decompressed);
@@ -175,13 +175,13 @@ public class DeltaCompressionTest {
     int numIntegers = input.remaining() / Integer.BYTES;
     assertEquals(numIntegers, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(CompressionCodec.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
       assertEquals(input.limit(), 4);
       int compressedSize = compressor.compress(input.slice(), compressed);
       assertEquals(compressedSize, 9);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(CompressionCodec.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
         assertEquals(decompressedSize, 4);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
@@ -209,11 +209,11 @@ public class DeltaCompressionTest {
     int numIntegers = input.remaining() / Integer.BYTES;
     assertEquals(numIntegers, values.length);
 
-    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.DELTA)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(CompressionCodec.DELTA)) {
       ByteBuffer compressed = ByteBuffer.allocateDirect(compressor.maxCompressedSize(input.limit()));
       compressor.compress(input.slice(), compressed);
 
-      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.DELTA)) {
+      try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(CompressionCodec.DELTA)) {
         int decompressedSize = decompressor.decompressedLength(compressed);
         ByteBuffer decompressed = ByteBuffer.allocateDirect(decompressedSize);
         int actualSize = decompressor.decompress(compressed, decompressed);

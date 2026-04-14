@@ -21,8 +21,8 @@ package org.apache.pinot.segment.local.io.compression;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import net.jpountz.lz4.LZ4Factory;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 
 
 /**
@@ -74,7 +74,7 @@ class LZ4Compressor implements ChunkCompressor {
   }
 
   @Override
-  public ChunkCompressionType compressionType() {
-    return ChunkCompressionType.LZ4;
+  public CompressionCodec compressionCodec() {
+    return CompressionCodec.LZ4;
   }
 }

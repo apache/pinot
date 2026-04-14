@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -214,7 +215,7 @@ public class IndexLoadingConfigTest {
     assertNotNull(indexConfigs);
     forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
     assertTrue(forwardIndexConfig.isEnabled());
-    assertEquals(forwardIndexConfig.getCompressionCodec(), FieldConfig.CompressionCodec.SNAPPY);
+    assertEquals(forwardIndexConfig.getCompressionCodec(), CompressionCodec.SNAPPY);
     assertTrue(forwardIndexConfig.isDeriveNumDocsPerChunk());
     assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), 4);
     assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), "100K");

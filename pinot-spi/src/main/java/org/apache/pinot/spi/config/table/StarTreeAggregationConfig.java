@@ -25,7 +25,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
-import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 
 

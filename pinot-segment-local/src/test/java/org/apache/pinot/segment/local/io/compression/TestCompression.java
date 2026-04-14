@@ -25,9 +25,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -47,33 +47,33 @@ public class TestCompression {
     buffer.put(input);
     buffer.flip();
     return new Object[][]{
-        {ChunkCompressionType.PASS_THROUGH, buffer.slice()}, {ChunkCompressionType.SNAPPY, buffer.slice()},
-        {ChunkCompressionType.LZ4, buffer.slice()}, {ChunkCompressionType.LZ4_LENGTH_PREFIXED, buffer.slice()},
-        {ChunkCompressionType.ZSTANDARD, buffer.slice()}, {ChunkCompressionType.GZIP, buffer.slice()}
+        {CompressionCodec.PASS_THROUGH, buffer.slice()}, {CompressionCodec.SNAPPY, buffer.slice()},
+        {CompressionCodec.LZ4, buffer.slice()}, {CompressionCodec.LZ4_LENGTH_PREFIXED, buffer.slice()},
+        {CompressionCodec.ZSTANDARD, buffer.slice()}, {CompressionCodec.GZIP, buffer.slice()}
     };
   }
 
   @Test(dataProvider = "formats")
-  public void testRoundtrip(ChunkCompressionType type, ByteBuffer rawInput)
+  public void testRoundtrip(CompressionCodec type, ByteBuffer rawInput)
       throws IOException {
     try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type)) {
-      assertEquals(compressor.compressionType(), type, "upgrade is opt in");
+      assertEquals(compressor.compressionCodec(), type, "upgrade is opt in");
       roundtrip(compressor, rawInput);
     }
   }
 
   @Test(dataProvider = "formats")
-  public void testRoundtripWithUpgrade(ChunkCompressionType type, ByteBuffer rawInput)
+  public void testRoundtripWithUpgrade(CompressionCodec type, ByteBuffer rawInput)
       throws IOException {
     try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type, true)) {
-      assertNotEquals(compressor.compressionType(), ChunkCompressionType.LZ4,
+      assertNotEquals(compressor.compressionCodec(), CompressionCodec.LZ4,
           "LZ4 compression type does not support length prefix");
       roundtrip(compressor, rawInput);
     }
   }
 
   @Test(dataProvider = "formats")
-  public void testConcurrent(ChunkCompressionType type, ByteBuffer ignore) {
+  public void testConcurrent(CompressionCodec type, ByteBuffer ignore) {
 
     String expected = "The gzip file format is:\n"
         + "- a 10-byte header, containing a magic number (1f 8b), the compression method (08 for DEFLATE), "
@@ -112,7 +112,7 @@ public class TestCompression {
           // decompress
           try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(type)) {
             int size = decompressor.decompressedLength(compressed[idx]);
-            if (type == ChunkCompressionType.LZ4) {
+            if (type == CompressionCodec.LZ4) {
               size = rawInput.limit();
             }
             decompressed[idx] = ByteBuffer.allocateDirect(size);
@@ -187,9 +187,9 @@ public class TestCompression {
       throws IOException {
     ByteBuffer compressedOutput = ByteBuffer.allocateDirect(compressor.maxCompressedSize(rawInput.limit()));
     compressor.compress(rawInput.slice(), compressedOutput);
-    try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(compressor.compressionType())) {
+    try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(compressor.compressionCodec())) {
       int decompressedLength = decompressor.decompressedLength(compressedOutput);
-      boolean isLz4 = compressor.compressionType() == ChunkCompressionType.LZ4;
+      boolean isLz4 = compressor.compressionCodec() == CompressionCodec.LZ4;
       assertTrue(isLz4 || decompressedLength > 0);
       ByteBuffer decompressedOutput = ByteBuffer.allocateDirect(isLz4 ? rawInput.limit() : decompressedLength);
       decompressor.decompress(compressedOutput, decompressedOutput);

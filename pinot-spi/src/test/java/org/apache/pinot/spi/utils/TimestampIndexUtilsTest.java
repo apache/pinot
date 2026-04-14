@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -68,7 +69,7 @@ public class TimestampIndexUtilsTest {
                 new TimestampConfig(Arrays.asList(TimestampIndexGranularity.HOUR, TimestampIndexGranularity.DAY,
                     TimestampIndexGranularity.WEEK)), null),
             new FieldConfig("ts3", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TIMESTAMP, null,
-                FieldConfig.CompressionCodec.PASS_THROUGH, new TimestampConfig(
+                CompressionCodec.PASS_THROUGH, new TimestampConfig(
                 Arrays.asList(TimestampIndexGranularity.WEEK, TimestampIndexGranularity.MONTH,
                     TimestampIndexGranularity.YEAR)), null))).build();
     Set<String> columnsWithGranularity = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);

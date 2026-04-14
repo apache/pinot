@@ -19,9 +19,9 @@
 package org.apache.pinot.segment.local.io.compression;
 
 import java.util.OptionalInt;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 
 
 /**
@@ -34,53 +34,39 @@ public class ChunkCompressorFactory {
   }
 
   /**
-   * Returns the chunk compressor for the specified name.
+   * Returns the chunk compressor for the specified codec.
    *
-   * @param compressionType Type of compressor.
-   * @return Compressor for the specified type.
+   * @param codec Compression codec.
+   * @return Compressor for the specified codec.
    */
-  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType) {
-    return getCompressor(compressionType, false);
+  public static ChunkCompressor getCompressor(CompressionCodec codec) {
+    return getCompressor(codec, false);
   }
 
   /**
-   * Returns the chunk compressor for the specified name.
+   * Returns the chunk compressor for the specified codec.
    *
-   * @param compressionType Type of compressor.
+   * @param codec Compression codec.
    * @param upgradeToLengthPrefixed if true, guarantee the compressed chunk contains metadata about the decompressed
    *                                size. Most formats do this anyway, but LZ4 requires a length prefix.
-   * @return Compressor for the specified type.
+   * @return Compressor for the specified codec.
    */
-  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, boolean upgradeToLengthPrefixed) {
-    return getCompressor(compressionType, upgradeToLengthPrefixed, OptionalInt.empty());
-  }
+  public static ChunkCompressor getCompressor(CompressionCodec codec, boolean upgradeToLengthPrefixed) {
+    OptionalInt compressionLevel = codec.getLevel();
+    switch (codec.getName()) {
 
-  /**
-   * Returns the chunk compressor for the specified name, optionally using an explicit compression level.
-   *
-   * @param compressionType Type of compressor.
-   * @param upgradeToLengthPrefixed if true, guarantee the compressed chunk contains metadata about the decompressed
-   *                                size. Most formats do this anyway, but LZ4 requires a length prefix.
-   * @param compressionLevel optional compression level; when present, used by compressors that support
-   *                         tunable levels (ZSTANDARD, GZIP, LZ4)
-   * @return Compressor for the specified type.
-   */
-  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, boolean upgradeToLengthPrefixed,
-      OptionalInt compressionLevel) {
-    switch (compressionType) {
-
-      case PASS_THROUGH:
+      case "PASS_THROUGH":
         return PassThroughCompressor.INSTANCE;
 
-      case SNAPPY:
+      case "SNAPPY":
         return SnappyCompressor.INSTANCE;
 
-      case ZSTANDARD:
+      case "ZSTANDARD":
         return compressionLevel.isPresent()
             ? new ZstandardCompressor(compressionLevel.getAsInt())
             : ZstandardCompressor.INSTANCE;
 
-      case LZ4:
+      case "LZ4":
         if (compressionLevel.isPresent()) {
           return upgradeToLengthPrefixed
               ? new LZ4WithLengthCompressor(compressionLevel.getAsInt())
@@ -88,61 +74,71 @@ public class ChunkCompressorFactory {
         }
         return upgradeToLengthPrefixed ? LZ4WithLengthCompressor.INSTANCE : LZ4Compressor.INSTANCE;
 
-      case LZ4_LENGTH_PREFIXED:
+      case "LZ4_LENGTH_PREFIXED":
         return compressionLevel.isPresent()
             ? new LZ4WithLengthCompressor(compressionLevel.getAsInt())
             : LZ4WithLengthCompressor.INSTANCE;
 
-      case GZIP:
+      case "GZIP":
         return compressionLevel.isPresent()
             ? new GzipCompressor(compressionLevel.getAsInt())
             : new GzipCompressor();
 
-      case DELTA:
+      case "DELTA":
         return DeltaCompressor.INSTANCE;
 
-      case DELTADELTA:
+      case "DELTADELTA":
         return DeltaDeltaCompressor.INSTANCE;
 
       default:
-        throw new IllegalArgumentException("Illegal compressor name " + compressionType);
+        throw new IllegalArgumentException("Illegal compressor name " + codec.getName());
     }
   }
 
   /**
-   * Returns the chunk decompressor for the specified name.
+   * Returns the chunk decompressor for the specified codec.
    *
-   * @param compressionType Type of compression
-   * @return decompressor for the specified name
+   * @param codec Compression codec.
+   * @return decompressor for the specified codec
    */
-  public static ChunkDecompressor getDecompressor(ChunkCompressionType compressionType) {
-    switch (compressionType) {
-      case PASS_THROUGH:
+  public static ChunkDecompressor getDecompressor(CompressionCodec codec) {
+    switch (codec.getName()) {
+      case "PASS_THROUGH":
         return PassThroughDecompressor.INSTANCE;
 
-      case SNAPPY:
+      case "SNAPPY":
         return SnappyDecompressor.INSTANCE;
 
-      case ZSTANDARD:
+      case "ZSTANDARD":
         return ZstandardDecompressor.INSTANCE;
 
-      case LZ4:
+      case "LZ4":
         return LZ4Decompressor.INSTANCE;
 
-      case LZ4_LENGTH_PREFIXED:
+      case "LZ4_LENGTH_PREFIXED":
         return LZ4WithLengthDecompressor.INSTANCE;
 
-      case GZIP:
+      case "GZIP":
         return new GzipDecompressor();
 
-      case DELTA:
+      case "DELTA":
         return DeltaDecompressor.INSTANCE;
 
-      case DELTADELTA:
+      case "DELTADELTA":
         return DeltaDeltaDecompressor.INSTANCE;
 
       default:
-        throw new IllegalArgumentException("Illegal decompressor name " + compressionType);
+        throw new IllegalArgumentException("Illegal decompressor name " + codec.getName());
     }
+  }
+
+  /**
+   * Convenience method to get a decompressor from a wire ID read from a segment file header.
+   *
+   * @param wireId the integer wire ID from the file header
+   * @return decompressor for the corresponding codec
+   */
+  public static ChunkDecompressor getDecompressor(int wireId) {
+    return getDecompressor(CompressionCodec.fromWireId(wireId));
   }
 }

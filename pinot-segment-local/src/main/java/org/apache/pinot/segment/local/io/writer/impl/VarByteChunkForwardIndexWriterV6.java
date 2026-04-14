@@ -20,9 +20,8 @@ package org.apache.pinot.segment.local.io.writer.impl;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.OptionalInt;
 import javax.annotation.concurrent.NotThreadSafe;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 
 
 /**
@@ -44,17 +43,10 @@ public class VarByteChunkForwardIndexWriterV6 extends VarByteChunkForwardIndexWr
 
   private final boolean _deltaEncoding;
 
-  public VarByteChunkForwardIndexWriterV6(File file, ChunkCompressionType compressionType, int chunkSize)
+  public VarByteChunkForwardIndexWriterV6(File file, CompressionCodec codec, int chunkSize)
       throws IOException {
-    super(file, compressionType, chunkSize);
-    _deltaEncoding = compressionType != ChunkCompressionType.PASS_THROUGH;
-  }
-
-  public VarByteChunkForwardIndexWriterV6(File file, ChunkCompressionType compressionType, int chunkSize,
-      OptionalInt compressionLevel)
-      throws IOException {
-    super(file, compressionType, chunkSize, compressionLevel);
-    _deltaEncoding = compressionType != ChunkCompressionType.PASS_THROUGH;
+    super(file, codec, chunkSize);
+    _deltaEncoding = !codec.equals(CompressionCodec.PASS_THROUGH);
   }
 
   @Override

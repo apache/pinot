@@ -60,6 +60,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
@@ -2174,19 +2175,20 @@ public final class TableConfigUtils {
   }
 
   private static void validateGorillaCompressionCodecIfPresent(FieldConfig fieldConfig, FieldSpec fieldSpec) {
-    if (fieldConfig.getCompressionCodec() == null) {
+    CompressionCodec codec = fieldConfig.getCompressionCodec();
+    if (codec == null) {
       return;
     }
-    switch (fieldConfig.getCompressionCodec()) {
-      case DELTA:
-      case DELTADELTA:
+    switch (codec.getName()) {
+      case "DELTA":
+      case "DELTADELTA":
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             "Compression codec %s can only be used on single-value columns, found multi-value column: %s",
-            fieldConfig.getCompressionCodec(), fieldConfig.getName());
+            codec, fieldConfig.getName());
         DataType storedType = fieldSpec.getDataType().getStoredType();
         Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
             "Compression codec %s can only be used on INT/LONG data types, found %s for column: %s",
-            fieldConfig.getCompressionCodec(), storedType, fieldConfig.getName());
+            codec, storedType, fieldConfig.getName());
         break;
       default:
         // no-op for other codecs

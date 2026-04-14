@@ -20,10 +20,9 @@ package org.apache.pinot.segment.local.io.writer.impl;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.OptionalInt;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 
 
 /**
@@ -85,15 +84,9 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 public class VarByteChunkForwardIndexWriterV5 extends VarByteChunkForwardIndexWriterV4 {
   public static final int VERSION = 5;
 
-  public VarByteChunkForwardIndexWriterV5(File file, ChunkCompressionType compressionType, int chunkSize)
+  public VarByteChunkForwardIndexWriterV5(File file, CompressionCodec codec, int chunkSize)
       throws IOException {
-    super(file, compressionType, chunkSize);
-  }
-
-  public VarByteChunkForwardIndexWriterV5(File file, ChunkCompressionType compressionType, int chunkSize,
-      OptionalInt compressionLevel)
-      throws IOException {
-    super(file, compressionType, chunkSize, compressionLevel);
+    super(file, codec, chunkSize);
   }
 
   // Override the parent class getVersion();

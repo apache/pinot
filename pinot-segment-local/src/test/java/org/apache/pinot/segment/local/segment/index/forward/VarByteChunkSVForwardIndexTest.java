@@ -32,9 +32,9 @@ import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWri
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -55,31 +55,31 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
   @Test
   public void testWithCompression()
       throws Exception {
-    test(ChunkCompressionType.SNAPPY);
+    test(CompressionCodec.SNAPPY);
   }
 
   @Test
   public void testWithoutCompression()
       throws Exception {
-    test(ChunkCompressionType.PASS_THROUGH);
+    test(CompressionCodec.PASS_THROUGH);
   }
 
   @Test
   public void testWithZstandardCompression()
       throws Exception {
-    test(ChunkCompressionType.ZSTANDARD);
+    test(CompressionCodec.ZSTANDARD);
   }
 
   @Test
   public void testWithLZ4Compression()
       throws Exception {
-    test(ChunkCompressionType.LZ4);
+    test(CompressionCodec.LZ4);
   }
 
   @Test
   public void testWithGZIPCompression()
       throws Exception {
-    test(ChunkCompressionType.GZIP);
+    test(CompressionCodec.GZIP);
   }
 
   /**
@@ -93,7 +93,7 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
    * @param compressionType Compression type
    * @throws Exception
    */
-  public void test(ChunkCompressionType compressionType)
+  public void test(CompressionCodec compressionType)
       throws Exception {
     String[] expected = new String[NUM_ENTRIES];
     Random random = new Random();
@@ -182,50 +182,50 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
   @Test
   public void testVarCharWithDifferentSizes()
       throws Exception {
-    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 10, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 10, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 10, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.LZ4, 10, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.GZIP, 10, 1000);
+    testLargeVarcharHelper(CompressionCodec.SNAPPY, 10, 1000);
+    testLargeVarcharHelper(CompressionCodec.PASS_THROUGH, 10, 1000);
+    testLargeVarcharHelper(CompressionCodec.ZSTANDARD, 10, 1000);
+    testLargeVarcharHelper(CompressionCodec.LZ4, 10, 1000);
+    testLargeVarcharHelper(CompressionCodec.GZIP, 10, 1000);
 
-    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 100, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 100, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 100, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.LZ4, 100, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.GZIP, 100, 1000);
+    testLargeVarcharHelper(CompressionCodec.SNAPPY, 100, 1000);
+    testLargeVarcharHelper(CompressionCodec.PASS_THROUGH, 100, 1000);
+    testLargeVarcharHelper(CompressionCodec.ZSTANDARD, 100, 1000);
+    testLargeVarcharHelper(CompressionCodec.LZ4, 100, 1000);
+    testLargeVarcharHelper(CompressionCodec.GZIP, 100, 1000);
 
-    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 1000, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 1000, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 1000, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.LZ4, 1000, 1000);
-    testLargeVarcharHelper(ChunkCompressionType.GZIP, 1000, 1000);
+    testLargeVarcharHelper(CompressionCodec.SNAPPY, 1000, 1000);
+    testLargeVarcharHelper(CompressionCodec.PASS_THROUGH, 1000, 1000);
+    testLargeVarcharHelper(CompressionCodec.ZSTANDARD, 1000, 1000);
+    testLargeVarcharHelper(CompressionCodec.LZ4, 1000, 1000);
+    testLargeVarcharHelper(CompressionCodec.GZIP, 1000, 1000);
 
-    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 10000, 100);
-    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 10000, 100);
-    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 10000, 100);
-    testLargeVarcharHelper(ChunkCompressionType.LZ4, 10000, 100);
-    testLargeVarcharHelper(ChunkCompressionType.GZIP, 10000, 100);
+    testLargeVarcharHelper(CompressionCodec.SNAPPY, 10000, 100);
+    testLargeVarcharHelper(CompressionCodec.PASS_THROUGH, 10000, 100);
+    testLargeVarcharHelper(CompressionCodec.ZSTANDARD, 10000, 100);
+    testLargeVarcharHelper(CompressionCodec.LZ4, 10000, 100);
+    testLargeVarcharHelper(CompressionCodec.GZIP, 10000, 100);
 
-    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 100000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 100000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 100000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.LZ4, 100000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.GZIP, 100000, 10);
+    testLargeVarcharHelper(CompressionCodec.SNAPPY, 100000, 10);
+    testLargeVarcharHelper(CompressionCodec.PASS_THROUGH, 100000, 10);
+    testLargeVarcharHelper(CompressionCodec.ZSTANDARD, 100000, 10);
+    testLargeVarcharHelper(CompressionCodec.LZ4, 100000, 10);
+    testLargeVarcharHelper(CompressionCodec.GZIP, 100000, 10);
 
-    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 1000000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 1000000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 1000000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.LZ4, 1000000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.GZIP, 1000000, 10);
+    testLargeVarcharHelper(CompressionCodec.SNAPPY, 1000000, 10);
+    testLargeVarcharHelper(CompressionCodec.PASS_THROUGH, 1000000, 10);
+    testLargeVarcharHelper(CompressionCodec.ZSTANDARD, 1000000, 10);
+    testLargeVarcharHelper(CompressionCodec.LZ4, 1000000, 10);
+    testLargeVarcharHelper(CompressionCodec.GZIP, 1000000, 10);
 
-    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 2000000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 2000000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 2000000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.LZ4, 2000000, 10);
-    testLargeVarcharHelper(ChunkCompressionType.GZIP, 2000000, 10);
+    testLargeVarcharHelper(CompressionCodec.SNAPPY, 2000000, 10);
+    testLargeVarcharHelper(CompressionCodec.PASS_THROUGH, 2000000, 10);
+    testLargeVarcharHelper(CompressionCodec.ZSTANDARD, 2000000, 10);
+    testLargeVarcharHelper(CompressionCodec.LZ4, 2000000, 10);
+    testLargeVarcharHelper(CompressionCodec.GZIP, 2000000, 10);
   }
 
-  private void testLargeVarcharHelper(ChunkCompressionType compressionType, int numChars, int numDocs)
+  private void testLargeVarcharHelper(CompressionCodec compressionType, int numChars, int numDocs)
       throws Exception {
     String[] expected = new String[numDocs];
     Random random = new Random();
@@ -288,7 +288,7 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
     int docSize = 21475;
     byte[] value = StringUtils.repeat("a", docSize).getBytes(UTF_8);
     try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file,
-        ChunkCompressionType.PASS_THROUGH, 100_001, 1000, docSize, 2)) {
+        CompressionCodec.PASS_THROUGH, 100_001, 1000, docSize, 2)) {
       try {
         for (int i = 0; i < 100_000; i++) {
           writer.putBytes(value);

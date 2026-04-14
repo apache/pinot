@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIn
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -83,7 +84,7 @@ public class CLPForwardIndexCreatorTest implements PinotBuffersAfterMethodCheckR
             null, null, null, null, null, null, null, null, false, null, null, null, null);
     List<FieldConfig> fieldConfigList = new ArrayList<>();
     fieldConfigList.add(new FieldConfig("column1", FieldConfig.EncodingType.RAW, Collections.EMPTY_LIST,
-        FieldConfig.CompressionCodec.CLP, Collections.EMPTY_MAP));
+        CompressionCodec.CLP, Collections.EMPTY_MAP));
     tableConfig.setFieldConfigList(fieldConfigList);
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(tableConfig, schema, null);
     StringColumnPreIndexStatsCollector statsCollector =

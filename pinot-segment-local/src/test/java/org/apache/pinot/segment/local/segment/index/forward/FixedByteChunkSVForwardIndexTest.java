@@ -29,9 +29,9 @@ import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexW
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -55,15 +55,15 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
 
   @DataProvider(name = "combinations")
   public static Object[][] combinations() {
-    return Arrays.stream(ChunkCompressionType.values())
-        .filter(t -> t != ChunkCompressionType.DELTA && t != ChunkCompressionType.DELTADELTA)
+    return Arrays.stream(new CompressionCodec[]{CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP})
+        .filter(t -> t != CompressionCodec.DELTA && t != CompressionCodec.DELTADELTA)
         .flatMap(chunkCompressionType -> IntStream.of(2, 3, 4)
             .mapToObj(version -> new Object[]{chunkCompressionType, version}))
         .toArray(Object[][]::new);
   }
 
   @Test(dataProvider = "combinations")
-  public void testInt(ChunkCompressionType compressionType, int version)
+  public void testInt(CompressionCodec compressionType, int version)
       throws Exception {
     int[] expected = new int[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
@@ -106,7 +106,7 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
       Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
       Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
       // Validate byte range provider behaviour
-      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+      if (compressionType == CompressionCodec.PASS_THROUGH) {
         // For pass through compression, the buffer is fixed offset mapping type
         Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
         Assert.assertEquals(fourByteOffsetReader.getDocLength(), Integer.BYTES);
@@ -126,7 +126,7 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
   }
 
   @Test(dataProvider = "combinations")
-  public void testLong(ChunkCompressionType compressionType, int version)
+  public void testLong(CompressionCodec compressionType, int version)
       throws Exception {
     long[] expected = new long[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
@@ -168,7 +168,7 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
       // Validate byte range provider behaviour
       Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
       Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
-      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+      if (compressionType == CompressionCodec.PASS_THROUGH) {
         // For pass through compression, the buffer is fixed offset mapping type
         Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
         Assert.assertEquals(fourByteOffsetReader.getDocLength(), Long.BYTES);
@@ -188,7 +188,7 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
   }
 
   @Test(dataProvider = "combinations")
-  public void testFloat(ChunkCompressionType compressionType, int version)
+  public void testFloat(CompressionCodec compressionType, int version)
       throws Exception {
     float[] expected = new float[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
@@ -229,7 +229,7 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
       // Validate byte range provider behaviour
       Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
       Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
-      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+      if (compressionType == CompressionCodec.PASS_THROUGH) {
         // For pass through compression, the buffer is fixed offset mapping type
         Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
         Assert.assertEquals(fourByteOffsetReader.getDocLength(), Float.BYTES);
@@ -249,7 +249,7 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
   }
 
   @Test(dataProvider = "combinations")
-  public void testDouble(ChunkCompressionType compressionType, int version)
+  public void testDouble(CompressionCodec compressionType, int version)
       throws Exception {
     double[] expected = new double[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
@@ -291,7 +291,7 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
       // Validate byte range provider behaviour
       Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
       Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
-      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+      if (compressionType == CompressionCodec.PASS_THROUGH) {
         // For pass through compression, the buffer is fixed offset mapping type
         Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
         Assert.assertEquals(fourByteOffsetReader.getDocLength(), Double.BYTES);
@@ -307,7 +307,7 @@ public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethod
 
       Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
       Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
-      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+      if (compressionType == CompressionCodec.PASS_THROUGH) {
         // For pass through compression, the buffer is fixed offset mapping type
         Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
         Assert.assertEquals(fourByteOffsetReader.getDocLength(), Double.BYTES);

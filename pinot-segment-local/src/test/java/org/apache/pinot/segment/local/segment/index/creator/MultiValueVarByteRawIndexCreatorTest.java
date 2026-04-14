@@ -33,11 +33,11 @@ import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -60,8 +60,8 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
 
   @DataProvider
   public Object[][] params() {
-    return Arrays.stream(ChunkCompressionType.values())
-        .filter(t -> t != ChunkCompressionType.DELTA && t != ChunkCompressionType.DELTADELTA)
+    return Arrays.stream(new CompressionCodec[]{CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP})
+        .filter(t -> t != CompressionCodec.DELTA && t != CompressionCodec.DELTADELTA)
         .flatMap(chunkCompressionType -> IntStream.rangeClosed(2, 6)
             .boxed()
             .flatMap(writerVersion -> IntStream.of(10, 100)
@@ -81,7 +81,7 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testOverflowElementCount()
       throws IOException {
-    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, "column", 10000,
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, CompressionCodec.PASS_THROUGH, "column", 10000,
         DataType.STRING, 1, Integer.MAX_VALUE / 2);
   }
 
@@ -90,13 +90,13 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
       throws IOException {
     // Contrived to produce a positive chunk size > Integer.MAX_VALUE but not fail num elements checks
     // This check only applies to v2/v3
-    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, "column", 10000,
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, CompressionCodec.PASS_THROUGH, "column", 10000,
         DataType.STRING, 2, Integer.MAX_VALUE - Integer.BYTES - 2 * Integer.BYTES, 2,
         ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
   @Test(dataProvider = "params")
-  public void testMVString(ChunkCompressionType compressionType, boolean useFullSize, int writerVersion, int maxLength,
+  public void testMVString(CompressionCodec compressionType, boolean useFullSize, int writerVersion, int maxLength,
       int maxNumEntries)
       throws IOException {
     String column = "testCol-" + UUID.randomUUID();
@@ -149,7 +149,7 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
   }
 
   @Test(dataProvider = "params")
-  public void testMVBytes(ChunkCompressionType compressionType, boolean useFullSize, int writerVersion, int maxLength,
+  public void testMVBytes(CompressionCodec compressionType, boolean useFullSize, int writerVersion, int maxLength,
       int maxNumEntries)
       throws IOException {
     String column = "testCol-" + UUID.randomUUID();

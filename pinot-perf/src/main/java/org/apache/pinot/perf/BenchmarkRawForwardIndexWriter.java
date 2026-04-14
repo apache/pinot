@@ -27,7 +27,7 @@ import java.util.function.LongSupplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Level;
@@ -87,7 +87,8 @@ public class BenchmarkRawForwardIndexWriter {
   @Param({"UNIFORM(1000,10000)", "EXP(0.001)"})
   String _distribution;
   @Param({"SNAPPY", "LZ4", "ZSTANDARD"})
-  ChunkCompressionType _chunkCompressionType;
+  String _compressionCodecName;
+  CompressionCodec _chunkCompressionType;
 
   @Param("1048576")
   int _maxChunkSize;
@@ -96,6 +97,7 @@ public class BenchmarkRawForwardIndexWriter {
   @Setup(Level.Trial)
   public void setup()
       throws IOException {
+    _chunkCompressionType = CompressionCodec.of(_compressionCodecName);
     FileUtils.forceMkdir(TARGET_DIR);
     SplittableRandom random = new SplittableRandom(42);
     LongSupplier supplier = Distribution.createSupplier(42, _distribution);

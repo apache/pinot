@@ -29,8 +29,8 @@ import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV6;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -49,7 +49,7 @@ public class VarByteChunkV6Test extends VarByteChunkV5Test {
   }
 
   @Override
-  protected VarByteChunkWriter createWriter(File file, ChunkCompressionType compressionType, int chunkSize)
+  protected VarByteChunkWriter createWriter(File file, CompressionCodec compressionType, int chunkSize)
       throws IOException {
     return new VarByteChunkForwardIndexWriterV6(file, compressionType, chunkSize);
   }
@@ -82,13 +82,13 @@ public class VarByteChunkV6Test extends VarByteChunkV5Test {
     FileUtils.deleteQuietly(v6FwdIndexFile);
 
     try (MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(v4FwdIndexFile,
-        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, maxMVRowSize, true, 4)) {
+        CompressionCodec.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, maxMVRowSize, true, 4)) {
       for (long[] mvRow : inputData) {
         creator.putLongMV(mvRow);
       }
     }
     try (MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(v6FwdIndexFile,
-        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, maxMVRowSize, true, 6)) {
+        CompressionCodec.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, maxMVRowSize, true, 6)) {
       for (long[] mvRow : inputData) {
         creator.putLongMV(mvRow);
       }

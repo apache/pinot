@@ -35,6 +35,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -110,7 +111,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     List<FieldConfig> fieldConfigs = new ArrayList<>(noDictionaryColumns.size());
     for (String column : noDictionaryColumns) {
       fieldConfigs.add(
-          new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), FieldConfig.CompressionCodec.SNAPPY, null));
+          new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.SNAPPY, null));
     }
     TableConfig tableConfig = createTableConfig(noDictionaryColumns, invertedIndexColumns, List.of(), fieldConfigs);
 
@@ -639,9 +640,9 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     List<String> rangeIndexColumns = List.of("column9", "column10");
     List<FieldConfig> fieldConfigs = new ArrayList<>(noDictionaryColumns.size());
     for (String column : noDictionaryColumns) {
-      FieldConfig.CompressionCodec compressionCodec = FieldConfig.CompressionCodec.SNAPPY;
+      CompressionCodec compressionCodec = CompressionCodec.SNAPPY;
       if (column.equals("column1")) {
-        compressionCodec = FieldConfig.CompressionCodec.ZSTANDARD;
+        compressionCodec = CompressionCodec.ZSTANDARD;
       }
       fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), compressionCodec, null));
     }

@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -58,11 +58,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   DataType getStoredType();
 
   /**
-   * Returns the compression type (if valid). Only valid for RAW forward index columns implemented in
+   * Returns the compression codec (if valid). Only valid for RAW forward index columns implemented in
    * BaseChunkForwardIndexReader.
    */
   @Nullable
-  default ChunkCompressionType getCompressionType() {
+  default CompressionCodec getCompressionCodec() {
     return null;
   }
 

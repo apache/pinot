@@ -45,7 +45,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
-import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -233,7 +233,7 @@ public class StarTreeBuilderUtilsTest {
     // Change compression codec
     starTreeIndexConfig = new StarTreeIndexConfig(List.of("col1"), null, null, List.of(
         new StarTreeAggregationConfig("col2", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16),
-            FieldConfig.CompressionCodec.LZ4, null, null, null, null)), 100);
+            CompressionCodec.LZ4, null, null, null, null)), 100);
     assertTrue(StarTreeBuilderUtils.shouldModifyExistingStarTrees(
         List.of(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig)), List.of(existingStarTreeMetadata)));
 

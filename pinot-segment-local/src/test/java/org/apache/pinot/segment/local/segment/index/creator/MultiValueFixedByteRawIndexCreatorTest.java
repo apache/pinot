@@ -34,10 +34,10 @@ import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -58,8 +58,8 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
 
   @DataProvider(name = "compressionTypes")
   public Object[][] compressionTypes() {
-    return Arrays.stream(ChunkCompressionType.values())
-        .filter(t -> t != ChunkCompressionType.DELTA && t != ChunkCompressionType.DELTADELTA)
+    return Arrays.stream(new CompressionCodec[]{CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP})
+        .filter(t -> t != CompressionCodec.DELTA && t != CompressionCodec.DELTADELTA)
         .flatMap(ct -> IntStream.rangeClosed(2, 6).boxed().map(writerVersion -> new Object[]{ct, writerVersion}))
         .toArray(Object[][]::new);
   }
@@ -80,7 +80,7 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
   }
 
   @Test(dataProvider = "compressionTypes")
-  public void testMVInt(ChunkCompressionType compressionType, int writerVersion)
+  public void testMVInt(CompressionCodec compressionType, int writerVersion)
       throws IOException {
     // This tests varying lengths of MV rows
     testMV(DataType.INT, ints(false), x -> x.length, int[]::new, MultiValueFixedByteRawIndexCreator::putIntMV,
@@ -98,7 +98,7 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
   }
 
   @Test(dataProvider = "compressionTypes")
-  public void testMVLong(ChunkCompressionType compressionType, int writerVersion)
+  public void testMVLong(CompressionCodec compressionType, int writerVersion)
       throws IOException {
     // This tests varying lengths of MV rows
     testMV(DataType.LONG, longs(false), x -> x.length, long[]::new, MultiValueFixedByteRawIndexCreator::putLongMV,
@@ -116,7 +116,7 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
   }
 
   @Test(dataProvider = "compressionTypes")
-  public void testMVFloat(ChunkCompressionType compressionType, int writerVersion)
+  public void testMVFloat(CompressionCodec compressionType, int writerVersion)
       throws IOException {
     // This tests varying lengths of MV rows
     testMV(DataType.FLOAT, floats(false), x -> x.length, float[]::new, MultiValueFixedByteRawIndexCreator::putFloatMV,
@@ -134,7 +134,7 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
   }
 
   @Test(dataProvider = "compressionTypes")
-  public void testMVDouble(ChunkCompressionType compressionType, int writerVersion)
+  public void testMVDouble(CompressionCodec compressionType, int writerVersion)
       throws IOException {
     // This tests varying lengths of MV rows
     testMV(DataType.DOUBLE, doubles(false), x -> x.length, double[]::new,
@@ -151,7 +151,7 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
         }, compressionType, writerVersion);
   }
 
-  public MultiValueFixedByteRawIndexCreator getMultiValueFixedByteRawIndexCreator(ChunkCompressionType compressionType,
+  public MultiValueFixedByteRawIndexCreator getMultiValueFixedByteRawIndexCreator(CompressionCodec compressionType,
       String column, int numDocs, DataType dataType, int maxElements, int writerVersion)
       throws IOException {
     return new MultiValueFixedByteRawIndexCreator(new File(_outputDir), compressionType, column, numDocs, dataType,
@@ -159,7 +159,7 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
   }
 
   public <T> void testMV(DataType dataType, List<T> inputs, ToIntFunction<T> sizeof, IntFunction<T> constructor,
-      Injector<T> injector, Extractor<T> extractor, ChunkCompressionType compressionType, int writerVersion)
+      Injector<T> injector, Extractor<T> extractor, CompressionCodec compressionType, int writerVersion)
       throws IOException {
     String column = "testCol_" + dataType;
     int numDocs = inputs.size();

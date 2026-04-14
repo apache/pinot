@@ -21,8 +21,8 @@ package org.apache.pinot.segment.local.io.compression;
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 
 
 /**
@@ -77,7 +77,7 @@ class ZstandardCompressor implements ChunkCompressor {
   }
 
   @Override
-  public ChunkCompressionType compressionType() {
-    return ChunkCompressionType.ZSTANDARD;
+  public CompressionCodec compressionCodec() {
+    return CompressionCodec.ZSTANDARD;
   }
 }

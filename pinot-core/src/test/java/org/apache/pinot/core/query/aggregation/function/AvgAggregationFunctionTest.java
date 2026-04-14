@@ -27,7 +27,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec.PASS_THROUGH;
+import static org.apache.pinot.spi.config.table.CompressionCodec.PASS_THROUGH;
 
 
 public class AvgAggregationFunctionTest extends AbstractAggregationFunctionTest {

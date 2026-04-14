@@ -25,9 +25,9 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -61,13 +61,13 @@ public class BenchmarkNoDictionaryStringCompression {
 
   private static final int MAX_CHARS_IN_LINE = 30;
   private static final Random RANDOM = new Random();
-  private static final ChunkCompressor LZ4_COMPRESSOR = ChunkCompressorFactory.getCompressor(ChunkCompressionType.LZ4);
+  private static final ChunkCompressor LZ4_COMPRESSOR = ChunkCompressorFactory.getCompressor(CompressionCodec.LZ4);
   private static final ChunkDecompressor LZ4_DECOMPRESSOR =
-      ChunkCompressorFactory.getDecompressor(ChunkCompressionType.LZ4);
+      ChunkCompressorFactory.getDecompressor(CompressionCodec.LZ4);
   private static final ChunkCompressor GZIP_COMPRESSOR =
-      ChunkCompressorFactory.getCompressor(ChunkCompressionType.GZIP);
+      ChunkCompressorFactory.getCompressor(CompressionCodec.GZIP);
   private static final ChunkDecompressor GZIP_DECOMPRESSOR =
-      ChunkCompressorFactory.getDecompressor(ChunkCompressionType.GZIP);
+      ChunkCompressorFactory.getDecompressor(CompressionCodec.GZIP);
 
   @State(Scope.Thread)
   public static class CompressionBuffers {

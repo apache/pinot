@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
@@ -78,27 +77,25 @@ public class FieldConfig extends BaseJsonConfig {
   private final JsonNode _indexes;
   private final JsonNode _tierOverwrites;
   private final CompressionCodec _compressionCodec;
-  @JsonIgnore
-  private final CodecSpec _codecSpec;
   private final Map<String, String> _properties;
   private final TimestampConfig _timestampConfig;
 
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
       @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
-    this(name, encodingType, indexType, null, compressionCodec, null, null, null, properties, null);
+    this(name, encodingType, indexType, null, compressionCodec, null, null, properties, null);
   }
 
   public FieldConfig(String name, EncodingType encodingType, @Nullable List<IndexType> indexTypes,
       @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
-    this(name, encodingType, null, indexTypes, compressionCodec, null, null, null, properties, null);
+    this(name, encodingType, null, indexTypes, compressionCodec, null, null, properties, null);
   }
 
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
       @Nullable List<IndexType> indexTypes, @Nullable CompressionCodec compressionCodec,
       @Nullable TimestampConfig timestampConfig, @Nullable Map<String, String> properties) {
-    this(name, encodingType, indexType, indexTypes, compressionCodec, null, timestampConfig, null, properties, null);
+    this(name, encodingType, indexType, indexTypes, compressionCodec, timestampConfig, null, properties, null);
   }
 
   @JsonCreator
@@ -116,18 +113,7 @@ public class FieldConfig extends BaseJsonConfig {
     _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
     _indexTypes =
         indexTypes != null ? indexTypes : (indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
-    if (compressionCodec != null) {
-      CodecSpec spec = CodecSpecParser.parse(compressionCodec);
-      _codecSpec = spec;
-      try {
-        _compressionCodec = CompressionCodec.valueOf(spec.getName());
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException("Unknown compression codec: " + compressionCodec, e);
-      }
-    } else {
-      _codecSpec = null;
-      _compressionCodec = null;
-    }
+    _compressionCodec = compressionCodec != null ? CompressionCodec.fromString(compressionCodec) : null;
     _timestampConfig = timestampConfig;
     _properties = properties;
     _indexes = indexes == null ? NullNode.getInstance() : indexes;
@@ -136,11 +122,11 @@ public class FieldConfig extends BaseJsonConfig {
 
   /**
    * Internal constructor used by the Builder and deprecated convenience constructors that already have a resolved
-   * {@link CompressionCodec} enum value.
+   * {@link CompressionCodec} value.
    */
   private FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
       @Nullable List<IndexType> indexTypes, @Nullable CompressionCodec compressionCodec,
-      @Nullable CodecSpec codecSpec, @Nullable TimestampConfig timestampConfig, @Nullable JsonNode indexes,
+      @Nullable TimestampConfig timestampConfig, @Nullable JsonNode indexes,
       @Nullable Map<String, String> properties, @Nullable JsonNode tierOverwrites) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
@@ -148,7 +134,6 @@ public class FieldConfig extends BaseJsonConfig {
     _indexTypes =
         indexTypes != null ? indexTypes : (indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
     _compressionCodec = compressionCodec;
-    _codecSpec = codecSpec;
     _timestampConfig = timestampConfig;
     _properties = properties;
     _indexes = indexes == null ? NullNode.getInstance() : indexes;
@@ -164,46 +149,6 @@ public class FieldConfig extends BaseJsonConfig {
   // NOTE: TIMESTAMP is ignored. In order to create TIMESTAMP index, configure 'timestampConfig' instead.
   public enum IndexType {
     INVERTED, SORTED, TEXT, FST, IFST, H3, JSON, TIMESTAMP, VECTOR, RANGE
-  }
-
-  public enum CompressionCodec {
-    //@formatter:off
-    PASS_THROUGH(true, false),
-    SNAPPY(true, false),
-    ZSTANDARD(true, false),
-    LZ4(true, false),
-    GZIP(true, false),
-
-    // For MV dictionary encoded forward index, add a second level dictionary encoding for the multi-value entries
-    MV_ENTRY_DICT(false, true),
-
-    // CLP is a special type of compression codec that isn't generally applicable to all RAW columns and has a special
-    // handling for log lines (see {@link CLPForwardIndexCreatorV1} and {@link CLPForwardIndexCreatorV2)
-    CLP(false, false),
-    CLPV2(false, false),
-    CLPV2_ZSTD(false, false),
-    CLPV2_LZ4(false, false),
-
-    DELTA(false, false),
-    DELTADELTA(false, false);
-
-    //@formatter:on
-
-    private final boolean _applicableToRawIndex;
-    private final boolean _applicableToDictEncodedIndex;
-
-    CompressionCodec(boolean applicableToRawIndex, boolean applicableToDictEncodedIndex) {
-      _applicableToRawIndex = applicableToRawIndex;
-      _applicableToDictEncodedIndex = applicableToDictEncodedIndex;
-    }
-
-    public boolean isApplicableToRawIndex() {
-      return _applicableToRawIndex;
-    }
-
-    public boolean isApplicableToDictEncodedIndex() {
-      return _applicableToDictEncodedIndex;
-    }
   }
 
   public String getName() {
@@ -232,34 +177,10 @@ public class FieldConfig extends BaseJsonConfig {
     return _tierOverwrites;
   }
 
-  @JsonIgnore
+  @JsonProperty("compressionCodec")
   @Nullable
   public CompressionCodec getCompressionCodec() {
     return _compressionCodec;
-  }
-
-  /**
-   * Returns the codec specification string for JSON serialization. When a compression level is
-   * configured (e.g. {@code "ZSTANDARD(3)"}), this returns the full spec string to preserve
-   * the level on round-trip. Otherwise returns the plain codec name.
-   */
-  @JsonProperty("compressionCodec")
-  @Nullable
-  public String getCompressionCodecString() {
-    if (_codecSpec != null) {
-      return _codecSpec.toString();
-    }
-    return _compressionCodec != null ? _compressionCodec.name() : null;
-  }
-
-  /**
-   * Returns the parsed {@link CodecSpec} that captures both the codec name and optional parameters
-   * (e.g. compression level). May be {@code null} if no compression codec was configured.
-   */
-  @JsonIgnore
-  @Nullable
-  public CodecSpec getCodecSpec() {
-    return _codecSpec;
   }
 
   @Nullable
@@ -278,7 +199,6 @@ public class FieldConfig extends BaseJsonConfig {
     private List<IndexType> _indexTypes;
     private JsonNode _indexes;
     private CompressionCodec _compressionCodec;
-    private CodecSpec _codecSpec;
     private Map<String, String> _properties;
     private TimestampConfig _timestampConfig;
     private JsonNode _tierOverwrites;
@@ -293,7 +213,6 @@ public class FieldConfig extends BaseJsonConfig {
       _indexTypes = other._indexTypes;
       _indexes = other._indexes;
       _compressionCodec = other._compressionCodec;
-      _codecSpec = other._codecSpec;
       _properties = other._properties;
       _timestampConfig = other._timestampConfig;
       _tierOverwrites = other._tierOverwrites;
@@ -324,11 +243,6 @@ public class FieldConfig extends BaseJsonConfig {
       return this;
     }
 
-    public Builder withCodecSpec(CodecSpec codecSpec) {
-      _codecSpec = codecSpec;
-      return this;
-    }
-
     public Builder withProperties(Map<String, String> properties) {
       _properties = properties;
       return this;
@@ -345,7 +259,7 @@ public class FieldConfig extends BaseJsonConfig {
     }
 
     public FieldConfig build() {
-      return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _codecSpec, _timestampConfig,
+      return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig,
           _indexes, _properties, _tierOverwrites);
     }
   }

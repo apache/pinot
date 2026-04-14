@@ -45,7 +45,6 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
@@ -59,8 +58,8 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -231,7 +230,7 @@ public class ForwardIndexHandlerTest {
       List.of(DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER, DIM_RAW_MV_FORWARD_INDEX_DISABLED_INTEGER);
 
   private static final List<CompressionCodec> RAW_COMPRESSION_TYPES =
-      Arrays.stream(CompressionCodec.values()).filter(CompressionCodec::isApplicableToRawIndex)
+      Arrays.stream(new CompressionCodec[]{CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP}).filter(CompressionCodec::isApplicableToRawIndex)
           .collect(Collectors.toList());
 
   //@formatter:off
@@ -702,7 +701,7 @@ public class ForwardIndexHandlerTest {
       String column = RAW_COLUMNS_WITH_FORWARD_INDEX.get(RANDOM.nextInt(RAW_COLUMNS_WITH_FORWARD_INDEX.size()));
       CompressionCodec compressionCodec = _fieldConfigMap.get(column).getCompressionCodec();
       CompressionCodec newCompressionCodec = null;
-      for (CompressionCodec codec : CompressionCodec.values()) {
+      for (CompressionCodec codec : new CompressionCodec[]{CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP}) {
         if (compressionCodec != codec) {
           newCompressionCodec = codec;
           break;
@@ -2132,10 +2131,10 @@ public class ForwardIndexHandlerTest {
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
     FieldIndexConfigs fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
     ForwardIndexReader<?> fwdIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata);
-    ChunkCompressionType fwdIndexCompressionType = fwdIndexReader.getCompressionType();
+    CompressionCodec fwdIndexCompressionType = fwdIndexReader.getCompressionCodec();
     if (expectedCompressionType != null) {
       assertNotNull(fwdIndexCompressionType);
-      assertEquals(fwdIndexCompressionType.name(), expectedCompressionType.name());
+      assertEquals(fwdIndexCompressionType.getName(), expectedCompressionType.getName());
     } else {
       assertNull(fwdIndexCompressionType);
     }

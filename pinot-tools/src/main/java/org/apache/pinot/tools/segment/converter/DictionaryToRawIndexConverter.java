@@ -37,7 +37,6 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -45,6 +44,7 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -312,7 +312,7 @@ public class DictionaryToRawIndexConverter {
       return;
     }
 
-    ChunkCompressionType compressionType = ChunkCompressionType.valueOf(_compressionType);
+    CompressionCodec compressionType = CompressionCodec.of(_compressionType.toUpperCase());
     DataType storedType = dictionary.getValueType();
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
     int lengthOfLongestEntry = !storedType.isFixedWidth() ? getLengthOfLongestEntry(dictionary) : -1;

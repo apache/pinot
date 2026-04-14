@@ -34,8 +34,8 @@ import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -67,8 +67,8 @@ public class VarByteChunkSVForwardIndexWriterTest implements PinotBuffersAfterMe
     int[] numbersOfDocs = {10, 1000};
     int[][] entryLengths = {{1, 1}, {0, 10}, {0, 100}, {100, 100}, {900, 1000}};
     int[] versions = {2, 3};
-    return Arrays.stream(ChunkCompressionType.values())
-        .filter(t -> t != ChunkCompressionType.DELTA && t != ChunkCompressionType.DELTADELTA)
+    return Arrays.stream(new CompressionCodec[]{CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4, CompressionCodec.LZ4_LENGTH_PREFIXED, CompressionCodec.GZIP})
+        .filter(t -> t != CompressionCodec.DELTA && t != CompressionCodec.DELTADELTA)
         .flatMap(chunkCompressionType -> IntStream.of(versions).boxed()
         .flatMap(version -> IntStream.of(numbersOfDocs).boxed().flatMap(
             totalDocs -> IntStream.of(numDocsPerChunks).boxed()
@@ -78,7 +78,7 @@ public class VarByteChunkSVForwardIndexWriterTest implements PinotBuffersAfterMe
   }
 
   @Test(dataProvider = "params")
-  public void testPutStrings(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk, int[] lengths,
+  public void testPutStrings(CompressionCodec compressionType, int totalDocs, int numDocsPerChunk, int[] lengths,
       int version)
       throws IOException {
     String column = "testCol-" + UUID.randomUUID();
@@ -113,7 +113,7 @@ public class VarByteChunkSVForwardIndexWriterTest implements PinotBuffersAfterMe
   }
 
   @Test(dataProvider = "params")
-  public void testPutBytes(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk, int[] lengths,
+  public void testPutBytes(CompressionCodec compressionType, int totalDocs, int numDocsPerChunk, int[] lengths,
       int version)
       throws IOException {
     String column = "testCol-" + UUID.randomUUID();

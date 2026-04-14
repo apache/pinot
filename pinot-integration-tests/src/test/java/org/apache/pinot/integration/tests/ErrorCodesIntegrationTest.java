@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -112,7 +113,7 @@ public abstract class ErrorCodesIntegrationTest extends BaseClusterIntegrationTe
   protected List<FieldConfig> getFieldConfigs() {
     return Collections.singletonList(
         new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
-            FieldConfig.CompressionCodec.MV_ENTRY_DICT, null));
+            CompressionCodec.MV_ENTRY_DICT, null));
   }
 
   @Test

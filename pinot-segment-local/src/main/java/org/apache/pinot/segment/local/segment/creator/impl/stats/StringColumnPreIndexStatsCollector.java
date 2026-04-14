@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
-import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -45,7 +45,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
-    if (_fieldConfig != null && _fieldConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+    if (_fieldConfig != null && CompressionCodec.CLP.equals(_fieldConfig.getCompressionCodec())) {
       _clpStatsCollector = new CLPStatsCollector();
     }
   }

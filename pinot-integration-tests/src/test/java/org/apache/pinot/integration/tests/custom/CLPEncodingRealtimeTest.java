@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -35,8 +36,8 @@ import org.testng.annotations.Test;
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class CLPEncodingRealtimeTest extends CustomDataQueryClusterIntegrationTest {
 
-  private final FieldConfig.CompressionCodec _selectedCompressionCodec =
-      RANDOM.nextBoolean() ? FieldConfig.CompressionCodec.CLP : FieldConfig.CompressionCodec.CLPV2;
+  private final CompressionCodec _selectedCompressionCodec =
+      RANDOM.nextBoolean() ? CompressionCodec.CLP : CompressionCodec.CLPV2;
 
   @Override
   public String getTableName() {

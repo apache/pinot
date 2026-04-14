@@ -21,8 +21,8 @@ package org.apache.pinot.segment.local.io.compression;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.zip.Deflater;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 
 
 /**
@@ -69,8 +69,8 @@ class GzipCompressor implements ChunkCompressor {
   }
 
   @Override
-  public ChunkCompressionType compressionType() {
-    return ChunkCompressionType.GZIP;
+  public CompressionCodec compressionCodec() {
+    return CompressionCodec.GZIP;
   }
 
   @Override

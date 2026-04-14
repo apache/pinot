@@ -21,9 +21,9 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -55,12 +55,12 @@ public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexRe
 
   @Override
   public ReaderContext createContext() {
-    if (_chunkCompressionType == ChunkCompressionType.PASS_THROUGH) {
+    if (_compressionCodec.equals(CompressionCodec.PASS_THROUGH)) {
       // No compression — V6 writes V4 offsets directly, so reuse V4's uncompressed context
       return new UncompressedReaderContext(_chunks, _metadata, _chunksStartOffset);
     }
     return new V6CompressedReaderContext(_metadata, _chunks, _chunksStartOffset, _chunkDecompressor,
-        _chunkCompressionType, _targetDecompressedChunkSize);
+        _compressionCodec, _targetDecompressedChunkSize);
   }
 
   /**
@@ -86,8 +86,8 @@ public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexRe
   private static final class V6CompressedReaderContext extends CompressedReaderContext {
 
     V6CompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset,
-        ChunkDecompressor chunkDecompressor, ChunkCompressionType chunkCompressionType, int targetChunkSize) {
-      super(metadata, chunks, chunkStartOffset, chunkDecompressor, chunkCompressionType, targetChunkSize);
+        ChunkDecompressor chunkDecompressor, CompressionCodec compressionCodec, int targetChunkSize) {
+      super(metadata, chunks, chunkStartOffset, chunkDecompressor, compressionCodec, targetChunkSize);
     }
 
     @Override
