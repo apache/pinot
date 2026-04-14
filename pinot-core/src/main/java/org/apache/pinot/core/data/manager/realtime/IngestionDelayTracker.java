@@ -388,10 +388,19 @@ public class IngestionDelayTracker {
       _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
           ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getLatestPartitionOffset(partitionId));
     }
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
-        () -> getPartitionIngestionDelayMs(partitionId));
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> getPartitionEndToEndIngestionDelayMs(partitionId));
+    IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
+    @Nullable String streamTopicName = ingestionInfo != null ? ingestionInfo._streamTopicName : null;
+    if (StringUtils.isNotBlank(streamTopicName)) {
+      _serverMetrics.setOrUpdatePartitionGaugeForStreamTopic(_metricName, streamTopicName, partitionId,
+          ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelayMs(partitionId));
+      _serverMetrics.setOrUpdatePartitionGaugeForStreamTopic(_metricName, streamTopicName, partitionId,
+          ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> getPartitionEndToEndIngestionDelayMs(partitionId));
+    } else {
+      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
+          () -> getPartitionIngestionDelayMs(partitionId));
+      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
+          ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> getPartitionEndToEndIngestionDelayMs(partitionId));
+    }
     _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
         ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS, () -> getPartitionIngestionReportingStatus(partitionId));
 
