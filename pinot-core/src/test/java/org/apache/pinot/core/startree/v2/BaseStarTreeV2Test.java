@@ -493,16 +493,11 @@ abstract class BaseStarTreeV2Test<R, A> {
   /**
    * Can be overridden to force the compression codec.
    */
-  private static final CompressionCodec[] RAW_INDEX_CODECS = {
-      CompressionCodec.PASS_THROUGH, CompressionCodec.SNAPPY, CompressionCodec.ZSTANDARD, CompressionCodec.LZ4,
-      CompressionCodec.GZIP
-  };
-
   @Nullable
   CompressionCodec getCompressionCodec() {
     // Randomly return a raw-index-applicable codec or null (for dictionary-encoded)
     if (RANDOM.nextBoolean()) {
-      return RAW_INDEX_CODECS[RANDOM.nextInt(RAW_INDEX_CODECS.length)];
+      return CompressionCodec.RAW_CODECS[RANDOM.nextInt(CompressionCodec.RAW_CODECS.length)];
     }
     return null;
   }

@@ -96,6 +96,11 @@ public final class CompressionCodec {
   // Wire-format only: used in segment file headers but not as a user-facing config value
   public static final CompressionCodec LZ4_LENGTH_PREFIXED = register("LZ4_LENGTH_PREFIXED", true, false);
 
+  /**
+   * All well-known codecs applicable to raw (non-dictionary-encoded) forward indexes.
+   */
+  public static final CompressionCodec[] RAW_CODECS = {PASS_THROUGH, SNAPPY, ZSTANDARD, LZ4, GZIP};
+
   // ---------------------------------------------------------------------------
   // Wire format: stable integer IDs for segment file headers (must never change)
   // ---------------------------------------------------------------------------
