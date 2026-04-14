@@ -28,7 +28,7 @@ import org.apache.pinot.segment.spi.Constants;
 /**
  * Aggregator for merging serialized TDigest sketches during segment processing
  * (e.g., MergeAndRollup). Handles both {@code PERCENTILETDIGEST} and
- * {@code PERCENTILERAWTDIGEST} aggregation types```
+ * {@code PERCENTILERAWTDIGEST} aggregation types
  */
 public class PercentileTDigestAggregator implements ValueAggregator {
 
