@@ -66,6 +66,10 @@ public class SumBigDecimalWindowValueAggregator implements WindowValueAggregator
     if (value instanceof BigDecimal) {
       return (BigDecimal) value;
     }
-    return BigDecimal.valueOf(((Number) value).doubleValue());
+    Number number = (Number) value;
+    if (number instanceof Long || number instanceof Integer || number instanceof Short || number instanceof Byte) {
+      return BigDecimal.valueOf(number.longValue());
+    }
+    return BigDecimal.valueOf(number.doubleValue());
   }
 }

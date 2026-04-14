@@ -218,6 +218,17 @@ public class WindowValueAggregatorTest {
   }
 
   @Test
+  public void testBigDecimalSumPreservesLongPrecision() {
+    WindowValueAggregator<Object> agg = new SumBigDecimalWindowValueAggregator();
+    // Value beyond double precision range (9007199254740993)
+    long largeValue = (1L << 53) + 1;
+    agg.addValue(largeValue);
+    agg.addValue(1L);
+    BigDecimal result = (BigDecimal) agg.getCurrentAggregatedValue();
+    assertEquals(result, BigDecimal.valueOf(largeValue + 1));
+  }
+
+  @Test
   public void testBigDecimalSumClear() {
     WindowValueAggregator<Object> agg = new SumBigDecimalWindowValueAggregator();
     agg.addValue(BigDecimal.ONE);
@@ -272,6 +283,13 @@ public class WindowValueAggregatorTest {
     assertNull(agg.getCurrentAggregatedValue());
   }
 
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testIntMinRemovalUnsupported() {
+    WindowValueAggregator<Object> agg = new MinIntWindowValueAggregator(false);
+    agg.addValue(1);
+    agg.removeValue(1);
+  }
+
   // ========================
   // MaxIntWindowValueAggregator tests
   // ========================
@@ -299,6 +317,13 @@ public class WindowValueAggregatorTest {
 
     agg.removeValue(10);
     assertEquals(agg.getCurrentAggregatedValue(), 8);
+  }
+
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testIntMaxRemovalUnsupported() {
+    WindowValueAggregator<Object> agg = new MaxIntWindowValueAggregator(false);
+    agg.addValue(1);
+    agg.removeValue(1);
   }
 
   // ========================
@@ -350,6 +375,13 @@ public class WindowValueAggregatorTest {
     assertTrue(agg.getCurrentAggregatedValue() instanceof Long);
   }
 
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testLongMinRemovalUnsupported() {
+    WindowValueAggregator<Object> agg = new MinLongWindowValueAggregator(false);
+    agg.addValue(1L);
+    agg.removeValue(1L);
+  }
+
   // ========================
   // MaxLongWindowValueAggregator tests
   // ========================
@@ -387,6 +419,13 @@ public class WindowValueAggregatorTest {
     agg.addValue(largeVal - 1);
     assertEquals(agg.getCurrentAggregatedValue(), largeVal);
     assertTrue(agg.getCurrentAggregatedValue() instanceof Long);
+  }
+
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testLongMaxRemovalUnsupported() {
+    WindowValueAggregator<Object> agg = new MaxLongWindowValueAggregator(false);
+    agg.addValue(1L);
+    agg.removeValue(1L);
   }
 
   // ========================
