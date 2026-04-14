@@ -39,7 +39,6 @@ import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlPostfixOperator;
 import org.apache.calcite.sql.SqlSplittableAggFunction;
 import org.apache.calcite.sql.SqlSyntax;
-import org.apache.calcite.sql.fun.SqlLeadLagAggFunction;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
 import org.apache.calcite.sql.fun.SqlNtileAggFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
@@ -217,10 +216,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
       // WINDOW Functions (non-aggregate)
       SqlStdOperatorTable.LAST_VALUE,
       SqlStdOperatorTable.FIRST_VALUE,
-      // TODO: Replace these with SqlStdOperatorTable.LEAD and SqlStdOperatorTable.LAG when the function implementations
-      // are updated to support the IGNORE NULLS option.
-      PinotLeadWindowFunction.INSTANCE,
-      PinotLagWindowFunction.INSTANCE,
+      SqlStdOperatorTable.LEAD,
+      SqlStdOperatorTable.LAG,
 
       // SPECIAL OPERATORS
       SqlStdOperatorTable.IGNORE_NULLS,
@@ -485,32 +482,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
   @Override
   public List<SqlOperator> getOperatorList() {
     return _operatorList;
-  }
-
-  private static class PinotLeadWindowFunction extends SqlLeadLagAggFunction {
-    static final SqlOperator INSTANCE = new PinotLeadWindowFunction();
-
-    public PinotLeadWindowFunction() {
-      super(SqlKind.LEAD);
-    }
-
-    @Override
-    public boolean allowsNullTreatment() {
-      return false;
-    }
-  }
-
-  private static class PinotLagWindowFunction extends SqlLeadLagAggFunction {
-    static final SqlOperator INSTANCE = new PinotLagWindowFunction();
-
-    public PinotLagWindowFunction() {
-      super(SqlKind.LAG);
-    }
-
-    @Override
-    public boolean allowsNullTreatment() {
-      return false;
-    }
   }
 
   private static final class PinotNtileWindowFunction extends SqlNtileAggFunction {
