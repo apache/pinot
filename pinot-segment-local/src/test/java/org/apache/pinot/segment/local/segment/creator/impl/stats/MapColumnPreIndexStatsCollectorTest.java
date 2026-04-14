@@ -502,6 +502,53 @@ public class MapColumnPreIndexStatsCollectorTest {
   }
 
   @Test
+  public void testAllEmptyMaps() {
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+
+    // Collect multiple rows with empty maps
+    col.collect(new HashMap<>());
+    col.collect(new HashMap<>());
+    col.collect(new HashMap<>());
+    col.seal();
+
+    // Should not throw AIOOBE; should return null for min/max/uniqueValuesSet
+    assertNull(col.getMinValue());
+    assertNull(col.getMaxValue());
+    assertNull(col.getUniqueValuesSet());
+    assertEquals(col.getCardinality(), 0);
+    assertEquals(col.getTotalNumberOfEntries(), 3);
+    // Serialized empty map is Integer.BYTES (4) bytes
+    assertEquals(col.getLengthOfShortestElement(), Integer.BYTES);
+    assertEquals(col.getLengthOfLongestElement(), Integer.BYTES);
+    assertEquals(col.getMaxRowLengthInBytes(), Integer.BYTES);
+    assertTrue(col.getAllKeyFrequencies().isEmpty());
+  }
+
+  @Test
+  public void testMixOfEmptyAndNonEmptyMaps() {
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+
+    col.collect(new HashMap<>());
+    col.collect(Map.of("k1", "v1"));
+    col.collect(new HashMap<>());
+    col.seal();
+
+    assertEquals(col.getMinValue(), "k1");
+    assertEquals(col.getMaxValue(), "k1");
+    assertNotNull(col.getUniqueValuesSet());
+    assertEquals(col.getUniqueValuesSet(), new String[]{"k1"});
+    assertEquals(col.getCardinality(), 1);
+    assertEquals(col.getTotalNumberOfEntries(), 3);
+
+    // Key appeared in 1 of 3 rows, so seal() inserted one default null value (2 total)
+    AbstractColumnStatisticsCollector k1Stats = col.getKeyStatistics("k1");
+    assertNotNull(k1Stats);
+    assertEquals(k1Stats.getTotalNumberOfEntries(), 2);
+  }
+
+  @Test
   public void testNoDictCreatesNoDictChildCollectors() {
     StatsCollectorConfig cfgNoDict = newConfig(true);
     MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfgNoDict);
