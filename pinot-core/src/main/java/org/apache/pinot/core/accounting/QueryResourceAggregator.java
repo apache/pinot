@@ -204,8 +204,8 @@ public class QueryResourceAggregator implements ResourceAggregator {
         if (_pauseActive) {
           // Pause is active - check if grace period expired
           if (System.currentTimeMillis() >= _pauseDeadlineMs) {
-            clearPause();
             killMostExpensiveQuery();
+            clearPause();
           }
           // else: still in grace period, skip kill this cycle
         } else if (config.isOomPauseEnabled()

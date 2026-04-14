@@ -37,9 +37,8 @@ public class QueryResourceAggregatorTest {
   private static final float TEST_CRITICAL_RATIO = 0f;
   private static final float TEST_PANIC_RATIO = 1.1f;
 
-  private QueryResourceAggregator createAggregator(boolean oomPauseEnabled, long oomPauseTimeoutMs) {
+  private QueryResourceAggregator createAggregator(long oomPauseTimeoutMs) {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_ENABLED, oomPauseEnabled);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS, oomPauseTimeoutMs);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, TEST_CRITICAL_RATIO);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, TEST_PANIC_RATIO);
@@ -54,21 +53,24 @@ public class QueryResourceAggregatorTest {
   }
 
   @Test
-  public void testConfigReadsOomPauseEnabled() {
+  public void testConfigReadsOomPauseTimeout() {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_ENABLED, true);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS, 2000L);
 
     long maxHeapSize = org.apache.pinot.spi.utils.ResourceUsageUtils.getMaxHeapSize();
     QueryMonitorConfig qmc = new QueryMonitorConfig(config, maxHeapSize);
 
-    assertTrue(qmc.isOomPauseEnabled(), "OOM pause should be enabled");
+    assertTrue(qmc.isOomPauseEnabled(), "OOM pause should be enabled when timeout > 0");
     assertEquals(qmc.getOomPauseTimeoutMs(), 2000L, "OOM pause timeout should be 2000ms");
+
+    PinotConfiguration disabledConfig = new PinotConfiguration();
+    QueryMonitorConfig disabledQmc = new QueryMonitorConfig(disabledConfig, maxHeapSize);
+    assertFalse(disabledQmc.isOomPauseEnabled(), "OOM pause should be disabled by default");
   }
 
   @Test
   public void testPauseActivatedOnTransitionToCritical() {
-    QueryResourceAggregator aggregator = createAggregator(true, 5000);
+    QueryResourceAggregator aggregator = createAggregator(5000);
 
     assertFalse(aggregator.isPauseActive(), "Pause should not be active initially");
 
@@ -85,7 +87,7 @@ public class QueryResourceAggregatorTest {
 
   @Test
   public void testWaitIfPausedFastPathWhenNotActive() {
-    QueryResourceAggregator aggregator = createAggregator(true, 1000);
+    QueryResourceAggregator aggregator = createAggregator(1000);
     long start = System.nanoTime();
     aggregator.waitIfPaused();
     long elapsed = System.nanoTime() - start;
@@ -94,7 +96,7 @@ public class QueryResourceAggregatorTest {
 
   @Test
   public void testWaitIfPausedBlocksForTimeout() {
-    QueryResourceAggregator aggregator = createAggregator(true, 300);
+    QueryResourceAggregator aggregator = createAggregator(300);
 
     aggregator.preAggregate(Collections.emptyList());
     aggregator.postAggregate();
@@ -110,7 +112,7 @@ public class QueryResourceAggregatorTest {
 
   @Test
   public void testNoPauseWhenDisabled() {
-    QueryResourceAggregator aggregator = createAggregator(false, 1000);
+    QueryResourceAggregator aggregator = createAggregator(-1);
 
     aggregator.preAggregate(Collections.emptyList());
     aggregator.postAggregate();
@@ -120,7 +122,7 @@ public class QueryResourceAggregatorTest {
 
   @Test
   public void testNoPauseWhenAlreadyAtCritical() {
-    QueryResourceAggregator aggregator = createAggregator(true, 200);
+    QueryResourceAggregator aggregator = createAggregator(200);
 
     // First cycle: transitions Normal -> Critical, activates pause
     aggregator.preAggregate(Collections.emptyList());

@@ -62,10 +62,7 @@ public class QueryMonitorConfig {
 
   private final boolean _queryKilledMetricEnabled;
 
-  // if we want to pause query threads before killing to allow the JVM to reclaim memory
-  private final boolean _oomPauseEnabled;
-
-  // how long to pause query threads (ms) before proceeding with kill
+  // how long to pause query threads (ms) before proceeding with kill; non-positive means disabled
   private final long _oomPauseTimeoutMs;
 
   private final int _workloadSleepTimeMs;
@@ -116,9 +113,6 @@ public class QueryMonitorConfig {
 
     _queryKilledMetricEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
         CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
-
-    _oomPauseEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_ENABLED,
-        CommonConstants.Accounting.DEFAULT_OOM_PAUSE_ENABLED);
 
     _oomPauseTimeoutMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS,
         CommonConstants.Accounting.DEFAULT_OOM_PAUSE_TIMEOUT_MS);
@@ -269,18 +263,6 @@ public class QueryMonitorConfig {
       _queryKilledMetricEnabled = oldConfig._queryKilledMetricEnabled;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_ENABLED)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_ENABLED)) {
-        _oomPauseEnabled = CommonConstants.Accounting.DEFAULT_OOM_PAUSE_ENABLED;
-      } else {
-        _oomPauseEnabled =
-            Boolean.parseBoolean(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_ENABLED));
-      }
-    } else {
-      _oomPauseEnabled = oldConfig._oomPauseEnabled;
-    }
-
     if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
           CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS)) {
@@ -367,7 +349,7 @@ public class QueryMonitorConfig {
   }
 
   public boolean isOomPauseEnabled() {
-    return _oomPauseEnabled;
+    return _oomPauseTimeoutMs > 0;
   }
 
   public long getOomPauseTimeoutMs() {
