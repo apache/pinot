@@ -80,8 +80,7 @@ public class SegmentPartitionUtils {
     }
 
     return new SegmentPartitionInfo(partitionColumn,
-        PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
-            columnPartitionMetadata.getNumPartitions(), columnPartitionMetadata.getFunctionConfig()),
+        PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
         columnPartitionMetadata.getPartitions());
   }
 
@@ -125,8 +124,7 @@ public class SegmentPartitionUtils {
         continue;
       }
       SegmentPartitionInfo segmentPartitionInfo = new SegmentPartitionInfo(partitionColumn,
-          PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
-              columnPartitionMetadata.getNumPartitions(), columnPartitionMetadata.getFunctionConfig()),
+          PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
           columnPartitionMetadata.getPartitions());
       columnSegmentPartitionInfoMap.put(partitionColumn, segmentPartitionInfo);
     }

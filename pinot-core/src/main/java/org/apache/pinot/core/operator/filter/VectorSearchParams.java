@@ -40,7 +40,7 @@ public final class VectorSearchParams {
 
   /** Singleton instance with all defaults, used when no query options are specified. */
   public static final VectorSearchParams DEFAULT =
-      new VectorSearchParams(null, null, null, null, null);
+      new VectorSearchParams(null, null, null, null, null, null, null);
 
   private final int _nprobe;
   @Nullable
@@ -51,27 +51,10 @@ public final class VectorSearchParams {
   private final boolean _hasDistanceThreshold;
   @Nullable
   private final Integer _efSearch;
-
-  /**
-   * Backward-compatible constructor that uses only the original three parameters.
-   *
-   * @param nprobe number of IVF probes, or null for default
-   * @param exactRerankOverride whether to re-score ANN candidates with exact distance, or null to use the backend
-   *                           default
-   * @param maxCandidates max candidates before final top-K, or null for default (topK * 10)
-   */
-  public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
-      @Nullable Integer maxCandidates) {
-    this(nprobe, exactRerankOverride, maxCandidates, null, null);
-  }
-
-  /**
-   * Backward-compatible constructor with distance threshold (Phase 3).
-   */
-  public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
-      @Nullable Integer maxCandidates, @Nullable Float distanceThreshold) {
-    this(nprobe, exactRerankOverride, maxCandidates, distanceThreshold, null);
-  }
+  @Nullable
+  private final Boolean _hnswUseRelativeDistance;
+  @Nullable
+  private final Boolean _hnswUseBoundedQueue;
 
   /**
    * Full constructor with all query option values.
@@ -82,9 +65,12 @@ public final class VectorSearchParams {
    * @param maxCandidates max candidates before final top-K, or null for default (topK * 10)
    * @param distanceThreshold distance threshold for radius search, or null for top-K mode
    * @param efSearch HNSW efSearch parameter, or null to use default
+   * @param hnswUseRelativeDistance HNSW relative-distance check toggle, or null to use default
+   * @param hnswUseBoundedQueue HNSW bounded queue toggle, or null to use default
    */
   public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
-      @Nullable Integer maxCandidates, @Nullable Float distanceThreshold, @Nullable Integer efSearch) {
+      @Nullable Integer maxCandidates, @Nullable Float distanceThreshold, @Nullable Integer efSearch,
+      @Nullable Boolean hnswUseRelativeDistance, @Nullable Boolean hnswUseBoundedQueue) {
     _nprobe = nprobe != null ? nprobe : DEFAULT_NPROBE;
     _exactRerankOverride = exactRerankOverride;
     _maxCandidates = maxCandidates != null ? maxCandidates : 0;
@@ -92,6 +78,8 @@ public final class VectorSearchParams {
     _distanceThreshold = distanceThreshold != null ? distanceThreshold : Float.NaN;
     _hasDistanceThreshold = distanceThreshold != null;
     _efSearch = efSearch;
+    _hnswUseRelativeDistance = hnswUseRelativeDistance;
+    _hnswUseBoundedQueue = hnswUseBoundedQueue;
   }
 
   /**
@@ -111,13 +99,16 @@ public final class VectorSearchParams {
     Integer maxCandidates = QueryOptionsUtils.getVectorMaxCandidates(queryOptions);
     Float distanceThreshold = QueryOptionsUtils.getVectorDistanceThreshold(queryOptions);
     Integer efSearch = QueryOptionsUtils.getVectorEfSearch(queryOptions);
+    Boolean hnswUseRelativeDistance = QueryOptionsUtils.getVectorUseRelativeDistance(queryOptions);
+    Boolean hnswUseBoundedQueue = QueryOptionsUtils.getVectorUseBoundedQueue(queryOptions);
 
     if (nprobe == null && exactRerank == null && maxCandidates == null && distanceThreshold == null
-        && efSearch == null) {
+        && efSearch == null && hnswUseRelativeDistance == null && hnswUseBoundedQueue == null) {
       return DEFAULT;
     }
 
-    return new VectorSearchParams(nprobe, exactRerank, maxCandidates, distanceThreshold, efSearch);
+    return new VectorSearchParams(nprobe, exactRerank, maxCandidates, distanceThreshold, efSearch,
+        hnswUseRelativeDistance, hnswUseBoundedQueue);
   }
 
   /**
@@ -187,6 +178,22 @@ public final class VectorSearchParams {
     return _efSearch;
   }
 
+  /**
+   * Returns whether HNSW should use relative-distance checks, or {@code null} if not explicitly set.
+   */
+  @Nullable
+  public Boolean getHnswUseRelativeDistance() {
+    return _hnswUseRelativeDistance;
+  }
+
+  /**
+   * Returns whether HNSW should use bounded queue mode, or {@code null} if not explicitly set.
+   */
+  @Nullable
+  public Boolean getHnswUseBoundedQueue() {
+    return _hnswUseBoundedQueue;
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("VectorSearchParams{nprobe=").append(_nprobe)
@@ -199,6 +206,12 @@ public final class VectorSearchParams {
     }
     if (_efSearch != null) {
       sb.append(", efSearch=").append(_efSearch);
+    }
+    if (_hnswUseRelativeDistance != null) {
+      sb.append(", hnswUseRelativeDistance=").append(_hnswUseRelativeDistance);
+    }
+    if (_hnswUseBoundedQueue != null) {
+      sb.append(", hnswUseBoundedQueue=").append(_hnswUseBoundedQueue);
     }
     sb.append('}');
     return sb.toString();

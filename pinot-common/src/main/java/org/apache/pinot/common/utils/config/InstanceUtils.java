@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -27,6 +28,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
@@ -157,6 +159,64 @@ public class InstanceUtils {
     } else {
       mapFields.remove(POOL_KEY);
     }
+  }
+
+  /**
+   * Converts a Helix InstanceConfig to a pinot-spi Instance. This is the reverse of
+   * {@link #toHelixInstanceConfig(Instance)}. Extracts host, port, type, tags, pools,
+   * and optional port fields from the InstanceConfig's ZNRecord.
+   */
+  public static Instance toInstance(InstanceConfig instanceConfig) {
+    String instanceId = instanceConfig.getInstanceName();
+    ZNRecord znRecord = instanceConfig.getRecord();
+    Map<String, String> simpleFields = znRecord.getSimpleFields();
+
+    // Extract type from instance ID prefix (the only reliable source for type)
+    InstanceType type;
+    if (instanceId.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      type = InstanceType.SERVER;
+    } else if (instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      type = InstanceType.BROKER;
+    } else if (instanceId.startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE)) {
+      type = InstanceType.CONTROLLER;
+    } else if (instanceId.startsWith(Helix.PREFIX_OF_MINION_INSTANCE)) {
+      type = InstanceType.MINION;
+    } else {
+      throw new IllegalArgumentException("Unknown instance type for: " + instanceId);
+    }
+
+    // Read host/port from ZNRecord simple fields (source of truth, updated by updateHelixInstanceConfig)
+    // Backward-compatible with legacy hostname of format 'Server_<hostname>'
+    String host = instanceConfig.getHostName();
+    if (type == InstanceType.SERVER && host.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      host = host.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    }
+    int port = Integer.parseInt(instanceConfig.getPort());
+
+    // Extract tags
+    List<String> tags = instanceConfig.getTags();
+
+    // Extract pools
+    Map<String, Integer> pools = null;
+    Map<String, String> poolMap = znRecord.getMapField(POOL_KEY);
+    if (MapUtils.isNotEmpty(poolMap)) {
+      pools = new HashMap<>();
+      for (Map.Entry<String, String> entry : poolMap.entrySet()) {
+        pools.put(entry.getKey(), Integer.parseInt(entry.getValue()));
+      }
+    }
+
+    // Extract optional ports
+    int grpcPort = Integer.parseInt(simpleFields.getOrDefault(Helix.Instance.GRPC_PORT_KEY, "-1"));
+    int adminPort = Integer.parseInt(simpleFields.getOrDefault(Helix.Instance.ADMIN_PORT_KEY, "-1"));
+    int queryServicePort = Integer.parseInt(
+        simpleFields.getOrDefault(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY, "-1"));
+    int queryMailboxPort = Integer.parseInt(
+        simpleFields.getOrDefault(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, "-1"));
+    boolean queriesDisabled = Boolean.parseBoolean(simpleFields.getOrDefault(Helix.QUERIES_DISABLED, "false"));
+
+    return new Instance(host, port, type, tags, pools, grpcPort, adminPort, queryServicePort, queryMailboxPort,
+        queriesDisabled);
   }
 
   public static String getInstanceBaseUri(InstanceConfig instanceConfig) {
