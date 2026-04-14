@@ -35,18 +35,19 @@ jobs:
       - name: Generate Build Info
         id: generate-build-info
         env:
-          PINOT_GIT_URL: "https://github.com/apache/pinot.git"
-          PINOT_BRANCH: "master"
+          PINOT_GIT_REF: "master"
         run: |
           .github/workflows/scripts/docker/.pinot_build_info_gen.sh
   compile-pinot:
+    # Pinot is compiled once per JDK version using the amazoncorretto build base.
+    # JVM bytecode is vendor-neutral, so the resulting build image is shared by all
+    # runtime distros (ms-openjdk, amazoncorretto) for the same JDK version.
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        java-disto: ["ms-openjdk", "amazoncorretto"]
         java-version: ["11", "17", "21", "25"]
-    name: Compile ${{ matrix.java-disto }}-${{ matrix.java-version }} Pinot
+    name: Compile JDK-${{ matrix.java-version }} Pinot
     needs: [generate-build-info]
     steps:
       - name: Login to DockerHub
@@ -59,9 +60,7 @@ jobs:
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
           DOCKER_IMAGE_NAME: "apachepinot/pinot"
-          BASE_IMAGE_TAG: "${{ matrix.java-version }}-${{ matrix.java-disto }}"
-          PINOT_GIT_URL: "https://github.com/apache/pinot.git"
-          PINOT_BRANCH: "${{ needs.generate-build-info.outputs.commit-id }}"
+          PINOT_GIT_REF: "${{ needs.generate-build-info.outputs.commit-id }}"
           JDK_VERSION: ${{ matrix.java-version }}
         run: .github/workflows/scripts/docker/.pinot_compile_and_push_build_image.sh
         timeout-minutes: 240
@@ -91,9 +90,9 @@ jobs:
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
           DOCKER_IMAGE_NAME: "apachepinot/pinot"
-          BASE_IMAGE_TAG: "${{ matrix.java-version }}-${{ matrix.java-disto }}"
+          JDK_VERSION: "${{ matrix.java-version }}"
           RUNTIME_IMAGE_TAGS: "${{ matrix.java-version }}-${{ matrix.java-disto }}"
-          PINOT_BRANCH: "${{ needs.generate-build-info.outputs.commit-id }}"
+          PINOT_GIT_REF: "${{ needs.generate-build-info.outputs.commit-id }}"
           BUILD_ARCH: ${{ matrix.arch }}
           TAGS: "${{ needs.generate-build-info.outputs.tags }}"
         run: .github/workflows/scripts/docker/.pinot_package_single_platform.sh

@@ -29,33 +29,26 @@ fi
 
 if [[ "$#" -gt 1 ]]
 then
-  PINOT_BRANCH=$2
+  PINOT_GIT_REF=$2
 else
-  PINOT_BRANCH=master
-  echo "Not specified a Pinot branch to build, using default branch: ${PINOT_BRANCH}."
+  PINOT_GIT_REF=master
+  echo "Not specified a Pinot git ref to build, using default: ${PINOT_GIT_REF}."
 fi
 
 if [[ "$#" -gt 2 ]]
 then
-  PINOT_GIT_URL=$3
+  KAFKA_VERSION=$3
 else
-  PINOT_GIT_URL="https://github.com/apache/pinot.git"
+  KAFKA_VERSION=3.0
 fi
 
 if [[ "$#" -gt 3 ]]
 then
-  KAFKA_VERSION=$4
-else
-  KAFKA_VERSION=2.0
-fi
-
-if [[ "$#" -gt 4 ]]
-then
-  JAVA_VERSION=$5
+  JAVA_VERSION=$4
 else
   JAVA_VERSION=11
 fi
 
-echo "Trying to build Pinot docker image from Git URL: [ ${PINOT_GIT_URL} ] on branch: [ ${PINOT_BRANCH} ] and tag it as: [ ${DOCKER_TAG} ]. Kafka Dependencies: [ ${KAFKA_VERSION} ]. Java Version: [ ${JAVA_VERSION} ]."
+echo "Trying to build Pinot docker image on git ref: [ ${PINOT_GIT_REF} ] and tag it as: [ ${DOCKER_TAG} ]. Kafka Dependencies: [ ${KAFKA_VERSION} ]. Java Version: [ ${JAVA_VERSION} ]."
 
-docker build --no-cache -t ${DOCKER_TAG} --build-arg PINOT_BRANCH=${PINOT_BRANCH} --build-arg PINOT_GIT_URL=${PINOT_GIT_URL} --build-arg KAFKA_VERSION=${KAFKA_VERSION} --build-arg JAVA_VERSION=${JAVA_VERSION} -f Dockerfile .
+docker build --no-cache -t ${DOCKER_TAG} --build-arg PINOT_GIT_REF=${PINOT_GIT_REF} --build-arg KAFKA_VERSION=${KAFKA_VERSION} --build-arg JAVA_VERSION=${JAVA_VERSION} -f Dockerfile .

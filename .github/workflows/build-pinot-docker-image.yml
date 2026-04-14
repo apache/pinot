@@ -21,10 +21,6 @@ name: Pinot Docker Image Build and Publish
 on:
   workflow_dispatch:
     inputs:
-      gitUrl:
-        description: "The Pinot git repo to check out to build, use https."
-        default: "https://github.com/apache/pinot.git"
-        required: true
       commit:
         description: "The branch/commit to check out to build Pinot image."
         default: "master"
@@ -61,7 +57,6 @@ jobs:
         DOCKER_FILE_BASE_DIR: "docker/images/pinot"
         DOCKER_IMAGE_NAME: ${{ github.event.inputs.dockerImageName }}
         BUILD_PLATFORM: ${{ github.event.inputs.platform }}
-        PINOT_GIT_URL: ${{ github.event.inputs.gitUrl }}
-        PINOT_BRANCH: ${{ github.event.inputs.commit }}
+        PINOT_GIT_REF: ${{ github.event.inputs.commit }}
         TAGS: ${{ github.event.inputs.tags }}
       run: .github/workflows/scripts/docker/.pinot_docker_image_build_and_push.sh

@@ -17,17 +17,14 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-if [ -z "${PINOT_GIT_URL}" ]; then
-  PINOT_GIT_URL="https://github.com/apache/pinot.git"
-fi
-if [ -z "${PINOT_BRANCH}" ]; then
-  PINOT_BRANCH="master"
+if [ -z "${PINOT_GIT_REF}" ]; then
+  PINOT_GIT_REF="master"
 fi
 
 # Get pinot commit id
 ROOT_DIR=$(pwd)
 rm -rf /tmp/pinot
-git clone -b ${PINOT_BRANCH} --single-branch ${PINOT_GIT_URL} /tmp/pinot
+git clone -b ${PINOT_GIT_REF} --single-branch https://github.com/apache/pinot.git /tmp/pinot
 cd /tmp/pinot
 COMMIT_ID=$(git rev-parse --short HEAD)
 VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)

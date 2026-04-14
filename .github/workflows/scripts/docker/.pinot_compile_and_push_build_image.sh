@@ -19,36 +19,48 @@
 #
 # Compiles Pinot from source on amd64 and pushes the build image to DockerHub
 # so that per-arch package jobs can pull it.
+#
+# The build image is tagged by JDK version only (not by JDK distro) because
+# JVM bytecode is identical regardless of the JDK vendor used to compile it.
+# Both amazoncorretto and ms-openjdk runtime images share the same build image.
 
 set -e
 
 if [ -z "${DOCKER_IMAGE_NAME}" ]; then
   DOCKER_IMAGE_NAME="apachepinot/pinot"
 fi
-if [ -z "${PINOT_GIT_URL}" ]; then
-  PINOT_GIT_URL="https://github.com/apache/pinot.git"
-fi
 if [ -z "${DOCKER_FILE_BASE_DIR}" ]; then
   echo "DOCKER_FILE_BASE_DIR is required" >&2
+  exit 1
+fi
+if [ -z "${JDK_VERSION}" ]; then
+  echo "JDK_VERSION is required" >&2
+  exit 1
+fi
+if [ -z "${PINOT_GIT_REF}" ]; then
+  echo "PINOT_GIT_REF is required" >&2
   exit 1
 fi
 
 cd "${DOCKER_FILE_BASE_DIR}"
 
-# Include PINOT_BRANCH (commit SHA) in the build image tag to avoid collisions
-# between concurrent workflow runs that target different commits.
-PINOT_BUILD_IMAGE_TAG="${BASE_IMAGE_TAG}-amd64"
-BUILD_IMAGE_REMOTE_TAG="${DOCKER_IMAGE_NAME}:build-${BASE_IMAGE_TAG}-${PINOT_BRANCH}"
+# Tag the build image by JDK version only — distro-agnostic.
+# Include PINOT_GIT_REF (commit SHA) to avoid collisions between concurrent runs.
+PINOT_BUILD_IMAGE_TAG="${JDK_VERSION}-amd64"
+BUILD_IMAGE_REMOTE_TAG="${DOCKER_IMAGE_NAME}:build-${JDK_VERSION}-${PINOT_GIT_REF}"
+
+# Use amazoncorretto as the compile-time base; the resulting JARs are identical
+# to those produced by any other JDK vendor at the same version.
+COMPILE_BASE_IMAGE_TAG="${JDK_VERSION}-amazoncorretto"
 
 echo "Building docker image for platform: amd64 with tag: pinot-build:${PINOT_BUILD_IMAGE_TAG}"
 docker build \
   --no-cache \
   --platform amd64 \
   --file Dockerfile.build \
-  --build-arg "PINOT_GIT_URL=${PINOT_GIT_URL}" \
-  --build-arg "PINOT_BRANCH=${PINOT_BRANCH}" \
+  --build-arg "PINOT_GIT_REF=${PINOT_GIT_REF}" \
   --build-arg "JDK_VERSION=${JDK_VERSION}" \
-  --build-arg "PINOT_BASE_IMAGE_TAG=${BASE_IMAGE_TAG}" \
+  --build-arg "PINOT_BASE_IMAGE_TAG=${COMPILE_BASE_IMAGE_TAG}" \
   --tag "pinot-build:${PINOT_BUILD_IMAGE_TAG}" \
   --tag "${BUILD_IMAGE_REMOTE_TAG}" \
   .

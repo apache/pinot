@@ -71,12 +71,12 @@ For users on Mac M1 chips, they need to build the images with arm64 base image, 
 
 or just run the docker build script directly
 ```SHELL
-docker build -t pinot:latest --no-cache --network=host --build-arg PINOT_GIT_URL=https://github.com/apache/pinot.git --build-arg PINOT_BRANCH=master --build-arg JDK_VERSION=11 --build-arg OPENJDK_IMAGE=arm64v8/openjdk -f Dockerfile .
+docker build -t pinot:latest --no-cache --network=host --build-arg PINOT_GIT_REF=master --build-arg JDK_VERSION=11 --build-arg OPENJDK_IMAGE=arm64v8/openjdk -f Dockerfile .
 ```
 
 Note that if you are not on arm64 machine, you can still build the image by turning on the experimental feature of docker, and add `--platform linux/arm64` into the `docker build ...` script, e.g.
 ```SHELL
-docker build -t pinot:latest --platform linux/arm64 --no-cache --network=host --build-arg PINOT_GIT_URL=https://github.com/apache/pinot.git --build-arg PINOT_BRANCH=master --build-arg JDK_VERSION=11 --build-arg OPENJDK_IMAGE=arm64v8/openjdk -f Dockerfile .
+docker build -t pinot:latest --platform linux/arm64 --no-cache --network=host --build-arg PINOT_GIT_REF=master --build-arg JDK_VERSION=11 --build-arg OPENJDK_IMAGE=arm64v8/openjdk -f Dockerfile .
 ```
 
 ## How to publish a docker image

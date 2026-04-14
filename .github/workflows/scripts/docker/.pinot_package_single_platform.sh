@@ -33,14 +33,23 @@ if [ -z "${DOCKER_FILE_BASE_DIR}" ]; then
   echo "DOCKER_FILE_BASE_DIR is required" >&2
   exit 1
 fi
+if [ -z "${JDK_VERSION}" ]; then
+  echo "JDK_VERSION is required" >&2
+  exit 1
+fi
+if [ -z "${PINOT_GIT_REF}" ]; then
+  echo "PINOT_GIT_REF is required" >&2
+  exit 1
+fi
 
 cd "${DOCKER_FILE_BASE_DIR}"
 
 # Pull the commit-scoped build image from DockerHub and tag it locally.
-# PINOT_BRANCH is the short commit SHA resolved by generate-build-info; including
-# it in the tag prevents concurrent nightly runs from overwriting each other.
-PINOT_BUILD_IMAGE_TAG="${BASE_IMAGE_TAG}-amd64"
-BUILD_IMAGE_REMOTE_TAG="${DOCKER_IMAGE_NAME}:build-${BASE_IMAGE_TAG}-${PINOT_BRANCH}"
+# Build images are keyed by JDK version only (not distro) because JVM bytecode
+# is identical regardless of JDK vendor. PINOT_GIT_REF (commit SHA) prevents
+# concurrent nightly runs from colliding.
+PINOT_BUILD_IMAGE_TAG="${JDK_VERSION}-amd64"
+BUILD_IMAGE_REMOTE_TAG="${DOCKER_IMAGE_NAME}:build-${JDK_VERSION}-${PINOT_GIT_REF}"
 echo "Pulling build image: ${BUILD_IMAGE_REMOTE_TAG}"
 docker pull --platform linux/amd64 "${BUILD_IMAGE_REMOTE_TAG}"
 docker tag "${BUILD_IMAGE_REMOTE_TAG}" "pinot-build:${PINOT_BUILD_IMAGE_TAG}"
