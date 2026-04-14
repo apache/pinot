@@ -283,6 +283,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private void submitInternal(Worker.QueryRequest request, Map<String, String> reqMetadata) {
     QueryExecutionContext executionContext = QueryExecutionContext.forMseServerRequest(reqMetadata, _instanceId);
     long requestId = executionContext.getRequestId();
+    ServerMetrics.get().addMeteredGlobalValue(ServerMeter.MSE_QUERIES, 1L);
     List<CompletableFuture<Void>> startedWorkers = new ArrayList<>();
     List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
     for (Worker.StagePlan protoStagePlan : protoStagePlans) {

@@ -272,7 +272,14 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   MSE_MEMORY_ALLOCATED_BYTES("bytes", true),
   /// Total number of rows emitted by multi-stage execution.
   /// This is equal to the sum of the emittedRows reported by the root of all the opchains executed in the server.
-  MSE_EMITTED_ROWS("rows", true);
+  MSE_EMITTED_ROWS("rows", true),
+
+  /// Number of MSE Worker.QueryRequest messages received by this server.
+  /// In MSE, the broker sends exactly one request per query containing all the intermediate and leaf stage information
+  /// the server needs. This metric is incremented once per received request, so it will be incremented exactly once
+  /// whether the server is acting as a leaf, intermediate, or both.
+  MSE_QUERIES("queries", true,
+      "Number of MSE Worker.QueryRequest messages received by this server");
 
   private final String _meterName;
   private final String _unit;

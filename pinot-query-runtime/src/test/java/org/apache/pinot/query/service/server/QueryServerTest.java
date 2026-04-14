@@ -32,6 +32,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
@@ -53,6 +55,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.LoggerConstants;
@@ -87,6 +90,8 @@ public class QueryServerTest extends QueryTestSet {
   @BeforeClass
   public void setUp()
       throws Exception {
+    ServerMetrics.deregister();
+    ServerMetrics.register(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = mock(QueryRunner.class);
@@ -109,6 +114,7 @@ public class QueryServerTest extends QueryTestSet {
     for (QueryServer worker : _queryServerMap.values()) {
       worker.shutdown();
     }
+    ServerMetrics.deregister();
   }
 
   @AfterMethod
@@ -132,6 +138,23 @@ public class QueryServerTest extends QueryTestSet {
     // should contain error message pattern
     String errorMessage = resp.getMetadataMap().get(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR);
     assertTrue(errorMessage.contains("foo"), "Error message should contain 'foo' but it is: " + errorMessage);
+  }
+
+  @Test
+  public void testMseQueriesMetricIncrementedOnSuccess()
+      throws Exception {
+    long mseBefore = ServerMetrics.get().getMeteredValue(ServerMeter.MSE_QUERIES).count();
+    long grpcBefore = ServerMetrics.get().getMeteredValue(ServerMeter.GRPC_QUERIES).count();
+    DispatchableSubPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a");
+    Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, 1);
+    Map<String, String> requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
+    Worker.QueryResponse resp = submitRequest(queryRequest, requestMetadata);
+    assertTrue(resp.getMetadataMap().containsKey(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK));
+    TestUtils.waitForCondition(
+        aVoid -> ServerMetrics.get().getMeteredValue(ServerMeter.MSE_QUERIES).count() == mseBefore + 1,
+        5000L, "MSE_QUERIES was not incremented");
+    assertEquals(ServerMetrics.get().getMeteredValue(ServerMeter.GRPC_QUERIES).count(), grpcBefore,
+        "GRPC_QUERIES should NOT be incremented by the MSE path");
   }
 
   @Test(dataProvider = "testSql")
