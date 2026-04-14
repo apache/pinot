@@ -146,10 +146,23 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   @Override
   public Object evaluate(Object[] values) {
+    boolean hasNullArgument = false;
     for (int i = 0; i < _numArguments; i++) {
-      _binding.setVariable(_arguments.get(i), values[i]);
+      Object value = values[i];
+      if (value == null) {
+        hasNullArgument = true;
+      }
+      _binding.setVariable(_arguments.get(i), value);
     }
-    return _script.run();
+    try {
+      return _script.run();
+    } catch (Exception e) {
+      if (hasNullArgument) {
+        return null;
+      } else {
+        throw e;
+      }
+    }
   }
 
   @Override

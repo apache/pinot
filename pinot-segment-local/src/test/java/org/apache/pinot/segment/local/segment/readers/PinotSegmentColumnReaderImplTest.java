@@ -20,12 +20,14 @@ package org.apache.pinot.segment.local.segment.readers;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.function.Function;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.ColumnarSegmentBuildingTestBase;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
@@ -37,20 +39,19 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Comprehensive tests for PinotSegmentColumnReaderImpl random access methods.
- *
- * <p>This test validates:
- * <ul>
- *   <li>Single-value accessor methods (getInt, getLong, getFloat, getDouble, getString, getBytes)</li>
- *   <li>Multi-value accessor methods (getIntMV, getLongMV, getFloatMV, getDoubleMV, getStringMV, getBytesMV)</li>
- *   <li>Metadata methods (getTotalDocs, isNull)</li>
- *   <li>Boundary conditions and exception handling</li>
- *   <li>Consistency between iterator and random access patterns</li>
- *   <li>Multiple readers for the same column</li>
- *   <li>Both dictionary-encoded and raw forward index columns</li>
- * </ul>
- */
+/// Comprehensive tests for {@link PinotSegmentColumnReaderImpl}.
+///
+/// This test validates:
+/// - Single-value accessor methods (getInt, getLong, getFloat, getDouble, getBigDecimal, getString, getBytes)
+/// - Multi-value accessor methods (getIntMV, getLongMV, getFloatMV, getDoubleMV, getStringMV, getBytesMV)
+/// - Sequential accessor methods (nextInt, nextLong, nextFloat, nextDouble, nextBigDecimal, nextString, nextBytes,
+///   and MV variants)
+/// - Type indicator methods (isInt, isLong, isFloat, isDouble, isBigDecimal, isString, isBytes)
+/// - Metadata methods (getTotalDocs, isNull)
+/// - Boundary conditions and exception handling
+/// - Consistency between iterator and random access patterns
+/// - Multiple readers for the same column
+/// - Dictionary-encoded, raw forward index, and nullable columns
 public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTestBase {
 
   /**
@@ -202,6 +203,8 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
             (Function<Object, Object>) val -> val instanceof Double ? ((Double) val).floatValue() : val},
         {DOUBLE_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getDouble,
             (SingleValueSequentialGetter) PinotSegmentColumnReaderImpl::nextDouble, null},
+        {BIG_DECIMAL_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getBigDecimal,
+            (SingleValueSequentialGetter) PinotSegmentColumnReaderImpl::nextBigDecimal, null},
         {STRING_COL_1, (SingleValueGetter) PinotSegmentColumnReaderImpl::getString,
             (SingleValueSequentialGetter) PinotSegmentColumnReaderImpl::nextString, null},
         {BYTES_COL, (SingleValueGetter) PinotSegmentColumnReaderImpl::getBytes,
@@ -235,21 +238,23 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
       // Get field spec and data type for the column
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
       Object defaultValue = fieldSpec.getDefaultNullValue();
-      FieldSpec.DataType dataType = fieldSpec.getDataType();
+      DataType dataType = fieldSpec.getDataType();
 
       // Test type indicator methods
-      Assert.assertEquals(reader.isInt(), dataType == FieldSpec.DataType.INT,
-          "isInt() should return " + (dataType == FieldSpec.DataType.INT) + " for " + columnName);
-      Assert.assertEquals(reader.isLong(), dataType == FieldSpec.DataType.LONG,
-          "isLong() should return " + (dataType == FieldSpec.DataType.LONG) + " for " + columnName);
-      Assert.assertEquals(reader.isFloat(), dataType == FieldSpec.DataType.FLOAT,
-          "isFloat() should return " + (dataType == FieldSpec.DataType.FLOAT) + " for " + columnName);
-      Assert.assertEquals(reader.isDouble(), dataType == FieldSpec.DataType.DOUBLE,
-          "isDouble() should return " + (dataType == FieldSpec.DataType.DOUBLE) + " for " + columnName);
-      Assert.assertEquals(reader.isString(), dataType == FieldSpec.DataType.STRING,
-          "isString() should return " + (dataType == FieldSpec.DataType.STRING) + " for " + columnName);
-      Assert.assertEquals(reader.isBytes(), dataType == FieldSpec.DataType.BYTES,
-          "isBytes() should return " + (dataType == FieldSpec.DataType.BYTES) + " for " + columnName);
+      Assert.assertEquals(reader.isInt(), dataType == DataType.INT,
+          "isInt() should return " + (dataType == DataType.INT) + " for " + columnName);
+      Assert.assertEquals(reader.isLong(), dataType == DataType.LONG,
+          "isLong() should return " + (dataType == DataType.LONG) + " for " + columnName);
+      Assert.assertEquals(reader.isFloat(), dataType == DataType.FLOAT,
+          "isFloat() should return " + (dataType == DataType.FLOAT) + " for " + columnName);
+      Assert.assertEquals(reader.isDouble(), dataType == DataType.DOUBLE,
+          "isDouble() should return " + (dataType == DataType.DOUBLE) + " for " + columnName);
+      Assert.assertEquals(reader.isBigDecimal(), dataType == DataType.BIG_DECIMAL,
+          "isBigDecimal() should return " + (dataType == DataType.BIG_DECIMAL) + " for " + columnName);
+      Assert.assertEquals(reader.isString(), dataType == DataType.STRING,
+          "isString() should return " + (dataType == DataType.STRING) + " for " + columnName);
+      Assert.assertEquals(reader.isBytes(), dataType == DataType.BYTES,
+          "isBytes() should return " + (dataType == DataType.BYTES) + " for " + columnName);
 
       // Test reading all documents using random access (Pattern 3)
       for (int docId = 0; docId < totalDocs; docId++) {
@@ -275,6 +280,9 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
           } else if (actualValue instanceof Float) {
             Assert.assertEquals((Float) actualValue, (Float) defaultValue, 0.0001f,
                 "Null should be replaced with default at docId " + docId);
+          } else if (actualValue instanceof BigDecimal) {
+            Assert.assertEquals(((BigDecimal) actualValue).compareTo((BigDecimal) defaultValue), 0,
+                "Null should be replaced with default at docId " + docId);
           } else {
             Assert.assertEquals(actualValue, defaultValue, "Null should be replaced with default at docId " + docId);
           }
@@ -286,6 +294,9 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
                 "Value mismatch at docId " + docId);
           } else if (actualValue instanceof Float) {
             Assert.assertEquals((Float) actualValue, (Float) convertedExpectedValue, 0.0001f,
+                "Value mismatch at docId " + docId);
+          } else if (actualValue instanceof BigDecimal) {
+            Assert.assertEquals(((BigDecimal) actualValue).compareTo((BigDecimal) convertedExpectedValue), 0,
                 "Value mismatch at docId " + docId);
           } else {
             Assert.assertEquals(actualValue, convertedExpectedValue, "Value mismatch at docId " + docId);
@@ -323,6 +334,9 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
               } else if (actualValue instanceof Float) {
                 Assert.assertEquals((Float) actualValue, (Float) defaultValue, 0.0001f,
                     "Null should be replaced with default at docId " + docId + " (sequential)");
+              } else if (actualValue instanceof BigDecimal) {
+                Assert.assertEquals(((BigDecimal) actualValue).compareTo((BigDecimal) defaultValue), 0,
+                    "Null should be replaced with default at docId " + docId + " (sequential)");
               } else {
                 Assert.assertEquals(actualValue, defaultValue,
                     "Null should be replaced with default at docId " + docId + " (sequential)");
@@ -335,6 +349,9 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
                     "Value mismatch at docId " + docId + " (sequential)");
               } else if (actualValue instanceof Float) {
                 Assert.assertEquals((Float) actualValue, (Float) convertedValue, 0.0001f,
+                    "Value mismatch at docId " + docId + " (sequential)");
+              } else if (actualValue instanceof BigDecimal) {
+                Assert.assertEquals(((BigDecimal) actualValue).compareTo((BigDecimal) convertedValue), 0,
                     "Value mismatch at docId " + docId + " (sequential)");
               } else {
                 Assert.assertEquals(actualValue, convertedValue,
@@ -442,22 +459,24 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
       // Get default value for MV type (wrapped in array)
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
-      FieldSpec.DataType dataType = fieldSpec.getDataType();
+      DataType dataType = fieldSpec.getDataType();
       Object defaultValue;
 
       // Test type indicator methods
-      Assert.assertEquals(reader.isInt(), dataType == FieldSpec.DataType.INT,
-          "isInt() should return " + (dataType == FieldSpec.DataType.INT) + " for " + columnName);
-      Assert.assertEquals(reader.isLong(), dataType == FieldSpec.DataType.LONG,
-          "isLong() should return " + (dataType == FieldSpec.DataType.LONG) + " for " + columnName);
-      Assert.assertEquals(reader.isFloat(), dataType == FieldSpec.DataType.FLOAT,
-          "isFloat() should return " + (dataType == FieldSpec.DataType.FLOAT) + " for " + columnName);
-      Assert.assertEquals(reader.isDouble(), dataType == FieldSpec.DataType.DOUBLE,
-          "isDouble() should return " + (dataType == FieldSpec.DataType.DOUBLE) + " for " + columnName);
-      Assert.assertEquals(reader.isString(), dataType == FieldSpec.DataType.STRING,
-          "isString() should return " + (dataType == FieldSpec.DataType.STRING) + " for " + columnName);
-      Assert.assertEquals(reader.isBytes(), dataType == FieldSpec.DataType.BYTES,
-          "isBytes() should return " + (dataType == FieldSpec.DataType.BYTES) + " for " + columnName);
+      Assert.assertEquals(reader.isInt(), dataType == DataType.INT,
+          "isInt() should return " + (dataType == DataType.INT) + " for " + columnName);
+      Assert.assertEquals(reader.isLong(), dataType == DataType.LONG,
+          "isLong() should return " + (dataType == DataType.LONG) + " for " + columnName);
+      Assert.assertEquals(reader.isFloat(), dataType == DataType.FLOAT,
+          "isFloat() should return " + (dataType == DataType.FLOAT) + " for " + columnName);
+      Assert.assertEquals(reader.isDouble(), dataType == DataType.DOUBLE,
+          "isDouble() should return " + (dataType == DataType.DOUBLE) + " for " + columnName);
+      Assert.assertEquals(reader.isBigDecimal(), dataType == DataType.BIG_DECIMAL,
+          "isBigDecimal() should return " + (dataType == DataType.BIG_DECIMAL) + " for " + columnName);
+      Assert.assertEquals(reader.isString(), dataType == DataType.STRING,
+          "isString() should return " + (dataType == DataType.STRING) + " for " + columnName);
+      Assert.assertEquals(reader.isBytes(), dataType == DataType.BYTES,
+          "isBytes() should return " + (dataType == DataType.BYTES) + " for " + columnName);
 
       // Create default array based on type
       switch (fieldSpec.getDataType()) {

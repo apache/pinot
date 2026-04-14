@@ -33,6 +33,8 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.ConfigChangeListenerConstants;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -330,7 +332,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
       throws Exception {
     // Test Case: Multi-Value Fields with Commit-Time Compaction
     // Goal: Ensure commit-time compaction correctly handles multi-value dictionary columns
-    // (like arrays/lists) during segment conversion, validating the fix for CompactedDictEncodedColumnStatistics
+    // (like arrays/lists) during segment conversion, validating the fix for CompactedColumnStatistics
 
     // Create test data with multi-value fields similar to user's "tags" column
     List<String> testRecords = List.of("200,Player200,game1,85.5,1681054200000,false,action;shooter",
@@ -341,6 +343,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "201,Player201Updated,game2,95.0,1681154300000,false,strategy;rts");
 
     String kafkaTopicName = getKafkaTopic() + "-multivalue";
+    createKafkaTopic(kafkaTopicName);
 
     // TABLE 1: With commit-time compaction DISABLED (baseline)
     String tableNameWithoutCompaction = "gameScoresMVCompactionDisabled";
@@ -532,22 +535,29 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     validatePreCommitState(tableNameWithoutCompaction, tableNameWithCompaction,
         tableNameWithCompactionColumnMajor, 3);
 
-    // Perform commit and wait for completion
-    performCommitAndWait(tableNameWithoutCompaction, tableNameWithCompaction,
-        tableNameWithCompactionColumnMajor, 20_000L, 4, 2);
+    try {
+      setConsumingSegmentConsistencyMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
 
-    // Brief wait to ensure all commit operations are complete
-    waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
-    waitForAllDocsLoaded(tableNameWithCompactionColumnMajor, 60_000L, 3);
+      // Perform commit and wait for completion
+      performCommitAndWait(tableNameWithoutCompaction, tableNameWithCompaction,
+          tableNameWithCompactionColumnMajor, 20_000L, 4, 2);
 
-    // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 2 removed)
-    validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
-        tableNameWithCompactionColumnMajor, 3, 2, 0.95);
+      // Brief wait to ensure all commit operations are complete
+      waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
+      waitForAllDocsLoaded(tableNameWithCompactionColumnMajor, 60_000L, 3);
 
-    // Clean up
-    cleanupTablesAndSchemas(
-        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor),
-        List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor));
+      // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 2 removed)
+      validatePostCommitCompaction(tableNameWithoutCompaction, tableNameWithCompaction,
+          tableNameWithCompactionColumnMajor, 3, 2, 0.95);
+    } finally {
+      try {
+        resetConsumingSegmentConsistencyMode();
+      } finally {
+        cleanupTablesAndSchemas(
+            List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor),
+            List.of(tableNameWithoutCompaction, tableNameWithCompaction, tableNameWithCompactionColumnMajor));
+      }
+    }
   }
 
   @Test
@@ -1144,9 +1154,9 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
 
   protected void forceCommit(String tableName1, String tableName2, String tableName3)
       throws Exception {
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName1));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName2));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName3));
+    getOrCreateAdminClient().getTableClient().forceCommit(tableName1);
+    getOrCreateAdminClient().getTableClient().forceCommit(tableName2);
+    getOrCreateAdminClient().getTableClient().forceCommit(tableName3);
   }
 
   protected void validatePostCommitCompaction(String tableNameBaseline, String tableNameCompacted1,
@@ -1219,6 +1229,25 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
       } catch (IOException ignored) {
       }
     });
+  }
+
+  private void setConsumingSegmentConsistencyMode(ConsumingSegmentConsistencyModeListener.Mode mode)
+      throws Exception {
+    updateClusterConfig(Map.of(ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE, mode.name()));
+    waitForConsumingSegmentConsistencyMode(mode);
+  }
+
+  private void resetConsumingSegmentConsistencyMode()
+      throws Exception {
+    deleteClusterConfig(ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE);
+    waitForConsumingSegmentConsistencyMode(
+        ConsumingSegmentConsistencyModeListener.Mode.DEFAULT_CONSUMING_SEGMENT_CONSISTENCY_MODE);
+  }
+
+  private void waitForConsumingSegmentConsistencyMode(ConsumingSegmentConsistencyModeListener.Mode expectedMode) {
+    TestUtils.waitForCondition(
+        aVoid -> ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode() == expectedMode, 10_000L,
+        "Timed out waiting for consuming segment consistency mode to become: " + expectedMode);
   }
 
   @Test

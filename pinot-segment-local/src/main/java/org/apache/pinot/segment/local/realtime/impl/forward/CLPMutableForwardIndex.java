@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.forward;
 
+import com.google.common.base.Utf8;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageDecoder;
@@ -30,7 +31,7 @@ import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class CLPMutableForwardIndex implements MutableForwardIndex {
@@ -39,7 +40,6 @@ public class CLPMutableForwardIndex implements MutableForwardIndex {
   private static final int ESTIMATED_DICT_VARS_CARDINALITY = 10000;
   private static final int ESTIMATED_LOG_TYPE_LENGTH = 200;
   private static final int ESTIMATED_DICT_VARS_LENGTH = 50;
-  private FieldSpec.DataType _storedType;
   private final EncodedMessage _clpEncodedMessage;
   private final MessageEncoder _clpMessageEncoder;
   private final MessageDecoder _clpMessageDecoder;
@@ -53,11 +53,11 @@ public class CLPMutableForwardIndex implements MutableForwardIndex {
   int _totalNumberOfDictVars = 0;
   int _maxNumberOfEncodedVars = 0;
   int _totalNumberOfEncodedVars = 0;
-  private int _lengthOfShortestElement;
-  private int _lengthOfLongestElement;
+  private int _lengthOfShortestElement = Integer.MAX_VALUE;
+  private int _lengthOfLongestElement = 0;
+  private boolean _isAscii = true;
 
-  public CLPMutableForwardIndex(String columnName, FieldSpec.DataType storedType,
-      PinotDataBufferMemoryManager memoryManager, int capacity) {
+  public CLPMutableForwardIndex(String columnName, PinotDataBufferMemoryManager memoryManager, int capacity) {
     _clpEncodedMessage = new EncodedMessage();
     _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
@@ -68,17 +68,16 @@ public class CLPMutableForwardIndex implements MutableForwardIndex {
         new StringOffHeapMutableDictionary(ESTIMATED_DICT_VARS_CARDINALITY, ESTIMATED_DICT_VARS_CARDINALITY / 10,
             memoryManager, columnName + "_dictVars.dict", ESTIMATED_DICT_VARS_LENGTH);
 
-    _logTypeFwdIndex = new FixedByteSVMutableForwardIndex(true, FieldSpec.DataType.INT, capacity, memoryManager,
-        columnName + "_logType.fwd");
+    _logTypeFwdIndex =
+        new FixedByteSVMutableForwardIndex(true, DataType.INT, capacity, memoryManager, columnName + "_logType.fwd");
     _dictVarsFwdIndex =
         new FixedByteMVMutableForwardIndex(ForwardIndexType.MAX_MULTI_VALUES_PER_ROW, 20, capacity, Integer.BYTES,
-            memoryManager, columnName + "_dictVars.fwd", true, FieldSpec.DataType.INT);
+            memoryManager, columnName + "_dictVars.fwd", true, DataType.INT);
     _encodedVarsFwdIndex =
         new FixedByteMVMutableForwardIndex(ForwardIndexType.MAX_MULTI_VALUES_PER_ROW, 20, capacity, Long.BYTES,
-            memoryManager, columnName + "_encodedVars.fwd", true, FieldSpec.DataType.LONG);
+            memoryManager, columnName + "_encodedVars.fwd", true, DataType.LONG);
     _clpMessageDecoder = new MessageDecoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
-    _storedType = storedType;
   }
 
   @Override
@@ -92,6 +91,11 @@ public class CLPMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
+  public boolean isAscii() {
+    return _isAscii;
+  }
+
+  @Override
   public boolean isDictionaryEncoded() {
     return false;
   }
@@ -102,8 +106,8 @@ public class CLPMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public FieldSpec.DataType getStoredType() {
-    return _storedType;
+  public DataType getStoredType() {
+    return DataType.STRING;
   }
 
   @Override
@@ -112,8 +116,12 @@ public class CLPMutableForwardIndex implements MutableForwardIndex {
     String[] dictVars;
     Long[] encodedVars;
 
-    _lengthOfLongestElement = Math.max(_lengthOfLongestElement, value.length());
-    _lengthOfShortestElement = Math.min(_lengthOfShortestElement, value.length());
+    int length = Utf8.encodedLength(value);
+    _lengthOfShortestElement = Math.min(_lengthOfShortestElement, length);
+    _lengthOfLongestElement = Math.max(_lengthOfLongestElement, length);
+    if (_isAscii) {
+      _isAscii = length == value.length();
+    }
 
     try {
       _clpMessageEncoder.encodeMessage(value, _clpEncodedMessage);

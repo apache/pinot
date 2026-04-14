@@ -21,7 +21,9 @@ package org.apache.pinot.common.assignment;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -109,7 +111,12 @@ public class InstanceAssignmentConfigUtils {
     String partitionColumn = replicaGroupStrategyConfig.getPartitionColumn();
     boolean minimizeDataMovement = segmentConfig.isMinimizeDataMovement();
     if (partitionColumn != null) {
-      int numPartitions = tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
+      SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+      Preconditions.checkState(segmentPartitionConfig != null, "Failed to find the segment partition config");
+      ColumnPartitionConfig columnPartitionConfig = segmentPartitionConfig.getColumnPartitionConfig(partitionColumn);
+      Preconditions.checkState(columnPartitionConfig != null,
+          "Failed to find the column partition config for column: %s", partitionColumn);
+      int numPartitions = columnPartitionConfig.getNumPartitions();
       Preconditions.checkState(numPartitions > 0, "Number of partitions for column: %s is not properly configured",
           partitionColumn);
       replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, 0, numPartitions,

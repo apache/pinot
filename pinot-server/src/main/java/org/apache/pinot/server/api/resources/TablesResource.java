@@ -20,6 +20,7 @@ package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -32,7 +33,6 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -84,6 +84,9 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -111,6 +114,7 @@ import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -242,26 +246,27 @@ public class TablesResource {
           }
           for (String column : columnSet) {
             ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
-            int columnLength = 0;
-            DataType storedDataType = columnMetadata.getDataType().getStoredType();
-            if (storedDataType.isFixedWidth()) {
+            int columnLength;
+            DataType storedType = columnMetadata.getDataType().getStoredType();
+            if (storedType.isFixedWidth()) {
               // For type of fixed width: INT, LONG, FLOAT, DOUBLE, BOOLEAN (stored as INT), TIMESTAMP (stored as LONG),
               // set the columnLength as the fixed width.
-              columnLength = storedDataType.size();
+              columnLength = storedType.size();
             } else if (columnMetadata.hasDictionary()) {
               // For type of variable width (String, Bytes), if it's stored using dictionary encoding, set the
               // columnLength as the max length in dictionary.
               columnLength = columnMetadata.getColumnMaxLength();
-            } else if (storedDataType == DataType.STRING || storedDataType == DataType.BYTES) {
-              // For type of variable width (String, Bytes), if it's stored using raw bytes, set the columnLength as
-              // the length of the max value.
-              if (columnMetadata.getMaxValue() != null) {
-                String maxValueString = (String) columnMetadata.getMaxValue();
-                columnLength = maxValueString.getBytes(StandardCharsets.UTF_8).length;
-              }
             } else {
-              // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
-              columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
+              // For raw STRING/BYTES column, set the columnLength as the length of the max value.
+              Comparable<?> maxValue = columnMetadata.getMaxValue();
+              if (maxValue instanceof String) {
+                columnLength = Utf8.encodedLength((String) maxValue);
+              } else if (maxValue instanceof ByteArray) {
+                columnLength = ((ByteArray) maxValue).length();
+              } else {
+                // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
+                columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
+              }
             }
             int columnCardinality = columnMetadata.getCardinality();
             columnLengthMap.merge(column, (double) columnLength, Double::sum);
@@ -293,23 +298,19 @@ public class TablesResource {
       }
     }
 
-    // fetch partition to primary key count for realtime tables that have upsert enabled
-    Map<Integer, Long> upsertPartitionToPrimaryKeyCountMap = new HashMap<>();
-    if (tableDataManager instanceof RealtimeTableDataManager) {
-      RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
-      upsertPartitionToPrimaryKeyCountMap = realtimeTableDataManager.getUpsertPartitionToPrimaryKeyCount();
-    }
+    // fetch partition to primary key count for tables that have upsert or dedup enabled
+    Map<Integer, Long> partitionToPrimaryKeyCountMap = tableDataManager.getPartitionToPrimaryKeyCount();
 
-    // construct upsertPartitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
-    Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap = new HashMap<>();
-    upsertPartitionToPrimaryKeyCountMap.forEach(
-        (partition, primaryKeyCount) -> upsertPartitionToServerPrimaryKeyCountMap.put(partition,
+    // construct partitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
+    Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
+    partitionToPrimaryKeyCountMap.forEach(
+        (partition, primaryKeyCount) -> partitionToServerPrimaryKeyCountMap.put(partition,
             Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
 
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
             totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
-            upsertPartitionToServerPrimaryKeyCountMap);
+            partitionToServerPrimaryKeyCountMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
@@ -472,10 +473,10 @@ public class TablesResource {
     }
   }
 
-  // TODO Add access control similar to PinotSegmentUploadDownloadRestletResource for segment download.
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DOWNLOAD_SEGMENT)
   @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
   public Response downloadSegment(
       @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE")

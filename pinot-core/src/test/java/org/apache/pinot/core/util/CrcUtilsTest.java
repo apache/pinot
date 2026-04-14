@@ -38,7 +38,6 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -92,11 +91,11 @@ public class CrcUtilsTest {
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
     assertNotNull(resource);
     File avroFile = new File(TestUtils.getFileFromResourceUrl(resource));
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
-            .setInvertedIndexColumns(List.of("column1", "column5", "column6"))
-            .setCreateInvertedIndexDuringSegmentGeneration(true)
-            .setIngestionConfig(SegmentTestUtils.getSkipTimeCheckIngestionConfig()).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("daysSinceEpoch")
+        .setInvertedIndexColumns(List.of("column1", "column5", "column6"))
+        .setIngestionConfig(SegmentTestUtils.getSkipTimeCheckIngestionConfig())
+        .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     config.setInputFilePath(avroFile.getAbsolutePath());
     config.setSegmentVersion(SegmentVersion.v1);
@@ -113,36 +112,6 @@ public class CrcUtilsTest {
   }
 
   @Test
-  public void testCrcWithNativeFstIndex()
-      throws Exception {
-    URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
-    assertNotNull(resource);
-    File avroFile = new File(TestUtils.getFileFromResourceUrl(resource));
-    List<FieldConfig> fieldConfigs = List.of(
-        new FieldConfig("column5", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
-            null));
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
-            .setInvertedIndexColumns(List.of("column1", "column5", "column6"))
-            .setCreateInvertedIndexDuringSegmentGeneration(true).setFieldConfigList(fieldConfigs)
-            .setIngestionConfig(SegmentTestUtils.getSkipTimeCheckIngestionConfig()).build();
-    tableConfig.getIndexingConfig().setFSTIndexType(FSTType.NATIVE);
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, SCHEMA);
-    config.setInputFilePath(avroFile.getAbsolutePath());
-    config.setSegmentVersion(SegmentVersion.v1);
-    config.setOutDir(INDEX_DIR.getAbsolutePath());
-    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config);
-    driver.build();
-
-    File indexDir = driver.getOutputDirectory();
-    assertEquals(CrcUtils.computeCrc(indexDir), 289171778L);
-
-    new SegmentV1V2ToV3FormatConverter().convert(indexDir);
-    assertEquals(CrcUtils.computeCrc(indexDir), 3409394291L);
-  }
-
-  @Test
   public void testCrcAllFilesWithLuceneFstIndex()
       throws Exception {
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
@@ -151,11 +120,12 @@ public class CrcUtilsTest {
     List<FieldConfig> fieldConfigs = List.of(
         new FieldConfig("column5", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
             null));
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
-            .setInvertedIndexColumns(List.of("column1", "column5", "column6"))
-            .setCreateInvertedIndexDuringSegmentGeneration(true).setFieldConfigList(fieldConfigs)
-            .setIngestionConfig(SegmentTestUtils.getSkipTimeCheckIngestionConfig()).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("daysSinceEpoch")
+        .setInvertedIndexColumns(List.of("column1", "column5", "column6"))
+        .setFieldConfigList(fieldConfigs)
+        .setIngestionConfig(SegmentTestUtils.getSkipTimeCheckIngestionConfig())
+        .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     config.setInputFilePath(avroFile.getAbsolutePath());
     config.setSegmentVersion(SegmentVersion.v1);
@@ -180,11 +150,12 @@ public class CrcUtilsTest {
     List<FieldConfig> fieldConfigs = List.of(
         new FieldConfig("column5", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT), null,
             null));
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
-            .setInvertedIndexColumns(List.of("column1", "column5", "column6"))
-            .setCreateInvertedIndexDuringSegmentGeneration(true).setFieldConfigList(fieldConfigs)
-            .setIngestionConfig(SegmentTestUtils.getSkipTimeCheckIngestionConfig()).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("daysSinceEpoch")
+        .setInvertedIndexColumns(List.of("column1", "column5", "column6"))
+        .setFieldConfigList(fieldConfigs)
+        .setIngestionConfig(SegmentTestUtils.getSkipTimeCheckIngestionConfig())
+        .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     config.setInputFilePath(avroFile.getAbsolutePath());
     config.setSegmentVersion(SegmentVersion.v1);

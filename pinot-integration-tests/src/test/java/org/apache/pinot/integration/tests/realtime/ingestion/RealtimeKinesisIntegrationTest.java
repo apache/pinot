@@ -84,13 +84,8 @@ public class RealtimeKinesisIntegrationTest extends BaseKinesisIntegrationTest {
     waitForAllDocsLoadedKinesis(120_000L);
   }
 
-  protected void waitForAllDocsLoadedKinesis(long timeoutMs)
-      throws Exception {
-    waitForAllDocsLoadedKinesis(timeoutMs, true);
-  }
-
-  protected void waitForAllDocsLoadedKinesis(long timeoutMs, boolean raiseError) {
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+  protected void waitForAllDocsLoadedKinesis(long timeoutMs) {
+    TestUtils.waitForCondition(new Function<>() {
       @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
@@ -101,7 +96,7 @@ public class RealtimeKinesisIntegrationTest extends BaseKinesisIntegrationTest {
           return null;
         }
       }
-    }, 1000L, timeoutMs, "Failed to load " + _totalRecordsPushedInStream + " documents", raiseError);
+    }, 1000L, timeoutMs, "Failed to load " + _totalRecordsPushedInStream + " documents");
   }
 
   @Override

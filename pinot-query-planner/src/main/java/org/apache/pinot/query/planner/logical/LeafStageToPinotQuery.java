@@ -28,9 +28,12 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.sql.FilterKind;
 
 
 /**
@@ -98,8 +101,88 @@ public class LeafStageToPinotQuery {
   private static void handleFilter(Filter filter, PinotQuery pinotQuery) {
     if (filter != null) {
       RexExpression rexExpression = RexExpressionUtils.fromRexNode(filter.getCondition());
-      pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(rexExpression,
-          pinotQuery.getSelectList()));
+      Expression filterExpression = CalciteRexExpressionParser.toExpression(rexExpression,
+          pinotQuery.getSelectList());
+      pinotQuery.setFilterExpression(ensureFilterIsFunctionExpression(filterExpression));
     }
+  }
+
+  /**
+   * Ensures the filter expression is a FUNCTION type that segment pruners can process.
+   * <p>
+   * When the V2 physical optimizer passes filters through Calcite's RelNode tree, certain expression types
+   * (REINTERPRET on bare boolean columns, constant-folded SEARCH) produce IDENTIFIER or LITERAL Expression
+   * objects with null functionCall. Segment pruners assume all filter expressions are FUNCTION type and NPE
+   * on these. This method wraps bare IDENTIFIERs as EQUALS(col, true), converts LITERAL false to an
+   * always-false predicate EQUALS(0, 1), and drops LITERAL true expressions (null = no filter).
+   * For AND/OR/NOT nodes, operands are recursively fixed.
+   * <p>
+   * Note: This method mutates the input expression's operand lists in-place for AND/OR/NOT nodes.
+   * It assumes the expression tree is freshly constructed and not shared across concurrent callers.
+   */
+  static Expression ensureFilterIsFunctionExpression(Expression expression) {
+    if (expression == null) {
+      return null;
+    }
+    if (expression.getFunctionCall() != null) {
+      Function function = expression.getFunctionCall();
+      String operator = function.getOperator();
+      if (FilterKind.AND.name().equals(operator) || FilterKind.OR.name().equals(operator)) {
+        // Recursively fix operands of AND/OR, dropping null (LITERAL) results
+        List<Expression> operands = function.getOperands();
+        List<Expression> fixedOperands = new ArrayList<>();
+        for (Expression operand : operands) {
+          Expression fixed = ensureFilterIsFunctionExpression(operand);
+          if (fixed != null) {
+            fixedOperands.add(fixed);
+          }
+        }
+        if (fixedOperands.isEmpty()) {
+          return null;  // All operands were constant — drop entire filter
+        }
+        if (fixedOperands.size() == 1) {
+          return fixedOperands.get(0);  // Single operand — unwrap AND/OR
+        }
+        function.setOperands(fixedOperands);
+      } else if (FilterKind.NOT.name().equals(operator)) {
+        // Recursively fix the single operand of NOT
+        List<Expression> operands = function.getOperands();
+        // NOT is always unary — Calcite validates this at parse time and RexExpressionUtils
+        // preserves the operand list unchanged. Guard defensively; drop filter if malformed.
+        if (operands.size() != 1) {
+          return null;
+        }
+        Expression fixed = ensureFilterIsFunctionExpression(operands.get(0));
+        if (fixed == null) {
+          return null;  // NOT(constant) — drop entire filter
+        }
+        operands.set(0, fixed);
+      }
+      return expression;
+    }
+    if (expression.getIdentifier() != null) {
+      // Bare boolean column reference (e.g., "is_active" after REINTERPRET stripped).
+      // Wrap as EQUALS(col, true) so pruners see a standard predicate.
+      Function equalsFunction = new Function(FilterKind.EQUALS.name());
+      equalsFunction.setOperands(new ArrayList<>(List.of(expression, RequestUtils.getLiteralExpression(true))));
+      Expression wrapped = new Expression(ExpressionType.FUNCTION);
+      wrapped.setFunctionCall(equalsFunction);
+      return wrapped;
+    }
+    // LITERAL expression (constant-folded predicate, e.g., TRUE/FALSE).
+    // Treat LITERAL false as an always-false predicate that pruners can process so they
+    // don't unnecessarily scan everything.
+    if (expression.getLiteral() != null && expression.getLiteral().isSetBoolValue()
+        && !expression.getLiteral().getBoolValue()) {
+      Function alwaysFalse = new Function(FilterKind.EQUALS.name());
+      alwaysFalse.setOperands(new ArrayList<>(List.of(
+          RequestUtils.getLiteralExpression(0),
+          RequestUtils.getLiteralExpression(1))));
+      Expression wrapped = new Expression(ExpressionType.FUNCTION);
+      wrapped.setFunctionCall(alwaysFalse);
+      return wrapped;
+    }
+    // LITERAL true or non-boolean literals have no filter constraint so we skip pruning
+    return null;
   }
 }

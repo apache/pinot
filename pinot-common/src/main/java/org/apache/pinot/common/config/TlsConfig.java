@@ -20,7 +20,9 @@ package org.apache.pinot.common.config;
 
 import io.netty.handler.ssl.SslProvider;
 import java.security.KeyStore;
+import java.util.Arrays;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -38,6 +40,9 @@ public class TlsConfig {
   private String _sslProvider = SslProvider.JDK.toString();
   // If true, the client will not verify the server's certificate
   private boolean _insecure = false;
+  // Allowed TLS protocols (optional, if not set uses default)
+  @Nullable
+  private String[] _allowedProtocols = null;
 
   public TlsConfig() {
     // left blank
@@ -52,6 +57,10 @@ public class TlsConfig {
     _trustStorePath = tlsConfig._trustStorePath;
     _trustStorePassword = tlsConfig._trustStorePassword;
     _sslProvider = tlsConfig._sslProvider;
+    _insecure = tlsConfig._insecure;
+    _allowedProtocols = tlsConfig._allowedProtocols != null
+        ? Arrays.copyOf(tlsConfig._allowedProtocols, tlsConfig._allowedProtocols.length)
+        : null;
   }
 
   public boolean isClientAuthEnabled() {
@@ -130,6 +139,17 @@ public class TlsConfig {
     _insecure = insecure;
   }
 
+  @Nullable
+  public String[] getAllowedProtocols() {
+    return _allowedProtocols != null ? Arrays.copyOf(_allowedProtocols, _allowedProtocols.length) : null;
+  }
+
+  public void setAllowedProtocols(@Nullable String[] allowedProtocols) {
+    _allowedProtocols = allowedProtocols != null
+        ? Arrays.copyOf(allowedProtocols, allowedProtocols.length)
+        : null;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -139,16 +159,23 @@ public class TlsConfig {
       return false;
     }
     TlsConfig tlsConfig = (TlsConfig) o;
-    return _clientAuthEnabled == tlsConfig._clientAuthEnabled && _insecure == tlsConfig._insecure && Objects.equals(
-        _keyStoreType, tlsConfig._keyStoreType) && Objects.equals(_keyStorePath, tlsConfig._keyStorePath)
-        && Objects.equals(_keyStorePassword, tlsConfig._keyStorePassword) && Objects.equals(_trustStoreType,
-        tlsConfig._trustStoreType) && Objects.equals(_trustStorePath, tlsConfig._trustStorePath) && Objects.equals(
-        _trustStorePassword, tlsConfig._trustStorePassword) && Objects.equals(_sslProvider, tlsConfig._sslProvider);
+    return _clientAuthEnabled == tlsConfig._clientAuthEnabled
+        && _insecure == tlsConfig._insecure
+        && Objects.equals(_keyStoreType, tlsConfig._keyStoreType)
+        && Objects.equals(_keyStorePath, tlsConfig._keyStorePath)
+        && Objects.equals(_keyStorePassword, tlsConfig._keyStorePassword)
+        && Objects.equals(_trustStoreType, tlsConfig._trustStoreType)
+        && Objects.equals(_trustStorePath, tlsConfig._trustStorePath)
+        && Objects.equals(_trustStorePassword, tlsConfig._trustStorePassword)
+        && Objects.equals(_sslProvider, tlsConfig._sslProvider)
+        && Arrays.equals(_allowedProtocols, tlsConfig._allowedProtocols);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_clientAuthEnabled, _keyStoreType, _keyStorePath, _keyStorePassword, _trustStoreType,
+    int result = Objects.hash(_clientAuthEnabled, _keyStoreType, _keyStorePath, _keyStorePassword, _trustStoreType,
         _trustStorePath, _trustStorePassword, _sslProvider, _insecure);
+    result = 31 * result + Arrays.hashCode(_allowedProtocols);
+    return result;
   }
 }

@@ -26,6 +26,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
@@ -65,8 +66,14 @@ public class ParquetAvroRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
+    // Data parsing: extract current record into GenericRow.
     _recordExtractor.extract(_nextRecord, reuse);
-    _nextRecord = _parquetReader.read();
+    // Record fetch: read next Parquet Avro record.
+    try {
+      _nextRecord = _parquetReader.read();
+    } catch (IOException e) {
+      throw new RecordFetchException("Failed to read next Parquet Avro record", e);
+    }
     return reuse;
   }
 

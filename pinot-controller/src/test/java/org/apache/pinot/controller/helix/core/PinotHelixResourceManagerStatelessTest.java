@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
@@ -79,9 +78,12 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
@@ -325,11 +327,79 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     resetBrokerTags();
   }
 
+  /**
+   * Verifies that when a new broker is added with the same tenant as a logical table,
+   * the broker resource ideal state is updated for the logical table partition (Issue #15751).
+   */
+  @Test
+  public void testUpdateBrokerResourceWithLogicalTable()
+      throws Exception {
+    untagBrokers();
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 2, 0, 0);
+    _helixResourceManager.createBrokerTenant(brokerTenant);
+
+    String brokerTag = TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME);
+    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
+    List<String> taggedBrokers = HelixHelper.getInstancesWithTag(instanceConfigs, brokerTag);
+    assertEquals(taggedBrokers.size(), 2);
+
+    // Add physical tables (offline + realtime) via manager with test tenants, then logical table
+    addDummySchema(RAW_TABLE_NAME);
+    TableConfig offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(offlineTableConfig.getTableName());
+    _helixResourceManager.addTable(offlineTableConfig);
+    waitForEVToDisappear(REALTIME_TABLE_NAME);
+    TableConfig realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    _helixResourceManager.addTable(realtimeTableConfig);
+    List<String> physicalTableNamesWithType = List.of(OFFLINE_TABLE_NAME, REALTIME_TABLE_NAME);
+    String logicalTableName = "test_logical_table";
+    addDummySchema(logicalTableName);
+    LogicalTableConfig logicalTableConfig =
+        ControllerTest.getDummyLogicalTableConfig(logicalTableName, physicalTableNamesWithType, BROKER_TENANT_NAME);
+    _helixResourceManager.addLogicalTableConfig(logicalTableConfig);
+
+    IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
+    assertTrue(brokerResource.getPartitionSet().contains(logicalTableName));
+    checkBrokerResourceForPartition(logicalTableName, taggedBrokers);
+
+    // Add a new broker instance with same tenant; verify add-broker path updates logical table partition
+    Instance newBrokerInstance =
+        new Instance("localhost", 3, InstanceType.BROKER, Collections.singletonList(brokerTag), null, 0, 0, 0, 0,
+            false);
+    assertTrue(_helixResourceManager.addInstance(newBrokerInstance, true).isSuccessful());
+    String newBrokerId = InstanceUtils.getHelixInstanceId(newBrokerInstance);
+    List<String> taggedBrokersAfterAdd = new ArrayList<>(taggedBrokers);
+    taggedBrokersAfterAdd.add(newBrokerId);
+
+    checkBrokerResourceForPartition(logicalTableName, taggedBrokersAfterAdd);
+
+    // Cleanup
+    _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
+    assertTrue(_helixResourceManager.dropInstance(newBrokerId).isSuccessful());
+    resetBrokerTags();
+  }
+
   private void checkBrokerResource(List<String> expectedBrokers) {
     IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
     assertEquals(brokerResource.getPartitionSet().size(), 1);
     Map<String, String> instanceStateMap = brokerResource.getInstanceStateMap(OFFLINE_TABLE_NAME);
     assertEquals(instanceStateMap.keySet(), new HashSet<>(expectedBrokers));
+  }
+
+  private void checkBrokerResourceForPartition(String partitionName, List<String> expectedBrokers) {
+    IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
+    assertTrue(brokerResource.getPartitionSet().contains(partitionName),
+        "Broker resource should contain partition: " + partitionName);
+    Map<String, String> instanceStateMap = brokerResource.getInstanceStateMap(partitionName);
+    assertEquals(instanceStateMap.keySet(), new HashSet<>(expectedBrokers),
+        "Broker set for partition " + partitionName + " should match expected");
   }
 
   @Test
@@ -1690,17 +1760,16 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     waitForEVToDisappear(tableConfig.getTableName());
     addDummySchema(rawTableName);
 
-    List<Pair<PartitionGroupMetadata, Integer>> consumingMetadata = new ArrayList<>();
-    PartitionGroupMetadata metadata0 = mock(PartitionGroupMetadata.class);
-    when(metadata0.getPartitionGroupId()).thenReturn(0);
-    when(metadata0.getStartOffset()).thenReturn(mock(StreamPartitionMsgOffset.class));
-    consumingMetadata.add(Pair.of(metadata0, 5));
-    PartitionGroupMetadata metadata1 = mock(PartitionGroupMetadata.class);
-    when(metadata1.getPartitionGroupId()).thenReturn(1);
-    when(metadata1.getStartOffset()).thenReturn(mock(StreamPartitionMsgOffset.class));
-    consumingMetadata.add(Pair.of(metadata1, 10));
+    StreamConfig streamConfig = new StreamConfig(rawTableName + "_REALTIME",
+        FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap());
+    PartitionGroupMetadata metadata0 =
+        new PartitionGroupMetadata(0, mock(StreamPartitionMsgOffset.class), 5);
+    PartitionGroupMetadata metadata1 =
+        new PartitionGroupMetadata(1, mock(StreamPartitionMsgOffset.class), 10);
+    List<StreamMetadata> streamMetadataList = Collections.singletonList(
+        new StreamMetadata(streamConfig, 2, Arrays.asList(metadata0, metadata1)));
 
-    _helixResourceManager.addTable(tableConfig, consumingMetadata);
+    _helixResourceManager.addTable(tableConfig, streamMetadataList);
 
     IdealState idealState = _helixResourceManager.getTableIdealState(realtimeTableName);
     assertNotNull(idealState);

@@ -236,6 +236,25 @@ public class InbuiltFunctionEvaluatorTest {
     }
   }
 
+  @Test
+  public void testPolymorphicBitwiseFunctions() {
+    // Ingestion evaluator resolves by arity, which returns the LONG overload.
+    // INT inputs are widened to LONG via convertTypes, so results use 64-bit semantics.
+    // Return type depends on the method: most return long, but bitExtract returns int.
+    GenericRow intRow = new GenericRow();
+    intRow.putValue("value", 6);
+    intRow.putValue("rhs", 3);
+    intRow.putValue("shift", 2);
+    assertEquals(new InbuiltFunctionEvaluator("bitNot(value)").evaluate(intRow), -7L);
+    assertEquals(new InbuiltFunctionEvaluator("bitAnd(value, rhs)").evaluate(intRow), 2L);
+    assertEquals(new InbuiltFunctionEvaluator("bitShiftRightUnsigned(value, shift)").evaluate(intRow), 1L);
+
+    GenericRow longRow = new GenericRow();
+    longRow.putValue("value", 1L << 40);
+    longRow.putValue("shift", 40);
+    assertEquals(new InbuiltFunctionEvaluator("bitExtract(value, shift)").evaluate(longRow), 1);
+  }
+
   @SuppressWarnings("unused")
   public static class MyFunc {
     String _baseString = "";

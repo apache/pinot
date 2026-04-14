@@ -63,25 +63,8 @@ public final class ServerInstance {
    */
   public ServerInstance(InstanceConfig instanceConfig) {
     _instanceId = instanceConfig.getInstanceName();
-    String hostname = instanceConfig.getHostName();
-    if (hostname != null) {
-      if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        _hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
-      } else {
-        _hostname = hostname;
-      }
-      _port = Integer.parseInt(instanceConfig.getPort());
-    } else {
-      // Hostname might be null in some tests (InstanceConfig created by calling the constructor instead of fetching
-      // from ZK), directly parse the instance name
-      String instanceName = instanceConfig.getInstanceName();
-      if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        instanceName = instanceName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
-      }
-      String[] hostnameAndPort = StringUtils.split(instanceName, HOSTNAME_PORT_DELIMITER);
-      _hostname = hostnameAndPort[0];
-      _port = Integer.parseInt(hostnameAndPort[1]);
-    }
+    _hostname = extractHostnameFromConfig(instanceConfig);
+    _port = extractPortFromConfig(instanceConfig);
     _grpcPort = instanceConfig.getRecord().getIntField(Helix.Instance.GRPC_PORT_KEY, INVALID_PORT);
     _nettyTlsPort = instanceConfig.getRecord().getIntField(Helix.Instance.NETTY_TLS_PORT_KEY, INVALID_PORT);
     _queryServicePort = instanceConfig.getRecord().getIntField(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY,
@@ -90,6 +73,50 @@ public final class ServerInstance {
         INVALID_PORT);
     _adminEndpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig, _hostname, CommonConstants.HTTP_PROTOCOL);
     _pool = extractPool(instanceConfig);
+  }
+
+  /**
+   * Extracts the raw hostname from an InstanceConfig, stripping the "Server_" prefix if present.
+   *
+   * <p>By default (auto joined instances), server instance name is of format:
+   * {@code Server_<hostname>_<port>}, e.g. {@code Server_localhost_12345}, hostname is of format:
+   * {@code Server_<hostname>}, e.g. {@code Server_localhost}.
+   */
+  public static String extractHostnameFromConfig(InstanceConfig instanceConfig) {
+    String hostname = instanceConfig.getHostName();
+    if (hostname != null) {
+      if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        return hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+      }
+      return hostname;
+    }
+    return parseInstanceNameParts(instanceConfig)[0];
+  }
+
+  /**
+   * Extracts the port from an InstanceConfig. When {@code instanceConfig.getPort()} is not null, uses it directly.
+   * Otherwise, parses the last segment of the instance name.
+   */
+  public static int extractPortFromConfig(InstanceConfig instanceConfig) {
+    String port = instanceConfig.getPort();
+    if (port != null) {
+      return Integer.parseInt(port);
+    }
+    String[] parts = parseInstanceNameParts(instanceConfig);
+    return Integer.parseInt(parts[1]);
+  }
+
+  /**
+   * Parses the instance name into parts split by {@code _}, stripping the "Server_" prefix if present.
+   * This is a fallback for when hostname/port are null (e.g. in tests where InstanceConfig is constructed
+   * directly instead of fetched from ZK).
+   */
+  private static String[] parseInstanceNameParts(InstanceConfig instanceConfig) {
+    String instanceName = instanceConfig.getInstanceName();
+    if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      instanceName = instanceName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    }
+    return StringUtils.split(instanceName, HOSTNAME_PORT_DELIMITER);
   }
 
   @VisibleForTesting

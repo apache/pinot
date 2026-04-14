@@ -422,9 +422,8 @@ public class DataTableImplV4 implements DataTable {
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     writeLeadingSections(dataOutputStream);
 
-    // Add table serialization time and memory metadata if thread timer is enabled.
-    // TODO: The check on cpu time and memory measurement is not needed. We can remove it. But keeping it around for
-    // backward compatibility.
+    // Add table serialization time and memory metadata when the corresponding measurement is enabled.
+    // When CPU time/memory usage is not collectable, we omit these values from the metadata.
     if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
       getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(),
           String.valueOf(resourceSnapshot.getCpuTimeNs()));

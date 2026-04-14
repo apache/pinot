@@ -21,6 +21,8 @@ package org.apache.pinot.segment.spi.partition;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 
 
 /**
@@ -29,7 +31,7 @@ import javax.annotation.Nullable;
 public class PartitionFunctionFactory {
   // Enum for various partition functions to be added.
   public enum PartitionFunctionType {
-    Modulo, Murmur, Murmur2, Murmur3, ByteArray, HashCode, BoundedColumnValue;
+    Modulo, Murmur, Murmur2, Murmur3, Fnv, ByteArray, HashCode, BoundedColumnValue;
     // Add more functions here.
 
     private static final Map<String, PartitionFunctionType> VALUE_MAP = new HashMap<>();
@@ -77,10 +79,13 @@ public class PartitionFunctionFactory {
 
       case Murmur:
       case Murmur2:
-        return new MurmurPartitionFunction(numPartitions);
+        return new MurmurPartitionFunction(numPartitions, functionConfig);
 
       case Murmur3:
         return new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+      case Fnv:
+        return new FnvPartitionFunction(numPartitions, functionConfig);
 
       case ByteArray:
         return new ByteArrayPartitionFunction(numPartitions);
@@ -94,5 +99,13 @@ public class PartitionFunctionFactory {
       default:
         throw new IllegalArgumentException("Illegal partition function name: " + functionName);
     }
+  }
+
+  public static PartitionFunction getPartitionFunction(ColumnPartitionConfig config) {
+    return getPartitionFunction(config.getFunctionName(), config.getNumPartitions(), config.getFunctionConfig());
+  }
+
+  public static PartitionFunction getPartitionFunction(ColumnPartitionMetadata metadata) {
+    return getPartitionFunction(metadata.getFunctionName(), metadata.getNumPartitions(), metadata.getFunctionConfig());
   }
 }

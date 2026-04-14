@@ -40,12 +40,12 @@ on:
 jobs:
   generate-build-info:
     name: Generate Build Info
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       commit-id: ${{ steps.generate-build-info.outputs.commit-id }}
       tags: ${{ steps.generate-build-info.outputs.tags }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Generate Build Info
         id: generate-build-info
         env:
@@ -55,26 +55,27 @@ jobs:
         run: |
           .github/workflows/scripts/docker/.pinot_build_info_gen.sh
   build-pinot-docker-image:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         arch: [ "amd64", "arm64" ]
         base-image-tag: [ "11-amazoncorretto", "11-ms-openjdk" ]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     name: Build Pinot Docker Image on ${{ matrix.arch }} with base image ${{ matrix.base-image-tag }}
     needs: [ generate-build-info ]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/setup-qemu-action@v3
-        name: Set up QEMU
-        with:
-          platforms: linux/${{ matrix.arch }}
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
         name: Set up Docker Buildx
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build and push the Docker image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
@@ -87,19 +88,15 @@ jobs:
         run: .github/workflows/scripts/docker/.pinot_single_platform_docker_image_build.sh
   create-multi-arch-manifest:
     name: Create Multi-Arch Manifest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [ generate-build-info, build-pinot-docker-image ]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/setup-qemu-action@v3
-        name: Set up QEMU
-      - uses: docker/setup-buildx-action@v3
-        name: Set up Docker Buildx
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Create Multi-Arch Manifest
         env:
           TAGS: "${{needs.generate-build-info.outputs.tags}}"

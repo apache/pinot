@@ -21,23 +21,24 @@ package org.apache.pinot.connector.flink;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.Row;
-import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminTransport;
 import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
-import org.apache.pinot.connector.flink.http.PinotConnectionUtils;
 import org.apache.pinot.connector.flink.sink.PinotSinkFunction;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 
 
 /**
@@ -79,12 +80,24 @@ public final class FlinkQuickStart {
     execEnv.setParallelism(2);
     DataStream<Row> srcDs = execEnv.fromCollection(data).returns(TEST_TYPE_INFO).keyBy(r -> r.getField(0));
 
-    HttpClient httpClient = HttpClient.getInstance();
-    ControllerRequestClient client = new ControllerRequestClient(
-        ControllerRequestURLBuilder.baseUrl(DEFAULT_CONTROLLER_URL), httpClient);
-    Schema schema = PinotConnectionUtils.getSchema(client, "starbucksStores");
-    TableConfig tableConfig = PinotConnectionUtils.getTableConfig(client, "starbucksStores", "OFFLINE");
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema));
+    URI controllerUri = URI.create(DEFAULT_CONTROLLER_URL);
+    String controllerAddress = controllerUri.getAuthority();
+    String controllerPath = controllerUri.getPath();
+    if (controllerPath != null && !controllerPath.isEmpty() && !"/".equals(controllerPath)) {
+      controllerAddress += controllerPath.endsWith("/") ? controllerPath.substring(0, controllerPath.length() - 1)
+          : controllerPath;
+    }
+    Properties properties = new Properties();
+    properties.setProperty(PinotAdminTransport.ADMIN_TRANSPORT_SCHEME, controllerUri.getScheme());
+
+    try (PinotAdminClient client = new PinotAdminClient(controllerAddress, properties)) {
+      Schema schema = client.getSchemaClient().getSchemaObject("starbucksStores");
+      TableConfig tableConfig =
+          client.getTableClient().getTableConfigObjectForType("starbucksStores", TableType.OFFLINE);
+      srcDs.addSink(
+          new PinotSinkFunction<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema,
+              DEFAULT_CONTROLLER_URL));
+    }
     execEnv.execute();
   }
 }

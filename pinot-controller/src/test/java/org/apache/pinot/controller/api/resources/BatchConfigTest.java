@@ -17,7 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
-
+import org.apache.pinot.common.restlet.resources.BatchConfig;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

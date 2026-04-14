@@ -44,6 +44,13 @@ class SetResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWra
 
   @Override
   public List<Set> extractIntermediateResult(DictIdsWrapper dictIdsWrapper) {
+    if (dictIdsWrapper == null) {
+      List<Set> result = new ArrayList<>(_numSteps);
+      for (int i = 0; i < _numSteps; i++) {
+        result.add(new ObjectOpenHashSet<>());
+      }
+      return result;
+    }
     Dictionary dictionary = dictIdsWrapper._dictionary;
     List<Set> result = new ArrayList<>(_numSteps);
     for (RoaringBitmap dictIdBitmap : dictIdsWrapper._stepsBitmaps) {

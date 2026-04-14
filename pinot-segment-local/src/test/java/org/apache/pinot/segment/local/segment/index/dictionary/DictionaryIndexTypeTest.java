@@ -298,7 +298,7 @@ public class DictionaryIndexTypeTest {
           fieldConfig.getIndexes().get(StandardIndexes.dictionary().getPrettyName()),
           DictionaryIndexConfig.class);
       assertNotNull(config);
-      assertTrue(config.getUseVarLengthDictionary());
+      assertTrue(config.isUseVarLengthDictionary());
       postConversionAsserts();
     }
 

@@ -26,6 +26,7 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -144,5 +145,11 @@ public abstract class BaseDataSource implements DataSource {
   @Override
   public VectorIndexReader getVectorIndex() {
     return getIndex(StandardIndexes.vector());
+  }
+
+  @Nullable
+  @Override
+  public VectorIndexConfig getVectorIndexConfig() {
+    return _indexContainer.getVectorIndexConfig();
   }
 }

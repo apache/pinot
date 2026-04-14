@@ -30,9 +30,9 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
@@ -204,6 +204,30 @@ public class ControllerRequestClient {
       HttpClient.wrapAndThrowHttpException(
           _httpClient.sendDeleteRequest(new URI(_controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName)),
               _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public String getLogicalTable(String logicalTableName)
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendGetRequest(
+              new URI(_controllerRequestURLBuilder.forLogicalTableGet(logicalTableName)), _headers));
+      return response.getResponse();
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public List<String> getLogicalTableNames()
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendGetRequest(
+              new URI(_controllerRequestURLBuilder.forLogicalTableNamesGet()), _headers));
+      return JsonUtils.stringToObject(response.getResponse(), List.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

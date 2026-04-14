@@ -56,13 +56,15 @@ public class WorkloadResourceAggregator implements ResourceAggregator {
   private Map<String, LongLongMutablePair> _currentCpuMemUsage = new HashMap<>();
 
   public WorkloadResourceAggregator(String instanceId, InstanceType instanceType, boolean cpuSamplingEnabled,
-      boolean memorySamplingEnabled, AtomicReference<QueryMonitorConfig> queryMonitorConfig) {
+      boolean memorySamplingEnabled, AtomicReference<QueryMonitorConfig> queryMonitorConfig,
+      WorkloadBudgetManager workloadBudgetManager) {
+    assert workloadBudgetManager.isEnabled();
     _instanceId = instanceId;
     _instanceType = instanceType;
     _cpuSamplingEnabled = cpuSamplingEnabled;
     _memorySamplingEnabled = memorySamplingEnabled;
     _queryMonitorConfig = queryMonitorConfig;
-    _workloadBudgetManager = WorkloadBudgetManager.get();
+    _workloadBudgetManager = workloadBudgetManager;
   }
 
   @Override

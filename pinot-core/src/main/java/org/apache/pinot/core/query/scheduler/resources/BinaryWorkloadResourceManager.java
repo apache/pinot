@@ -32,11 +32,17 @@ import org.slf4j.LoggerFactory;
  */
 public class BinaryWorkloadResourceManager extends ResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(BinaryWorkloadResourceManager.class);
-  private final ResourceLimitPolicy _secondaryWorkloadPolicy;
+  // Volatile to ensure visibility across query threads when the policy is replaced by onThreadPoolsResized()
+  private volatile ResourceLimitPolicy _secondaryWorkloadPolicy;
 
   public BinaryWorkloadResourceManager(PinotConfiguration config) {
     super(config);
     _secondaryWorkloadPolicy = new ResourceLimitPolicy(config, _numQueryWorkerThreads);
+  }
+
+  @Override
+  protected void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads) {
+    _secondaryWorkloadPolicy = new ResourceLimitPolicy(_config, newWorkerThreads);
   }
 
   /**

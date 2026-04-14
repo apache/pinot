@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -61,6 +62,7 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.request.PinotQuery;
@@ -526,9 +528,12 @@ public class ClusterIntegrationTestUtils {
     properties.put("bootstrap.servers", kafkaBroker);
     properties.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
     properties.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
-    properties.put("request.required.acks", "1");
-    properties.put("transactional.id", "test-transaction");
-    properties.put("transaction.state.log.replication.factor", "2");
+    properties.put(ProducerConfig.ACKS_CONFIG, "all");
+    properties.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+    properties.put(ProducerConfig.RETRIES_CONFIG, Integer.toString(Integer.MAX_VALUE));
+    properties.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5");
+    properties.put(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG, "600000");
+    properties.put(ProducerConfig.TRANSACTIONAL_ID_CONFIG, "test-transaction-" + UUID.randomUUID());
     try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(properties)) {
       pushAvroIntoKafkaWithTransaction(avroFiles, kafkaTopic, maxNumKafkaMessagesPerBatch, header, partitionColumn,
           commit, producer);
@@ -542,15 +547,23 @@ public class ClusterIntegrationTestUtils {
       int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn, boolean commit,
       KafkaProducer<byte[], byte[]> producer)
       throws Exception {
+    int maxMessagesPerTransaction = maxNumKafkaMessagesPerBatch > 0 ? maxNumKafkaMessagesPerBatch : Integer.MAX_VALUE;
     producer.initTransactions();
-    producer.beginTransaction();
     long counter = 0;
+    int recordsInTransaction = 0;
+    boolean hasOpenTransaction = false;
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       for (File avroFile : avroFiles) {
         try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
           BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
           GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(reader.getSchema());
           for (GenericRecord genericRecord : reader) {
+            if (!hasOpenTransaction) {
+              producer.beginTransaction();
+              hasOpenTransaction = true;
+              recordsInTransaction = 0;
+            }
+
             outputStream.reset();
             if (header != null && 0 < header.length) {
               outputStream.write(header);
@@ -563,14 +576,26 @@ public class ClusterIntegrationTestUtils {
             byte[] bytes = outputStream.toByteArray();
             ProducerRecord<byte[], byte[]> record = new ProducerRecord(kafkaTopic, keyBytes, bytes);
             producer.send(record);
+
+            recordsInTransaction++;
+            if (recordsInTransaction >= maxMessagesPerTransaction) {
+              if (commit) {
+                producer.commitTransaction();
+              } else {
+                producer.abortTransaction();
+              }
+              hasOpenTransaction = false;
+            }
           }
         }
       }
     }
-    if (commit) {
-      producer.commitTransaction();
-    } else {
-      producer.abortTransaction();
+    if (hasOpenTransaction) {
+      if (commit) {
+        producer.commitTransaction();
+      } else {
+        producer.abortTransaction();
+      }
     }
   }
 

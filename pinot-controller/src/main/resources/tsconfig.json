@@ -17,24 +17,25 @@
  * under the License.
  */
 {
-    "compilerOptions": {
-        "outDir": "./dist/",
-        "sourceMap": true,
-        "noImplicitAny": false,
-        "module": "commonjs",
-        "target": "es6",
-        "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true,
-        "jsx": "react",
-        "skipLibCheck": true,
-        "moduleResolution": "node",
-        "resolveJsonModule": true
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": ["dom", "dom.iterable", "es2020"],
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react",
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "Models": ["app/Models.ts"]
     },
-    "include": [
-        "app/**/*"
-    ],
-    "exclude": [
-        "node_modules",
-        "dist"
-    ]
+    "types": ["vite/client", "node"]
+  },
+  "include": ["app/**/*", "vite.config.ts"],
+  "exclude": ["node_modules", "dist"]
 }

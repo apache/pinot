@@ -21,7 +21,7 @@ package org.apache.pinot.common.utils.regex;
 import java.util.regex.Pattern;
 
 public class JavaUtilPattern implements org.apache.pinot.common.utils.regex.Pattern {
-  Pattern _pattern;
+  final Pattern _pattern;
 
   public JavaUtilPattern(String regex) {
     _pattern = Pattern.compile(regex, 0);

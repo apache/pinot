@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.IntFunction;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
@@ -75,6 +76,8 @@ public class QuickstartRunner {
   private final AuthProvider _authProvider;
   private final Map<String, Object> _configOverrides;
   private final Map<String, String> _clusterConfigOverrides;
+  private final IntFunction<Map<String, Object>> _individualBrokerConfigOverridesFunction;
+  private final IntFunction<Map<String, Object>> _individualServerConfigOverridesFunction;
   private final boolean _deleteExistingData;
 
   // If this field is non-null, an embedded Zookeeper instance will not be launched
@@ -103,6 +106,18 @@ public class QuickstartRunner {
       Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData,
       Map<String, String> clusterConfigOverrides)
       throws Exception {
+    this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, enableIsolation, authProvider,
+        configOverrides, zkExternalAddress, deleteExistingData, clusterConfigOverrides, i -> Map.of(),
+        i -> Map.of());
+  }
+
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
+      int numServers, int numMinions, File tempDir, boolean enableIsolation, AuthProvider authProvider,
+      Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData,
+      Map<String, String> clusterConfigOverrides,
+      IntFunction<Map<String, Object>> individualBrokerConfigOverridesFunction,
+      IntFunction<Map<String, Object>> individualServerConfigOverridesFunction
+  ) throws Exception {
     _tableRequests = tableRequests;
     _numControllers = numControllers;
     _numBrokers = numBrokers;
@@ -113,6 +128,8 @@ public class QuickstartRunner {
     _authProvider = authProvider;
     _configOverrides = new HashMap<>(configOverrides);
     _clusterConfigOverrides = clusterConfigOverrides;
+    _individualBrokerConfigOverridesFunction = individualBrokerConfigOverridesFunction;
+    _individualServerConfigOverridesFunction = individualServerConfigOverridesFunction;
     if (numMinions > 0) {
       // configure the controller to schedule tasks when minion is enabled
       _configOverrides.put("controller.task.scheduler.enabled", true);
@@ -164,10 +181,19 @@ public class QuickstartRunner {
       throws Exception {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
-      brokerStarter.setPort(DEFAULT_BROKER_PORT + i)
+      brokerStarter
+          .setPort(DEFAULT_BROKER_PORT + i)
           .setGrpcPort(DEFAULT_BROKER_GRPC_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
-          .setConfigOverrides(_configOverrides);
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME);
+
+      Map<String, Object> individualBrokerConfigOverrides = _individualBrokerConfigOverridesFunction.apply(i);
+      if (!individualBrokerConfigOverrides.isEmpty()) {
+        Map<String, Object> config = new HashMap<>(_configOverrides);
+        config.putAll(individualBrokerConfigOverrides);
+        brokerStarter.setConfigOverrides(config);
+      } else {
+        brokerStarter.setConfigOverrides(_configOverrides);
+      }
       if (!brokerStarter.execute()) {
         throw new RuntimeException("Failed to start Broker");
       }
@@ -179,12 +205,22 @@ public class QuickstartRunner {
       throws Exception {
     for (int i = 0; i < _numServers; i++) {
       StartServerCommand serverStarter = new StartServerCommand();
-      serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
+      serverStarter
+          .setPort(DEFAULT_SERVER_NETTY_PORT + i)
+          .setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setGrpcPort(DEFAULT_SERVER_GRPC_PORT + i)
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
-          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
-          .setConfigOverrides(_configOverrides);
+          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath());
+
+      Map<String, Object> individualControllerConfigOverrides = _individualServerConfigOverridesFunction.apply(i);
+      if (!individualControllerConfigOverrides.isEmpty()) {
+        Map<String, Object> config = new HashMap<>(_configOverrides);
+        config.putAll(individualControllerConfigOverrides);
+        serverStarter.setConfigOverrides(config);
+      } else {
+        serverStarter.setConfigOverrides(_configOverrides);
+      }
       if (!serverStarter.execute()) {
         throw new RuntimeException("Failed to start Server");
       }

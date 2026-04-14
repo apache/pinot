@@ -123,8 +123,8 @@ public class TablePropagationScheme implements PropagationScheme {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableWithType);
       if (tableType == TableType.OFFLINE) {
         // We skip overrides since they are only applicable to REALTIME tables
-        String offlineKey = InstancePartitionsUtils.getInstancePartitionsName(tableWithType,
-            InstancePartitionsType.OFFLINE.toString());
+        String offlineKey =
+            InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.OFFLINE);
         Set<String> offlineInstances = getInstancesFromInstancePartitions(offlineKey);
         // Given we allow for entity without table type, it's possible to not find any OFFLINE instances if the
         // table is REALTIME only. However, we have a check above to ensure at least one table type resolves
@@ -159,10 +159,10 @@ public class TablePropagationScheme implements PropagationScheme {
    * If {@code type} is null, returns the union of CONSUMING and COMPLETED.
    */
   private Set<String> getRealtimeInstances(String tableWithType, @Nullable OverrideEntityType type) {
-    String consumingKey = InstancePartitionsUtils.getInstancePartitionsName(
-        tableWithType, InstancePartitionsType.CONSUMING.toString());
-    String completedKey = InstancePartitionsUtils.getInstancePartitionsName(
-        tableWithType, InstancePartitionsType.COMPLETED.toString());
+    String consumingKey =
+        InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.CONSUMING);
+    String completedKey =
+        InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.COMPLETED);
     if (type == OverrideEntityType.CONSUMING) {
       Set<String> instances = getInstancesFromInstancePartitions(consumingKey);
       return (instances == null) ? Collections.emptySet() : new HashSet<>(instances);

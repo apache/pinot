@@ -30,17 +30,28 @@ StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvi
 execEnv.setParallelism(2); // optional
 DataStream<Row> srcDs = execEnv.fromCollection(data).returns(TEST_TYPE_INFO)
 
-// Create a ControllerRequestClient to fetch Pinot schema and table config
-HttpClient httpClient = HttpClient.getInstance();
-ControllerRequestClient client = new ControllerRequestClient(
-ControllerRequestURLBuilder.baseUrl(DEFAULT_CONTROLLER_URL), httpClient);
+// Create a PinotAdminClient to fetch Pinot schema and table config
+String controllerUrl = "http://localhost:9000";
+URI controllerUri = URI.create(controllerUrl);
+String controllerAddress = controllerUri.getAuthority();
+String controllerPath = controllerUri.getPath();
+if (controllerPath != null && !controllerPath.isEmpty() && !"/".equals(controllerPath)) {
+  controllerAddress += controllerPath.endsWith("/") ? controllerPath.substring(0, controllerPath.length() - 1)
+      : controllerPath;
+}
+Properties properties = new Properties();
+properties.setProperty(PinotAdminTransport.ADMIN_TRANSPORT_SCHEME, controllerUri.getScheme());
 
-// fetch Pinot schema
-Schema schema = PinotConnectionUtils.getSchema(client, "starbucksStores");
-// fetch Pinot table config
-TableConfig tableConfig = PinotConnectionUtils.getTableConfig(client, "starbucksStores", "OFFLINE");
-// create Flink Pinot Sink
-srcDs.addSink(new PinotSinkFunction<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema));
+try (PinotAdminClient client = new PinotAdminClient(controllerAddress, properties)) {
+  // fetch Pinot schema
+  Schema schema = client.getSchemaClient().getSchemaObject("starbucksStores");
+  // fetch Pinot table config
+  TableConfig tableConfig =
+      client.getTableClient().getTableConfigObjectForType("starbucksStores", TableType.OFFLINE);
+  // create Flink Pinot Sink
+  srcDs.addSink(new PinotSinkFunction<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema,
+      controllerUrl));
+}
 execEnv.execute();
 ```
 
@@ -48,22 +59,33 @@ execEnv.execute();
 ```java
 // Set up flink env and data source
 StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
-execEnv.setParallelism(2); // mandatory for upsert tables wi
+execEnv.setParallelism(2); // mandatory for upsert tables
 DataStream<Row> srcDs = execEnv.fromCollection(data).returns(TEST_TYPE_INFO)
 
-// Create a ControllerRequestClient to fetch Pinot schema and table config
-HttpClient httpClient = HttpClient.getInstance();
-ControllerRequestClient client = new ControllerRequestClient(
-ControllerRequestURLBuilder.baseUrl(DEFAULT_CONTROLLER_URL), httpClient);
+// Create a PinotAdminClient to fetch Pinot schema and table config
+String controllerUrl = "http://localhost:9000";
+URI controllerUri = URI.create(controllerUrl);
+String controllerAddress = controllerUri.getAuthority();
+String controllerPath = controllerUri.getPath();
+if (controllerPath != null && !controllerPath.isEmpty() && !"/".equals(controllerPath)) {
+  controllerAddress += controllerPath.endsWith("/") ? controllerPath.substring(0, controllerPath.length() - 1)
+      : controllerPath;
+}
+Properties properties = new Properties();
+properties.setProperty(PinotAdminTransport.ADMIN_TRANSPORT_SCHEME, controllerUri.getScheme());
 
-// fetch Pinot schema
-Schema schema = PinotConnectionUtils.getSchema(client, "starbucksStores");
-// fetch Pinot table config
-TableConfig tableConfig = PinotConnectionUtils.getTableConfig(client, "starbucksStores", "REALTIME");
+try (PinotAdminClient client = new PinotAdminClient(controllerAddress, properties)) {
+  // fetch Pinot schema
+  Schema schema = client.getSchemaClient().getSchemaObject("starbucksStores");
+  // fetch Pinot table config
+  TableConfig tableConfig =
+      client.getTableClient().getTableConfigObjectForType("starbucksStores", TableType.REALTIME);
 
-// create Flink Pinot Sink (partition it same as the realtime stream(e.g. kafka) in case of upsert tables)
-srcDs.partitionCustom((Partitioner<Integer>) (key, partitions) -> key % partitions, r -> (Integer) r.getField("primaryKey"))
-    .addSink(new PinotSinkFunction<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema));
+  // create Flink Pinot Sink (partition it same as the realtime stream(e.g. kafka) in case of upsert tables)
+  srcDs.partitionCustom((Partitioner<Integer>) (key, partitions) -> key % partitions, r -> (Integer) r.getField("primaryKey"))
+      .addSink(new PinotSinkFunction<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema,
+          controllerUrl));
+}
 execEnv.execute();
 
 ```

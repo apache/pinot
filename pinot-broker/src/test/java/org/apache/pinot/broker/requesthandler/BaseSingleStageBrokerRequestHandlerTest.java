@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -32,21 +33,27 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
+import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
@@ -272,5 +279,173 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         pinotQuery.getQueryOptions().get(CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH),
         queryHash,
         "QueryOptions should contain the correct queryHash value");
+  }
+
+  private BaseSingleStageBrokerRequestHandler createHybridHandlerWithTimeBoundary(
+      AtomicReference<TableRouteInfo> capturedRouteInfo) {
+    String offlineTableName = "myTable_OFFLINE";
+    String realtimeTableName = "myTable_REALTIME";
+
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("myTable")
+        .addDateTime("created_15min", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName("myTable")).thenReturn("myTable");
+    when(tableCache.getSchema("myTable")).thenReturn(schema);
+    when(tableCache.getColumnNameMap("myTable")).thenReturn(Map.of("created_15min", "created_15min"));
+
+    TableConfig offlineTableCfg = mock(TableConfig.class);
+    TableConfig realtimeTableCfg = mock(TableConfig.class);
+    TenantConfig tenant = new TenantConfig("tier_BROKER", "tier_SERVER", null);
+    when(offlineTableCfg.getTenantConfig()).thenReturn(tenant);
+    when(realtimeTableCfg.getTenantConfig()).thenReturn(tenant);
+    when(tableCache.getTableConfig(offlineTableName)).thenReturn(offlineTableCfg);
+    when(tableCache.getTableConfig(realtimeTableName)).thenReturn(realtimeTableCfg);
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(offlineTableName)).thenReturn(true);
+    when(routingManager.routingExists(realtimeTableName)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    TimeBoundaryInfo timeBoundaryInfo = new TimeBoundaryInfo("created_15min", "1772109900000");
+    when(routingManager.getTimeBoundaryInfo(offlineTableName)).thenReturn(timeBoundaryInfo);
+
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+            new SegmentsToQuery(List.of("segment01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
+
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+
+    return new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
+        routingManager, new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
+        ThreadAccountantUtils.getNoOpAccountant(), null) {
+      @Override
+      public void start() {
+      }
+
+      @Override
+      public void shutDown() {
+      }
+
+      @Override
+      protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+          BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+          RequestContext requestContext) {
+        capturedRouteInfo.set(route);
+        return BrokerResponseNative.empty();
+      }
+    };
+  }
+
+  private static void assertRangeFilter(BrokerRequest brokerRequest, String column, String expectedRange,
+      String label) {
+    Assert.assertNotNull(brokerRequest, label + ": broker request should exist");
+    Expression filter = brokerRequest.getPinotQuery().getFilterExpression();
+    // Walk past any AND nodes wrapping non-time-column predicates to find the RANGE on our column
+    Function filterFunc = filter.getFunctionCall();
+    if (FilterKind.AND.name().equals(filterFunc.getOperator())) {
+      Expression rangeExpr = null;
+      for (Expression operand : filterFunc.getOperands()) {
+        Function fn = operand.getFunctionCall();
+        if (FilterKind.RANGE.name().equals(fn.getOperator())
+            && column.equals(fn.getOperands().get(0).getIdentifier().getName())) {
+          rangeExpr = operand;
+          break;
+        }
+      }
+      Assert.assertNotNull(rangeExpr, label + ": expected a RANGE filter on " + column + " within AND");
+      filterFunc = rangeExpr.getFunctionCall();
+    }
+    Assert.assertEquals(filterFunc.getOperator(), FilterKind.RANGE.name(),
+        label + ": filter should be a RANGE");
+    List<Expression> operands = filterFunc.getOperands();
+    Assert.assertEquals(operands.get(0).getIdentifier().getName(), column);
+    Assert.assertEquals(operands.get(1).getLiteral().getStringValue(), expectedRange);
+  }
+
+  @Test
+  public void testTimeBoundaryMergesWithBetween()
+      throws Exception {
+    AtomicReference<TableRouteInfo> capturedRouteInfo = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler = createHybridHandlerWithTimeBoundary(capturedRouteInfo);
+
+    handler.handleRequest("SELECT * FROM myTable "
+        + "WHERE created_15min BETWEEN 1772106300000 AND 1772113500000 LIMIT 10");
+
+    TableRouteInfo routeInfo = capturedRouteInfo.get();
+    Assert.assertNotNull(routeInfo, "processBrokerRequest should have been called");
+    assertRangeFilter(routeInfo.getOfflineBrokerRequest(), "created_15min",
+        "[1772106300000" + Range.DELIMITER + "1772109900000]", "Offline BETWEEN");
+    assertRangeFilter(routeInfo.getRealtimeBrokerRequest(), "created_15min",
+        "(1772109900000" + Range.DELIMITER + "1772113500000]", "Realtime BETWEEN");
+  }
+
+  @Test
+  public void testTimeBoundaryMergesWithExplicitRange()
+      throws Exception {
+    AtomicReference<TableRouteInfo> capturedRouteInfo = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler = createHybridHandlerWithTimeBoundary(capturedRouteInfo);
+
+    handler.handleRequest("SELECT * FROM myTable "
+        + "WHERE created_15min > 1772106300000 AND created_15min < 1772113500000 LIMIT 10");
+
+    TableRouteInfo routeInfo = capturedRouteInfo.get();
+    Assert.assertNotNull(routeInfo, "processBrokerRequest should have been called");
+    assertRangeFilter(routeInfo.getOfflineBrokerRequest(), "created_15min",
+        "(1772106300000" + Range.DELIMITER + "1772109900000]", "Offline explicit range");
+    assertRangeFilter(routeInfo.getRealtimeBrokerRequest(), "created_15min",
+        "(1772109900000" + Range.DELIMITER + "1772113500000)", "Realtime explicit range");
+  }
+
+  @Test
+  public void testTimeBoundaryMergesWithOneSidedRange()
+      throws Exception {
+    AtomicReference<TableRouteInfo> capturedRouteInfo = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler = createHybridHandlerWithTimeBoundary(capturedRouteInfo);
+
+    // Query has only a lower bound — time boundary supplies the complementary bound for each side
+    handler.handleRequest("SELECT * FROM myTable "
+        + "WHERE created_15min > 1772106300000 LIMIT 10");
+
+    TableRouteInfo routeInfo = capturedRouteInfo.get();
+    Assert.assertNotNull(routeInfo, "processBrokerRequest should have been called");
+    // Offline: query's > 1772106300000 merged with time boundary's <= 1772109900000
+    assertRangeFilter(routeInfo.getOfflineBrokerRequest(), "created_15min",
+        "(1772106300000" + Range.DELIMITER + "1772109900000]", "Offline one-sided");
+    // Realtime: query's > 1772106300000 merged with time boundary's > 1772109900000
+    // Tighter bound wins: > 1772109900000 with no upper bound
+    assertRangeFilter(routeInfo.getRealtimeBrokerRequest(), "created_15min",
+        "(1772109900000" + Range.DELIMITER + "*)", "Realtime one-sided");
+  }
+
+  @Test
+  public void testTimeBoundaryMergesWithMixedFilters()
+      throws Exception {
+    AtomicReference<TableRouteInfo> capturedRouteInfo = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler = createHybridHandlerWithTimeBoundary(capturedRouteInfo);
+
+    handler.handleRequest("SELECT * FROM myTable "
+        + "WHERE created_15min BETWEEN 1772106300000 AND 1772113500000 "
+        + "AND created_15min > 1772109900000 LIMIT 10");
+
+    TableRouteInfo routeInfo = capturedRouteInfo.get();
+    Assert.assertNotNull(routeInfo, "processBrokerRequest should have been called");
+    // Offline merges to (1772109900000, 1772109900000] — an empty range (exclusive lower = inclusive upper),
+    // but the handler doesn't prune it as always-false; the server handles that at execution time.
+    assertRangeFilter(routeInfo.getOfflineBrokerRequest(), "created_15min",
+        "(1772109900000" + Range.DELIMITER + "1772109900000]", "Offline mixed");
+    // Realtime merges to (1772109900000, 1772113500000].
+    assertRangeFilter(routeInfo.getRealtimeBrokerRequest(), "created_15min",
+        "(1772109900000" + Range.DELIMITER + "1772113500000]", "Realtime mixed");
   }
 }

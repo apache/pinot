@@ -23,8 +23,6 @@ import java.util.Map;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
-import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -68,11 +66,6 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     }
     if (indexReader == null) {
       throw new IllegalArgumentException("Cannot apply TEXT_MATCH on column: " + columnName + " without text index");
-    }
-    if (indexReader instanceof NativeTextIndexReader
-        || indexReader instanceof NativeMutableTextIndex) {
-      throw new UnsupportedOperationException(
-          "TEXT_MATCH is not supported on column: " + columnName + " with native text index");
     }
 
     TransformFunction predicate = arguments.get(1);

@@ -18,15 +18,19 @@
  */
 package org.apache.pinot.controller.validation;
 
+import java.util.List;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -98,6 +102,62 @@ public class ValidationManagerStatelessTest extends ControllerTest {
     // Assert that the two do equal after being rebuilt.
     Assert.assertTrue(idealState.getInstanceSet(partitionNameTwo)
         .equals(_helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
+  }
+
+  /**
+   * Verifies that rebuildBrokerResourceFromHelixTags works for a logical table partition when a new broker
+   * is added manually and the ideal state is out of sync (Issue #15751).
+   */
+  @Test
+  public void testRebuildBrokerResourceWhenBrokerAddedForLogicalTable()
+      throws Exception {
+    // Add realtime table so we can create a logical table with both offline and realtime
+    TableConfig realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TEST_TABLE_NAME).setNumReplicas(2)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    _helixResourceManager.addTable(realtimeTableConfig);
+
+    String logicalTableName = "test_logical_rebuild";
+    addDummySchema(logicalTableName);
+    List<String> physicalTableNamesWithType =
+        List.of(TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME),
+            TableNameBuilder.REALTIME.tableNameWithType(TEST_TABLE_NAME));
+    LogicalTableConfig logicalTableConfig =
+        ControllerTest.getDummyLogicalTableConfig(logicalTableName, physicalTableNamesWithType,
+            TagNameUtils.DEFAULT_TENANT_NAME);
+    addLogicalTableConfig(logicalTableConfig);
+
+    HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
+    IdealState idealState = HelixHelper.getBrokerIdealStates(helixAdmin, getHelixClusterName());
+    Assert.assertTrue(idealState.getPartitionSet().contains(logicalTableName));
+
+    // Add a new broker manually so the logical table partition is missing it
+    final String newBrokerId = "Broker_localhost_3";
+    InstanceConfig instanceConfig = new InstanceConfig(newBrokerId);
+    instanceConfig.setInstanceEnabled(true);
+    instanceConfig.setHostName("Broker_localhost");
+    instanceConfig.setPort("3");
+    helixAdmin.addInstance(getHelixClusterName(), instanceConfig);
+    helixAdmin.addInstanceTag(getHelixClusterName(), instanceConfig.getInstanceName(),
+        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
+
+    idealState = HelixHelper.getBrokerIdealStates(helixAdmin, getHelixClusterName());
+    Assert.assertFalse(idealState.getInstanceSet(logicalTableName)
+        .equals(_helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
+
+    _helixResourceManager.rebuildBrokerResourceFromHelixTags(logicalTableName);
+    idealState = HelixHelper.getBrokerIdealStates(helixAdmin, getHelixClusterName());
+    Assert.assertTrue(idealState.getInstanceSet(logicalTableName)
+        .equals(_helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
+
+    // Cleanup
+    _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
+    _helixResourceManager.deleteRealtimeTable(TEST_TABLE_NAME);
+    // Remove the manually added broker instance so that subsequent tests see a clean cluster state
+    helixAdmin.removeInstanceTag(getHelixClusterName(), instanceConfig.getInstanceName(),
+        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
+    instanceConfig.setInstanceEnabled(false);
+    helixAdmin.dropInstance(getHelixClusterName(), instanceConfig);
   }
 
   @AfterClass

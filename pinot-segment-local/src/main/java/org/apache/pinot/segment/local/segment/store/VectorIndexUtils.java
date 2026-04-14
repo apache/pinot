@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.codecs.lucene912.Lucene912Codec;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
@@ -27,7 +28,9 @@ import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswCodec;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 
 
 public class VectorIndexUtils {
@@ -52,11 +55,55 @@ public class VectorIndexUtils {
     FileUtils.deleteQuietly(nativeV99IndexFile);
     File nativeV912IndexFile = new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(nativeV912IndexFile);
+
+    // Remove the IVF_FLAT index file
+    File ivfFlatIndexFile = new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(ivfFlatIndexFile);
+
+    // Remove the IVF_PQ index file
+    File ivfPqIndexFile = new File(segDir, column + Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(ivfPqIndexFile);
   }
 
   static boolean hasVectorIndex(File segDir, String column) {
-    return new File(segDir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists();
+    return new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_V99_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION).exists();
+  }
+
+  @Nullable
+  public static VectorBackendType detectVectorIndexBackend(File segmentIndexDir, String column) {
+    if (SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, column, VectorBackendType.IVF_PQ) != null) {
+      return VectorBackendType.IVF_PQ;
+    }
+    if (SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, column, VectorBackendType.IVF_FLAT) != null) {
+      return VectorBackendType.IVF_FLAT;
+    }
+    if (SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, column, VectorBackendType.HNSW) != null) {
+      return VectorBackendType.HNSW;
+    }
+    return null;
+  }
+
+  public static String getIndexFileExtension(VectorBackendType backendType) {
+    switch (backendType) {
+      case HNSW:
+        return Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
+      case IVF_FLAT:
+        return Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
+      case IVF_PQ:
+        return Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION;
+      case IVF_ON_DISK:
+        // IVF_ON_DISK reuses the IVF_FLAT file format with FileChannel random-access reads
+        return Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
+      default:
+        throw new IllegalStateException("Unsupported vector backend type: " + backendType);
+    }
   }
 
   public static VectorSimilarityFunction toSimilarityFunction(
@@ -70,6 +117,8 @@ public class VectorIndexUtils {
         return VectorSimilarityFunction.EUCLIDEAN;
       case DOT_PRODUCT:
         return VectorSimilarityFunction.DOT_PRODUCT;
+      case L2:
+        return VectorSimilarityFunction.EUCLIDEAN;
       default:
         throw new IllegalArgumentException("Unknown distance function: " + distanceFunction);
     }

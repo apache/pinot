@@ -34,7 +34,7 @@ RUN case `uname -m` in \
   *) echo "platform=$(uname -m) un-supported, exit ..."; exit 1; ;; \
   esac \
   && mkdir -p /usr/local/lib/async-profiler \
-  && curl -L https://github.com/jvm-profiling-tools/async-profiler/releases/download/v2.9/async-profiler-2.9-linux-${arch}.tar.gz | tar -xz --strip-components 1 -C /usr/local/lib/async-profiler \
-  && ln -s /usr/local/lib/async-profiler/profiler.sh /usr/local/bin/async-profiler
+  && curl -L https://github.com/async-profiler/async-profiler/releases/download/v4.3/async-profiler-4.3-linux-${arch}.tar.gz | tar -xz --strip-components 1 -C /usr/local/lib/async-profiler \
+  && ln -s /usr/local/lib/async-profiler/bin/asprof /usr/local/bin/async-profiler
 
 CMD ["bash"]

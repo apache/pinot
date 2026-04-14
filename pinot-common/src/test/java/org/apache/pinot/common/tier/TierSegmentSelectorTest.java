@@ -138,4 +138,20 @@ public class TierSegmentSelectorTest {
     realtimeSegmentZKMetadata.setStatus(Status.IN_PROGRESS);
     Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, realtimeSegmentZKMetadata));
   }
+
+  @Test
+  public void testFixedSegmentSelectorWithWildcardSelectsAllCompleted() {
+    String segmentName = "segment_0";
+    String tableNameWithType = "myTable_OFFLINE";
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+    segmentZKMetadata.setStatus(Status.DONE);
+
+    // ["*"] selects all completed segments (no time column required)
+    FixedTierSegmentSelector segmentSelector = new FixedTierSegmentSelector(Set.of("*"));
+    Assert.assertTrue(segmentSelector.selectSegment(tableNameWithType, segmentZKMetadata));
+
+    // Consuming segments are not selected
+    segmentZKMetadata.setStatus(Status.IN_PROGRESS);
+    Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentZKMetadata));
+  }
 }

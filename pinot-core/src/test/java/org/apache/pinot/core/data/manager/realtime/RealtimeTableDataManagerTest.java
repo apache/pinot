@@ -126,4 +126,17 @@ public class RealtimeTableDataManagerTest {
             .equals(streamMetadataProvider1)), 5, 2000, "streamMetadataProvider returned from cache must be new.");
     Assert.assertTrue(fakeRealtimeTableDataManager._cacheEntryRemovalNotified);
   }
+
+  @Test
+  public void testEnforceConsumptionInOrderRuntimeOverride() {
+    RealtimeTableDataManager realtimeTableDataManager = new RealtimeTableDataManager(null);
+
+    Assert.assertFalse(realtimeTableDataManager.isEnforceConsumptionInOrderEnabled());
+
+    realtimeTableDataManager.setEnforceConsumptionInOrder(true);
+    Assert.assertTrue(realtimeTableDataManager.isEnforceConsumptionInOrderEnabled());
+
+    realtimeTableDataManager.setEnforceConsumptionInOrder(false);
+    Assert.assertFalse(realtimeTableDataManager.isEnforceConsumptionInOrderEnabled());
+  }
 }

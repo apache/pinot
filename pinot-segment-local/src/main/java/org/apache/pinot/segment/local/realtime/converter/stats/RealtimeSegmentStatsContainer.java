@@ -18,104 +18,95 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
-import java.util.HashMap;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.EmptyColumnStatistics;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
-import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
  * Stats container for an in-memory realtime segment.
  */
 public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContainer {
-  private final MutableSegment _mutableSegment;
-  private final Map<String, ColumnStatistics> _columnStatisticsMap = new HashMap<>();
+  private final Map<String, ColumnStatistics> _columnStatisticsMap;
   private final int _totalDocCount;
 
-  @Deprecated
   public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
-      StatsCollectorConfig statsCollectorConfig) {
-    this(mutableSegment, sortedDocIds, statsCollectorConfig, null, null);
+      @Nullable String sortedColumn, @Nullable RoaringBitmap validDocIds, StatsCollectorConfig statsCollectorConfig) {
+    _totalDocCount = validDocIds != null ? validDocIds.getCardinality() : mutableSegment.getNumDocsIndexed();
+
+    Set<String> columns = mutableSegment.getPhysicalColumnNames();
+    _columnStatisticsMap = Maps.newHashMapWithExpectedSize(columns.size());
+    for (String column : columns) {
+      DataSource dataSource = mutableSegment.getDataSource(column);
+      boolean isSortedColumn = column.equals(sortedColumn);
+      _columnStatisticsMap.put(column,
+          createColumnStatistics(dataSource, sortedDocIds, isSortedColumn, validDocIds, statsCollectorConfig));
+    }
   }
 
-  @Deprecated
-  public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
-      StatsCollectorConfig statsCollectorConfig, @Nullable RecordReader recordReader) {
-    this(mutableSegment, sortedDocIds, statsCollectorConfig, recordReader, null);
-  }
+  /**
+   * Creates the appropriate {@link ColumnStatistics} for the given data source, dispatching on
+   * column type (map, dictionary, or no-dictionary) and whether compaction is active.
+   */
+  private ColumnStatistics createColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds,
+      boolean isSortedColumn, @Nullable RoaringBitmap validDocIds, StatsCollectorConfig statsCollectorConfig) {
+    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    Preconditions.checkState(!isSortedColumn || dataSourceMetadata.isSingleValue(),
+        "Sorted column must be single-valued, but column '%s' is multi-valued",
+        dataSourceMetadata.getFieldSpec().getName());
 
-  public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
-      StatsCollectorConfig statsCollectorConfig, @Nullable RecordReader recordReader,
-      @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot) {
-    _mutableSegment = mutableSegment;
-
-    // Determine if we're using compacted reader
-    boolean isUsingCompactedReader = recordReader instanceof CompactedPinotSegmentRecordReader;
-
-    // Validate that compacted readers always have a validDocIds snapshot
-    if (isUsingCompactedReader && validDocIdsSnapshot == null) {
-      throw new IllegalArgumentException(
-          "CompactedPinotSegmentRecordReader requires a non-null validDocIdsSnapshot to ensure consistency");
+    if (dataSourceMetadata.getNumDocs() == 0 || (validDocIds != null && validDocIds.isEmpty())) {
+      return new EmptyColumnStatistics(dataSourceMetadata.getFieldSpec(), dataSourceMetadata.getPartitionFunction(),
+          dataSourceMetadata.getPartitions());
     }
-
-    // Determine the correct total document count based on whether compaction is being used
-    if (isUsingCompactedReader) {
-      _totalDocCount = validDocIdsSnapshot.getMutableRoaringBitmap().getCardinality();
-    } else {
-      _totalDocCount = mutableSegment.getNumDocsIndexed();
+    // TODO: Add compaction support to MAP
+    if (dataSource instanceof MutableMapDataSource) {
+      return createMapColumnStatistics(dataSource, validDocIds, statsCollectorConfig);
     }
-
-    // Create all column statistics
-    for (String columnName : mutableSegment.getPhysicalColumnNames()) {
-      DataSource dataSource = mutableSegment.getDataSource(columnName);
-
-      // Handle map columns
-      if (dataSource instanceof MutableMapDataSource) {
-        _columnStatisticsMap.put(columnName,
-            createMapColumnStatistics(dataSource, isUsingCompactedReader, validDocIdsSnapshot, statsCollectorConfig));
-        continue;
-      }
-
-      // Handle dictionary columns
+    if (validDocIds != null) {
       if (dataSource.getDictionary() != null) {
-        _columnStatisticsMap.put(columnName,
-            createDictionaryColumnStatistics(dataSource, sortedDocIds, isUsingCompactedReader, validDocIdsSnapshot));
-        continue;
+        return new CompactedColumnStatistics(dataSource, sortedDocIds, isSortedColumn, validDocIds);
+      } else {
+        return new CompactedNoDictColumnStatistics(dataSource, sortedDocIds, isSortedColumn, validDocIds);
       }
-
-      // Handle no dictionary columns
-      _columnStatisticsMap.put(columnName, new MutableNoDictionaryColStatistics(dataSource));
+    } else {
+      if (dataSource.getDictionary() != null) {
+        return new MutableColumnStatistics(dataSource, sortedDocIds, isSortedColumn);
+      } else {
+        return new MutableNoDictColumnStatistics(dataSource, sortedDocIds, isSortedColumn);
+      }
     }
   }
 
   /**
    * Creates column statistics for map columns.
    */
-  private ColumnStatistics createMapColumnStatistics(DataSource dataSource, boolean useCompactedStatistics,
-      ThreadSafeMutableRoaringBitmap validDocIds, StatsCollectorConfig statsCollectorConfig) {
+  private ColumnStatistics createMapColumnStatistics(DataSource dataSource, @Nullable RoaringBitmap validDocIds,
+      StatsCollectorConfig statsCollectorConfig) {
     ForwardIndexReader reader = dataSource.getForwardIndex();
     MapColumnPreIndexStatsCollector mapColumnPreIndexStatsCollector =
         new MapColumnPreIndexStatsCollector(dataSource.getColumnName(), statsCollectorConfig);
 
-    if (useCompactedStatistics && validDocIds != null) {
-      // COMPACTED: Only process valid documents for commit-time compaction
-      PeekableIntIterator iterator = validDocIds.getMutableRoaringBitmap().toRoaringBitmap().getIntIterator();
+    if (validDocIds != null) {
+      PeekableIntIterator iterator = validDocIds.getIntIterator();
       ForwardIndexReaderContext readerContext = reader.createContext();
       while (iterator.hasNext()) {
-        int docId = iterator.next();
-        mapColumnPreIndexStatsCollector.collect(reader.getMap(docId, readerContext));
+        mapColumnPreIndexStatsCollector.collect(reader.getMap(iterator.next(), readerContext));
       }
     } else {
       int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
@@ -127,25 +118,6 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
 
     mapColumnPreIndexStatsCollector.seal();
     return mapColumnPreIndexStatsCollector;
-  }
-
-  /**
-   * Creates column statistics for dictionary columns.
-   */
-  private ColumnStatistics createDictionaryColumnStatistics(DataSource dataSource, int[] sortedDocIds,
-      boolean useCompactedStatistics, ThreadSafeMutableRoaringBitmap validDocIds) {
-    if (useCompactedStatistics) {
-      if (dataSource.getForwardIndex().isDictionaryEncoded()) {
-        // Safe to use getDictId() - forward index supports dictionary operations
-        return new CompactedDictEncodedColumnStatistics(dataSource, sortedDocIds, validDocIds);
-      } else {
-        // Forward index doesn't support getDictId() - use raw value scanning
-        return new CompactedRawIndexDictColumnStatistics(dataSource, sortedDocIds, validDocIds);
-      }
-    } else {
-      // Regular case: non-compacted readers or no valid doc IDs available
-      return new MutableColumnStatistics(dataSource, sortedDocIds);
-    }
   }
 
   @Override

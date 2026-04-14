@@ -35,7 +35,7 @@ import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -65,7 +65,7 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
   public void init(InstanceDataManagerConfig instanceDataManagerConfig,
       HelixManager helixManager,
       SegmentLocks segmentLocks,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
       ServerReloadJobStatusCache reloadJobStatusCache) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     _helixManager = helixManager;

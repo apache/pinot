@@ -17,12 +17,13 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
-
 import java.lang.reflect.Field;
 import java.util.Collections;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.restlet.resources.BatchConfig;
+import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;

@@ -178,7 +178,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
         ThreadAccountantUtils.getNoOpAccountant())) {
       // exception will be propagated through for assert purpose on runtime error
-      return QueryDispatcher.runReducer(dispatchableSubPlan, Map.of(), _mailboxService);
+      return QueryDispatcher.runReducer(dispatchableSubPlan, requestMetadataMap, _mailboxService);
     }
   }
 

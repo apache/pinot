@@ -150,7 +150,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
           getSchema(tableNameWithType));
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader, InstanceType.MINION);
+      driver.init(config, recordReader);
       driver.build();
       _eventObserver.notifyProgress(pinotTaskConfig,
           "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
@@ -174,11 +174,8 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
 
   private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
       SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
-    // Inverted index creation is disabled by default during segment generation typically to reduce segment push times
-    // from external sources like HDFS. Also, not creating an inverted index here, the segment will always be flagged as
-    // needReload, causing the segment refresh to take place.
-    tableConfig.getIndexingConfig().setCreateInvertedIndexDuringSegmentGeneration(true);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.MINION);
     config.setOutDir(workingDir.getPath());
     config.setSegmentName(segmentName);
 

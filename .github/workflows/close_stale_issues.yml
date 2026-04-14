@@ -1,0 +1,53 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+name: Close Stale Issues
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  close-stale-issues:
+    if: github.repository == 'apache/pinot'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v10
+        with:
+          days-before-issue-stale: 150
+          days-before-issue-close: 30
+          stale-issue-label: 'stale'
+          stale-issue-message: >
+            This issue has been automatically marked as stale because it has not had
+            any activity in the last 150 days. It will be closed in 30 days if no
+            further activity occurs. If this issue is still relevant, please leave a
+            comment to keep it open. Thank you for your contributions!
+          close-issue-message: >
+            This issue has been closed because it has been inactive for 180 days.
+            If you believe this issue is still relevant, please feel free to reopen
+            it or create a new issue. Thank you!
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          operations-per-run: 100
+          exempt-issue-labels: 'pinned,security,critical'

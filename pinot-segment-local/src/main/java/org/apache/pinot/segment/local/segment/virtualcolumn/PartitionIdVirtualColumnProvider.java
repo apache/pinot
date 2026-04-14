@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
+import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -210,6 +213,16 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     }
 
     @Override
+    public byte[] getBytesValue(int dictId) {
+      return _values.get(dictId).getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public int getValueSize(int dictId) {
+      return Utf8.encodedLength(_values.get(dictId));
+    }
+
+    @Override
     public int getIntValue(int dictId) {
       throw new UnsupportedOperationException();
     }
@@ -230,7 +243,7 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     }
 
     @Override
-    public java.math.BigDecimal getBigDecimalValue(int dictId) {
+    public BigDecimal getBigDecimalValue(int dictId) {
       throw new UnsupportedOperationException();
     }
   }
