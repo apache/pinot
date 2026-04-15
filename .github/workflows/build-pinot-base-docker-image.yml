@@ -39,10 +39,10 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - name: Login to DockerHub
-        env:
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        run: echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: actions/checkout@v5
       - name: Build ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }}-${{ matrix.arch }} Pinot Base Docker Image
         env:
@@ -64,10 +64,10 @@ jobs:
         type: [build, runtime]
     steps:
       - name: Login to DockerHub
-        env:
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        run: echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: actions/checkout@v5
       - name: Push ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }} Pinot Base Docker manifest
         env:
