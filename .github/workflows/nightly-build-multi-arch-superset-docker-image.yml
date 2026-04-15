@@ -74,7 +74,7 @@ jobs:
             DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-${ARCH} "
           done
 
-          docker build \
+          docker buildx build \
             --no-cache \
             --platform=linux/${ARCH} \
             --file Dockerfile \
