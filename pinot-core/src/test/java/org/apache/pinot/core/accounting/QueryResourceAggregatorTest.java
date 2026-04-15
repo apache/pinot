@@ -68,12 +68,12 @@ public class QueryResourceAggregatorTest {
     long maxHeapSize = org.apache.pinot.spi.utils.ResourceUsageUtils.getMaxHeapSize();
     QueryMonitorConfig qmc = new QueryMonitorConfig(config, maxHeapSize);
 
-    assertTrue(qmc.isOomPauseEnabled(), "OOM pause should be enabled when timeout > 0");
-    assertEquals(qmc.getOomPauseTimeoutMs(), 2000L, "OOM pause timeout should be 2000ms");
+    assertTrue(qmc.isOomPreQueryKillPauseEnabled(), "OOM pause should be enabled when timeout > 0");
+    assertEquals(qmc.getOomPreQueryKillPauseDurationMs(), 2000L, "OOM pause timeout should be 2000ms");
 
     PinotConfiguration disabledConfig = new PinotConfiguration();
     QueryMonitorConfig disabledQmc = new QueryMonitorConfig(disabledConfig, maxHeapSize);
-    assertFalse(disabledQmc.isOomPauseEnabled(), "OOM pause should be disabled by default");
+    assertFalse(disabledQmc.isOomPreQueryKillPauseEnabled(), "OOM pause should be disabled by default");
   }
 
   @Test

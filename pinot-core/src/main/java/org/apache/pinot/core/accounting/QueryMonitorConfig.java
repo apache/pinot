@@ -63,10 +63,10 @@ public class QueryMonitorConfig {
   private final boolean _queryKilledMetricEnabled;
 
   // how long to pause query threads (ms) before proceeding with kill; non-positive means disabled
-  private final long _oomPauseTimeoutMs;
+  private final long _oomPreQueryKillPauseDurationMs;
 
   // whether to also apply the OOM pause before killing at panic level
-  private final boolean _oomPauseOnPanicEnabled;
+  private final boolean _oomPanicPreQueryKillPauseEnabled;
 
   private final int _workloadSleepTimeMs;
 
@@ -117,10 +117,11 @@ public class QueryMonitorConfig {
     _queryKilledMetricEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
         CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
 
-    _oomPauseTimeoutMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS,
+    _oomPreQueryKillPauseDurationMs = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS,
         CommonConstants.Accounting.DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS);
 
-    _oomPauseOnPanicEnabled = config.getProperty(
+    _oomPanicPreQueryKillPauseEnabled = config.getProperty(
         CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED,
         CommonConstants.Accounting.DEFAULT_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED);
 
@@ -273,25 +274,25 @@ public class QueryMonitorConfig {
     if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
           CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS)) {
-        _oomPauseTimeoutMs = CommonConstants.Accounting.DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS;
+        _oomPreQueryKillPauseDurationMs = CommonConstants.Accounting.DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS;
       } else {
-        _oomPauseTimeoutMs = Long.parseLong(
+        _oomPreQueryKillPauseDurationMs = Long.parseLong(
             clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS));
       }
     } else {
-      _oomPauseTimeoutMs = oldConfig._oomPauseTimeoutMs;
+      _oomPreQueryKillPauseDurationMs = oldConfig._oomPreQueryKillPauseDurationMs;
     }
 
     if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
           CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED)) {
-        _oomPauseOnPanicEnabled = CommonConstants.Accounting.DEFAULT_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED;
+        _oomPanicPreQueryKillPauseEnabled = CommonConstants.Accounting.DEFAULT_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED;
       } else {
-        _oomPauseOnPanicEnabled = Boolean.parseBoolean(
+        _oomPanicPreQueryKillPauseEnabled = Boolean.parseBoolean(
             clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED));
       }
     } else {
-      _oomPauseOnPanicEnabled = oldConfig._oomPauseOnPanicEnabled;
+      _oomPanicPreQueryKillPauseEnabled = oldConfig._oomPanicPreQueryKillPauseEnabled;
     }
 
     if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS)) {
@@ -367,16 +368,16 @@ public class QueryMonitorConfig {
     return _queryKilledMetricEnabled;
   }
 
-  public boolean isOomPauseEnabled() {
-    return _oomPauseTimeoutMs > 0;
+  public boolean isOomPreQueryKillPauseEnabled() {
+    return _oomPreQueryKillPauseDurationMs > 0;
   }
 
-  public long getOomPauseTimeoutMs() {
-    return _oomPauseTimeoutMs;
+  public long getOomPreQueryKillPauseDurationMs() {
+    return _oomPreQueryKillPauseDurationMs;
   }
 
-  public boolean isOomPauseOnPanicEnabled() {
-    return _oomPauseOnPanicEnabled;
+  public boolean isOomPanicPreQueryKillPauseEnabled() {
+    return _oomPanicPreQueryKillPauseEnabled;
   }
 
   public int getWorkloadSleepTimeMs() {

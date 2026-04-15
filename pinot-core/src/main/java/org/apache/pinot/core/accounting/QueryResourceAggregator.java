@@ -150,7 +150,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
     evalTriggers();
     // Prioritize the panic check
     if (_triggeringLevel == TriggeringLevel.HeapMemoryPanic) {
-      boolean pauseOnPanic = config.isOomPauseEnabled() && config.isOomPauseOnPanicEnabled();
+      boolean pauseOnPanic = config.isOomPreQueryKillPauseEnabled() && config.isOomPanicPreQueryKillPauseEnabled();
       if (_pauseActive) {
         if (System.currentTimeMillis() >= _pauseDeadlineMs || !pauseOnPanic) {
           // Grace period expired, or panic-pause disabled — kill all and clear
@@ -161,7 +161,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
       } else if (pauseOnPanic
           && _previousTriggeringLevel.ordinal() < TriggeringLevel.HeapMemoryCritical.ordinal()) {
         // Fresh jump to panic bypassing critical — activate pause before killing
-        activatePause(config.getOomPauseTimeoutMs());
+        activatePause(config.getOomPreQueryKillPauseDurationMs());
       } else {
         // Pause-on-panic disabled, or already been through a pause cycle — kill immediately
         killAllQueries(threadTrackers);
@@ -219,10 +219,10 @@ public class QueryResourceAggregator implements ResourceAggregator {
             clearPause();
           }
           // else: still in grace period, skip kill this cycle
-        } else if (config.isOomPauseEnabled()
+        } else if (config.isOomPreQueryKillPauseEnabled()
             && _previousTriggeringLevel.ordinal() < TriggeringLevel.HeapMemoryCritical.ordinal()) {
           // Just transitioned to critical - activate pause instead of killing
-          activatePause(config.getOomPauseTimeoutMs());
+          activatePause(config.getOomPreQueryKillPauseDurationMs());
         } else {
           // Pause disabled, or already been through a pause cycle - kill
           killMostExpensiveQuery();

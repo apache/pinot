@@ -232,13 +232,13 @@ public class QueryMonitorConfigTest {
     PerQueryCPUMemResourceUsageAccountant accountant =
         new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
 
-    assertEquals(accountant.getQueryMonitorConfig().getOomPauseTimeoutMs(),
+    assertEquals(accountant.getQueryMonitorConfig().getOomPreQueryKillPauseDurationMs(),
         Accounting.DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS);
     accountant.getWatcherTask()
         .onChange(
             Set.of(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS)),
             CLUSTER_CONFIGS);
-    assertEquals(accountant.getQueryMonitorConfig().getOomPauseTimeoutMs(), EXPECTED_OOM_PAUSE_TIMEOUT_MS);
+    assertEquals(accountant.getQueryMonitorConfig().getOomPreQueryKillPauseDurationMs(), EXPECTED_OOM_PAUSE_TIMEOUT_MS);
   }
 
   @Test
@@ -246,11 +246,11 @@ public class QueryMonitorConfigTest {
     PerQueryCPUMemResourceUsageAccountant accountant =
         new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
 
-    assertFalse(accountant.getQueryMonitorConfig().isOomPauseOnPanicEnabled());
+    assertFalse(accountant.getQueryMonitorConfig().isOomPanicPreQueryKillPauseEnabled());
     accountant.getWatcherTask()
         .onChange(
             Set.of(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED)),
             CLUSTER_CONFIGS);
-    assertTrue(accountant.getQueryMonitorConfig().isOomPauseOnPanicEnabled());
+    assertTrue(accountant.getQueryMonitorConfig().isOomPanicPreQueryKillPauseEnabled());
   }
 }
