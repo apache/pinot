@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-name: Nightly Pinot Snapshot Docker Image Build and Publish
+name: "[Pinot Release] Nightly Pinot Snapshot Docker Image Build and Publish"
 
 on:
   workflow_dispatch:

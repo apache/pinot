@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-name: Pinot Release All Java Distro Docker Image Build and Publish
+name: "[Pinot Release] Pinot Release All Java Distro Docker Image Build and Publish"
 
 on:
   workflow_dispatch:
