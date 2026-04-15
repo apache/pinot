@@ -27,6 +27,8 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
  * <p>Instances inherit the thread-safety characteristics of
  * {@link org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator}.
  *
+ * <p>TODO: Delete this shim after Pinot 1.6.0 is released.
+ *
  * @deprecated Use {@link org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator} instead.
  */
 @Deprecated

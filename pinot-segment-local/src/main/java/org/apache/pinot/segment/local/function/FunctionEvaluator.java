@@ -26,6 +26,8 @@ package org.apache.pinot.segment.local.function;
  * <p>Behavioral and thread-safety expectations are defined by
  * {@link org.apache.pinot.spi.function.FunctionEvaluator}.
  *
+ * <p>TODO: Delete this shim after Pinot 1.6.0 is released.
+ *
  * @deprecated Use {@link org.apache.pinot.spi.function.FunctionEvaluator} instead.
  */
 @Deprecated
