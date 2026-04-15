@@ -294,8 +294,15 @@ public class UpsertViewManager {
     _trackedSegmentsLock.writeLock().lock();
     try {
       _trackedSegments.remove(segment);
-      // No need to eagerly refresh the upsert view for SNAPSHOT mode when untracking a segment, as the untracked
-      // segment won't be used by any new queries, thus it can be removed when next refresh happens later.
+      _updatedSegmentsSinceLastRefresh.remove(segment);
+      // Eagerly evict destroyed segment from the snapshot view to avoid retaining its bitmap indefinitely on idle
+      // SNAPSHOT tables. Swap in a new map without the segment to preserve the lock-free volatile read guarantee.
+      Map<IndexSegment, MutableRoaringBitmap> current = _segmentQueryableDocIdsMap;
+      if (current != null && current.containsKey(segment)) {
+        Map<IndexSegment, MutableRoaringBitmap> updated = new HashMap<>(current);
+        updated.remove(segment);
+        _segmentQueryableDocIdsMap = updated;
+      }
     } finally {
       _trackedSegmentsLock.writeLock().unlock();
     }
