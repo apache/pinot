@@ -310,10 +310,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       QueryQuotaManager queryQuotaManager, TableCache tableCache,
       MultiStageQueryThrottler multiStageQueryThrottler, FailureDetector failureDetector,
       ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
-      WorkerManager workerManager, WorkerManager multiClusterWorkerManager) {
+      WorkerManager workerManager, WorkerManager multiClusterWorkerManager,
+      ServerRoutingStatsManager serverRoutingStatsManager) {
     return new MultiStageBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
         accessControlFactory, queryQuotaManager, tableCache, multiStageQueryThrottler, failureDetector,
-        threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager);
+        threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
+        serverRoutingStatsManager);
   }
 
   private void setupHelixSystemProperties() {
@@ -559,7 +561,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       multiStageBrokerRequestHandler =
           createMultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
-              _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager);
+              _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
+              _serverRoutingStatsManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));

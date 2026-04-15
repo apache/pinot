@@ -31,11 +31,14 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -220,5 +223,64 @@ public class QueryDispatcherTest extends QueryTestSet {
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 0L, new HashSet<>(), Map.of());
     }
+  }
+
+  @Test
+  public void testStatsManagerRecordsSubmissionAndArrivalForDispatchedServers()
+      throws Exception {
+    ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
+    String sql = "SELECT * FROM a";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+
+    Set<String> expectedInstanceIds = new HashSet<>();
+    for (DispatchablePlanFragment fragment : plan.getQueryStagesWithoutRoot()) {
+      for (QueryServerInstance server : fragment.getServerInstanceToWorkerIdMap().keySet()) {
+        expectedInstanceIds.add(server.getInstanceId());
+      }
+    }
+    Assert.assertFalse(expectedInstanceIds.isEmpty());
+
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
+    } catch (NullPointerException e) {
+      // expected: reduce phase fails with mocked MailboxService
+    }
+
+    for (String instanceId : expectedInstanceIds) {
+      Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
+      Mockito.verify(statsManager).recordStatsUponResponseArrival(requestId, instanceId, -1L);
+    }
+  }
+
+  @Test
+  public void testStatsManagerArrivalRecordedEvenWhenDispatchFails()
+      throws Exception {
+    ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
+    QueryServer failingServer = _queryServerMap.values().iterator().next();
+    Mockito.doAnswer(inv -> {
+      StreamObserver<Worker.QueryResponse> obs = inv.getArgument(1);
+      obs.onError(new RuntimeException("simulated failure"));
+      return null;
+    }).when(failingServer).submit(Mockito.any(), Mockito.any());
+
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
+    } catch (Exception e) {
+      // dispatch failed — expected
+    }
+
+    // Inflight must be decremented even when dispatch fails
+    Mockito.verify(statsManager, Mockito.atLeastOnce())
+        .recordStatsUponResponseArrival(Mockito.eq(requestId), Mockito.anyString(), Mockito.eq(-1L));
+    Mockito.reset(failingServer);
   }
 }
