@@ -23,7 +23,8 @@ package org.apache.pinot.segment.local.function;
  * Deprecated forwarding interface that preserves the historical
  * {@code org.apache.pinot.segment.local.function} binary name for downstream callers.
  *
- * <p>This interface is stateless and thread-safe.
+ * <p>Behavioral and thread-safety expectations are defined by
+ * {@link org.apache.pinot.spi.function.FunctionEvaluator}.
  *
  * @deprecated Use {@link org.apache.pinot.spi.function.FunctionEvaluator} instead.
  */
