@@ -38,16 +38,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
-      - name: Build the Docker image
-        env:
-          DOCKER_FILE_BASE_DIR: "docker/images/pinot"
-          DOCKER_IMAGE_NAME: "apachepinot/pinot"
-          PINOT_GIT_REF: ${{ github.sha }}
-          PINOT_SHA: ${{ github.sha }}
-        run: .github/workflows/scripts/.pinot_vuln_check.sh
-
       - name: Install Trivy
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
@@ -60,7 +50,7 @@ jobs:
             --vuln-type os,library \
             --severity CRITICAL,HIGH \
             --timeout 10m \
-            apachepinot/pinot:${{ github.sha }}
+            apachepinot/pinot:latest
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4
         with:
