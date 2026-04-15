@@ -24,6 +24,7 @@ import com.google.common.cache.RemovalListener;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -169,7 +170,20 @@ public class FlightMailboxService implements AutoCloseable {
       }
     }
 
+    private long extractDeadlineMs(org.apache.arrow.flight.FlightStream stream) {
+      try {
+        List<String> path = stream.getDescriptor().getPath();
+        if (path.size() >= 2) {
+          return Long.parseLong(path.get(1));
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Could not extract deadline from Flight descriptor, using no deadline", e);
+      }
+      return Long.MAX_VALUE;
+    }
+
     private void processStream(org.apache.arrow.flight.FlightStream stream, ReceivingMailbox mailbox) {
+      long deadlineMs = extractDeadlineMs(stream);
       try (stream) {
         while (stream.next()) {
           VectorSchemaRoot root = stream.getRoot();
@@ -186,11 +200,12 @@ public class FlightMailboxService implements AutoCloseable {
             DictionaryProvider copiedProvider = ArrowDataBlock.copyDictionaryProvider(dictProvider);
             ArrowBlock block = new ArrowBlock(new ArrowDataBlock(ownedRoot, copiedProvider));
 
+            long timeoutMs = deadlineMs - System.currentTimeMillis();
             ReceivingMailbox.ReceivingMailboxStatus status =
-                mailbox.offer(block, Collections.emptyList(), System.currentTimeMillis());
+                mailbox.offer(block, Collections.emptyList(), Math.max(0, timeoutMs));
 
-            if (status == ReceivingMailbox.ReceivingMailboxStatus.ERROR
-                || status == ReceivingMailbox.ReceivingMailboxStatus.CANCELLED) {
+            if (status == ReceivingMailbox.ReceivingMailboxStatus.LAST_BLOCK
+                || status == ReceivingMailbox.ReceivingMailboxStatus.ALREADY_TERMINATED) {
               LOGGER.warn("Mailbox {} returned status {}, stopping stream", mailbox.getId(), status);
               return;
             }
@@ -198,7 +213,8 @@ public class FlightMailboxService implements AutoCloseable {
         }
       } catch (Exception e) {
         LOGGER.error("Error processing Flight stream for mailbox: {}", mailbox.getId(), e);
-        mailbox.offer(ErrorMseBlock.fromException(e), Collections.emptyList(), System.currentTimeMillis());
+        long timeoutMs = deadlineMs - System.currentTimeMillis();
+        mailbox.offer(ErrorMseBlock.fromException(e), Collections.emptyList(), Math.max(0, timeoutMs));
       }
     }
   }

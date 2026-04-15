@@ -160,6 +160,8 @@ public class ArrowBuffers {
   public void close() {
     if (_allocator != null) {
       _allocator.close();
+      _allocator = null;
+      _enabled = false;
     }
   }
 

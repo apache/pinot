@@ -101,5 +101,19 @@ public class HashExchangeTest {
     public int computeHash(Object[] input) {
       return _hashes.next();
     }
+
+    @Override
+    public org.apache.pinot.query.planner.partitioning.KeySelector.ArrowKeyHasher getArrowHasher(
+        org.apache.pinot.common.datablock.ArrowDataBlock arrowDataBlock) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public org.apache.pinot.query.planner.partitioning.KeySelector.ArrowKeyComparator getArrowKeyComparator(
+        org.apache.pinot.common.datablock.ArrowDataBlock left,
+        org.apache.pinot.common.datablock.ArrowDataBlock right,
+        org.apache.pinot.query.planner.partitioning.KeySelector<?> other) {
+      throw new UnsupportedOperationException();
+    }
   }
 }

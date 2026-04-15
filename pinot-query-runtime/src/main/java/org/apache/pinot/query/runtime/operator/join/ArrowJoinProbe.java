@@ -189,6 +189,7 @@ public class ArrowJoinProbe {
 
   // ----- private helpers -----
 
+  /** Full result schema: left columns + right columns. */
   private Schema resultSchema() {
     List<Field> fields = new ArrayList<>(_resultColumnCount);
     List<Field> leftFields = _leftBlock.getSchema().getFields();
@@ -202,14 +203,20 @@ public class ArrowJoinProbe {
     return new Schema(fields);
   }
 
+  /** Left-only result schema: used by SEMI and ANTI joins which only return left-side columns. */
+  private Schema leftOnlySchema() {
+    List<Field> leftFields = _leftBlock.getSchema().getFields();
+    return new Schema(leftFields.subList(0, _leftColumnCount));
+  }
+
   private ArrowDataBlock buildLeftSubset(RoaringBitmap rowIds) {
-    VectorSchemaRoot root = VectorSchemaRoot.create(resultSchema(), ArrowBuffers.getLocalAllocator());
+    VectorSchemaRoot root = VectorSchemaRoot.create(leftOnlySchema(), ArrowBuffers.getLocalAllocator());
     int cardinality = rowIds.getCardinality();
     int[] buffer = new int[256];
     for (int col = 0; col < _leftColumnCount; col++) {
       FieldVector source = _leftBlock.getRoot().getVector(col);
       FieldVector target = root.getVector(col);
-      target.setValueCount(cardinality);
+      target.setInitialCapacity(cardinality);
       target.allocateNew();
       RoaringBatchIterator it = rowIds.getBatchIterator();
       int targetRow = 0;

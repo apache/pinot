@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.query.mailbox.flight;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.apache.arrow.flight.AsyncPutListener;
 import org.apache.arrow.flight.CallOptions;
 import org.apache.arrow.flight.FlightClient;
@@ -64,6 +62,9 @@ public class FlightSendingMailbox implements SendingMailbox {
   private final GrpcSendingMailbox _grpcMailbox;
 
   private FlightClient _client;
+  // Kept open across send(Data) calls; completed/closed on EOS or cancel.
+  private FlightClient.ClientStreamListener _listener;
+  private VectorSchemaRoot _sendRoot;
 
   public FlightSendingMailbox(String id, FlightChannelManager channelManager, String hostname, int port,
       long deadlineMs, StatMap<MailboxSendOperator.StatKey> statMap, GrpcSendingMailbox grpcMailbox) {
@@ -82,10 +83,9 @@ public class FlightSendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(MseBlock.Data data)
-      throws IOException, TimeoutException {
+  public void send(MseBlock.Data data) {
     if (isTerminated() || isEarlyTerminated()) {
-      LOGGER.debug("Mailbox {} is terminated, skipping data send", _id);
+      LOGGER.info("Mailbox {} is terminated, skipping data send", _id);
       if (data instanceof ArrowBlock) {
         ((ArrowBlock) data).release();
       }
@@ -101,9 +101,10 @@ public class FlightSendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
-      throws IOException, TimeoutException {
-    // EOS / error signalling goes through gRPC so the receiver detects stream termination
+  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
+    // Complete the Flight stream before signalling EOS over gRPC, so the receiver has all data
+    // before it sees the termination signal.
+    completeFlightStream();
     _grpcMailbox.send(block, serializedStats);
   }
 
@@ -112,42 +113,52 @@ public class FlightSendingMailbox implements SendingMailbox {
     VectorSchemaRoot root = arrowBlock.getDataBlock().getRoot();
     DictionaryProvider dictionaryProvider = arrowBlock.getDataBlock().getDictionaryProvider();
 
-    FlightDescriptor descriptor = FlightDescriptor.path(_id);
-    long remainingMs = _deadlineMs - System.currentTimeMillis();
-    FlightClient.ClientStreamListener listener = getClient().startPut(descriptor, new AsyncPutListener(),
-        CallOptions.timeout(remainingMs, TimeUnit.MILLISECONDS), null);
+    // Open the stream lazily on the first data block.
+    if (_listener == null) {
+      FlightDescriptor descriptor = FlightDescriptor.path(_id, Long.toString(_deadlineMs));
+      long remainingMs = _deadlineMs - System.currentTimeMillis();
+      _sendRoot = VectorSchemaRoot.create(root.getSchema(), ArrowBuffers.getLocalAllocator());
+      _listener = getClient().startPut(descriptor, new AsyncPutListener(),
+          CallOptions.timeout(remainingMs, TimeUnit.MILLISECONDS), null);
+      _listener.start(_sendRoot, dictionaryProvider);
+    }
 
-    try (VectorSchemaRoot sendRoot = VectorSchemaRoot.create(root.getSchema(), ArrowBuffers.getLocalAllocator())) {
-      listener.start(sendRoot, dictionaryProvider);
-      int offset = 0;
-      int totalRows = arrowBlock.getNumRows();
-      List<FieldVector> sendVectors = sendRoot.getFieldVectors();
-      while (offset < totalRows) {
-        int batchSize = Math.min(MAX_BATCH_ROWS, totalRows - offset);
-        try (VectorSchemaRoot slice = root.slice(offset, batchSize)) {
-          List<FieldVector> sliceVectors = slice.getFieldVectors();
-          for (int i = 0; i < sliceVectors.size(); i++) {
-            sliceVectors.get(i).makeTransferPair(sendVectors.get(i)).transfer();
-          }
-          sendRoot.setRowCount(batchSize);
-          listener.putNext();
+    int offset = 0;
+    int totalRows = arrowBlock.getNumRows();
+    List<FieldVector> sendVectors = _sendRoot.getFieldVectors();
+    while (offset < totalRows) {
+      int batchSize = Math.min(MAX_BATCH_ROWS, totalRows - offset);
+      try (VectorSchemaRoot slice = root.slice(offset, batchSize)) {
+        List<FieldVector> sliceVectors = slice.getFieldVectors();
+        for (int i = 0; i < sliceVectors.size(); i++) {
+          sliceVectors.get(i).makeTransferPair(sendVectors.get(i)).transfer();
         }
-        offset += batchSize;
+        _sendRoot.setRowCount(batchSize);
+        _listener.putNext();
       }
-    } finally {
-      listener.completed();
+      offset += batchSize;
     }
   }
 
-  @Override
-  public void complete() {
-    if (!isTerminated()) {
-      _grpcMailbox.complete();
+  private void completeFlightStream() {
+    if (_listener != null) {
+      try {
+        _listener.completed();
+      } catch (Exception e) {
+        LOGGER.warn("Exception completing Flight stream for mailbox: {}", _id, e);
+      } finally {
+        _listener = null;
+        if (_sendRoot != null) {
+          _sendRoot.close();
+          _sendRoot = null;
+        }
+      }
     }
   }
 
   @Override
   public void cancel(Throwable t) {
+    completeFlightStream();
     if (!isTerminated()) {
       try {
         _grpcMailbox.cancel(t);
@@ -155,6 +166,11 @@ public class FlightSendingMailbox implements SendingMailbox {
         LOGGER.debug("Exception cancelling gRPC mailbox: {}", _id, e);
       }
     }
+  }
+
+  @Override
+  public void close() {
+    completeFlightStream();
   }
 
   @Override
