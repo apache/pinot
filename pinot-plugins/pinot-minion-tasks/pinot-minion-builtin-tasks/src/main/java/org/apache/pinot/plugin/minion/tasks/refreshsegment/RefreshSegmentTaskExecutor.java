@@ -66,8 +66,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     _eventObserver.notifyProgress(pinotTaskConfig, "Refreshing segment: " + indexDir);
 
     // We set _taskStartTime before fetching the tableConfig. Task Generation relies on tableConfig/Schema updates
-    // happening after the last processed time. So we explicity use the timestamp before fetching tableConfig as the
-    // processedTime.
+    // happening after the last processed time. So we explicitly use the timestamp before fetching tableConfig as the processed time.
     _taskStartTime = System.currentTimeMillis();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
@@ -121,12 +120,12 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
         // Column exists in segment.
         if (dataTypeInSegment != dataTypeInSchema) {
           // Check if we need to update the data-type. DataType change is dependent on segmentGeneration code converting
-          // the object to the destination datatype. If the existing data is the column is not compatible with the
+          // the object to the destination datatype. If the existing data in the column is not compatible with the
           // destination data-type, the refresh task will fail.
           refreshColumnSet.add(column);
         }
 
-        // TODO: Maybe we can support singleValue to multi-value conversions are supproted and vice-versa.
+        // TODO: Maybe we can support singleValue to multi-value conversions and vice-versa.
       } else {
         refreshColumnSet.add(column);
       }
