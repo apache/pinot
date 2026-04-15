@@ -53,6 +53,7 @@ public class QueryMonitorConfigTest {
   }
 
   private static final long EXPECTED_OOM_PAUSE_TIMEOUT_MS = 2000;
+  private static final boolean EXPECTED_OOM_PAUSE_ON_PANIC_ENABLED = true;
 
   @BeforeClass
   public void setUp() {
@@ -78,8 +79,10 @@ public class QueryMonitorConfigTest {
         Double.toString(EXPECTED_MIN_MEMORY_FOOTPRINT_FOR_KILL));
     CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED),
         Boolean.toString(EXPECTED_IS_QUERY_KILLED_METRIC_ENABLED));
-    CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS),
+    CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS),
         Long.toString(EXPECTED_OOM_PAUSE_TIMEOUT_MS));
+    CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED),
+        Boolean.toString(EXPECTED_OOM_PAUSE_ON_PANIC_ENABLED));
   }
 
   @Test
@@ -230,9 +233,24 @@ public class QueryMonitorConfigTest {
         new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
 
     assertEquals(accountant.getQueryMonitorConfig().getOomPauseTimeoutMs(),
-        Accounting.DEFAULT_OOM_PAUSE_TIMEOUT_MS);
+        Accounting.DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS);
     accountant.getWatcherTask()
-        .onChange(Set.of(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS)), CLUSTER_CONFIGS);
+        .onChange(
+            Set.of(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS)),
+            CLUSTER_CONFIGS);
     assertEquals(accountant.getQueryMonitorConfig().getOomPauseTimeoutMs(), EXPECTED_OOM_PAUSE_TIMEOUT_MS);
+  }
+
+  @Test
+  void testOomPauseOnPanicEnabledConfigChange() {
+    PerQueryCPUMemResourceUsageAccountant accountant =
+        new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
+
+    assertFalse(accountant.getQueryMonitorConfig().isOomPauseOnPanicEnabled());
+    accountant.getWatcherTask()
+        .onChange(
+            Set.of(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED)),
+            CLUSTER_CONFIGS);
+    assertTrue(accountant.getQueryMonitorConfig().isOomPauseOnPanicEnabled());
   }
 }

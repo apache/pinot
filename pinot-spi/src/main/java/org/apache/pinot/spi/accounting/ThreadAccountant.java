@@ -41,6 +41,11 @@ public interface ThreadAccountant {
   void updateUntrackedResourceUsage(String identifier, long cpuTimeNs, long allocatedBytes,
       TrackingScope trackingScope);
 
+  /// Blocks the current thread if the OOM protection framework has activated a pause. Implementations should use a
+  /// fast-path (e.g. single volatile read) so that there is zero overhead when no pause is active.
+  default void waitIfPaused() {
+  }
+
   /// Returns `true` when the query submission should be throttled, `false` otherwise.
   default boolean throttleQuerySubmission() {
     return false;

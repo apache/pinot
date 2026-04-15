@@ -38,12 +38,20 @@ public class QueryResourceAggregatorTest {
   private static final float TEST_PANIC_RATIO = 1.1f;
 
   private QueryResourceAggregator createAggregator(long oomPauseTimeoutMs) {
+    return createAggregator(oomPauseTimeoutMs, false);
+  }
+
+  /// Creates an aggregator that always hits critical level. When {@code pauseOnPanic} is true, the panic ratio is
+  /// also set to 0 so that the aggregator always hits panic level instead.
+  private QueryResourceAggregator createAggregator(long oomPauseTimeoutMs, boolean pauseOnPanic) {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS, oomPauseTimeoutMs);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS, oomPauseTimeoutMs);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, TEST_CRITICAL_RATIO);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, TEST_PANIC_RATIO);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
+        pauseOnPanic ? 0f : TEST_PANIC_RATIO);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED, pauseOnPanic);
 
     long maxHeapSize = org.apache.pinot.spi.utils.ResourceUsageUtils.getMaxHeapSize();
     AtomicReference<QueryMonitorConfig> configRef =
@@ -55,7 +63,7 @@ public class QueryResourceAggregatorTest {
   @Test
   public void testConfigReadsOomPauseTimeout() {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PAUSE_TIMEOUT_MS, 2000L);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS, 2000L);
 
     long maxHeapSize = org.apache.pinot.spi.utils.ResourceUsageUtils.getMaxHeapSize();
     QueryMonitorConfig qmc = new QueryMonitorConfig(config, maxHeapSize);
@@ -95,19 +103,34 @@ public class QueryResourceAggregatorTest {
   }
 
   @Test
-  public void testWaitIfPausedBlocksForTimeout() {
-    QueryResourceAggregator aggregator = createAggregator(300);
+  public void testWaitIfPausedBlocksUntilSignaled()
+      throws Exception {
+    QueryResourceAggregator aggregator = createAggregator(5000);
 
     aggregator.preAggregate(Collections.emptyList());
     aggregator.postAggregate();
     assertTrue(aggregator.isPauseActive(), "Pause should be active");
 
+    // Clear the pause from a background thread after 200ms
+    Thread signaler = new Thread(() -> {
+      try {
+        Thread.sleep(200);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      aggregator.clearPause();
+    });
+    signaler.start();
+
     long start = System.currentTimeMillis();
     aggregator.waitIfPaused();
     long elapsed = System.currentTimeMillis() - start;
+    signaler.join(1000);
 
-    assertTrue(elapsed >= 200,
-        "waitIfPaused should have blocked for ~300ms, but only blocked for " + elapsed + "ms");
+    assertTrue(elapsed >= 150,
+        "waitIfPaused should have blocked until signaled (~200ms), but only blocked for " + elapsed + "ms");
+    assertTrue(elapsed < 2000,
+        "waitIfPaused should have unblocked promptly after signal, but took " + elapsed + "ms");
   }
 
   @Test
@@ -129,8 +152,8 @@ public class QueryResourceAggregatorTest {
     aggregator.postAggregate();
     assertTrue(aggregator.isPauseActive(), "Pause should be active after first cycle");
 
-    // Wait out the pause
-    aggregator.waitIfPaused();
+    // Explicitly clear the pause (simulating the watcher clearing after timeout)
+    aggregator.clearPause();
 
     // Second cycle: stays at Critical -> Critical, should NOT re-pause
     aggregator.preAggregate(Collections.emptyList());
@@ -138,5 +161,63 @@ public class QueryResourceAggregatorTest {
 
     assertFalse(aggregator.isPauseActive(),
         "Should not re-pause when already at critical level");
+  }
+
+  @Test
+  public void testPauseActivatedOnFreshJumpToPanic() {
+    QueryResourceAggregator aggregator = createAggregator(5000, true);
+
+    assertFalse(aggregator.isPauseActive(), "Pause should not be active initially");
+
+    aggregator.preAggregate(Collections.emptyList());
+    assertEquals(aggregator.getTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.HeapMemoryPanic,
+        "Triggering level should be HeapMemoryPanic");
+    assertEquals(aggregator.getPreviousTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.Normal,
+        "Previous triggering level should be Normal");
+
+    assertTrue(aggregator.isPauseActive(),
+        "Pause should be active after fresh jump to panic with pause-on-panic enabled");
+  }
+
+  @Test
+  public void testNoPanicPauseWhenDisabled() {
+    // Create aggregator that hits panic but with pauseOnPanic=false
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS, 5000L);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0f);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, 0f);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED, false);
+
+    long maxHeapSize = org.apache.pinot.spi.utils.ResourceUsageUtils.getMaxHeapSize();
+    AtomicReference<QueryMonitorConfig> configRef =
+        new AtomicReference<>(new QueryMonitorConfig(config, maxHeapSize));
+    QueryResourceAggregator aggregator =
+        new QueryResourceAggregator("test-instance", InstanceType.SERVER, false, true, configRef);
+
+    aggregator.preAggregate(Collections.emptyList());
+
+    assertFalse(aggregator.isPauseActive(),
+        "Pause should not be active at panic level when pause-on-panic is disabled");
+  }
+
+  @Test
+  public void testNoPanicRePauseAfterFirstPause() {
+    QueryResourceAggregator aggregator = createAggregator(5000, true);
+
+    // First cycle: Normal → Panic, activates pause
+    aggregator.preAggregate(Collections.emptyList());
+    assertTrue(aggregator.isPauseActive(), "Pause should be active from first panic transition");
+
+    // Simulate the watcher clearing the pause after timeout
+    aggregator.clearPause();
+
+    // Second cycle: Panic → Panic, should NOT re-pause
+    aggregator.preAggregate(Collections.emptyList());
+    assertEquals(aggregator.getPreviousTriggeringLevel(),
+        QueryResourceAggregator.TriggeringLevel.HeapMemoryPanic);
+    assertFalse(aggregator.isPauseActive(),
+        "Should not re-pause on Panic→Panic transition");
   }
 }

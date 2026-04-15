@@ -106,6 +106,10 @@ public class QueryThreadContext implements AutoCloseable {
     _accountant.sampleUsage();
   }
 
+  private void waitIfPausedInternal() {
+    _accountant.waitIfPaused();
+  }
+
   private void checkTerminationInternal(String scope) {
     checkTerminationInternal(scope, _executionContext.getActiveDeadlineMs());
   }
@@ -259,6 +263,7 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
+      threadContext.waitIfPausedInternal();
       threadContext.checkTerminationInternal(scopeSupplier);
     }
   }
@@ -272,6 +277,7 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
+      threadContext.waitIfPausedInternal();
       threadContext.checkTerminationInternal(scopeSupplier, deadlineMs);
     }
   }
@@ -293,8 +299,9 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
-      threadContext.checkTerminationInternal(scope);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal();
+      threadContext.checkTerminationInternal(scope);
     }
   }
 
@@ -305,8 +312,9 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
-      threadContext.checkTerminationInternal(scopeSupplier);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal();
+      threadContext.checkTerminationInternal(scopeSupplier);
     }
   }
 
@@ -317,8 +325,9 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
-      threadContext.checkTerminationInternal(scope, deadlineMs);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal();
+      threadContext.checkTerminationInternal(scope, deadlineMs);
     }
   }
 
@@ -329,8 +338,9 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
-      threadContext.checkTerminationInternal(scopeSupplier, deadlineMs);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal();
+      threadContext.checkTerminationInternal(scopeSupplier, deadlineMs);
     }
   }
 

@@ -26,7 +26,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -149,11 +148,23 @@ public class QueryResourceAggregator implements ResourceAggregator {
     _previousTriggeringLevel = _triggeringLevel;
     collectTriggerMetrics();
     evalTriggers();
-    // Prioritize the panic check, kill ALL QUERIES immediately if triggered
+    // Prioritize the panic check
     if (_triggeringLevel == TriggeringLevel.HeapMemoryPanic) {
-      killAllQueries(threadTrackers);
+      boolean pauseOnPanic = config.isOomPauseEnabled() && config.isOomPauseOnPanicEnabled();
       if (_pauseActive) {
-        clearPause();
+        if (System.currentTimeMillis() >= _pauseDeadlineMs || !pauseOnPanic) {
+          // Grace period expired, or panic-pause disabled — kill all and clear
+          killAllQueries(threadTrackers);
+          clearPause();
+        }
+        // else: still in grace period and panic-pause is enabled
+      } else if (pauseOnPanic
+          && _previousTriggeringLevel.ordinal() < TriggeringLevel.HeapMemoryCritical.ordinal()) {
+        // Fresh jump to panic bypassing critical — activate pause before killing
+        activatePause(config.getOomPauseTimeoutMs());
+      } else {
+        // Pause-on-panic disabled, or already been through a pause cycle — kill immediately
+        killAllQueries(threadTrackers);
       }
       return;
     }
@@ -320,7 +331,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
   /**
    * Clears the OOM pause and wakes all blocked query threads.
    */
-  private void clearPause() {
+  void clearPause() {
     LOGGER.info("Clearing OOM pause. Heap used bytes: {}", _usedBytes);
     _pauseLock.lock();
     try {
@@ -342,11 +353,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
     _pauseLock.lock();
     try {
       while (_pauseActive) {
-        long remaining = _pauseDeadlineMs - System.currentTimeMillis();
-        if (remaining <= 0) {
-          break;
-        }
-        _pauseCondition.await(remaining, TimeUnit.MILLISECONDS);
+        _pauseCondition.await();
       }
     } catch (InterruptedException e) {
       // Query was killed during pause - restore interrupt flag so the next checkTermination() call detects it
