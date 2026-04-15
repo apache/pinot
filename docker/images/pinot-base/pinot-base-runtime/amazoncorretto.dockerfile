@@ -25,7 +25,7 @@ LABEL MAINTAINER=dev@pinot.apache.org
 
 RUN yum update -y && \
   yum swap -y curl-minimal curl && \
-  yum install -y procps less wget git-core sysstat libtasn1 zstd tar gzip && \
+  yum install -y procps less wget sysstat libtasn1 zstd tar gzip && \
   yum clean all && \
   rm -rf /var/cache/yum
 

@@ -32,7 +32,8 @@ COPY --from=builder $JAVA_HOME $JAVA_HOME
 LABEL MAINTAINER=dev@pinot.apache.org
 
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends less wget curl git sysstat procps libtasn1-6 zstd ca-certificates && \
+  apt-get upgrade -y --no-install-recommends && \
+  apt-get install -y --no-install-recommends less wget curl sysstat procps libtasn1-6 zstd ca-certificates && \
   rm -rf /var/lib/apt/lists/*
 
 RUN case `uname -m` in \

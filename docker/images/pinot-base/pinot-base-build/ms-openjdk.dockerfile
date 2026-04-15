@@ -27,9 +27,9 @@ RUN echo "Building for platform: $(uname -m)" && \
     echo "Architecture: $(dpkg --print-architecture)" && \
     cat /etc/os-release
 
-# extra dependency for running launcher
-# Split package installation to better identify issues
-RUN apt-get update && \
+# Upgrade all OS packages first to pick up security patches, then install build deps
+RUN set -eux && apt-get update && \
+  apt-get upgrade -y --no-install-recommends && \
   apt-get install -y --no-install-recommends \
     wget curl git \
     automake bison flex g++ \
@@ -52,16 +52,18 @@ RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
 ENV MAVEN_HOME=/usr/share/maven
 ENV MAVEN_CONFIG=/opt/.m2
 
-# install thrift with better error handling
+# install thrift — version matches libthrift in Pinot's pom.xml
 RUN echo "Building Thrift for $(uname -m) architecture..." && \
-  wget https://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
-  tar xfz /tmp/thrift-0.12.0.tar.gz --directory /tmp && \
-  cd /tmp/thrift-0.12.0 && \
+  wget https://archive.apache.org/dist/thrift/0.22.0/thrift-0.22.0.tar.gz -O /tmp/thrift-0.22.0.tar.gz && \
+  wget https://archive.apache.org/dist/thrift/0.22.0/thrift-0.22.0.tar.gz.sha512 -O /tmp/thrift-0.22.0.tar.gz.sha512 && \
+  echo "$(cat /tmp/thrift-0.22.0.tar.gz.sha512)  /tmp/thrift-0.22.0.tar.gz" | sha512sum -c - && \
+  tar xfz /tmp/thrift-0.22.0.tar.gz --directory /tmp && \
+  cd /tmp/thrift-0.22.0 && \
   echo "Configuring Thrift..." && \
   ./configure --with-cpp=no --with-c_glib=no --with-java=yes --with-python=no --with-ruby=no --with-erlang=no --with-go=no --with-nodejs=no --with-php=no && \
   echo "Building Thrift..." && \
   make -j$(nproc) install && \
   echo "Thrift installation completed" && \
-  rm -rf /tmp/thrift-0.12.0*
+  rm -rf /tmp/thrift-0.22.0*
 
 CMD ["bash"]
