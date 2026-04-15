@@ -19,12 +19,10 @@
 package org.apache.pinot.common.evaluator;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.function.FunctionEvaluator;
-import org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator;
-import org.apache.pinot.segment.spi.function.TimeSpecFunctionEvaluator;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
 /**

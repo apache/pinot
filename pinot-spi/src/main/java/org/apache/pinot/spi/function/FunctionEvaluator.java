@@ -16,17 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.function;
+package org.apache.pinot.spi.function;
+
+import java.util.List;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Deprecated forwarding interface that preserves the historical
- * {@code org.apache.pinot.segment.local.function} binary name for downstream callers.
- *
- * <p>This interface is stateless and thread-safe.
- *
- * @deprecated Use {@link org.apache.pinot.spi.function.FunctionEvaluator} instead.
+ * Interface for evaluators of transform function expressions of schema field specs
  */
-@Deprecated
-public interface FunctionEvaluator extends org.apache.pinot.spi.function.FunctionEvaluator {
+public interface FunctionEvaluator {
+
+  /**
+   * Get the arguments of the function
+   */
+  List<String> getArguments();
+
+  /**
+   * Evaluate the function on the generic row and return the result
+   */
+  Object evaluate(GenericRow genericRow);
+
+  /**
+   * Evaluates the function on the given values (same order as the arguments) and returns the result.
+   */
+  Object evaluate(Object[] values);
 }

@@ -25,12 +25,12 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
  * Deprecated forwarding wrapper for the legacy time spec evaluator type name.
  *
  * <p>Instances inherit the thread-safety characteristics of
- * {@link org.apache.pinot.segment.spi.function.TimeSpecFunctionEvaluator}.
+ * {@link org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator}.
  *
- * @deprecated Use {@link org.apache.pinot.segment.spi.function.TimeSpecFunctionEvaluator} instead.
+ * @deprecated Use {@link org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator} instead.
  */
 @Deprecated
-public class TimeSpecFunctionEvaluator extends org.apache.pinot.segment.spi.function.TimeSpecFunctionEvaluator
+public class TimeSpecFunctionEvaluator extends org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator
     implements FunctionEvaluator {
   public TimeSpecFunctionEvaluator(TimeGranularitySpec incomingGranularitySpec,
       TimeGranularitySpec outgoingGranularitySpec) {

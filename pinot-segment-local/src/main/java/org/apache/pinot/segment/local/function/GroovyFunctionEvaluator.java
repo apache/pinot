@@ -23,33 +23,32 @@ package org.apache.pinot.segment.local.function;
  * Deprecated forwarding wrapper for the legacy Groovy evaluator type name.
  *
  * <p>Instances inherit the thread-safety characteristics of
- * {@link org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator}.
+ * {@link org.apache.pinot.common.evaluator.GroovyFunctionEvaluator}.
  *
- * @deprecated Use {@link org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator} instead.
+ * @deprecated Use {@link org.apache.pinot.common.evaluator.GroovyFunctionEvaluator} instead.
  */
 @Deprecated
-public class GroovyFunctionEvaluator extends org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator
+public class GroovyFunctionEvaluator extends org.apache.pinot.common.evaluator.GroovyFunctionEvaluator
     implements FunctionEvaluator {
   public GroovyFunctionEvaluator(String closure) {
     super(closure);
   }
 
   public static String getGroovyExpressionPrefix() {
-    return org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator.getGroovyExpressionPrefix();
+    return org.apache.pinot.common.evaluator.GroovyFunctionEvaluator.getGroovyExpressionPrefix();
   }
 
   public static void parseGroovyScript(String script) {
-    org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator.parseGroovyScript(script);
+    org.apache.pinot.common.evaluator.GroovyFunctionEvaluator.parseGroovyScript(script);
   }
 
   public static void configureGroovySecurity(String groovyASTConfig)
       throws Exception {
-    org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator.configureGroovySecurity(groovyASTConfig);
+    org.apache.pinot.common.evaluator.GroovyFunctionEvaluator.configureGroovySecurity(groovyASTConfig);
   }
 
   public static void setGroovyStaticAnalyzerConfig(GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig)
-      throws Exception {
-    org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(
-        groovyStaticAnalyzerConfig);
+      throws com.fasterxml.jackson.core.JsonProcessingException {
+    org.apache.pinot.common.evaluator.GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(groovyStaticAnalyzerConfig);
   }
 }

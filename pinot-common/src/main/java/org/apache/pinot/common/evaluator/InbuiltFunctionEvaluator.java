@@ -29,8 +29,8 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.segment.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
 /**

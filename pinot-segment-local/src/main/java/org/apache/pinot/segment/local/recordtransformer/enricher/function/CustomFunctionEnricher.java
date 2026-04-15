@@ -26,8 +26,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
-import org.apache.pinot.segment.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
 import org.apache.pinot.spi.utils.JsonUtils;
 

@@ -16,20 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.function;
+package org.apache.pinot.common.evaluator;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.utils.TimeConverter;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
 /**
- * An implementation of {@link FunctionEvaluator} for converting the time value based on the {@link TimeFieldSpec}.
+ * An implementation of {@link FunctionEvaluator} for converting the time value based on the
+ * {@link org.apache.pinot.spi.data.TimeFieldSpec}.
  */
 public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
   private final String _incomingTimeColumn;

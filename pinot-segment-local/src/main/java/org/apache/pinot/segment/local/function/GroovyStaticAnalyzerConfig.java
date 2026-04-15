@@ -28,10 +28,10 @@ import java.util.List;
  *
  * <p>This value object is immutable and thread-safe.
  *
- * @deprecated Use {@link org.apache.pinot.segment.spi.function.GroovyStaticAnalyzerConfig} instead.
+ * @deprecated Use {@link org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig} instead.
  */
 @Deprecated
-public class GroovyStaticAnalyzerConfig extends org.apache.pinot.segment.spi.function.GroovyStaticAnalyzerConfig {
+public class GroovyStaticAnalyzerConfig extends org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig {
   public GroovyStaticAnalyzerConfig(
       @JsonProperty("allowedReceivers")
       List<String> allowedReceivers,
@@ -48,29 +48,29 @@ public class GroovyStaticAnalyzerConfig extends org.apache.pinot.segment.spi.fun
 
   public static GroovyStaticAnalyzerConfig fromJson(String configJson)
       throws JsonProcessingException {
-    org.apache.pinot.segment.spi.function.GroovyStaticAnalyzerConfig config =
-        org.apache.pinot.segment.spi.function.GroovyStaticAnalyzerConfig.fromJson(configJson);
+    org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig config =
+        org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.fromJson(configJson);
     return copy(config);
   }
 
   public static List<Class> getDefaultAllowedTypes() {
-    return org.apache.pinot.segment.spi.function.GroovyStaticAnalyzerConfig.getDefaultAllowedTypes();
+    return org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.getDefaultAllowedTypes();
   }
 
   public static List<String> getDefaultAllowedReceivers() {
-    return org.apache.pinot.segment.spi.function.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers();
+    return org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers();
   }
 
   public static List<String> getDefaultAllowedImports() {
-    return org.apache.pinot.segment.spi.function.GroovyStaticAnalyzerConfig.getDefaultAllowedImports();
+    return org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.getDefaultAllowedImports();
   }
 
   public static GroovyStaticAnalyzerConfig createDefault() {
-    return copy(org.apache.pinot.segment.spi.function.GroovyStaticAnalyzerConfig.createDefault());
+    return copy(org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.createDefault());
   }
 
   private static GroovyStaticAnalyzerConfig copy(
-      org.apache.pinot.segment.spi.function.GroovyStaticAnalyzerConfig config) {
+      org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig config) {
     return new GroovyStaticAnalyzerConfig(config.getAllowedReceivers(), config.getAllowedImports(),
         config.getAllowedStaticImports(), config.getDisallowedMethodNames(), config.isMethodDefinitionAllowed());
   }
