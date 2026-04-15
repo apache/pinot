@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.function;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+
 
 /**
  * Deprecated forwarding wrapper for the legacy Groovy evaluator type name.
@@ -48,7 +50,7 @@ public class GroovyFunctionEvaluator extends org.apache.pinot.common.evaluator.G
   }
 
   public static void setGroovyStaticAnalyzerConfig(GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig)
-      throws com.fasterxml.jackson.core.JsonProcessingException {
+      throws JsonProcessingException {
     org.apache.pinot.common.evaluator.GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(groovyStaticAnalyzerConfig);
   }
 }

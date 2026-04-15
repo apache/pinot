@@ -23,7 +23,10 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Interface for evaluators of transform function expressions of schema field specs
+ * Interface for evaluators of transform function expressions of schema field specs.
+ *
+ * <p>Implementations are not required to be thread-safe. A single instance should be used
+ * from one thread at a time, or callers must provide their own synchronization.
  */
 public interface FunctionEvaluator {
 
