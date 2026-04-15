@@ -1480,8 +1480,10 @@ public final class TableConfigUtils {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     if (CollectionUtils.isNotEmpty(fieldConfigs)) {
+      Set<String> seenColumns = new HashSet<>();
       for (FieldConfig fieldConfig : fieldConfigs) {
         String column = fieldConfig.getName();
+        Preconditions.checkState(seenColumns.add(column), "Duplicate FieldConfig for column: %s", column);
         Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
 
         // Validate DELTA / DELTADELTA compression codecs compatibility
