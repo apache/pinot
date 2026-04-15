@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.partitioning;
 
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datablock.ArrowDataBlock;
 
 
 public class EmptyKeySelector implements KeySelector<Integer> {
@@ -41,5 +42,15 @@ public class EmptyKeySelector implements KeySelector<Integer> {
   @Override
   public int[] getColumnIds() {
     return new int[0];
+  }
+
+  @Override
+  public ArrowKeyHasher getArrowHasher(ArrowDataBlock arrowDataBlock) {
+    return rowIdx -> 0;
+  }
+
+  @Override
+  public ArrowKeyComparator getArrowKeyComparator(ArrowDataBlock left, ArrowDataBlock right, KeySelector<?> other) {
+    return (leftIdx, rightIdx) -> true;
   }
 }

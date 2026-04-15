@@ -98,7 +98,8 @@ public interface DataBlock {
   enum Type {
     ROW(0),
     COLUMNAR(1),
-    METADATA(2);
+    METADATA(2),
+    ARROW(3);
 
     private final int _ordinal;
 
@@ -114,6 +115,8 @@ public interface DataBlock {
           return COLUMNAR;
         case 2:
           return METADATA;
+        case 3:
+          return ARROW;
         default:
           throw new IllegalArgumentException("Invalid ordinal: " + ordinal);
       }

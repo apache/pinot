@@ -98,5 +98,11 @@ public interface BlockSplitter {
     public Iterator<MseBlock.Data> visit(LazyDataBlock block, Integer maxBlockSize) {
       return Iterators.singletonIterator(block);
     }
+
+    @Override
+    public Iterator<MseBlock.Data> visit(ArrowBlock block, Integer maxBlockSize) {
+      // Arrow blocks are already columnar; splitting is handled at the Flight layer
+      return Iterators.singletonIterator(block);
+    }
   }
 }

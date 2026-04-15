@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.partitioning;
 
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datablock.ArrowDataBlock;
 
 
 /**
@@ -49,5 +50,33 @@ public interface KeySelector<T> {
     return DEFAULT_HASH_ALGORITHM;
   }
 
+  /** Returns the column indices this selector operates on. */
   int[] getColumnIds();
+
+  /**
+   * Creates an {@link ArrowKeyHasher} bound to the given Arrow data block.
+   * The hasher is valid only for the lifetime of the block.
+   */
+  ArrowKeyHasher getArrowHasher(ArrowDataBlock arrowDataBlock);
+
+  /**
+   * Creates an {@link ArrowKeyComparator} that compares rows between two Arrow blocks.
+   *
+   * @param left  the left (probe) block
+   * @param right the right (build) block
+   * @param other the key selector for the right block
+   */
+  ArrowKeyComparator getArrowKeyComparator(ArrowDataBlock left, ArrowDataBlock right, KeySelector<?> other);
+
+  /** Per-row hash function bound to a specific {@link ArrowDataBlock}. */
+  interface ArrowKeyHasher {
+    /** Returns the hash for the given row index. */
+    int computeHash(int rowIdx);
+  }
+
+  /** Per-row equality check across two {@link ArrowDataBlock}s. */
+  interface ArrowKeyComparator {
+    /** Returns {@code true} if the left row and right row have equal keys. */
+    boolean equals(int leftIdx, int rightIdx);
+  }
 }

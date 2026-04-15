@@ -244,6 +244,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
 
     @Override
+    public DataBlock visit(org.apache.pinot.query.runtime.blocks.ArrowBlock block, List<DataBuffer> serializedStats) {
+      // Convert to row-heap then serialize via the existing path
+      return visit(block.asRowHeap(), serializedStats);
+    }
+
+    @Override
     public DataBlock visit(SuccessMseBlock block, List<DataBuffer> serializedStats) {
       if (serializedStats != null && !serializedStats.isEmpty()) {
         return MetadataBlock.newEosWithStats(serializedStats);
