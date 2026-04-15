@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
+import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.core.data.table.Key;
 
 
@@ -71,5 +72,37 @@ public class MultiColumnKeySelector implements KeySelector<Key> {
   @Override
   public String hashAlgorithm() {
     return _hashFunction;
+  }
+
+  @Override
+  public ArrowKeyHasher getArrowHasher(ArrowDataBlock arrowDataBlock) {
+    ArrowKeyHasher[] hashers = new ArrowKeyHasher[_keyIds.length];
+    for (int i = 0; i < _keyIds.length; i++) {
+      hashers[i] = SingleColumnKeySelector.getArrowHasher(arrowDataBlock, _keyIds[i]);
+    }
+    return rowIdx -> {
+      int hash = 0;
+      for (ArrowKeyHasher hasher : hashers) {
+        hash += hasher.computeHash(rowIdx);
+      }
+      return hash & Integer.MAX_VALUE;
+    };
+  }
+
+  @Override
+  public ArrowKeyComparator getArrowKeyComparator(ArrowDataBlock left, ArrowDataBlock right, KeySelector<?> other) {
+    int[] rightKeyIds = ((MultiColumnKeySelector) other)._keyIds;
+    ArrowKeyComparator[] comparators = new ArrowKeyComparator[_keyIds.length];
+    for (int i = 0; i < _keyIds.length; i++) {
+      comparators[i] = SingleColumnKeySelector.getArrowKeyComparator(left, right, _keyIds[i], rightKeyIds[i]);
+    }
+    return (leftIdx, rightIdx) -> {
+      for (ArrowKeyComparator comparator : comparators) {
+        if (!comparator.equals(leftIdx, rightIdx)) {
+          return false;
+        }
+      }
+      return true;
+    };
   }
 }

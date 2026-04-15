@@ -129,6 +129,13 @@ public class CommonConstants {
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
     public static final int DEFAULT_HYPERLOGLOG_PLUS_P = 14;
+
+    // Arrow allocator configuration
+    public static final String CONFIG_OF_ARROW_ALLOCATOR_MAX_SIZE = "pinot.arrow.allocator.maxSize";
+    public static final String CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_INITIAL_RESERVATION =
+        "pinot.arrow.allocator.defaultInitialReservation";
+    public static final String CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_CHILD_LIMIT =
+        "pinot.arrow.allocator.defaultChildLimit";
     public static final int DEFAULT_HYPERLOGLOG_PLUS_SP = 0;
 
     // 2 to the power of 14, for tradeoffs see datasketches library documentation:
