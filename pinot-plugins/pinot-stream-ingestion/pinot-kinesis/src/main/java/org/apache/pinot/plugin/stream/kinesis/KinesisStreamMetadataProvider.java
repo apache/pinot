@@ -108,7 +108,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         .findFirst().orElseThrow(() -> new RuntimeException("Failed to find shard for partitionId: " + _partitionId));
     SequenceNumberRange sequenceNumberRange = foundShard.sequenceNumberRange();
     if (offsetCriteria.isSmallest()) {
-      return new KinesisPartitionGroupOffset(foundShard.shardId(), sequenceNumberRange.startingSequenceNumber());
+      return new KinesisPartitionGroupOffset(foundShard.shardId(), sequenceNumberRange.startingSequenceNumber(), true);
     } else if (offsetCriteria.isLargest()) {
       return new KinesisPartitionGroupOffset(foundShard.shardId(), sequenceNumberRange.endingSequenceNumber());
     }
@@ -186,10 +186,9 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       // 3. Parent reached EOL and completely consumed.
       if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded.contains(
           parentShardId)) {
-        // TODO: Revisit this. Kinesis starts consuming AFTER the start sequence number, and we might miss the first
-        //       message.
+        // Mark as inclusive so the consumer fetches AT (not after) the starting sequence number.
         StreamPartitionMsgOffset newStartOffset =
-            new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
+            new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber(), true);
         int partitionGroupId = getPartitionGroupIdFromShardId(newShardId);
         newPartitionGroupMetadataList.add(new PartitionGroupMetadata(partitionGroupId, newStartOffset));
       }

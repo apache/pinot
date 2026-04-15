@@ -40,16 +40,31 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   private final String _shardId;
   private final String _sequenceNumber;
+  // When true, the sequenceNumber is inclusive (AT_SEQUENCE_NUMBER); false means AFTER_SEQUENCE_NUMBER.
+  private final boolean _inclusive;
 
   public KinesisPartitionGroupOffset(String shardId, String sequenceNumber) {
+    this(shardId, sequenceNumber, false);
+  }
+
+  public KinesisPartitionGroupOffset(String shardId, String sequenceNumber, boolean inclusive) {
     _shardId = shardId;
     _sequenceNumber = sequenceNumber;
+    _inclusive = inclusive;
   }
 
   public KinesisPartitionGroupOffset(String offsetStr) {
     try {
       ObjectNode objectNode = (ObjectNode) JsonUtils.stringToJsonNode(offsetStr);
-      Preconditions.checkArgument(objectNode.size() == 1);
+      int size = objectNode.size();
+      Preconditions.checkArgument(size == 1 || size == 2);
+      if (size == 2) {
+        // New format: {"<shardId>": "<seqNum>", "inclusive": true}
+        Preconditions.checkArgument(objectNode.has("inclusive"));
+        _inclusive = objectNode.remove("inclusive").asBoolean();
+      } else {
+        _inclusive = false;
+      }
       Map.Entry<String, JsonNode> entry = objectNode.properties().iterator().next();
       _shardId = entry.getKey();
       _sequenceNumber = entry.getValue().asText();
@@ -66,9 +81,17 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
     return _sequenceNumber;
   }
 
+  public boolean isInclusive() {
+    return _inclusive;
+  }
+
   @Override
   public String toString() {
-    return JsonUtils.newObjectNode().put(_shardId, _sequenceNumber).toString();
+    ObjectNode node = JsonUtils.newObjectNode().put(_shardId, _sequenceNumber);
+    if (_inclusive) {
+      node.put("inclusive", true);
+    }
+    return node.toString();
   }
 
   @Override

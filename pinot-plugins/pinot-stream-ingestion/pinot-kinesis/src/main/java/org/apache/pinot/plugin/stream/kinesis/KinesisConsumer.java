@@ -91,12 +91,11 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     if (startSequenceNumber.equals(_nextStartSequenceNumber)) {
       shardIterator = _nextShardIterator;
     } else {
-      // TODO: Revisit the offset handling logic. Reading after the start sequence number can lose the first message
-      //       when consuming from a new partition because the initial start sequence number is inclusive.
+      ShardIteratorType iteratorType =
+          startOffset.isInclusive() ? ShardIteratorType.AT_SEQUENCE_NUMBER : ShardIteratorType.AFTER_SEQUENCE_NUMBER;
       GetShardIteratorRequest getShardIteratorRequest =
           GetShardIteratorRequest.builder().streamName(_config.getStreamTopicName()).shardId(shardId)
-              .startingSequenceNumber(startSequenceNumber).shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER)
-              .build();
+              .startingSequenceNumber(startSequenceNumber).shardIteratorType(iteratorType).build();
       shardIterator = _kinesisClient.getShardIterator(getShardIteratorRequest).shardIterator();
     }
     if (shardIterator == null) {
@@ -122,8 +121,11 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       }
       offsetOfNextBatch = (KinesisPartitionGroupOffset) messages.get(messages.size() - 1).getMetadata().getNextOffset();
     } else {
-      // TODO: Revisit whether Kinesis can return empty batch when there are available records. The consumer cna handle
-      //       empty message batch, but it will treat it as fully caught up.
+      // Empty batch with non-null nextShardIterator: Kinesis may return empty results transiently even when
+      // records are available. The framework re-fetches on the next cycle using the cached shard iterator.
+      if (getRecordsResponse.nextShardIterator() != null) {
+        LOGGER.debug("Empty batch returned from Kinesis shard: {} with non-null next shard iterator", shardId);
+      }
       messages = List.of();
       offsetOfNextBatch = startOffset;
     }
