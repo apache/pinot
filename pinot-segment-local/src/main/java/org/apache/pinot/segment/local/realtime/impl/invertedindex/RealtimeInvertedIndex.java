@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -31,7 +30,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * <p>This class is thread-safe for single writer multiple readers.
  */
 public class RealtimeInvertedIndex implements MutableInvertedIndex {
-  private final List<ThreadSafeMutableRoaringBitmap> _bitmaps = new ArrayList<>();
+  private final ArrayList<ThreadSafeMutableRoaringBitmap> _bitmaps = new ArrayList<>();
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
 
@@ -85,6 +84,7 @@ public class RealtimeInvertedIndex implements MutableInvertedIndex {
     try {
       _writeLock.lock();
       _bitmaps.clear();
+      _bitmaps.trimToSize();
     } finally {
       _writeLock.unlock();
     }
