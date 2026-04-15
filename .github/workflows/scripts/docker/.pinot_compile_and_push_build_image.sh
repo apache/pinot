@@ -56,7 +56,7 @@ COMPILE_BASE_IMAGE_TAG="${JDK_VERSION}-amazoncorretto"
 echo "Building docker image for platform: amd64 with tag: pinot-build:${PINOT_BUILD_IMAGE_TAG}"
 docker build \
   --no-cache \
-  --platform amd64 \
+  --platform linux/amd64 \
   --file Dockerfile.build \
   --build-arg "PINOT_GIT_REF=${PINOT_GIT_REF}" \
   --build-arg "JDK_VERSION=${JDK_VERSION}" \

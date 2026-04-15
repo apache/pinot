@@ -44,7 +44,7 @@ jobs:
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
           DOCKER_IMAGE_NAME: "apachepinot/pinot"
-          PINOT_GIT_REF: ${{ env.GITHUB_REF }}
+          PINOT_GIT_REF: ${{ github.sha }}
           PINOT_SHA: ${{ github.sha }}
         run: .github/workflows/scripts/.pinot_vuln_check.sh
 

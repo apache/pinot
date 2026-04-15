@@ -28,11 +28,14 @@ if [ -z "${BUILD_PLATFORM}" ]; then
   BUILD_PLATFORM="linux/arm64,linux/amd64"
 fi
 
-# Get pinot commit id
+# Get pinot commit id.
+# Use clone + checkout instead of clone -b so that commit SHAs work in
+# addition to branch/tag names.
 ROOT_DIR=`pwd`
 rm -rf /tmp/pinot
-git clone -b ${PINOT_GIT_REF} --single-branch https://github.com/apache/pinot.git /tmp/pinot
+git clone --no-single-branch https://github.com/apache/pinot.git /tmp/pinot
 cd /tmp/pinot
+git checkout "${PINOT_GIT_REF}"
 COMMIT_ID=`git rev-parse --short HEAD`
 VERSION=`mvn help:evaluate -Dexpression=project.version -q -DforceStdout`
 rm -rf /tmp/pinot
