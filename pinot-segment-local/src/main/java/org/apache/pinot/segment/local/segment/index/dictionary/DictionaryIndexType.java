@@ -415,6 +415,7 @@ public class DictionaryIndexType
     for (FieldConfig fieldConfig : fieldConfigList) {
       // skip further computation of field configs which already has RAW encodingType
       if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
+        noDictionaryColumns.remove(fieldConfig.getName());
         continue;
       }
       // ensure encodingType is RAW on noDictionaryColumns
