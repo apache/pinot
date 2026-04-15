@@ -19,19 +19,26 @@
 package org.apache.pinot.segment.local.function;
 
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
+/**
+ * Verifies that the deprecated {@code org.apache.pinot.segment.local.function} shim layer
+ * is wired through to the canonical implementations in {@code org.apache.pinot.common.evaluator}.
+ */
 @SuppressWarnings("deprecation")
 public class FunctionPackageCompatibilityTest {
 
   @Test
-  public void testLegacyFactoryReturnsLegacyInbuiltEvaluator() {
+  public void testLegacyFactoryReturnsCanonicalInbuiltEvaluator() {
     FunctionEvaluator evaluator = FunctionEvaluatorFactory.getExpressionEvaluator("reverse(testColumn)");
-    assertTrue(evaluator instanceof InbuiltFunctionEvaluator);
+    assertNotNull(evaluator);
+    assertTrue(evaluator instanceof org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator);
 
     GenericRow row = new GenericRow();
     row.putValue("testColumn", "value");
@@ -46,7 +53,7 @@ public class FunctionPackageCompatibilityTest {
     try {
       GroovyFunctionEvaluator.parseGroovyScript("Groovy({a + 1}, a)");
       FunctionEvaluator evaluator = FunctionEvaluatorFactory.getExpressionEvaluator("Groovy({a + 1}, a)");
-      assertTrue(evaluator instanceof GroovyFunctionEvaluator);
+      assertTrue(evaluator instanceof org.apache.pinot.common.evaluator.GroovyFunctionEvaluator);
       assertEquals(evaluator.evaluate(new Object[]{1}), 2);
     } finally {
       GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(null);

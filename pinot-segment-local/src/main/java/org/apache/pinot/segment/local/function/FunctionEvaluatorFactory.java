@@ -19,15 +19,14 @@
 package org.apache.pinot.segment.local.function;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
 /**
- * Deprecated factory shim that preserves the historical evaluator entry points under
- * {@code org.apache.pinot.segment.local.function}.
+ * Deprecated factory shim that preserves the historical entry points under
+ * {@code org.apache.pinot.segment.local.function}. Delegates entirely to
+ * {@link org.apache.pinot.common.evaluator.FunctionEvaluatorFactory}.
  *
  * <p>This class is stateless and thread-safe.
  *
@@ -40,59 +39,14 @@ public class FunctionEvaluatorFactory {
 
   @Nullable
   public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
-    FunctionEvaluator functionEvaluator = null;
-
-    String columnName = fieldSpec.getName();
-    String transformExpression = fieldSpec.getTransformFunction();
-    if (transformExpression != null && !transformExpression.isEmpty()) {
-      try {
-        functionEvaluator = getExpressionEvaluator(transformExpression);
-      } catch (Exception e) {
-        throw new IllegalStateException(
-            "Caught exception while constructing expression evaluator for transform expression: " + transformExpression
-                + " of column: " + columnName + ", exception: " + e.getMessage(), e);
-      }
-    } else if (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
-      TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-      TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
-      TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
-      if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
-        if (!incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
-          functionEvaluator = new TimeSpecFunctionEvaluator(incomingGranularitySpec, outgoingGranularitySpec);
-        } else {
-          throw new IllegalStateException(
-              "Invalid timeSpec - Incoming and outgoing field specs are different, but name " + incomingGranularitySpec
-                  .getName() + " is same");
-        }
-      }
-    } else if (columnName.endsWith(SchemaUtils.MAP_KEY_COLUMN_SUFFIX)) {
-      String sourceMapName = columnName.substring(0, columnName.length() - SchemaUtils.MAP_KEY_COLUMN_SUFFIX.length());
-      functionEvaluator = getExpressionEvaluator(getDefaultMapKeysTransformExpression(sourceMapName));
-    } else if (columnName.endsWith(SchemaUtils.MAP_VALUE_COLUMN_SUFFIX)) {
-      String sourceMapName =
-          columnName.substring(0, columnName.length() - SchemaUtils.MAP_VALUE_COLUMN_SUFFIX.length());
-      functionEvaluator = getExpressionEvaluator(getDefaultMapValuesTransformExpression(sourceMapName));
-    }
-    return functionEvaluator;
+    return org.apache.pinot.common.evaluator.FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
   }
 
   public static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
-    if (isGroovyExpression(transformExpression)) {
-      return new GroovyFunctionEvaluator(transformExpression);
-    } else {
-      return new InbuiltFunctionEvaluator(transformExpression);
-    }
+    return org.apache.pinot.common.evaluator.FunctionEvaluatorFactory.getExpressionEvaluator(transformExpression);
   }
 
   public static boolean isGroovyExpression(String transformExpression) {
-    return transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix());
-  }
-
-  private static String getDefaultMapKeysTransformExpression(String mapColumnName) {
-    return String.format("Groovy({%s.sort()*.key}, %s)", mapColumnName, mapColumnName);
-  }
-
-  private static String getDefaultMapValuesTransformExpression(String mapColumnName) {
-    return String.format("Groovy({%s.sort()*.value}, %s)", mapColumnName, mapColumnName);
+    return org.apache.pinot.common.evaluator.FunctionEvaluatorFactory.isGroovyExpression(transformExpression);
   }
 }
