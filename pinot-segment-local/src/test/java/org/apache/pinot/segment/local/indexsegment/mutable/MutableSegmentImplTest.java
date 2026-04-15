@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.Map;
 import java.util.Set;
@@ -248,6 +249,28 @@ public class MutableSegmentImplTest {
       assertEquals(dataSource.getVectorIndexConfig(), vectorIndexConfig);
     } finally {
       mutableSegment.destroy();
+    }
+  }
+
+  @Test
+  public void testDestroyClearsIndexContainerMap()
+      throws ReflectiveOperationException {
+    MutableSegmentImpl freshSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema);
+    boolean destroyed = false;
+    try {
+      Field indexContainerMapField = MutableSegmentImpl.class.getDeclaredField("_indexContainerMap");
+      indexContainerMapField.setAccessible(true);
+      Map<?, ?> indexContainerMap = (Map<?, ?>) indexContainerMapField.get(freshSegment);
+      Assert.assertFalse(indexContainerMap.isEmpty());
+
+      freshSegment.destroy();
+      destroyed = true;
+
+      Assert.assertTrue(indexContainerMap.isEmpty());
+    } finally {
+      if (!destroyed) {
+        freshSegment.destroy();
+      }
     }
   }
 
