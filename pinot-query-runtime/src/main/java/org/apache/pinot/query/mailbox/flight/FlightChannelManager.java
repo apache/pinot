@@ -44,9 +44,9 @@ public class FlightChannelManager implements AutoCloseable {
   private final TlsConfig _tlsConfig;
   private final BufferAllocator _allocator;
 
-  public FlightChannelManager(@Nullable TlsConfig tlsConfig) {
+  public FlightChannelManager(@Nullable TlsConfig tlsConfig, ArrowBuffers arrowBuffers) {
     _tlsConfig = tlsConfig;
-    _allocator = ArrowBuffers.getInstance().getAllocator("flight-channel-manager");
+    _allocator = arrowBuffers.newQueryAllocator("flight-channel-manager");
   }
 
   /**
@@ -54,7 +54,7 @@ public class FlightChannelManager implements AutoCloseable {
    */
   public FlightClient getClient(String hostname, int port) {
     return _clientMap.computeIfAbsent(Pair.of(hostname, port), k -> {
-      LOGGER.debug("Creating Arrow Flight client for {}:{}", k.getLeft(), k.getRight());
+      LOGGER.info("Creating Arrow Flight client for {}:{}", k.getLeft(), k.getRight());
       Location location = _tlsConfig != null
           ? Location.forGrpcTls(k.getLeft(), k.getRight())
           : Location.forGrpcInsecure(k.getLeft(), k.getRight());

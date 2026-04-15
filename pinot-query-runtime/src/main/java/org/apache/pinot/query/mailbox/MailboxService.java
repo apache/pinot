@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
@@ -39,6 +40,7 @@ import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -85,6 +87,7 @@ public class MailboxService {
   @Nullable
   private final SslContext _serverSslContext;
   @Nullable private final QueryAccessControlFactory _accessControlFactory;
+  private final ArrowBuffers _arrowBuffers;
   /**
    * The max inbound message size for the gRPC server.
    *
@@ -110,6 +113,13 @@ public class MailboxService {
 
   public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config,
       @Nullable TlsConfig tlsConfig, @Nullable QueryAccessControlFactory accessControlFactory) {
+    this(hostname, port, instanceType, config, tlsConfig, accessControlFactory,
+        ArrowBuffers.create(config));
+  }
+
+  public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config,
+      @Nullable TlsConfig tlsConfig, @Nullable QueryAccessControlFactory accessControlFactory,
+      ArrowBuffers arrowBuffers) {
     _hostname = hostname;
     _port = port;
     _instanceType = instanceType;
@@ -123,6 +133,7 @@ public class MailboxService {
     );
     _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config));
     _accessControlFactory = accessControlFactory;
+    _arrowBuffers = arrowBuffers;
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
 
@@ -153,6 +164,20 @@ public class MailboxService {
 
   public InstanceType getInstanceType() {
     return _instanceType;
+  }
+
+  /** Returns the {@link ArrowBuffers} instance used by this mailbox service. */
+  public ArrowBuffers getArrowBuffers() {
+    return _arrowBuffers;
+  }
+
+  /**
+   * Creates a new per-query Arrow {@link BufferAllocator} child for the given query/stage.
+   * Returns {@code null} when Arrow is disabled.
+   */
+  @Nullable
+  public BufferAllocator newQueryArrowAllocator(String name) {
+    return _arrowBuffers.isEnabled() ? _arrowBuffers.newQueryAllocator(name) : null;
   }
 
   /**

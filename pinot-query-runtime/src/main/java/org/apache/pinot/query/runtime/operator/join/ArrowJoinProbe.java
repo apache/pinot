@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -30,7 +31,6 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.roaringbitmap.RoaringBatchIterator;
 import org.roaringbitmap.RoaringBitmap;
@@ -59,9 +59,11 @@ public class ArrowJoinProbe {
   private final RoaringBitmap _matchedRightRows;
   private final int _leftColumnCount;
   private final int _resultColumnCount;
+  private final BufferAllocator _allocator;
 
   public ArrowJoinProbe(ArrowDataBlock leftBlock, KeySelector<?> leftSelector, ArrowLookupTable rightTable,
-      @Nullable List<TransformOperand> nonEquiEvaluators, int leftColumnCount, int resultColumnCount) {
+      @Nullable List<TransformOperand> nonEquiEvaluators, int leftColumnCount, int resultColumnCount,
+      BufferAllocator allocator) {
     _leftBlock = leftBlock;
     _rightBlock = rightTable.getMergedBlock();
     _hashes = rightTable.getHashes();
@@ -72,6 +74,7 @@ public class ArrowJoinProbe {
     _leftKeyHasher = leftSelector.getArrowHasher(leftBlock);
     _keyComparator = leftSelector.getArrowKeyComparator(leftBlock, _rightBlock, rightTable.getKeySelector());
     _leftColumnCount = leftColumnCount;
+    _allocator = allocator;
     _resultColumnCount = resultColumnCount;
 
     if (nonEquiEvaluators != null && !nonEquiEvaluators.isEmpty()) {
@@ -94,7 +97,7 @@ public class ArrowJoinProbe {
     IntArrayList rightIndexes = new IntArrayList();
     collectAllMatches(leftIndexes, rightIndexes);
 
-    VectorSchemaRoot result = VectorSchemaRoot.create(resultSchema(), ArrowBuffers.getLocalAllocator());
+    VectorSchemaRoot result = VectorSchemaRoot.create(resultSchema(), _allocator);
     if (leftIndexes.isEmpty()) {
       return new ArrowDataBlock(result);
     }
@@ -102,7 +105,8 @@ public class ArrowJoinProbe {
     copyColumns(_leftBlock, leftIndexes, result, 0, _leftColumnCount, rowCount);
     copyColumns(_rightBlock, rightIndexes, result, _leftColumnCount, _resultColumnCount - _leftColumnCount, rowCount);
     result.setRowCount(rowCount);
-    DictionaryProvider dictProvider = ArrowDataBlock.copyDictionaryProvider(_leftBlock.getDictionaryProvider());
+    DictionaryProvider dictProvider =
+        ArrowDataBlock.copyDictionaryProvider(_leftBlock.getDictionaryProvider(), _allocator);
     return new ArrowDataBlock(result, dictProvider);
   }
 
@@ -115,7 +119,7 @@ public class ArrowJoinProbe {
     collectAllMatches(leftIndexes, rightIndexes);
 
     int leftRowCount = _leftBlock.getNumberOfRows();
-    VectorSchemaRoot result = VectorSchemaRoot.create(resultSchema(), ArrowBuffers.getLocalAllocator());
+    VectorSchemaRoot result = VectorSchemaRoot.create(resultSchema(), _allocator);
 
     // Build a lookup: leftRow → first match index (for interleaving)
     int totalRows = computeTotalRowsWithUnmatchedLeft(leftIndexes, leftRowCount);
@@ -147,7 +151,8 @@ public class ArrowJoinProbe {
       }
     }
     result.setRowCount(currentRow);
-    DictionaryProvider dictProvider = ArrowDataBlock.copyDictionaryProvider(_leftBlock.getDictionaryProvider());
+    DictionaryProvider dictProvider =
+        ArrowDataBlock.copyDictionaryProvider(_leftBlock.getDictionaryProvider(), _allocator);
     return new ArrowDataBlock(result, dictProvider);
   }
 
@@ -210,7 +215,7 @@ public class ArrowJoinProbe {
   }
 
   private ArrowDataBlock buildLeftSubset(RoaringBitmap rowIds) {
-    VectorSchemaRoot root = VectorSchemaRoot.create(leftOnlySchema(), ArrowBuffers.getLocalAllocator());
+    VectorSchemaRoot root = VectorSchemaRoot.create(leftOnlySchema(), _allocator);
     int cardinality = rowIds.getCardinality();
     int[] buffer = new int[256];
     for (int col = 0; col < _leftColumnCount; col++) {
@@ -229,7 +234,8 @@ public class ArrowJoinProbe {
       target.setValueCount(cardinality);
     }
     root.setRowCount(cardinality);
-    DictionaryProvider dictProvider = ArrowDataBlock.copyDictionaryProvider(_leftBlock.getDictionaryProvider());
+    DictionaryProvider dictProvider =
+        ArrowDataBlock.copyDictionaryProvider(_leftBlock.getDictionaryProvider(), _allocator);
     return new ArrowDataBlock(root, dictProvider);
   }
 

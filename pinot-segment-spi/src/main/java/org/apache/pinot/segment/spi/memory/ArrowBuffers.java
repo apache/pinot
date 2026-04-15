@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.spi.memory;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -28,140 +28,122 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
- * Singleton holder for Apache Arrow buffer allocators.
+ * Manages Apache Arrow {@link BufferAllocator} lifecycle for a single Pinot component (server or broker).
  *
- * <p>Arrow allocators are expensive to create and should be shared. This class manages a single global
- * {@link RootAllocator} that is created at component startup and closed on shutdown. Short-lived per-thread
- * child allocators are vended via {@link #getLocalAllocator()} to reduce contention.
+ * <p>This class is <strong>not</strong> a singleton. One instance is created at component startup, passed
+ * explicitly to the services and query-runtime layer that need it (via constructor injection), and closed at
+ * shutdown. This makes the dependency visible and testable without hidden global state.
  *
- * <p>Usage:
+ * <p>Typical usage:
  * <pre>
- *   // At startup:
- *   ArrowBuffers.getInstance().init(config);
+ *   // At component startup:
+ *   ArrowBuffers arrowBuffers = ArrowBuffers.create(config);
  *
- *   // In query execution:
- *   BufferAllocator allocator = ArrowBuffers.getLocalAllocator();
+ *   // Pass to services that need it:
+ *   new MailboxService(hostname, port, config, tlsConfig, arrowBuffers);
+ *   new FlightMailboxService(hostname, flightPort, tlsConfig, arrowBuffers);
  *
  *   // At shutdown:
- *   ArrowBuffers.getInstance().close();
+ *   arrowBuffers.close();
  * </pre>
+ *
+ * <p>Operators obtain a per-query child {@link BufferAllocator} via {@link #newQueryAllocator(String)} and close
+ * it when the query finishes.  The short-lived child allocator approach avoids contention on a single root and
+ * makes per-query memory accounting trivial.
  *
  * <p>This class is thread-safe.
  */
-public class ArrowBuffers {
-  private static final ArrowBuffers INSTANCE = new ArrowBuffers();
-
-  private volatile BufferAllocator _allocator = null;
-  private volatile boolean _enabled = false;
-  private final ThreadLocal<BufferAllocator> _threadLocalAllocator = new ThreadLocal<>();
-  private long _defaultInitialReservation = 0;
-  private long _defaultChildLimit = Long.MAX_VALUE;
+public class ArrowBuffers implements AutoCloseable {
+  private final boolean _enabled;
+  @Nullable
+  private final RootAllocator _root;
+  private final long _defaultInitialReservation;
+  private final long _defaultChildLimit;
   private final AtomicInteger _childNumber = new AtomicInteger(0);
 
-  private ArrowBuffers() {
-  }
-
-  public static ArrowBuffers getInstance() {
-    return INSTANCE;
-  }
-
-  /**
-   * Returns the total allocated memory across all arrow buffers.
-   */
-  public long getAllocatedMemory() {
-    return _allocator.getAllocatedMemory();
+  private ArrowBuffers(boolean enabled, @Nullable RootAllocator root, long defaultInitialReservation,
+      long defaultChildLimit) {
+    _enabled = enabled;
+    _root = root;
+    _defaultInitialReservation = defaultInitialReservation;
+    _defaultChildLimit = defaultChildLimit;
   }
 
   /**
-   * Initializes the root allocator using the given {@link PinotConfiguration}. Must be called exactly once
-   * before any allocator is requested.
+   * Creates an {@link ArrowBuffers} from the given configuration. If Arrow is disabled in the config, returns a
+   * disabled instance whose {@link #isEnabled()} returns {@code false} and whose allocator methods throw.
    */
-  public void init(PinotConfiguration config) {
-    Preconditions.checkState(_allocator == null, "Only a single global Arrow allocator is allowed");
-    _enabled = config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_USE_ARROW,
+  public static ArrowBuffers create(PinotConfiguration config) {
+    boolean enabled = config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_USE_ARROW,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_USE_ARROW);
-    if (!_enabled) {
-      return;
+    if (!enabled) {
+      return disabled();
     }
     long limit = config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_MAX_SIZE, Long.MAX_VALUE);
-    _defaultInitialReservation =
+    long initialReservation =
         config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_INITIAL_RESERVATION, 0L);
-    _defaultChildLimit =
+    long childLimit =
         config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_CHILD_LIMIT, Long.MAX_VALUE);
-    _allocator = new RootAllocator(limit);
-  }
-
-  /** Returns {@code true} if Arrow execution is enabled for the Multi-Stage Query Engine. */
-  public static boolean isEnabled() {
-    return INSTANCE._enabled;
+    return new ArrowBuffers(true, new RootAllocator(limit), initialReservation, childLimit);
   }
 
   /**
-   * Initializes the root allocator with unlimited memory and Arrow enabled. Intended for tests only.
+   * Creates an enabled {@link ArrowBuffers} with unlimited memory for use in tests.
    */
   @VisibleForTesting
-  public void init() {
-    if (_allocator == null) {
-      _enabled = true;
-      _allocator = new RootAllocator(Long.MAX_VALUE);
-    }
+  public static ArrowBuffers createForTest() {
+    return new ArrowBuffers(true, new RootAllocator(Long.MAX_VALUE), 0, Long.MAX_VALUE);
   }
 
   /**
-   * Returns a thread-local child allocator, creating it on first access for the calling thread.
+   * Returns a disabled {@link ArrowBuffers} instance. Arrow operations will throw if attempted.
    */
-  public static BufferAllocator getLocalAllocator() {
-    return INSTANCE.getLocal();
+  public static ArrowBuffers disabled() {
+    return new ArrowBuffers(false, null, 0, Long.MAX_VALUE);
   }
 
-  public BufferAllocator getLocal() {
-    BufferAllocator allocator = _threadLocalAllocator.get();
-    if (allocator == null) {
-      allocator = _allocator.newChildAllocator(uniqueName("local"), _defaultInitialReservation, _defaultChildLimit);
-      _threadLocalAllocator.set(allocator);
-    }
-    return allocator;
+  /** Returns {@code true} if Arrow execution is enabled. */
+  public boolean isEnabled() {
+    return _enabled;
   }
 
   /**
-   * Closes and removes the thread-local child allocator for the calling thread. Should be called when a thread
-   * exits or is returned to a pool.
+   * Creates a named child allocator for a single query or operation. Callers must close the returned allocator
+   * when the query finishes to return memory to the root.
    */
-  public void closeLocal() {
-    BufferAllocator allocator = _threadLocalAllocator.get();
-    if (allocator != null) {
-      allocator.close();
-      _threadLocalAllocator.remove();
-    }
+  public BufferAllocator newQueryAllocator(String name) {
+    checkEnabled();
+    return _root.newChildAllocator(uniqueName(name), _defaultInitialReservation, _defaultChildLimit);
   }
 
   /**
-   * Creates a named child allocator with the given reservation and max allocation.
+   * Creates a named child allocator with an explicit initial reservation and limit.
    */
-  public BufferAllocator getAllocator(String name, long initialReservation, long maxAllocation) {
-    return _allocator.newChildAllocator(uniqueName(name), initialReservation, maxAllocation);
+  public BufferAllocator newAllocator(String name, long initialReservation, long maxAllocation) {
+    checkEnabled();
+    return _root.newChildAllocator(uniqueName(name), initialReservation, maxAllocation);
   }
 
   /**
-   * Creates a named child allocator with default reservation/limit settings.
+   * Returns the total bytes currently allocated across all child allocators.
    */
-  public BufferAllocator getAllocator(String name) {
-    return getAllocator(name, _defaultInitialReservation, _defaultChildLimit);
+  public long getAllocatedMemory() {
+    checkEnabled();
+    return _root.getAllocatedMemory();
   }
 
-  /**
-   * Creates a named child allocator with a specific initial reservation and default limit.
-   */
-  public BufferAllocator getAllocator(String name, long initialReservation) {
-    return getAllocator(name, initialReservation, _defaultChildLimit);
-  }
-
-  /** Closes the root allocator. Should be called once at component shutdown. */
+  /** Closes the root allocator. Must be called at component shutdown. */
+  @Override
   public void close() {
-    if (_allocator != null) {
-      _allocator.close();
-      _allocator = null;
-      _enabled = false;
+    if (_root != null) {
+      _root.close();
+    }
+  }
+
+  private void checkEnabled() {
+    if (!_enabled || _root == null) {
+      throw new IllegalStateException("Arrow is not enabled. Set "
+          + CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_USE_ARROW + "=true in the component configuration.");
     }
   }
 

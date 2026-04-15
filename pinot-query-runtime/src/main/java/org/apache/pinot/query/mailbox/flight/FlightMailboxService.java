@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.arrow.flight.FlightServer;
 import org.apache.arrow.flight.Location;
 import org.apache.arrow.flight.PutResult;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.VectorUnloader;
@@ -61,9 +62,11 @@ public class FlightMailboxService implements AutoCloseable {
 
   private final FlightServer _flightServer;
   private final FlightChannelManager _channelManager;
+  private final ArrowBuffers _arrowBuffers;
   private final Cache<String, ReceivingMailbox> _receivingMailboxCache;
 
-  public FlightMailboxService(String hostname, int flightPort, @Nullable TlsConfig tlsConfig) {
+  public FlightMailboxService(String hostname, int flightPort, @Nullable TlsConfig tlsConfig,
+      ArrowBuffers arrowBuffers) {
     _receivingMailboxCache = CacheBuilder.newBuilder()
         .expireAfterAccess(DANGLING_MAILBOX_EXPIRY_SECONDS, TimeUnit.SECONDS)
         .removalListener((RemovalListener<String, ReceivingMailbox>) notification -> {
@@ -81,8 +84,9 @@ public class FlightMailboxService implements AutoCloseable {
         ? Location.forGrpcTls(hostname, flightPort)
         : Location.forGrpcInsecure(hostname, flightPort);
 
+    _arrowBuffers = arrowBuffers;
     FlightServer.Builder builder = FlightServer.builder(
-        ArrowBuffers.getInstance().getAllocator("flight-mailbox-server"), location, new MailboxFlightProducer());
+        arrowBuffers.newQueryAllocator("flight-mailbox-server"), location, new MailboxFlightProducer());
 
     if (tlsConfig != null) {
       try {
@@ -92,7 +96,7 @@ public class FlightMailboxService implements AutoCloseable {
       }
     }
     _flightServer = builder.build();
-    _channelManager = new FlightChannelManager(tlsConfig);
+    _channelManager = new FlightChannelManager(tlsConfig, arrowBuffers);
   }
 
   /** Starts the Flight server. Must be called before any mailboxes are used. */
@@ -192,12 +196,12 @@ public class FlightMailboxService implements AutoCloseable {
           // Unload to get a self-contained batch, then load into a fresh root so we own the buffers
           VectorUnloader unloader = new VectorUnloader(root);
           try (ArrowRecordBatch batch = unloader.getRecordBatch()) {
-            VectorSchemaRoot ownedRoot = VectorSchemaRoot.create(root.getSchema(),
-                ArrowBuffers.getInstance().getAllocator("flight-stream-block"));
+            BufferAllocator blockAllocator = _arrowBuffers.newQueryAllocator("flight-stream-block");
+            VectorSchemaRoot ownedRoot = VectorSchemaRoot.create(root.getSchema(), blockAllocator);
             VectorLoader loader = new VectorLoader(ownedRoot);
             loader.load(batch);
 
-            DictionaryProvider copiedProvider = ArrowDataBlock.copyDictionaryProvider(dictProvider);
+            DictionaryProvider copiedProvider = ArrowDataBlock.copyDictionaryProvider(dictProvider, blockAllocator);
             ArrowBlock block = new ArrowBlock(new ArrowDataBlock(ownedRoot, copiedProvider));
 
             long timeoutMs = deadlineMs - System.currentTimeMillis();

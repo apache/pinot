@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float4Vector;
@@ -37,7 +38,6 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
-import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -56,27 +56,31 @@ public final class ArrowBlockConverter {
   /**
    * Converts the given {@link MseBlock.Data} to an {@link ArrowBlock}.
    * If the block is already an {@link ArrowBlock}, returns it unchanged.
+   *
+   * @param allocator the Arrow allocator to use for new off-heap buffers
    */
-  public static ArrowBlock toArrowBlock(MseBlock.Data block) {
+  public static ArrowBlock toArrowBlock(MseBlock.Data block, BufferAllocator allocator) {
     if (block instanceof ArrowBlock) {
       return (ArrowBlock) block;
     }
     DataBlock dataBlock = block.asSerialized().getDataBlock();
     DataSchema schema = block.getDataSchema();
-    return fromDataBlock(dataBlock, schema);
+    return fromDataBlock(dataBlock, schema, allocator);
   }
 
   /**
    * Converts a raw {@link DataBlock} with the given schema into an {@link ArrowBlock}.
+   *
+   * @param allocator the Arrow allocator to use for new off-heap buffers
    */
-  public static ArrowBlock fromDataBlock(DataBlock dataBlock, DataSchema schema) {
+  public static ArrowBlock fromDataBlock(DataBlock dataBlock, DataSchema schema, BufferAllocator allocator) {
     int numRows = dataBlock.getNumberOfRows();
     int numCols = schema.size();
     ColumnDataType[] storedTypes = schema.getStoredColumnDataTypes();
 
     // Build a non-dictionary Arrow schema (plain VarChar for strings)
     Schema arrowSchema = buildPlainSchema(schema);
-    VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, ArrowBuffers.getLocalAllocator());
+    VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, allocator);
 
     for (int colId = 0; colId < numCols; colId++) {
       FieldVector vector = root.getVector(colId);

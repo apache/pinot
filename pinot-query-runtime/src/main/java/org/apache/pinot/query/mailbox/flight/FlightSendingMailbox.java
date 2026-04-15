@@ -24,6 +24,7 @@ import org.apache.arrow.flight.AsyncPutListener;
 import org.apache.arrow.flight.CallOptions;
 import org.apache.arrow.flight.FlightClient;
 import org.apache.arrow.flight.FlightDescriptor;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -33,7 +34,6 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.ArrowBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
-import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +60,7 @@ public class FlightSendingMailbox implements SendingMailbox {
   private final long _deadlineMs;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final GrpcSendingMailbox _grpcMailbox;
+  private final BufferAllocator _allocator;
 
   private FlightClient _client;
   // Kept open across send(Data) calls; completed/closed on EOS or cancel.
@@ -67,7 +68,8 @@ public class FlightSendingMailbox implements SendingMailbox {
   private VectorSchemaRoot _sendRoot;
 
   public FlightSendingMailbox(String id, FlightChannelManager channelManager, String hostname, int port,
-      long deadlineMs, StatMap<MailboxSendOperator.StatKey> statMap, GrpcSendingMailbox grpcMailbox) {
+      long deadlineMs, StatMap<MailboxSendOperator.StatKey> statMap, GrpcSendingMailbox grpcMailbox,
+      BufferAllocator allocator) {
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
@@ -75,6 +77,7 @@ public class FlightSendingMailbox implements SendingMailbox {
     _deadlineMs = deadlineMs;
     _statMap = statMap;
     _grpcMailbox = grpcMailbox;
+    _allocator = allocator;
   }
 
   @Override
@@ -117,7 +120,7 @@ public class FlightSendingMailbox implements SendingMailbox {
     if (_listener == null) {
       FlightDescriptor descriptor = FlightDescriptor.path(_id, Long.toString(_deadlineMs));
       long remainingMs = _deadlineMs - System.currentTimeMillis();
-      _sendRoot = VectorSchemaRoot.create(root.getSchema(), ArrowBuffers.getLocalAllocator());
+      _sendRoot = VectorSchemaRoot.create(root.getSchema(), _allocator);
       _listener = getClient().startPut(descriptor, new AsyncPutListener(),
           CallOptions.timeout(remainingMs, TimeUnit.MILLISECONDS), null);
       _listener.start(_sendRoot, dictionaryProvider);

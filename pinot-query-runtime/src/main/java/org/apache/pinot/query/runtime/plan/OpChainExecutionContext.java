@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -63,14 +64,24 @@ public class OpChainExecutionContext {
   private ServerPlanRequestContext _leafStageContext;
   private final boolean _sendStats;
   private final boolean _keepPipelineBreakerStats;
+  // Null when Arrow execution is disabled (pinot.multistage.engine.useArrow=false)
+  @Nullable
+  private final BufferAllocator _arrowAllocator;
 
   @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, String cid, long activeDeadlineMs,
       long passiveDeadlineMs, String brokerId, Map<String, String> opChainMetadata, StageMetadata stageMetadata,
       WorkerMetadata workerMetadata, @Nullable PipelineBreakerResult pipelineBreakerResult, boolean sendStats,
       boolean keepPipelineBreakerStats) {
+    this(mailboxService, requestId, cid, activeDeadlineMs, passiveDeadlineMs, brokerId, opChainMetadata,
+        stageMetadata, workerMetadata, pipelineBreakerResult, sendStats, keepPipelineBreakerStats, null);
+  }
+
+  public OpChainExecutionContext(MailboxService mailboxService, long requestId, String cid, long activeDeadlineMs,
+      long passiveDeadlineMs, String brokerId, Map<String, String> opChainMetadata, StageMetadata stageMetadata,
+      WorkerMetadata workerMetadata, @Nullable PipelineBreakerResult pipelineBreakerResult, boolean sendStats,
+      boolean keepPipelineBreakerStats, @Nullable BufferAllocator arrowAllocator) {
     _mailboxService = mailboxService;
-    // TODO: Consider removing info included in QueryExecutionContext
     _requestId = requestId;
     _cid = cid;
     _activeDeadlineMs = activeDeadlineMs;
@@ -87,6 +98,7 @@ public class OpChainExecutionContext {
     _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
     _queryOperatorFactoryProvider = getDefaultQueryOperatorFactoryProvider();
     _keepPipelineBreakerStats = keepPipelineBreakerStats;
+    _arrowAllocator = arrowAllocator;
   }
 
   public static OpChainExecutionContext fromQueryContext(MailboxService mailboxService,
@@ -101,10 +113,27 @@ public class OpChainExecutionContext {
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
       @Nullable PipelineBreakerResult pipelineBreakerResult, boolean sendStats, boolean keepPipelineBreakerStats,
       QueryExecutionContext queryExecutionContext) {
+    // Obtain a per-query Arrow allocator from the MailboxService if Arrow is enabled
+    BufferAllocator arrowAllocator = mailboxService.newQueryArrowAllocator(
+        "q-" + queryExecutionContext.getRequestId() + "-s-" + stageMetadata.getStageId());
     return new OpChainExecutionContext(mailboxService, queryExecutionContext.getRequestId(),
         queryExecutionContext.getCid(), queryExecutionContext.getActiveDeadlineMs(),
         queryExecutionContext.getPassiveDeadlineMs(), queryExecutionContext.getBrokerId(), opChainMetadata,
-        stageMetadata, workerMetadata, pipelineBreakerResult, sendStats, keepPipelineBreakerStats);
+        stageMetadata, workerMetadata, pipelineBreakerResult, sendStats, keepPipelineBreakerStats, arrowAllocator);
+  }
+
+  /** Returns {@code true} if Arrow columnar execution is enabled for this query chain. */
+  public boolean isArrowEnabled() {
+    return _arrowAllocator != null;
+  }
+
+  /**
+   * Returns the Arrow {@link BufferAllocator} for this query chain, or {@code null} if Arrow is not enabled.
+   * Operators should check {@link #isArrowEnabled()} before calling this.
+   */
+  @Nullable
+  public BufferAllocator getArrowAllocator() {
+    return _arrowAllocator;
   }
 
   public MailboxService getMailboxService() {

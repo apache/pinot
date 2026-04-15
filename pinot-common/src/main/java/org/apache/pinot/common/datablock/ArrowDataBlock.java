@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
@@ -45,7 +46,6 @@ import org.apache.arrow.vector.util.TransferPair;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.arrow.ArrowSchemaConverter;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
@@ -97,7 +97,8 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
    * Copies a {@link DictionaryProvider} by transferring all dictionary vectors to new off-heap buffers.
    * This ensures the dictionaries remain valid after the source block is closed.
    */
-  public static DictionaryProvider copyDictionaryProvider(@Nullable DictionaryProvider source) {
+  public static DictionaryProvider copyDictionaryProvider(@Nullable DictionaryProvider source,
+      BufferAllocator allocator) {
     DictionaryProvider.MapDictionaryProvider copy = new DictionaryProvider.MapDictionaryProvider();
     if (source == null) {
       return copy;
@@ -106,7 +107,7 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
     for (long id : ids) {
       Dictionary sourceDictionary = source.lookup(id);
       FieldVector sourceVector = sourceDictionary.getVector();
-      TransferPair transferPair = sourceVector.getTransferPair(ArrowBuffers.getLocalAllocator());
+      TransferPair transferPair = sourceVector.getTransferPair(allocator);
       transferPair.splitAndTransfer(0, sourceVector.getValueCount());
       copy.put(new Dictionary((FieldVector) transferPair.getTo(), sourceDictionary.getEncoding()));
     }

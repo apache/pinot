@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
@@ -45,7 +46,6 @@ import org.apache.pinot.query.runtime.operator.join.LongLookupTable;
 import org.apache.pinot.query.runtime.operator.join.LookupTable;
 import org.apache.pinot.query.runtime.operator.join.ObjectLookupTable;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 
 
 /**
@@ -66,7 +66,9 @@ public class HashJoinOperator extends BaseJoinOperator {
   protected final KeySelector<?> _rightKeySelector;
   @Nullable
   protected LookupTable _rightTable;
-  // Arrow path — non-null only when ArrowBuffers.isEnabled()
+  // Arrow path — non-null only when context.isArrowEnabled()
+  @Nullable
+  private final BufferAllocator _arrowAllocator;
   @Nullable
   private ArrowLookupTable _arrowRightTable;
   // Track matched right rows for right join and full join to output non-matched right rows.
@@ -89,6 +91,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     _matchedRightRows = needUnmatchedRightRows() ? new HashMap<>() : null;
     // Initialize _nullKeyRightRows for both RIGHT and FULL JOINs
     _nullKeyRightRows = needUnmatchedRightRows() ? new ArrayList<>() : null;
+    _arrowAllocator = context.getArrowAllocator();
   }
 
   /// Constructor that takes the schema for NonEquiEvaluator as an argument
@@ -101,6 +104,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
     _rightTable = createLookupTable(leftKeys, leftSchema);
     _matchedRightRows = needUnmatchedRightRows() ? new HashMap<>() : null;
+    _arrowAllocator = context.getArrowAllocator();
   }
 
   private static LookupTable createLookupTable(List<Integer> joinKeys, DataSchema schema) {
@@ -189,12 +193,12 @@ public class HashJoinOperator extends BaseJoinOperator {
    */
   @Override
   protected void buildRightTable() {
-    if (!ArrowBuffers.isEnabled()) {
+    if (_arrowAllocator == null) {
       super.buildRightTable();
       return;
     }
     LOGGER.trace("Building Arrow right table for hash join");
-    _arrowRightTable = new ArrowLookupTable(_rightKeySelector);
+    _arrowRightTable = new ArrowLookupTable(_rightKeySelector, _arrowAllocator);
     if (needUnmatchedRightRows()) {
       _arrowRightTable.enableMatchedRowTracking();
     }
@@ -235,7 +239,7 @@ public class HashJoinOperator extends BaseJoinOperator {
    */
   @Override
   protected MseBlock buildJoinedDataBlock() {
-    if (!ArrowBuffers.isEnabled() || _arrowRightTable == null) {
+    if (_arrowAllocator == null || _arrowRightTable == null) {
       return super.buildJoinedDataBlock();
     }
     while (true) {
@@ -260,7 +264,8 @@ public class HashJoinOperator extends BaseJoinOperator {
       }
       ArrowBlock leftArrow = ((MseBlock.Data) leftBlock).asArrow();
       ArrowJoinProbe probe = new ArrowJoinProbe(leftArrow.getDataBlock(), _leftKeySelector, _arrowRightTable,
-          _nonEquiEvaluators.isEmpty() ? null : _nonEquiEvaluators, _leftColumnSize, _resultColumnSize);
+          _nonEquiEvaluators.isEmpty() ? null : _nonEquiEvaluators, _leftColumnSize, _resultColumnSize,
+          _arrowAllocator);
       ArrowDataBlock resultData;
       switch (_joinType) {
         case SEMI:
@@ -276,10 +281,14 @@ public class HashJoinOperator extends BaseJoinOperator {
           resultData = probe.buildOnlyMatches();
           break;
       }
+      // Release the left block — the probe has finished reading it
+      leftArrow.release();
       checkTerminationAndSampleUsage();
       if (resultData.getNumberOfRows() > 0) {
         return new ArrowBlock(resultData);
       }
+      // No matching rows — close the empty result block and probe the next left block
+      resultData.close();
     }
   }
 

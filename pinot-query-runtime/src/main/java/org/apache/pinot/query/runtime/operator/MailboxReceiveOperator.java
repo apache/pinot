@@ -23,7 +23,6 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.runtime.blocks.ArrowBlockConverter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,8 +61,8 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
     }
     if (block.isData()) {
       checkTerminationAndSampleUsage();
-      if (ArrowBuffers.isEnabled()) {
-        block = ArrowBlockConverter.toArrowBlock((MseBlock.Data) block);
+      if (_context.isArrowEnabled()) {
+        block = ArrowBlockConverter.toArrowBlock((MseBlock.Data) block, _context.getArrowAllocator());
       }
     } else {
       onEos();

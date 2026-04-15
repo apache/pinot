@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -28,6 +29,7 @@ import org.apache.pinot.query.runtime.blocks.ArrowBlock;
 import org.apache.pinot.query.runtime.blocks.ArrowBlockConverter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -68,17 +70,20 @@ public class ArrowHashJoinOperatorTest {
       new String[]{"l_user_id", "l_name", "r_user_id", "r_name"},
       new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
 
+  // Each test gets a fresh allocator — no shared singleton state
+  private ArrowBuffers _arrowBuffers;
+  private BufferAllocator _allocator;
+
   @BeforeMethod
   public void setUp() {
-    // Enable Arrow execution — this is what pinot.multistage.engine.useArrow=true does at startup
-    ArrowBuffers.getInstance().init();
+    _arrowBuffers = ArrowBuffers.createForTest();
+    _allocator = _arrowBuffers.newQueryAllocator("test");
   }
 
   @AfterMethod
   public void tearDown() {
-    // Close the thread-local child allocator before closing the root allocator
-    ArrowBuffers.getInstance().closeLocal();
-    ArrowBuffers.getInstance().close();
+    _allocator.close();
+    _arrowBuffers.close();
   }
 
   // ----- inner join -----
@@ -312,7 +317,7 @@ public class ArrowHashJoinOperatorTest {
         new Object[]{1, "Alice"},
         new Object[]{2, "Bob"});
 
-    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock);
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
 
     assertEquals(arrowBlock.getNumRows(), 2);
 
@@ -331,14 +336,16 @@ public class ArrowHashJoinOperatorTest {
    * Creates an {@link ArrowBlock} from literal row data via {@link ArrowBlockConverter}.
    * This simulates what {@link MailboxReceiveOperator} does when Arrow is enabled.
    */
-  private static ArrowBlock arrowBlock(DataSchema schema, Object[]... rows) {
+  private ArrowBlock arrowBlock(DataSchema schema, Object[]... rows) {
     RowHeapDataBlock rowBlock = OperatorTestUtil.block(schema, rows);
-    return ArrowBlockConverter.toArrowBlock(rowBlock);
+    return ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
   }
 
   private HashJoinOperator buildOperator(MultiStageOperator leftInput, MultiStageOperator rightInput,
       JoinRelType joinType, List<Integer> leftKeys, List<Integer> rightKeys) {
-    return new HashJoinOperator(OperatorTestUtil.getTracingContext(), leftInput, CHILD_SCHEMA, rightInput,
+    // Pass the allocator via a context that has Arrow enabled
+    OpChainExecutionContext context = OperatorTestUtil.getTracingContextWithArrow(_allocator);
+    return new HashJoinOperator(context, leftInput, CHILD_SCHEMA, rightInput,
         new JoinNode(-1, RESULT_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), joinType, leftKeys, rightKeys,
             List.of(), JoinNode.JoinStrategy.HASH));
   }

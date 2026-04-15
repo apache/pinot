@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator.join;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.dictionary.Dictionary;
@@ -32,7 +33,6 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.util.VectorAppender;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -55,6 +55,7 @@ public class ArrowLookupTable implements AutoCloseable {
 
   private final KeySelector<?> _keySelector;
   private final float _loadFactor;
+  private final BufferAllocator _allocator;
   private final List<ArrowDataBlock> _rightBatches = new ArrayList<>();
 
   private KeySelector.ArrowKeyHasher _keyHasher;
@@ -70,13 +71,14 @@ public class ArrowLookupTable implements AutoCloseable {
   @javax.annotation.Nullable
   private RoaringBitmap _matchedRightRows = null;
 
-  public ArrowLookupTable(KeySelector<?> keySelector) {
-    this(keySelector, 0.6f);
+  public ArrowLookupTable(KeySelector<?> keySelector, BufferAllocator allocator) {
+    this(keySelector, 0.6f, allocator);
   }
 
-  public ArrowLookupTable(KeySelector<?> keySelector, float loadFactor) {
+  public ArrowLookupTable(KeySelector<?> keySelector, float loadFactor, BufferAllocator allocator) {
     _keySelector = keySelector;
     _loadFactor = loadFactor;
+    _allocator = allocator;
   }
 
   /** Enables tracking of which right-side rows have been matched (needed for RIGHT / FULL OUTER joins). */
@@ -180,7 +182,7 @@ public class ArrowLookupTable implements AutoCloseable {
     }
     Schema decodedSchema = new Schema(decodedFields);
 
-    VectorSchemaRoot mergedRoot = VectorSchemaRoot.create(decodedSchema, ArrowBuffers.getLocalAllocator());
+    VectorSchemaRoot mergedRoot = VectorSchemaRoot.create(decodedSchema, _allocator);
     int numFields = mergedRoot.getFieldVectors().size();
     for (int i = 0; i < numFields; i++) {
       FieldVector target = mergedRoot.getVector(i);

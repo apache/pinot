@@ -22,6 +22,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -127,9 +129,24 @@ public class OperatorTestUtil {
   }
 
   private static OpChainExecutionContext getTracingContext(Map<String, String> opChainMetadata) {
+    return buildContext(opChainMetadata, null);
+  }
+
+  /**
+   * Creates an {@link OpChainExecutionContext} with Arrow execution enabled, using the provided allocator.
+   * Use this in tests that exercise the Arrow execution path.
+   */
+  public static OpChainExecutionContext getTracingContextWithArrow(BufferAllocator arrowAllocator) {
+    return buildContext(Map.of(CommonConstants.Broker.Request.TRACE, "true"), arrowAllocator);
+  }
+
+  private static OpChainExecutionContext buildContext(Map<String, String> opChainMetadata,
+      @Nullable BufferAllocator arrowAllocator) {
     MailboxService mailboxService = mock(MailboxService.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(1234);
+    when(mailboxService.newQueryArrowAllocator(org.mockito.ArgumentMatchers.anyString()))
+        .thenReturn(arrowAllocator);
     WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
     StageMetadata stageMetadata =
         new StageMetadata(0, List.of(workerMetadata), Map.of(DispatchablePlanFragment.TABLE_NAME_KEY, "testTable"));
