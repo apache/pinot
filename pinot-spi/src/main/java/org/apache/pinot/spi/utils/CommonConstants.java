@@ -273,6 +273,14 @@ public class CommonConstants {
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED = "pinot.multistage.engine.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = true;
 
+    /**
+     * When true, the Multi-Stage Query Engine uses Apache Arrow as the in-memory block format and Arrow Flight
+     * for inter-node data transfer instead of the default row-oriented Object[][] / gRPC path.
+     * Disabled by default; enable to opt into the Arrow execution path.
+     */
+    public static final String CONFIG_OF_MULTI_STAGE_ENGINE_USE_ARROW = "pinot.multistage.engine.useArrow";
+    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_USE_ARROW = false;
+
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED = "pinot.multistage.engine.tls.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED = false;
     public static final String CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS =

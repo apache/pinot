@@ -52,6 +52,7 @@ public class ArrowBuffers {
   private static final ArrowBuffers INSTANCE = new ArrowBuffers();
 
   private volatile BufferAllocator _allocator = null;
+  private volatile boolean _enabled = false;
   private final ThreadLocal<BufferAllocator> _threadLocalAllocator = new ThreadLocal<>();
   private long _defaultInitialReservation = 0;
   private long _defaultChildLimit = Long.MAX_VALUE;
@@ -77,6 +78,11 @@ public class ArrowBuffers {
    */
   public void init(PinotConfiguration config) {
     Preconditions.checkState(_allocator == null, "Only a single global Arrow allocator is allowed");
+    _enabled = config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_USE_ARROW,
+        CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_USE_ARROW);
+    if (!_enabled) {
+      return;
+    }
     long limit = config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_MAX_SIZE, Long.MAX_VALUE);
     _defaultInitialReservation =
         config.getProperty(CommonConstants.Helix.CONFIG_OF_ARROW_ALLOCATOR_DEFAULT_INITIAL_RESERVATION, 0L);
@@ -85,12 +91,18 @@ public class ArrowBuffers {
     _allocator = new RootAllocator(limit);
   }
 
+  /** Returns {@code true} if Arrow execution is enabled for the Multi-Stage Query Engine. */
+  public static boolean isEnabled() {
+    return INSTANCE._enabled;
+  }
+
   /**
-   * Initializes the root allocator with unlimited memory. Intended for tests only.
+   * Initializes the root allocator with unlimited memory and Arrow enabled. Intended for tests only.
    */
   @VisibleForTesting
   public void init() {
     if (_allocator == null) {
+      _enabled = true;
       _allocator = new RootAllocator(Long.MAX_VALUE);
     }
   }

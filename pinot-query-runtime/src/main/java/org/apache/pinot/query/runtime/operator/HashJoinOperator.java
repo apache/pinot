@@ -26,12 +26,18 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.runtime.blocks.ArrowBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.join.ArrowJoinProbe;
+import org.apache.pinot.query.runtime.operator.join.ArrowLookupTable;
 import org.apache.pinot.query.runtime.operator.join.DoubleLookupTable;
 import org.apache.pinot.query.runtime.operator.join.FloatLookupTable;
 import org.apache.pinot.query.runtime.operator.join.IntLookupTable;
@@ -39,6 +45,7 @@ import org.apache.pinot.query.runtime.operator.join.LongLookupTable;
 import org.apache.pinot.query.runtime.operator.join.LookupTable;
 import org.apache.pinot.query.runtime.operator.join.ObjectLookupTable;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 
 
 /**
@@ -59,6 +66,9 @@ public class HashJoinOperator extends BaseJoinOperator {
   protected final KeySelector<?> _rightKeySelector;
   @Nullable
   protected LookupTable _rightTable;
+  // Arrow path — non-null only when ArrowBuffers.isEnabled()
+  @Nullable
+  private ArrowLookupTable _arrowRightTable;
   // Track matched right rows for right join and full join to output non-matched right rows.
   // TODO: Revisit whether we should use IntList or RoaringBitmap for smaller memory footprint.
   // TODO: Optimize this
@@ -165,6 +175,112 @@ public class HashJoinOperator extends BaseJoinOperator {
     _rightTable = null;
     _matchedRightRows = null;
     _nullKeyRightRows = null;
+    if (_arrowRightTable != null) {
+      _arrowRightTable.close();
+      _arrowRightTable = null;
+    }
+  }
+
+  // ----- Arrow execution path -----
+
+  /**
+   * Overrides the base build phase to push {@link ArrowDataBlock}s directly into {@link ArrowLookupTable}
+   * when Arrow execution is enabled, bypassing the row-materialisation in the base class.
+   */
+  @Override
+  protected void buildRightTable() {
+    if (!ArrowBuffers.isEnabled()) {
+      super.buildRightTable();
+      return;
+    }
+    LOGGER.trace("Building Arrow right table for hash join");
+    _arrowRightTable = new ArrowLookupTable(_rightKeySelector);
+    if (needUnmatchedRightRows()) {
+      _arrowRightTable.enableMatchedRowTracking();
+    }
+    int numRows = 0;
+    MseBlock rightBlock = _rightInput.nextBlock();
+    while (rightBlock.isData()) {
+      ArrowBlock arrowBlock = ((MseBlock.Data) rightBlock).asArrow();
+      int blockRows = arrowBlock.getNumRows();
+      if (blockRows + numRows > _maxRowsInJoin) {
+        if (_joinOverflowMode
+            == org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode.THROW) {
+          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numRows + blockRows);
+          throwForJoinRowLimitExceeded(
+              "Arrow hash join exceeded row limit: " + _maxRowsInJoin);
+        } else {
+          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
+          _rightInput.earlyTerminate();
+        }
+      }
+      _arrowRightTable.push(arrowBlock.getDataBlock());
+      numRows += blockRows;
+      checkTerminationAndSampleUsage();
+      rightBlock = _rightInput.nextBlock();
+    }
+    MseBlock.Eos eosBlock = (MseBlock.Eos) rightBlock;
+    if (eosBlock.isError()) {
+      _eos = eosBlock;
+    } else {
+      _arrowRightTable.finalize();
+      _isRightTableBuilt = true;
+      _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numRows);
+    }
+    _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, 0L);
+  }
+
+  /**
+   * Overrides the probe phase to use {@link ArrowJoinProbe} when the right table is an {@link ArrowLookupTable}.
+   */
+  @Override
+  protected MseBlock buildJoinedDataBlock() {
+    if (!ArrowBuffers.isEnabled() || _arrowRightTable == null) {
+      return super.buildJoinedDataBlock();
+    }
+    while (true) {
+      if (_eos != null) {
+        return _eos;
+      }
+      MseBlock leftBlock = _leftInput.nextBlock();
+      if (leftBlock.isEos()) {
+        MseBlock.Eos eosBlock = (MseBlock.Eos) leftBlock;
+        if (eosBlock.isError()) {
+          return eosBlock;
+        }
+        if (needUnmatchedRightRows()) {
+          // TODO: emit unmatched right rows as Arrow blocks
+          List<Object[]> rows = buildNonMatchRightRows();
+          if (!rows.isEmpty()) {
+            _eos = SuccessMseBlock.INSTANCE;
+            return new RowHeapDataBlock(rows, _resultSchema);
+          }
+        }
+        return leftBlock;
+      }
+      ArrowBlock leftArrow = ((MseBlock.Data) leftBlock).asArrow();
+      ArrowJoinProbe probe = new ArrowJoinProbe(leftArrow.getDataBlock(), _leftKeySelector, _arrowRightTable,
+          _nonEquiEvaluators.isEmpty() ? null : _nonEquiEvaluators, _leftColumnSize, _resultColumnSize);
+      ArrowDataBlock resultData;
+      switch (_joinType) {
+        case SEMI:
+          resultData = probe.buildSemiJoin();
+          break;
+        case ANTI:
+          resultData = probe.buildAntiJoin();
+          break;
+        case LEFT:
+          resultData = probe.buildWithUnmatchedLeft();
+          break;
+        default:
+          resultData = probe.buildOnlyMatches();
+          break;
+      }
+      checkTerminationAndSampleUsage();
+      if (resultData.getNumberOfRows() > 0) {
+        return new ArrowBlock(resultData);
+      }
+    }
   }
 
   @Override
