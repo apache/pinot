@@ -16,30 +16,50 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.function;
+package org.apache.pinot.segment.local.evaluator;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
+import org.apache.pinot.segment.spi.function.FunctionEvaluator;
+import org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator;
+import org.apache.pinot.segment.spi.function.TimeSpecFunctionEvaluator;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 
 
 /**
- * @deprecated Use {@link org.apache.pinot.segment.local.evaluator.FunctionEvaluatorFactory} instead.
+ * Factory class to create an {@link FunctionEvaluator} for the field spec based on the
+ * {@link FieldSpec#getTransformFunction()}
  */
-@Deprecated
 public class FunctionEvaluatorFactory {
   private FunctionEvaluatorFactory() {
   }
 
+  /**
+   * Creates the {@link FunctionEvaluator} for the given field spec
+   *
+   * 1. If transform expression is defined, use it to create the appropriate {@link FunctionEvaluator}
+   * 2. For TIME column, if conversion is needed, {@link TimeSpecFunctionEvaluator} for backward compatible handling
+   * of time spec. This
+   * is needed until we migrate to {@link org.apache.pinot.spi.data.DateTimeFieldSpec}
+   * 3. For columns ending with __KEYS or __VALUES (used for interpreting Map column in Avro), create default groovy
+   * functions for
+   * handing the Map
+   * 4. Return null, if none of the above
+   */
   @Nullable
   public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
     FunctionEvaluator functionEvaluator = null;
 
     String columnName = fieldSpec.getName();
+    // TODO: once we have published a release w/ IngestionConfig#TransformConfigs, stop reading transform function
+    //  from schema in next
+    //  release
     String transformExpression = fieldSpec.getTransformFunction();
     if (transformExpression != null && !transformExpression.isEmpty()) {
+
+      // if transform function expression present, use it to generate function evaluator
       try {
         functionEvaluator = getExpressionEvaluator(transformExpression);
       } catch (Exception e) {
@@ -48,6 +68,9 @@ public class FunctionEvaluatorFactory {
                 + " of column: " + columnName + ", exception: " + e.getMessage(), e);
       }
     } else if (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
+
+      // Time conversions should be done using DateTimeFieldSpec and transformFunctions
+      // But we need below lines for converting TimeFieldSpec's incoming to outgoing
       TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
       TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
       TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
@@ -61,12 +84,17 @@ public class FunctionEvaluatorFactory {
         }
       }
     } else if (columnName.endsWith(SchemaUtils.MAP_KEY_COLUMN_SUFFIX)) {
+
+      // for backward compatible handling of Map type (currently only in Avro)
       String sourceMapName = columnName.substring(0, columnName.length() - SchemaUtils.MAP_KEY_COLUMN_SUFFIX.length());
-      functionEvaluator = getExpressionEvaluator(getDefaultMapKeysTransformExpression(sourceMapName));
+      String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
+      functionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
     } else if (columnName.endsWith(SchemaUtils.MAP_VALUE_COLUMN_SUFFIX)) {
+      // for backward compatible handling of Map type in avro (currently only in Avro)
       String sourceMapName =
           columnName.substring(0, columnName.length() - SchemaUtils.MAP_VALUE_COLUMN_SUFFIX.length());
-      functionEvaluator = getExpressionEvaluator(getDefaultMapValuesTransformExpression(sourceMapName));
+      String defaultMapValuesTransformExpression = getDefaultMapValuesTransformExpression(sourceMapName);
+      functionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
     }
     return functionEvaluator;
   }
@@ -79,6 +107,9 @@ public class FunctionEvaluatorFactory {
     }
   }
 
+  /**
+   * @return true if the given transform function is a groovy expression, otherwise returns false
+   */
   public static boolean isGroovyExpression(String transformExpression) {
     return transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix());
   }

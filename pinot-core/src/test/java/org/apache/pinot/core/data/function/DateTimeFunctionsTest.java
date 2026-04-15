@@ -28,7 +28,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
-import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
+import org.apache.pinot.segment.local.evaluator.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;

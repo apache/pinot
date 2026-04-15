@@ -99,7 +99,7 @@ import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
-import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;

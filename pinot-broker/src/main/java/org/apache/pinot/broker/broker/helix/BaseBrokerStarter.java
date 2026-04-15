@@ -96,7 +96,7 @@ import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
-import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;

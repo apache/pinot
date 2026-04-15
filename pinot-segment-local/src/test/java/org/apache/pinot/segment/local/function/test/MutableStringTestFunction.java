@@ -16,16 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.function;
+package org.apache.pinot.segment.local.function.test;
+
+import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
- * @deprecated Use {@link org.apache.pinot.segment.local.evaluator.InbuiltFunctionEvaluator} instead.
+ * Test-only scalar function used to verify that stateful function instances are reused across evaluations.
  */
-@Deprecated
-public class InbuiltFunctionEvaluator extends org.apache.pinot.segment.local.evaluator.InbuiltFunctionEvaluator
-    implements FunctionEvaluator {
-  public InbuiltFunctionEvaluator(String functionExpression) {
-    super(functionExpression);
+@SuppressWarnings("unused")
+public class MutableStringTestFunction {
+  private String _baseString = "";
+
+  @ScalarFunction
+  public String appendToStringAndReturn(String addedString) {
+    _baseString += addedString;
+    return _baseString;
   }
 }

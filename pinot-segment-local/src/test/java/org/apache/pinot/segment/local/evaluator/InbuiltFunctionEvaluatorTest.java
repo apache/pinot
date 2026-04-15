@@ -16,12 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.function;
+package org.apache.pinot.segment.local.evaluator;
 
 import java.util.Collections;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.PinotDataType;
-import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -253,16 +252,5 @@ public class InbuiltFunctionEvaluatorTest {
     longRow.putValue("value", 1L << 40);
     longRow.putValue("shift", 40);
     assertEquals(new InbuiltFunctionEvaluator("bitExtract(value, shift)").evaluate(longRow), 1);
-  }
-
-  @SuppressWarnings("unused")
-  public static class MyFunc {
-    String _baseString = "";
-
-    @ScalarFunction
-    public String appendToStringAndReturn(String addedString) {
-      _baseString += addedString;
-      return _baseString;
-    }
   }
 }
