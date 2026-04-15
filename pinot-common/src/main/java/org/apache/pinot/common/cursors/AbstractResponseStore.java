@@ -126,6 +126,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
   protected abstract ResultTable readResultTable(String requestId, int offset, int numRows)
       throws Exception;
 
+  // Must only be called from deleteResponse(), which holds the instance monitor to prevent concurrent metric updates.
   protected abstract boolean deleteResponseImpl(String requestId)
       throws Exception;
 
@@ -230,20 +231,49 @@ public abstract class AbstractResponseStore implements ResponseStore {
     return responses;
   }
 
+  /**
+   * Default implementation that iterates all stored responses and deletes those expired before the given timestamp.
+   * Subclasses should override this with an optimized single-pass implementation when possible.
+   */
   @Override
-  public boolean deleteResponse(String requestId) throws Exception {
+  public int deleteExpiredResponses(long expiredBeforeMs)
+      throws Exception {
+    List<String> expiredIds = new ArrayList<>();
+    for (String requestId : getAllStoredRequestIds()) {
+      try {
+        CursorResponse response = readResponse(requestId);
+        if (response.getExpirationTimeMs() <= expiredBeforeMs) {
+          expiredIds.add(requestId);
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Error reading response metadata for requestId={} during cleanup", requestId, e);
+      }
+    }
+
+    int deletedCount = 0;
+    for (String requestId : expiredIds) {
+      try {
+        if (deleteResponse(requestId)) {
+          deletedCount++;
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Error deleting expired response for requestId={}", requestId, e);
+      }
+    }
+    return deletedCount;
+  }
+
+  @Override
+  public synchronized boolean deleteResponse(String requestId) throws Exception {
     if (!exists(requestId)) {
       return false;
     }
 
-    // Read bytesWritten for metrics tracking. The response may be deleted concurrently between exists() and
-    // readResponse() (TOCTOU race), so handle that gracefully.
     long bytesWritten = 0;
     try {
       bytesWritten = readResponse(requestId).getBytesWritten();
     } catch (Exception e) {
-      LOGGER.debug("Could not read response metadata for requestId={} (may have been deleted concurrently)",
-          requestId, e);
+      LOGGER.debug("Could not read response metadata for requestId={}", requestId, e);
     }
 
     boolean isSucceeded = deleteResponseImpl(requestId);

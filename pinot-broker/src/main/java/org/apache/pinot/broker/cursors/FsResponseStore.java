@@ -138,9 +138,11 @@ public class FsResponseStore extends AbstractResponseStore {
           LOGGER.debug("Checking for query dir {} & metadata file: {}. Metadata file exists: {}", queryDir,
               metadataFile, metadataFileExists);
           if (metadataFileExists) {
-            BrokerResponse response =
-                _responseSerde.deserialize(pinotFS.open(metadataFile), CursorResponseNative.class);
-            if (response.getBrokerId().equals(_brokerId)) {
+            BrokerResponse response;
+            try (InputStream is = pinotFS.open(metadataFile)) {
+              response = _responseSerde.deserialize(is, CursorResponseNative.class);
+            }
+            if (_brokerId.equals(response.getBrokerId())) {
               requestIdList.add(response.getRequestId());
               LOGGER.debug("Added response store {}", queryDir);
             }
@@ -163,13 +165,53 @@ public class FsResponseStore extends AbstractResponseStore {
       pinotFS.delete(queryDir, true);
       return true;
     } catch (Exception e) {
-      // Directory may have been deleted concurrently. If it's gone, treat as success.
       if (!pinotFS.exists(queryDir)) {
         LOGGER.debug("Directory already deleted for requestId={} (likely concurrent deletion)", requestId);
-        return true;
+        // synchronized serializes JVM-local calls, but external deletion (ops, other brokers) can still remove the dir.
+        return false;
       }
       throw e;
     }
+  }
+
+  /**
+   * Single-pass optimization: reads each response metadata file once to check both brokerId and expirationTimeMs,
+   * avoiding the double-read (getAllStoredRequestIds + readResponse) in the default AbstractResponseStore
+   * implementation.
+   */
+  @Override
+  public int deleteExpiredResponses(long expiredBeforeMs)
+      throws Exception {
+    PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
+    List<FileMetadata> queryPaths = pinotFS.listFilesWithMetadata(_dataDir, true);
+    int deletedCount = 0;
+
+    for (FileMetadata metadata : queryPaths) {
+      if (!metadata.isDirectory()) {
+        continue;
+      }
+      try {
+        URI queryDir = new URI(metadata.getFilePath());
+        URI metadataFile = combinePath(queryDir, String.format(RESPONSE_FILE_NAME_FORMAT, _fileExtension));
+        if (!pinotFS.exists(metadataFile)) {
+          continue;
+        }
+        CursorResponseNative response;
+        try (InputStream is = pinotFS.open(metadataFile)) {
+          response = _responseSerde.deserialize(is, CursorResponseNative.class);
+        }
+        // brokerId filter is needed because shared storage (S3/HDFS) makes all brokers' responses visible
+        if (_brokerId.equals(response.getBrokerId()) && response.getExpirationTimeMs() <= expiredBeforeMs) {
+          if (deleteResponse(response.getRequestId())) {
+            deletedCount++;
+          }
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Error cleaning up expired response for path={} (may have been deleted concurrently)",
+            metadata.getFilePath(), e);
+      }
+    }
+    return deletedCount;
   }
 
   @Override

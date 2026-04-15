@@ -2179,11 +2179,12 @@ public class CommonConstants {
     public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
     public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".expiration";
 
+    // Read once at broker startup; changes require broker restart to take effect.
     public static final String RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD =
-        "controller.cluster.response.store.cleaner.frequencyPeriod";
+        PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".cleaner.frequencyPeriod";
     public static final String DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD = "1h";
     public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
-        "controller.cluster.response.store.cleaner.initialDelay";
+        PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".cleaner.initialDelay";
   }
 
   public static class ForwardIndexConfigs {
