@@ -20,8 +20,8 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.utils.ThrottledLogger;
-import org.apache.pinot.segment.local.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;

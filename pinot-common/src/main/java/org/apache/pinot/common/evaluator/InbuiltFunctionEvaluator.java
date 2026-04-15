@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.evaluator;
+package org.apache.pinot.common.evaluator;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;

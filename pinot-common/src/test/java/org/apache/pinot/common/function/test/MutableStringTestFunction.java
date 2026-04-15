@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.function.test;
+package org.apache.pinot.common.function.test;
 
 import org.apache.pinot.spi.annotations.ScalarFunction;
 

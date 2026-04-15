@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.evaluator;
+package org.apache.pinot.common.evaluator;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.spi.function.FunctionEvaluator;
 import org.apache.pinot.segment.spi.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.spi.function.TimeSpecFunctionEvaluator;
@@ -33,6 +32,9 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
  * {@link FieldSpec#getTransformFunction()}
  */
 public class FunctionEvaluatorFactory {
+  private static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
+  private static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
+
   private FunctionEvaluatorFactory() {
   }
 
@@ -83,16 +85,16 @@ public class FunctionEvaluatorFactory {
                   .getName() + " is same");
         }
       }
-    } else if (columnName.endsWith(SchemaUtils.MAP_KEY_COLUMN_SUFFIX)) {
+    } else if (columnName.endsWith(MAP_KEY_COLUMN_SUFFIX)) {
 
       // for backward compatible handling of Map type (currently only in Avro)
-      String sourceMapName = columnName.substring(0, columnName.length() - SchemaUtils.MAP_KEY_COLUMN_SUFFIX.length());
+      String sourceMapName = columnName.substring(0, columnName.length() - MAP_KEY_COLUMN_SUFFIX.length());
       String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
       functionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
-    } else if (columnName.endsWith(SchemaUtils.MAP_VALUE_COLUMN_SUFFIX)) {
+    } else if (columnName.endsWith(MAP_VALUE_COLUMN_SUFFIX)) {
       // for backward compatible handling of Map type in avro (currently only in Avro)
       String sourceMapName =
-          columnName.substring(0, columnName.length() - SchemaUtils.MAP_VALUE_COLUMN_SUFFIX.length());
+          columnName.substring(0, columnName.length() - MAP_VALUE_COLUMN_SUFFIX.length());
       String defaultMapValuesTransformExpression = getDefaultMapValuesTransformExpression(sourceMapName);
       functionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
     }
