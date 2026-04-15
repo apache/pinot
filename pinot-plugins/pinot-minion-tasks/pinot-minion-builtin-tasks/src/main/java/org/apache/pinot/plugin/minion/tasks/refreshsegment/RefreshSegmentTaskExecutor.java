@@ -126,7 +126,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
           refreshColumnSet.add(column);
         }
 
-        // TODO: Maybe we can support singleValue to multi-value conversions are supproted and vice-versa.
+        // TODO: support single-value to multi-value column conversions and vice-versa.
       } else {
         refreshColumnSet.add(column);
       }
