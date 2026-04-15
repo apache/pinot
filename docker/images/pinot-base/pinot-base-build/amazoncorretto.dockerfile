@@ -26,23 +26,32 @@ RUN echo "Building for platform: $(uname -m)" && \
     echo "Architecture: $(dpkg --print-architecture)" && \
     cat /etc/os-release
 
-# Upgrade all OS packages first to pick up security patches
+# Upgrade all OS packages first to pick up security patches.
+# Omit gpg binary: apt reads .asc (ASCII-armored) key files natively via
+# signed-by= when placed in /etc/apt/keyrings/, so there is no need to
+# install gpg/gpgconf/libreadline/libsqlite3 just for key dearmoring —
+# avoiding the libsqlite3 CRITICAL CVE surface.
+# curl is kept alongside wget because some build tooling (libssl configure
+# tests, CI scripts) may invoke it; the libcurl CVE surface is acceptable
+# in a build-only image that is not deployed to production.
 RUN set -eux \
   && apt-get update \
   && apt-get upgrade -y --no-install-recommends \
   && apt-get install -y --no-install-recommends \
-  curl ca-certificates gpg fontconfig java-common \
-  wget git && \
+  ca-certificates java-common \
+  wget curl git && \
   rm -rf /var/lib/apt/lists/*
 
-# Install Amazon Corretto
-ARG JAVA_VERSION
+# Install Amazon Corretto.
+# /etc/apt/keyrings/ is the correct path for user-managed keys referenced via
+# signed-by=; apt natively handles ASCII-armored .asc files at that path.
+ARG JAVA_VERSION=11
 RUN set -eux \
   && mkdir -p /etc/apt/keyrings \
-  && curl -fL https://apt.corretto.aws/corretto.key | gpg --dearmor -o /etc/apt/keyrings/corretto.gpg \
-  && echo "deb [signed-by=/etc/apt/keyrings/corretto.gpg] https://apt.corretto.aws stable main" > /etc/apt/sources.list.d/corretto.list \
+  && wget -qO /etc/apt/keyrings/corretto.asc https://apt.corretto.aws/corretto.key \
+  && echo "deb [signed-by=/etc/apt/keyrings/corretto.asc] https://apt.corretto.aws stable main" > /etc/apt/sources.list.d/corretto.list \
   && apt-get update \
-  && apt-get install -y java-${JAVA_VERSION}-amazon-corretto-jdk \
+  && apt-get install -y --no-install-recommends java-${JAVA_VERSION}-amazon-corretto-jdk \
   && rm -rf /var/lib/apt/lists/*
 
 # Install build dependencies separately
