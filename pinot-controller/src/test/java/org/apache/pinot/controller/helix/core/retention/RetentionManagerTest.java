@@ -892,6 +892,17 @@ public class RetentionManagerTest {
     clusterConfigs.put(configKey, "invalid");
     retentionManager.onChange(Set.of(configKey), clusterConfigs);
     assertFalse(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Simulate config key deletion (null value) while feature is enabled — should revert to default (false)
+    clusterConfigs.put(configKey, "true");
+    retentionManager.onChange(Set.of(configKey), clusterConfigs);
+    assertTrue(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Now delete the config key: changedConfigs contains the key, but clusterConfigs.get() returns null
+    Map<String, String> configsWithDeletedKey = new HashMap<>();
+    configsWithDeletedKey.put(configKey, null);
+    retentionManager.onChange(Set.of(configKey), configsWithDeletedKey);
+    assertFalse(retentionManager.isRetentionCreationTimeFallbackEnabled());
   }
 
   @Test

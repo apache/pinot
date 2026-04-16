@@ -251,6 +251,7 @@ public class ControllerConf extends PinotConfiguration {
     // Untracked segments are those that exist in deep store but have no corresponding entry in the ZK property store.
     public static final String ENABLE_UNTRACKED_SEGMENT_DELETION =
         "controller.retentionManager.untrackedSegmentDeletionEnabled";
+    public static final boolean DEFAULT_ENABLE_UNTRACKED_SEGMENT_DELETION = false;
     public static final String UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS =
         "controller.retentionManager.untrackedSegmentsRetentionTimeInDays";
     public static final int DEFAULT_UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS = 3;
@@ -262,6 +263,7 @@ public class ControllerConf extends PinotConfiguration {
     // when the segment end time is invalid (e.g., time column populated with 0).
     public static final String ENABLE_RETENTION_CREATION_TIME_FALLBACK =
         "controller.retentionManager.enableCreationTimeFallback";
+    public static final boolean DEFAULT_ENABLE_RETENTION_CREATION_TIME_FALLBACK = false;
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
@@ -1222,7 +1224,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public boolean getUntrackedSegmentDeletionEnabled() {
-    return getProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, false);
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION,
+        ControllerPeriodicTasksConf.DEFAULT_ENABLE_UNTRACKED_SEGMENT_DELETION);
   }
 
   public int getUntrackedSegmentsRetentionTimeInDays() {
@@ -1235,7 +1238,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public boolean isRetentionCreationTimeFallbackEnabled() {
-    return getProperty(ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK, false);
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK,
+        ControllerPeriodicTasksConf.DEFAULT_ENABLE_RETENTION_CREATION_TIME_FALLBACK);
   }
 
   public int getAgedSegmentsDeletionBatchSize() {
