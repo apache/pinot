@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,8 +126,13 @@ public class BloomFilterHandler extends BaseIndexHandler {
         StandardIndexes.bloomFilter().createIndexCreator(context, bloomFilterConfig);
         Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
       int length = dictionary.length();
+      boolean isUuid = columnMetadata.getDataType() == DataType.UUID;
       for (int i = 0; i < length; i++) {
-        bloomFilterCreator.add(dictionary.getStringValue(i));
+        if (isUuid) {
+          bloomFilterCreator.add(UuidUtils.toString(dictionary.getBytesValue(i)));
+        } else {
+          bloomFilterCreator.add(dictionary.getStringValue(i));
+        }
       }
       bloomFilterCreator.seal();
     }
@@ -175,6 +181,11 @@ public class BloomFilterHandler extends BaseIndexHandler {
           case STRING:
             for (int i = 0; i < numDocs; i++) {
               bloomFilterCreator.add(forwardIndexReader.getString(i, readerContext));
+            }
+            break;
+          case UUID:
+            for (int i = 0; i < numDocs; i++) {
+              bloomFilterCreator.add(UuidUtils.toString(forwardIndexReader.getBytes(i, readerContext)));
             }
             break;
           case BYTES:
