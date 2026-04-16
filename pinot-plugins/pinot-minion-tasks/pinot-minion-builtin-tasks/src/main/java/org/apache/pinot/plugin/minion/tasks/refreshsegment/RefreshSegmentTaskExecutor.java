@@ -66,7 +66,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     _eventObserver.notifyProgress(pinotTaskConfig, "Refreshing segment: " + indexDir);
 
     // We set _taskStartTime before fetching the tableConfig. Task Generation relies on tableConfig/Schema updates
-    // happening after the last processed time. So we explicity use the timestamp before fetching tableConfig as the
+    // happening after the last processed time. So we explicitly use the timestamp before fetching tableConfig as the
     // processedTime.
     _taskStartTime = System.currentTimeMillis();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
