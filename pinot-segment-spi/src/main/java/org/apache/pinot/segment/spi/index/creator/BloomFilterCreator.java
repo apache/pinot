@@ -35,7 +35,7 @@ public interface BloomFilterCreator extends IndexCreator {
     if (getDataType() == FieldSpec.DataType.BYTES) {
       add(BytesUtils.toHexString((byte[]) value));
     } else if (getDataType() == FieldSpec.DataType.UUID) {
-      add(UuidUtils.toString((byte[]) value));
+      add(UuidUtils.toString(UuidUtils.toBytes(value)));
     } else {
       add(value.toString());
     }
@@ -49,7 +49,7 @@ public interface BloomFilterCreator extends IndexCreator {
       }
     } else if (getDataType() == FieldSpec.DataType.UUID) {
       for (Object value : values) {
-        add(UuidUtils.toString((byte[]) value));
+        add(UuidUtils.toString(UuidUtils.toBytes(value)));
       }
     } else {
       for (Object value : values) {

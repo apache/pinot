@@ -272,10 +272,16 @@ public class AvroUtils {
     try {
       org.apache.avro.Schema fieldSchema = extractSupportedSchema(field.schema());
       if (fieldSchema.getType() == org.apache.avro.Schema.Type.ARRAY) {
-        return AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()));
+        DataType elementDataType = AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()));
+        Preconditions.checkState(elementDataType != DataType.UUID,
+            "Avro ARRAY<uuid> cannot be mapped to Pinot UUID because UUID data type only supports single-value "
+                + "fields: %s", field.name());
+        return elementDataType;
       } else {
         return AvroSchemaUtil.valueOf(fieldSchema);
       }
+    } catch (RuntimeException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while extracting data type from field: " + field.name(), e);
     }

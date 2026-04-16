@@ -35,6 +35,7 @@ import org.apache.pinot.segment.spi.index.creator.RawValueBasedInvertedIndexCrea
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 /**
@@ -202,7 +203,9 @@ public class RawValueBitmapInvertedIndexCreator implements RawValueBasedInverted
         add((String) value);
         break;
       case BYTES:
-        if (value instanceof ByteArray) {
+        if (_dataType == DataType.UUID) {
+          add(UuidUtils.toBytes(value));
+        } else if (value instanceof ByteArray) {
           add(((ByteArray) value).getBytes());
         } else {
           add((byte[]) value);
@@ -256,8 +259,15 @@ public class RawValueBitmapInvertedIndexCreator implements RawValueBasedInverted
         byte[][] bytesValues = new byte[values.length][];
         for (int i = 0; i < values.length; i++) {
           Object value = values[i];
-          bytesValues[i] = value == null ? null
-              : value instanceof ByteArray ? ((ByteArray) value).getBytes() : (byte[]) value;
+          if (value == null) {
+            bytesValues[i] = null;
+          } else if (_dataType == DataType.UUID) {
+            bytesValues[i] = UuidUtils.toBytes(value);
+          } else if (value instanceof ByteArray) {
+            bytesValues[i] = ((ByteArray) value).getBytes();
+          } else {
+            bytesValues[i] = (byte[]) value;
+          }
         }
         add(bytesValues, values.length);
         break;
@@ -341,6 +351,9 @@ public class RawValueBitmapInvertedIndexCreator implements RawValueBasedInverted
           typedValues = stringValues;
           break;
         case BYTES:
+          // Values are stored as ByteArray in the map (add(byte[]) always wraps via new ByteArray()).
+          // This holds for UUID columns too: both add(Object, int) and add(Object[], int[]) route UUID
+          // values through add(byte[]) which performs the wrapping.
           ByteArray[] bytesValues = new ByteArray[numValues];
           for (int i = 0; i < numValues; i++) {
             bytesValues[i] = (ByteArray) rawValues[i];

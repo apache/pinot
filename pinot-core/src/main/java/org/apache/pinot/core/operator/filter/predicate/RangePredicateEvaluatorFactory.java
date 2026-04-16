@@ -32,6 +32,7 @@ import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -111,6 +112,13 @@ public class RangePredicateEvaluatorFactory {
         return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? null : BytesUtils.toBytes(lowerBound),
             upperUnbounded ? null : BytesUtils.toBytes(upperBound), lowerInclusive, upperInclusive);
+      case UUID:
+        // UUID is stored as 16-byte BYTES. UUID dictionaries report getValueType() == BYTES, so the
+        // UnsortedDictionaryBasedRangePredicateEvaluator will dispatch on BYTES and call getBytesValue(),
+        // returning the raw 16-byte array which is directly comparable to the bounds below.
+        return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? null : UuidUtils.toBytes(lowerBound),
+            upperUnbounded ? null : UuidUtils.toBytes(upperBound), lowerInclusive, upperInclusive);
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
