@@ -613,7 +613,7 @@ public final class Schema implements Serializable {
    *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL,
    *   BOOLEAN, TIMESTAMP, STRING, JSON, UUID, BYTES</li>
    *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, BYTES</li>
-   *   <li>BIG_DECIMAL and UUID fields only support single-value columns</li>
+   *   <li>UUID fields only support single-value columns</li>
    * </ul>
    */
   public void validate() {
@@ -630,13 +630,8 @@ public final class Schema implements Serializable {
   public static void validate(FieldSpec fieldSpec) {
     DataType dataType = fieldSpec.getDataType();
     validate(fieldSpec.getFieldType(), dataType);
-    if (!fieldSpec.isSingleValueField()) {
-      if (dataType == DataType.BIG_DECIMAL) {
-        throw new IllegalStateException("BIG_DECIMAL data type only supports single-value fields");
-      }
-      if (dataType == DataType.UUID) {
-        throw new IllegalStateException("UUID data type only supports single-value fields");
-      }
+    if (!fieldSpec.isSingleValueField() && dataType == DataType.UUID) {
+      throw new IllegalStateException("UUID data type only supports single-value fields");
     }
   }
 
