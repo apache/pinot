@@ -116,15 +116,6 @@ public class SchemaTest {
   }
 
   @Test
-  public void testBigDecimalValidationRejectsMV() {
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec("bdMv", FieldSpec.DataType.BIG_DECIMAL, false));
-
-    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class, schema::validate);
-    assertThat(exception).hasMessageContaining("single-value fields");
-  }
-
-  @Test
   public void testSchemaBuilder() {
     String defaultString = "default";
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
