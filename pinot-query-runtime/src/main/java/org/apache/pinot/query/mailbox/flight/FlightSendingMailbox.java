@@ -126,20 +126,28 @@ public class FlightSendingMailbox implements SendingMailbox {
       _listener.start(_sendRoot, dictionaryProvider);
     }
 
-    int offset = 0;
     int totalRows = arrowBlock.getNumRows();
     List<FieldVector> sendVectors = _sendRoot.getFieldVectors();
-    while (offset < totalRows) {
-      int batchSize = Math.min(MAX_BATCH_ROWS, totalRows - offset);
-      try (VectorSchemaRoot slice = root.slice(offset, batchSize)) {
-        List<FieldVector> sliceVectors = slice.getFieldVectors();
-        for (int i = 0; i < sliceVectors.size(); i++) {
-          sliceVectors.get(i).makeTransferPair(sendVectors.get(i)).transfer();
+    if (totalRows <= MAX_BATCH_ROWS) {
+      // Common case: entire block fits in one batch — transfer vectors directly (zero-copy)
+      for (int i = 0; i < sendVectors.size(); i++) {
+        root.getVector(i).makeTransferPair(sendVectors.get(i)).transfer();
+      }
+      _sendRoot.setRowCount(totalRows);
+      _listener.putNext();
+    } else {
+      // Multi-batch: use splitAndTransfer per range (avoids the intermediate slice root)
+      int offset = 0;
+      while (offset < totalRows) {
+        int batchSize = Math.min(MAX_BATCH_ROWS, totalRows - offset);
+        for (int i = 0; i < sendVectors.size(); i++) {
+          root.getVector(i).makeTransferPair(sendVectors.get(i))
+              .splitAndTransfer(offset, batchSize);
         }
         _sendRoot.setRowCount(batchSize);
         _listener.putNext();
+        offset += batchSize;
       }
-      offset += batchSize;
     }
   }
 

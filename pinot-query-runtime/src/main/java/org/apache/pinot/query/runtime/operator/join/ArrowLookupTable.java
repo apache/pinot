@@ -42,7 +42,7 @@ import org.roaringbitmap.RoaringBitmap;
  * <p>Usage:
  * <ol>
  *   <li>Call {@link #push(ArrowDataBlock)} for each right-side batch as it arrives.</li>
- *   <li>Call {@link #finalize()} once all batches have been pushed. This merges all batches into a single
+ *   <li>Call {@link #build()} once all batches have been pushed. This merges all batches into a single
  *       contiguous {@link ArrowDataBlock} and builds the open-addressing linear-probe hash table.</li>
  *   <li>Use {@link #getHashes()}, {@link #getAddresses()}, etc. to hand the table off to {@link ArrowJoinProbe}.</li>
  * </ol>
@@ -103,12 +103,12 @@ public class ArrowLookupTable implements AutoCloseable {
   }
 
   /**
-   * Appends a right-side batch. The hash table is not built until {@link #finalize()} is called, which avoids
+   * Appends a right-side batch. The hash table is not built until {@link #build()} is called, which avoids
    * any rehashing.
    */
   public void push(ArrowDataBlock dataBlock) {
     if (_finalized) {
-      throw new IllegalStateException("Cannot push data blocks after finalize()");
+      throw new IllegalStateException("Cannot push data blocks after build()");
     }
     _rightBatches.add(dataBlock);
     _size += dataBlock.getNumberOfRows();
@@ -118,9 +118,8 @@ public class ArrowLookupTable implements AutoCloseable {
    * Merges all pushed batches into a single block and builds the hash table. Must be called exactly once,
    * after all batches have been pushed.
    */
-  public void finalize() {
+  public void build() {
     _mergedBlock = mergeBlocks(_rightBatches);
-    _keyHasher = _keySelector.getArrowHasher(_mergedBlock);
 
     // Close individual batches that were merged away
     for (ArrowDataBlock batch : _rightBatches) {
@@ -129,6 +128,12 @@ public class ArrowLookupTable implements AutoCloseable {
       }
     }
     _rightBatches.clear();
+
+    if (_mergedBlock == null || _mergedBlock.getNumberOfRows() == 0) {
+      _finalized = true;
+      return;
+    }
+    _keyHasher = _keySelector.getArrowHasher(_mergedBlock);
 
     int initialCapacity = (int) Math.ceil(_size / _loadFactor);
     _capacity = Integer.highestOneBit(Math.max(16, initialCapacity) - 1) << 1;
@@ -171,18 +176,19 @@ public class ArrowLookupTable implements AutoCloseable {
       return first;
     }
 
-    // Build a decoded schema (drop dictionary encoding from string columns)
-    List<Field> decodedFields = new ArrayList<>();
-    for (Field field : first.getSchema().getFields()) {
-      if (field.getDictionary() != null) {
-        decodedFields.add(Field.nullable(field.getName(), new ArrowType.Utf8()));
-      } else {
-        decodedFields.add(field);
-      }
-    }
-    Schema decodedSchema = new Schema(decodedFields);
+    boolean hasDictionary = hasDictionaryColumns(first);
+    boolean allShareSameDictionary = hasDictionary && allBatchesShareDictionary(batches);
 
-    VectorSchemaRoot mergedRoot = VectorSchemaRoot.create(decodedSchema, _allocator);
+    Schema mergedSchema;
+    if (hasDictionary && !allShareSameDictionary) {
+      // Different dictionaries across batches — must decode to plain VarChar
+      mergedSchema = buildDecodedSchema(first);
+    } else {
+      // Either no dictionaries, or all batches share the same one — keep schema as-is
+      mergedSchema = first.getSchema();
+    }
+
+    VectorSchemaRoot mergedRoot = VectorSchemaRoot.create(mergedSchema, _allocator);
     int numFields = mergedRoot.getFieldVectors().size();
     for (int i = 0; i < numFields; i++) {
       FieldVector target = mergedRoot.getVector(i);
@@ -192,10 +198,16 @@ public class ArrowLookupTable implements AutoCloseable {
       for (ArrowDataBlock batch : batches) {
         FieldVector source = batch.getRoot().getVector(i);
         if (source.getField().getDictionary() != null && batch.getDictionaryProvider() != null) {
-          DictionaryProvider provider = batch.getDictionaryProvider();
-          Dictionary dictionary = provider.lookup(source.getField().getDictionary().getId());
-          try (FieldVector decoded = (FieldVector) DictionaryEncoder.decode(source, dictionary)) {
-            decoded.accept(appender, null);
+          if (allShareSameDictionary) {
+            // Same dictionary across all batches — append index vectors directly (no decode)
+            source.accept(appender, null);
+          } else {
+            // Different dictionaries — must decode before appending
+            DictionaryProvider provider = batch.getDictionaryProvider();
+            Dictionary dictionary = provider.lookup(source.getField().getDictionary().getId());
+            try (FieldVector decoded = (FieldVector) DictionaryEncoder.decode(source, dictionary)) {
+              decoded.accept(appender, null);
+            }
           }
         } else {
           source.accept(appender, null);
@@ -203,7 +215,65 @@ public class ArrowLookupTable implements AutoCloseable {
       }
     }
     mergedRoot.setRowCount(_size);
-    return new ArrowDataBlock(mergedRoot, null);
+
+    // When all batches share the same dictionary, preserve it on the merged block
+    DictionaryProvider mergedDictProvider = allShareSameDictionary
+        ? ArrowDataBlock.copyDictionaryProvider(first.getDictionaryProvider(), _allocator)
+        : null;
+    return new ArrowDataBlock(mergedRoot, mergedDictProvider);
+  }
+
+  private static boolean hasDictionaryColumns(ArrowDataBlock block) {
+    for (Field field : block.getSchema().getFields()) {
+      if (field.getDictionary() != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Returns true if all batches share the exact same dictionary for every dictionary-encoded column.
+   * This is the common case when all batches originate from the same leaf stage.
+   */
+  private static boolean allBatchesShareDictionary(List<ArrowDataBlock> batches) {
+    ArrowDataBlock first = batches.get(0);
+    DictionaryProvider firstProvider = first.getDictionaryProvider();
+    if (firstProvider == null) {
+      return false;
+    }
+    for (int i = 1; i < batches.size(); i++) {
+      DictionaryProvider provider = batches.get(i).getDictionaryProvider();
+      if (provider == null) {
+        return false;
+      }
+      // Check that dictionary IDs match and dictionaries have the same size
+      // (identity check on the provider object handles the common case of literal sharing)
+      if (provider == firstProvider) {
+        continue;
+      }
+      for (long dictId : firstProvider.getDictionaryIds()) {
+        Dictionary firstDict = firstProvider.lookup(dictId);
+        Dictionary otherDict = provider.lookup(dictId);
+        if (otherDict == null
+            || firstDict.getVector().getValueCount() != otherDict.getVector().getValueCount()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private static Schema buildDecodedSchema(ArrowDataBlock block) {
+    List<Field> decodedFields = new ArrayList<>();
+    for (Field field : block.getSchema().getFields()) {
+      if (field.getDictionary() != null) {
+        decodedFields.add(Field.nullable(field.getName(), new ArrowType.Utf8()));
+      } else {
+        decodedFields.add(field);
+      }
+    }
+    return new Schema(decodedFields);
   }
 
   // ----- accessors for ArrowJoinProbe -----

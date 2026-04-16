@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
@@ -96,6 +97,8 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
   /**
    * Copies a {@link DictionaryProvider} by transferring all dictionary vectors to new off-heap buffers.
    * This ensures the dictionaries remain valid after the source block is closed.
+   *
+   * <p>Prefer {@link #shareDictionaryProvider} when the source outlives the consumer.
    */
   public static DictionaryProvider copyDictionaryProvider(@Nullable DictionaryProvider source,
       BufferAllocator allocator) {
@@ -112,6 +115,66 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
       copy.put(new Dictionary((FieldVector) transferPair.getTo(), sourceDictionary.getEncoding()));
     }
     return copy;
+  }
+
+  /**
+   * Returns a reference-counted wrapper around the given {@link DictionaryProvider}. Multiple result blocks can
+   * share the same underlying dictionary without copying. The dictionary vectors are freed only when the last
+   * reference is released via {@link SharedDictionaryProvider#release()}.
+   *
+   * <p>Returns {@code null} if the source is null or has no dictionaries.
+   */
+  @Nullable
+  public static SharedDictionaryProvider shareDictionaryProvider(@Nullable DictionaryProvider source) {
+    if (source == null || source.getDictionaryIds().isEmpty()) {
+      return null;
+    }
+    return new SharedDictionaryProvider(source);
+  }
+
+  /**
+   * A reference-counted wrapper around a {@link DictionaryProvider}. Call {@link #retain()} before sharing
+   * and {@link #release()} when done. The underlying dictionary vectors are closed when the count reaches zero.
+   */
+  public static class SharedDictionaryProvider implements DictionaryProvider {
+    private final DictionaryProvider _delegate;
+    private final AtomicInteger _refCount = new AtomicInteger(1);
+
+    SharedDictionaryProvider(DictionaryProvider delegate) {
+      _delegate = delegate;
+    }
+
+    @Override
+    public Dictionary lookup(long id) {
+      return _delegate.lookup(id);
+    }
+
+    @Override
+    public Set<Long> getDictionaryIds() {
+      return _delegate.getDictionaryIds();
+    }
+
+    /** Increments the reference count. Must be paired with a subsequent {@link #release()}. */
+    public void retain() {
+      while (true) {
+        int count = _refCount.get();
+        if (count <= 0) {
+          throw new IllegalStateException("SharedDictionaryProvider already released");
+        }
+        if (_refCount.compareAndSet(count, count + 1)) {
+          return;
+        }
+      }
+    }
+
+    /** Decrements the reference count, closing the underlying dictionaries when it reaches zero. */
+    public void release() {
+      if (_refCount.decrementAndGet() == 0) {
+        if (_delegate instanceof DictionaryProvider.MapDictionaryProvider) {
+          ((DictionaryProvider.MapDictionaryProvider) _delegate).close();
+        }
+      }
+    }
   }
 
   // ----- DataBlock interface -----

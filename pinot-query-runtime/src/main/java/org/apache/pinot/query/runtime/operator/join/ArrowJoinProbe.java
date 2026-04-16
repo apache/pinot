@@ -22,7 +22,9 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.BaseFixedWidthVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
@@ -60,6 +62,10 @@ public class ArrowJoinProbe {
   private final int _leftColumnCount;
   private final int _resultColumnCount;
   private final BufferAllocator _allocator;
+  // Shared across all result blocks to avoid deep-copying dictionaries per result.
+  // Null when the left block has no dictionaries (common path via ArrowBlockConverter).
+  @Nullable
+  private final ArrowDataBlock.SharedDictionaryProvider _sharedDictProvider;
 
   public ArrowJoinProbe(ArrowDataBlock leftBlock, KeySelector<?> leftSelector, ArrowLookupTable rightTable,
       @Nullable List<TransformOperand> nonEquiEvaluators, int leftColumnCount, int resultColumnCount,
@@ -76,6 +82,7 @@ public class ArrowJoinProbe {
     _leftColumnCount = leftColumnCount;
     _allocator = allocator;
     _resultColumnCount = resultColumnCount;
+    _sharedDictProvider = ArrowDataBlock.shareDictionaryProvider(leftBlock.getDictionaryProvider());
 
     if (nonEquiEvaluators != null && !nonEquiEvaluators.isEmpty()) {
       _nonEquiEvaluators = new TransformOperand.ArrowEvaluator[nonEquiEvaluators.size()];
@@ -105,9 +112,7 @@ public class ArrowJoinProbe {
     copyColumns(_leftBlock, leftIndexes, result, 0, _leftColumnCount, rowCount);
     copyColumns(_rightBlock, rightIndexes, result, _leftColumnCount, _resultColumnCount - _leftColumnCount, rowCount);
     result.setRowCount(rowCount);
-    DictionaryProvider dictProvider =
-        ArrowDataBlock.copyDictionaryProvider(_leftBlock.getDictionaryProvider(), _allocator);
-    return new ArrowDataBlock(result, dictProvider);
+    return new ArrowDataBlock(result, retainSharedDict());
   }
 
   /**
@@ -151,9 +156,7 @@ public class ArrowJoinProbe {
       }
     }
     result.setRowCount(currentRow);
-    DictionaryProvider dictProvider =
-        ArrowDataBlock.copyDictionaryProvider(_leftBlock.getDictionaryProvider(), _allocator);
-    return new ArrowDataBlock(result, dictProvider);
+    return new ArrowDataBlock(result, retainSharedDict());
   }
 
   /**
@@ -234,9 +237,7 @@ public class ArrowJoinProbe {
       target.setValueCount(cardinality);
     }
     root.setRowCount(cardinality);
-    DictionaryProvider dictProvider =
-        ArrowDataBlock.copyDictionaryProvider(_leftBlock.getDictionaryProvider(), _allocator);
-    return new ArrowDataBlock(root, dictProvider);
+    return new ArrowDataBlock(root, retainSharedDict());
   }
 
   private void copyColumns(ArrowDataBlock src, IntArrayList rowIndexes, VectorSchemaRoot dest,
@@ -246,8 +247,45 @@ public class ArrowJoinProbe {
       FieldVector target = dest.getVector(destColOffset + col);
       target.setInitialCapacity(rowCount);
       target.allocateNew();
-      for (int i = 0; i < rowIndexes.size(); i++) {
-        target.copyFromSafe(rowIndexes.getInt(i), i, source);
+      gatherRows(source, target, rowIndexes, rowCount);
+    }
+  }
+
+  /**
+   * Copies selected rows from {@code source} to {@code target} using the fastest available path.
+   *
+   * <p>For fixed-width vectors (INT, LONG, FLOAT, DOUBLE), this operates directly on the underlying
+   * {@link ArrowBuf} data buffers, bypassing per-row bounds checking and validity bit logic. This is
+   * significantly faster than {@link FieldVector#copyFromSafe} for large row counts.
+   *
+   * <p>Variable-width vectors (VarChar, VarBinary, List) fall back to {@code copyFromSafe}.
+   */
+  private static void gatherRows(FieldVector source, FieldVector target, IntArrayList indices,
+      int rowCount) {
+    if (source instanceof BaseFixedWidthVector && target instanceof BaseFixedWidthVector
+        && source.getNullCount() == 0) {
+      // Fast path: bulk copy data bytes + set all validity bits (no nulls in source)
+      int typeWidth = ((BaseFixedWidthVector) source).getTypeWidth();
+      ArrowBuf srcBuf = source.getDataBuffer();
+      ArrowBuf dstBuf = target.getDataBuffer();
+      for (int i = 0; i < indices.size(); i++) {
+        dstBuf.setBytes((long) i * typeWidth, srcBuf,
+            (long) indices.getInt(i) * typeWidth, typeWidth);
+      }
+      ArrowBuf validityBuf = target.getValidityBuffer();
+      int fullBytes = rowCount / 8;
+      for (int i = 0; i < fullBytes; i++) {
+        validityBuf.setByte(i, 0xFF);
+      }
+      int remaining = rowCount % 8;
+      if (remaining > 0) {
+        validityBuf.setByte(fullBytes, (1 << remaining) - 1);
+      }
+      target.setValueCount(rowCount);
+    } else {
+      // Fallback: handles variable-width vectors, nullable columns, and type mismatches
+      for (int i = 0; i < indices.size(); i++) {
+        target.copyFromSafe(indices.getInt(i), i, source);
       }
       target.setValueCount(rowCount);
     }
@@ -361,5 +399,18 @@ public class ArrowJoinProbe {
       }
     }
     return result;
+  }
+
+  /**
+   * Returns the shared dictionary provider with an incremented ref count (or null if none).
+   * The returned provider can be passed to {@link ArrowDataBlock} without deep-copying.
+   */
+  @Nullable
+  private DictionaryProvider retainSharedDict() {
+    if (_sharedDictProvider != null) {
+      _sharedDictProvider.retain();
+      return _sharedDictProvider;
+    }
+    return null;
   }
 }

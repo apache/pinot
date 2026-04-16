@@ -227,7 +227,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     if (eosBlock.isError()) {
       _eos = eosBlock;
     } else {
-      _arrowRightTable.finalize();
+      _arrowRightTable.build();
       _isRightTableBuilt = true;
       _statMap.merge(StatKey.MAX_ROWS_IN_JOIN, numRows);
     }

@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.FieldVector;
@@ -31,13 +32,17 @@ import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.VarBinaryVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.types.FloatingPointPrecision;
+import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
+import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -106,30 +111,26 @@ public final class ArrowBlockConverter {
   private static Field buildPlainField(String name, ColumnDataType type) {
     switch (type) {
       case BOOLEAN:
-        return Field.nullable(name, new org.apache.arrow.vector.types.pojo.ArrowType.Bool());
+        return Field.nullable(name, new ArrowType.Bool());
       case INT:
-        return Field.nullable(name, new org.apache.arrow.vector.types.pojo.ArrowType.Int(32, true));
+        return Field.nullable(name, new ArrowType.Int(32, true));
       case LONG:
       case TIMESTAMP:
-        return Field.nullable(name, new org.apache.arrow.vector.types.pojo.ArrowType.Int(64, true));
+        return Field.nullable(name, new ArrowType.Int(64, true));
       case FLOAT:
-        return Field.nullable(name,
-            new org.apache.arrow.vector.types.pojo.ArrowType.FloatingPoint(
-                org.apache.arrow.vector.types.FloatingPointPrecision.SINGLE));
+        return Field.nullable(name, new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE));
       case DOUBLE:
-        return Field.nullable(name,
-            new org.apache.arrow.vector.types.pojo.ArrowType.FloatingPoint(
-                org.apache.arrow.vector.types.FloatingPointPrecision.DOUBLE));
+        return Field.nullable(name, new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE));
       case STRING:
       case JSON:
       case BIG_DECIMAL:
-        return Field.nullable(name, new org.apache.arrow.vector.types.pojo.ArrowType.Utf8());
+        return Field.nullable(name, new ArrowType.Utf8());
       case BYTES:
       case MAP:
       case OBJECT:
-        return Field.nullable(name, new org.apache.arrow.vector.types.pojo.ArrowType.Binary());
+        return Field.nullable(name, new ArrowType.Binary());
       default:
-        return Field.nullable(name, new org.apache.arrow.vector.types.pojo.ArrowType.Null());
+        return Field.nullable(name, new ArrowType.Null());
     }
   }
 
@@ -177,6 +178,23 @@ public final class ArrowBlockConverter {
 
   private static void writeIntColumn(DataBlock dataBlock, IntVector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
+    // Fast path: for ColumnarDataBlock without nulls, read directly from the backing buffer
+    // with inline BIG_ENDIAN → LITTLE_ENDIAN byte swap. Eliminates the intermediate int[] heap array.
+    if (dataBlock instanceof ColumnarDataBlock && nullBitmap == null
+        && storedType == ColumnDataType.INT) {
+      ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
+      DataBuffer fixedData = colBlock.getFixedData();
+      int byteOffset = colBlock.getColumnByteOffset(colId);
+      ArrowBuf dstBuf = vector.getDataBuffer();
+      for (int row = 0; row < numRows; row++) {
+        dstBuf.setInt((long) row * 4,
+            Integer.reverseBytes(fixedData.getInt(byteOffset + (long) row * 4)));
+      }
+      setAllValid(vector, numRows);
+      vector.setValueCount(numRows);
+      return;
+    }
+    // Fallback: extract to heap array then write
     int[] values = DataBlockExtractUtils.extractIntColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
       if (nullBitmap != null && nullBitmap.contains(row)) {
@@ -190,6 +208,21 @@ public final class ArrowBlockConverter {
 
   private static void writeLongColumn(DataBlock dataBlock, BigIntVector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
+    // Fast path for ColumnarDataBlock without nulls
+    if (dataBlock instanceof ColumnarDataBlock && nullBitmap == null
+        && storedType == ColumnDataType.LONG) {
+      ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
+      DataBuffer fixedData = colBlock.getFixedData();
+      int byteOffset = colBlock.getColumnByteOffset(colId);
+      ArrowBuf dstBuf = vector.getDataBuffer();
+      for (int row = 0; row < numRows; row++) {
+        dstBuf.setLong((long) row * 8,
+            Long.reverseBytes(fixedData.getLong(byteOffset + (long) row * 8)));
+      }
+      setAllValid(vector, numRows);
+      vector.setValueCount(numRows);
+      return;
+    }
     long[] values = DataBlockExtractUtils.extractLongColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
       if (nullBitmap != null && nullBitmap.contains(row)) {
@@ -203,6 +236,21 @@ public final class ArrowBlockConverter {
 
   private static void writeFloatColumn(DataBlock dataBlock, Float4Vector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
+    // Fast path: byte-swap INT representation of float (float and int have same 4-byte layout)
+    if (dataBlock instanceof ColumnarDataBlock && nullBitmap == null
+        && storedType == ColumnDataType.FLOAT) {
+      ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
+      DataBuffer fixedData = colBlock.getFixedData();
+      int byteOffset = colBlock.getColumnByteOffset(colId);
+      ArrowBuf dstBuf = vector.getDataBuffer();
+      for (int row = 0; row < numRows; row++) {
+        dstBuf.setInt((long) row * 4,
+            Integer.reverseBytes(fixedData.getInt(byteOffset + (long) row * 4)));
+      }
+      setAllValid(vector, numRows);
+      vector.setValueCount(numRows);
+      return;
+    }
     float[] values = DataBlockExtractUtils.extractFloatColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
       if (nullBitmap != null && nullBitmap.contains(row)) {
@@ -216,6 +264,21 @@ public final class ArrowBlockConverter {
 
   private static void writeDoubleColumn(DataBlock dataBlock, Float8Vector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
+    // Fast path: byte-swap LONG representation of double (double and long have same 8-byte layout)
+    if (dataBlock instanceof ColumnarDataBlock && nullBitmap == null
+        && storedType == ColumnDataType.DOUBLE) {
+      ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
+      DataBuffer fixedData = colBlock.getFixedData();
+      int byteOffset = colBlock.getColumnByteOffset(colId);
+      ArrowBuf dstBuf = vector.getDataBuffer();
+      for (int row = 0; row < numRows; row++) {
+        dstBuf.setLong((long) row * 8,
+            Long.reverseBytes(fixedData.getLong(byteOffset + (long) row * 8)));
+      }
+      setAllValid(vector, numRows);
+      vector.setValueCount(numRows);
+      return;
+    }
     double[] values = DataBlockExtractUtils.extractDoubleColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
       if (nullBitmap != null && nullBitmap.contains(row)) {
@@ -253,5 +316,21 @@ public final class ArrowBlockConverter {
       }
     }
     vector.setValueCount(numRows);
+  }
+
+  /**
+   * Sets all validity bits to 1 (non-null) for the given vector. Used by the fast-path writers that bypass
+   * per-row {@code set()} calls and instead write directly to the data buffer.
+   */
+  private static void setAllValid(FieldVector vector, int numRows) {
+    ArrowBuf validityBuf = vector.getValidityBuffer();
+    int fullBytes = numRows / 8;
+    for (int i = 0; i < fullBytes; i++) {
+      validityBuf.setByte(i, 0xFF);
+    }
+    int remaining = numRows % 8;
+    if (remaining > 0) {
+      validityBuf.setByte(fullBytes, (1 << remaining) - 1);
+    }
   }
 }

@@ -144,10 +144,15 @@ public class ArrowBlock implements MseBlock.Data, AutoCloseable {
 
   /** Increments the reference count. Must be paired with a subsequent {@link #release()}. */
   public void retain() {
-    if (_refCount.get() == 0) {
-      throw new IllegalStateException("ArrowBlock has already been released");
+    while (true) {
+      int count = _refCount.get();
+      if (count <= 0) {
+        throw new IllegalStateException("ArrowBlock has already been released");
+      }
+      if (_refCount.compareAndSet(count, count + 1)) {
+        return;
+      }
     }
-    _refCount.incrementAndGet();
   }
 
   /** Decrements the reference count, closing the underlying buffers when it reaches zero. */

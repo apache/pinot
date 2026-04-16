@@ -54,7 +54,9 @@ public interface KeySelector<T> {
    * Creates an {@link ArrowKeyHasher} bound to the given Arrow data block.
    * The hasher is valid only for the lifetime of the block.
    */
-  ArrowKeyHasher getArrowHasher(ArrowDataBlock arrowDataBlock);
+  default ArrowKeyHasher getArrowHasher(ArrowDataBlock arrowDataBlock) {
+    throw new UnsupportedOperationException("Arrow not supported by " + getClass().getSimpleName());
+  }
 
   /**
    * Creates an {@link ArrowKeyComparator} that compares rows between two Arrow blocks.
@@ -63,7 +65,10 @@ public interface KeySelector<T> {
    * @param right the right (build) block
    * @param other the key selector for the right block
    */
-  ArrowKeyComparator getArrowKeyComparator(ArrowDataBlock left, ArrowDataBlock right, KeySelector<?> other);
+  default ArrowKeyComparator getArrowKeyComparator(ArrowDataBlock left, ArrowDataBlock right,
+      KeySelector<?> other) {
+    throw new UnsupportedOperationException("Arrow not supported by " + getClass().getSimpleName());
+  }
 
   /** Per-row hash function bound to a specific {@link ArrowDataBlock}. */
   interface ArrowKeyHasher {

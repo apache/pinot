@@ -40,6 +40,7 @@ import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
+import org.apache.pinot.query.runtime.blocks.ArrowBlock;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
@@ -255,7 +256,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
 
     @Override
-    public DataBlock visit(org.apache.pinot.query.runtime.blocks.ArrowBlock block, List<DataBuffer> serializedStats) {
+    public DataBlock visit(ArrowBlock block, List<DataBuffer> serializedStats) {
       // Convert to row-heap then serialize via the existing gRPC path
       return visit(block.asRowHeap(), serializedStats);
     }

@@ -32,11 +32,8 @@ import org.apache.arrow.flight.FlightServer;
 import org.apache.arrow.flight.Location;
 import org.apache.arrow.flight.PutResult;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.VectorUnloader;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -193,26 +190,27 @@ public class FlightMailboxService implements AutoCloseable {
           VectorSchemaRoot root = stream.getRoot();
           DictionaryProvider dictProvider = stream.getDictionaryProvider();
 
-          // Unload to get a self-contained batch, then load into a fresh root so we own the buffers
-          VectorUnloader unloader = new VectorUnloader(root);
-          try (ArrowRecordBatch batch = unloader.getRecordBatch()) {
-            BufferAllocator blockAllocator = _arrowBuffers.newQueryAllocator("flight-stream-block");
-            VectorSchemaRoot ownedRoot = VectorSchemaRoot.create(root.getSchema(), blockAllocator);
-            VectorLoader loader = new VectorLoader(ownedRoot);
-            loader.load(batch);
+          // Transfer buffer ownership from the Flight stream's allocator to our own allocator.
+          // This is O(1) per vector — no data bytes are copied, only buffer references are moved.
+          BufferAllocator blockAllocator = _arrowBuffers.newQueryAllocator("flight-stream-block");
+          VectorSchemaRoot ownedRoot = VectorSchemaRoot.create(root.getSchema(), blockAllocator);
+          for (int i = 0; i < root.getFieldVectors().size(); i++) {
+            root.getVector(i).makeTransferPair(ownedRoot.getVector(i)).transfer();
+          }
+          ownedRoot.setRowCount(root.getRowCount());
 
-            DictionaryProvider copiedProvider = ArrowDataBlock.copyDictionaryProvider(dictProvider, blockAllocator);
-            ArrowBlock block = new ArrowBlock(new ArrowDataBlock(ownedRoot, copiedProvider));
+          DictionaryProvider copiedProvider =
+              ArrowDataBlock.copyDictionaryProvider(dictProvider, blockAllocator);
+          ArrowBlock block = new ArrowBlock(new ArrowDataBlock(ownedRoot, copiedProvider));
 
-            long timeoutMs = deadlineMs - System.currentTimeMillis();
-            ReceivingMailbox.ReceivingMailboxStatus status =
-                mailbox.offer(block, Collections.emptyList(), Math.max(0, timeoutMs));
+          long timeoutMs = deadlineMs - System.currentTimeMillis();
+          ReceivingMailbox.ReceivingMailboxStatus status =
+              mailbox.offer(block, Collections.emptyList(), Math.max(0, timeoutMs));
 
-            if (status == ReceivingMailbox.ReceivingMailboxStatus.LAST_BLOCK
-                || status == ReceivingMailbox.ReceivingMailboxStatus.ALREADY_TERMINATED) {
-              LOGGER.warn("Mailbox {} returned status {}, stopping stream", mailbox.getId(), status);
-              return;
-            }
+          if (status == ReceivingMailbox.ReceivingMailboxStatus.LAST_BLOCK
+              || status == ReceivingMailbox.ReceivingMailboxStatus.ALREADY_TERMINATED) {
+            LOGGER.warn("Mailbox {} returned status {}, stopping stream", mailbox.getId(), status);
+            return;
           }
         }
       } catch (Exception e) {
