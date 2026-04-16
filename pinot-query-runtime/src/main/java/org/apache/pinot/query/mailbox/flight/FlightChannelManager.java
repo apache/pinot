@@ -55,9 +55,8 @@ public class FlightChannelManager implements AutoCloseable {
   public FlightClient getClient(String hostname, int port) {
     return _clientMap.computeIfAbsent(Pair.of(hostname, port), k -> {
       LOGGER.info("Creating Arrow Flight client for {}:{}", k.getLeft(), k.getRight());
-      Location location = _tlsConfig != null
-          ? Location.forGrpcTls(k.getLeft(), k.getRight())
-          : Location.forGrpcInsecure(k.getLeft(), k.getRight());
+      // TODO: Add TLS support for Flight clients (requires PEM cert/key, not JKS)
+      Location location = Location.forGrpcInsecure(k.getLeft(), k.getRight());
       return FlightClient.builder(_allocator, location).build();
     });
   }

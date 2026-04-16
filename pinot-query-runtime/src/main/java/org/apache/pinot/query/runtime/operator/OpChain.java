@@ -76,8 +76,17 @@ public class OpChain implements AutoCloseable {
     try {
       _root.close();
     } finally {
-      _finishCallback.accept(getId());
-      LOGGER.trace("OpChain callback called");
+      try {
+        // Close the per-query Arrow allocator to return off-heap memory to the root allocator.
+        // Must happen after operator tree is closed so all Arrow buffers are freed first.
+        org.apache.arrow.memory.BufferAllocator arrowAllocator = _context.getArrowAllocator();
+        if (arrowAllocator != null) {
+          arrowAllocator.close();
+        }
+      } finally {
+        _finishCallback.accept(getId());
+        LOGGER.trace("OpChain callback called");
+      }
     }
   }
 
@@ -92,8 +101,15 @@ public class OpChain implements AutoCloseable {
     try {
       _root.cancel(e);
     } finally {
-      _finishCallback.accept(getId());
-      LOGGER.trace("OpChain callback called");
+      try {
+        org.apache.arrow.memory.BufferAllocator arrowAllocator = _context.getArrowAllocator();
+        if (arrowAllocator != null) {
+          arrowAllocator.close();
+        }
+      } finally {
+        _finishCallback.accept(getId());
+        LOGGER.trace("OpChain callback called");
+      }
     }
   }
 }

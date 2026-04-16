@@ -18,15 +18,8 @@
  */
 package org.apache.pinot.query.mailbox.flight;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
-import java.io.File;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.arrow.flight.FlightServer;
 import org.apache.arrow.flight.Location;
@@ -53,47 +46,29 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The Flight server binds on a separate port from gRPC (configured at construction time).
  */
-public class FlightMailboxService implements AutoCloseable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(FlightMailboxService.class);
-  private static final int DANGLING_MAILBOX_EXPIRY_SECONDS = 300;
+public class FlightMailboxServer implements AutoCloseable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FlightMailboxServer.class);
 
   private final FlightServer _flightServer;
-  private final FlightChannelManager _channelManager;
   private final ArrowBuffers _arrowBuffers;
-  private final Cache<String, ReceivingMailbox> _receivingMailboxCache;
+  // Shared with MailboxService — Flight and gRPC route to the same receiving mailboxes
+  private final org.apache.pinot.query.mailbox.MailboxService _mailboxService;
 
-  public FlightMailboxService(String hostname, int flightPort, @Nullable TlsConfig tlsConfig,
-      ArrowBuffers arrowBuffers) {
-    _receivingMailboxCache = CacheBuilder.newBuilder()
-        .expireAfterAccess(DANGLING_MAILBOX_EXPIRY_SECONDS, TimeUnit.SECONDS)
-        .removalListener((RemovalListener<String, ReceivingMailbox>) notification -> {
-          if (notification.wasEvicted()) {
-            int pending = notification.getValue().getNumPendingBlocks();
-            if (pending > 0) {
-              LOGGER.warn("Evicting dangling Flight receiving mailbox: {} with {} pending blocks",
-                  notification.getKey(), pending);
-            }
-          }
-        })
-        .build();
-
-    Location location = tlsConfig != null
-        ? Location.forGrpcTls(hostname, flightPort)
-        : Location.forGrpcInsecure(hostname, flightPort);
-
+  public FlightMailboxServer(String hostname, int flightPort, @Nullable TlsConfig tlsConfig,
+      ArrowBuffers arrowBuffers, org.apache.pinot.query.mailbox.MailboxService mailboxService) {
     _arrowBuffers = arrowBuffers;
+    _mailboxService = mailboxService;
+
+    // TODO: Arrow Flight's useTls() requires PEM cert/key files, not JKS/PKCS12 keystores.
+    //  For now, Flight always uses plaintext. Add PEM-based TLS support in a follow-up.
+    if (tlsConfig != null) {
+      LOGGER.warn("Arrow Flight does not yet support TLS — running Flight on plaintext. "
+          + "gRPC TLS is unaffected.");
+    }
+    Location location = Location.forGrpcInsecure(hostname, flightPort);
     FlightServer.Builder builder = FlightServer.builder(
         arrowBuffers.newQueryAllocator("flight-mailbox-server"), location, new MailboxFlightProducer());
-
-    if (tlsConfig != null) {
-      try {
-        builder.useTls(new File(tlsConfig.getKeyStorePath()), new File(tlsConfig.getTrustStorePath()));
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to configure Flight TLS", e);
-      }
-    }
     _flightServer = builder.build();
-    _channelManager = new FlightChannelManager(tlsConfig, arrowBuffers);
   }
 
   /** Starts the Flight server. Must be called before any mailboxes are used. */
@@ -106,35 +81,12 @@ public class FlightMailboxService implements AutoCloseable {
     }
   }
 
-  /** Returns (or creates) the receiving mailbox for the given id. */
-  public ReceivingMailbox getReceivingMailbox(String mailboxId) {
-    try {
-      return _receivingMailboxCache.get(mailboxId, () -> new ReceivingMailbox(mailboxId));
-    } catch (ExecutionException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  /** Removes the receiving mailbox from the cache when it is no longer needed. */
-  public void releaseReceivingMailbox(ReceivingMailbox mailbox) {
-    _receivingMailboxCache.invalidate(mailbox.getId());
-  }
-
-  public FlightChannelManager getChannelManager() {
-    return _channelManager;
-  }
-
   @Override
   public void close() {
     try {
       _flightServer.close();
     } catch (Exception e) {
       LOGGER.warn("Error stopping Arrow Flight server", e);
-    }
-    try {
-      _channelManager.close();
-    } catch (Exception e) {
-      LOGGER.warn("Error closing Arrow Flight channel manager", e);
     }
   }
 
@@ -151,7 +103,7 @@ public class FlightMailboxService implements AutoCloseable {
           return;
         }
         try {
-          ReceivingMailbox mailbox = _receivingMailboxCache.get(mailboxId, () -> new ReceivingMailbox(mailboxId));
+          ReceivingMailbox mailbox = _mailboxService.getReceivingMailbox(mailboxId);
           processStream(stream, mailbox);
           ack.onCompleted();
         } catch (Exception e) {

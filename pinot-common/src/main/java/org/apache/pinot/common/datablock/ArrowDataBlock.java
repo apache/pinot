@@ -41,12 +41,15 @@ import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.dictionary.Dictionary;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.FloatingPointPrecision;
+import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.util.TransferPair;
 import org.apache.pinot.common.CustomObject;
-import org.apache.pinot.common.arrow.ArrowSchemaConverter;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
@@ -188,9 +191,34 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
   @Override
   public DataSchema getDataSchema() {
     if (_dataSchema == null) {
-      _dataSchema = ArrowSchemaConverter.toDataSchema(_root.getSchema());
+      List<Field> fields = _root.getSchema().getFields();
+      String[] names = new String[fields.size()];
+      ColumnDataType[] types = new ColumnDataType[fields.size()];
+      for (int i = 0; i < fields.size(); i++) {
+        names[i] = fields.get(i).getName();
+        types[i] = arrowTypeToPinot(fields.get(i).getType());
+      }
+      _dataSchema = new DataSchema(names, types);
     }
     return _dataSchema;
+  }
+
+  private static ColumnDataType arrowTypeToPinot(ArrowType type) {
+    if (type instanceof ArrowType.Bool) {
+      return ColumnDataType.BOOLEAN;
+    } else if (type instanceof ArrowType.Int) {
+      return ((ArrowType.Int) type).getBitWidth() == 32 ? ColumnDataType.INT : ColumnDataType.LONG;
+    } else if (type instanceof ArrowType.FloatingPoint) {
+      return ((ArrowType.FloatingPoint) type).getPrecision() == FloatingPointPrecision.SINGLE
+          ? ColumnDataType.FLOAT : ColumnDataType.DOUBLE;
+    } else if (type instanceof ArrowType.Utf8) {
+      return ColumnDataType.STRING;
+    } else if (type instanceof ArrowType.Binary) {
+      return ColumnDataType.BYTES;
+    } else if (type instanceof ArrowType.Null) {
+      return ColumnDataType.UNKNOWN;
+    }
+    return ColumnDataType.STRING;
   }
 
   @Override
@@ -270,12 +298,12 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
 
   @Override
   public int[] getIntArray(int rowId, int colId) {
-    ListVector listVector = (ListVector) _root.getVector(colId);
-    int start = listVector.getOffsetBuffer().getInt(rowId * 4L);
-    int end = listVector.getOffsetBuffer().getInt((rowId + 1) * 4L);
-    int[] result = new int[end - start];
-    IntVector child = (IntVector) listVector.getDataVector();
-    for (int i = 0; i < result.length; i++) {
+    ListVector lv = (ListVector) _root.getVector(colId);
+    int start = lv.getOffsetBuffer().getInt(rowId * 4L);
+    int len = lv.getOffsetBuffer().getInt((rowId + 1) * 4L) - start;
+    int[] result = new int[len];
+    IntVector child = (IntVector) lv.getDataVector();
+    for (int i = 0; i < len; i++) {
       result[i] = child.get(start + i);
     }
     return result;
@@ -283,12 +311,12 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
 
   @Override
   public long[] getLongArray(int rowId, int colId) {
-    ListVector listVector = (ListVector) _root.getVector(colId);
-    int start = listVector.getOffsetBuffer().getInt(rowId * 4L);
-    int end = listVector.getOffsetBuffer().getInt((rowId + 1) * 4L);
-    long[] result = new long[end - start];
-    BigIntVector child = (BigIntVector) listVector.getDataVector();
-    for (int i = 0; i < result.length; i++) {
+    ListVector lv = (ListVector) _root.getVector(colId);
+    int start = lv.getOffsetBuffer().getInt(rowId * 4L);
+    int len = lv.getOffsetBuffer().getInt((rowId + 1) * 4L) - start;
+    long[] result = new long[len];
+    BigIntVector child = (BigIntVector) lv.getDataVector();
+    for (int i = 0; i < len; i++) {
       result[i] = child.get(start + i);
     }
     return result;
@@ -296,12 +324,12 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
 
   @Override
   public float[] getFloatArray(int rowId, int colId) {
-    ListVector listVector = (ListVector) _root.getVector(colId);
-    int start = listVector.getOffsetBuffer().getInt(rowId * 4L);
-    int end = listVector.getOffsetBuffer().getInt((rowId + 1) * 4L);
-    float[] result = new float[end - start];
-    Float4Vector child = (Float4Vector) listVector.getDataVector();
-    for (int i = 0; i < result.length; i++) {
+    ListVector lv = (ListVector) _root.getVector(colId);
+    int start = lv.getOffsetBuffer().getInt(rowId * 4L);
+    int len = lv.getOffsetBuffer().getInt((rowId + 1) * 4L) - start;
+    float[] result = new float[len];
+    Float4Vector child = (Float4Vector) lv.getDataVector();
+    for (int i = 0; i < len; i++) {
       result[i] = child.get(start + i);
     }
     return result;
@@ -309,12 +337,12 @@ public class ArrowDataBlock implements DataBlock, AutoCloseable {
 
   @Override
   public double[] getDoubleArray(int rowId, int colId) {
-    ListVector listVector = (ListVector) _root.getVector(colId);
-    int start = listVector.getOffsetBuffer().getInt(rowId * 4L);
-    int end = listVector.getOffsetBuffer().getInt((rowId + 1) * 4L);
-    double[] result = new double[end - start];
-    Float8Vector child = (Float8Vector) listVector.getDataVector();
-    for (int i = 0; i < result.length; i++) {
+    ListVector lv = (ListVector) _root.getVector(colId);
+    int start = lv.getOffsetBuffer().getInt(rowId * 4L);
+    int len = lv.getOffsetBuffer().getInt((rowId + 1) * 4L) - start;
+    double[] result = new double[len];
+    Float8Vector child = (Float8Vector) lv.getDataVector();
+    for (int i = 0; i < len; i++) {
       result[i] = child.get(start + i);
     }
     return result;

@@ -39,6 +39,9 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
+import org.apache.pinot.query.mailbox.flight.FlightChannelManager;
+import org.apache.pinot.query.mailbox.flight.FlightMailboxServer;
+import org.apache.pinot.query.mailbox.flight.FlightSendingMailbox;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.ArrowBuffers;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -88,6 +91,11 @@ public class MailboxService {
   private final SslContext _serverSslContext;
   @Nullable private final QueryAccessControlFactory _accessControlFactory;
   private final ArrowBuffers _arrowBuffers;
+  private final int _flightPort;
+  @Nullable
+  private FlightChannelManager _flightChannelManager;
+  @Nullable
+  private FlightMailboxServer _flightServer;
   /**
    * The max inbound message size for the gRPC server.
    *
@@ -134,7 +142,16 @@ public class MailboxService {
     _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config));
     _accessControlFactory = accessControlFactory;
     _arrowBuffers = arrowBuffers;
-    LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
+    // Derive Flight port: explicit config, or gRPC port + 1 when Arrow is enabled
+    int configuredFlightPort = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_FLIGHT_PORT,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_FLIGHT_PORT);
+    _flightPort = arrowBuffers.isEnabled() && configuredFlightPort == 0 ? port + 1 : configuredFlightPort;
+    if (arrowBuffers.isEnabled()) {
+      _flightChannelManager = new FlightChannelManager(tlsConfig, arrowBuffers);
+    }
+    LOGGER.info("Initialized MailboxService with hostname: {}, port: {}, flightPort: {}",
+        hostname, port, _flightPort);
   }
 
   /**
@@ -144,6 +161,11 @@ public class MailboxService {
     LOGGER.info("Starting GrpcMailboxServer");
     _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig, _serverSslContext, _accessControlFactory);
     _grpcMailboxServer.start();
+    if (_arrowBuffers.isEnabled() && _flightPort > 0) {
+      LOGGER.info("Starting FlightMailboxServer on port {}", _flightPort);
+      _flightServer = new FlightMailboxServer(_hostname, _flightPort, _tlsConfig, _arrowBuffers, this);
+      _flightServer.start();
+    }
   }
 
   /**
@@ -152,6 +174,15 @@ public class MailboxService {
   public void shutdown() {
     LOGGER.info("Shutting down GrpcMailboxServer");
     _grpcMailboxServer.shutdown();
+    if (_flightServer != null) {
+      LOGGER.info("Shutting down FlightMailboxServer");
+      _flightServer.close();
+      _flightServer = null;
+    }
+    if (_flightChannelManager != null) {
+      _flightChannelManager.close();
+      _flightChannelManager = null;
+    }
   }
 
   public String getHostname() {
@@ -189,10 +220,18 @@ public class MailboxService {
       StatMap<MailboxSendOperator.StatKey> statMap) {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
-    } else {
-      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
-          _maxInboundMessageSize);
     }
+    // When Arrow is enabled, send data via Flight (zero-copy) with gRPC fallback for EOS/errors
+    if (_flightChannelManager != null && _flightPort > 0) {
+      GrpcSendingMailbox grpcFallback = new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port,
+          deadlineMs, statMap, _maxInboundMessageSize);
+      int targetFlightPort = port + 1; // Convention: flight port = gRPC port + 1
+      BufferAllocator allocator = _arrowBuffers.newQueryAllocator("flight-send");
+      return new FlightSendingMailbox(mailboxId, _flightChannelManager, hostname, targetFlightPort,
+          deadlineMs, statMap, grpcFallback, allocator);
+    }
+    return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
+        _maxInboundMessageSize);
   }
 
   /**

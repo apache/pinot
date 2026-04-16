@@ -151,15 +151,15 @@ public final class ArrowBlockConverter {
       case INT:
         writeIntColumn(dataBlock, (IntVector) vector, storedType, colId, numRows, nullBitmap);
         break;
+      case FLOAT:
+        writeFloatColumn(dataBlock, (Float4Vector) vector, colId, numRows, nullBitmap);
+        break;
       case LONG:
       case TIMESTAMP:
         writeLongColumn(dataBlock, (BigIntVector) vector, storedType, colId, numRows, nullBitmap);
         break;
-      case FLOAT:
-        writeFloatColumn(dataBlock, (Float4Vector) vector, storedType, colId, numRows, nullBitmap);
-        break;
       case DOUBLE:
-        writeDoubleColumn(dataBlock, (Float8Vector) vector, storedType, colId, numRows, nullBitmap);
+        writeDoubleColumn(dataBlock, (Float8Vector) vector, colId, numRows, nullBitmap);
         break;
       case STRING:
       case JSON:
@@ -170,32 +170,73 @@ public final class ArrowBlockConverter {
         writeBytesColumn(dataBlock, (VarBinaryVector) vector, colId, numRows, nullBitmap);
         break;
       default:
-        // UNKNOWN / unsupported — leave as null vector
         vector.setValueCount(numRows);
         break;
     }
   }
 
+  /**
+   * Fast path for ColumnarDataBlock: copy 4-byte values with endian swap directly into the Arrow buffer.
+   * Returns true if the fast path was taken.
+   */
+  private static boolean tryDirectCopy4(DataBlock dataBlock, FieldVector vector, int colId, int numRows,
+      @Nullable RoaringBitmap nullBitmap) {
+    if (!(dataBlock instanceof ColumnarDataBlock) || nullBitmap != null) {
+      return false;
+    }
+    ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
+    ArrowBuf dstBuf = vector.getDataBuffer();
+    int byteOffset = colBlock.getColumnByteOffset(colId);
+    DataBuffer src = colBlock.getFixedData();
+    for (int row = 0; row < numRows; row++) {
+      dstBuf.setInt((long) row * 4, Integer.reverseBytes(src.getInt(byteOffset + (long) row * 4)));
+    }
+    setAllValid(vector, numRows);
+    vector.setValueCount(numRows);
+    return true;
+  }
+
+  /** Same as {@link #tryDirectCopy4} but for 8-byte values. */
+  private static boolean tryDirectCopy8(DataBlock dataBlock, FieldVector vector, int colId, int numRows,
+      @Nullable RoaringBitmap nullBitmap) {
+    if (!(dataBlock instanceof ColumnarDataBlock) || nullBitmap != null) {
+      return false;
+    }
+    ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
+    ArrowBuf dstBuf = vector.getDataBuffer();
+    int byteOffset = colBlock.getColumnByteOffset(colId);
+    DataBuffer src = colBlock.getFixedData();
+    for (int row = 0; row < numRows; row++) {
+      dstBuf.setLong((long) row * 8, Long.reverseBytes(src.getLong(byteOffset + (long) row * 8)));
+    }
+    setAllValid(vector, numRows);
+    vector.setValueCount(numRows);
+    return true;
+  }
+
   private static void writeIntColumn(DataBlock dataBlock, IntVector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
-    // Fast path: for ColumnarDataBlock without nulls, read directly from the backing buffer
-    // with inline BIG_ENDIAN → LITTLE_ENDIAN byte swap. Eliminates the intermediate int[] heap array.
-    if (dataBlock instanceof ColumnarDataBlock && nullBitmap == null
-        && storedType == ColumnDataType.INT) {
-      ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
-      DataBuffer fixedData = colBlock.getFixedData();
-      int byteOffset = colBlock.getColumnByteOffset(colId);
-      ArrowBuf dstBuf = vector.getDataBuffer();
-      for (int row = 0; row < numRows; row++) {
-        dstBuf.setInt((long) row * 4,
-            Integer.reverseBytes(fixedData.getInt(byteOffset + (long) row * 4)));
-      }
-      setAllValid(vector, numRows);
-      vector.setValueCount(numRows);
+    if (tryDirectCopy4(dataBlock, vector, colId, numRows, nullBitmap)) {
       return;
     }
-    // Fallback: extract to heap array then write
     int[] values = DataBlockExtractUtils.extractIntColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
+    for (int row = 0; row < numRows; row++) {
+      if (nullBitmap != null && nullBitmap.contains(row)) {
+        vector.setNull(row);
+      } else {
+        vector.set(row, values[row]);
+      }
+    }
+    vector.setValueCount(numRows);
+  }
+
+  private static void writeFloatColumn(DataBlock dataBlock, Float4Vector vector,
+      int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
+    if (tryDirectCopy4(dataBlock, vector, colId, numRows, nullBitmap)) {
+      return;
+    }
+    float[] values = DataBlockExtractUtils.extractFloatColumn(
+        ColumnDataType.FLOAT.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
       if (nullBitmap != null && nullBitmap.contains(row)) {
         vector.setNull(row);
@@ -208,19 +249,7 @@ public final class ArrowBlockConverter {
 
   private static void writeLongColumn(DataBlock dataBlock, BigIntVector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
-    // Fast path for ColumnarDataBlock without nulls
-    if (dataBlock instanceof ColumnarDataBlock && nullBitmap == null
-        && storedType == ColumnDataType.LONG) {
-      ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
-      DataBuffer fixedData = colBlock.getFixedData();
-      int byteOffset = colBlock.getColumnByteOffset(colId);
-      ArrowBuf dstBuf = vector.getDataBuffer();
-      for (int row = 0; row < numRows; row++) {
-        dstBuf.setLong((long) row * 8,
-            Long.reverseBytes(fixedData.getLong(byteOffset + (long) row * 8)));
-      }
-      setAllValid(vector, numRows);
-      vector.setValueCount(numRows);
+    if (tryDirectCopy8(dataBlock, vector, colId, numRows, nullBitmap)) {
       return;
     }
     long[] values = DataBlockExtractUtils.extractLongColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
@@ -234,52 +263,13 @@ public final class ArrowBlockConverter {
     vector.setValueCount(numRows);
   }
 
-  private static void writeFloatColumn(DataBlock dataBlock, Float4Vector vector, ColumnDataType storedType,
+  private static void writeDoubleColumn(DataBlock dataBlock, Float8Vector vector,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
-    // Fast path: byte-swap INT representation of float (float and int have same 4-byte layout)
-    if (dataBlock instanceof ColumnarDataBlock && nullBitmap == null
-        && storedType == ColumnDataType.FLOAT) {
-      ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
-      DataBuffer fixedData = colBlock.getFixedData();
-      int byteOffset = colBlock.getColumnByteOffset(colId);
-      ArrowBuf dstBuf = vector.getDataBuffer();
-      for (int row = 0; row < numRows; row++) {
-        dstBuf.setInt((long) row * 4,
-            Integer.reverseBytes(fixedData.getInt(byteOffset + (long) row * 4)));
-      }
-      setAllValid(vector, numRows);
-      vector.setValueCount(numRows);
+    if (tryDirectCopy8(dataBlock, vector, colId, numRows, nullBitmap)) {
       return;
     }
-    float[] values = DataBlockExtractUtils.extractFloatColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
-    for (int row = 0; row < numRows; row++) {
-      if (nullBitmap != null && nullBitmap.contains(row)) {
-        vector.setNull(row);
-      } else {
-        vector.set(row, values[row]);
-      }
-    }
-    vector.setValueCount(numRows);
-  }
-
-  private static void writeDoubleColumn(DataBlock dataBlock, Float8Vector vector, ColumnDataType storedType,
-      int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
-    // Fast path: byte-swap LONG representation of double (double and long have same 8-byte layout)
-    if (dataBlock instanceof ColumnarDataBlock && nullBitmap == null
-        && storedType == ColumnDataType.DOUBLE) {
-      ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
-      DataBuffer fixedData = colBlock.getFixedData();
-      int byteOffset = colBlock.getColumnByteOffset(colId);
-      ArrowBuf dstBuf = vector.getDataBuffer();
-      for (int row = 0; row < numRows; row++) {
-        dstBuf.setLong((long) row * 8,
-            Long.reverseBytes(fixedData.getLong(byteOffset + (long) row * 8)));
-      }
-      setAllValid(vector, numRows);
-      vector.setValueCount(numRows);
-      return;
-    }
-    double[] values = DataBlockExtractUtils.extractDoubleColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
+    double[] values = DataBlockExtractUtils.extractDoubleColumn(
+        ColumnDataType.DOUBLE.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
       if (nullBitmap != null && nullBitmap.contains(row)) {
         vector.setNull(row);

@@ -178,11 +178,7 @@ public class ArrowJoinProbe {
 
   /** Collects left/right row-index pairs for all equi-join (and non-equi) matches. */
   public void collectAllMatches(IntArrayList leftIndexes, IntArrayList rightIndexes) {
-    if (_hasCollisions) {
-      collectMatchesWithCollisions(leftIndexes, rightIndexes);
-    } else {
-      collectMatchesNoCollisions(leftIndexes, rightIndexes);
-    }
+    collectMatchesImpl(leftIndexes, rightIndexes);
     if (_matchedRightRows != null) {
       for (int i = 0; i < rightIndexes.size(); i++) {
         _matchedRightRows.add(rightIndexes.getInt(i));
@@ -192,7 +188,7 @@ public class ArrowJoinProbe {
 
   /** Returns a bitmap of left-side row indices that have at least one match. */
   public RoaringBitmap matchedLeftRows() {
-    return _hasCollisions ? matchedLeftRowsWithCollisions() : matchedLeftRowsNoCollisions();
+    return matchedLeftRowsImpl();
   }
 
   // ----- private helpers -----
@@ -324,76 +320,43 @@ public class ArrowJoinProbe {
     return true;
   }
 
-  private void collectMatchesNoCollisions(IntArrayList leftIndexes, IntArrayList rightIndexes) {
+  private void collectMatchesImpl(IntArrayList leftIndexes, IntArrayList rightIndexes) {
     int leftRowCount = _leftBlock.getNumberOfRows();
     for (int leftRow = 0; leftRow < leftRowCount; leftRow++) {
       int leftHash = _leftKeyHasher.computeHash(leftRow);
       int slot = leftHash & _hashMask;
-      if (_hashes[slot] == leftHash) {
-        int rightRow = _addresses[slot];
-        if (_keyComparator.equals(leftRow, rightRow) && matchNonEqui(leftRow, rightRow)) {
-          leftIndexes.add(leftRow);
-          rightIndexes.add(rightRow);
-        }
-      }
-    }
-  }
-
-  private void collectMatchesWithCollisions(IntArrayList leftIndexes, IntArrayList rightIndexes) {
-    int leftRowCount = _leftBlock.getNumberOfRows();
-    for (int leftRow = 0; leftRow < leftRowCount; leftRow++) {
-      int leftHash = _leftKeyHasher.computeHash(leftRow);
-      int slot = leftHash & _hashMask;
-      while (true) {
-        int rightHash = _hashes[slot];
-        if (rightHash == ArrowLookupTable.SENTINEL) {
-          break;
-        }
-        if (rightHash == leftHash) {
+      while (_hashes[slot] != ArrowLookupTable.SENTINEL) {
+        if (_hashes[slot] == leftHash) {
           int rightRow = _addresses[slot];
           if (_keyComparator.equals(leftRow, rightRow) && matchNonEqui(leftRow, rightRow)) {
             leftIndexes.add(leftRow);
             rightIndexes.add(rightRow);
           }
         }
+        if (!_hasCollisions) {
+          break;
+        }
         slot = (slot + 1) & _hashMask;
       }
     }
   }
 
-  private RoaringBitmap matchedLeftRowsNoCollisions() {
+  private RoaringBitmap matchedLeftRowsImpl() {
     RoaringBitmap result = new RoaringBitmap();
     int leftRowCount = _leftBlock.getNumberOfRows();
     for (int leftRow = 0; leftRow < leftRowCount; leftRow++) {
       int leftHash = _leftKeyHasher.computeHash(leftRow);
       int slot = leftHash & _hashMask;
-      if (_hashes[slot] == leftHash) {
-        int rightRow = _addresses[slot];
-        if (_keyComparator.equals(leftRow, rightRow) && matchNonEqui(leftRow, rightRow)) {
-          result.add(leftRow);
-        }
-      }
-    }
-    return result;
-  }
-
-  private RoaringBitmap matchedLeftRowsWithCollisions() {
-    RoaringBitmap result = new RoaringBitmap();
-    int leftRowCount = _leftBlock.getNumberOfRows();
-    for (int leftRow = 0; leftRow < leftRowCount; leftRow++) {
-      int leftHash = _leftKeyHasher.computeHash(leftRow);
-      int slot = leftHash & _hashMask;
-      while (true) {
-        int rightHash = _hashes[slot];
-        if (rightHash == ArrowLookupTable.SENTINEL) {
-          break;
-        }
-        if (rightHash == leftHash) {
+      while (_hashes[slot] != ArrowLookupTable.SENTINEL) {
+        if (_hashes[slot] == leftHash) {
           int rightRow = _addresses[slot];
           if (_keyComparator.equals(leftRow, rightRow) && matchNonEqui(leftRow, rightRow)) {
             result.add(leftRow);
             break;
           }
+        }
+        if (!_hasCollisions) {
+          break;
         }
         slot = (slot + 1) & _hashMask;
       }

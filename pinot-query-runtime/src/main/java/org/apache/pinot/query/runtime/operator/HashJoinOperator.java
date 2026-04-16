@@ -193,7 +193,8 @@ public class HashJoinOperator extends BaseJoinOperator {
    */
   @Override
   protected void buildRightTable() {
-    if (_arrowAllocator == null) {
+    // Fall back to row-oriented path for RIGHT/FULL joins — buildNonMatchRightRows() needs _rightTable
+    if (_arrowAllocator == null || needUnmatchedRightRows()) {
       super.buildRightTable();
       return;
     }

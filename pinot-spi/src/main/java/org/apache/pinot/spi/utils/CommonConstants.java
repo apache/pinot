@@ -2086,6 +2086,11 @@ public class CommonConstants {
     public static final String KEY_OF_QUERY_RUNNER_PORT = "pinot.query.runner.port";
     public static final int DEFAULT_QUERY_RUNNER_PORT = 0;
 
+    // Arrow Flight data transfer port (only used when pinot.multistage.engine.useArrow=true).
+    // Convention: when set to 0 and Arrow is enabled, defaults to gRPC port + 1.
+    public static final String KEY_OF_QUERY_RUNNER_FLIGHT_PORT = "pinot.query.runner.flight.port";
+    public static final int DEFAULT_QUERY_RUNNER_FLIGHT_PORT = 0;
+
     /**
      * Configuration for join overflow.
      */
