@@ -26,9 +26,7 @@ import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.UuidUtils;
 
@@ -39,7 +37,7 @@ import org.apache.pinot.spi.utils.UuidUtils;
  * <p>This implementation is stateless and thread-safe.
  */
 @ScalarFunction(names = {"TO_UUID"})
-public class ToUuidScalarFunction implements PinotScalarFunction {
+public class ToUuidScalarFunction extends AbstractStringOrBytesUuidFunction {
   private static final FunctionInfo STRING_FUNCTION_INFO;
   private static final FunctionInfo BYTES_FUNCTION_INFO;
 
@@ -54,6 +52,16 @@ public class ToUuidScalarFunction implements PinotScalarFunction {
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  protected FunctionInfo getStringFunctionInfo() {
+    return STRING_FUNCTION_INFO;
+  }
+
+  @Override
+  protected FunctionInfo getBytesFunctionInfo() {
+    return BYTES_FUNCTION_INFO;
   }
 
   @Override
@@ -72,28 +80,6 @@ public class ToUuidScalarFunction implements PinotScalarFunction {
     return new PinotSqlFunction("TO_UUID", ReturnTypes.explicit(org.apache.calcite.sql.type.SqlTypeName.UUID),
         OperandTypes.or(OperandTypes.family(List.of(SqlTypeFamily.CHARACTER)),
             OperandTypes.family(List.of(SqlTypeFamily.BINARY))));
-  }
-
-  @Nullable
-  @Override
-  public FunctionInfo getFunctionInfo(ColumnDataType[] argumentTypes) {
-    if (argumentTypes.length != 1) {
-      return null;
-    }
-    switch (argumentTypes[0]) {
-      case STRING:
-        return STRING_FUNCTION_INFO;
-      case BYTES:
-        return BYTES_FUNCTION_INFO;
-      default:
-        return null;
-    }
-  }
-
-  @Nullable
-  @Override
-  public FunctionInfo getFunctionInfo(int numArguments) {
-    return numArguments == 1 ? STRING_FUNCTION_INFO : null;
   }
 
   public static UUID toUuid(String value) {
