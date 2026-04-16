@@ -581,13 +581,13 @@ public class CommonConstants {
     public static final boolean DEFAULT_USE_BROKER_PRUNING = true;
 
     /**
-     * Whether to use broker pruning by default on the MSE path.
+     * Whether to use broker pruning by default on the logical planner (non-physical-optimizer) path.
      * This value can always be overridden by {@link Request.QueryOptionKey#USE_BROKER_PRUNING} query option.
      * Separated from {@link #CONFIG_OF_USE_BROKER_PRUNING} so the two paths can be rolled out independently.
      */
-    public static final String CONFIG_OF_MSE_USE_BROKER_PRUNING =
-        "pinot.broker.multistage.mse.use.broker.pruning";
-    public static final boolean DEFAULT_MSE_USE_BROKER_PRUNING = false;
+    public static final String CONFIG_OF_LOGICAL_PLANNER_USE_BROKER_PRUNING =
+        "pinot.broker.multistage.logical.planner.use.broker.pruning";
+    public static final boolean DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING = false;
 
     /**
      * Default server stage limit for lite mode queries.
