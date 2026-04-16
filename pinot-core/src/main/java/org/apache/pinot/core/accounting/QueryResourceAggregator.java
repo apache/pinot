@@ -81,11 +81,17 @@ public class QueryResourceAggregator implements ResourceAggregator {
   // Track previous triggering level to detect transitions into critical
   private TriggeringLevel _previousTriggeringLevel = TriggeringLevel.Normal;
 
-  // OOM pause state - lock+condition for blocking query threads at critical heap level
+  // OOM pause state - lock+condition for blocking query threads at critical heap level.
+  // _pauseLock / _pauseCondition are used to coordinate blocking query threads and signaling them from the watcher
+  // thread when the pause is cleared.
   private final ReentrantLock _pauseLock = new ReentrantLock();
   private final Condition _pauseCondition = _pauseLock.newCondition();
+  // Shared between the watcher thread (writer) and query threads (readers). Volatile enables the fast-path in
+  // waitIfPaused() to avoid acquiring the lock when no pause is active.
   private volatile boolean _pauseActive = false;
-  private volatile long _pauseDeadlineMs = 0;
+  // Local state for the watcher thread only (similar to _triggeringLevel) - read/written only from preAggregate and
+  // postAggregate, never by query threads.
+  private long _pauseDeadlineMs = 0;
 
   // metrics class
   private final AbstractMetrics _metrics;
@@ -245,8 +251,6 @@ public class QueryResourceAggregator implements ResourceAggregator {
   }
 
   private void evalTriggers() {
-    TriggeringLevel previousTriggeringLevel = _triggeringLevel;
-
     // Compute the new triggering level based on the current heap usage
     QueryMonitorConfig config = _queryMonitorConfig.get();
     if (_usedBytes > config.getPanicLevel()) {
@@ -281,7 +285,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
     }
 
     // Log the triggering level change
-    if (previousTriggeringLevel != _triggeringLevel) {
+    if (_previousTriggeringLevel != _triggeringLevel) {
       switch (_triggeringLevel) {
         case HeapMemoryPanic:
           LOGGER.error("Heap used bytes: {} exceeds panic level: {}, killing all queries", _usedBytes,
@@ -320,8 +324,6 @@ public class QueryResourceAggregator implements ResourceAggregator {
   private void activatePause(long timeoutMs) {
     LOGGER.warn("Activating OOM pause for {}ms to allow garbage collection before killing queries. "
         + "Heap used bytes: {}", timeoutMs, _usedBytes);
-    // Write deadline before the flag - volatile ordering guarantees any thread that reads
-    // _pauseActive == true will also see the updated _pauseDeadlineMs.
     _pauseDeadlineMs = System.currentTimeMillis() + timeoutMs;
     _pauseActive = true;
     // Hint the JVM to run GC while query threads are pausing
@@ -331,6 +333,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
   /**
    * Clears the OOM pause and wakes all blocked query threads.
    */
+  @VisibleForTesting
   void clearPause() {
     LOGGER.info("Clearing OOM pause. Heap used bytes: {}", _usedBytes);
     _pauseLock.lock();
@@ -346,6 +349,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
    * Called by query threads at sampling checkpoints. Blocks if an OOM pause is active. Fast-path: single volatile read
    * when no pause is active.
    */
+  @VisibleForTesting
   void waitIfPaused() {
     if (!_pauseActive) {
       return;
@@ -491,6 +495,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
     _inactiveQueries.addAll(_untrackedCpuMemUsage.keySet());
   }
 
+  @VisibleForTesting
   boolean isPauseActive() {
     return _pauseActive;
   }

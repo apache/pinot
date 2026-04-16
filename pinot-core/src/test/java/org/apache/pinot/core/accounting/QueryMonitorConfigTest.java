@@ -81,7 +81,7 @@ public class QueryMonitorConfigTest {
         Boolean.toString(EXPECTED_IS_QUERY_KILLED_METRIC_ENABLED));
     CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS),
         Long.toString(EXPECTED_OOM_PAUSE_TIMEOUT_MS));
-    CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED),
+    CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE),
         Boolean.toString(EXPECTED_OOM_PAUSE_ON_PANIC_ENABLED));
   }
 
@@ -249,7 +249,7 @@ public class QueryMonitorConfigTest {
     assertFalse(accountant.getQueryMonitorConfig().isOomPanicPreQueryKillPauseEnabled());
     accountant.getWatcherTask()
         .onChange(
-            Set.of(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED)),
+            Set.of(getFullyQualifiedConfigName(Accounting.CONFIG_OF_OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE)),
             CLUSTER_CONFIGS);
     assertTrue(accountant.getQueryMonitorConfig().isOomPanicPreQueryKillPauseEnabled());
   }

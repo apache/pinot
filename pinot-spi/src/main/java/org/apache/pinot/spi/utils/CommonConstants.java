@@ -1763,8 +1763,8 @@ public class CommonConstants {
         "accounting.oom.pre.query.kill.pause.duration.ms";
     public static final long DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS = -1;
 
-    public static final String CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED =
-        "accounting.oom.panic.pre.query.kill.pause.enabled";
+    public static final String CONFIG_OF_OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE =
+        "accounting.oom.panic.allow.pre.query.kill.pause";
     public static final boolean DEFAULT_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED = false;
 
     /**

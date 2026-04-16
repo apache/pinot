@@ -106,8 +106,27 @@ public class QueryThreadContext implements AutoCloseable {
     _accountant.sampleUsage();
   }
 
-  private void waitIfPausedInternal() {
+  // Blocks the thread if the accountant has activated a pause, then re-checks termination before returning. The
+  // re-check catches the case where the watcher terminated this query while the thread was paused, allowing the
+  // thread to throw immediately instead of proceeding with more work.
+  private void waitIfPausedInternal(String scope) {
     _accountant.waitIfPaused();
+    checkTerminationInternal(scope);
+  }
+
+  private void waitIfPausedInternal(Supplier<String> scopeSupplier) {
+    _accountant.waitIfPaused();
+    checkTerminationInternal(scopeSupplier);
+  }
+
+  private void waitIfPausedInternal(String scope, long deadlineMs) {
+    _accountant.waitIfPaused();
+    checkTerminationInternal(scope, deadlineMs);
+  }
+
+  private void waitIfPausedInternal(Supplier<String> scopeSupplier, long deadlineMs) {
+    _accountant.waitIfPaused();
+    checkTerminationInternal(scopeSupplier, deadlineMs);
   }
 
   private void checkTerminationInternal(String scope) {
@@ -263,8 +282,8 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
-      threadContext.waitIfPausedInternal();
       threadContext.checkTerminationInternal(scopeSupplier);
+      threadContext.waitIfPausedInternal(scopeSupplier);
     }
   }
 
@@ -277,8 +296,8 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
-      threadContext.waitIfPausedInternal();
       threadContext.checkTerminationInternal(scopeSupplier, deadlineMs);
+      threadContext.waitIfPausedInternal(scopeSupplier, deadlineMs);
     }
   }
 
@@ -299,9 +318,9 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
-      threadContext.sampleUsageInternal();
-      threadContext.waitIfPausedInternal();
       threadContext.checkTerminationInternal(scope);
+      threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scope);
     }
   }
 
@@ -312,9 +331,9 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
-      threadContext.sampleUsageInternal();
-      threadContext.waitIfPausedInternal();
       threadContext.checkTerminationInternal(scopeSupplier);
+      threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scopeSupplier);
     }
   }
 
@@ -325,9 +344,9 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
-      threadContext.sampleUsageInternal();
-      threadContext.waitIfPausedInternal();
       threadContext.checkTerminationInternal(scope, deadlineMs);
+      threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scope, deadlineMs);
     }
   }
 
@@ -338,9 +357,9 @@ public class QueryThreadContext implements AutoCloseable {
     // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
     //       is not set up.
     if (threadContext != null) {
-      threadContext.sampleUsageInternal();
-      threadContext.waitIfPausedInternal();
       threadContext.checkTerminationInternal(scopeSupplier, deadlineMs);
+      threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scopeSupplier, deadlineMs);
     }
   }
 

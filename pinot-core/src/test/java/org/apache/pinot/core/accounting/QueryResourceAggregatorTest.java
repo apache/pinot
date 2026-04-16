@@ -51,7 +51,7 @@ public class QueryResourceAggregatorTest {
         pauseOnPanic ? 0f : TEST_PANIC_RATIO);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED, pauseOnPanic);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE, pauseOnPanic);
 
     long maxHeapSize = org.apache.pinot.spi.utils.ResourceUsageUtils.getMaxHeapSize();
     AtomicReference<QueryMonitorConfig> configRef =
@@ -188,7 +188,7 @@ public class QueryResourceAggregatorTest {
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, 0f);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED, false);
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE, false);
 
     long maxHeapSize = org.apache.pinot.spi.utils.ResourceUsageUtils.getMaxHeapSize();
     AtomicReference<QueryMonitorConfig> configRef =
