@@ -928,10 +928,23 @@ public class CommonConstants {
          *  top-K selection. Defaults to topK * 10 if not set. */
         public static final String VECTOR_MAX_CANDIDATES = "vectorMaxCandidates";
 
-        /** Distance threshold for vector radius/threshold search. When set, the query returns
-         *  all vectors within this distance rather than a fixed top-K. ANN candidate generation
-         *  is used followed by exact threshold refinement. */
+        /** Distance threshold for vector search. When set, only results within this distance are
+         *  returned. The threshold is compared against the raw distance value from the configured
+         *  distance function: EUCLIDEAN/L2 uses squared L2 (sum of squared diffs, no sqrt),
+         *  COSINE uses 1 - cosine_similarity, INNER_PRODUCT/DOT_PRODUCT uses negated dot product. */
         public static final String VECTOR_DISTANCE_THRESHOLD = "vectorDistanceThreshold";
+
+        /** efSearch parameter for HNSW vector indexes. Higher values improve recall at the cost
+         *  of latency by allowing the graph search to visit more candidates. */
+        public static final String VECTOR_EF_SEARCH = "vectorEfSearch";
+
+        /** Controls whether HNSW uses relative-distance competitive checks during traversal.
+         *  Defaults to true. Setting false disables score-threshold pruning. */
+        public static final String VECTOR_USE_RELATIVE_DISTANCE = "vectorUseRelativeDistance";
+
+        /** Controls whether HNSW uses a bounded top-K collector queue. Defaults to true.
+         *  Setting false uses an unbounded per-query collector and requires vectorEfSearch. */
+        public static final String VECTOR_USE_BOUNDED_QUEUE = "vectorUseBoundedQueue";
       }
 
       public static class QueryOptionValue {

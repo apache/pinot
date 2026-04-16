@@ -42,11 +42,31 @@ import org.slf4j.LoggerFactory;
 public abstract class PriorityScheduler extends QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PriorityScheduler.class);
 
+  /**
+   * A {@link Semaphore} subclass that supports adjusting the number of permits at runtime.
+   * This is needed because {@link Semaphore#reducePermits(int)} is protected.
+   */
+  @VisibleForTesting
+  static class ResizableSemaphore extends Semaphore {
+    ResizableSemaphore(int permits) {
+      super(permits);
+    }
+
+    void resize(int oldPermits, int newPermits) {
+      int delta = newPermits - oldPermits;
+      if (delta > 0) {
+        release(delta);
+      } else if (delta < 0) {
+        reducePermits(-delta);
+      }
+    }
+  }
+
   protected final SchedulerPriorityQueue _queryQueue;
 
   @VisibleForTesting
-  protected final Semaphore _runningQueriesSemaphore;
-  private final int _numRunners;
+  protected final ResizableSemaphore _runningQueriesSemaphore;
+  private volatile int _numRunners;
   @VisibleForTesting
   Thread _scheduler;
 
@@ -56,7 +76,13 @@ public abstract class PriorityScheduler extends QueryScheduler {
     super(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, resourceManager);
     _queryQueue = queue;
     _numRunners = resourceManager.getNumQueryRunnerThreads();
-    _runningQueriesSemaphore = new Semaphore(_numRunners);
+    _runningQueriesSemaphore = new ResizableSemaphore(_numRunners);
+    resourceManager.addThreadPoolResizeListener((newRunnerThreads, newWorkerThreads) -> {
+      int oldRunners = _numRunners;
+      _runningQueriesSemaphore.resize(oldRunners, newRunnerThreads);
+      _numRunners = newRunnerThreads;
+      LOGGER.info("Resized running queries semaphore: {} -> {}", oldRunners, newRunnerThreads);
+    });
   }
 
   @Override

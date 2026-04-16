@@ -16,11 +16,11 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-name: Pinot Base Docker Image Build and Publish
+name: "[Pinot Release] Pinot Base Docker Image Build and Publish"
 
 on:
   workflow_dispatch:
-    inputs: { }
+    inputs: {}
 
 jobs:
   build-pinot-build-docker-image:
@@ -28,9 +28,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        baseImageType: [ "build", "runtime" ]
-        openJdkDist: [ "amazoncorretto", "ms-openjdk" ]
-        arch: [ "amd64", "arm64" ]
+        openJdkDist: ["amazoncorretto", "ms-openjdk"]
+        jdk_version: [11, 17, 21, 25]
+        arch: [amd64, arm64]
+        type: [build, runtime]
         include:
           - arch: amd64
             runner: ubuntu-24.04
@@ -38,17 +39,38 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/setup-buildx-action@v4
-        name: Set up Docker Buildx
       - uses: actions/checkout@v5
-      - name: Build and push the Docker image
+      - name: Build ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }}-${{ matrix.arch }} Pinot Base Docker Image
         env:
           OPEN_JDK_DIST: ${{ matrix.openJdkDist }}
-          BASE_IMAGE_TYPE: ${{ matrix.baseImageType }}
+          BASE_IMAGE_TYPE: ${{ matrix.type }}
           BUILD_PLATFORM: "linux/${{ matrix.arch }}"
-          TAG: "11-${{ matrix.openJdkDist }}"
+          TAG: "${{ matrix.jdk_version }}-${{ matrix.openJdkDist }}"
+          JDK_VERSION: ${{ matrix.jdk_version }}
+          ARCH: ${{ matrix.arch }}
         run: .github/workflows/scripts/docker/.pinot_base_docker_image_build_and_push.sh
+  push-pinot-build-docker-manifest:
+    name: Push Pinot Base Docker Manifest
+    runs-on: ubuntu-24.04
+    needs: build-pinot-build-docker-image
+    strategy:
+      matrix:
+        openJdkDist: ["amazoncorretto", "ms-openjdk"]
+        jdk_version: [11, 17, 21, 25]
+        type: [build, runtime]
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: actions/checkout@v5
+      - name: Push ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }} Pinot Base Docker manifest
+        env:
+          BASE_IMAGE_TYPE: ${{ matrix.type }}
+          TAG: "${{ matrix.jdk_version }}-${{ matrix.openJdkDist }}"
+        run: .github/workflows/scripts/docker/.pinot_base_docker_manifest_build_and_push.sh

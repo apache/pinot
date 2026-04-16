@@ -413,6 +413,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
 
     properties.setProperty(SEGMENT_CREATOR_VERSION, _config.getCreatorVersion());
+    // TODO: Remove it after 1.6 release
     properties.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
     properties.setProperty(SEGMENT_NAME, _segmentName);
     properties.setProperty(TABLE_NAME, _config.getTableName());
@@ -586,10 +587,11 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     PartitionFunction partitionFunction = columnStatistics.getPartitionFunction();
     if (partitionFunction != null) {
       properties.setProperty(getKeyFor(column, PARTITION_FUNCTION), partitionFunction.getName());
-      properties.setProperty(getKeyFor(column, NUM_PARTITIONS), columnStatistics.getNumPartitions());
+      properties.setProperty(getKeyFor(column, NUM_PARTITIONS), partitionFunction.getNumPartitions());
       properties.setProperty(getKeyFor(column, PARTITION_VALUES), columnStatistics.getPartitions());
-      if (columnStatistics.getPartitionFunctionConfig() != null) {
-        for (Map.Entry<String, String> entry : columnStatistics.getPartitionFunctionConfig().entrySet()) {
+      Map<String, String> partitionFunctionConfig = partitionFunction.getFunctionConfig();
+      if (partitionFunctionConfig != null) {
+        for (Map.Entry<String, String> entry : partitionFunctionConfig.entrySet()) {
           properties.setProperty(getKeyFor(column, String.format("%s.%s", PARTITION_FUNCTION_CONFIG, entry.getKey())),
               entry.getValue());
         }

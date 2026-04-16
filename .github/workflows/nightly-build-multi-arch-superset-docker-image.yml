@@ -1,0 +1,106 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+name: Nightly Multi Arch Superset Pinot Docker Image Build and Publish
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # run at 0 AM UTC
+
+jobs:
+  generate-superset-info:
+    name: Generate Superset Build Info
+    runs-on: ubuntu-24.04
+    outputs:
+      tags: ${{ steps.gen-info.outputs.tags }}
+    steps:
+      - id: gen-info
+        env:
+          SUPERSET_IMAGE_TAG: master-py310
+        run: |
+          docker pull apache/superset:${SUPERSET_IMAGE_TAG}
+          COMMIT_ID=$(docker images apache/superset:${SUPERSET_IMAGE_TAG} --format "{{.ID}}")
+          DATE=$(date +%Y%m%d)
+          echo "tags=${COMMIT_ID}-${DATE},latest" >> $GITHUB_OUTPUT
+  build-superset-docker-image:
+    name: Build Superset ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    needs: generate-superset-info
+    strategy:
+      matrix:
+        arch: ["amd64", "arm64"]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            superset_suffix: ""
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            superset_suffix: "-arm"
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+      - uses: actions/checkout@v5
+      - name: Build and push
+        env:
+          DOCKER_IMAGE_NAME: apachepinot/pinot-superset
+          SUPERSET_IMAGE_TAG: "master-py310${{ matrix.superset_suffix }}"
+          TAGS: "${{ needs.generate-superset-info.outputs.tags }}"
+          ARCH: ${{ matrix.arch }}
+        run: |
+          cd docker/images/pinot-superset
+
+          DOCKER_BUILD_TAGS=""
+          for tag in $(echo ${TAGS} | tr "," " "); do
+            DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-${ARCH} "
+          done
+
+          docker buildx build \
+            --no-cache \
+            --platform=linux/${ARCH} \
+            --file Dockerfile \
+            --build-arg SUPERSET_IMAGE_TAG=${SUPERSET_IMAGE_TAG} \
+            ${DOCKER_BUILD_TAGS} \
+            --push \
+            .
+  create-superset-manifest:
+    name: Create Superset Multi-Arch Manifest
+    runs-on: ubuntu-24.04
+    needs: [generate-superset-info, build-superset-docker-image]
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Create and push manifests
+        env:
+          DOCKER_IMAGE_NAME: apachepinot/pinot-superset
+          TAGS: "${{ needs.generate-superset-info.outputs.tags }}"
+        run: |
+          for tag in $(echo ${TAGS} | tr "," " "); do
+            echo "Creating manifest for ${DOCKER_IMAGE_NAME}:${tag}"
+            docker manifest create ${DOCKER_IMAGE_NAME}:${tag} \
+              --amend ${DOCKER_IMAGE_NAME}:${tag}-amd64 \
+              --amend ${DOCKER_IMAGE_NAME}:${tag}-arm64
+            docker manifest push ${DOCKER_IMAGE_NAME}:${tag}
+          done

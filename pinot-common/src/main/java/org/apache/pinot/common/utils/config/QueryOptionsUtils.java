@@ -729,6 +729,48 @@ public class QueryOptionsUtils {
     }
   }
 
+  /**
+   * Returns the configured efSearch value for HNSW vector search, or {@code null} if not set.
+   */
+  @Nullable
+  public static Integer getVectorEfSearch(Map<String, String> queryOptions) {
+    String efSearch = queryOptions.get(QueryOptionKey.VECTOR_EF_SEARCH);
+    return checkedParseIntPositive(QueryOptionKey.VECTOR_EF_SEARCH, efSearch);
+  }
+
+  /**
+   * Returns whether HNSW should use relative-distance competitive checks, or {@code null} if not set.
+   */
+  @Nullable
+  public static Boolean getVectorUseRelativeDistance(Map<String, String> queryOptions) {
+    return checkedParseBooleanNullable(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE,
+        queryOptions.get(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE));
+  }
+
+  /**
+   * Returns whether HNSW should use a bounded collector queue, or {@code null} if not set.
+   */
+  @Nullable
+  public static Boolean getVectorUseBoundedQueue(Map<String, String> queryOptions) {
+    return checkedParseBooleanNullable(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE,
+        queryOptions.get(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE));
+  }
+
+  @Nullable
+  private static Boolean checkedParseBooleanNullable(String optionName, @Nullable String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    String normalized = optionValue.trim();
+    if ("true".equalsIgnoreCase(normalized)) {
+      return Boolean.TRUE;
+    }
+    if ("false".equalsIgnoreCase(normalized)) {
+      return Boolean.FALSE;
+    }
+    throw new IllegalArgumentException(optionName + " must be either true or false, got: " + optionValue);
+  }
+
   public static int getSortExchangeCopyThreshold(Map<String, String> options, int i) {
     String sortExchangeCopyThreshold = options.get(QueryOptionKey.SORT_EXCHANGE_COPY_THRESHOLD);
     if (sortExchangeCopyThreshold != null) {

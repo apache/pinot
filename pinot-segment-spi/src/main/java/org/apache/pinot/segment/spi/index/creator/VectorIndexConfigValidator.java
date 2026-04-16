@@ -54,6 +54,10 @@ public final class VectorIndexConfigValidator {
   static final Set<String> IVF_PQ_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Arrays.asList("nlist", "pqM", "pqNbits", "trainSampleSize", "trainingSeed")));
 
+  // IVF_ON_DISK-specific property keys (same as IVF_FLAT; always uses FileChannel reads)
+  static final Set<String> IVF_ON_DISK_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
+      Arrays.asList("nlist", "trainSampleSize", "trainingSeed", "minRowsForIndex")));
+
   private static final Set<String> IVF_FLAT_EXCLUSIVE_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Collections.singletonList("minRowsForIndex")));
 
@@ -62,7 +66,7 @@ public final class VectorIndexConfigValidator {
 
   // Common property keys that appear in the properties map (legacy format stores common fields there too)
   private static final Set<String> COMMON_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
-      Arrays.asList("vectorIndexType", "vectorDimension", "vectorDistanceFunction", "version")));
+      Arrays.asList("vectorIndexType", "vectorDimension", "vectorDistanceFunction", "version", "quantizer")));
 
   private static final int DEFAULT_IVF_PQ_NLIST = 128;
   private static final int DEFAULT_IVF_PQ_PQ_NBITS = 8;
@@ -134,6 +138,7 @@ public final class VectorIndexConfigValidator {
 
     VectorBackendType backendType = resolveBackendType(config);
     validateCommonFields(config);
+    validateQuantizerProperty(config, backendType);
     validateBackendSpecificProperties(config, backendType);
   }
 
@@ -168,6 +173,49 @@ public final class VectorIndexConfigValidator {
   }
 
   /**
+   * Validates the optional "quantizer" property, if present, is a valid {@link VectorQuantizerType}.
+   */
+  private static void validateQuantizerProperty(VectorIndexConfig config, VectorBackendType backendType) {
+    Map<String, String> properties = config.getProperties();
+    if (properties == null) {
+      return;
+    }
+    String quantizer = properties.get("quantizer");
+    if (quantizer != null && !quantizer.isEmpty()) {
+      if (!VectorQuantizerType.isValid(quantizer)) {
+        throw new IllegalArgumentException(
+            "Invalid quantizer type: '" + quantizer + "'. Supported types: FLAT, SQ8, SQ4, PQ");
+      }
+      VectorQuantizerType quantizerType = VectorQuantizerType.fromString(quantizer);
+      switch (backendType) {
+        case HNSW:
+          if (quantizerType != VectorQuantizerType.FLAT) {
+            throw new IllegalArgumentException(
+                "vectorIndexType HNSW supports only quantizer='FLAT' (no quantization), got: " + quantizer);
+          }
+          break;
+        case IVF_FLAT:
+        case IVF_ON_DISK:
+          if (quantizerType == VectorQuantizerType.PQ) {
+            throw new IllegalArgumentException(
+                "vectorIndexType " + backendType + " does not support quantizer='PQ'. "
+                    + "Supported quantizers: FLAT, SQ8, SQ4");
+          }
+          break;
+        case IVF_PQ:
+          // Preserve backward compatibility: FLAT remains accepted as a no-op override.
+          if (quantizerType != VectorQuantizerType.FLAT && quantizerType != VectorQuantizerType.PQ) {
+            throw new IllegalArgumentException(
+                "vectorIndexType IVF_PQ supports quantizer='PQ' (preferred) or 'FLAT' (legacy), got: " + quantizer);
+          }
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported vector backend type: " + backendType);
+      }
+    }
+  }
+
+  /**
    * Validates that the properties map only contains keys valid for the resolved backend type,
    * and that backend-specific property values are within acceptable ranges.
    */
@@ -195,6 +243,11 @@ public final class VectorIndexConfigValidator {
         validateNoForeignProperties(properties, union(HNSW_PROPERTIES, IVF_FLAT_EXCLUSIVE_PROPERTIES), "IVF_PQ",
             "other backends");
         validateIvfPqProperties(properties, config.getVectorDimension());
+        break;
+      case IVF_ON_DISK:
+        validateNoForeignProperties(properties, union(HNSW_PROPERTIES, IVF_PQ_EXCLUSIVE_PROPERTIES), "IVF_ON_DISK",
+            "other backends");
+        validateIvfOnDiskProperties(properties);
         break;
       default:
         throw new IllegalArgumentException("Unsupported vector backend type: " + backendType);
@@ -245,6 +298,25 @@ public final class VectorIndexConfigValidator {
       if (trainSampleSize < nlist) {
         throw new IllegalArgumentException(
             "IVF_FLAT trainSampleSize (" + trainSampleSize + ") must be >= nlist (" + nlist + ")");
+      }
+    }
+  }
+
+  /**
+   * Validates IVF_ON_DISK-specific property values.
+   */
+  private static void validateIvfOnDiskProperties(Map<String, String> properties) {
+    validatePositiveIntProperty(properties, "nlist", "IVF_ON_DISK nlist");
+    validatePositiveIntProperty(properties, "trainSampleSize", "IVF_ON_DISK trainSampleSize");
+    validatePositiveIntProperty(properties, "minRowsForIndex", "IVF_ON_DISK minRowsForIndex");
+
+    // If both nlist and trainSampleSize are specified, trainSampleSize must be >= nlist
+    if (properties.containsKey("nlist") && properties.containsKey("trainSampleSize")) {
+      int nlist = Integer.parseInt(properties.get("nlist"));
+      int trainSampleSize = Integer.parseInt(properties.get("trainSampleSize"));
+      if (trainSampleSize < nlist) {
+        throw new IllegalArgumentException(
+            "IVF_ON_DISK trainSampleSize (" + trainSampleSize + ") must be >= nlist (" + nlist + ")");
       }
     }
   }

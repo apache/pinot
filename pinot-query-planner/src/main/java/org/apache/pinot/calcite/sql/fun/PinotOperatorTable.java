@@ -294,6 +294,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
               i -> i == 2)),
       new PinotSqlFunction("VECTOR_SIMILARITY", ReturnTypes.BOOLEAN,
           OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER), i -> i == 2)),
+      new PinotSqlFunction("VECTOR_SIMILARITY_RADIUS", ReturnTypes.BOOLEAN,
+          OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC), i -> i == 2)),
 
       // Placeholder for special functions to handle MV
       // NOTE:

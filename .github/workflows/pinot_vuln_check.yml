@@ -37,28 +37,20 @@ jobs:
     name: Verify Docker Image
     runs-on: ubuntu-latest
     steps:
-      - uses: docker/setup-qemu-action@v4
-        name: Set up QEMU
       - uses: actions/checkout@v5
-      - name: Build the Docker image
-        env:
-          DOCKER_FILE_BASE_DIR: "docker/images/pinot"
-          DOCKER_IMAGE_NAME: "apachepinot/pinot"
-          PINOT_GIT_URL: ${{ github.event.inputs.gitUrl }}
-          PINOT_BRANCH: ${{ env.GITHUB_REF }}
-          PINOT_SHA: ${{ github.sha }}
-        run: .github/workflows/scripts/.pinot_vuln_check.sh
-
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
       - name: Run Trivy vulnerability scanner (sarif)
-        uses: aquasecurity/trivy-action@master
-        with:
-          trivyignores: '.trivyignore'
-          image-ref: 'apachepinot/pinot:${{ github.sha }}'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          timeout: '10m'
+        run: |
+          trivy image \
+            --ignorefile .trivyignore \
+            --format sarif \
+            --output trivy-results.sarif \
+            --vuln-type os,library \
+            --severity CRITICAL,HIGH \
+            --timeout 10m \
+            apachepinot/pinot:latest
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4
         with:

@@ -229,6 +229,22 @@ public class ServerGrpcChannelBackoffResetHandlerTest {
     return context;
   }
 
+  @Test
+  public void testFinalizeNotificationIsNoOp() {
+    // Simulate a FINALIZE notification where pathChanged is null. The listener should ignore this.
+    _handler.onInstanceConfigChange(Collections.emptyList(), createFinalizeContextWithNullPath());
+
+    verify(_mailboxService, never()).resetConnectBackoff(any(), anyInt());
+    verify(_helixAdmin, never()).getInstancesInCluster(any());
+  }
+
+  private NotificationContext createFinalizeContextWithNullPath() {
+    NotificationContext context = new NotificationContext(_helixManager);
+    context.setType(NotificationContext.Type.FINALIZE);
+    // pathChanged is not set, so getPathChanged() returns null
+    return context;
+  }
+
   private NotificationContext createInitContext() {
     NotificationContext context = new NotificationContext(_helixManager);
     context.setType(NotificationContext.Type.INIT);

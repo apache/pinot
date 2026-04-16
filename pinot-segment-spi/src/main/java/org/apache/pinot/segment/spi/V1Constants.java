@@ -96,10 +96,13 @@ public class V1Constants {
       public static final String SEGMENT_END_TIME = "segment.end.time";
       public static final String DATETIME_COLUMNS = "segment.datetime.column.names";
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
-      public static final String SEGMENT_PADDING_CHARACTER = "segment.padding.character";
       public static final String COMPLEX_COLUMNS = "segment.complex.column.names";
 
       public static final String CUSTOM_SUBSET = "custom";
+
+      // TODO: Remove it after 1.6 release
+      @Deprecated
+      public static final String SEGMENT_PADDING_CHARACTER = "segment.padding.character";
 
       public static class Realtime {
         public static final String START_OFFSET = "segment.realtime.startOffset";

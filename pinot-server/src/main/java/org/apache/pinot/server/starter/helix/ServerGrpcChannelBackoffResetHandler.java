@@ -77,13 +77,16 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
   @Override
   public synchronized void onInstanceConfigChange(List<InstanceConfig> instanceConfigs,
       NotificationContext context) {
+    // Only process INIT (listener registration) and CALLBACK (ZK data/child change).
+    // Ignore FINALIZE (listener unregistration) and other types.
+
     // INIT: first callback when the listener is registered (full cluster snapshot).
     // isChildChange: an instance ZK node was added or removed under /CONFIGS/PARTICIPANT.
     // Both require a full scan to rebuild _shuttingDownServers from the current cluster state.
     NotificationContext.Type type = context.getType();
     if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {
       handleFullScan();
-    } else {
+    } else if (type == NotificationContext.Type.CALLBACK) {
       // An existing instance's config changed (e.g. IS_SHUTDOWN_IN_PROGRESS toggled).
       // pathChanged is the ZK path of the specific instance that changed.
       String pathChanged = context.getPathChanged();

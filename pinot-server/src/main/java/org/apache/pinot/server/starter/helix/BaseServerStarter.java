@@ -85,6 +85,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.data.manager.realtime.ServerRateLimitConfigChangeListener;
 import org.apache.pinot.core.instance.context.ServerContext;
+import org.apache.pinot.core.query.scheduler.QuerySchedulerThreadPoolConfigChangeListener;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.NettyInspector;
@@ -803,6 +804,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottlerSet);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
+    ResourceManager resourceManager = _serverInstance.getQueryScheduler().getResourceManager();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new QuerySchedulerThreadPoolConfigChangeListener(resourceManager));
+
+    // Keep the Lucene searcher pool in sync with query_worker_threads changes
+    resourceManager.addThreadPoolResizeListener((newRunnerThreads, newWorkerThreads) -> {
+      _realtimeLuceneTextIndexSearcherPool.resize(newWorkerThreads);
+    });
 
     if (sendStatsPredicate.needWatchForInstanceConfigChange()) {
       LOGGER.info("Initializing and registering the SendStatsPredicate");

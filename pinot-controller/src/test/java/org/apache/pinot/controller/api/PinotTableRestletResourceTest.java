@@ -41,6 +41,7 @@ import org.apache.pinot.client.admin.ZookeeperAdminClient;
 import org.apache.pinot.common.restlet.resources.RebalanceResult;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingInfo;
@@ -1204,13 +1205,15 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void testTableTasksValidationWithDanglingTasks()
       throws Exception {
     String tableName = "testTableTasksValidationWithDangling";
+    String tableNameWithType = tableName + "_OFFLINE";
+    String taskType = MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
         .setTaskConfig(new TableTaskConfig(Map.of(
-            MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            taskType,
             Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
-                CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
+                CommonConstants.TABLE_NAME, tableNameWithType))))
         .build();
 
     // First create the table successfully
@@ -1219,27 +1222,27 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Create a task manually to simulate dangling task
     PinotTaskManager taskManager = DEFAULT_INSTANCE.getControllerStarter().getTaskManager();
     TaskSchedulingContext context = new TaskSchedulingContext();
-    context.setTablesToSchedule(Set.of(tableName + "_OFFLINE"));
+    context.setTablesToSchedule(Set.of(tableNameWithType));
     Map<String, TaskSchedulingInfo> taskInfo = taskManager.scheduleTasks(context);
     String taskName = taskInfo.values().iterator().next().getScheduledTaskNames().get(0);
-    waitForTaskState(taskName, TaskState.IN_PROGRESS);
-    boolean taskKnown = fetchTaskState(taskName) != null;
+    waitForTaskToBecomeActiveForCleanup(taskType, tableNameWithType, taskName);
 
     // Now try to create another table with same name (simulating re-creation with dangling tasks)
     deleteTable(tableName, null, true);
 
     try {
       createTable(offlineTableConfig.toJsonString());
-      if (taskKnown) {
-        fail("Table creation should fail when dangling tasks exist");
-      }
+      fail("Table creation should fail when dangling tasks exist");
     } catch (IOException e) {
-      if (taskKnown) {
-        assertTrue(e.getMessage().contains("The table has dangling task data"));
-      }
+      assertTrue(e.getMessage().contains("The table has dangling task data"));
     }
 
     // Clean up any remaining tasks
+    try {
+      taskResourceManager().deleteTask(taskName, true);
+    } catch (Exception ignored) {
+      // Ignore if task no longer exists
+    }
     try {
       deleteTable(tableName, null, true);
     } catch (Exception ignored) {
@@ -1268,13 +1271,15 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void testTableTasksCleanupWithNonActiveTasks()
       throws Exception {
     String tableName = "testTableTasksCleanup";
+    String tableNameWithType = tableName + "_OFFLINE";
+    String taskType = MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
         .setTaskConfig(new TableTaskConfig(Map.of(
-            MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            taskType,
             Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
-                CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
+                CommonConstants.TABLE_NAME, tableNameWithType))))
         .build();
 
     // Create table
@@ -1283,65 +1288,82 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Create some completed tasks
     PinotTaskManager taskManager = DEFAULT_INSTANCE.getControllerStarter().getTaskManager();
     TaskSchedulingContext context = new TaskSchedulingContext();
-    context.setTablesToSchedule(Set.of(tableName + "_OFFLINE"));
-    Map<String, TaskSchedulingInfo> taskInfo = taskManager.scheduleTasks(context);
-    String taskName = taskInfo.values().iterator().next().getScheduledTaskNames().get(0);
-    waitForTaskState(taskName, TaskState.IN_PROGRESS);
-    boolean taskKnown = fetchTaskState(taskName) != null;
+    context.setTablesToSchedule(Set.of(tableNameWithType));
+    taskManager.scheduleTasks(context);
+    taskResourceManager().stopTaskQueue(taskType);
+    try {
+      waitForTaskQueueState(taskType, TaskState.STOPPED);
 
-    if (taskKnown) {
-      // stop the task queue to abort the task
-      taskClient().stopTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
-      waitForTaskState(taskName, TaskState.STOPPED);
-      // resume the task queue again to avoid affecting other tests
-      taskClient().resumeTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
+      // Delete table - should succeed and clean up tasks once the task stop is visible to cleanup.
+      String deleteResponse = deleteTableWhenNoActiveTasksRemain(tableName);
+      assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableNameWithType + "] deleted\"}");
+    } finally {
+      taskResourceManager().resumeTaskQueue(taskType);
     }
-
-    // Delete table - should succeed and clean up tasks
-    String deleteResponse = deleteTable(tableName);
-    assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
   }
 
-  private void waitForTaskState(String taskName, TaskState expectedState) {
+  private PinotHelixTaskResourceManager taskResourceManager() {
+    return DEFAULT_INSTANCE.getControllerStarter().getHelixTaskResourceManager();
+  }
+
+  private void waitForTaskQueueState(String taskType, TaskState expectedState) {
+    TestUtils.waitForCondition((aVoid) -> taskResourceManager().getTaskQueueState(taskType) == expectedState, 60_000,
+        "Task queue not in expected state " + expectedState);
+  }
+
+  private void waitForTaskToBecomeActiveForCleanup(String taskType, String tableNameWithType, String taskName) {
     TestUtils.waitForCondition((aVoid) -> {
       try {
-        TaskState state = taskClient().getTaskState(taskName);
-        if (state == null) {
-          // If we cannot fetch state, treat IN_PROGRESS waits as best-effort no-ops.
-          return expectedState == TaskState.IN_PROGRESS;
-        }
-        // In test environments without a running minion, Helix can keep tasks in NOT_STARTED even though they
-        // are enqueued. Accept NOT_STARTED when we're only validating the presence of an in-flight task.
-        if (expectedState == TaskState.IN_PROGRESS && state == TaskState.NOT_STARTED) {
-          return true;
-        }
-        return state == expectedState;
+        return isTaskActiveForCleanup(taskType, tableNameWithType, taskName);
       } catch (Exception e) {
-        // If state lookup fails, consider IN_PROGRESS satisfied (task was enqueued) but surface other states.
-        return expectedState == TaskState.IN_PROGRESS;
+        return false;
       }
-    }, 60_000, "Task not scheduled to expected state " + expectedState);
+    }, 60_000, "Task not active for table cleanup: " + taskName);
   }
 
-  private TaskState fetchTaskState(String taskName) {
-    try {
-      return taskClient().getTaskState(taskName);
-    } catch (Exception e) {
-      return null;
+  private boolean isTaskActiveForCleanup(String taskType, String tableNameWithType, String taskName) {
+    TaskState taskState = taskResourceManager().getTaskStatesByTable(taskType, tableNameWithType).get(taskName);
+    return taskState == TaskState.IN_PROGRESS && taskResourceManager().getTaskCount(taskName).getRunning() > 0;
+  }
+
+  private String deleteTableWhenNoActiveTasksRemain(String tableName)
+      throws IOException {
+    long deadlineMs = System.currentTimeMillis() + 60_000L;
+    IOException lastActiveTaskError = null;
+    while (System.currentTimeMillis() < deadlineMs) {
+      try {
+        return deleteTable(tableName);
+      } catch (IOException e) {
+        String message = e.getMessage();
+        if (message == null || !message.contains("active running tasks")) {
+          throw e;
+        }
+        lastActiveTaskError = e;
+        try {
+          Thread.sleep(100L);
+        } catch (InterruptedException interruptedException) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Interrupted while waiting for task cleanup to finish", interruptedException);
+        }
+      }
     }
+    throw lastActiveTaskError != null ? lastActiveTaskError
+        : new IOException("Timed out waiting for table deletion to succeed");
   }
 
   @Test
   public void testTableTasksCleanupWithActiveTasks()
       throws Exception {
     String tableName = "testTableTasksCleanupActive";
+    String tableNameWithType = tableName + "_OFFLINE";
+    String taskType = MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
         .setTaskConfig(new TableTaskConfig(Map.of(
-            MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            taskType,
             Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
-                CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
+                CommonConstants.TABLE_NAME, tableNameWithType))))
         .build();
 
     // Create table
@@ -1350,38 +1372,27 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Create an active/in-progress task
     PinotTaskManager taskManager = DEFAULT_INSTANCE.getControllerStarter().getTaskManager();
     TaskSchedulingContext context = new TaskSchedulingContext();
-    context.setTablesToSchedule(Set.of(tableName + "_OFFLINE"));
+    context.setTablesToSchedule(Set.of(tableNameWithType));
     Map<String, TaskSchedulingInfo> taskInfo = taskManager.scheduleTasks(context);
     String taskName = taskInfo.values().iterator().next().getScheduledTaskNames().get(0);
-    waitForTaskState(taskName, TaskState.IN_PROGRESS);
-    boolean taskKnown = fetchTaskState(taskName) != null;
+    waitForTaskToBecomeActiveForCleanup(taskType, tableNameWithType, taskName);
     try {
       // Try to delete table without ignoring active tasks - should fail
       deleteTable(tableName);
-      if (taskKnown) {
-        fail("Table deletion should fail when active tasks exist");
-      }
+      fail("Table deletion should fail when active tasks exist");
     } catch (IOException e) {
-      if (taskKnown) {
-        assertTrue(e.getMessage().contains("The table has") && e.getMessage().contains("active running tasks"));
-      }
+      assertTrue(e.getMessage().contains("The table has") && e.getMessage().contains("active running tasks"));
     }
 
     // Delete table with ignoreActiveTasks flag - should succeed
-    try {
-      String deleteResponse = getOrCreateAdminClient().getTableClient().deleteTable(tableName, null, null, true);
-      assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
-    } catch (Exception e) {
-      // Table might already be removed if task state was unknown; ignore missing table errors
-      String message = e.getMessage();
-      if (message == null || !message.contains("does not exist")) {
-        throw e;
-      }
-    }
+    String deleteResponse = getOrCreateAdminClient().getTableClient().deleteTable(tableName, null, null, true);
+    assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableNameWithType + "] deleted\"}");
 
     // delete task
-    if (taskKnown) {
-      getOrCreateAdminClient().getTaskClient().deleteTask(taskName, true);
+    try {
+      taskResourceManager().deleteTask(taskName, true);
+    } catch (Exception ignored) {
+      // Ignore if task no longer exists
     }
   }
 

@@ -39,18 +39,27 @@ public final class VectorExplainContext {
   private final int _effectiveSearchCount;
   @Nullable
   private final String _fallbackReason;
+  @Nullable
+  private final String _searchMode;
+  private final int _effectiveEfSearch;
+  private final float _effectiveThreshold;
+  private final VectorSearchMode _vectorSearchMode;
+  private final double _filterSelectivity;
+  @Nullable
+  private final Boolean _effectiveHnswUseRelativeDistance;
+  @Nullable
+  private final Boolean _effectiveHnswUseBoundedQueue;
 
-  public VectorExplainContext(VectorBackendType backendType,
-      VectorIndexConfig.VectorDistanceFunction distanceFunction, int effectiveNprobe, boolean effectiveExactRerank,
-      int effectiveSearchCount, @Nullable String fallbackReason) {
-    this(backendType, distanceFunction, null, effectiveNprobe, effectiveExactRerank, effectiveSearchCount,
-        fallbackReason);
-  }
-
+  /**
+   * Full constructor with all fields including HNSW runtime control metadata.
+   */
   public VectorExplainContext(VectorBackendType backendType,
       VectorIndexConfig.VectorDistanceFunction distanceFunction, @Nullable VectorExecutionMode executionMode,
       int effectiveNprobe, boolean effectiveExactRerank, int effectiveSearchCount,
-      @Nullable String fallbackReason) {
+      @Nullable String fallbackReason, @Nullable String searchMode,
+      int effectiveEfSearch, float effectiveThreshold, VectorSearchMode vectorSearchMode,
+      double filterSelectivity, @Nullable Boolean effectiveHnswUseRelativeDistance,
+      @Nullable Boolean effectiveHnswUseBoundedQueue) {
     _backendType = backendType;
     _distanceFunction = distanceFunction;
     _executionMode = executionMode;
@@ -58,6 +67,13 @@ public final class VectorExplainContext {
     _effectiveExactRerank = effectiveExactRerank;
     _effectiveSearchCount = effectiveSearchCount;
     _fallbackReason = fallbackReason;
+    _searchMode = searchMode;
+    _effectiveEfSearch = effectiveEfSearch;
+    _effectiveThreshold = effectiveThreshold;
+    _vectorSearchMode = vectorSearchMode;
+    _filterSelectivity = filterSelectivity;
+    _effectiveHnswUseRelativeDistance = effectiveHnswUseRelativeDistance;
+    _effectiveHnswUseBoundedQueue = effectiveHnswUseBoundedQueue;
   }
 
   public VectorBackendType getBackendType() {
@@ -91,5 +107,58 @@ public final class VectorExplainContext {
   @Nullable
   public String getFallbackReason() {
     return _fallbackReason;
+  }
+
+  /**
+   * Returns the search mode label for the adaptive planner, or {@code null} if not set.
+   */
+  @Nullable
+  public String getSearchMode() {
+    return _searchMode;
+  }
+
+  /**
+   * Returns the effective efSearch value. Returns 0 if not applicable (non-HNSW backends).
+   */
+  public int getEffectiveEfSearch() {
+    return _effectiveEfSearch;
+  }
+
+  /**
+   * Returns the effective distance threshold, or -1 if not set.
+   */
+  public float getEffectiveThreshold() {
+    return _effectiveThreshold;
+  }
+
+  /**
+   * Returns the vector search mode enum describing how ANN interacts with filters.
+   */
+  public VectorSearchMode getVectorSearchMode() {
+    return _vectorSearchMode;
+  }
+
+  /**
+   * Returns the filter selectivity as a ratio (0.0 to 1.0), or -1 if no filter is applied.
+   * A selectivity of 0.1 means 10% of documents pass the filter.
+   */
+  public double getFilterSelectivity() {
+    return _filterSelectivity;
+  }
+
+  /**
+   * Returns the effective HNSW relative-distance check mode, or null if not applicable.
+   */
+  @Nullable
+  public Boolean getEffectiveHnswUseRelativeDistance() {
+    return _effectiveHnswUseRelativeDistance;
+  }
+
+  /**
+   * Returns the effective HNSW bounded queue mode, or null if not applicable.
+   */
+  @Nullable
+  public Boolean getEffectiveHnswUseBoundedQueue() {
+    return _effectiveHnswUseBoundedQueue;
   }
 }
