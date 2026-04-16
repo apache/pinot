@@ -146,7 +146,7 @@ public class RequestContextUtils {
     try {
       evaluateLiteralValue(thriftExpression);
       return true;
-    } catch (RuntimeException e) {
+    } catch (BadQueryRequestException e) {
       return false;
     }
   }

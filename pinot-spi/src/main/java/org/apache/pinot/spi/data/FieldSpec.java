@@ -693,11 +693,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     STRING(false, true),
     JSON(STRING, false, false),
     BYTES(false, false),
-    UUID(BYTES, UuidUtils.UUID_NUM_BYTES, false, true),
     STRUCT(false, false),
     MAP(false, false),
     LIST(false, false),
-    UNKNOWN(false, true);
+    UNKNOWN(false, true),
+    // UUID must remain at the end to avoid shifting ordinals of existing types.
+    // AnyValueAggregationFunction serializes DataType.ordinal() into intermediate results.
+    UUID(BYTES, UuidUtils.UUID_NUM_BYTES, false, true);
 
     private final DataType _storedType;
     private final int _size;

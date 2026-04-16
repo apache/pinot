@@ -39,11 +39,6 @@ public final class UuidUtils {
     return Arrays.copyOf(NULL_UUID_BYTES, UUID_NUM_BYTES);
   }
 
-  @Deprecated
-  public static byte[] nilUuidBytes() {
-    return nullUuidBytes();
-  }
-
   public static byte[] toBytes(long mostSignificantBits, long leastSignificantBits) {
     byte[] uuidBytes = new byte[UUID_NUM_BYTES];
     writeLong(uuidBytes, 0, mostSignificantBits);

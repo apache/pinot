@@ -127,7 +127,6 @@ public class UuidUtilsTest {
 
     first[0] = 1;
     assertEquals(second, new byte[UuidUtils.UUID_NUM_BYTES]);
-    assertEquals(UuidUtils.nilUuidBytes(), new byte[UuidUtils.UUID_NUM_BYTES]);
   }
 
   @Test

@@ -39,7 +39,7 @@ public class IdentifierTransformFunction implements TransformFunction {
   private final String _columnName;
   private final Dictionary _dictionary;
   private final TransformResultMetadata _resultMetadata;
-  private volatile String[] _uuidStringValuesSV;
+  private String[] _uuidStringValuesSV;
 
   public IdentifierTransformFunction(String columnName, ColumnContext columnContext) {
     _columnName = columnName;
