@@ -530,6 +530,9 @@ public class RequestContextUtils {
     throw new BadQueryRequestException(UNSUPPORTED_RHS_MESSAGE);
   }
 
+  // NOTE: This method hard-codes the set of functions that can appear on the RHS of a predicate literal
+  // (e.g., WHERE col = TO_UUID('...')). If new UUID-related or other constant-folding functions are added
+  // (see ToUuidScalarFunction, UuidConversionFunctions in pinot-common), add the corresponding case here.
   private static <T> EvaluatedLiteralValue evaluateFunctionLiteral(String functionName, List<T> operands,
       java.util.function.Function<T, EvaluatedLiteralValue> evaluator) {
     String canonicalName = FunctionRegistry.canonicalize(functionName);

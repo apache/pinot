@@ -479,7 +479,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       if (resultDataType == DataType.UUID) {
-        throw new IllegalStateException("Cannot read SV UUID as BYTES without an override");
+        // UUID transform functions should override transformToBytesValuesSV to return raw 16-byte values.
+        // As a safe fallback, convert via the string representation.
+        String[] stringValues = transformToStringValuesSV(valueBlock);
+        for (int i = 0; i < length; i++) {
+          _bytesValuesSV[i] = UuidUtils.toBytes(stringValues[i]);
+        }
+        return _bytesValuesSV;
       }
       switch (resultDataType.getStoredType()) {
         case BIG_DECIMAL:
