@@ -300,10 +300,12 @@ public class SchemaUtilsTest {
         .addMultiValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
     checkValidationFails(pinotSchema);
 
-    // BIG_DECIMAL MV: caught at Schema.build() time (Schema.validate rejects it)
-    Assert.assertThrows(RuntimeException.class, () -> new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+    // BIG_DECIMAL MV: caught by SchemaUtils.validate (Schema.build allows it; restriction lives in
+    // SchemaUtils.validateMultiValueCompatibility, not Schema.validate)
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build());
+        .addMultiValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build();
+    checkValidationFails(pinotSchema);
 
     // UUID MV: caught at Schema.build() time (Schema.validate rejects it)
     Assert.assertThrows(RuntimeException.class, () -> new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
