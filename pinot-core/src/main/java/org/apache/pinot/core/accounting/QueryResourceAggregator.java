@@ -348,11 +348,13 @@ public class QueryResourceAggregator implements ResourceAggregator {
   /**
    * Called by query threads at sampling checkpoints. Blocks if an OOM pause is active. Fast-path: single volatile read
    * when no pause is active.
+   * @return {@code true} if the thread entered the slow path (i.e. a pause was active when called), {@code false} if
+   *         the fast-path was taken and the thread did not block.
    */
   @VisibleForTesting
-  void waitIfPaused() {
+  boolean waitIfPaused() {
     if (!_pauseActive) {
-      return;
+      return false;
     }
     _pauseLock.lock();
     try {
@@ -365,6 +367,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
     } finally {
       _pauseLock.unlock();
     }
+    return true;
   }
 
   private void killAllQueries(Iterable<ThreadResourceTrackerImpl> threadTrackers) {

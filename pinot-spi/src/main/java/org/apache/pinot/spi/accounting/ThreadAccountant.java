@@ -43,7 +43,11 @@ public interface ThreadAccountant {
 
   /// Blocks the current thread if the OOM protection framework has activated a pause. Implementations should use a
   /// fast-path (e.g. single volatile read) so that there is zero overhead when no pause is active.
-  default void waitIfPaused() {
+  /// @return {@code true} if the thread entered the slow path (i.e. a pause was active when called), {@code false} if
+  ///         the fast-path was taken. Callers can use this to decide whether follow-up work (e.g. re-checking
+  ///         termination) is warranted.
+  default boolean waitIfPaused() {
+    return false;
   }
 
   /// Returns `true` when the query submission should be throttled, `false` otherwise.

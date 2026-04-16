@@ -136,8 +136,8 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     }
 
     @Override
-    public void waitIfPaused() {
-      _queryResourceAggregator.waitIfPaused();
+    public boolean waitIfPaused() {
+      return _queryResourceAggregator.waitIfPaused();
     }
 
     @Override
