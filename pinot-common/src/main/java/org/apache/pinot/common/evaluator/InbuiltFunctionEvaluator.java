@@ -19,16 +19,23 @@
 package org.apache.pinot.common.evaluator;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 
@@ -50,18 +57,29 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   private final String _functionExpression;
 
   public InbuiltFunctionEvaluator(String functionExpression) {
-    _functionExpression = functionExpression;
-    _arguments = new ArrayList<>();
-    _rootNode = planExecution(RequestContextUtils.getExpression(functionExpression));
+    this(functionExpression, null);
   }
 
-  private ExecutableNode planExecution(ExpressionContext expression) {
+  /**
+   * Creates an evaluator with an optional schema for type-aware function resolution. When the schema is provided,
+   * polymorphic scalar functions (e.g. comparison operators) are resolved using argument data types, selecting
+   * type-specific implementations (e.g. {@code stringEquals} instead of {@code doubleEqualsWithTolerance}).
+   */
+  public InbuiltFunctionEvaluator(String functionExpression, @Nullable Schema schema) {
+    _functionExpression = functionExpression;
+    _arguments = new ArrayList<>();
+    _rootNode = planExecution(RequestContextUtils.getExpression(functionExpression), schema);
+  }
+
+  private ExecutableNode planExecution(ExpressionContext expression, @Nullable Schema schema) {
     switch (expression.getType()) {
       case LITERAL:
-        return new ConstantExecutionNode(expression.getLiteral().getValue());
+        LiteralContext literal = expression.getLiteral();
+        return new ConstantExecutionNode(literal.getValue(), resolveLiteralType(literal));
       case IDENTIFIER:
         String columnName = expression.getIdentifier();
-        ColumnExecutionNode columnExecutionNode = new ColumnExecutionNode(columnName, _arguments.size());
+        ColumnExecutionNode columnExecutionNode =
+            new ColumnExecutionNode(columnName, _arguments.size(), resolveColumnType(columnName, schema));
         _arguments.add(columnName);
         return columnExecutionNode;
       case FUNCTION:
@@ -70,7 +88,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         int numArguments = arguments.size();
         ExecutableNode[] childNodes = new ExecutableNode[numArguments];
         for (int i = 0; i < numArguments; i++) {
-          childNodes[i] = planExecution(arguments.get(i));
+          childNodes[i] = planExecution(arguments.get(i), schema);
         }
         String functionName = function.getFunctionName();
         String canonicalName = FunctionRegistry.canonicalize(functionName);
@@ -85,25 +103,102 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           case "arrayvalueconstructor":
             Object[] values = new Object[numArguments];
             int i = 0;
-            for (ExpressionContext literal : arguments) {
-              values[i++] = literal.getLiteral().getValue();
+            for (ExpressionContext lit : arguments) {
+              values[i++] = lit.getLiteral().getValue();
             }
             return new ArrayConstantExecutionNode(values);
           default:
-            FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
-            if (functionInfo == null) {
-              if (FunctionRegistry.contains(canonicalName)) {
-                throw new IllegalStateException(
-                    String.format("Unsupported function: %s with %d arguments", functionName, numArguments));
-              } else {
-                throw new IllegalStateException(String.format("Unsupported function: %s", functionName));
-              }
-            }
+            FunctionInfo functionInfo = resolveFunction(canonicalName, functionName, childNodes, numArguments);
             return new FunctionExecutionNode(functionInfo, childNodes);
         }
       default:
         throw new IllegalStateException();
     }
+  }
+
+  /**
+   * Resolves a scalar function, preferring polymorphic (type-aware) lookup when argument types are available,
+   * and falling back to arity-based lookup otherwise.
+   */
+  private FunctionInfo resolveFunction(String canonicalName, String functionName, ExecutableNode[] childNodes,
+      int numArguments) {
+    // Try polymorphic lookup when all argument types are known
+    ColumnDataType[] argumentTypes = new ColumnDataType[numArguments];
+    boolean allTypesKnown = true;
+    for (int i = 0; i < numArguments; i++) {
+      argumentTypes[i] = childNodes[i].getResultType();
+      if (argumentTypes[i] == null) {
+        allTypesKnown = false;
+        break;
+      }
+    }
+    if (allTypesKnown) {
+      FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
+      if (functionInfo != null) {
+        return functionInfo;
+      }
+    }
+    // Fall back to arity-based lookup
+    FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
+    if (functionInfo == null) {
+      if (FunctionRegistry.contains(canonicalName)) {
+        throw new IllegalStateException(
+            String.format("Unsupported function: %s with %d arguments", functionName, numArguments));
+      } else {
+        throw new IllegalStateException(String.format("Unsupported function: %s", functionName));
+      }
+    }
+    return functionInfo;
+  }
+
+  @Nullable
+  private static ColumnDataType resolveColumnType(String columnName, @Nullable Schema schema) {
+    if (schema == null) {
+      return null;
+    }
+    FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+    if (fieldSpec == null) {
+      return null;
+    }
+    return ColumnDataType.fromDataType(fieldSpec.getDataType(), fieldSpec.isSingleValueField());
+  }
+
+  @Nullable
+  static ColumnDataType resolveLiteralType(LiteralContext literal) {
+    DataType type = literal.getType();
+    if (type == DataType.UNKNOWN) {
+      return null;
+    }
+    return ColumnDataType.fromDataType(type, literal.isSingleValue());
+  }
+
+  @Nullable
+  static ColumnDataType resolveReturnType(Class<?> clazz) {
+    if (clazz == boolean.class || clazz == Boolean.class) {
+      return ColumnDataType.BOOLEAN;
+    }
+    if (clazz == int.class || clazz == Integer.class) {
+      return ColumnDataType.INT;
+    }
+    if (clazz == long.class || clazz == Long.class) {
+      return ColumnDataType.LONG;
+    }
+    if (clazz == float.class || clazz == Float.class) {
+      return ColumnDataType.FLOAT;
+    }
+    if (clazz == double.class || clazz == Double.class) {
+      return ColumnDataType.DOUBLE;
+    }
+    if (clazz == String.class) {
+      return ColumnDataType.STRING;
+    }
+    if (clazz == BigDecimal.class) {
+      return ColumnDataType.BIG_DECIMAL;
+    }
+    if (clazz == byte[].class) {
+      return ColumnDataType.BYTES;
+    }
+    return null;
   }
 
   @Override
@@ -131,6 +226,13 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     Object execute(GenericRow row);
 
     Object execute(Object[] values);
+
+    /**
+     * Returns the result data type of this node, or {@code null} if the type cannot be determined. Used during
+     * planning to enable polymorphic (type-aware) function resolution.
+     */
+    @Nullable
+    ColumnDataType getResultType();
   }
 
   private static class NotExecutionNode implements ExecutableNode {
@@ -158,6 +260,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       } else {
         return !res;
       }
+    }
+
+    @Nullable
+    @Override
+    public ColumnDataType getResultType() {
+      return ColumnDataType.BOOLEAN;
     }
   }
 
@@ -203,6 +311,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
       return hasNull ? null : false;
     }
+
+    @Nullable
+    @Override
+    public ColumnDataType getResultType() {
+      return ColumnDataType.BOOLEAN;
+    }
   }
 
   private static class AndExecutionNode implements ExecutableNode {
@@ -247,6 +361,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
       return hasNull ? null : true;
     }
+
+    @Nullable
+    @Override
+    public ColumnDataType getResultType() {
+      return ColumnDataType.BOOLEAN;
+    }
   }
 
   private static class FunctionExecutionNode implements ExecutableNode {
@@ -254,12 +374,15 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     final FunctionInfo _functionInfo;
     final ExecutableNode[] _argumentNodes;
     final Object[] _arguments;
+    @Nullable
+    final ColumnDataType _resultType;
 
     FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentNodes) {
       _functionInvoker = new FunctionInvoker(functionInfo);
       _functionInfo = functionInfo;
       _argumentNodes = argumentNodes;
       _arguments = new Object[_argumentNodes.length];
+      _resultType = resolveReturnType(functionInfo.getMethod().getReturnType());
     }
 
     @Override
@@ -314,6 +437,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       }
     }
 
+    @Nullable
+    @Override
+    public ColumnDataType getResultType() {
+      return _resultType;
+    }
+
     @Override
     public String toString() {
       return _functionInvoker.getMethod().getName() + '(' + StringUtils.join(_argumentNodes, ',') + ')';
@@ -322,9 +451,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
   private static class ConstantExecutionNode implements ExecutableNode {
     final Object _value;
+    @Nullable
+    final ColumnDataType _resultType;
 
-    ConstantExecutionNode(Object value) {
+    ConstantExecutionNode(Object value, @Nullable ColumnDataType resultType) {
       _value = value;
+      _resultType = resultType;
     }
 
     @Override
@@ -335,6 +467,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(Object[] values) {
       return _value;
+    }
+
+    @Nullable
+    @Override
+    public ColumnDataType getResultType() {
+      return _resultType;
     }
 
     @Override
@@ -360,6 +498,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       return _value;
     }
 
+    @Nullable
+    @Override
+    public ColumnDataType getResultType() {
+      return null;
+    }
+
     @Override
     public String toString() {
       return String.format("'%s'", Arrays.toString(_value));
@@ -369,10 +513,13 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   private static class ColumnExecutionNode implements ExecutableNode {
     final String _column;
     final int _id;
+    @Nullable
+    final ColumnDataType _resultType;
 
-    ColumnExecutionNode(String column, int id) {
+    ColumnExecutionNode(String column, int id, @Nullable ColumnDataType resultType) {
       _column = column;
       _id = id;
+      _resultType = resultType;
     }
 
     @Override
@@ -383,6 +530,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(Object[] values) {
       return values[_id];
+    }
+
+    @Nullable
+    @Override
+    public ColumnDataType getResultType() {
+      return _resultType;
     }
 
     @Override

@@ -75,7 +75,7 @@ public class ExpressionTransformer implements RecordTransformer {
     if (transformConfigs != null) {
       for (TransformConfig transformConfig : transformConfigs) {
         FunctionEvaluator previous = expressionEvaluators.put(transformConfig.getColumnName(),
-            FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()));
+            FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction(), schema));
         Preconditions.checkState(previous == null,
             "Cannot set more than one transform function on column: %s.", transformConfig.getColumnName());
       }
@@ -83,7 +83,7 @@ public class ExpressionTransformer implements RecordTransformer {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       String fieldName = fieldSpec.getName();
       if (!fieldSpec.isVirtualColumn() && !expressionEvaluators.containsKey(fieldName)) {
-        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec, schema);
         if (functionEvaluator != null) {
           expressionEvaluators.put(fieldName, functionEvaluator);
           if (isImplicitMapTransform(fieldSpec)) {
