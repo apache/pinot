@@ -343,7 +343,7 @@ public class QueryDispatcher {
     // TODO: Cancel all dispatched requests if one of the dispatch errors out or deadline is breached.
     while (!deadline.isExpired() && numSuccessCalls < numServers) {
       AsyncResponse<E> resp =
-          dispatchCallbacks.poll(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+          dispatchCallbacks.poll(Math.max(1, deadline.timeRemaining(TimeUnit.MILLISECONDS)), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
           // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
