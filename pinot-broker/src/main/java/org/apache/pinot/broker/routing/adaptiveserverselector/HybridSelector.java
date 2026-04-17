@@ -37,8 +37,10 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
  * https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf
  *
  * The Hybrid score for each server is calculated as follows. The server with the lowest Hybrid score is picked.
- *       HybridScore = Math.pow(A+B, N) * C
+ *       HybridScore = Math.pow(O+A+B, N) * C
  * N -> Configurable exponent with default value of 3.
+ * O -> Configurable queue size offset with default value of 0. Setting O=1 matches the original paper formulation and
+ *      prevents the score from collapsing to 0 when all servers are idle, ensuring latency is still used for routing.
  */
 public class HybridSelector implements AdaptiveServerSelector {
   private final ServerRoutingStatsManager _serverRoutingStatsManager;

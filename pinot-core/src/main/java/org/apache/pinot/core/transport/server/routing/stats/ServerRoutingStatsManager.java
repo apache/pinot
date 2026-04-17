@@ -64,6 +64,7 @@ public class ServerRoutingStatsManager {
   private long _warmupDurationMs;
   private double _avgInitializationVal;
   private int _hybridScoreExponent;
+  private int _hybridScoreQueueSizeOffset;
   private boolean _enableStatsMetricExport;
 
   public ServerRoutingStatsManager(PinotConfiguration pinotConfig, BrokerMetrics brokerMetrics) {
@@ -91,6 +92,8 @@ public class ServerRoutingStatsManager {
         AdaptiveServerSelector.DEFAULT_AVG_INITIALIZATION_VAL);
     _hybridScoreExponent = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT,
         AdaptiveServerSelector.DEFAULT_HYBRID_SCORE_EXPONENT);
+    _hybridScoreQueueSizeOffset = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_SIZE_OFFSET,
+        AdaptiveServerSelector.DEFAULT_HYBRID_SCORE_QUEUE_SIZE_OFFSET);
 
     int threadPoolSize = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE,
         AdaptiveServerSelector.DEFAULT_STATS_MANAGER_THREADPOOL_SIZE);
@@ -167,7 +170,7 @@ public class ServerRoutingStatsManager {
   private void updateStatsAfterQuerySubmission(String serverInstanceId) {
     ServerRoutingStatsEntry stats = _serverQueryStatsMap.computeIfAbsent(serverInstanceId,
         k -> new ServerRoutingStatsEntry(serverInstanceId, _alpha, _autoDecayWindowMs, _warmupDurationMs,
-            _avgInitializationVal, _hybridScoreExponent, _periodicTaskExecutor));
+            _avgInitializationVal, _hybridScoreExponent, _hybridScoreQueueSizeOffset, _periodicTaskExecutor));
 
     try {
       stats.getServerWriteLock().lock();
@@ -197,7 +200,7 @@ public class ServerRoutingStatsManager {
   private void updateStatsUponResponseArrival(String serverInstanceId, long latencyMs) {
     ServerRoutingStatsEntry stats = _serverQueryStatsMap.computeIfAbsent(serverInstanceId,
         k -> new ServerRoutingStatsEntry(serverInstanceId, _alpha, _autoDecayWindowMs, _warmupDurationMs,
-            _avgInitializationVal, _hybridScoreExponent, _periodicTaskExecutor));
+            _avgInitializationVal, _hybridScoreExponent, _hybridScoreQueueSizeOffset, _periodicTaskExecutor));
 
     try {
       stats.getServerWriteLock().lock();

@@ -388,6 +388,45 @@ public class ServerRoutingStatsManagerTest {
     assertNull(_brokerMetrics.getGaugeValue(numInFlightKey));
   }
 
+  @Test
+  public void testHybridScoreWithQueueSizeOffset() {
+    // With offset=1 the formula is Math.pow(1+A+B, N)*C instead of Math.pow(A+B, N)*C.
+    // This prevents the score from collapsing to 0 when all servers are idle so that latency
+    // still drives routing decisions in low-traffic conditions.
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+
+    // offset=0 (default): after 1 submit + 1 response at latency=10,
+    // numInFlight=0, inFlightEMA=1, latencyEMA=10 -> (0+1)^3 * 10 = 10.
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_SIZE_OFFSET, 0);
+    ServerRoutingStatsManager managerNoOffset =
+        new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
+    managerNoOffset.init();
+    int requestId = 0;
+    managerNoOffset.recordStatsForQuerySubmission(requestId++, "offsetServer");
+    waitForStatsUpdate(managerNoOffset, requestId);
+    managerNoOffset.recordStatsUponResponseArrival(requestId++, "offsetServer", 10);
+    waitForStatsUpdate(managerNoOffset, requestId);
+    assertEquals(managerNoOffset.fetchHybridScoreForServer("offsetServer"), 10.0);
+
+    // offset=1: same sequence -> (1+0+1)^3 * 10 = 80.
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_SIZE_OFFSET, 1);
+    ServerRoutingStatsManager managerWithOffset =
+        new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
+    managerWithOffset.init();
+    requestId = 0;
+    managerWithOffset.recordStatsForQuerySubmission(requestId++, "offsetServer");
+    waitForStatsUpdate(managerWithOffset, requestId);
+    managerWithOffset.recordStatsUponResponseArrival(requestId++, "offsetServer", 10);
+    waitForStatsUpdate(managerWithOffset, requestId);
+    assertEquals(managerWithOffset.fetchHybridScoreForServer("offsetServer"), 80.0);
+  }
+
   private void assertStatsNullForInstance(ServerRoutingStatsManager manager, String instanceId) {
     Integer numInFlightReq = manager.fetchNumInFlightRequestsForServer(instanceId);
     assertNull(numInFlightReq);

@@ -44,8 +44,11 @@ public class ServerRoutingStatsEntry {
   // Hybrid score exponent.
   private final int _hybridScoreExponent;
 
+  // Hybrid score queue size offset (added to A+B before exponentiation to avoid score collapsing to 0 when idle).
+  private final int _hybridScoreQueueSizeOffset;
+
   public ServerRoutingStatsEntry(String serverInstanceId, double alphaEMA, long autoDecayWindowMsEMA,
-      long warmupDurationMsEMA, double avgInitializationValEMA, int scoreExponent,
+      long warmupDurationMsEMA, double avgInitializationValEMA, int scoreExponent, int queueSizeOffset,
       ScheduledExecutorService periodicTaskExecutor) {
     _serverInstanceId = serverInstanceId;
     _serverLock = new ReentrantReadWriteLock();
@@ -58,6 +61,7 @@ public class ServerRoutingStatsEntry {
             periodicTaskExecutor);
 
     _hybridScoreExponent = scoreExponent;
+    _hybridScoreQueueSizeOffset = queueSizeOffset;
   }
 
   @JsonIgnore
@@ -84,7 +88,7 @@ public class ServerRoutingStatsEntry {
 
   @JsonProperty("hybridScore")
   public double computeHybridScore() {
-    double estimatedQSize = _numInFlightRequests + _inFlighRequestsEMA.getAverage();
+    double estimatedQSize = _hybridScoreQueueSizeOffset + _numInFlightRequests + _inFlighRequestsEMA.getAverage();
     return Math.pow(estimatedQSize, _hybridScoreExponent) * _latencyMsEMA.getAverage();
   }
 
