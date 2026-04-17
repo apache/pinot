@@ -47,6 +47,7 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.grpc.BrokerGrpcServer;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
+import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
@@ -249,6 +250,23 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return new WorkerManager(brokerId, hostname, port, routingManager);
   }
 
+  /**
+   * Override to supply a custom {@link SingleConnectionBrokerRequestHandler} subclass (e.g. one
+   * that overrides {@code onQueryCompletion(RequestContext, BrokerResponse)} for async query
+   * logging). The default implementation returns a plain {@link SingleConnectionBrokerRequestHandler}.
+   */
+  protected SingleConnectionBrokerRequestHandler createSingleStageBrokerRequestHandler(
+      PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
+      RoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, NettyConfig nettyConfig,
+      TlsConfig tlsConfig, ServerRoutingStatsManager serverRoutingStatsManager,
+      FailureDetector failureDetector, ThreadAccountant threadAccountant,
+      MultiClusterRoutingContext multiClusterRoutingContext) {
+    return new SingleConnectionBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
+        accessControlFactory, queryQuotaManager, tableCache, nettyConfig, tlsConfig,
+        serverRoutingStatsManager, failureDetector, threadAccountant, multiClusterRoutingContext);
+  }
+
   private void setupHelixSystemProperties() {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
@@ -439,7 +457,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         brokerContext.setServerHttpsContext(sslContext);
       }
       singleStageBrokerRequestHandler =
-          new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+          createSingleStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, nettyDefaults, tlsDefaults,
               _serverRoutingStatsManager, _failureDetector, _threadAccountant, multiClusterRoutingContext);
     }
