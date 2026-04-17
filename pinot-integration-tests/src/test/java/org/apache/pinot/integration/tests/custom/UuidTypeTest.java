@@ -264,6 +264,58 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  /**
+   * Tests range predicates on UUID columns (both dictionary-backed and no-dictionary).
+   *
+   * <p>UUID byte order determines sort order: the last segment of each test UUID differs only in the final byte
+   * (00–03), so the four distinct values have a well-defined byte-ordered range.
+   *
+   * <p>Only the single-stage engine is tested here; MSQE range pushdown for UUID columns is verified separately
+   * through the SSE/MSE parity checks in {@link #testSseMseParity}.
+   */
+  @Test
+  public void testRangePredicates()
+      throws Exception {
+    // uuidFromString is dictionary-backed; uuidFromBytes is no-dictionary (raw bytes)
+    // Sorted distinct values: 440000 < 440001 < 440002 < 440003
+
+    // GT on dictionary-backed UUID column: > 440001 → values 440002 (id=3), 440003 (id=5)
+    JsonNode rows = postRows(false, String.format(
+        "SELECT %s FROM %s WHERE %s > '%s' ORDER BY %s", ID_COLUMN, getTableName(),
+        UUID_FROM_STRING_COLUMN, DISTINCT_UUID_VALUES.get(1), ID_COLUMN));
+    assertIdRows(rows, 3, 5);
+
+    // LT on dictionary-backed UUID column: < 440002 → values 440000 (ids=0,2), 440001 (ids=1,4)
+    rows = postRows(false, String.format(
+        "SELECT %s FROM %s WHERE %s < '%s' ORDER BY %s", ID_COLUMN, getTableName(),
+        UUID_FROM_STRING_COLUMN, DISTINCT_UUID_VALUES.get(2), ID_COLUMN));
+    assertIdRows(rows, 0, 1, 2, 4);
+
+    // BETWEEN on no-dictionary UUID column: 440001–440002 inclusive → ids 1, 3, 4
+    rows = postRows(false, String.format(
+        "SELECT %s FROM %s WHERE %s BETWEEN '%s' AND '%s' ORDER BY %s", ID_COLUMN, getTableName(),
+        UUID_FROM_BYTES_COLUMN, DISTINCT_UUID_VALUES.get(1), DISTINCT_UUID_VALUES.get(2), ID_COLUMN));
+    assertIdRows(rows, 1, 3, 4);
+
+    // GTE on no-dictionary UUID column: >= 440002 → values 440002 (id=3), 440003 (id=5)
+    rows = postRows(false, String.format(
+        "SELECT %s FROM %s WHERE %s >= '%s' ORDER BY %s", ID_COLUMN, getTableName(),
+        UUID_FROM_BYTES_COLUMN, DISTINCT_UUID_VALUES.get(2), ID_COLUMN));
+    assertIdRows(rows, 3, 5);
+
+    // LTE on no-dictionary UUID column: <= 440001 → values 440000 (ids=0,2), 440001 (ids=1,4)
+    rows = postRows(false, String.format(
+        "SELECT %s FROM %s WHERE %s <= '%s' ORDER BY %s", ID_COLUMN, getTableName(),
+        UUID_FROM_BYTES_COLUMN, DISTINCT_UUID_VALUES.get(1), ID_COLUMN));
+    assertIdRows(rows, 0, 1, 2, 4);
+
+    // Mixed-case UUID bounds are normalized: upper-case variant of 440001
+    rows = postRows(false, String.format(
+        "SELECT %s FROM %s WHERE %s > '%s' ORDER BY %s", ID_COLUMN, getTableName(),
+        UUID_FROM_STRING_COLUMN, DISTINCT_UUID_VALUES.get(1).toUpperCase(), ID_COLUMN));
+    assertIdRows(rows, 3, 5);
+  }
+
   @Test
   public void testSseMseParity()
       throws Exception {
