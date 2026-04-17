@@ -91,11 +91,10 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     if (startSequenceNumber.equals(_nextStartSequenceNumber)) {
       shardIterator = _nextShardIterator;
     } else {
-      ShardIteratorType iteratorType =
-          startOffset.isInclusive() ? ShardIteratorType.AT_SEQUENCE_NUMBER : ShardIteratorType.AFTER_SEQUENCE_NUMBER;
       GetShardIteratorRequest getShardIteratorRequest =
           GetShardIteratorRequest.builder().streamName(_config.getStreamTopicName()).shardId(shardId)
-              .startingSequenceNumber(startSequenceNumber).shardIteratorType(iteratorType).build();
+              .startingSequenceNumber(startSequenceNumber).shardIteratorType(ShardIteratorType.AT_SEQUENCE_NUMBER)
+              .build();
       shardIterator = _kinesisClient.getShardIterator(getShardIteratorRequest).shardIterator();
     }
     if (shardIterator == null) {
