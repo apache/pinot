@@ -28,6 +28,7 @@ import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageBoundaryRul
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LiteModeSortInsertRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LiteModeWorkerAssignmentRule;
+import org.apache.pinot.query.planner.physical.v2.opt.rules.LookupJoinRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.RootExchangeInsertRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.SortPushdownRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.WorkerExchangeAssignmentRule;
@@ -44,6 +45,7 @@ public class PhysicalOptRuleSet {
         context));
     transformers.add(create(new LeafStageAggregateRule(context), RuleExecutors.Type.POST_ORDER, context));
     transformers.add(createWorkerAssignmentRule(context));
+    transformers.add(new LookupJoinRule(context));
     transformers.add(create(new AggregatePushdownRule(context), RuleExecutors.Type.POST_ORDER, context));
     transformers.add(create(new SortPushdownRule(context), RuleExecutors.Type.POST_ORDER, context));
     if (context.isUseLiteMode()) {
