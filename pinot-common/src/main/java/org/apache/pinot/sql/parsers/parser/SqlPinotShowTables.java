@@ -41,7 +41,7 @@ public class SqlPinotShowTables extends SqlCall {
   private static final SqlSpecialOperator OPERATOR =
       new SqlSpecialOperator("SHOW_TABLES", SqlKind.OTHER_DDL);
 
-  private final SqlIdentifier _database;
+  @Nullable private final SqlIdentifier _database;
 
   public SqlPinotShowTables(SqlParserPos pos, @Nullable SqlIdentifier database) {
     super(pos);

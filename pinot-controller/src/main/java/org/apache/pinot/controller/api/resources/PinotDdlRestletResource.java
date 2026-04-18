@@ -115,6 +115,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotDdlRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDdlRestletResource.class);
+  /** Maximum accepted SQL input length (256 KB) to prevent unbounded parser memory allocation. */
+  private static final int MAX_DDL_SQL_LENGTH = 256 * 1024;
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -138,12 +140,13 @@ public class PinotDdlRestletResource {
           + "generated Schema/TableConfig (CREATE), operation outcome (DROP/SHOW TABLES), or "
           + "canonical DDL string (SHOW CREATE TABLE).")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 200, message = "Success (DROP, SHOW TABLES, SHOW CREATE TABLE, dry-run, IF NOT EXISTS)"),
+      @ApiResponse(code = 201, message = "Table created"),
       @ApiResponse(code = 400, message = "Bad request (parse/semantic error)"),
       @ApiResponse(code = 409, message = "Table already exists"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public DdlExecutionResponse executeDdl(
+  public Response executeDdl(
       @ApiParam(value = "DDL request body with 'sql' field", required = true)
           DdlExecutionRequest request,
       @ApiParam(value = "When true, compile and validate but do not persist.")
@@ -151,6 +154,11 @@ public class PinotDdlRestletResource {
       @Context HttpHeaders httpHeaders, @Context Request httpRequest) {
     if (request == null || StringUtils.isBlank(request.getSql())) {
       throw badRequest("Request body must include a non-empty 'sql' field.");
+    }
+    // Guard against arbitrarily large inputs that would force the Calcite parser to allocate
+    // excessive memory building the AST in-memory.
+    if (request.getSql().length() > MAX_DDL_SQL_LENGTH) {
+      throw badRequest("DDL statement exceeds maximum length of " + MAX_DDL_SQL_LENGTH + " characters.");
     }
 
     CompiledDdl compiled;
@@ -175,13 +183,15 @@ public class PinotDdlRestletResource {
         return executeCreate((CompiledCreateTable) compiled, effectiveDatabase, dryRun,
             httpHeaders, httpRequest);
       case DROP_TABLE:
-        return executeDrop((CompiledDropTable) compiled, effectiveDatabase, dryRun,
-            httpHeaders, httpRequest);
+        return Response.ok(
+            executeDrop((CompiledDropTable) compiled, effectiveDatabase, dryRun,
+                httpHeaders, httpRequest)).build();
       case SHOW_TABLES:
-        return executeShow(effectiveDatabase, httpHeaders, httpRequest);
+        return Response.ok(executeShow(effectiveDatabase, httpHeaders, httpRequest)).build();
       case SHOW_CREATE_TABLE:
-        return executeShowCreate((CompiledShowCreateTable) compiled, effectiveDatabase,
-            httpHeaders, httpRequest);
+        return Response.ok(
+            executeShowCreate((CompiledShowCreateTable) compiled, effectiveDatabase,
+                httpHeaders, httpRequest)).build();
       default:
         throw new ControllerApplicationException(LOGGER, "Unhandled DDL operation: " + op,
             Response.Status.INTERNAL_SERVER_ERROR);
@@ -192,7 +202,7 @@ public class PinotDdlRestletResource {
   // CREATE
   // -------------------------------------------------------------------------------------------
 
-  private DdlExecutionResponse executeCreate(CompiledCreateTable create, String database,
+  private Response executeCreate(CompiledCreateTable create, String database,
       boolean dryRun, HttpHeaders headers, Request httpRequest) {
     // The compiled TableConfig.tableName carries the SQL `db.tbl` qualifier when one was given;
     // translateTableName then reconciles it against the Database header (and rejects conflicts).
@@ -241,7 +251,7 @@ public class PinotDdlRestletResource {
     if (_pinotHelixResourceManager.hasTable(tableNameWithType)) {
       if (create.isIfNotExists()) {
         response.setMessage("Table " + tableNameWithType + " already exists; CREATE IF NOT EXISTS is a no-op.");
-        return response;
+        return Response.ok(response).build();
       }
       throw new ControllerApplicationException(LOGGER,
           "Table " + tableNameWithType + " already exists.", Response.Status.CONFLICT);
@@ -249,7 +259,7 @@ public class PinotDdlRestletResource {
 
     if (dryRun) {
       response.setMessage("Dry run: validated CREATE TABLE without persisting.");
-      return response;
+      return Response.ok(response).build();
     }
 
     // When a schema for this raw table name already exists (the common case when adding the
@@ -259,22 +269,20 @@ public class PinotDdlRestletResource {
     Schema storedSchema = _pinotHelixResourceManager.getSchema(schemaName);
     boolean schemaPreexisted = storedSchema != null;
     if (schemaPreexisted) {
-      try {
-        String storedJson = JsonUtils.objectToString(storedSchema);
-        String compiledJson = JsonUtils.objectToString(create.getSchema());
-        if (!storedJson.equals(compiledJson)) {
-          throw new ControllerApplicationException(LOGGER,
-              "Schema '" + schemaName + "' already exists and does not match the column list in the DDL. "
-                  + "Either omit the column list to reuse the existing schema, or drop and recreate the table pair "
-                  + "if the schema has genuinely changed.",
-              Response.Status.CONFLICT);
-        }
-      } catch (ControllerApplicationException e) {
-        throw e;
-      } catch (Exception e) {
+      // Use JsonNode structural comparison rather than string equality: Jackson may serialize
+      // fields in a different order or represent defaults differently (e.g. 0 vs 0.0) depending
+      // on which code path populated the Schema object, causing false mismatches that would block
+      // valid hybrid table creation even when the schemas are semantically identical.
+      com.fasterxml.jackson.databind.JsonNode storedNode =
+          JsonUtils.objectToJsonNode(storedSchema);
+      com.fasterxml.jackson.databind.JsonNode compiledNode =
+          JsonUtils.objectToJsonNode(create.getSchema());
+      if (!storedNode.equals(compiledNode)) {
         throw new ControllerApplicationException(LOGGER,
-            "Failed to compare schemas for '" + schemaName + "': " + e.getMessage(),
-            Response.Status.INTERNAL_SERVER_ERROR, e);
+            "Schema '" + schemaName + "' already exists and does not match the column list in the DDL. "
+                + "Either omit the column list to reuse the existing schema, or drop and recreate the table pair "
+                + "if the schema has genuinely changed.",
+            Response.Status.CONFLICT);
       }
     }
 
@@ -290,7 +298,7 @@ public class PinotDdlRestletResource {
       _pinotHelixResourceManager.addTable(create.getTableConfig());
       response.setMessage("Successfully created table " + tableNameWithType);
       LOGGER.info("DDL created table {}", tableNameWithType);
-      return response;
+      return Response.status(Response.Status.CREATED).entity(response).build();
     } catch (TableAlreadyExistsException e) {
       // Race: another caller added the table between our hasTable check and addTable.
       // Only roll back the schema we created here if no table for this raw name now exists —
@@ -485,7 +493,8 @@ public class PinotDdlRestletResource {
     String causeDesc = firstFailure.getMessage() != null
         ? firstFailure.getMessage() : firstFailure.getClass().getSimpleName();
     String msg = "Partial DROP TABLE: dropped " + dropped + ", failed to drop " + failed
-        + ": " + causeDesc;
+        + ": " + causeDesc + ". Schema '" + fullyQualifiedRaw
+        + "' may require manual deletion if the remaining variant is also removed.";
     throw new ControllerApplicationException(LOGGER, msg,
         Response.Status.INTERNAL_SERVER_ERROR, firstFailure);
   }
@@ -528,10 +537,19 @@ public class PinotDdlRestletResource {
           AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
       ResourceUtils.checkPermissionAndAccess(rt, httpRequest, headers,
           AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
-      if (_pinotHelixResourceManager.hasTable(off)) {
+      boolean offExists = _pinotHelixResourceManager.hasTable(off);
+      boolean rtExists = _pinotHelixResourceManager.hasTable(rt);
+      if (offExists && rtExists) {
+        // Both variants exist; silently picking one would return DDL for the wrong variant.
+        // Require the caller to disambiguate with an explicit TYPE clause.
+        throw new ControllerApplicationException(LOGGER,
+            "Table '" + fullyQualifiedRaw + "' has both OFFLINE and REALTIME variants. "
+                + "Use 'SHOW CREATE TABLE ... TYPE OFFLINE' or 'TYPE REALTIME' to specify which.",
+            Response.Status.BAD_REQUEST);
+      } else if (offExists) {
         tableNameWithType = off;
         resolvedType = TableType.OFFLINE;
-      } else if (_pinotHelixResourceManager.hasTable(rt)) {
+      } else if (rtExists) {
         tableNameWithType = rt;
         resolvedType = TableType.REALTIME;
       } else {

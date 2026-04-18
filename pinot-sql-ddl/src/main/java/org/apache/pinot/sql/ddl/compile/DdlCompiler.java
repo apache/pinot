@@ -123,7 +123,8 @@ public final class DdlCompiler {
     QualifiedName name = parseQualifiedName(node.getName());
     TableType tableType = parseTableType(node.getTableType().toValue());
 
-    List<ResolvedColumnDefinition> columns = resolveColumns(node.getColumns().getList());
+    List<String> warnings = new ArrayList<>();
+    List<ResolvedColumnDefinition> columns = resolveColumns(node.getColumns().getList(), warnings);
     Map<String, String> properties = resolveProperties(node.getProperties().getList());
 
     // Extract PRIMARY KEY column names (null when no PRIMARY KEY clause).
@@ -156,7 +157,6 @@ public final class DdlCompiler {
       }
       schema.setPrimaryKeyColumns(primaryKeyColumns);
     }
-    List<String> warnings = new ArrayList<>();
     TableConfig tableConfig = buildTableConfig(resolved, warnings);
     validateConsistency(resolved, schema, tableConfig, warnings);
 
@@ -164,7 +164,8 @@ public final class DdlCompiler {
         resolved.isIfNotExists(), warnings);
   }
 
-  private static List<ResolvedColumnDefinition> resolveColumns(List<SqlNode> columnNodes) {
+  private static List<ResolvedColumnDefinition> resolveColumns(List<SqlNode> columnNodes,
+      List<String> warnings) {
     if (columnNodes.isEmpty()) {
       throw new DdlCompilationException("CREATE TABLE requires at least one column.");
     }
@@ -180,7 +181,15 @@ public final class DdlCompiler {
       if (!seen.add(name.toLowerCase(Locale.ROOT))) {
         throw new DdlCompilationException("Duplicate column name: " + name);
       }
-      DataType dt = DataTypeMapper.resolve(col.getDataType().getTypeName().getSimple());
+      String sqlTypeName = col.getDataType().getTypeName().getSimple();
+      DataType dt = DataTypeMapper.resolve(sqlTypeName);
+      // DECIMAL/NUMERIC precision and scale are accepted by the Calcite grammar but Pinot's
+      // BIG_DECIMAL type does not enforce them. Warn so the user knows the constraint is ignored.
+      if (dt == DataType.BIG_DECIMAL
+          && ("DECIMAL".equalsIgnoreCase(sqlTypeName) || "NUMERIC".equalsIgnoreCase(sqlTypeName))) {
+        warnings.add("Column '" + name + "': precision/scale on " + sqlTypeName.toUpperCase(Locale.ROOT)
+            + " is not enforced by Pinot BIG_DECIMAL; the constraint is silently ignored.");
+      }
       ColumnRole role = inferRole(col, dt);
 
       String fmt = col.getDateTimeFormat() == null ? null : col.getDateTimeFormat().toValue();
