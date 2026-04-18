@@ -353,6 +353,25 @@ public class RoundTripTest {
     assertRoundTrip(schema, config);
   }
 
+  @Test
+  public void replicasPerPartitionRoundTrip() {
+    // Regression: replicasPerPartition was silently dropped by PropertyExtractor (it had no
+    // handler) and therefore lost on SHOW CREATE TABLE. It must now survive the full round-trip.
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .addSingleValueDimension("id", DataType.INT)
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("events")
+        .build();
+    config.getValidationConfig().setReplicasPerPartition("3");
+    // Assert the emitted DDL text carries the property before doing the full semantic round-trip.
+    String ddl = CanonicalDdlEmitter.emit(schema, config);
+    assertTrue(ddl.contains("replicasPerPartition"),
+        "Expected 'replicasPerPartition' in emitted DDL but got:\n" + ddl);
+    assertRoundTrip(schema, config);
+  }
+
   // -------------------------------------------------------------------------------------------
   // Equivalence machinery
   // -------------------------------------------------------------------------------------------

@@ -132,6 +132,7 @@ public final class PropertyExtractor {
     if (replication != null && !"1".equals(replication)) {
       props.put("replication", replication);
     }
+    putIfPresent(props, "replicasPerPartition", v.getReplicasPerPartition());
     putIfPresent(props, "peerSegmentDownloadScheme", v.getPeerSegmentDownloadScheme());
     putIfPresent(props, "crypterClassName", v.getCrypterClassName());
     putIfPresent(props, "deletedSegmentsRetentionPeriod",

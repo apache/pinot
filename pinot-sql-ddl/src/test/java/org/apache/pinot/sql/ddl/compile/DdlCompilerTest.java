@@ -366,6 +366,14 @@ public class DdlCompilerTest {
         "CREATE TABLE t (id INT) PRIMARY KEY (nonexistent) TABLE_TYPE = OFFLINE"));
   }
 
+  @Test
+  public void replicasPerPartitionPropertyApplied() {
+    CompiledCreateTable c = compileCreate(
+        "CREATE TABLE t (id INT) TABLE_TYPE = REALTIME PROPERTIES ("
+            + "  'replicasPerPartition' = '3')");
+    assertEquals(c.getTableConfig().getValidationConfig().getReplicasPerPartition(), "3");
+  }
+
   // -------------------------------------------------------------------------------------------
   // SHOW TABLES
   // -------------------------------------------------------------------------------------------

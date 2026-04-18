@@ -122,6 +122,7 @@ public final class PropertyMapping {
     keys.add("aggregatemetrics");
     keys.add("description");
     keys.add("tags");
+    keys.add("replicasperpartition");
     keys.add("ingestionconfig");
     keys.add("upsertconfig");
     keys.add("dedupconfig");
@@ -345,6 +346,11 @@ public final class PropertyMapping {
         return true;
       case "tags":
         builder.setTags(splitCsv(value));
+        return true;
+      case "replicasperpartition":
+        // TableConfigBuilder does not expose setReplicasPerPartition; DdlCompiler applies this
+        // value post-build via tableConfig.getValidationConfig().setReplicasPerPartition().
+        // Return true to prevent fall-through to customConfigs.
         return true;
       default:
         return false;
