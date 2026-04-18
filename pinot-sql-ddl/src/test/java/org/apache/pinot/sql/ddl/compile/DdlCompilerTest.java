@@ -332,6 +332,35 @@ public class DdlCompilerTest {
   }
 
   // -------------------------------------------------------------------------------------------
+  // PRIMARY KEY
+  // -------------------------------------------------------------------------------------------
+
+  @Test
+  public void primaryKeyClauseSetsSchemaField() {
+    CompiledCreateTable c = compileCreate(
+        "CREATE TABLE upsertTbl (id INT, val STRING) PRIMARY KEY (id) TABLE_TYPE = REALTIME");
+    assertNotNull(c.getSchema().getPrimaryKeyColumns());
+    assertEquals(c.getSchema().getPrimaryKeyColumns().size(), 1);
+    assertEquals(c.getSchema().getPrimaryKeyColumns().get(0), "id");
+  }
+
+  @Test
+  public void compositePrimaryKeyPreservesOrder() {
+    CompiledCreateTable c = compileCreate(
+        "CREATE TABLE t (a INT, b STRING, c LONG) PRIMARY KEY (b, a) TABLE_TYPE = OFFLINE");
+    assertEquals(c.getSchema().getPrimaryKeyColumns().size(), 2);
+    assertEquals(c.getSchema().getPrimaryKeyColumns().get(0), "b");
+    assertEquals(c.getSchema().getPrimaryKeyColumns().get(1), "a");
+  }
+
+  @Test
+  public void noPrimaryKeyClauseLeavesPrimaryKeyColumnsNull() {
+    CompiledCreateTable c = compileCreate(
+        "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE");
+    assertNull(c.getSchema().getPrimaryKeyColumns());
+  }
+
+  // -------------------------------------------------------------------------------------------
   // SHOW TABLES
   // -------------------------------------------------------------------------------------------
 

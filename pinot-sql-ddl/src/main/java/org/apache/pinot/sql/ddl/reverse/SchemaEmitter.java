@@ -88,7 +88,7 @@ final class SchemaEmitter {
     org.apache.pinot.spi.data.TimeGranularitySpec tgs = spec.getOutgoingGranularitySpec();
     String format = tgs.getTimeUnitSize() + ":" + tgs.getTimeType().name() + ":"
         + tgs.getTimeFormat();
-    String granularity = "1:" + tgs.getTimeType().name();
+    String granularity = tgs.getTimeUnitSize() + ":" + tgs.getTimeType().name();
     StringBuilder sb = new StringBuilder();
     sb.append(SqlIdentifiers.quote(spec.getName()));
     sb.append(' ').append(emitDataType(spec.getDataType()));

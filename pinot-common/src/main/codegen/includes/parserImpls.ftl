@@ -125,6 +125,7 @@ SqlNode SqlPinotCreateTable() :
     SqlIdentifier name;
     boolean ifNotExists = false;
     SqlNodeList columns;
+    SqlNodeList primaryKeyColumns = null;
     SqlLiteral tableType;
     SqlNodeList properties = null;
 }
@@ -134,11 +135,13 @@ SqlNode SqlPinotCreateTable() :
     [ LOOKAHEAD(3) <IF> <NOT> <EXISTS> { ifNotExists = true; } ]
     name = CompoundIdentifier()
     columns = PinotColumnList()
+    [ LOOKAHEAD(2) primaryKeyColumns = PinotPrimaryKeyList() ]
     <TABLE_TYPE> <EQ>
     tableType = PinotTableTypeLiteral()
     [ <PROPERTIES> properties = PinotPropertyList() ]
     {
-        return new SqlPinotCreateTable(pos, name, ifNotExists, columns, tableType, properties);
+        return new SqlPinotCreateTable(pos, name, ifNotExists, columns, primaryKeyColumns,
+            tableType, properties);
     }
 }
 
@@ -152,6 +155,23 @@ SqlNodeList PinotColumnList() :
     <LPAREN> { pos = getPos(); }
     col = PinotColumnDeclaration() { list.add(col); }
     ( <COMMA> col = PinotColumnDeclaration() { list.add(col); } )*
+    <RPAREN>
+    {
+        return new SqlNodeList(list, pos.plus(getPos()));
+    }
+}
+
+SqlNodeList PinotPrimaryKeyList() :
+{
+    SqlParserPos pos;
+    SqlIdentifier col;
+    List<SqlNode> list = new ArrayList<SqlNode>();
+}
+{
+    <PRIMARY> { pos = getPos(); } <KEY>
+    <LPAREN>
+    col = SimpleIdentifier() { list.add(col); }
+    ( <COMMA> col = SimpleIdentifier() { list.add(col); } )*
     <RPAREN>
     {
         return new SqlNodeList(list, pos.plus(getPos()));

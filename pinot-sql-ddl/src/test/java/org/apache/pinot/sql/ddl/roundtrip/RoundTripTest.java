@@ -20,9 +20,11 @@ package org.apache.pinot.sql.ddl.roundtrip;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -32,6 +34,8 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.ddl.compile.CompiledCreateTable;
@@ -284,6 +288,66 @@ public class RoundTripTest {
     schema.addField(new DimensionFieldSpec("tags", DataType.STRING, false));
     schema.addField(new DimensionFieldSpec("id", DataType.INT, true));
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
+    assertRoundTrip(schema, config);
+  }
+
+  @Test
+  public void primaryKeyRoundTrip() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("upsertTbl")
+        .addSingleValueDimension("id", DataType.INT)
+        .addSingleValueDimension("userId", DataType.STRING)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    schema.setPrimaryKeyColumns(Arrays.asList("id", "userId"));
+    TableConfig config = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("upsertTbl")
+        .setTimeColumnName("ts")
+        .build();
+    assertRoundTrip(schema, config);
+  }
+
+  @Test
+  public void timeFieldSpecGranularityPreserved() {
+    // Regression: SchemaEmitter was hardcoding "1:" as the granularity size instead of using
+    // tgs.getTimeUnitSize(). Verify a 15-MINUTE TimeFieldSpec emits "15:MINUTES", not "1:MINUTES".
+    // Note: TimeFieldSpec (legacy) is normalized to DateTimeFieldSpec on the re-parse side, so
+    // this test only validates the emission step — it does not do a full schema round-trip.
+    Schema schema = new Schema();
+    schema.setSchemaName("events");
+    schema.addField(new DimensionFieldSpec("id", DataType.INT, true));
+    TimeGranularitySpec incoming = new TimeGranularitySpec(DataType.LONG, 15, TimeUnit.MINUTES, "incomingTime");
+    TimeGranularitySpec outgoing = new TimeGranularitySpec(DataType.LONG, 15, TimeUnit.MINUTES, "ts");
+    schema.addField(new TimeFieldSpec(incoming, outgoing));
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("events")
+        .setTimeColumnName("ts")
+        .build();
+    String ddl = CanonicalDdlEmitter.emit(schema, config);
+    assertNotNull(ddl);
+    // The emitted granularity must reflect the actual timeUnitSize (15), not a hardcoded 1.
+    assertEquals(ddl.contains("15:MINUTES"), true,
+        "Expected granularity '15:MINUTES' in DDL but got:\n" + ddl);
+    assertEquals(ddl.contains("1:MINUTES"), false,
+        "Unexpected hardcoded '1:MINUTES' in DDL:\n" + ddl);
+    // The emitted DDL must also be parseable/compileable without error.
+    CompiledCreateTable compiled = (CompiledCreateTable) DdlCompiler.compile(ddl);
+    assertNotNull(compiled, "Re-parsed DDL should compile");
+  }
+
+  @Test
+  public void dateTimeFieldSpecRoundTrip() {
+    // Regression for DateTimeFieldSpec: format string and granularity must survive the
+    // emit → parse → compile round-trip unchanged.
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .addSingleValueDimension("id", DataType.INT)
+        .addDateTime("eventTime", DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS")
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("events")
+        .setTimeColumnName("eventTime")
+        .build();
     assertRoundTrip(schema, config);
   }
 

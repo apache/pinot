@@ -36,13 +36,14 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 /**
  * Pinot-native {@code CREATE TABLE} DDL statement.
  *
- * <p>Syntax (Phase 1, Slice 1):
+ * <p>Syntax:
  * <pre>{@code
  *   CREATE TABLE [IF NOT EXISTS] [db.]name (
  *     col TYPE [NULL | NOT NULL] [DEFAULT literal] [DIMENSION | METRIC],
  *     col TYPE DATETIME FORMAT 'fmt' GRANULARITY 'gran',
  *     ...
  *   )
+ *   [PRIMARY KEY (col, ...)]
  *   TABLE_TYPE = OFFLINE | REALTIME
  *   PROPERTIES (
  *     'key' = 'value',
@@ -62,15 +63,17 @@ public class SqlPinotCreateTable extends SqlCall {
   private final SqlIdentifier _name;
   private final boolean _ifNotExists;
   private final SqlNodeList _columns;
+  @Nullable private final SqlNodeList _primaryKeyColumns;
   private final SqlLiteral _tableType;
   private final SqlNodeList _properties;
 
   public SqlPinotCreateTable(SqlParserPos pos, SqlIdentifier name, boolean ifNotExists, SqlNodeList columns,
-      SqlLiteral tableType, @Nullable SqlNodeList properties) {
+      @Nullable SqlNodeList primaryKeyColumns, SqlLiteral tableType, @Nullable SqlNodeList properties) {
     super(pos);
     _name = name;
     _ifNotExists = ifNotExists;
     _columns = columns;
+    _primaryKeyColumns = primaryKeyColumns;
     _tableType = tableType;
     _properties = properties == null ? SqlNodeList.EMPTY : properties;
   }
@@ -85,6 +88,11 @@ public class SqlPinotCreateTable extends SqlCall {
 
   public SqlNodeList getColumns() {
     return _columns;
+  }
+
+  @Nullable
+  public SqlNodeList getPrimaryKeyColumns() {
+    return _primaryKeyColumns;
   }
 
   public SqlLiteral getTableType() {
@@ -118,6 +126,15 @@ public class SqlPinotCreateTable extends SqlCall {
       column.unparse(writer, 0, 0);
     }
     writer.endList(columnFrame);
+    if (_primaryKeyColumns != null && !_primaryKeyColumns.isEmpty()) {
+      writer.keyword("PRIMARY KEY");
+      SqlWriter.Frame pkFrame = writer.startList("(", ")");
+      for (SqlNode pk : _primaryKeyColumns) {
+        writer.sep(",");
+        pk.unparse(writer, 0, 0);
+      }
+      writer.endList(pkFrame);
+    }
     writer.keyword("TABLE_TYPE");
     writer.keyword("=");
     writer.keyword(_tableType.toValue());
