@@ -1710,114 +1710,152 @@ public class CommonConstants {
     public static final String NUM_CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED = "numberOfSegmentsYetToBeCommitted";
   }
 
-  // prefix for scheduler related features, e.g. query accountant
+  // Prefix for query scheduler related features
   public static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
 
   public static class Accounting {
-    public static final String CONFIG_OF_FACTORY_NAME = "accounting.factory.name";
+    /// Shared prefix for accounting configs. Values under this prefix applies to both brokers and servers.
+    public static final String COMMON_PREFIX = "pinot.query.scheduler.accounting";
+    /// Broker-specific accounting config prefix. Values under this prefix override values under [#COMMON_PREFIX] on the
+    /// broker.
+    public static final String BROKER_PREFIX = "pinot.broker.query.accounting";
+    /// Server-specific accounting config prefix. Values under this prefix override values under [#COMMON_PREFIX] on the
+    /// server.
+    public static final String SERVER_PREFIX = "pinot.server.query.accounting";
 
-    public static final String CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = "accounting.enable.thread.cpu.sampling";
-    public static final Boolean DEFAULT_ENABLE_THREAD_CPU_SAMPLING = false;
+    /// Config keys within the accounting scope (i.e. the suffix after one of [#COMMON_PREFIX], [#BROKER_PREFIX], or
+    /// [#SERVER_PREFIX]). Use these when reading from a config subsetted to the accounting scope.
+    public static class Keys {
+      public static final String FACTORY_NAME = "factory.name";
+      public static final String ENABLE_THREAD_CPU_SAMPLING = "enable.thread.cpu.sampling";
+      public static final String ENABLE_THREAD_MEMORY_SAMPLING = "enable.thread.memory.sampling";
+      public static final String OOM_PROTECTION_KILLING_QUERY = "oom.enable.killing.query";
+      public static final String PUBLISHING_JVM_USAGE = "publishing.jvm.heap.usage";
+      public static final String CPU_TIME_BASED_KILLING_ENABLED = "cpu.time.based.killing.enabled";
+      public static final String CPU_TIME_BASED_KILLING_THRESHOLD_MS = "cpu.time.based.killing.threshold.ms";
+      public static final String PANIC_LEVEL_HEAP_USAGE_RATIO = "oom.panic.heap.usage.ratio";
+      public static final String CRITICAL_LEVEL_HEAP_USAGE_RATIO = "oom.critical.heap.usage.ratio";
+      public static final String ALARMING_LEVEL_HEAP_USAGE_RATIO = "oom.alarming.usage.ratio";
+      public static final String HEAP_USAGE_PUBLISHING_PERIOD_MS = "heap.usage.publishing.period.ms";
+      public static final String SLEEP_TIME_MS = "sleep.ms";
+      public static final String SLEEP_TIME_DENOMINATOR = "sleep.time.denominator";
+      public static final String MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO = "min.memory.footprint.to.kill.ratio";
+      public static final String QUERY_KILLED_METRIC_ENABLED = "query.killed.metric.enabled";
+      public static final String OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS = "oom.pre.query.kill.pause.duration.ms";
+      public static final String OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE = "oom.panic.allow.pre.query.kill.pause";
 
-    public static final String CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING = "accounting.enable.thread.memory.sampling";
-    public static final Boolean DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING = false;
+      /// QUERY WORKLOAD ISOLATION Configs
+      ///
+      /// This is a set of configs to enable query workload isolation. Queries are classified into workload based on the
+      /// QueryOption - WORKLOAD_NAME. The CPU and Memory cost for a workload are set globally in ZK. The CPU and memory
+      /// costs are for a certain time duration, called "enforcementWindow". The workload cost is split into smaller
+      /// cost for each instance involved in executing queries of the workload.
+      ///
+      /// At each instance (broker,server), there are two parts to workload isolation:
+      /// 1. Workload Cost Collection
+      /// 2. Workload Cost Enforcement
+      ///
+      /// Workload Cost collection happens at various stages of query execution. On server, the resource costs
+      /// associated with pruning, planning and execution are collected. On broker, the resource costs associated with
+      /// compilation & reduce are collected. WorkloadBudgetManager maintains the budget and usage for each workload in
+      /// the instance.
+      ///
+      /// Workload Enforcement enforces the budget for a workload if the resource usages are exceeded. The queries in
+      /// the workload are killed until the enforcementWindow is refreshed.
+      ///
+      /// More details in the [Design Doc](https://tinyurl.com/2p9vuzbd)
+      ///
+      /// Pre-req configs for enabling Query Workload Isolation:
+      ///  - CommonConstants.Accounting.Keys.FACTORY_NAME = ResourceUsageAccountantFactory
+      ///  - CommonConstants.Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING = true
+      ///  - CommonConstants.Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING = true
+      ///  - CommonConstants.Accounting.Keys.ENABLE_THREAD_SAMPLING_MSE = true
+      ///  - Instance Config: enableThreadCpuTimeMeasurement = true
+      ///  - Instance Config: enableThreadAllocatedBytesMeasurement = true
+      public static final String WORKLOAD_ENABLE_COST_COLLECTION = "workload.enable.cost.collection";
+      public static final String WORKLOAD_ENABLE_COST_ENFORCEMENT = "workload.enable.cost.enforcement";
+      public static final String WORKLOAD_ENFORCEMENT_WINDOW_MS = "workload.enforcement.window.ms";
+      public static final String WORKLOAD_SLEEP_TIME_MS = "workload.sleep.time.ms";
+      public static final String SECONDARY_WORKLOAD_NAME = "secondary.workload.name";
+      public static final String SECONDARY_WORKLOAD_CPU_PERCENTAGE = "secondary.workload.cpu.percentage";
+    }
 
-    public static final String CONFIG_OF_OOM_PROTECTION_KILLING_QUERY = "accounting.oom.enable.killing.query";
+    public static final boolean DEFAULT_ENABLE_THREAD_CPU_SAMPLING = false;
+    public static final boolean DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING = false;
     public static final boolean DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY = false;
-
-    public static final String CONFIG_OF_PUBLISHING_JVM_USAGE = "accounting.publishing.jvm.heap.usage";
     public static final boolean DEFAULT_PUBLISHING_JVM_USAGE = false;
-
-    public static final String CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED = "accounting.cpu.time.based.killing.enabled";
     public static final boolean DEFAULT_CPU_TIME_BASED_KILLING_ENABLED = false;
+    public static final int DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS = 30_000;
+    public static final float DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
+    public static final float DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO = 0.96f;
+    public static final float DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO = 0.75f;
+    public static final int DEFAULT_HEAP_USAGE_PUBLISH_PERIOD = 5000;
+    public static final int DEFAULT_SLEEP_TIME_MS = 30;
+    public static final int DEFAULT_SLEEP_TIME_DENOMINATOR = 3;
+    public static final double DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO = 0.025;
+    public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
+    public static final long DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS = -1;
+    public static final boolean DEFAULT_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED = false;
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION = false;
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT = false;
+    public static final long DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS = 60_000L;
+    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 100;
+    public static final String DEFAULT_WORKLOAD_NAME = "default";
+    public static final String DEFAULT_SECONDARY_WORKLOAD_NAME = "defaultSecondary";
+    public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 0.0;
 
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_FACTORY_NAME = "accounting.factory.name";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = "accounting.enable.thread.cpu.sampling";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING = "accounting.enable.thread.memory.sampling";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_OOM_PROTECTION_KILLING_QUERY = "accounting.oom.enable.killing.query";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_PUBLISHING_JVM_USAGE = "accounting.publishing.jvm.heap.usage";
+    @Deprecated(since = "1.6.0", forRemoval = true)
+    public static final String CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED = "accounting.cpu.time.based.killing.enabled";
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS =
         "accounting.cpu.time.based.killing.threshold.ms";
-    public static final int DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS = 30_000;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.panic.heap.usage.ratio";
-    public static final float DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.critical.heap.usage.ratio";
-    public static final float DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO = 0.96f;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.alarming.usage.ratio";
-    public static final float DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO = 0.75f;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD_MS = "accounting.heap.usage.publishing.period.ms";
-    public static final int DEFAULT_HEAP_USAGE_PUBLISH_PERIOD = 5000;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SLEEP_TIME_MS = "accounting.sleep.ms";
-    public static final int DEFAULT_SLEEP_TIME_MS = 30;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SLEEP_TIME_DENOMINATOR = "accounting.sleep.time.denominator";
-    public static final int DEFAULT_SLEEP_TIME_DENOMINATOR = 3;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO =
         "accounting.min.memory.footprint.to.kill.ratio";
-    public static final double DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO = 0.025;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
-    public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS =
         "accounting.oom.pre.query.kill.pause.duration.ms";
-    public static final long DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS = -1;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE =
         "accounting.oom.panic.allow.pre.query.kill.pause";
-    public static final boolean DEFAULT_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED = false;
-
-    /**
-     * QUERY WORKLOAD ISOLATION Configs
-     *
-     * This is a set of configs to enable query workload isolation. Queries are classified into workload based on the
-     * QueryOption - WORKLOAD_NAME. The CPU and Memory cost for a workload are set globally in ZK. The CPU and memory
-     * costs are for a certain time duration, called "enforcementWindow". The workload cost is split into smaller cost
-     * for each instance involved in executing queries of the workload.
-     *
-     *
-     * At each instance (broker,server), there are two parts to workload isolation:
-     * 1. Workload Cost Collection
-     * 2. Workload Cost Enforcement
-     *
-     *
-     * Workload Cost collection happens at various stages of query execution. On server, the resource costs associated
-     * with pruning, planning and execution are collected. On broker, the resource costs associated with compilation &
-     * reduce are collected. WorkloadBudgetManager maintains the budget and usage for each workload in the instance.
-     * Workload Enforcement enforces the budget for a workload if the resource usages are exceeded. The queries in the
-     * workload are killed until the enforcementWindow is refreshed.
-     *
-     * More details in https://tinyurl.com/2p9vuzbd
-     *
-     * Pre-req configs for enabling Query Workload Isolation:
-     *  - CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME  = ResourceUsageAccountantFactory
-     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = true
-     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING = true
-     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE = true
-     *  - Instance Config: enableThreadCpuTimeMeasurement = true
-     *  - Instance Config: enableThreadAllocatedBytesMeasurement = true
-     */
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION = "accounting.workload.enable.cost.collection";
-    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION = false;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT =
         "accounting.workload.enable.cost.enforcement";
-    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT = false;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS = "accounting.workload.enforcement.window.ms";
-    public static final long DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS = 60_000L;
-
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS = "accounting.workload.sleep.time.ms";
-    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 100;
-
-    public static final String DEFAULT_WORKLOAD_NAME = "default";
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";
-    public static final String DEFAULT_SECONDARY_WORKLOAD_NAME = "defaultSecondary";
+    @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
         "accounting.secondary.workload.cpu.percentage";
-    public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 0.0;
   }
 
   public static class ExecutorService {

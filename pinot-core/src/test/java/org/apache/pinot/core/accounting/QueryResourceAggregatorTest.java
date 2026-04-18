@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -45,17 +45,15 @@ public class QueryResourceAggregatorTest {
   /// also set to 0 so that the aggregator always hits panic level instead.
   private QueryResourceAggregator createAggregator(long oomPauseTimeoutMs, boolean pauseOnPanic) {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS, oomPauseTimeoutMs);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, TEST_CRITICAL_RATIO);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
-        pauseOnPanic ? 0f : TEST_PANIC_RATIO);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE, pauseOnPanic);
+    config.setProperty(Accounting.Keys.OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS, oomPauseTimeoutMs);
+    config.setProperty(Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO, TEST_CRITICAL_RATIO);
+    config.setProperty(Accounting.Keys.PANIC_LEVEL_HEAP_USAGE_RATIO, pauseOnPanic ? 0f : TEST_PANIC_RATIO);
+    config.setProperty(Accounting.Keys.OOM_PROTECTION_KILLING_QUERY, true);
+    config.setProperty(Accounting.Keys.ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
+    config.setProperty(Accounting.Keys.OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE, pauseOnPanic);
 
     long maxHeapSize = org.apache.pinot.spi.utils.ResourceUsageUtils.getMaxHeapSize();
-    AtomicReference<QueryMonitorConfig> configRef =
-        new AtomicReference<>(new QueryMonitorConfig(config, maxHeapSize));
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(new QueryMonitorConfig(config, maxHeapSize));
 
     return new QueryResourceAggregator("test-instance", InstanceType.SERVER, false, true, configRef);
   }
@@ -63,7 +61,7 @@ public class QueryResourceAggregatorTest {
   @Test
   public void testConfigReadsOomPauseTimeout() {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS, 2000L);
+    config.setProperty(Accounting.Keys.OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS, 2000L);
 
     long maxHeapSize = org.apache.pinot.spi.utils.ResourceUsageUtils.getMaxHeapSize();
     QueryMonitorConfig qmc = new QueryMonitorConfig(config, maxHeapSize);
@@ -129,8 +127,7 @@ public class QueryResourceAggregatorTest {
 
     assertTrue(elapsed >= 150,
         "waitIfPaused should have blocked until signaled (~200ms), but only blocked for " + elapsed + "ms");
-    assertTrue(elapsed < 2000,
-        "waitIfPaused should have unblocked promptly after signal, but took " + elapsed + "ms");
+    assertTrue(elapsed < 2000, "waitIfPaused should have unblocked promptly after signal, but took " + elapsed + "ms");
   }
 
   @Test
@@ -159,8 +156,7 @@ public class QueryResourceAggregatorTest {
     aggregator.preAggregate(Collections.emptyList());
     aggregator.postAggregate();
 
-    assertFalse(aggregator.isPauseActive(),
-        "Should not re-pause when already at critical level");
+    assertFalse(aggregator.isPauseActive(), "Should not re-pause when already at critical level");
   }
 
   @Test
@@ -183,16 +179,15 @@ public class QueryResourceAggregatorTest {
   public void testNoPanicPauseWhenDisabled() {
     // Create aggregator that hits panic but with pauseOnPanic=false
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS, 5000L);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0f);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, 0f);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
-    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE, false);
+    config.setProperty(Accounting.Keys.OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS, 5000L);
+    config.setProperty(Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0f);
+    config.setProperty(Accounting.Keys.PANIC_LEVEL_HEAP_USAGE_RATIO, 0f);
+    config.setProperty(Accounting.Keys.OOM_PROTECTION_KILLING_QUERY, true);
+    config.setProperty(Accounting.Keys.ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
+    config.setProperty(Accounting.Keys.OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE, false);
 
     long maxHeapSize = org.apache.pinot.spi.utils.ResourceUsageUtils.getMaxHeapSize();
-    AtomicReference<QueryMonitorConfig> configRef =
-        new AtomicReference<>(new QueryMonitorConfig(config, maxHeapSize));
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(new QueryMonitorConfig(config, maxHeapSize));
     QueryResourceAggregator aggregator =
         new QueryResourceAggregator("test-instance", InstanceType.SERVER, false, true, configRef);
 
@@ -215,9 +210,7 @@ public class QueryResourceAggregatorTest {
 
     // Second cycle: Panic → Panic, should NOT re-pause
     aggregator.preAggregate(Collections.emptyList());
-    assertEquals(aggregator.getPreviousTriggeringLevel(),
-        QueryResourceAggregator.TriggeringLevel.HeapMemoryPanic);
-    assertFalse(aggregator.isPauseActive(),
-        "Should not re-pause on Panic→Panic transition");
+    assertEquals(aggregator.getPreviousTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.HeapMemoryPanic);
+    assertFalse(aggregator.isPauseActive(), "Should not re-pause on Panic→Panic transition");
   }
 }
