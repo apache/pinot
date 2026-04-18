@@ -37,16 +37,10 @@ public class PercentileTDigestAggregator implements ValueAggregator {
     byte[] bytes1 = (byte[]) value1;
     byte[] bytes2 = (byte[]) value2;
 
-    // Empty byte arrays represent the default null value for BYTES columns.
-    // Deserializing byte[0] would throw BufferUnderflowException, so handle it explicitly.
-    if (bytes1.length == 0 && bytes2.length == 0) {
-      int compression = getCompression(functionParameters);
-      return ObjectSerDeUtils.TDIGEST_SER_DE.serialize(TDigest.createMergingDigest(compression));
-    }
+    // Treat empty byte arrays (default null value for BYTES columns) as missing values
     if (bytes1.length == 0) {
       return bytes2;
-    }
-    if (bytes2.length == 0) {
+    } else if (bytes2.length == 0) {
       return bytes1;
     }
 

@@ -98,10 +98,8 @@ public class PercentileTDigestAggregatorTest {
     Map<String, String> functionParameters = new HashMap<>();
     byte[] result = (byte[]) _aggregator.aggregate(empty1, empty2, functionParameters);
 
-    // Should return a valid serialized empty TDigest, not crash
-    TDigest resultDigest = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(result);
-    assertNotNull(resultDigest);
-    assertEquals(resultDigest.size(), 0);
+    // Both empty — treat as missing, return empty bytes
+    assertEquals(result.length, 0);
   }
 
   @Test
