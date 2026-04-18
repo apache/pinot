@@ -217,7 +217,7 @@
     <kafka4.version>4.2.0</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
     <pulsar.version>4.0.9</pulsar.version>
-    <flink.version>1.20.3</flink.version>
+    <flink.version>2.2.0</flink.version>
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.20.0</commons-lang3.version>
@@ -1854,11 +1854,6 @@
       <dependency>
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-streaming-java</artifactId>
-        <version>${flink.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.flink</groupId>
-        <artifactId>flink-java</artifactId>
         <version>${flink.version}</version>
       </dependency>
 
