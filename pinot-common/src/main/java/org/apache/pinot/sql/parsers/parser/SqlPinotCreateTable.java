@@ -110,9 +110,7 @@ public class SqlPinotCreateTable extends SqlCall {
 
   @Override
   public List<SqlNode> getOperandList() {
-    if (_primaryKeyColumns == null) {
-      return Arrays.asList(_name, _columns, _tableType, _properties);
-    }
+    // Fixed-arity list with null placeholder for absent optional operand, per Calcite SqlCall contract.
     return Arrays.asList(_name, _columns, _primaryKeyColumns, _tableType, _properties);
   }
 

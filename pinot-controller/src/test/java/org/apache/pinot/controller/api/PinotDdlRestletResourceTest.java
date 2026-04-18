@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterClass;
@@ -285,6 +287,27 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
     int status = postDdlExpectFailure(
         "CREATE TABLE foo (id INT) TABLE_TYPE = OFFLINE PROPERTIES ('timeColumnName' = 'missing')");
     assertEquals(status, 400);
+  }
+
+  @Test
+  public void successfulCreateReturns201()
+      throws IOException {
+    String tbl = "ddlCreate201Test";
+    String url = DEFAULT_INSTANCE.getControllerBaseApiUrl() + "/sql/ddl";
+    String body = "{\"sql\": \"CREATE TABLE " + tbl + " (id INT) TABLE_TYPE = OFFLINE\"}";
+    Pair<Integer, String> result = postRequestWithStatusCode(url, body);
+    assertEquals(result.getLeft().intValue(), 201, "Expected HTTP 201 for successful CREATE TABLE");
+    JsonNode response = JsonUtils.stringToJsonNode(result.getRight());
+    assertEquals(response.get("operation").asText(), "CREATE_TABLE");
+  }
+
+  @Test
+  public void oversizedInputReturnsBadRequest()
+      throws IOException {
+    // Any SQL that exceeds 256 KB must be rejected before parsing to prevent unbounded allocations.
+    String oversized = "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE /* " + StringUtils.repeat("x", 256 * 1024) + " */";
+    int status = postDdlExpectFailure(oversized);
+    assertEquals(status, 400, "Expected 400 for input exceeding MAX_DDL_SQL_LENGTH");
   }
 
   // -------------------------------------------------------------------------------------------

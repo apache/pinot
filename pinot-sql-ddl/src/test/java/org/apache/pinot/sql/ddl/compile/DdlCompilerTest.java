@@ -391,6 +391,24 @@ public class DdlCompilerTest {
   }
 
   // -------------------------------------------------------------------------------------------
+  // DECIMAL precision warning
+  // -------------------------------------------------------------------------------------------
+
+  @Test
+  public void decimalWithPrecisionScaleEmitsWarning() {
+    CompiledCreateTable c = compileCreate("CREATE TABLE t (price DECIMAL(10,2)) TABLE_TYPE = OFFLINE");
+    assertTrue(c.getWarnings().stream().anyMatch(w -> w.contains("DECIMAL")),
+        "Expected DECIMAL precision warning, got: " + c.getWarnings());
+  }
+
+  @Test
+  public void decimalWithoutPrecisionEmitsNoWarning() {
+    CompiledCreateTable c = compileCreate("CREATE TABLE t (price DECIMAL) TABLE_TYPE = OFFLINE");
+    assertTrue(c.getWarnings().stream().noneMatch(w -> w.contains("DECIMAL")),
+        "Unexpected DECIMAL warning for bare DECIMAL: " + c.getWarnings());
+  }
+
+  // -------------------------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------------------------
 
