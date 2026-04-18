@@ -66,6 +66,10 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotDropTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -133,6 +137,17 @@ public class CalciteSqlParser {
         // extract insert statement (execution statement)
         if (sqlType == null) {
           sqlType = PinotSqlType.DML;
+          statementNode = sqlNode;
+        } else {
+          throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
+        }
+      } else if (sqlNode instanceof SqlPinotCreateTable
+          || sqlNode instanceof SqlPinotDropTable
+          || sqlNode instanceof SqlPinotShowTables
+          || sqlNode instanceof SqlPinotShowCreateTable) {
+        // Pinot-native DDL statements; the controller dispatches these via the DDL endpoint.
+        if (sqlType == null) {
+          sqlType = PinotSqlType.DDL;
           statementNode = sqlNode;
         } else {
           throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
