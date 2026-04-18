@@ -34,6 +34,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
@@ -886,6 +887,30 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     }, 600_000L, "Failed to complete task");
   }
 
+  /**
+   * Poll the {@code mergeRollupTaskNumBucketsToProcess} gauges until they exist and match the expected values.
+   *
+   * <p>The gauges are (re)registered and updated only when {@link PinotTaskManager#scheduleTasks} runs for a merge
+   * level that has no in-flight task. In {@link #testRealtimeTableProcessAllModeMultiLevelConcat}, the scheduling
+   * call that refreshes the gauge for a given iteration can race with either (a) the in-flight task's completion
+   * in Helix or (b) the segment-lineage commit that follows task completion. Polling here absorbs that short race
+   * window instead of asserting once and flaking.
+   */
+  private void waitForExpectedNumBucketsToProcess(String tableNameWithType, long expected100Days,
+      long expected200Days) {
+    String metric100Days = "mergeRollupTaskNumBucketsToProcess." + tableNameWithType + ".100days";
+    String metric200Days = "mergeRollupTaskNumBucketsToProcess." + tableNameWithType + ".200days";
+    TestUtils.waitForCondition(aVoid -> {
+      ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
+      if (!MetricValueUtils.gaugeExists(controllerMetrics, metric100Days)
+          || !MetricValueUtils.gaugeExists(controllerMetrics, metric200Days)) {
+        return false;
+      }
+      return MetricValueUtils.getGaugeValue(controllerMetrics, metric100Days) == expected100Days
+          && MetricValueUtils.getGaugeValue(controllerMetrics, metric200Days) == expected200Days;
+    }, TIMEOUT_IN_MS, "Timeout while waiting for expected num buckets to process metrics on " + tableNameWithType);
+  }
+
   // The use case is similar as the one defined in offline table
   @Test
   public void testRealtimeTableSingleLevelConcat()
@@ -1055,16 +1080,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       assertNull(minionTaskMetadataZNRecord);
 
       // Check metrics
-      assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.100days"));
-      assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.200days"));
-      long numBucketsToProcess = MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.100days");
-      assertEquals(numBucketsToProcess, expectedNumBucketsToProcess100Days[numTasks]);
-      numBucketsToProcess = MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.200days");
-      assertEquals(numBucketsToProcess, expectedNumBucketsToProcess200Days[numTasks]);
+      waitForExpectedNumBucketsToProcess(realtimeTableName, expectedNumBucketsToProcess100Days[numTasks],
+          expectedNumBucketsToProcess200Days[numTasks]);
     }
     // Check total tasks
     assertEquals(numTasks, 4);
@@ -1085,12 +1102,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
             tasks = taskList != null && !taskList.isEmpty() ? taskList.get(0) : null, numTasks++) {
       waitForTaskToComplete();
       // Check metrics
-      long numBucketsToProcess = MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.100days");
-      assertEquals(numBucketsToProcess, expectedNumBucketsToProcess100Days[numTasks]);
-      numBucketsToProcess = MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
-          "mergeRollupTaskNumBucketsToProcess.myTable6_REALTIME.200days");
-      assertEquals(numBucketsToProcess, expectedNumBucketsToProcess200Days[numTasks]);
+      waitForExpectedNumBucketsToProcess(realtimeTableName, expectedNumBucketsToProcess100Days[numTasks],
+          expectedNumBucketsToProcess200Days[numTasks]);
     }
 
     // Check total tasks
