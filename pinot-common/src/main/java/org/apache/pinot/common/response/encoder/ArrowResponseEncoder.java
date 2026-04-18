@@ -22,6 +22,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -48,6 +49,7 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.util.JsonStringArrayList;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
 
 
@@ -105,6 +107,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
           break;
         case BIG_DECIMAL:
         case TIMESTAMP:
+        case UUID:
         case STRING:
         case JSON:
         case BYTES:
@@ -232,11 +235,12 @@ public class ArrowResponseEncoder implements ResponseEncoder {
               break;
             case BIG_DECIMAL:
             case TIMESTAMP:
+            case UUID:
             case STRING:
             case JSON:
             case BYTES:
             case OBJECT:
-              byte[] bytes = ((String) value).getBytes(StandardCharsets.UTF_8);
+              byte[] bytes = getVarCharValue(colType, value).getBytes(StandardCharsets.UTF_8);
               ((VarCharVector) vector).setSafe(rowIndex, bytes);
               break;
             case MAP:
@@ -409,6 +413,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
               break;
             case BIG_DECIMAL:
             case TIMESTAMP:
+            case UUID:
             case STRING:
             case JSON:
             case BYTES:
@@ -487,6 +492,30 @@ public class ArrowResponseEncoder implements ResponseEncoder {
       }
       // Construct a Pinot ResultTable from the DataSchema and rows.
       return new ResultTable(schema, rows);
+    }
+  }
+
+  private static String getVarCharValue(DataSchema.ColumnDataType columnDataType, Object value) {
+    if (value instanceof String) {
+      return (String) value;
+    }
+    switch (columnDataType) {
+      case TIMESTAMP:
+        return value instanceof Timestamp ? columnDataType.format(value).toString()
+            : columnDataType.convertAndFormat(value).toString();
+      case UUID:
+        return columnDataType.format(value).toString();
+      case BYTES:
+        return value instanceof ByteArray ? columnDataType.convertAndFormat(value).toString()
+            : columnDataType.format(value).toString();
+      case BIG_DECIMAL:
+        return columnDataType.format(value).toString();
+      case STRING:
+      case JSON:
+      case OBJECT:
+        return value.toString();
+      default:
+        throw new IllegalStateException("Unsupported column type for var char encoding: " + columnDataType);
     }
   }
 }

@@ -23,13 +23,13 @@ import com.dynatrace.hash4j.hashing.Hasher128;
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.UUID;
 import net.jpountz.xxhash.XXHashFactory;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 public class HashUtils {
@@ -56,14 +56,11 @@ public class HashUtils {
       if (value == null) {
         throw new IllegalArgumentException("Found null value in primary key");
       }
-      UUID uuid;
       try {
-        uuid = UUID.fromString(value.toString());
-      } catch (Throwable t) {
+        byteBuffer.put(UuidUtils.toBytes(value));
+      } catch (RuntimeException e) {
         return primaryKey.asBytes();
       }
-      byteBuffer.putLong(uuid.getMostSignificantBits());
-      byteBuffer.putLong(uuid.getLeastSignificantBits());
     }
     return result;
   }

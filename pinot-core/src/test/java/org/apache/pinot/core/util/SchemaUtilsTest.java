@@ -292,12 +292,40 @@ public class SchemaUtilsTest {
 
   @Test
   public void testValidateMultiValueFieldSpec() {
-    Schema pinotSchema = new Schema.SchemaBuilder()
-        .setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", DataType.STRING)
-        .addMultiValueDimension("myJsonCol", DataType.JSON)
-        .build();
+    Schema pinotSchema;
+
+    // JSON MV: caught by SchemaUtils.validate (Schema.build allows it)
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
     checkValidationFails(pinotSchema);
+
+    // BIG_DECIMAL MV: caught by SchemaUtils.validate (Schema.build allows it)
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build();
+    checkValidationFails(pinotSchema);
+
+    // UUID MV: caught by SchemaUtils.validate (Schema.build allows it)
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("myUuidCol", FieldSpec.DataType.UUID).build();
+    checkValidationFails(pinotSchema);
+
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
+    SchemaUtils.validate(pinotSchema);
+
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build();
+    SchemaUtils.validate(pinotSchema);
+
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myUuidCol", FieldSpec.DataType.UUID).build();
+    SchemaUtils.validate(pinotSchema);
   }
 
   @Test

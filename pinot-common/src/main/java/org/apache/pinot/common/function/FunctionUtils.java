@@ -23,11 +23,13 @@ import java.sql.Timestamp;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
@@ -51,6 +53,7 @@ public class FunctionUtils {
       put(Timestamp.class, PinotDataType.TIMESTAMP);
       put(String.class, PinotDataType.STRING);
       put(byte[].class, PinotDataType.BYTES);
+      put(UUID.class, PinotDataType.UUID);
       put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
       put(long[].class, PinotDataType.PRIMITIVE_LONG_ARRAY);
       put(float[].class, PinotDataType.PRIMITIVE_FLOAT_ARRAY);
@@ -62,6 +65,34 @@ public class FunctionUtils {
       put(byte[][].class, PinotDataType.BYTES_ARRAY);
       put(Map.class, PinotDataType.MAP);
       put(Object.class, PinotDataType.OBJECT);
+    }};
+
+  private static final Map<Class<?>, DataType> DATA_TYPE_MAP = new HashMap<>() {{
+      put(int.class, DataType.INT);
+      put(Integer.class, DataType.INT);
+      put(long.class, DataType.LONG);
+      put(Long.class, DataType.LONG);
+      put(float.class, DataType.FLOAT);
+      put(Float.class, DataType.FLOAT);
+      put(double.class, DataType.DOUBLE);
+      put(Double.class, DataType.DOUBLE);
+      put(BigDecimal.class, DataType.BIG_DECIMAL);
+      put(boolean.class, DataType.BOOLEAN);
+      put(Boolean.class, DataType.BOOLEAN);
+      put(Timestamp.class, DataType.TIMESTAMP);
+      put(String.class, DataType.STRING);
+      put(byte[].class, DataType.BYTES);
+      put(UUID.class, DataType.UUID);
+      put(int[].class, DataType.INT);
+      put(long[].class, DataType.LONG);
+      put(float[].class, DataType.FLOAT);
+      put(double[].class, DataType.DOUBLE);
+      put(BigDecimal[].class, DataType.BIG_DECIMAL);
+      put(boolean[].class, DataType.BOOLEAN);
+      put(Timestamp[].class, DataType.TIMESTAMP);
+      put(String[].class, DataType.STRING);
+      put(byte[][].class, DataType.BYTES);
+      put(UUID[].class, DataType.UUID);
     }};
 
   private static final Map<Class<?>, ColumnDataType> COLUMN_DATA_TYPE_MAP = new HashMap<>() {{
@@ -79,6 +110,7 @@ public class FunctionUtils {
       put(Timestamp.class, ColumnDataType.TIMESTAMP);
       put(String.class, ColumnDataType.STRING);
       put(byte[].class, ColumnDataType.BYTES);
+      put(UUID.class, ColumnDataType.UUID);
       put(int[].class, ColumnDataType.INT_ARRAY);
       put(long[].class, ColumnDataType.LONG_ARRAY);
       put(float[].class, ColumnDataType.FLOAT_ARRAY);
@@ -151,6 +183,14 @@ public class FunctionUtils {
   }
 
   /**
+   * Returns the corresponding DataType for the given class, or {@code null} if there is no one matching.
+   */
+  @Nullable
+  public static DataType getDataType(Class<?> clazz) {
+    return DATA_TYPE_MAP.get(clazz);
+  }
+
+  /**
    * Returns the corresponding ColumnDataType for the given class, or {@code null} if there is no one matching.
    */
   @Nullable
@@ -184,6 +224,8 @@ public class FunctionUtils {
       case STRING:
       case JSON:
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      case UUID:
+        return typeFactory.createSqlType(SqlTypeName.UUID);
       case BYTES:
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
       case INT_ARRAY:

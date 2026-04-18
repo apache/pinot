@@ -40,6 +40,7 @@ import static org.testng.Assert.fail;
 
 
 public class PinotDataTypeTest {
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
   private static final PinotDataType[] SOURCE_TYPES = {
       BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_DECIMAL, STRING, JSON,
       BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
@@ -209,6 +210,20 @@ public class PinotDataTypeTest {
     assertEquals(BYTES.convert("AAE=", JSON), new byte[]{0, 1});
     assertEquals(BYTES.convert(new Byte[]{0, 1}, BYTE_ARRAY), new byte[]{0, 1});
     assertEquals(BYTES.convert(new String[]{"0001"}, STRING_ARRAY), new byte[]{0, 1});
+  }
+
+  @Test
+  public void testUUID() {
+    java.util.UUID uuid = java.util.UUID.fromString(UUID_VALUE);
+    byte[] uuidBytes = UuidUtils.toBytes(UUID_VALUE);
+    String mixedCaseUuid = UUID_VALUE.toUpperCase();
+
+    assertEquals(UUID.convert(UUID_VALUE, STRING), uuid);
+    assertEquals(UUID.convert(mixedCaseUuid, STRING), uuid);
+    assertEquals(UUID.convert(uuid, UUID), uuid);
+    assertEquals(UUID.convert(uuidBytes, BYTES), uuid);
+    assertEquals(STRING.convert(uuid, UUID), UUID_VALUE);
+    assertEquals(BYTES.convert(uuid, UUID), uuidBytes);
   }
 
   @Test

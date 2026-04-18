@@ -290,8 +290,9 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
   private AbstractColumnStatisticsCollector createKeyStatsCollector(String key, FieldSpec.DataType dataType) {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(key).build();
-    Schema keySchema = new Schema.SchemaBuilder().setSchemaName(key)
-        .addField(new DimensionFieldSpec(key, dataType, false)).build();
+    Schema keySchema = new Schema();
+    keySchema.setSchemaName(key);
+    keySchema.addField(new DimensionFieldSpec(key, dataType, false));
     StatsCollectorConfig config = new StatsCollectorConfig(tableConfig, keySchema, null);
 
     if (_createNoDictCollectorsForKeys) {

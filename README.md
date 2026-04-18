@@ -193,5 +193,55 @@ Check out [Pinot documentation](https://docs.pinot.apache.org/) for a complete d
 - [Pinot Architecture](https://docs.pinot.apache.org/basics/architecture)
 - [Pinot Query Language](https://docs.pinot.apache.org/users/user-guide-query/pinot-query-language)
 
+### UUID Logical Type
+
+Pinot supports a logical `UUID` type for single-value columns. In v1, Pinot stores `UUID` values using the existing
+16-byte `BYTES` representation, while schema definitions and query results use canonical lowercase RFC 4122 strings.
+
+Schema example:
+```json
+{
+  "schemaName": "events",
+  "dimensionFieldSpecs": [
+    {
+      "name": "eventId",
+      "dataType": "UUID"
+    }
+  ]
+}
+```
+
+Query example:
+```sql
+SELECT eventId
+FROM events
+WHERE eventId = CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID)
+```
+
+UUID conversion helpers:
+```sql
+SELECT
+  TO_UUID('550E8400-E29B-41D4-A716-446655440000'),
+  UUID_TO_STRING(eventId),
+  UUID_TO_BYTES(eventId),
+  BYTES_TO_UUID(eventIdBytes),
+  IS_UUID(eventIdBytes)
+FROM events
+```
+
+Behavior notes:
+- Pinot accepts canonical RFC 4122 UUID strings in either upper or lower case on ingest and in functions/casts.
+- Pinot always renders `UUID` results as canonical lowercase strings.
+- `CAST(... AS UUID)` accepts canonical strings and 16-byte `BYTES` values.
+
+Migration notes:
+- Existing `BYTES` columns keep returning hex strings. Pinot only renders canonical UUID strings for columns declared as `UUID`.
+- Pinot does not support changing the data type of an existing column in place. To adopt `UUID` for existing
+  `STRING` or `BYTES` UUID-shaped data, create a new `UUID` column or a new table/schema and reingest/backfill the
+  data into it.
+- The `UUID` type itself does not require a segment or wire format bump in v1, but migration still requires rebuild or
+  reingest because schema type mutation is unsupported.
+- Multi-value UUID columns are not supported in v1.
+
 ## License
 Apache Pinot is under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)

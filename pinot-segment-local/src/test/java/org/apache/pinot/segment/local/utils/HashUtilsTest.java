@@ -21,9 +21,11 @@ package org.apache.pinot.segment.local.utils;
 import java.util.UUID;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -47,6 +49,7 @@ public class HashUtilsTest {
     // Test happy cases: when all UUID values are valid
     testHashUUID(new UUID[]{UUID.randomUUID()});
     testHashUUID(new UUID[]{UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()});
+    testHashUUIDNormalizedPrimaryKeyValues();
 
     // Test failure scenario when there's a non-null invalid uuid value
     PrimaryKey invalidUUIDs = new PrimaryKey(new String[]{"some-random-string"});
@@ -62,6 +65,19 @@ public class HashUtilsTest {
     } catch (IllegalArgumentException e) {
       assertTrue(e.getMessage().contains("Found null value"));
     }
+  }
+
+  @Test
+  public void testHashUUIDNormalizedPrimaryKeyValues() {
+    UUID firstUuid = UUID.randomUUID();
+    UUID secondUuid = UUID.randomUUID();
+
+    byte[] expectedHash = HashUtils.hashUUID(new PrimaryKey(new Object[]{firstUuid, secondUuid}));
+    assertEquals(HashUtils.hashUUID(new PrimaryKey(
+        new Object[]{new ByteArray(UuidUtils.toBytes(firstUuid)), new ByteArray(UuidUtils.toBytes(secondUuid))})),
+        expectedHash);
+    assertEquals(HashUtils.hashUUID(
+        new PrimaryKey(new Object[]{UuidUtils.toBytes(firstUuid), UuidUtils.toBytes(secondUuid)})), expectedHash);
   }
 
   @Test

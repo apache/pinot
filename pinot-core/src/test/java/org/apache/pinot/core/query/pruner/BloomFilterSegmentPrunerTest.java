@@ -96,6 +96,22 @@ public class BloomFilterSegmentPrunerTest {
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 AND column = 30.0"));
   }
 
+  @Test
+  public void testUuidBloomFilterPruning()
+      throws IOException {
+    IndexSegment indexSegment = mockIndexSegment(new String[]{
+        "550e8400-e29b-41d4-a716-446655440000",
+        "550e8400-e29b-41d4-a716-446655440001"
+    }, DataType.UUID);
+
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column = '550e8400-e29b-41d4-a716-446655440000'"));
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column IN ('550e8400-e29b-41d4-a716-446655440001')"));
+    assertTrue(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column = '550e8400-e29b-41d4-a716-44665544ffff'"));
+  }
+
   @Test(expectedExceptions = RuntimeException.class)
   public void testQueryTimeoutOnPruning()
       throws IOException {
@@ -162,6 +178,11 @@ public class BloomFilterSegmentPrunerTest {
 
   private IndexSegment mockIndexSegment(String[] values)
       throws IOException {
+    return mockIndexSegment(values, DataType.DOUBLE);
+  }
+
+  private IndexSegment mockIndexSegment(String[] values, DataType dataType)
+      throws IOException {
     IndexSegment indexSegment = mock(IndexSegment.class);
     when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("column"));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
@@ -176,7 +197,7 @@ public class BloomFilterSegmentPrunerTest {
     for (String v : values) {
       builder.put(v);
     }
-    when(dataSourceMetadata.getDataType()).thenReturn(DataType.DOUBLE);
+    when(dataSourceMetadata.getDataType()).thenReturn(dataType);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
     when(dataSource.getBloomFilter()).thenReturn(builder.build());
 

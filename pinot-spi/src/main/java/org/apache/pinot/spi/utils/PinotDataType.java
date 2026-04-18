@@ -820,6 +820,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public UUID toUUID(Object value) {
+      return UuidUtils.toUUID(value.toString());
+    }
+
+    @Override
     public String convert(Object value, PinotDataType sourceType) {
       return sourceType.toString(value);
     }
@@ -937,13 +942,17 @@ public enum PinotDataType {
     }
 
     @Override
+    public UUID toUUID(Object value) {
+      return UuidUtils.toUUID(value);
+    }
+
+    @Override
     public Object convert(Object value, PinotDataType sourceType) {
       return sourceType.toBytes(value);
     }
   },
 
-  /// Wraps [UUID]. Internal representation is the canonical String form (e.g.
-  /// `"550e8400-e29b-41d4-a716-446655440000"`).
+  /// Wraps [UUID]. Internal representation is the 16-byte big-endian binary form.
   ///
   /// When converting from UUID to other types:
   /// - String / JSON: canonical UUID string
@@ -953,9 +962,6 @@ public enum PinotDataType {
   /// - String / JSON: parsed via [UUID#fromString]
   /// - BYTES (length 16): decoded big-endian
   ///
-  /// Pinot has no UUID storage type — declaring the schema column as `STRING` produces the canonical
-  /// form, declaring it as `BYTES` produces the 16-byte big-endian form. Decoders / extractors emit
-  /// [UUID] uniformly and `PinotDataType` adapts at the type-transformer boundary.
   UUID {
     @Override
     public int toInt(Object value) {
@@ -994,21 +1000,26 @@ public enum PinotDataType {
 
     @Override
     public String toString(Object value) {
-      return value.toString();
+      return UuidUtils.toUUID(value).toString();
     }
 
     @Override
     public byte[] toBytes(Object value) {
-      return UuidUtils.toBytes((UUID) value);
+      return UuidUtils.toBytes(value);
+    }
+
+    @Override
+    public UUID toUUID(Object value) {
+      return UuidUtils.toUUID(value);
     }
 
     @Override
     public UUID convert(Object value, PinotDataType sourceType) {
       switch (sourceType) {
         case UUID:
-          return (UUID) value;
+          return UuidUtils.toUUID(value);
         case STRING:
-          return java.util.UUID.fromString(value.toString().trim());
+          return UuidUtils.toUUID(value.toString().trim());
         case JSON:
           try {
             // JSON-encoded UUID is a quoted JSON string; Jackson's UUIDDeserializer handles both the
@@ -1018,15 +1029,15 @@ public enum PinotDataType {
             throw new RuntimeException("Cannot parse JSON value as UUID: " + value, e);
           }
         case BYTES:
-          return UuidUtils.fromBytes((byte[]) value);
+          return UuidUtils.toUUID(value);
         default:
-          throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to UUID");
+          return sourceType.toUUID(value);
       }
     }
 
     @Override
-    public String toInternal(Object value) {
-      return value.toString();
+    public byte[] toInternal(Object value) {
+      return UuidUtils.toBytes(value);
     }
   },
 
@@ -1074,6 +1085,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from OBJECT to BYTES");
+    }
+
+    @Override
+    public UUID toUUID(Object value) {
+      return UuidUtils.toUUID(value);
     }
 
     @Override
@@ -1395,6 +1411,10 @@ public enum PinotDataType {
 
   public byte[] toBytes(Object value) {
     return getSingleValueType().toBytes(toObjectArray(value)[0]);
+  }
+
+  public UUID toUUID(Object value) {
+    return getSingleValueType().toUUID(toObjectArray(value)[0]);
   }
 
   public int[] toPrimitiveIntArray(Object value) {
@@ -1974,6 +1994,11 @@ public enum PinotDataType {
           return JSON;
         }
         throw new IllegalStateException("There is no multi-value type for JSON");
+      case UUID:
+        if (fieldSpec.isSingleValueField()) {
+          return UUID;
+        }
+        throw new IllegalStateException("UUID data type only supports single-value fields");
       case BYTES:
         return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
       case MAP:

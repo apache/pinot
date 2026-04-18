@@ -821,6 +821,7 @@ public abstract class ClusterTest extends ControllerTest {
       case BIG_DECIMAL:
       case TIMESTAMP:
       case STRING:
+      case UUID:
       case BYTES:
       case JSON:
         object = jsonValue.textValue();

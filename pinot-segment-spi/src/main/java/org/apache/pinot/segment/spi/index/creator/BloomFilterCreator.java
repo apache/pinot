@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 public interface BloomFilterCreator extends IndexCreator {
@@ -33,6 +34,8 @@ public interface BloomFilterCreator extends IndexCreator {
   default void add(Object value, int dictId) {
     if (getDataType() == FieldSpec.DataType.BYTES) {
       add(BytesUtils.toHexString((byte[]) value));
+    } else if (getDataType() == FieldSpec.DataType.UUID) {
+      add(UuidUtils.toString(UuidUtils.toBytes(value)));
     } else {
       add(value.toString());
     }
@@ -43,6 +46,10 @@ public interface BloomFilterCreator extends IndexCreator {
     if (getDataType() == FieldSpec.DataType.BYTES) {
       for (Object value : values) {
         add(BytesUtils.toHexString((byte[]) value));
+      }
+    } else if (getDataType() == FieldSpec.DataType.UUID) {
+      for (Object value : values) {
+        add(UuidUtils.toString(UuidUtils.toBytes(value)));
       }
     } else {
       for (Object value : values) {

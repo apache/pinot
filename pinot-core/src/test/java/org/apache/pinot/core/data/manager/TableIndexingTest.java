@@ -160,7 +160,9 @@ public class TableIndexingTest {
   protected void createSchemas() {
     for (DataType type : DataType.values()) {
       if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP || type == DataType.STRUCT
-          || type == DataType.OPEN_STRUCT) {
+          || type == DataType.OPEN_STRUCT || type == DataType.UUID) {
+        // UUID v1 is SV-only and its supported behavior is covered by dedicated UUID tests rather than this static
+        // all-type/all-index expectation matrix.
         continue;
       }
 
