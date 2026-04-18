@@ -35,6 +35,12 @@ import org.apache.pinot.spi.data.Schema;
 @Deprecated
 public class PinotSinkFunction<T> extends PinotSink<T> {
   private static final long serialVersionUID = 1L;
+  @Deprecated
+  public static final String DEFAULT_OUTPUT_DIR_URI = PinotSink.DEFAULT_OUTPUT_DIR_URI;
+  @Deprecated
+  public static final long DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS = PinotSink.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS;
+  @Deprecated
+  public static final int DEFAULT_EXECUTOR_POOL_SIZE = PinotSink.DEFAULT_EXECUTOR_POOL_SIZE;
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema) {
     super(recordConverter, tableConfig, schema);

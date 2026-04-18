@@ -218,11 +218,13 @@ public class PinotSink<T> implements Sink<T> {
       try {
         flush(true);
       } catch (Exception e) {
+        restoreInterruptFlag(e);
         failure = e;
       } finally {
         try {
           shutdownExecutor();
         } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           if (failure == null) {
             failure = e;
           } else {
@@ -321,6 +323,12 @@ public class PinotSink<T> implements Sink<T> {
 
     private void shutdownExecutorNow() {
       _executor.shutdownNow();
+    }
+
+    private void restoreInterruptFlag(Exception exception) {
+      if (exception instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
     }
 
     private void closeQuietly(@Nullable SegmentWriter closeable) {

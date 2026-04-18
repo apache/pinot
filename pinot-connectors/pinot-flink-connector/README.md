@@ -28,7 +28,7 @@ including the upsert tables. You can read more about the motivation and design i
 // Set up flink env and data source
 StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
 execEnv.setParallelism(2); // optional
-DataStream<Row> srcDs = execEnv.fromData(data, TEST_TYPE_INFO)
+DataStream<Row> srcDs = execEnv.fromData(data, TEST_TYPE_INFO);
 
 // Create a PinotAdminClient to fetch Pinot schema and table config
 String controllerUrl = "http://localhost:9000";
@@ -60,7 +60,7 @@ execEnv.execute();
 // Set up flink env and data source
 StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
 execEnv.setParallelism(2); // mandatory for upsert tables
-DataStream<Row> srcDs = execEnv.fromData(data, TEST_TYPE_INFO)
+DataStream<Row> srcDs = execEnv.fromData(data, TEST_TYPE_INFO);
 
 // Create a PinotAdminClient to fetch Pinot schema and table config
 String controllerUrl = "http://localhost:9000";
