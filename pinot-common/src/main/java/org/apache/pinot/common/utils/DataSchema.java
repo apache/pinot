@@ -137,6 +137,13 @@ public class DataSchema {
     for (ColumnDataType columnDataType : _columnDataTypes) {
       // We don't want to use ordinal of the enum since adding a new data type will break things if server and broker
       // use different versions of DataType class.
+      //
+      // NOTE: Rolling-upgrade limitation for UUID columns — Once a broker or server on this build starts emitting
+      // "UUID" tokens over this wire format, any older peer that does not know the UUID ColumnDataType will throw
+      // an IllegalArgumentException in ColumnDataType.valueOf(). There is no version-negotiation shim or fallback
+      // to BYTES today. Operators must upgrade all brokers and servers atomically (or keep UUID columns out of
+      // production until the cluster is fully on this build) to avoid mixed-version deserialization failures.
+      // Rollback to a pre-UUID build is likewise unsafe while UUID-typed query results are in flight.
       byte[] bytes = columnDataType.name().getBytes(UTF_8);
       dataOutputStream.writeInt(bytes.length);
       dataOutputStream.write(bytes);

@@ -47,9 +47,9 @@ import static org.testng.Assert.assertNotNull;
 /**
  * Realtime upsert coverage for UUID primary keys.
  *
- * <p>This test uses a single Kafka partition because mixed-case UUID spellings normalize only after Pinot ingests the
- * row. Keeping the stream single-partitioned ensures logically equivalent UUID keys remain colocated before that
- * canonicalization step.
+ * <p>This test uses a single Kafka partition. UUID primary keys must be in canonical lowercase form (enforced at
+ * ingestion time by {@code DataTypeTransformer}) because Kafka partition routing is determined by the raw string value
+ * before Pinot normalization; non-canonical values would cause silent dedup failures in multi-partition tables.
  */
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTest {
@@ -58,12 +58,15 @@ public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTes
   private static final String UUID_PK_COLUMN = "uuidPk";
   private static final String PAYLOAD_COLUMN = "payload";
   private static final String TIME_COLUMN = "ts";
+  // All primary key values must be canonical lowercase UUIDs. DataTypeTransformer rejects non-canonical
+  // (uppercase) UUID primary keys for upsert tables to prevent silent dedup failures when the same
+  // logical UUID is routed to different Kafka partitions before normalization.
   private static final List<String> UUID_INPUT_VALUES = List.of(
-      "550E8400-E29B-41D4-A716-446655440000",
-      "550E8400-E29B-41D4-A716-446655440001",
       "550e8400-e29b-41d4-a716-446655440000",
+      "550e8400-e29b-41d4-a716-446655440001",
+      "550e8400-e29b-41d4-a716-446655440000",  // duplicate of index 0, triggers upsert dedup
       "550e8400-e29b-41d4-a716-446655440002",
-      "550e8400-e29b-41d4-a716-446655440001");
+      "550e8400-e29b-41d4-a716-446655440001"); // duplicate of index 1, triggers upsert dedup
   private static final List<String> PAYLOAD_VALUES = List.of("alpha-v1", "beta-v1", "alpha-v2", "gamma-v1",
       "beta-v2");
   private static final List<String> EXPECTED_UUID_VALUES = List.of(

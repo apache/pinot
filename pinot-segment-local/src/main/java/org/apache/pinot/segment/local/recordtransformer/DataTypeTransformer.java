@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
@@ -46,6 +51,13 @@ public class DataTypeTransformer implements RecordTransformer {
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
+  // UUID primary key columns for upsert/dedup tables; non-null and non-empty when applicable.
+  // Non-canonical (uppercase) UUID strings in these columns will be rejected at ingest time because
+  // Kafka partition routing is decided by the producer before Pinot normalises the value. Accepting
+  // uppercase UUIDs as primary keys silently causes dedup failures in multi-partition realtime
+  // upsert tables when the same logical UUID is routed to different partitions.
+  @Nullable
+  private final Set<String> _upsertUuidPrimaryKeyColumns;
 
   public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -56,6 +68,24 @@ public class DataTypeTransformer implements RecordTransformer {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
     _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
+
+    if (tableConfig.getUpsertConfig() != null || tableConfig.getDedupConfig() != null) {
+      List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+      if (primaryKeyColumns != null && !primaryKeyColumns.isEmpty()) {
+        Set<String> uuidPkCols = new HashSet<>();
+        for (String col : primaryKeyColumns) {
+          FieldSpec spec = schema.getFieldSpecFor(col);
+          if (spec != null && spec.getDataType() == FieldSpec.DataType.UUID) {
+            uuidPkCols.add(col);
+          }
+        }
+        _upsertUuidPrimaryKeyColumns = uuidPkCols.isEmpty() ? null : Collections.unmodifiableSet(uuidPkCols);
+      } else {
+        _upsertUuidPrimaryKeyColumns = null;
+      }
+    } else {
+      _upsertUuidPrimaryKeyColumns = null;
+    }
   }
 
   @Override
@@ -69,6 +99,10 @@ public class DataTypeTransformer implements RecordTransformer {
       String column = entry.getKey();
       try {
         Object value = record.getValue(column);
+        if (_upsertUuidPrimaryKeyColumns != null && _upsertUuidPrimaryKeyColumns.contains(column)
+            && value instanceof CharSequence) {
+          validateCanonicalUuidPrimaryKey(column, value.toString());
+        }
         value = DataTypeTransformerUtils.transformValue(column, value, entry.getValue());
         record.putValue(column, value);
       } catch (Exception e) {
@@ -79,6 +113,38 @@ public class DataTypeTransformer implements RecordTransformer {
         record.putValue(column, null);
         record.markIncomplete();
       }
+    }
+  }
+
+  /**
+   * Validates that a UUID primary key string value is in canonical lowercase RFC 4122 form.
+   *
+   * <p>UUID primary keys in upsert/dedup realtime tables must be canonical because Kafka partition routing
+   * is determined by the raw string value that the producer sends. If the producer sends the same logical
+   * UUID with different casing (e.g. uppercase vs lowercase), Kafka will hash the strings differently
+   * and the messages may land on different partitions. Pinot then normalises them to the same bytes
+   * inside each consuming segment, so within-segment dedup works, but cross-partition dedup never
+   * fires - producing duplicate or stale rows silently.
+   *
+   * <p>By rejecting non-canonical UUIDs here (before bytes conversion loses the original string),
+   * we ensure that any producer-side casing inconsistency surfaces as an ingestion error rather
+   * than a silent correctness failure. Producers must canonicalise UUID primary keys to lowercase
+   * before publishing to Kafka.
+   */
+  private static void validateCanonicalUuidPrimaryKey(String column, String uuidStr) {
+    String canonical;
+    try {
+      canonical = UUID.fromString(uuidStr).toString();
+    } catch (IllegalArgumentException e) {
+      // Malformed UUID; let DataTypeTransformerUtils.transformValue produce the standard error.
+      return;
+    }
+    if (!canonical.equals(uuidStr)) {
+      throw new IllegalArgumentException(
+          "Non-canonical UUID primary key value '" + uuidStr + "' in upsert/dedup column '" + column + "'. "
+              + "Expected canonical lowercase RFC 4122 form: '" + canonical + "'. "
+              + "UUID primary keys must be in canonical lowercase form to ensure consistent Kafka partition "
+              + "routing. Non-canonical values cause silent dedup failures in multi-partition realtime tables.");
     }
   }
 }
