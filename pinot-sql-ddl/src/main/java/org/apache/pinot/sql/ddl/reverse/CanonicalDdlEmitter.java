@@ -91,19 +91,17 @@ public final class CanonicalDdlEmitter {
     sb.append(SqlIdentifiers.quote(displayName));
     sb.append(" (\n");
     List<String> columns = SchemaEmitter.emitColumns(schema);
-    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
-    boolean hasPrimaryKey = primaryKeyColumns != null && !primaryKeyColumns.isEmpty();
-    // Column count for trailing-comma logic: columns + optional PRIMARY KEY line.
-    int totalEntries = columns.size() + (hasPrimaryKey ? 1 : 0);
     for (int i = 0; i < columns.size(); i++) {
       sb.append(INDENT).append(columns.get(i));
-      if (i < totalEntries - 1) {
+      if (i < columns.size() - 1) {
         sb.append(',');
       }
       sb.append('\n');
     }
-    if (hasPrimaryKey) {
-      sb.append(INDENT).append("PRIMARY KEY (");
+    sb.append(")\n");
+    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+    if (primaryKeyColumns != null && !primaryKeyColumns.isEmpty()) {
+      sb.append("PRIMARY KEY (");
       for (int i = 0; i < primaryKeyColumns.size(); i++) {
         sb.append(SqlIdentifiers.quote(primaryKeyColumns.get(i)));
         if (i < primaryKeyColumns.size() - 1) {
@@ -112,7 +110,6 @@ public final class CanonicalDdlEmitter {
       }
       sb.append(")\n");
     }
-    sb.append(")\n");
 
     sb.append("TABLE_TYPE = ").append(emitTableType(config.getTableType())).append('\n');
 

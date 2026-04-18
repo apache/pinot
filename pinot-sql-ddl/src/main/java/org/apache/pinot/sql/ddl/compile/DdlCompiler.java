@@ -126,10 +126,26 @@ public final class DdlCompiler {
     List<ResolvedColumnDefinition> columns = resolveColumns(node.getColumns().getList());
     Map<String, String> properties = resolveProperties(node.getProperties().getList());
 
+    // Extract PRIMARY KEY column names (null when no PRIMARY KEY clause).
+    List<String> primaryKeyColumns = null;
+    if (node.getPrimaryKeyColumns() != null && !node.getPrimaryKeyColumns().getList().isEmpty()) {
+      primaryKeyColumns = new ArrayList<>();
+      for (SqlNode pkNode : node.getPrimaryKeyColumns().getList()) {
+        if (!(pkNode instanceof SqlIdentifier)) {
+          throw new DdlCompilationException(
+              "PRIMARY KEY column must be a simple identifier; got: " + pkNode.getClass().getSimpleName());
+        }
+        primaryKeyColumns.add(((SqlIdentifier) pkNode).getSimple());
+      }
+    }
+
     ResolvedTableDefinition resolved = new ResolvedTableDefinition(
         name._databaseName, name._tableName, tableType, node.isIfNotExists(), columns, properties);
 
     Schema schema = buildSchema(resolved);
+    if (primaryKeyColumns != null) {
+      schema.setPrimaryKeyColumns(primaryKeyColumns);
+    }
     List<String> warnings = new ArrayList<>();
     TableConfig tableConfig = buildTableConfig(resolved, warnings);
     validateConsistency(resolved, schema, tableConfig, warnings);

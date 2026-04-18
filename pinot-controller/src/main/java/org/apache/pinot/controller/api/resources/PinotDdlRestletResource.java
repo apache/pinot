@@ -228,6 +228,19 @@ public class PinotDdlRestletResource {
         .setTableConfig(toJson(create.getTableConfig()))
         .setWarnings(create.getWarnings());
 
+    // IF NOT EXISTS short-circuit: check existence BEFORE running config validation so that
+    // rerunning the statement against an existing table is a true no-op. Validation may reject
+    // configs that are valid at create time but would fail if the stored schema or config has
+    // since drifted, making declarative-deploy workflows fragile otherwise.
+    if (!dryRun && _pinotHelixResourceManager.hasTable(tableNameWithType)) {
+      if (create.isIfNotExists()) {
+        response.setMessage("Table " + tableNameWithType + " already exists; CREATE IF NOT EXISTS is a no-op.");
+        return response;
+      }
+      throw new ControllerApplicationException(LOGGER,
+          "Table " + tableNameWithType + " already exists.", Response.Status.CONFLICT);
+    }
+
     // Run the full schema/table validation stack that the existing /tables and /tableConfigs APIs
     // apply before any ZK write. This catches invalid combinations (upsert without primary keys,
     // field configs referencing non-existent columns, task configs with bad column references,
@@ -237,15 +250,6 @@ public class PinotDdlRestletResource {
     if (dryRun) {
       response.setMessage("Dry run: validated CREATE TABLE without persisting.");
       return response;
-    }
-
-    if (_pinotHelixResourceManager.hasTable(tableNameWithType)) {
-      if (create.isIfNotExists()) {
-        response.setMessage("Table " + tableNameWithType + " already exists; CREATE IF NOT EXISTS is a no-op.");
-        return response;
-      }
-      throw new ControllerApplicationException(LOGGER,
-          "Table " + tableNameWithType + " already exists.", Response.Status.CONFLICT);
     }
 
     // When a schema for this raw table name already exists (the common case when adding the

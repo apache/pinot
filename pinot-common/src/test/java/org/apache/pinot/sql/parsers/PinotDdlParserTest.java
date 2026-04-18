@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.sql.parsers.parser.SqlPinotColumnDeclaration;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
@@ -288,6 +289,31 @@ public class PinotDdlParserTest {
     expectThrows(SqlCompilationException.class,
         () -> CalciteSqlParser.compileToSqlNodeAndOptions(
             "CREATE TABLE t (id INT DIMENSION METRIC) TABLE_TYPE = OFFLINE"));
+  }
+
+  @Test
+  public void createTableWithPrimaryKey() {
+    SqlPinotCreateTable node = parseCreate(
+        "CREATE TABLE t (id INT, name STRING) PRIMARY KEY (id) TABLE_TYPE = OFFLINE");
+    assertNotNull(node.getPrimaryKeyColumns(), "PRIMARY KEY clause should be parsed");
+    assertEquals(node.getPrimaryKeyColumns().size(), 1);
+    assertEquals(((SqlIdentifier) node.getPrimaryKeyColumns().get(0)).getSimple(), "id");
+  }
+
+  @Test
+  public void createTableWithCompositePrimaryKey() {
+    SqlPinotCreateTable node = parseCreate(
+        "CREATE TABLE t (a INT, b STRING, c LONG) PRIMARY KEY (a, b) TABLE_TYPE = OFFLINE");
+    assertEquals(node.getPrimaryKeyColumns().size(), 2);
+    assertEquals(((SqlIdentifier) node.getPrimaryKeyColumns().get(0)).getSimple(), "a");
+    assertEquals(((SqlIdentifier) node.getPrimaryKeyColumns().get(1)).getSimple(), "b");
+  }
+
+  @Test
+  public void createTableWithoutPrimaryKeyHasNullPkList() {
+    SqlPinotCreateTable node = parseCreate(
+        "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE");
+    assertNull(node.getPrimaryKeyColumns());
   }
 
   @Test
