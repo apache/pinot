@@ -273,10 +273,8 @@ public class PinotDdlRestletResource {
       // fields in a different order or represent defaults differently (e.g. 0 vs 0.0) depending
       // on which code path populated the Schema object, causing false mismatches that would block
       // valid hybrid table creation even when the schemas are semantically identical.
-      com.fasterxml.jackson.databind.JsonNode storedNode =
-          JsonUtils.objectToJsonNode(storedSchema);
-      com.fasterxml.jackson.databind.JsonNode compiledNode =
-          JsonUtils.objectToJsonNode(create.getSchema());
+      JsonNode storedNode = JsonUtils.objectToJsonNode(storedSchema);
+      JsonNode compiledNode = JsonUtils.objectToJsonNode(create.getSchema());
       if (!storedNode.equals(compiledNode)) {
         throw new ControllerApplicationException(LOGGER,
             "Schema '" + schemaName + "' already exists and does not match the column list in the DDL. "
