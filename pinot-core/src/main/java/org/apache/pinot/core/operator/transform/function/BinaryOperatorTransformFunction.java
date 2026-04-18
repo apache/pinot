@@ -40,6 +40,7 @@ import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -68,6 +69,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   protected boolean _alwaysTrue;
   protected boolean _alwaysFalse;
   protected boolean _alwaysNull;
+  protected boolean _useUuidComparison;
 
   protected BinaryOperatorTransformFunction(TransformFunctionType transformFunctionType) {
     // translate to integer in [0, 5] for guaranteed tableswitch
@@ -110,15 +112,17 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     DataType leftDataType = _leftTransformFunction.getResultMetadata().getDataType();
+    DataType rightDataType = _rightTransformFunction.getResultMetadata().getDataType();
     _leftStoredType = leftDataType.getStoredType();
-    _rightStoredType = _rightTransformFunction.getResultMetadata().getDataType().getStoredType();
+    _rightStoredType = rightDataType.getStoredType();
+    _useUuidComparison = leftDataType == DataType.UUID && rightDataType == DataType.UUID;
 
     // Data type check: left and right types should be compatible.
     if (_leftStoredType == DataType.BYTES || _rightStoredType == DataType.BYTES) {
       Preconditions.checkState(_leftStoredType == _rightStoredType, String.format(
           "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform "
-              + "Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
-          _rightTransformFunction.getName(), _rightStoredType));
+              + "Function [%s] result type is [%s]]", getTransformFunctionDisplayName(_leftTransformFunction),
+          _leftStoredType, getTransformFunctionDisplayName(_rightTransformFunction), _rightStoredType));
     }
 
     // Create predicate evaluator when the right side is a literal
@@ -697,8 +701,15 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private IllegalStateException illegalState() {
     throw new IllegalStateException(String.format(
         "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
-            + "Transform Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
-        _rightTransformFunction.getName(), _rightStoredType));
+            + "Transform Function [%s] result type is [%s]]", getTransformFunctionDisplayName(_leftTransformFunction),
+        _leftStoredType, getTransformFunctionDisplayName(_rightTransformFunction), _rightStoredType));
+  }
+
+  private static String getTransformFunctionDisplayName(TransformFunction transformFunction) {
+    if (transformFunction instanceof IdentifierTransformFunction) {
+      return ((IdentifierTransformFunction) transformFunction).getColumnName();
+    }
+    return transformFunction.getName();
   }
 
   private void fillResultString(ValueBlock valueBlock, int length) {
@@ -713,7 +724,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     byte[][] leftBytesValues = _leftTransformFunction.transformToBytesValuesSV(valueBlock);
     byte[][] rightBytesValues = _rightTransformFunction.transformToBytesValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
-      _intValuesSV[i] = getIntResult((ByteArray.compare(leftBytesValues[i], rightBytesValues[i])));
+      _intValuesSV[i] = getIntResult(
+          _useUuidComparison ? UuidUtils.compare(leftBytesValues[i], rightBytesValues[i])
+              : ByteArray.compare(leftBytesValues[i], rightBytesValues[i]));
     }
   }
 

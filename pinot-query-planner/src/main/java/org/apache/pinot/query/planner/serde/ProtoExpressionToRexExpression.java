@@ -182,6 +182,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.JSON;
       case BYTES:
         return ColumnDataType.BYTES;
+      case UUID:
+        return ColumnDataType.UUID;
       case INT_ARRAY:
         return ColumnDataType.INT_ARRAY;
       case LONG_ARRAY:

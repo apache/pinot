@@ -31,6 +31,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -45,6 +46,7 @@ public class DefaultNullValueVirtualColumnProviderTest {
   private static final FieldSpec SV_STRING_WITH_DEFAULT =
       new DimensionFieldSpec("svStringColumn", DataType.STRING, true, "default");
   private static final FieldSpec SV_BYTES = new DimensionFieldSpec("svBytesColumn", DataType.BYTES, true);
+  private static final FieldSpec SV_UUID = new DimensionFieldSpec("svUuidColumn", DataType.UUID, true);
   private static final FieldSpec MV_INT = new DimensionFieldSpec("mvIntColumn", DataType.INT, false);
   private static final FieldSpec MV_LONG = new DimensionFieldSpec("mvLongColumn", DataType.LONG, false);
   private static final FieldSpec MV_FLOAT = new DimensionFieldSpec("mvFloatColumn", DataType.FLOAT, false);
@@ -87,6 +89,11 @@ public class DefaultNullValueVirtualColumnProviderTest {
         new ColumnMetadataImpl.Builder().setFieldSpec(SV_BYTES).setTotalDocs(1).setCardinality(1).setSorted(true)
             .setHasDictionary(true).setMinValue(new ByteArray((byte[]) SV_BYTES.getDefaultNullValue()))
             .setMaxValue(new ByteArray((byte[]) SV_BYTES.getDefaultNullValue())).build());
+
+    assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(SV_UUID, 1)),
+        new ColumnMetadataImpl.Builder().setFieldSpec(SV_UUID).setTotalDocs(1).setCardinality(1).setSorted(true)
+            .setHasDictionary(true).setMinValue(new ByteArray((byte[]) SV_UUID.getDefaultNullValue()))
+            .setMaxValue(new ByteArray((byte[]) SV_UUID.getDefaultNullValue())).build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_INT, 1)),
         new ColumnMetadataImpl.Builder().setFieldSpec(MV_INT).setTotalDocs(1).setCardinality(1).setSorted(false)
@@ -145,6 +152,14 @@ public class DefaultNullValueVirtualColumnProviderTest {
     dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     assertEquals(dictionary.getClass(), ConstantValueBytesDictionary.class);
     assertEquals(dictionary.getBytesValue(0), new byte[0]);
+
+    virtualColumnContext = new VirtualColumnContext(SV_UUID, 1);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
+    assertEquals(dictionary.getClass(), ConstantValueBytesDictionary.class);
+    byte[] uuidDefaultNullValue = (byte[]) SV_UUID.getDefaultNullValue();
+    assertEquals(dictionary.getBytesValue(0), uuidDefaultNullValue);
+    assertEquals(dictionary.getStringValue(0), BytesUtils.toHexString(uuidDefaultNullValue));
+    assertEquals(dictionary.indexOf(BytesUtils.toHexString(uuidDefaultNullValue)), 0);
 
     virtualColumnContext = new VirtualColumnContext(MV_INT, 1);
     dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
