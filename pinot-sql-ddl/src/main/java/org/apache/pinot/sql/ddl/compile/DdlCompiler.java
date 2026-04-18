@@ -144,6 +144,16 @@ public final class DdlCompiler {
 
     Schema schema = buildSchema(resolved);
     if (primaryKeyColumns != null) {
+      Set<String> columnNames = new HashSet<>();
+      for (ResolvedColumnDefinition col : columns) {
+        columnNames.add(col.getName());
+      }
+      for (String pk : primaryKeyColumns) {
+        if (!columnNames.contains(pk)) {
+          throw new DdlCompilationException(
+              "PRIMARY KEY column '" + pk + "' is not declared in the column list.");
+        }
+      }
       schema.setPrimaryKeyColumns(primaryKeyColumns);
     }
     List<String> warnings = new ArrayList<>();

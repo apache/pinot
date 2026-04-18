@@ -360,6 +360,12 @@ public class DdlCompilerTest {
     assertNull(c.getSchema().getPrimaryKeyColumns());
   }
 
+  @Test
+  public void primaryKeyReferencingUnknownColumnThrows() {
+    expectThrows(DdlCompilationException.class, () -> compileCreate(
+        "CREATE TABLE t (id INT) PRIMARY KEY (nonexistent) TABLE_TYPE = OFFLINE"));
+  }
+
   // -------------------------------------------------------------------------------------------
   // SHOW TABLES
   // -------------------------------------------------------------------------------------------

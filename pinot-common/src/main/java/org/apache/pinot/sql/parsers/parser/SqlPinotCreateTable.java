@@ -110,7 +110,7 @@ public class SqlPinotCreateTable extends SqlCall {
 
   @Override
   public List<SqlNode> getOperandList() {
-    return Arrays.asList(_name, _columns, _tableType, _properties);
+    return Arrays.asList(_name, _columns, _primaryKeyColumns, _tableType, _properties);
   }
 
   @Override
