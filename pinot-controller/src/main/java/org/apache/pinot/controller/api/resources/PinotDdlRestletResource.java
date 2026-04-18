@@ -43,21 +43,28 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
+import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.ddl.DdlExecutionRequest;
 import org.apache.pinot.controller.api.resources.ddl.DdlExecutionResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.util.TaskConfigUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -114,6 +121,9 @@ public class PinotDdlRestletResource {
 
   @Inject
   PinotTaskManager _pinotTaskManager;
+
+  @Inject
+  PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
 
   @Inject
   AccessControlFactory _accessControlFactory;
@@ -278,9 +288,14 @@ public class PinotDdlRestletResource {
       LOGGER.info("DDL created table {}", tableNameWithType);
       return response;
     } catch (TableAlreadyExistsException e) {
-      // Race: another caller added the table between our hasTable check and addTable. Map to
-      // 409 Conflict so the failure mode is consistent with the pre-check path.
-      rollbackSchemaIfCreated(schemaName, schemaCreatedHere);
+      // Race: another caller added the table between our hasTable check and addTable.
+      // Only roll back the schema we created here if no table for this raw name now exists —
+      // if another caller won the race and its table is live, removing the schema would
+      // orphan that table. Re-check existence with the winner's table still present before
+      // deciding to clean up.
+      if (schemaCreatedHere && !_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        rollbackSchemaIfCreated(schemaName, true);
+      }
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (SchemaAlreadyExistsException e) {
       // The override=false addSchema call lost a race with another schema writer. Surface 409.
@@ -397,14 +412,48 @@ public class PinotDdlRestletResource {
       return response;
     }
 
+    // Reject drop if any target is referenced by a logical table, matching the safeguard in
+    // the existing /tables and /tableConfigs DELETE endpoints.
+    List<LogicalTableConfig> allLogicalTableConfigs =
+        ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
+    for (String target : targets) {
+      for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
+        if (LogicalTableConfigUtils.checkPhysicalTableRefExists(logicalTableConfig, target)) {
+          throw new ControllerApplicationException(LOGGER,
+              "Cannot drop table '" + target + "': it is referenced by logical table '"
+                  + logicalTableConfig.getTableName() + "'.",
+              Response.Status.CONFLICT);
+        }
+      }
+    }
+
     try {
       for (String target : targets) {
+        // Remove task schedules before deletion so tasks are not triggered during the drop.
+        PinotTableRestletResource.tableTasksCleanup(target, false,
+            _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
         TableType type = TableNameBuilder.getTableTypeFromTableName(target);
         _pinotHelixResourceManager.deleteTable(fullyQualifiedRaw, type, null);
+      }
+      // Delete the shared schema when the last physical variant has been removed. A schema
+      // without any table leaves stale metadata that blocks future CREATE TABLE for the same
+      // raw name with a different column list.
+      boolean offlineExists = _pinotHelixResourceManager.hasOfflineTable(fullyQualifiedRaw);
+      boolean realtimeExists = _pinotHelixResourceManager.hasRealtimeTable(fullyQualifiedRaw);
+      if (!offlineExists && !realtimeExists) {
+        try {
+          _pinotHelixResourceManager.deleteSchema(fullyQualifiedRaw);
+          LOGGER.info("DDL deleted schema {} after dropping last table variant", fullyQualifiedRaw);
+        } catch (Exception schemaEx) {
+          LOGGER.warn("Failed to delete schema {} after DROP TABLE; manual cleanup may be required",
+              fullyQualifiedRaw, schemaEx);
+        }
       }
       response.setMessage("Dropped " + targets.size() + " table(s).");
       LOGGER.info("DDL dropped tables {}", targets);
       return response;
+    } catch (ControllerApplicationException e) {
+      throw e;
     } catch (Exception e) {
       // ControllerApplicationException(LOGGER, ...) logs the exception itself; don't double-log.
       throw new ControllerApplicationException(LOGGER,
@@ -498,12 +547,18 @@ public class PinotDdlRestletResource {
     // databases the caller may not have access to. The database resolution chain (SQL FROM
     // clause -> Database header -> DEFAULT_DATABASE) ensures we always have an explicit scope.
     String scopedDatabase = database == null ? CommonConstants.DEFAULT_DATABASE : database;
-    // Use the cluster-scoped GetTable action that the existing GET /tables endpoint uses. We
-    // pass the database name as the resource handle so AccessControl impls that key on
-    // database scope can still authorise per-database, but the action itself is cluster-level
-    // (matching the listing semantics) rather than table-level.
-    ResourceUtils.checkPermissionAndAccess(scopedDatabase, httpRequest, headers,
-        AccessType.READ, Actions.Cluster.GET_TABLE, _accessControlFactory, LOGGER);
+    // SHOW TABLES is a cluster-level listing operation, not a per-table read. Use the same
+    // TargetType.CLUSTER + GET_TABLE action pair that the existing @Authorize-annotated
+    // GET /tables endpoint uses, so secured deployments grant SHOW TABLES to callers who
+    // already have cluster-level table-listing access rather than requiring a fictitious
+    // per-table READ on a resource named after the database.
+    String endpointUrl = httpRequest.getRequestURL().toString();
+    AccessControl accessControl = _accessControlFactory.create();
+    AccessControlUtils.validatePermission(null, AccessType.READ, headers, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(headers, TargetType.CLUSTER, scopedDatabase,
+        Actions.Cluster.GET_TABLE)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
     List<String> tables = _pinotHelixResourceManager.getAllRawTables(scopedDatabase);
     return new DdlExecutionResponse()
         .setOperation(DdlOperation.SHOW_TABLES)

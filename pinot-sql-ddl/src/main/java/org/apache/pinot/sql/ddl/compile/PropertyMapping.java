@@ -33,6 +33,7 @@ import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -171,13 +172,19 @@ public final class PropertyMapping {
   /**
    * Applies all properties from {@code definition} onto {@code builder}.
    *
+   * <p>Returns the full list of sorted columns parsed from the {@code sortedColumn} property so
+   * the caller can apply them directly to {@link IndexingConfig#setSortedColumn(List)} after
+   * {@code builder.build()}. The builder's {@code setSortedColumn(String)} only stores a single
+   * value; using the returned list avoids silently dropping all but the first sort column.
+   *
    * @throws DdlCompilationException if a promoted key has a non-coercible value (e.g. non-integer
    *     replication).
    */
-  public static void apply(ResolvedTableDefinition definition, TableConfigBuilder builder) {
+  public static List<String> apply(ResolvedTableDefinition definition, TableConfigBuilder builder) {
     Map<String, String> streamConfigs = new LinkedHashMap<>();
     Map<String, Map<String, String>> taskConfigs = new LinkedHashMap<>();
     Map<String, String> customConfigs = new LinkedHashMap<>();
+    List<String> sortedColumns = null;
 
     for (Map.Entry<String, String> entry : definition.getProperties().entrySet()) {
       String rawKey = entry.getKey();
@@ -190,6 +197,17 @@ public final class PropertyMapping {
         throw new DdlCompilationException(
             "Property '" + rawKey + "' is reserved and must be expressed via a first-class clause, "
                 + "not PROPERTIES.");
+      }
+
+      if (lower.equals("sortedcolumn")) {
+        // Capture the full list so the caller can call IndexingConfig.setSortedColumn(List)
+        // after build(). Also set the first element via the builder so single-column sort
+        // configs still work when the caller ignores the returned list.
+        sortedColumns = splitCsv(value);
+        if (!sortedColumns.isEmpty()) {
+          builder.setSortedColumn(sortedColumns.get(0));
+        }
+        continue;
       }
 
       if (applyPromoted(lower, value, builder)) {
@@ -245,6 +263,7 @@ public final class PropertyMapping {
     if (!customConfigs.isEmpty()) {
       builder.setCustomConfig(new TableCustomConfig(customConfigs));
     }
+    return sortedColumns;
   }
 
   /** Returns true if {@code lowerKey} matched a promoted property and was applied. */
@@ -276,13 +295,8 @@ public final class PropertyMapping {
         builder.setLoadMode(value);
         return true;
       case "sortedcolumn":
-        // The canonical DDL emits all sort columns as CSV but TableConfigBuilder.setSortedColumn
-        // only accepts a single string. Use the first element so the primary sort column is
-        // preserved; multi-column sort configs are intentionally deferred to Slice 4.
-        List<String> sortCols = splitCsv(value);
-        if (!sortCols.isEmpty()) {
-          builder.setSortedColumn(sortCols.get(0));
-        }
+        // Handled above the applyPromoted call so the full column list is captured.
+        // This branch is dead code but kept to satisfy the switch exhaustiveness check.
         return true;
       case "nullhandlingenabled":
         builder.setNullHandlingEnabled(parseBool(lowerKey, value));
