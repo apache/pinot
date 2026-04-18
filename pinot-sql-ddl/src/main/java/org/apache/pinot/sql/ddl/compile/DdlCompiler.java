@@ -26,6 +26,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.SqlBasicTypeNameSpec;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
@@ -188,9 +190,9 @@ public final class DdlCompiler {
       // DECIMAL(p,s) — Calcite uses RelDataType.PRECISION_NOT_SPECIFIED (-1) when omitted.
       if (dt == DataType.BIG_DECIMAL
           && ("DECIMAL".equalsIgnoreCase(sqlTypeName) || "NUMERIC".equalsIgnoreCase(sqlTypeName))
-          && col.getDataType().getTypeNameSpec() instanceof org.apache.calcite.sql.SqlBasicTypeNameSpec
-          && ((org.apache.calcite.sql.SqlBasicTypeNameSpec) col.getDataType().getTypeNameSpec())
-              .getPrecision() != org.apache.calcite.rel.type.RelDataType.PRECISION_NOT_SPECIFIED) {
+          && col.getDataType().getTypeNameSpec() instanceof SqlBasicTypeNameSpec
+          && ((SqlBasicTypeNameSpec) col.getDataType().getTypeNameSpec())
+              .getPrecision() != RelDataType.PRECISION_NOT_SPECIFIED) {
         warnings.add("Column '" + name + "': precision/scale on " + sqlTypeName.toUpperCase(Locale.ROOT)
             + " is not enforced by Pinot BIG_DECIMAL; the constraint is silently ignored.");
       }
