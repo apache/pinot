@@ -228,10 +228,14 @@ public class PinotDdlRestletResource {
         .setTableConfig(toJson(create.getTableConfig()))
         .setWarnings(create.getWarnings());
 
-    // IF NOT EXISTS short-circuit: check existence BEFORE running config validation so that
-    // rerunning the statement against an existing table is a true no-op. Validation may reject
-    // configs that are valid at create time but would fail if the stored schema or config has
-    // since drifted, making declarative-deploy workflows fragile otherwise.
+    // Run the full schema/table validation stack that the existing /tables and /tableConfigs APIs
+    // apply before any ZK write. This catches invalid combinations (upsert without primary keys,
+    // field configs referencing non-existent columns, task configs with bad column references,
+    // etc.) that the compiler alone cannot detect. Runs for both dry-run and live create.
+    // Validation runs BEFORE the existence check so that IF NOT EXISTS is a no-op only for
+    // semantically valid statements; invalid DDL is always rejected regardless of IF NOT EXISTS.
+    validateTableConfig(create.getSchema(), create.getTableConfig());
+
     if (!dryRun && _pinotHelixResourceManager.hasTable(tableNameWithType)) {
       if (create.isIfNotExists()) {
         response.setMessage("Table " + tableNameWithType + " already exists; CREATE IF NOT EXISTS is a no-op.");
@@ -240,12 +244,6 @@ public class PinotDdlRestletResource {
       throw new ControllerApplicationException(LOGGER,
           "Table " + tableNameWithType + " already exists.", Response.Status.CONFLICT);
     }
-
-    // Run the full schema/table validation stack that the existing /tables and /tableConfigs APIs
-    // apply before any ZK write. This catches invalid combinations (upsert without primary keys,
-    // field configs referencing non-existent columns, task configs with bad column references,
-    // etc.) that the compiler alone cannot detect. Runs for both dry-run and live create.
-    validateTableConfig(create.getSchema(), create.getTableConfig());
 
     if (dryRun) {
       response.setMessage("Dry run: validated CREATE TABLE without persisting.");

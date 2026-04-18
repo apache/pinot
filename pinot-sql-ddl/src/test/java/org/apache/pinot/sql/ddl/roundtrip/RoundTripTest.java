@@ -44,7 +44,9 @@ import org.apache.pinot.sql.ddl.reverse.CanonicalDdlEmitter;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -326,9 +328,9 @@ public class RoundTripTest {
     String ddl = CanonicalDdlEmitter.emit(schema, config);
     assertNotNull(ddl);
     // The emitted granularity must reflect the actual timeUnitSize (15), not a hardcoded 1.
-    assertEquals(ddl.contains("15:MINUTES"), true,
+    assertTrue(ddl.contains("15:MINUTES"),
         "Expected granularity '15:MINUTES' in DDL but got:\n" + ddl);
-    assertEquals(ddl.contains("1:MINUTES"), false,
+    assertFalse(ddl.contains("1:MINUTES"),
         "Unexpected hardcoded '1:MINUTES' in DDL:\n" + ddl);
     // The emitted DDL must also be parseable/compileable without error.
     CompiledCreateTable compiled = (CompiledCreateTable) DdlCompiler.compile(ddl);
