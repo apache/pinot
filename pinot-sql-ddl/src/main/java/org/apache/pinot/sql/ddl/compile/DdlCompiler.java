@@ -325,6 +325,18 @@ public final class DdlCompiler {
     if (sortedColumns != null && sortedColumns.size() > 1) {
       tableConfig.getIndexingConfig().setSortedColumn(sortedColumns);
     }
+    // replicasPerPartition is not exposed on TableConfigBuilder; apply post-build if present.
+    // Use the same case-fold as PropertyMapping so any accepted casing is honoured.
+    String replicasPerPartition = null;
+    for (Map.Entry<String, String> e : resolved.getProperties().entrySet()) {
+      if ("replicasperpartition".equals(e.getKey().toLowerCase(Locale.ROOT))) {
+        replicasPerPartition = e.getValue();
+        break;
+      }
+    }
+    if (replicasPerPartition != null) {
+      tableConfig.getValidationConfig().setReplicasPerPartition(replicasPerPartition);
+    }
     return tableConfig;
   }
 

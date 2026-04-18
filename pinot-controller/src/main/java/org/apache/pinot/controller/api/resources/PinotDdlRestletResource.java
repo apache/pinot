@@ -236,7 +236,9 @@ public class PinotDdlRestletResource {
     // semantically valid statements; invalid DDL is always rejected regardless of IF NOT EXISTS.
     validateTableConfig(create.getSchema(), create.getTableConfig());
 
-    if (!dryRun && _pinotHelixResourceManager.hasTable(tableNameWithType)) {
+    // Check existence for both live and dry-run paths: dry-run must faithfully predict conflicts
+    // so callers can use it for pre-deployment validation ("would this DDL succeed?").
+    if (_pinotHelixResourceManager.hasTable(tableNameWithType)) {
       if (create.isIfNotExists()) {
         response.setMessage("Table " + tableNameWithType + " already exists; CREATE IF NOT EXISTS is a no-op.");
         return response;
@@ -303,9 +305,15 @@ public class PinotDdlRestletResource {
       // The override=false addSchema call lost a race with another schema writer. Surface 409.
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
-      // Roll back the schema we created in this call so we don't leak partial state. We only
-      // touch the schema when this call created it; a pre-existing schema is left alone.
-      rollbackSchemaIfCreated(schemaName, schemaCreatedHere);
+      // Only roll back the schema if no table for this raw name now exists. A concurrent request
+      // may have added the sibling physical variant (OFFLINE vs REALTIME) between our addSchema()
+      // and this addTable() failure; deleting the schema would orphan that live table. Check both
+      // typed variants before deciding to remove the shared schema.
+      if (schemaCreatedHere) {
+        boolean offlineNowExists = _pinotHelixResourceManager.hasOfflineTable(schemaName);
+        boolean realtimeNowExists = _pinotHelixResourceManager.hasRealtimeTable(schemaName);
+        rollbackSchemaIfCreated(schemaName, !offlineNowExists && !realtimeNowExists);
+      }
       // ControllerApplicationException(LOGGER, ...) logs the exception, so don't double-log here.
       throw new ControllerApplicationException(LOGGER,
           "Failed to create table " + tableNameWithType + ": " + e.getMessage(),
@@ -429,17 +437,34 @@ public class PinotDdlRestletResource {
       }
     }
 
-    try {
-      for (String target : targets) {
+    // Drop each target individually and track outcomes. A failure on one variant should not
+    // prevent the response from reporting what was already deleted — partial deletes on a hybrid
+    // table are expensive to recover from, so we surface per-target status instead of surfacing
+    // only the first failure and hiding the rest.
+    List<String> dropped = new ArrayList<>();
+    List<String> failed = new ArrayList<>();
+    Exception firstFailure = null;
+    for (String target : targets) {
+      try {
         // Remove task schedules before deletion so tasks are not triggered during the drop.
         PinotTableRestletResource.tableTasksCleanup(target, false,
             _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
         TableType type = TableNameBuilder.getTableTypeFromTableName(target);
         _pinotHelixResourceManager.deleteTable(fullyQualifiedRaw, type, null);
+        dropped.add(target);
+        LOGGER.info("DDL dropped table {}", target);
+      } catch (Exception e) {
+        LOGGER.error("Failed to drop table {} during DDL DROP TABLE", target, e);
+        failed.add(target);
+        if (firstFailure == null) {
+          firstFailure = e;
+        }
       }
-      // Delete the shared schema when the last physical variant has been removed. A schema
-      // without any table leaves stale metadata that blocks future CREATE TABLE for the same
-      // raw name with a different column list.
+    }
+    // Delete the shared schema when the last physical variant has been removed. A schema
+    // without any table leaves stale metadata that blocks future CREATE TABLE for the same
+    // raw name with a different column list. Only attempt if all targets were deleted.
+    if (failed.isEmpty()) {
       boolean offlineExists = _pinotHelixResourceManager.hasOfflineTable(fullyQualifiedRaw);
       boolean realtimeExists = _pinotHelixResourceManager.hasRealtimeTable(fullyQualifiedRaw);
       if (!offlineExists && !realtimeExists) {
@@ -451,17 +476,18 @@ public class PinotDdlRestletResource {
               fullyQualifiedRaw, schemaEx);
         }
       }
-      response.setMessage("Dropped " + targets.size() + " table(s).");
-      LOGGER.info("DDL dropped tables {}", targets);
+      response.setMessage("Dropped " + dropped.size() + " table(s).");
+      LOGGER.info("DDL dropped tables {}", dropped);
       return response;
-    } catch (ControllerApplicationException e) {
-      throw e;
-    } catch (Exception e) {
-      // ControllerApplicationException(LOGGER, ...) logs the exception itself; don't double-log.
-      throw new ControllerApplicationException(LOGGER,
-          "Failed to drop table " + fullyQualifiedRaw + ": " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+    // At least one target failed. Surface a structured error that names both what succeeded
+    // and what failed so the operator knows which variant needs manual cleanup.
+    String causeDesc = firstFailure.getMessage() != null
+        ? firstFailure.getMessage() : firstFailure.getClass().getSimpleName();
+    String msg = "Partial DROP TABLE: dropped " + dropped + ", failed to drop " + failed
+        + ": " + causeDesc;
+    throw new ControllerApplicationException(LOGGER, msg,
+        Response.Status.INTERNAL_SERVER_ERROR, firstFailure);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -533,7 +559,18 @@ public class PinotDdlRestletResource {
 
     // Use the resolved database (which incorporates the Database header) so the emitted DDL
     // carries the correct qualifier even when the caller omits the db. prefix in the SQL.
-    String ddl = CanonicalDdlEmitter.emit(schema, tableConfig, database);
+    String ddl;
+    try {
+      ddl = CanonicalDdlEmitter.emit(schema, tableConfig, database);
+    } catch (IllegalArgumentException e) {
+      // SchemaEmitter.validateEmittable() throws IllegalArgumentException for unsupported column
+      // types (MAP, LIST, STRUCT, UNKNOWN) that the current DDL grammar cannot represent. Return
+      // 400 so the caller sees a deterministic client error rather than a 500.
+      throw new ControllerApplicationException(LOGGER,
+          "SHOW CREATE TABLE is not supported for table " + tableNameWithType
+              + ": " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
+    }
 
     return new DdlExecutionResponse()
         .setOperation(DdlOperation.SHOW_CREATE_TABLE)
