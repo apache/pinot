@@ -26,6 +26,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
 
 
 /**
@@ -41,18 +42,59 @@ final class SchemaEmitter {
   private SchemaEmitter() {
   }
 
+  /**
+   * Returns canonical column declarations for all fields in {@code schema}.
+   *
+   * <p>Fails fast with {@link IllegalArgumentException} for MAP/LIST/STRUCT columns because those
+   * types have no DDL representation yet; emitting incomplete DDL for them would produce a
+   * statement that silently drops part of the schema on replay.
+   */
   static List<String> emitColumns(Schema schema) {
     List<String> out = new ArrayList<>();
     for (DimensionFieldSpec dim : schema.getDimensionFieldSpecs()) {
+      validateEmittable(dim);
       out.add(emitColumn(dim));
     }
     for (MetricFieldSpec metric : schema.getMetricFieldSpecs()) {
+      validateEmittable(metric);
       out.add(emitColumn(metric));
     }
     for (DateTimeFieldSpec dt : schema.getDateTimeFieldSpecs()) {
       out.add(emitColumn(dt));
     }
+    // Legacy time field: emit as a DATETIME column so the column is not silently dropped.
+    TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
+    if (timeFieldSpec != null) {
+      out.add(emitTimeColumn(timeFieldSpec));
+    }
     return out;
+  }
+
+  private static void validateEmittable(FieldSpec spec) {
+    DataType dt = spec.getDataType();
+    if (dt == DataType.MAP || dt == DataType.LIST || dt == DataType.STRUCT
+        || dt == DataType.UNKNOWN) {
+      throw new IllegalArgumentException(
+          "SHOW CREATE TABLE cannot represent column '" + spec.getName() + "' of type " + dt
+              + " in DDL; replay of the emitted DDL would silently drop this column. "
+              + "The DDL grammar does not yet support complex types.");
+    }
+  }
+
+  private static String emitTimeColumn(TimeFieldSpec spec) {
+    // Emit the legacy time column as a DATETIME column so it survives a round-trip.
+    // Use the outgoing granularity spec to derive format and granularity strings matching
+    // the DateTimeFieldSpec convention ({size}:{unit}:{format}).
+    org.apache.pinot.spi.data.TimeGranularitySpec tgs = spec.getOutgoingGranularitySpec();
+    String format = tgs.getTimeUnitSize() + ":" + tgs.getTimeType().name() + ":"
+        + tgs.getTimeFormat();
+    String granularity = "1:" + tgs.getTimeType().name();
+    StringBuilder sb = new StringBuilder();
+    sb.append(SqlIdentifiers.quote(spec.getName()));
+    sb.append(' ').append(emitDataType(spec.getDataType()));
+    sb.append(" DATETIME FORMAT ").append(SqlIdentifiers.quoteString(format));
+    sb.append(" GRANULARITY ").append(SqlIdentifiers.quoteString(granularity));
+    return sb.toString();
   }
 
   private static String emitColumn(FieldSpec spec) {

@@ -292,8 +292,14 @@ public final class DdlCompiler {
         : resolved.getDatabaseName() + "." + resolved.getRawTableName();
     TableConfigBuilder builder = new TableConfigBuilder(resolved.getTableType())
         .setTableName(tableNameForConfig);
-    PropertyMapping.apply(resolved, builder);
-    return builder.build();
+    List<String> sortedColumns = PropertyMapping.apply(resolved, builder);
+    TableConfig tableConfig = builder.build();
+    // Apply the full sorted-column list if more than one column was specified; the builder's
+    // setSortedColumn(String) wraps in singletonList and loses the remaining columns.
+    if (sortedColumns != null && sortedColumns.size() > 1) {
+      tableConfig.getIndexingConfig().setSortedColumn(sortedColumns);
+    }
+    return tableConfig;
   }
 
   /**
