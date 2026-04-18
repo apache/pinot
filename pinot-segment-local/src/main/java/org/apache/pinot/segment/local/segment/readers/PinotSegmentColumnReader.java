@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -44,6 +45,7 @@ public class PinotSegmentColumnReader implements Closeable {
   private final DataType _valueType;
   @Nullable
   private final String _columnName;
+  private final DataType _logicalValueType;
 
   public PinotSegmentColumnReader(IndexSegment indexSegment, String column) {
     DataSource dataSource = indexSegment.getDataSource(column);
@@ -54,6 +56,7 @@ public class PinotSegmentColumnReader implements Closeable {
     _nullValueVectorReader = dataSource.getNullValueVector();
     _valueType = _dictionary != null ? _dictionary.getValueType() : _forwardIndexReader.getStoredType();
     _columnName = column;
+    _logicalValueType = dataSource.getDataSourceMetadata().getFieldSpec().getDataType();
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
@@ -71,6 +74,7 @@ public class PinotSegmentColumnReader implements Closeable {
     _nullValueVectorReader = nullValueVectorReader;
     _valueType = _dictionary != null ? _dictionary.getValueType() : _forwardIndexReader.getStoredType();
     _columnName = column;
+    _logicalValueType = _valueType;
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
@@ -641,8 +645,11 @@ public class PinotSegmentColumnReader implements Closeable {
         return _forwardIndexReader.getString(docId1, _forwardIndexReaderContext)
             .compareTo(_forwardIndexReader.getString(docId2, _forwardIndexReaderContext));
       case BYTES:
-        return ByteArray.compare(_forwardIndexReader.getBytes(docId1, _forwardIndexReaderContext),
-            _forwardIndexReader.getBytes(docId2, _forwardIndexReaderContext));
+        return _logicalValueType == DataType.UUID
+            ? UuidUtils.compare(_forwardIndexReader.getBytes(docId1, _forwardIndexReaderContext),
+                _forwardIndexReader.getBytes(docId2, _forwardIndexReaderContext))
+            : ByteArray.compare(_forwardIndexReader.getBytes(docId1, _forwardIndexReaderContext),
+                _forwardIndexReader.getBytes(docId2, _forwardIndexReaderContext));
       default:
         throw new IllegalStateException("Unsupported SV no-dictionary column type for comparison: " + _valueType);
     }

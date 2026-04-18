@@ -219,6 +219,7 @@ public class JsonResponseEncoder implements ResponseEncoder {
         return Double.valueOf(jsonValue.asDouble()).floatValue();
       case DOUBLE:
         return jsonValue.asDouble();
+      case UUID:
       case BIG_DECIMAL:
       case TIMESTAMP:
       case STRING:

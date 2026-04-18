@@ -338,6 +338,11 @@ public class PRelToPlanNodeConverter {
       case CHAR:
       case VARCHAR:
         return isArray ? ColumnDataType.STRING_ARRAY : ColumnDataType.STRING;
+      case UUID:
+        if (isArray) {
+          throw new IllegalArgumentException("UUID arrays are not supported: " + relDataType);
+        }
+        return ColumnDataType.UUID;
       case BINARY:
       case VARBINARY:
         return isArray ? ColumnDataType.BYTES_ARRAY : ColumnDataType.BYTES;

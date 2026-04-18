@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -108,6 +109,26 @@ public class JsonResponseEncoderTest {
         assertEquals(actual, expected, "Row " + (i + 1) + " should match");
       }
     }
+  }
+
+  @Test
+  public void testEncodeDecodeUuidColumn() throws IOException {
+    DataSchema schema = new DataSchema(
+        new String[] {"uuidCol"},
+        new ColumnDataType[] {ColumnDataType.UUID});
+    String uuidValue = "550e8400-e29b-41d4-a716-446655440000";
+
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[] {ColumnDataType.UUID.format(UUID.fromString(uuidValue))});
+
+    ResultTable resultTable = new ResultTable(schema, rows);
+    JsonResponseEncoder encoder = new JsonResponseEncoder();
+
+    byte[] encodedBytes = encoder.encodeResultTable(resultTable, 0, rows.size());
+    ResultTable decodedTable = encoder.decodeResultTable(encodedBytes, rows.size(), schema);
+
+    assertEquals(decodedTable.getRows().size(), 1, "Row count should be 1");
+    assertEquals(decodedTable.getRows().get(0)[0], uuidValue, "UUID value should round-trip as canonical string");
   }
 
   @Test
