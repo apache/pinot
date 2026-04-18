@@ -24,6 +24,7 @@ on:
 
 jobs:
   generate-superset-info:
+    if: github.repository == 'apache/pinot'
     name: Generate Superset Build Info
     runs-on: ubuntu-24.04
     outputs:
