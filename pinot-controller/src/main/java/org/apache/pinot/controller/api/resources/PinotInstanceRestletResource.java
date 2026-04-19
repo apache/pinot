@@ -56,6 +56,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -166,6 +167,9 @@ public class PinotInstanceRestletResource {
         CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
     response.put(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, shutdownInProgress);
     response.put("systemResourceInfo", JsonUtils.objectToJsonNode(getSystemResourceInfo(instanceConfig)));
+    String pinotVersion =
+        instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY);
+    response.put("version", pinotVersion != null ? pinotVersion : PinotVersion.UNKNOWN);
     return response.toString();
   }
 

@@ -120,6 +120,9 @@ import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
+import org.apache.pinot.controller.helix.core.version.ClusterVersionHealthCheckTask;
+import org.apache.pinot.controller.helix.core.version.VersionCompatibilityService;
+import org.apache.pinot.controller.helix.core.version.VersionCompatibilityServiceImpl;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.services.PinotTableReloadService;
 import org.apache.pinot.controller.services.PinotTableReloadStatusReporter;
@@ -238,6 +241,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
+  protected VersionCompatibilityServiceImpl _versionCompatibilityService;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -602,6 +606,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
     _helixResourceManager.start(_helixParticipantManager, _controllerMetrics);
 
+    LOGGER.info("Initializing version compatibility service");
+    _versionCompatibilityService = new VersionCompatibilityServiceImpl(_helixResourceManager, _config);
+
     // Initialize segment lifecycle event listeners
     PinotSegmentLifecycleEventListenerManager.getInstance().init(_helixParticipantManager);
 
@@ -678,6 +685,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_pinotLLCRealtimeSegmentManager);
     LOGGER.info("Registered PinotLLCRealtimeSegmentManager as cluster config change listener");
 
+    // The version compatibility service needs runtime TTL updates from cluster config.
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_versionCompatibilityService);
+    LOGGER.info("Registered VersionCompatibilityService as cluster config change listener");
+
     LOGGER.info("Init controller periodic tasks scheduler");
     _periodicTaskScheduler = new PeriodicTaskScheduler();
     _periodicTaskScheduler.init(controllerPeriodicTasks);
@@ -729,6 +740,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_tableSizeReader).to(TableSizeReader.class);
         bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
+        bind(_versionCompatibilityService).to(VersionCompatibilityService.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
 
         bindAsContract(PinotTableReloadService.class).in(Singleton.class);
@@ -1056,6 +1068,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     PeriodicTask tenantRebalanceChecker =
         new TenantRebalanceChecker(_config, _helixResourceManager, _tenantRebalancer);
     periodicTasks.add(tenantRebalanceChecker);
+    ClusterVersionHealthCheckTask versionHealthCheckTask =
+        new ClusterVersionHealthCheckTask(_leadControllerManager, _config, _versionCompatibilityService);
+    periodicTasks.add(versionHealthCheckTask);
 
     return periodicTasks;
   }
