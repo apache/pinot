@@ -259,7 +259,7 @@ public class IndexLoadingConfigTest {
     IndexLoadingConfig base = new IndexLoadingConfig(idmCfg, tableConfig, schema);
     base.setTableDataDir("/tmp/table");
     base.setSegmentTier("hot");
-    base.setReadMode(ReadMode.MMAP);
+    base.setReadMode(ReadMode.mmap);
 
     IndexLoadingConfig copy = base.copy();
     assertSame(copy.getTableConfig(), base.getTableConfig());
