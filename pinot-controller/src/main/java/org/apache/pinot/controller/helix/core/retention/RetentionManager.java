@@ -492,9 +492,12 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       segmentsToDelete.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(tableNameWithType));
     }
-    // Delete segments based on the segment lineage
+    // Delete segments based on the segment lineage.
+    // Pass deletedSegmentsRetentionPeriod from table config so REFRESH tables (which are skipped by
+    // manageRetentionForTable) can honour per-table staging retention, including "0d" for immediate deletion.
     if (!segmentsToDelete.isEmpty()) {
-      _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+      String retentionPeriod = tableConfig.getValidationConfig().getDeletedSegmentsRetentionPeriod();
+      _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete, retentionPeriod);
       LOGGER.info("Finished cleaning up segment lineage for table: {} in {}ms, deleted segments: {}",
           tableNameWithType, (System.currentTimeMillis() - cleanupStartTime), segmentsToDelete);
     }
