@@ -256,12 +256,16 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
+    // For dictionary-encoded expression, offer dictionary values directly to HyperLogLog.
+    // Unlike the non-group-by aggregation path (where a single BitSet over the full dict is cheap), the group-by
+    // path creates one result per group. Pre-allocating a BitSet of dictSize/8 bytes per group would multiply memory
+    // usage by numGroups (e.g. 100K groups × 375KB = 37.5GB for a 3M-entry dict). Since HLL is an approximation and
+    // max-register semantics make duplicate offers a no-op, deduplication is unnecessary here.
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
-        getDictIdBitSet(groupByResultHolder, groupKeyArray[i], dictionary).set(dictIds[i]);
+        getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(dictionary.get(dictIds[i]));
       }
       return;
     }
@@ -305,13 +309,15 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
+    // For dictionary-encoded expression, offer dictionary values directly to HyperLogLog (see aggregateSVGroupBySV).
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
-        DictIdsWrapper dictIdsWrapper = getDictIdBitSet(groupByResultHolder, groupKeyArray[i], dictionary);
-        dictIdsWrapper.addDictIds(dictIds[i]);
+        HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+        for (int dictId : dictIds[i]) {
+          hyperLogLog.offer(dictionary.get(dictId));
+        }
       }
       return;
     }
@@ -406,14 +412,14 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
+    // For dictionary-encoded expression, offer dictionary values directly to HyperLogLog (see aggregateSVGroupBySV).
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
-        int dictId = dictIds[i];
+        Object value = dictionary.get(dictIds[i]);
         for (int groupKey : groupKeysArray[i]) {
-          getDictIdBitSet(groupByResultHolder, groupKey, dictionary).set(dictId);
+          getHyperLogLog(groupByResultHolder, groupKey).offer(value);
         }
       }
       return;
@@ -458,14 +464,17 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
+    // For dictionary-encoded expression, offer dictionary values directly to HyperLogLog (see aggregateSVGroupBySV).
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
         int[] rowDictIds = dictIds[i];
         for (int groupKey : groupKeysArray[i]) {
-          getDictIdBitSet(groupByResultHolder, groupKey, dictionary).addDictIds(rowDictIds);
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+          for (int dictId : rowDictIds) {
+            hyperLogLog.offer(dictionary.get(dictId));
+          }
         }
       }
       return;
@@ -556,18 +565,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   @Override
   public HyperLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    Object result = groupByResultHolder.getResult(groupKey);
-    if (result == null) {
-      return new HyperLogLog(_log2m);
-    }
-
-    if (result instanceof DictIdsWrapper) {
-      // For dictionary-encoded expression, convert dictionary ids to HyperLogLog
-      return convertToHyperLogLog((DictIdsWrapper) result);
-    } else {
-      // For non-dictionary-encoded expression, directly return the HyperLogLog
-      return (HyperLogLog) result;
-    }
+    HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+    return hyperLogLog != null ? hyperLogLog : new HyperLogLog(_log2m);
   }
 
   @Override
@@ -658,19 +657,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       aggregationResultHolder.setValue(hyperLogLog);
     }
     return hyperLogLog;
-  }
-
-  /**
-   * Returns the {@link DictIdsWrapper} for the given group key, creating a new one if absent.
-   */
-  protected static DictIdsWrapper getDictIdBitSet(GroupByResultHolder groupByResultHolder, int groupKey,
-      Dictionary dictionary) {
-    DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
-    if (dictIdsWrapper == null) {
-      dictIdsWrapper = new DictIdsWrapper(dictionary);
-      groupByResultHolder.setValueForKey(groupKey, dictIdsWrapper);
-    }
-    return dictIdsWrapper;
   }
 
   /**
