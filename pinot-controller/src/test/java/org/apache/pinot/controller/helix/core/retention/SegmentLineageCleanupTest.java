@@ -45,6 +45,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 
 
 public class SegmentLineageCleanupTest {
@@ -184,6 +185,22 @@ public class SegmentLineageCleanupTest {
     _retentionManager.processTable(REFRESH_OFFLINE_TABLE_NAME);
     assertEquals(getNumSegments(REFRESH_OFFLINE_TABLE_NAME), 6);
     assertEquals(_resourceManager.getSegmentsFor(REFRESH_OFFLINE_TABLE_NAME, true).size(), 3);
+
+    // Validate the case when the lineage entry state is 'COMPLETED' — old segments should be deleted.
+    // Timestamp must be older than REPLACED_SEGMENTS_RETENTION_IN_MILLIS (1 day) for REFRESH tables.
+    SegmentLineage completedLineage = new SegmentLineage(REFRESH_OFFLINE_TABLE_NAME);
+    completedLineage.addLineageEntry("0", new LineageEntry(Arrays.asList("segment1_0", "segment1_1", "segment1_2"),
+        Arrays.asList("segment2_0", "segment2_1", "segment2_2"),
+        LineageEntryState.COMPLETED, System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2)));
+    SegmentLineageAccessHelper.writeSegmentLineage(_resourceManager.getPropertyStore(), completedLineage, -1);
+    _retentionManager.processTable(REFRESH_OFFLINE_TABLE_NAME);
+
+    TestUtils.waitForCondition(aVoid -> getNumSegments(REFRESH_OFFLINE_TABLE_NAME) == 3, 60_000L,
+        "Failed to delete old segments for REFRESH table after COMPLETED lineage entry");
+    List<String> remaining = getSegments(REFRESH_OFFLINE_TABLE_NAME);
+    for (String seg : Arrays.asList("segment1_0", "segment1_1", "segment1_2")) {
+      assertFalse(remaining.contains(seg));
+    }
   }
 
   @AfterClass
