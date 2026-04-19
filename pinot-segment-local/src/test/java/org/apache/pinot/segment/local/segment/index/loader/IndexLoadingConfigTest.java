@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -248,7 +249,7 @@ public class IndexLoadingConfigTest {
   }
 
   @Test
-  public void testCopySharesTableConfigAndIndependentSegmentTier() {
+  public void testCopyPreservesMutableStateAndIndependentTier() {
     InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
     when(idmCfg.getConfig()).thenReturn(new PinotConfiguration());
     Schema schema =
@@ -258,11 +259,13 @@ public class IndexLoadingConfigTest {
     IndexLoadingConfig base = new IndexLoadingConfig(idmCfg, tableConfig, schema);
     base.setTableDataDir("/tmp/table");
     base.setSegmentTier("hot");
+    base.setReadMode(ReadMode.MMAP);
 
     IndexLoadingConfig copy = base.copy();
     assertSame(copy.getTableConfig(), base.getTableConfig());
     assertSame(copy.getSchema(), base.getSchema());
     assertEquals(copy.getTableDataDir(), base.getTableDataDir());
+    assertEquals(copy.getReadMode(), base.getReadMode());
     assertNull(copy.getSegmentTier());
 
     copy.setSegmentTier("cold");
