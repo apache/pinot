@@ -538,6 +538,43 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   /**
+   * Array literals (ARRAY[...]) propagate their inferred element type so comparisons with multi-valued columns
+   * dispatch to the typed array overloads (e.g. {@code stringArrayEquals}) instead of falling back to
+   * {@code doubleEqualsWithTolerance}, which would throw or misbehave on non-numeric arrays.
+   */
+  @Test
+  public void testStringArrayLiteralEqualityWithSchema() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+        .build();
+    String expression = "CASE WHEN tags = ARRAY['a', 'b'] THEN 'match' ELSE 'no_match' END";
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("tags", new String[]{"a", "b"});
+    assertEquals(evaluator.evaluate(row), "match");
+
+    row.putValue("tags", new String[]{"a", "c"});
+    assertEquals(evaluator.evaluate(row), "no_match");
+  }
+
+  /**
+   * Mixed-type array literals cannot be unified to a single element type, so polymorphic dispatch falls back
+   * to arity-based lookup. Ensures the mixed-type case doesn't throw and the existing behavior is preserved.
+   */
+  @Test
+  public void testMixedTypeArrayLiteralFallsBackToArityLookup() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("nums", FieldSpec.DataType.INT)
+        .build();
+    // ARRAY[1, 'a'] has mixed INT/STRING — type can't be inferred, so we fall back to arity-based lookup.
+    // The check itself is just that planning doesn't blow up; runtime behavior is preserved.
+    String expression = "CASE WHEN nums = ARRAY[1, 'a'] THEN 'match' ELSE 'no_match' END";
+    // Constructing the evaluator is the real assertion — it must not throw during planning.
+    new InbuiltFunctionEvaluator(expression, schema);
+  }
+
+  /**
    * Test that a column not in the schema (e.g., intermediate derived column) falls back gracefully.
    */
   @Test

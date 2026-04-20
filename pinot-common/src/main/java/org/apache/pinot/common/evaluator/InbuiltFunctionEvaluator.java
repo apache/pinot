@@ -106,7 +106,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
             for (ExpressionContext lit : arguments) {
               values[i++] = lit.getLiteral().getValue();
             }
-            return new ArrayConstantExecutionNode(values);
+            return new ArrayConstantExecutionNode(values, resolveArrayLiteralType(arguments));
           default:
             FunctionInfo functionInfo = resolveFunction(canonicalName, functionName, childNodes, numArguments);
             return new FunctionExecutionNode(functionInfo, childNodes);
@@ -170,6 +170,44 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       return null;
     }
     return ColumnDataType.fromDataType(type, literal.isSingleValue());
+  }
+
+  /**
+   * Infers the {@link ColumnDataType} of an ARRAY[...] literal by unifying the element types. Returns {@code null}
+   * when the type cannot be determined — mixed element types, non-literal arguments, nested arrays, all-null or empty
+   * arrays, or element types that do not have an array variant (e.g. BIG_DECIMAL, JSON, MAP).
+   */
+  @Nullable
+  static ColumnDataType resolveArrayLiteralType(List<ExpressionContext> arguments) {
+    DataType elementType = null;
+    for (ExpressionContext arg : arguments) {
+      if (arg.getType() != ExpressionContext.Type.LITERAL) {
+        return null;
+      }
+      LiteralContext lit = arg.getLiteral();
+      if (!lit.isSingleValue()) {
+        return null;
+      }
+      DataType type = lit.getType();
+      if (type == DataType.UNKNOWN) {
+        // Null literal — skip for inference and let non-null siblings determine the element type.
+        continue;
+      }
+      if (elementType == null) {
+        elementType = type;
+      } else if (elementType != type) {
+        return null;
+      }
+    }
+    if (elementType == null) {
+      return null;
+    }
+    try {
+      return ColumnDataType.fromDataType(elementType, false);
+    } catch (IllegalStateException e) {
+      // The element type has no multi-valued variant (e.g. BIG_DECIMAL, JSON, MAP).
+      return null;
+    }
   }
 
   @Nullable
@@ -483,9 +521,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
   private static class ArrayConstantExecutionNode implements ExecutableNode {
     final Object[] _value;
+    @Nullable
+    final ColumnDataType _resultType;
 
-    ArrayConstantExecutionNode(Object[] value) {
+    ArrayConstantExecutionNode(Object[] value, @Nullable ColumnDataType resultType) {
       _value = value;
+      _resultType = resultType;
     }
 
     @Override
@@ -501,7 +542,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Nullable
     @Override
     public ColumnDataType getResultType() {
-      return null;
+      return _resultType;
     }
 
     @Override
