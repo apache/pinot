@@ -266,7 +266,7 @@ public class IndexLoadingConfigTest {
     assertSame(copy.getSchema(), base.getSchema());
     assertEquals(copy.getTableDataDir(), base.getTableDataDir());
     assertEquals(copy.getReadMode(), base.getReadMode());
-    assertNull(copy.getSegmentTier());
+    assertEquals(copy.getSegmentTier(), base.getSegmentTier());
 
     copy.setSegmentTier("cold");
     assertEquals(base.getSegmentTier(), "hot");
