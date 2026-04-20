@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>pinot</artifactId>
+    <groupId>org.apache.pinot</groupId>
+    <version>1.6.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>pinot-spark-4</artifactId>
+  <packaging>pom</packaging>
+  <name>Pinot Spark 4</name>
+  <url>https://pinot.apache.org/</url>
+  <description>
+    Umbrella module for Apache Spark 4.x integrations (connector and batch ingestion).
+    Only built when JDK >= 21 and Scala 2.13 are active. The Spark 3 counterparts stay
+    under pinot-connectors/pinot-spark-3-connector and
+    pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-3.
+  </description>
+
+  <properties>
+    <pinot.root>${basedir}/..</pinot.root>
+    <!-- Spark 4 requires JDK 17+; Pinot builds the produced jars on JDK 21 (class file 65),
+         so these artifacts require a JDK 21+ runtime. -->
+    <jdk.version>21</jdk.version>
+    <plugin.type>pinot-batch-ingestion</plugin.type>
+  </properties>
+
+  <modules>
+    <module>pinot-spark-4-connector</module>
+    <module>pinot-batch-ingestion-spark-4</module>
+  </modules>
+
+  <build>
+    <plugins>
+      <!-- Hard-fail early with a clear message on JDK 17/11 or Scala 2.12 instead of letting
+           an obscure Maven resolution error leak through. The JDK-21 module activation in the
+           root pom already gates this module out of older builds, but this enforcer catches
+           someone invoking `./mvnw -pl pinot-spark-4` directly. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-spark4-prereqs</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[21,)</version>
+                  <message>pinot-spark-4 requires JDK 21 or newer. Use the Spark 3 modules for older JDKs.</message>
+                </requireJavaVersion>
+                <requireProperty>
+                  <property>scala.compat.version</property>
+                  <regex>^2\.13$</regex>
+                  <regexMessage>pinot-spark-4 requires Scala 2.13 (Apache Spark 4 does not publish Scala 2.12 artifacts). Remove -Pscala-2.12 or exclude this module.</regexMessage>
+                </requireProperty>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
