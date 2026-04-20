@@ -20,6 +20,7 @@
 package org.apache.pinot.segment.spi.index;
 
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
+import org.apache.pinot.segment.spi.index.creator.ColumnarMapIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
@@ -31,6 +32,7 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
+import org.apache.pinot.segment.spi.index.reader.ColumnarMapIndexReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
@@ -41,6 +43,7 @@ import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.ColumnarMapIndexConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 
@@ -79,6 +82,7 @@ public class StandardIndexes {
   public static final String TEXT_ID = "text_index";
   public static final String H3_ID = "h3_index";
   public static final String VECTOR_ID = "vector_index";
+  public static final String COLUMNAR_MAP_ID = "columnar_map_index";
 
   private StandardIndexes() {
   }
@@ -141,5 +145,11 @@ public class StandardIndexes {
   public static IndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator> vector() {
     return (IndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator>)
         IndexService.getInstance().get(VECTOR_ID);
+  }
+
+  @SuppressWarnings("unchecked")
+  public static IndexType<ColumnarMapIndexConfig, ColumnarMapIndexReader, ColumnarMapIndexCreator> columnarMap() {
+    return (IndexType<ColumnarMapIndexConfig, ColumnarMapIndexReader, ColumnarMapIndexCreator>)
+        IndexService.getInstance().get(COLUMNAR_MAP_ID);
   }
 }
