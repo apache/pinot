@@ -66,17 +66,5 @@ public class ColumnarDataBlock extends BaseDataBlock {
     return _fixDataSize;
   }
 
-  /**
-   * Returns the byte offset of column {@code colId} within the fixed-size data buffer.
-   */
-  public int getColumnByteOffset(int colId) {
-    return _cumulativeColumnOffsetSizeInBytes[colId];
-  }
-
-  /**
-   * Returns the byte size per element for column {@code colId} (e.g. 4 for INT, 8 for LONG).
-   */
-  public int getColumnElementSize(int colId) {
-    return _columnSizeInBytes[colId];
-  }
+  // TODO: add whole-column access methods.
 }

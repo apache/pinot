@@ -257,8 +257,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
     @Override
     public DataBlock visit(ArrowBlock block, List<DataBuffer> serializedStats) {
-      // Convert to row-heap then serialize via the existing gRPC path
-      return visit(block.asRowHeap(), serializedStats);
+      // No operator currently produces ArrowBlocks, so the gRPC sender is never invoked with one.
+      // When ArrowBlocks start flowing to this mailbox, they should travel via Arrow Flight (zero-copy,
+      // allocator-to-allocator transfer) rather than being flattened through the gRPC DataBlock path.
+      throw new UnsupportedOperationException(
+          "GrpcSendingMailbox does not support ArrowBlocks; Arrow transport will go via Flight");
     }
 
     @Override

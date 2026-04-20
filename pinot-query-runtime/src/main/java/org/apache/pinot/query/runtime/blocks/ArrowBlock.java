@@ -19,14 +19,10 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.NullVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.dictionary.Dictionary;
-import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 
@@ -34,22 +30,26 @@ import org.apache.pinot.common.utils.DataSchema;
 /**
  * An {@link MseBlock.Data} backed by an Apache Arrow {@link VectorSchemaRoot}.
  *
- * <p>This is the primary columnar block type for the Multi-Stage Query Engine. All operators that can produce
- * Arrow data should return an {@code ArrowBlock}; conversion to {@link RowHeapDataBlock} or
- * {@link SerializedDataBlock} is available via the deprecated methods for backward-compatibility with operators
- * that have not yet been Arrow-ified.
+ * <p>This is the columnar block type for the Multi-Stage Query Engine when Arrow is enabled. The
+ * {@link #asRowHeap()} and {@link #asSerialized()} methods provide a fallback path for operators that
+ * don't yet consume Arrow blocks directly — they materialize the off-heap columnar data into the legacy
+ * row-heap format. These fallback conversions are expensive (every primitive gets boxed, every string
+ * allocated on heap); they exist as a compatibility bridge, not as the intended hot path.
  *
- * <p>Reference counting: the underlying {@link ArrowDataBlock} is reference-counted. Call {@link #retain()} to
- * increment the count before sharing a block across threads or data structures; call {@link #release()} (or
- * {@link #close()}) when done. The off-heap buffers are freed when the count reaches zero.
+ * <p><b>Lifetime:</b> the block's off-heap buffers are owned by the {@code BufferAllocator} used to
+ * construct it (typically a per-query or per-stage child of the root allocator). When that allocator
+ * closes, every block it produced is freed atomically. Individual blocks <em>do not</em> need to be
+ * released by operator code — the allocator is the unit of ownership.
+ *
+ * <p>{@link #close()} is provided for explicit early disposal (e.g. in tests, or when a caller wants to
+ * free a block before its allocator closes). It is <b>not</b> reference-counted; calling it twice will
+ * attempt to close the underlying {@link ArrowDataBlock} twice.
+ *
+ * <p>To move a block across allocator scopes (e.g. across stage boundaries or onto the wire), use
+ * Arrow's {@code TransferPair} API — this is zero-copy and preserves the allocator-ownership invariant.
  */
 public class ArrowBlock implements MseBlock.Data, AutoCloseable {
   private final ArrowDataBlock _dataBlock;
-  private final AtomicInteger _refCount = new AtomicInteger(1);
-
-  public ArrowBlock(VectorSchemaRoot root) {
-    _dataBlock = new ArrowDataBlock(root);
-  }
 
   public ArrowBlock(ArrowDataBlock dataBlock) {
     _dataBlock = dataBlock;
@@ -77,15 +77,31 @@ public class ArrowBlock implements MseBlock.Data, AutoCloseable {
   }
 
   @Override
+  public boolean isSerialized() {
+    return false;
+  }
+
+  @Override
+  public boolean isArrow() {
+    return true;
+  }
+
+  @Override
   public ArrowBlock asArrow() {
     return this;
   }
 
   /**
-   * Materializes the Arrow columnar data into a row-heap block. This is an expensive operation and should only
-   * be used for operators that have not yet been Arrow-ified.
+   * Materializes the Arrow columnar data into a row-heap block. This is the fallback path for operators
+   * that don't yet consume Arrow blocks directly; it is expensive (every primitive gets boxed, every string
+   * allocated on heap).
+   *
+   * <p>The returned {@link RowHeapDataBlock} is independent of this block's off-heap buffers — the caller
+   * may close this block (or let its allocator close) without affecting the row-heap copy. This block is
+   * <em>not</em> closed as a side effect.
+   *
+   * <p>TODO: remove this method once all operators consume {@link ArrowBlock} directly.
    */
-  @Deprecated
   @Override
   public RowHeapDataBlock asRowHeap() {
     int numRows = getNumRows();
@@ -97,17 +113,7 @@ public class ArrowBlock implements MseBlock.Data, AutoCloseable {
       if (vector instanceof NullVector) {
         continue;
       }
-      DictionaryEncoding encoding = vector.getField().getDictionary();
-      if (encoding != null && _dataBlock.getDictionaryProvider() != null) {
-        Dictionary dict = _dataBlock.getDictionaryProvider().lookup(encoding.getId());
-        FieldVector dictVector = dict.getVector();
-        IntVector indexVector = (IntVector) vector;
-        for (int row = 0; row < numRows; row++) {
-          if (!indexVector.isNull(row)) {
-            rows[row][colIdx] = dictVector.getObject(indexVector.get(row)).toString();
-          }
-        }
-      } else if (vector instanceof VarCharVector) {
+      if (vector instanceof VarCharVector) {
         for (int row = 0; row < numRows; row++) {
           Object value = vector.getObject(row);
           if (value != null) {
@@ -120,11 +126,15 @@ public class ArrowBlock implements MseBlock.Data, AutoCloseable {
         }
       }
     }
-    release();
     return new RowHeapDataBlock(Arrays.asList(rows), getDataSchema());
   }
 
-  @Deprecated
+  /**
+   * Materializes the Arrow columnar data into a serialized block by first converting to row-heap. Fallback
+   * path for operators that need serialized output; inherits the cost of {@link #asRowHeap()}.
+   *
+   * <p>TODO: remove this method once all operators consume {@link ArrowBlock} directly.
+   */
   @Override
   public SerializedDataBlock asSerialized() {
     return asRowHeap().asSerialized();
@@ -140,30 +150,8 @@ public class ArrowBlock implements MseBlock.Data, AutoCloseable {
     return "{\"type\": \"arrow\", \"numRows\": " + getNumRows() + "}";
   }
 
-  // ----- reference counting -----
-
-  /** Increments the reference count. Must be paired with a subsequent {@link #release()}. */
-  public void retain() {
-    while (true) {
-      int count = _refCount.get();
-      if (count <= 0) {
-        throw new IllegalStateException("ArrowBlock has already been released");
-      }
-      if (_refCount.compareAndSet(count, count + 1)) {
-        return;
-      }
-    }
-  }
-
-  /** Decrements the reference count, closing the underlying buffers when it reaches zero. */
-  public void release() {
-    if (_refCount.decrementAndGet() == 0) {
-      _dataBlock.close();
-    }
-  }
-
   @Override
   public void close() {
-    release();
+    _dataBlock.close();
   }
 }

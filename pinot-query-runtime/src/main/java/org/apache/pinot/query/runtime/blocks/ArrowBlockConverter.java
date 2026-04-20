@@ -22,9 +22,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.BigIntVector;
+import org.apache.arrow.vector.BitVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.Float4Vector;
 import org.apache.arrow.vector.Float8Vector;
@@ -37,12 +37,10 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
-import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
-import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -50,9 +48,7 @@ import org.roaringbitmap.RoaringBitmap;
  * Converts a legacy {@link DataBlock} (row-heap or serialized columnar) into an {@link ArrowBlock}.
  *
  * <p>Each column is extracted using {@link DataBlockExtractUtils} and written column-by-column into the appropriate
- * Arrow vector. String columns are stored as plain {@code VarCharVector} (no dictionary encoding) for simplicity;
- * the {@link org.apache.pinot.query.runtime.operator.join.ArrowLookupTable} decodes dictionaries during the merge
- * phase anyway.
+ * Arrow vector. String columns are stored as plain {@code VarCharVector} (no dictionary encoding) for simplicity.
  */
 public final class ArrowBlockConverter {
   private ArrowBlockConverter() {
@@ -68,8 +64,12 @@ public final class ArrowBlockConverter {
     if (block instanceof ArrowBlock) {
       return (ArrowBlock) block;
     }
-    DataBlock dataBlock = block.asSerialized().getDataBlock();
     DataSchema schema = block.getDataSchema();
+    // Validate the schema before forcing serialization — a RowHeapDataBlock with an unsupported
+    // column (MAP, BIG_DECIMAL, etc.) should fail fast without paying asSerialized()'s full
+    // row-to-buffer materialization cost.
+    buildArrowSchema(schema);
+    DataBlock dataBlock = block.asSerialized().getDataBlock();
     return fromDataBlock(dataBlock, schema, allocator);
   }
 
@@ -83,32 +83,35 @@ public final class ArrowBlockConverter {
     int numCols = schema.size();
     ColumnDataType[] storedTypes = schema.getStoredColumnDataTypes();
 
-    // Build a non-dictionary Arrow schema (plain VarChar for strings)
-    Schema arrowSchema = buildPlainSchema(schema);
+    Schema arrowSchema = buildArrowSchema(schema);
     VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, allocator);
-
-    for (int colId = 0; colId < numCols; colId++) {
-      FieldVector vector = root.getVector(colId);
-      RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
-      writeColumn(dataBlock, vector, storedTypes[colId], colId, numRows, nullBitmap);
+    // Close the root on any failure during population so partially-allocated off-heap buffers
+    // don't leak for the lifetime of the allocator.
+    try {
+      for (int colId = 0; colId < numCols; colId++) {
+        FieldVector vector = root.getVector(colId);
+        RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
+        writeColumn(dataBlock, vector, storedTypes[colId], colId, numRows, nullBitmap);
+      }
+      root.setRowCount(numRows);
+      return new ArrowBlock(new ArrowDataBlock(root, schema));
+    } catch (Throwable t) {
+      root.close();
+      throw t;
     }
-    root.setRowCount(numRows);
-    return new ArrowBlock(new ArrowDataBlock(root));
   }
 
-  // ----- schema builder (plain VarChar, no dictionary) -----
-
-  private static Schema buildPlainSchema(DataSchema schema) {
+  private static Schema buildArrowSchema(DataSchema schema) {
     List<Field> fields = new ArrayList<>(schema.size());
     String[] names = schema.getColumnNames();
     ColumnDataType[] types = schema.getColumnDataTypes();
     for (int i = 0; i < names.length; i++) {
-      fields.add(buildPlainField(names[i], types[i]));
+      fields.add(buildArrowField(names[i], types[i]));
     }
     return new Schema(fields);
   }
 
-  private static Field buildPlainField(String name, ColumnDataType type) {
+  private static Field buildArrowField(String name, ColumnDataType type) {
     switch (type) {
       case BOOLEAN:
         return Field.nullable(name, new ArrowType.Bool());
@@ -123,14 +126,13 @@ public final class ArrowBlockConverter {
         return Field.nullable(name, new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE));
       case STRING:
       case JSON:
-      case BIG_DECIMAL:
         return Field.nullable(name, new ArrowType.Utf8());
       case BYTES:
-      case MAP:
-      case OBJECT:
         return Field.nullable(name, new ArrowType.Binary());
       default:
-        return Field.nullable(name, new ArrowType.Null());
+        throw new UnsupportedOperationException(
+            "Arrow block conversion does not yet support column type " + type
+                + " (column '" + name + "')");
     }
   }
 
@@ -146,8 +148,13 @@ public final class ArrowBlockConverter {
       return;
     }
 
+    // BOOLEAN columns are backed by BitVector while their stored type is INT; handle them before the
+    // storedType dispatch so we don't ClassCastException casting a BitVector to IntVector.
+    if (vector instanceof BitVector) {
+      writeBitColumn(dataBlock, (BitVector) vector, storedType, colId, numRows, nullBitmap);
+      return;
+    }
     switch (storedType) {
-      case BOOLEAN:
       case INT:
         writeIntColumn(dataBlock, (IntVector) vector, storedType, colId, numRows, nullBitmap);
         break;
@@ -163,62 +170,32 @@ public final class ArrowBlockConverter {
         break;
       case STRING:
       case JSON:
-      case BIG_DECIMAL:
         writeStringColumn(dataBlock, (VarCharVector) vector, storedType, colId, numRows, nullBitmap);
         break;
       case BYTES:
         writeBytesColumn(dataBlock, (VarBinaryVector) vector, colId, numRows, nullBitmap);
         break;
       default:
-        vector.setValueCount(numRows);
-        break;
+        // Should never be reached — buildArrowField already rejects unsupported types.
+        throw new UnsupportedOperationException("Arrow block conversion does not support type " + storedType);
     }
   }
 
-  /**
-   * Fast path for ColumnarDataBlock: copy 4-byte values with endian swap directly into the Arrow buffer.
-   * Returns true if the fast path was taken.
-   */
-  private static boolean tryDirectCopy4(DataBlock dataBlock, FieldVector vector, int colId, int numRows,
-      @Nullable RoaringBitmap nullBitmap) {
-    if (!(dataBlock instanceof ColumnarDataBlock) || nullBitmap != null) {
-      return false;
-    }
-    ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
-    ArrowBuf dstBuf = vector.getDataBuffer();
-    int byteOffset = colBlock.getColumnByteOffset(colId);
-    DataBuffer src = colBlock.getFixedData();
+  private static void writeBitColumn(DataBlock dataBlock, BitVector vector, ColumnDataType storedType, int colId,
+      int numRows, @Nullable RoaringBitmap nullBitmap) {
+    int[] values = DataBlockExtractUtils.extractIntColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
-      dstBuf.setInt((long) row * 4, Integer.reverseBytes(src.getInt(byteOffset + (long) row * 4)));
+      if (nullBitmap != null && nullBitmap.contains(row)) {
+        vector.setNull(row);
+      } else {
+        vector.set(row, values[row]);
+      }
     }
-    setAllValid(vector, numRows);
     vector.setValueCount(numRows);
-    return true;
-  }
-
-  /** Same as {@link #tryDirectCopy4} but for 8-byte values. */
-  private static boolean tryDirectCopy8(DataBlock dataBlock, FieldVector vector, int colId, int numRows,
-      @Nullable RoaringBitmap nullBitmap) {
-    if (!(dataBlock instanceof ColumnarDataBlock) || nullBitmap != null) {
-      return false;
-    }
-    ColumnarDataBlock colBlock = (ColumnarDataBlock) dataBlock;
-    ArrowBuf dstBuf = vector.getDataBuffer();
-    int byteOffset = colBlock.getColumnByteOffset(colId);
-    DataBuffer src = colBlock.getFixedData();
-    for (int row = 0; row < numRows; row++) {
-      dstBuf.setLong((long) row * 8, Long.reverseBytes(src.getLong(byteOffset + (long) row * 8)));
-    }
-    setAllValid(vector, numRows);
-    vector.setValueCount(numRows);
-    return true;
   }
 
   private static void writeIntColumn(DataBlock dataBlock, IntVector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
-    if (tryDirectCopy4(dataBlock, vector, colId, numRows, nullBitmap)) {
-      return;
-    }
     int[] values = DataBlockExtractUtils.extractIntColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
       if (nullBitmap != null && nullBitmap.contains(row)) {
@@ -232,9 +209,6 @@ public final class ArrowBlockConverter {
 
   private static void writeFloatColumn(DataBlock dataBlock, Float4Vector vector,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
-    if (tryDirectCopy4(dataBlock, vector, colId, numRows, nullBitmap)) {
-      return;
-    }
     float[] values = DataBlockExtractUtils.extractFloatColumn(
         ColumnDataType.FLOAT.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
@@ -249,9 +223,6 @@ public final class ArrowBlockConverter {
 
   private static void writeLongColumn(DataBlock dataBlock, BigIntVector vector, ColumnDataType storedType,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
-    if (tryDirectCopy8(dataBlock, vector, colId, numRows, nullBitmap)) {
-      return;
-    }
     long[] values = DataBlockExtractUtils.extractLongColumn(storedType.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
       if (nullBitmap != null && nullBitmap.contains(row)) {
@@ -265,9 +236,6 @@ public final class ArrowBlockConverter {
 
   private static void writeDoubleColumn(DataBlock dataBlock, Float8Vector vector,
       int colId, int numRows, @Nullable RoaringBitmap nullBitmap) {
-    if (tryDirectCopy8(dataBlock, vector, colId, numRows, nullBitmap)) {
-      return;
-    }
     double[] values = DataBlockExtractUtils.extractDoubleColumn(
         ColumnDataType.DOUBLE.toDataType(), dataBlock, colId, nullBitmap);
     for (int row = 0; row < numRows; row++) {
@@ -286,10 +254,8 @@ public final class ArrowBlockConverter {
     for (int row = 0; row < numRows; row++) {
       if (nullBitmap != null && nullBitmap.contains(row)) {
         vector.setNull(row);
-      } else if (values[row] != null) {
-        vector.setSafe(row, values[row].getBytes(StandardCharsets.UTF_8));
       } else {
-        vector.setNull(row);
+        vector.setSafe(row, values[row].getBytes(StandardCharsets.UTF_8));
       }
     }
     vector.setValueCount(numRows);
@@ -306,21 +272,5 @@ public final class ArrowBlockConverter {
       }
     }
     vector.setValueCount(numRows);
-  }
-
-  /**
-   * Sets all validity bits to 1 (non-null) for the given vector. Used by the fast-path writers that bypass
-   * per-row {@code set()} calls and instead write directly to the data buffer.
-   */
-  private static void setAllValid(FieldVector vector, int numRows) {
-    ArrowBuf validityBuf = vector.getValidityBuffer();
-    int fullBytes = numRows / 8;
-    for (int i = 0; i < fullBytes; i++) {
-      validityBuf.setByte(i, 0xFF);
-    }
-    int remaining = numRows % 8;
-    if (remaining > 0) {
-      validityBuf.setByte(fullBytes, (1 << remaining) - 1);
-    }
   }
 }
