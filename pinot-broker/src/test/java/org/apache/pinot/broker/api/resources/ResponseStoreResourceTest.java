@@ -28,10 +28,11 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.longThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -57,18 +58,6 @@ public class ResponseStoreResourceTest {
   public void tearDown()
       throws Exception {
     _mocks.close();
-  }
-
-  @Test
-  public void testDeleteExpiredResponsesReturnsBadRequestWhenParamMissing() {
-    try {
-      _resource.deleteExpiredResponses(null, _httpHeaders);
-      fail("Expected WebApplicationException for missing expiredBefore param");
-    } catch (WebApplicationException e) {
-      assertEquals(e.getResponse().getStatus(), 400);
-      assertTrue(e.getResponse().getEntity().toString().contains("expiredBefore"));
-    }
-    verifyNoInteractions(_responseStore);
   }
 
   @Test
@@ -105,5 +94,15 @@ public class ResponseStoreResourceTest {
     } catch (WebApplicationException e) {
       assertEquals(e.getResponse().getStatus(), 500);
     }
+  }
+
+  @Test
+  public void testDeleteExpiredResponsesDefaultsToCurrentTimeWhenParamMissing()
+      throws Exception {
+    when(_responseStore.deleteExpiredResponses(anyLong())).thenReturn(0);
+    String result = _resource.deleteExpiredResponses(null, _httpHeaders);
+    assertEquals(result, "Deleted 0 expired response(s).");
+    // Verify deleteExpiredResponses was called with a timestamp close to now
+    verify(_responseStore).deleteExpiredResponses(longThat(ts -> Math.abs(ts - System.currentTimeMillis()) < 5000));
   }
 }

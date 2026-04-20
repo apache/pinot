@@ -189,19 +189,16 @@ public class ResponseStoreResource {
   @Path("/")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_RESPONSE_STORE)
   @ApiOperation(value = "Delete expired response stores",
-      notes = "Delete all response stores expired before the given timestamp.")
+      notes = "Delete all response stores whose expirationTimeMs is at or before the cutoff. "
+          + "If expiredBefore is omitted, the cutoff defaults to the current time.")
   public String deleteExpiredResponses(
-      @ApiParam(value = "Delete responses expired at or before this epoch ms", required = true)
+      @ApiParam(value = "Epoch ms cutoff; responses with expirationTimeMs <= this value are deleted. "
+          + "Defaults to current time when omitted.")
       @QueryParam("expiredBefore") Long expiredBeforeMs,
       @Context HttpHeaders headers) {
-    if (expiredBeforeMs == null) {
-      throw new WebApplicationException(
-          Response.status(Response.Status.BAD_REQUEST)
-              .entity("Query parameter 'expiredBefore' is required.")
-              .build());
-    }
+    long cutoff = expiredBeforeMs != null ? expiredBeforeMs : System.currentTimeMillis();
     try {
-      int count = _responseStore.deleteExpiredResponses(expiredBeforeMs);
+      int count = _responseStore.deleteExpiredResponses(cutoff);
       return String.format("Deleted %d expired response(s).", count);
     } catch (Exception e) {
       throw new WebApplicationException(e,

@@ -403,7 +403,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
-  public void testResponseStoreCleaner()
+  public void testDeleteExpiredResponses()
       throws Exception {
     // Establish clean state so count-based assertions are deterministic
     deleteAllResponses();
@@ -455,5 +455,14 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     // Clean up the survivor
     ClusterTest.sendDeleteRequest(
         getBrokerDeleteResponseStoresApiUrl(getBrokerBaseApiUrl(), survivorId), getHeaders());
+  }
+
+  @Test
+  public void testDeleteExpiredResponsesWithoutExpiredBeforeQueryParam()
+      throws Exception {
+    deleteAllResponses();
+    String result = ClusterTest.sendDeleteRequest(
+        getBrokerGetAllResponseStoresApiUrl(getBrokerBaseApiUrl()), getHeaders());
+    Assert.assertTrue(result.contains("Deleted"), result);
   }
 }

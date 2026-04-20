@@ -113,6 +113,6 @@ public class MemoryResponseStore extends AbstractResponseStore {
 
   @Override
   protected boolean deleteResponseImpl(String requestId) {
-    return _cursorResponseMap.remove(requestId) != null && _resultTableMap.remove(requestId) != null;
+    return _cursorResponseMap.remove(requestId) != null & _resultTableMap.remove(requestId) != null;
   }
 }

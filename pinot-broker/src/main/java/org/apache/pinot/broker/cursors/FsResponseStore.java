@@ -167,51 +167,12 @@ public class FsResponseStore extends AbstractResponseStore {
     } catch (Exception e) {
       if (!pinotFS.exists(queryDir)) {
         LOGGER.debug("Directory already deleted for requestId={} (likely concurrent deletion)", requestId);
-        // synchronized serializes JVM-local calls, but external deletion (ops, other brokers) can still remove the dir.
+        // synchronized serializes JVM-local callers; the directory can still disappear due to operator cleanup,
+        // manual FS edits, or tooling. Other brokers should not delete this broker's request ids per SPI contract.
         return false;
       }
       throw e;
     }
-  }
-
-  /**
-   * Single-pass optimization: reads each response metadata file once to check both brokerId and expirationTimeMs,
-   * avoiding the double-read (getAllStoredRequestIds + readResponse) in the default AbstractResponseStore
-   * implementation.
-   */
-  @Override
-  public int deleteExpiredResponses(long expiredBeforeMs)
-      throws Exception {
-    PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
-    List<FileMetadata> queryPaths = pinotFS.listFilesWithMetadata(_dataDir, true);
-    int deletedCount = 0;
-
-    for (FileMetadata metadata : queryPaths) {
-      if (!metadata.isDirectory()) {
-        continue;
-      }
-      try {
-        URI queryDir = new URI(metadata.getFilePath());
-        URI metadataFile = combinePath(queryDir, String.format(RESPONSE_FILE_NAME_FORMAT, _fileExtension));
-        if (!pinotFS.exists(metadataFile)) {
-          continue;
-        }
-        CursorResponseNative response;
-        try (InputStream is = pinotFS.open(metadataFile)) {
-          response = _responseSerde.deserialize(is, CursorResponseNative.class);
-        }
-        // brokerId filter is needed because shared storage (S3/HDFS) makes all brokers' responses visible
-        if (_brokerId.equals(response.getBrokerId()) && response.getExpirationTimeMs() <= expiredBeforeMs) {
-          if (deleteResponse(response.getRequestId())) {
-            deletedCount++;
-          }
-        }
-      } catch (Exception e) {
-        LOGGER.warn("Error cleaning up expired response for path={} (may have been deleted concurrently)",
-            metadata.getFilePath(), e);
-      }
-    }
-    return deletedCount;
   }
 
   @Override

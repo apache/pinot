@@ -56,7 +56,6 @@ public class CursorCronCleanupIntegrationTest extends BaseClusterIntegrationTest
         CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".type", "memory");
     configuration.setProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL, "3s");
     configuration.setProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD, "2s");
-    configuration.setProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_INITIAL_DELAY, "1s");
   }
 
   @Override
@@ -121,7 +120,7 @@ public class CursorCronCleanupIntegrationTest extends BaseClusterIntegrationTest
     Assert.assertEquals(afterCreate.size(), countBefore + 1, "Expected one new cursor response after query");
 
     // Wait for cron to clean it up automatically (no manual DELETE call).
-    // Expiration=3s, cron fires every 2s with explicit 1s initial delay (no jitter) → should be cleaned within ~6s.
+    // Expiration=3s, frequency=2s, first run after ~2s + jitter (0..500ms), then every 2s.
     TestUtils.waitForCondition(aVoid -> {
       try {
         List<CursorResponseNative> remaining = JsonUtils.stringToObject(

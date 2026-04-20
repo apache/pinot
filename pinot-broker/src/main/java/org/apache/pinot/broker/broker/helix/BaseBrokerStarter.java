@@ -134,6 +134,12 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseBrokerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerStarter.class);
 
+  /**
+   * Jitter for the first response-store cleanup run is drawn from {@code [0, frequencyMs / this value)} in addition
+   * to one full {@code frequencyMs} delay, to desynchronize brokers on shared storage without extra user config.
+   */
+  private static final int RESPONSE_STORE_CLEANUP_INITIAL_DELAY_JITTER_DIVISOR = 4;
+
   protected PinotConfiguration _brokerConf;
   protected List<ListenerConfig> _listenerConfigs;
   protected String _clusterName;
@@ -499,25 +505,21 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerMetrics, expirationTime);
 
     LOGGER.info("Starting ResponseStore cleanup scheduler");
-    _responseStoreCleanupExecutor = Executors.newSingleThreadScheduledExecutor(
-        runnable -> new Thread(runnable, "ResponseStoreCleanup"));
+    _responseStoreCleanupExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+      Thread t = new Thread(runnable, "ResponseStoreCleanup");
+      t.setDaemon(true);
+      return t;
+    });
     long cleanupFrequencyMs = TimeUtils.convertPeriodToMillis(
         _brokerConf.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD,
             CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD));
     Preconditions.checkArgument(cleanupFrequencyMs > 0,
         "Invalid config '%s': cleanup frequency must be positive, got %s ms",
         CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD, cleanupFrequencyMs);
-    String initialDelayStr =
-        _brokerConf.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_INITIAL_DELAY);
-
-    long cleanupInitialDelayMs;
-    if (initialDelayStr != null) {
-      cleanupInitialDelayMs = TimeUtils.convertPeriodToMillis(initialDelayStr);
-    } else {
-      cleanupInitialDelayMs = cleanupFrequencyMs;
-      // Spread broker cleanup across the interval to avoid synchronized FS scan spikes on shared storage
-      cleanupInitialDelayMs += ThreadLocalRandom.current().nextLong(cleanupFrequencyMs / 4);
-    }
+    // First run after one full period plus jitter (internal; not user-configurable to avoid config proliferation).
+    long jitterUpperBound = Math.max(1L, cleanupFrequencyMs / RESPONSE_STORE_CLEANUP_INITIAL_DELAY_JITTER_DIVISOR);
+    long cleanupInitialDelayMs =
+        cleanupFrequencyMs + ThreadLocalRandom.current().nextLong(jitterUpperBound);
 
     _responseStoreCleanupExecutor.scheduleWithFixedDelay(() -> {
       try {
