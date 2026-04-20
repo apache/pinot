@@ -225,9 +225,10 @@
     <jopt-simple.version>5.0.4</jopt-simple.version>
 
     <spark3.version>3.5.8</spark3.version>
-    <!-- Spark 4.x requires Java 17+; all Pinot Spark 4 code lives under the top-level
-         pinot-spark-4/ module (connector + batch ingestion) and is only built when JDK >= 21 is
-         active. See the `pinot-spark-4` profile below in this pom.xml. -->
+    <!-- Spark 4.x requires Java 17+. Pinot compiles the Spark 4 modules with release=21 and
+         the modules are registered in their parent reactors only under a JDK-21+ profile
+         activation (see pinot-connectors/pom.xml and
+         pinot-plugins/pinot-batch-ingestion/pom.xml). -->
     <spark4.version>4.0.0</spark4.version>
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
@@ -371,7 +372,7 @@
                   <rules>
                     <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
                       <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
-                        pinot-tools,contrib,pinot-dependency-verifier,pinot-spark-4</skipModules>
+                        pinot-tools,contrib,pinot-dependency-verifier</skipModules>
                     </pinotCustomDependencyVersionRule>
                   </rules>
                   <fail>true</fail>
@@ -613,22 +614,6 @@
         <scala.version>${scala-2.12.version}</scala.version>
         <scala.compat.version>2.12</scala.compat.version>
       </properties>
-    </profile>
-
-    <!-- Spark 4.x integrations live in pinot-spark-4/ and require JDK 21+ and Scala 2.13.
-         This profile activates on JDK 21+. Apache Spark 4 does not publish Scala 2.12 artifacts,
-         so the pinot-spark-4 umbrella pom has a maven-enforcer rule that fails fast with a
-         helpful message when the scala-2.12 profile is also active. Spark 3 users on older
-         JDKs continue to build only the Spark 3 modules. Disable explicitly with
-         `-P!pinot-spark-4` if needed. -->
-    <profile>
-      <id>pinot-spark-4</id>
-      <activation>
-        <jdk>[21,)</jdk>
-      </activation>
-      <modules>
-        <module>pinot-spark-4</module>
-      </modules>
     </profile>
   </profiles>
 

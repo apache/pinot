@@ -41,10 +41,10 @@ The produced jar is compiled with `--release 21` (class file major version 65), 
 not load on a JDK 17 runtime despite Spark 4 itself supporting JDK 17. If JDK 17 runtime is
 required, use the Spark 3 connector.
 
-This module lives under the top-level [`pinot-spark-4/`](../) umbrella and is only built when
-the active JDK is 21 or later (see the `pinot-spark-4` profile in the root
-[`pom.xml`](../../pom.xml)). It is automatically excluded when `-Pscala-2.12` is active
-because Apache Spark 4 is Scala 2.13 only.
+This module sits next to [`pinot-spark-3-connector`](../pinot-spark-3-connector) under
+`pinot-connectors/` and is only registered in the reactor when the active JDK is 21 or later
+(see the `pinot-spark-4-connector` profile in [`pinot-connectors/pom.xml`](../pom.xml)). It is
+automatically excluded when `-Pscala-2.12` is active because Apache Spark 4 is Scala 2.13 only.
 
 ### Runtime JVM flags
 
