@@ -475,6 +475,37 @@ public class AbstractMetricsTest {
   }
 
   @Test
+  public void testPartitionGaugeWithOptionalStreamTopicDelegates() {
+    ControllerMetrics controllerMetrics = buildTestMetrics();
+    String tableWithType = "myTable_REALTIME";
+    String topic = "events";
+    int partitionGroupId = 3;
+    String compositeKey = tableWithType + "-" + topic + "-" + partitionGroupId;
+
+    controllerMetrics.setOrUpdatePartitionGauge(tableWithType, partitionGroupId, topic, ControllerGauge.VERSION,
+        () -> 7L);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+        ControllerGauge.VERSION.getGaugeName() + "." + compositeKey), 7);
+
+    controllerMetrics.removePartitionGauge(tableWithType, partitionGroupId, topic, ControllerGauge.VERSION);
+    Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+  }
+
+  @Test
+  public void testPartitionGaugeWithBlankOptionalStreamTopicMatchesPartitionOnly() {
+    ControllerMetrics controllerMetrics = buildTestMetrics();
+    String table = "test_table";
+    int partitionId = 1024;
+
+    controllerMetrics.setOrUpdatePartitionGauge(table, partitionId, null, ControllerGauge.VERSION, () -> 2L);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+        ControllerGauge.VERSION.getGaugeName() + "." + table + "." + partitionId), 2);
+
+    controllerMetrics.removePartitionGauge(table, partitionId, "", ControllerGauge.VERSION);
+    Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+  }
+
+  @Test
   public void testAddCallbackGauges() {
     ControllerMetrics controllerMetrics = buildTestMetrics();
     String table = "test_table";
