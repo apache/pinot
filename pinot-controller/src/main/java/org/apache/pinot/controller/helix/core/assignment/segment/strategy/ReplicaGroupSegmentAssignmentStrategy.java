@@ -40,10 +40,10 @@ import org.slf4j.LoggerFactory;
 class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupSegmentAssignmentStrategy.class);
 
-  private HelixManager _helixManager;
-  private String _tableName;
-  private String _partitionColumn;
-  private int _replication;
+  protected HelixManager _helixManager;
+  protected String _tableName;
+  protected String _partitionColumn;
+  protected int _replication;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
@@ -64,6 +64,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
 
   /**
    * Assigns the segment for the replica-group based segment assignment strategy and returns the assigned instances.
+   * Assign to the instance with the least number of segments for each replica-group.
    */
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
@@ -128,7 +129,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
    * mismatch can happen when table is not configured correctly (table replication and numReplicaGroups does not match
    * or replication changed without reassigning instances).
    */
-  private static void checkReplication(InstancePartitions instancePartitions, int replication, String tableName) {
+  protected static void checkReplication(InstancePartitions instancePartitions, int replication, String tableName) {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups != replication) {
       LOGGER.warn(

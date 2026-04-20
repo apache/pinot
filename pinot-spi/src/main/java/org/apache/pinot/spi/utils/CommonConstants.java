@@ -1954,7 +1954,9 @@ public class CommonConstants {
 
     public static class AssignmentStrategy {
       public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "balanced";
+      public static final String ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY = "roundrobin";
       public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "replicagroup";
+      public static final String ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "roundrobinreplicagroup";
       public static final String DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY = "allservers";
     }
 
