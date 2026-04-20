@@ -17,14 +17,13 @@
  * under the License.
  */
 
-package org.apache.pinot.common.metrics.prometheus.dropwizard;
+package org.apache.pinot.plugin.metrics.dropwizard.prometheus;
 
-import org.apache.pinot.common.metrics.ServerGauge;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerTimer;
-import org.apache.pinot.common.metrics.prometheus.ServerPrometheusMetricsTest;
+import org.apache.pinot.common.metrics.MinionGauge;
+import org.apache.pinot.common.metrics.MinionMeter;
+import org.apache.pinot.common.metrics.MinionTimer;
+import org.apache.pinot.common.metrics.prometheus.MinionPrometheusMetricsTest;
 import org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.testng.annotations.Test;
 
@@ -33,11 +32,11 @@ import org.testng.annotations.Test;
  * Disabling tests as Pinot currently uses Yammer and these tests fail for for {@link DropwizardMetricsFactory}
  */
 @Test(enabled = false) // enabled=false on class level doesn't seem to work in intellij
-public class DropwizardServerPrometheusMetricsTest extends ServerPrometheusMetricsTest {
+public class DropwizardMinionPrometheusMetricsTest extends MinionPrometheusMetricsTest {
 
   @Override
   protected PinotMetricsFactory getPinotMetricsFactory() {
-    return new YammerMetricsFactory();
+    return new DropwizardMetricsFactory();
   }
 
   @Override
@@ -46,18 +45,18 @@ public class DropwizardServerPrometheusMetricsTest extends ServerPrometheusMetri
     return null;
   }
 
-  @Test(dataProvider = "serverTimers", enabled = false)
-  public void timerTest(ServerTimer serverTimer) {
-    super.timerTest(serverTimer);
+  @Test(dataProvider = "minionTimers", enabled = false)
+  public void timerTest(MinionTimer timer) {
+    super.timerTest(timer);
   }
 
-  @Test(dataProvider = "serverMeters", enabled = false)
-  public void meterTest(ServerMeter serverMeter) {
-    super.meterTest(serverMeter);
+  @Test(dataProvider = "minionMeters", enabled = false)
+  public void meterTest(MinionMeter meter) {
+    super.meterTest(meter);
   }
 
-  @Test(dataProvider = "serverGauges", enabled = false)
-  public void gaugeTest(ServerGauge serverGauge) {
-    super.gaugeTest(serverGauge);
+  @Test(dataProvider = "minionGauges", enabled = false)
+  public void gaugeTest(MinionGauge gauge) {
+    super.gaugeTest(gauge);
   }
 }

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.common.metrics.prometheus.yammer;
+package org.apache.pinot.plugin.metrics.yammer.prometheus;
 
 import org.apache.pinot.common.metrics.prometheus.MinionPrometheusMetricsTest;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory;
@@ -33,6 +33,6 @@ public class YammerMinionPrometheusMetricsTest extends MinionPrometheusMetricsTe
 
   @Override
   protected String getConfigFile() {
-    return "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/minion.yml";
+    return "../../../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/minion.yml";
   }
 }

@@ -16,23 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.plugin.metrics.fake;
 
-package org.apache.pinot.common.metrics.prometheus.yammer;
-
-import org.apache.pinot.common.metrics.prometheus.ControllerPrometheusMetricsTest;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory;
-import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.pinot.spi.metrics.PinotCounter;
 
 
-public class YammerControllerPrometheusMetricsTest extends ControllerPrometheusMetricsTest {
+public class FakePinotCounter implements PinotCounter {
+  private final AtomicLong _value = new AtomicLong();
 
   @Override
-  protected PinotMetricsFactory getPinotMetricsFactory() {
-    return new YammerMetricsFactory();
+  public Object getCounter() {
+    return this;
   }
 
   @Override
-  protected String getConfigFile() {
-    return "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/controller.yml";
+  public Object getMetric() {
+    return this;
+  }
+
+  public long count() {
+    return _value.get();
+  }
+
+  public void inc(long n) {
+    _value.addAndGet(n);
   }
 }

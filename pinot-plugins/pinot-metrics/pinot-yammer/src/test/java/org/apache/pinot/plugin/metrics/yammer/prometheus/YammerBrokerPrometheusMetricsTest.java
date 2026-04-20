@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.common.metrics.prometheus.yammer;
+package org.apache.pinot.plugin.metrics.yammer.prometheus;
 
 import org.apache.pinot.common.metrics.prometheus.BrokerPrometheusMetricsTest;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory;
@@ -33,6 +33,6 @@ public class YammerBrokerPrometheusMetricsTest extends BrokerPrometheusMetricsTe
 
   @Override
   protected String getConfigFile() {
-    return "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/broker.yml";
+    return "../../../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/broker.yml";
   }
 }

@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package org.apache.pinot.common.metrics.prometheus.dropwizard;
+package org.apache.pinot.plugin.metrics.dropwizard.prometheus;
 
-import org.apache.pinot.common.metrics.BrokerGauge;
-import org.apache.pinot.common.metrics.BrokerMeter;
-import org.apache.pinot.common.metrics.BrokerTimer;
-import org.apache.pinot.common.metrics.prometheus.BrokerPrometheusMetricsTest;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.metrics.prometheus.ServerPrometheusMetricsTest;
 import org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.testng.annotations.Test;
@@ -32,7 +32,8 @@ import org.testng.annotations.Test;
  * Disabling tests as Pinot currently uses Yammer and these tests fail for for {@link DropwizardMetricsFactory}
  */
 @Test(enabled = false) // enabled=false on class level doesn't seem to work in intellij
-public class DropwizardBrokerPrometheusMetricsTest extends BrokerPrometheusMetricsTest {
+public class DropwizardServerPrometheusMetricsTest extends ServerPrometheusMetricsTest {
+
   @Override
   protected PinotMetricsFactory getPinotMetricsFactory() {
     return new DropwizardMetricsFactory();
@@ -44,18 +45,18 @@ public class DropwizardBrokerPrometheusMetricsTest extends BrokerPrometheusMetri
     return null;
   }
 
-  @Test(dataProvider = "brokerGauges", enabled = false)
-  public void timerTest(BrokerTimer timer) {
-    super.timerTest(timer);
+  @Test(dataProvider = "serverTimers", enabled = false)
+  public void timerTest(ServerTimer serverTimer) {
+    super.timerTest(serverTimer);
   }
 
-  @Test(dataProvider = "brokerMeters", enabled = false)
-  public void meterTest(BrokerMeter meter) {
-    super.meterTest(meter);
+  @Test(dataProvider = "serverMeters", enabled = false)
+  public void meterTest(ServerMeter serverMeter) {
+    super.meterTest(serverMeter);
   }
 
-  @Test(dataProvider = "brokerGauges", enabled = false)
-  public void gaugeTest(BrokerGauge gauge) {
-    super.gaugeTest(gauge);
+  @Test(dataProvider = "serverGauges", enabled = false)
+  public void gaugeTest(ServerGauge serverGauge) {
+    super.gaugeTest(serverGauge);
   }
 }

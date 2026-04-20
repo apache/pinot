@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package org.apache.pinot.common.metrics.prometheus.yammer;
+package org.apache.pinot.plugin.metrics.yammer.prometheus;
 
-import org.apache.pinot.common.metrics.prometheus.ServerPrometheusMetricsTest;
+import org.apache.pinot.common.metrics.prometheus.ControllerPrometheusMetricsTest;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 
 
-public class YammerServerPrometheusMetricsTest extends ServerPrometheusMetricsTest {
+public class YammerControllerPrometheusMetricsTest extends ControllerPrometheusMetricsTest {
 
   @Override
   protected PinotMetricsFactory getPinotMetricsFactory() {
@@ -33,6 +33,6 @@ public class YammerServerPrometheusMetricsTest extends ServerPrometheusMetricsTe
 
   @Override
   protected String getConfigFile() {
-    return "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/server.yml";
+    return "../../../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/controller.yml";
   }
 }
