@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
@@ -256,16 +257,15 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, offer dictionary values directly to HyperLogLog.
-    // Unlike the non-group-by aggregation path (where a single BitSet over the full dict is cheap), the group-by
-    // path creates one result per group. Pre-allocating a BitSet of dictSize/8 bytes per group would multiply memory
-    // usage by numGroups (e.g. 100K groups × 375KB = 37.5GB for a 3M-entry dict). Since HLL is an approximation and
-    // max-register semantics make duplicate offers a no-op, deduplication is unnecessary here.
+    // For dictionary-encoded expression, collect dictionary ids into a RoaringBitmap for deduplication.
+    // RoaringBitmap is used (not BitSet) because it is sparse: memory scales with the number of distinct dict IDs
+    // seen per group, not with the full dictionary size. This avoids OOM when many groups each see few distinct values
+    // (contrast with the non-group-by path, which uses a single BitSet across the entire dictionary).
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
-        getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(dictionary.get(dictIds[i]));
+        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
       }
       return;
     }
@@ -309,15 +309,12 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, offer dictionary values directly to HyperLogLog (see aggregateSVGroupBySV).
+    // For dictionary-encoded expression, collect dictionary ids into a RoaringBitmap (see aggregateSVGroupBySV).
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
-        HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
-        for (int dictId : dictIds[i]) {
-          hyperLogLog.offer(dictionary.get(dictId));
-        }
+        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
       }
       return;
     }
@@ -412,14 +409,14 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, offer dictionary values directly to HyperLogLog (see aggregateSVGroupBySV).
+    // For dictionary-encoded expression, collect dictionary ids into a RoaringBitmap (see aggregateSVGroupBySV).
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
-        Object value = dictionary.get(dictIds[i]);
+        int dictId = dictIds[i];
         for (int groupKey : groupKeysArray[i]) {
-          getHyperLogLog(groupByResultHolder, groupKey).offer(value);
+          getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictId);
         }
       }
       return;
@@ -464,17 +461,14 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
-    // For dictionary-encoded expression, offer dictionary values directly to HyperLogLog (see aggregateSVGroupBySV).
+    // For dictionary-encoded expression, collect dictionary ids into a RoaringBitmap (see aggregateSVGroupBySV).
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
         int[] rowDictIds = dictIds[i];
         for (int groupKey : groupKeysArray[i]) {
-          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
-          for (int dictId : rowDictIds) {
-            hyperLogLog.offer(dictionary.get(dictId));
-          }
+          getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(rowDictIds);
         }
       }
       return;
@@ -565,8 +559,17 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   @Override
   public HyperLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-    return hyperLogLog != null ? hyperLogLog : new HyperLogLog(_log2m);
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result == null) {
+      return new HyperLogLog(_log2m);
+    }
+    if (result instanceof GroupByDictIdsWrapper) {
+      // For dictionary-encoded expression, convert the collected dict IDs to a HyperLogLog
+      return convertToHyperLogLog((GroupByDictIdsWrapper) result);
+    } else {
+      // For non-dictionary-encoded expression, the result is already a HyperLogLog
+      return (HyperLogLog) result;
+    }
   }
 
   @Override
@@ -635,6 +638,20 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   }
 
   /**
+   * Returns the {@link GroupByDictIdsWrapper} for the given group key, creating a new one if absent.
+   * Uses a {@link RoaringBitmap} (sparse) so memory scales with distinct values per group, not dictionary size.
+   */
+  protected static GroupByDictIdsWrapper getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
+      Dictionary dictionary) {
+    GroupByDictIdsWrapper wrapper = groupByResultHolder.getResult(groupKey);
+    if (wrapper == null) {
+      wrapper = new GroupByDictIdsWrapper(dictionary);
+      groupByResultHolder.setValueForKey(groupKey, wrapper);
+    }
+    return wrapper;
+  }
+
+  /**
    * Returns the {@link DictIdsWrapper} from the result holder, creating a new one if absent.
    */
   protected static DictIdsWrapper getDictIdBitSet(AggregationResultHolder aggregationResultHolder,
@@ -681,6 +698,18 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   }
 
   /**
+   * Converts a {@link GroupByDictIdsWrapper} to a HyperLogLog by offering each distinct dictionary value exactly once.
+   */
+  private HyperLogLog convertToHyperLogLog(GroupByDictIdsWrapper wrapper) {
+    HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
+    Dictionary dictionary = wrapper._dictionary;
+    for (int dictId : wrapper._dictIdBitmap) {
+      hyperLogLog.offer(dictionary.get(dictId));
+    }
+    return hyperLogLog;
+  }
+
+  /**
    * Converts a {@link DictIdsWrapper} to a HyperLogLog by offering each distinct dictionary value exactly once.
    */
   private HyperLogLog convertToHyperLogLog(DictIdsWrapper dictIdsWrapper) {
@@ -721,6 +750,31 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       for (int i = 0; i < length; i++) {
         _bitSet.set(dictIds[i]);
       }
+    }
+  }
+
+  /**
+   * Wraps a {@link Dictionary} with a {@link RoaringBitmap} to collect and deduplicate dictionary IDs in the group-by
+   * aggregation path. Unlike {@link DictIdsWrapper} (which uses a pre-allocated {@link BitSet} of dictSize/8 bytes),
+   * this uses a sparse RoaringBitmap whose memory grows only with the number of distinct dict IDs seen per group.
+   * This is critical for group-by: one wrapper per group means memory = numGroups × (distinct values/group × ~2 bytes),
+   * which stays bounded even when there are many groups or a large dictionary.
+   */
+  protected static final class GroupByDictIdsWrapper {
+    final Dictionary _dictionary;
+    final RoaringBitmap _dictIdBitmap;
+
+    GroupByDictIdsWrapper(Dictionary dictionary) {
+      _dictionary = dictionary;
+      _dictIdBitmap = new RoaringBitmap();
+    }
+
+    void add(int dictId) {
+      _dictIdBitmap.add(dictId);
+    }
+
+    void add(int[] dictIds) {
+      _dictIdBitmap.add(dictIds);
     }
   }
 }
