@@ -26,7 +26,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 @ScalarFunction(names = {"mult", "times"})
-public class MultScalarFunction extends PolymorphicBinaryArithmeticScalarFunction {
+public class MultScalarFunction extends BaseBinaryArithmeticScalarFunction {
 
   private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new EnumMap<>(ColumnDataType.class);
 

@@ -365,7 +365,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
               _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
               _tableConfig.getIndexingConfig().isNullHandlingEnabled());
       try {
-        converter.build(null, null);
+        converter.build(null);
       } catch (Exception e) {
         throw new RuntimeException("Failed to build segment", e);
       }

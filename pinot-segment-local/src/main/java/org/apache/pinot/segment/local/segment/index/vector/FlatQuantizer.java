@@ -31,7 +31,7 @@ import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
  *
  * <p>This is the trivial quantizer: {@link #encode} serializes each float as 4 bytes in
  * little-endian order, and {@link #decode} deserializes them back. Distance computation
- * decodes first and then delegates to standard float32 distance functions.</p>
+ * decodes first and then applies the quantizer distance semantics used across the ANN stack.</p>
  *
  * <p>This class is thread-safe and immutable after construction.</p>
  */
@@ -93,7 +93,65 @@ public final class FlatQuantizer implements VectorQuantizer {
   @Override
   public float computeDistance(float[] query, byte[] encodedDoc,
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
-    float[] docVector = decode(encodedDoc);
-    return VectorQuantizationUtils.computeDistance(query, docVector, distanceFunction);
+    Preconditions.checkArgument(query.length == _dimension,
+        "Expected query dimension %s, got %s", _dimension, query.length);
+    Preconditions.checkArgument(encodedDoc.length == _encodedBytesPerVector,
+        "Expected %s bytes, got %s", _encodedBytesPerVector, encodedDoc.length);
+
+    switch (distanceFunction) {
+      case EUCLIDEAN:
+      case L2:
+        return (float) computeEuclideanDistance(query, encodedDoc);
+      case COSINE:
+        return (float) computeCosineDistance(query, encodedDoc, 1.0d);
+      case INNER_PRODUCT:
+      case DOT_PRODUCT:
+        return (float) computeNegativeDotProduct(query, encodedDoc);
+      default:
+        throw new IllegalArgumentException("Unsupported distance function: " + distanceFunction);
+    }
+  }
+
+  private double computeEuclideanDistance(float[] query, byte[] encodedDoc) {
+    double distance = 0.0d;
+    for (int i = 0, offset = 0; i < _dimension; i++, offset += Float.BYTES) {
+      float docValue = decodeLittleEndianFloat(encodedDoc, offset);
+      double diff = query[i] - docValue;
+      distance += diff * diff;
+    }
+    return distance;
+  }
+
+  private double computeCosineDistance(float[] query, byte[] encodedDoc, double defaultValue) {
+    double dotProduct = 0.0d;
+    double queryNorm = 0.0d;
+    double docNorm = 0.0d;
+    for (int i = 0, offset = 0; i < _dimension; i++, offset += Float.BYTES) {
+      float docValue = decodeLittleEndianFloat(encodedDoc, offset);
+      dotProduct += query[i] * docValue;
+      queryNorm += query[i] * query[i];
+      docNorm += docValue * docValue;
+    }
+    if (queryNorm == 0.0d || docNorm == 0.0d) {
+      // Quantizer code paths use a finite cosine fallback to keep candidate ordering stable.
+      return defaultValue;
+    }
+    return 1.0d - (dotProduct / (Math.sqrt(queryNorm) * Math.sqrt(docNorm)));
+  }
+
+  private double computeNegativeDotProduct(float[] query, byte[] encodedDoc) {
+    double dotProduct = 0.0d;
+    for (int i = 0, offset = 0; i < _dimension; i++, offset += Float.BYTES) {
+      dotProduct += query[i] * decodeLittleEndianFloat(encodedDoc, offset);
+    }
+    return -dotProduct;
+  }
+
+  private static float decodeLittleEndianFloat(byte[] encodedDoc, int offset) {
+    int bits = (encodedDoc[offset] & 0xFF)
+        | ((encodedDoc[offset + 1] & 0xFF) << 8)
+        | ((encodedDoc[offset + 2] & 0xFF) << 16)
+        | ((encodedDoc[offset + 3] & 0xFF) << 24);
+    return Float.intBitsToFloat(bits);
   }
 }

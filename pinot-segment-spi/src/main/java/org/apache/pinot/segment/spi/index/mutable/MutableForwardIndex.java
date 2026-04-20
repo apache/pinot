@@ -171,6 +171,9 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
    */
   int getLengthOfLongestElement();
 
+  /// Returns `true` when all elements of a STRING raw forward index contain only ASCII characters, `false` otherwise.
+  boolean isAscii();
+
   /**
    * DICTIONARY-ENCODED INDEX APIs
    */

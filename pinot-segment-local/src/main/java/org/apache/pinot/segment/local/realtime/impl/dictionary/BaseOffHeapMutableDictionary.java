@@ -130,7 +130,7 @@ import org.slf4j.LoggerFactory;
  * NOT safe for a multiple writer scenario.
  *
  * TODO
- * - It may be useful to implement a way to stop adding new items when the the number of buffers reaches a certain
+ * - It may be useful to implement a way to stop adding new items when the number of buffers reaches a certain
  *   threshold. In this case, we could close the realtime segment, and start a new one with bigger buffers.
  */
 public abstract class BaseOffHeapMutableDictionary implements MutableDictionary {

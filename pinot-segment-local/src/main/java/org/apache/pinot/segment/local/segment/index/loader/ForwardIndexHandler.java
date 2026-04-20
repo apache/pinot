@@ -36,7 +36,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCrea
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPreIndexStatsCollector;
-import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
@@ -1018,7 +1018,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         statsCollector.collect(columnReader.getValue(i));
       }
       // NOTE: No need to seal the stats collector because value length is updated while collecting stats.
-      return columnMetadata.isSingleValue() ? statsCollector.getLengthOfLargestElement()
+      return columnMetadata.isSingleValue() ? statsCollector.getLengthOfLongestElement()
           : statsCollector.getMaxRowLengthInBytes();
     }
   }
@@ -1046,7 +1046,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       case STRING:
         return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
       case BYTES:
-        return new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
+        return new BytesColumnPreIndexStatsCollector(column, statsCollectorConfig);
       case MAP:
         return new MapColumnPreIndexStatsCollector(column, statsCollectorConfig);
       default:

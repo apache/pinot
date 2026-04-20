@@ -101,9 +101,11 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     _column = column;
     _hasDistanceThreshold = searchParams.hasDistanceThreshold();
     _distanceThreshold = searchParams.getDistanceThreshold();
+    float effectiveThreshold = _hasDistanceThreshold ? _distanceThreshold : -1f;
     _vectorExplainContext = new VectorExplainContext(VectorDistanceUtils.resolveBackendType(vectorIndexConfig),
         VectorDistanceUtils.resolveDistanceFunction(vectorIndexConfig), VectorExecutionMode.EXACT_SCAN,
-        VectorSearchParams.DEFAULT_NPROBE, false, predicate.getTopK(), fallbackReason);
+        VectorSearchParams.DEFAULT_NPROBE, false, predicate.getTopK(), fallbackReason, null, 0, effectiveThreshold,
+        VectorSearchMode.EXACT_SCAN, -1.0, null, null);
   }
 
   @Override

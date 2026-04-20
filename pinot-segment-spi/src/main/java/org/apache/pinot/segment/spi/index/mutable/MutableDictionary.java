@@ -49,6 +49,21 @@ public interface MutableDictionary extends Dictionary {
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  default int getLengthOfShortestElement() {
+    return getValueType().size();
+  }
+
+  @Override
+  default int getLengthOfLongestElement() {
+    return getValueType().size();
+  }
+
+  @Override
+  default boolean isAscii() {
+    return false;
+  }
+
   /**
    * Return true if the mutable dictionary can consume an additional row.
    */

@@ -35,6 +35,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
@@ -93,6 +94,55 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         Assert.fail("rewritten column name should be column_name_1st or column_name_1st, but is " + columnName);
       }
     }
+  }
+
+  @Test
+  public void testOnQueryCompletionHookReceivesBrokerResponse() {
+    // Verify that the overridable onQueryCompletion(RequestContext, BrokerResponse) hook is invoked
+    // and receives the BrokerResponse that handleRequest() produced.
+    AtomicReference<BrokerResponse> capturedResponse = new AtomicReference<>();
+
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
+    TableCache tableCache = mock(TableCache.class);
+
+    BaseSingleStageBrokerRequestHandler handler =
+        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
+            mock(org.apache.pinot.core.routing.RoutingManager.class), new AllowAllAccessControlFactory(),
+            queryQuotaManager, tableCache, ThreadAccountantUtils.getNoOpAccountant(), null) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+              BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            return new BrokerResponseNative();
+          }
+
+          @Override
+          protected void onQueryCompletion(RequestContext requestContext, BrokerResponse brokerResponse) {
+            capturedResponse.set(brokerResponse);
+          }
+        };
+
+    try {
+      handler.handleRequest("SELECT 1");
+    } catch (Exception ignored) {
+      // routing may fail — we only care that the hook was called with a non-null response
+    }
+    Assert.assertNotNull(capturedResponse.get(),
+        "onQueryCompletion hook must be called with the BrokerResponse from handleRequest");
   }
 
   @Test

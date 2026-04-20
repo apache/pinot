@@ -66,6 +66,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -143,9 +144,10 @@ import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
-import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -1114,6 +1116,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     ServiceStatus.removeServiceStatusCallback(_helixParticipantInstanceId);
     LOGGER.info("Shutdown Controller Metrics Registry");
     _metricsRegistry.shutdown();
+    // Clear validator registries so in-process restart (e.g. integration tests reusing one JVM) does not leak
+    // validators that hold references to the now-disconnected HelixAdmin/HelixManager.
+    LOGGER.info("Clearing config validator registries");
+    TableConfigValidatorRegistry.reset();
+    InstanceConfigValidatorRegistry.reset();
     LOGGER.info("Finish shutting down Pinot controller for {}", _helixParticipantInstanceId);
   }
 

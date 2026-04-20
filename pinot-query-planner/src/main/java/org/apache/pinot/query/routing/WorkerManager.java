@@ -112,19 +112,34 @@ public class WorkerManager {
     DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(0);
     metadata.setWorkerIdToServerInstanceMap(
         Collections.singletonMap(0, new QueryServerInstance(_instanceId, _hostName, _port, _port)));
+
+    // Two-pass assignment: leaf stages must be assigned first so that the candidate server information
+    // (_nonLookupTables or _leafServerInstances) is fully populated before intermediate stages use it.
+    // Without this, literal-only stages (e.g. UNION ALL of constants) that are traversed before any table scan
+    // would see an empty candidate set and fall back to all enabled servers across all tenants.
     for (PlanFragment child : rootFragment.getChildren()) {
-      assignWorkersToNonRootFragment(child, context);
+      assignWorkersToNonRootFragment(child, context, true);
+    }
+    for (PlanFragment child : rootFragment.getChildren()) {
+      assignWorkersToNonRootFragment(child, context, false);
     }
   }
 
-  private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context) {
+  /// Post-order traversal that assigns workers to either leaf or intermediate fragments.
+  /// @param leafOnly when true, only leaf fragments are assigned; when false, only intermediate fragments are assigned
+  private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context,
+      boolean leafOnly) {
     List<PlanFragment> children = fragment.getChildren();
     for (PlanFragment child : children) {
-      assignWorkersToNonRootFragment(child, context);
+      assignWorkersToNonRootFragment(child, context, leafOnly);
     }
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
-    if (isLeafPlan(metadata)) {
+    boolean isLeaf = isLeafPlan(metadata);
+    if (leafOnly != isLeaf) {
+      return;
+    }
+    if (isLeaf) {
       // TODO: Revisit this logic and see if we can generalize this
       // For LOOKUP join, join is leaf stage because there is no exchange added to the right side of the join. When we
       // find a single local exchange child in the leaf stage, assign workers based on the local exchange child.

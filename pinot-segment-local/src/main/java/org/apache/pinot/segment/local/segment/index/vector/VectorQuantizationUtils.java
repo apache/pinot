@@ -19,8 +19,12 @@
 package org.apache.pinot.segment.local.segment.index.vector;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
+import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
 
 
 /**
@@ -193,5 +197,81 @@ public final class VectorQuantizationUtils {
       copy[i] = values[i].clone();
     }
     return copy;
+  }
+
+  /**
+   * Resolves the configured quantizer type from index properties.
+   * Defaults to {@link VectorQuantizerType#FLAT} for backward compatibility.
+   */
+  public static VectorQuantizerType resolveQuantizerType(@Nullable Map<String, String> properties) {
+    if (properties == null) {
+      return VectorQuantizerType.FLAT;
+    }
+    String value = properties.get("quantizer");
+    if (value == null || value.isEmpty()) {
+      return VectorQuantizerType.FLAT;
+    }
+    return VectorQuantizerType.fromString(value);
+  }
+
+  /**
+   * Creates a trained quantizer for write-time usage.
+   *
+   * <p>For scalar quantizers, if training vectors are empty this method creates a valid
+   * deterministic quantizer with zero min/max bounds so empty indexes can still be serialized.</p>
+   */
+  public static VectorQuantizer createWriteQuantizer(VectorQuantizerType quantizerType, int dimension,
+      @Nullable float[][] trainingVectors) {
+    switch (quantizerType) {
+      case FLAT:
+        return new FlatQuantizer(dimension);
+      case SQ8:
+        return createScalarWriteQuantizer(dimension, ScalarQuantizer.BitWidth.SQ8, trainingVectors);
+      case SQ4:
+        return createScalarWriteQuantizer(dimension, ScalarQuantizer.BitWidth.SQ4, trainingVectors);
+      default:
+        throw new IllegalArgumentException("Unsupported quantizer for IVF_FLAT family: " + quantizerType);
+    }
+  }
+
+  /**
+   * Creates a read-time quantizer instance from serialized parameters.
+   */
+  public static VectorQuantizer createReadQuantizer(VectorQuantizerType quantizerType, int dimension,
+      @Nullable byte[] serializedParams) {
+    switch (quantizerType) {
+      case FLAT:
+        return new FlatQuantizer(dimension);
+      case SQ8:
+      case SQ4:
+        Preconditions.checkArgument(serializedParams != null && serializedParams.length > 0,
+            "Serialized scalar quantizer params must be present for quantizer=%s", quantizerType);
+        return ScalarQuantizer.deserialize(serializedParams);
+      default:
+        throw new IllegalArgumentException("Unsupported quantizer for IVF_FLAT family: " + quantizerType);
+    }
+  }
+
+  /**
+   * Serializes quantizer parameters for persistence in the index header.
+   */
+  public static byte[] serializeQuantizerParams(VectorQuantizer quantizer) {
+    if (quantizer instanceof ScalarQuantizer) {
+      return ((ScalarQuantizer) quantizer).serialize();
+    }
+    return new byte[0];
+  }
+
+  private static VectorQuantizer createScalarWriteQuantizer(int dimension, ScalarQuantizer.BitWidth bitWidth,
+      @Nullable float[][] trainingVectors) {
+    if (trainingVectors == null || trainingVectors.length == 0) {
+      float[] minValues = new float[dimension];
+      float[] maxValues = new float[dimension];
+      for (int d = 0; d < dimension; d++) {
+        maxValues[d] = 1e-7f;
+      }
+      return new ScalarQuantizer(dimension, bitWidth, minValues, maxValues);
+    }
+    return ScalarQuantizer.train(trainingVectors, dimension, bitWidth);
   }
 }

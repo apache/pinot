@@ -28,7 +28,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloo
 import org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
@@ -99,7 +98,7 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
   @Override
   public BloomFilterCreator createIndexCreator(IndexCreationContext context, BloomFilterConfig indexConfig) {
     int cardinality = context.getCardinality();
-    if (cardinality == Constants.UNKNOWN_CARDINALITY) {
+    if (cardinality < 0) {
       // This is when we're creating bloom filters for non dictionary encoded cols where exact cardinality is not
       // known beforehand.
       // Since this field is only used for the estimate cardinality, using total # of entries instead

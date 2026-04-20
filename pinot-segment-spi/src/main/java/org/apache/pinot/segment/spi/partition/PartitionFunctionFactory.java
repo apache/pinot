@@ -21,6 +21,8 @@ package org.apache.pinot.segment.spi.partition;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 
 
 /**
@@ -97,5 +99,13 @@ public class PartitionFunctionFactory {
       default:
         throw new IllegalArgumentException("Illegal partition function name: " + functionName);
     }
+  }
+
+  public static PartitionFunction getPartitionFunction(ColumnPartitionConfig config) {
+    return getPartitionFunction(config.getFunctionName(), config.getNumPartitions(), config.getFunctionConfig());
+  }
+
+  public static PartitionFunction getPartitionFunction(ColumnPartitionMetadata metadata) {
+    return getPartitionFunction(metadata.getFunctionName(), metadata.getNumPartitions(), metadata.getFunctionConfig());
   }
 }

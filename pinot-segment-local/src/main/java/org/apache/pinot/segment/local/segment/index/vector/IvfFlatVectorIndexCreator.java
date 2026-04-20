@@ -34,6 +34,8 @@ import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
+import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +59,9 @@ import org.slf4j.LoggerFactory;
  *   numVectors:             4 bytes
  *   nlist:                  4 bytes
  *   distanceFunctionOrd:    4 bytes
+ *   quantizerTypeOrd:       4 bytes
+ *   quantizerParamsLen:     4 bytes
+ *   quantizerParams:        quantizerParamsLen bytes
  *
  * [Centroids Section]
  *   nlist x dimension x 4 bytes (float32)
@@ -65,7 +70,7 @@ import org.slf4j.LoggerFactory;
  *   For each centroid i (0..nlist-1):
  *     listSize_i:           4 bytes
  *     docIds_i:             listSize_i x 4 bytes (int32)
- *     vectors_i:            listSize_i x dimension x 4 bytes (float32)
+ *     encodedVectors_i:     listSize_i x encodedBytesPerVector bytes
  *
  * [Inverted List Offsets]
  *   nlist x 8 bytes (long offset to start of each inverted list)
@@ -74,7 +79,10 @@ import org.slf4j.LoggerFactory;
  *   offsetToOffsets:        8 bytes (position of the offsets section)
  * </pre>
  *
- * <p>All multi-byte values are written in big-endian order (Java {@link DataOutputStream} default).</p>
+ * <p>Header fields, centroid float32 values, list sizes/doc IDs, offsets, and footer metadata are written in
+ * big-endian order (Java {@link DataOutputStream} default). {@code encodedVectors} payload bytes are emitted
+ * verbatim by the selected quantizer and therefore use quantizer-defined encoding semantics; the
+ * {@link FlatQuantizer} currently stores float32 payloads in little-endian order.</p>
  */
 public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfFlatVectorIndexCreator.class);
@@ -82,7 +90,7 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   /** Magic bytes identifying an IVF_FLAT index file: ASCII "IVFF". */
   public static final int MAGIC = 0x49564646;
 
-  /** Current file format version. */
+  /** Current file format version (quantizer-aware encoded vectors). */
   public static final int FORMAT_VERSION = 1;
 
   /** Default number of Voronoi cells (centroids). */
@@ -107,6 +115,7 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   private final int _trainSampleSize;
   private final long _trainingSeed;
   private final VectorIndexConfig.VectorDistanceFunction _distanceFunction;
+  private final VectorQuantizerType _quantizerType;
 
   /** All vectors collected during add(), indexed by docId (ordinal). */
   private final List<float[]> _vectors = new ArrayList<>();
@@ -136,12 +145,14 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
     _trainingSeed = properties != null && properties.containsKey("trainingSeed")
         ? Long.parseLong(properties.get("trainingSeed"))
         : System.nanoTime();
+    _quantizerType = VectorQuantizationUtils.resolveQuantizerType(properties);
 
     Preconditions.checkArgument(_dimension > 0, "Vector dimension must be positive, got: %s", _dimension);
     Preconditions.checkArgument(_nlist > 0, "nlist must be positive, got: %s", _nlist);
 
-    LOGGER.info("Creating IVF_FLAT index for column: {} in dir: {}, dimension={}, nlist={}, distance={}",
-        column, indexDir.getAbsolutePath(), _dimension, _nlist, _distanceFunction);
+    LOGGER.info("Creating IVF_FLAT index for column: {} in dir: {}, dimension={}, nlist={}, distance={}, "
+            + "quantizer={}",
+        column, indexDir.getAbsolutePath(), _dimension, _nlist, _distanceFunction, _quantizerType);
   }
 
   @Override
@@ -174,7 +185,9 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
     int numVectors = _vectors.size();
     if (numVectors == 0) {
       LOGGER.warn("No vectors to index for column: {}. Writing empty index.", _column);
-      writeIndex(new float[0][0], new int[0], new List[0], 0);
+      VectorQuantizer quantizer =
+          VectorQuantizationUtils.createWriteQuantizer(_quantizerType, _dimension, new float[0][]);
+      writeIndex(new float[0][0], new int[0], new List[0], 0, quantizer);
       return;
     }
 
@@ -184,6 +197,8 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
 
     // Collect training samples
     float[][] trainingSamples = collectTrainingSamples(numVectors, effectiveNlist);
+    VectorQuantizer quantizer =
+        VectorQuantizationUtils.createWriteQuantizer(_quantizerType, _dimension, trainingSamples);
 
     // Train centroids using k-means
     float[][] centroids = trainKMeans(trainingSamples, effectiveNlist);
@@ -202,10 +217,10 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
     }
 
     // Write the index file
-    writeIndex(centroids, assignments, invertedLists, effectiveNlist);
+    writeIndex(centroids, assignments, invertedLists, effectiveNlist, quantizer);
 
-    LOGGER.info("IVF_FLAT index sealed for column: {}. {} vectors across {} centroids.",
-        _column, numVectors, effectiveNlist);
+    LOGGER.info("IVF_FLAT index sealed for column: {}. {} vectors across {} centroids. quantizer={}",
+        _column, numVectors, effectiveNlist, _quantizerType);
   }
 
   @Override
@@ -475,10 +490,15 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   /**
    * Writes the complete IVF_FLAT index to disk.
    */
-  private void writeIndex(float[][] centroids, int[] assignments, List<Integer>[] invertedLists, int effectiveNlist)
+  private void writeIndex(float[][] centroids, int[] assignments, List<Integer>[] invertedLists, int effectiveNlist,
+      VectorQuantizer quantizer)
       throws IOException {
     File indexFile = new File(_indexDir, _column + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
     int numVectors = _vectors.size();
+    byte[] quantizerParams = VectorQuantizationUtils.serializeQuantizerParams(quantizer);
+    int encodedBytesPerVector = quantizer.getEncodedBytesPerVector();
+    Preconditions.checkArgument(encodedBytesPerVector > 0,
+        "Encoded bytes per vector must be > 0 for quantizer=%s", quantizer.getType());
 
     try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(indexFile)))) {
       // --- Header ---
@@ -488,6 +508,11 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
       out.writeInt(numVectors);
       out.writeInt(effectiveNlist);
       out.writeInt(_distanceFunction.ordinal());
+      out.writeInt(quantizer.getType().ordinal());
+      out.writeInt(quantizerParams.length);
+      if (quantizerParams.length > 0) {
+        out.write(quantizerParams);
+      }
 
       // --- Centroids Section ---
       for (int c = 0; c < effectiveNlist; c++) {
@@ -499,9 +524,10 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
       // --- Inverted Lists Section ---
       // Track offsets for each inverted list
       // We compute offsets from the start of the file
-      // Header size: 6 ints = 24 bytes
+      // Header size:
+      // base 6 ints + quantizerType + quantizerParamsLen + quantizerParams bytes
       // Centroids size: effectiveNlist * dimension * 4 bytes
-      long currentOffset = 24L + (long) effectiveNlist * _dimension * 4;
+      long currentOffset = 32L + quantizerParams.length + (long) effectiveNlist * _dimension * 4;
       long[] listOffsets = new long[effectiveNlist];
 
       for (int c = 0; c < effectiveNlist; c++) {
@@ -518,14 +544,12 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
         }
         currentOffset += (long) listSize * 4;
 
-        // Write vectors for this list
+        // Write quantized vectors for this list
         for (int docId : list) {
           float[] vector = _vectors.get(docId);
-          for (int d = 0; d < _dimension; d++) {
-            out.writeFloat(vector[d]);
-          }
+          out.write(quantizer.encode(vector));
         }
-        currentOffset += (long) listSize * _dimension * 4;
+        currentOffset += (long) listSize * encodedBytesPerVector;
       }
 
       // --- Inverted List Offsets ---
