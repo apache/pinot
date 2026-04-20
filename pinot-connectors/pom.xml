@@ -39,4 +39,6 @@
     <module>pinot-spark-3-connector</module>
     <module>pinot-flink-connector</module>
   </modules>
+  <!-- The Spark 4 connector lives in the top-level pinot-spark-4/ module and is registered in
+       the root pom under the pinot-spark-4 profile (JDK 21+). -->
 </project>
