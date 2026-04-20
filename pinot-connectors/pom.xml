@@ -39,6 +39,20 @@
     <module>pinot-spark-3-connector</module>
     <module>pinot-flink-connector</module>
   </modules>
-  <!-- The Spark 4 connector lives in the top-level pinot-spark-4/ module and is registered in
-       the root pom under the pinot-spark-4 profile (JDK 21+). -->
+
+  <profiles>
+    <!-- Apache Spark 4 requires JDK 17+ and Scala 2.13 only. Register the Spark 4 connector
+         module only when the active JDK is 21 or later; on JDK 11/17 the module is absent from
+         the reactor entirely, so nothing attempts to resolve Spark 4 artifacts. Spark 3 users
+         on older JDKs continue to build pinot-spark-3-connector as before. -->
+    <profile>
+      <id>pinot-spark-4-connector</id>
+      <activation>
+        <jdk>[21,)</jdk>
+      </activation>
+      <modules>
+        <module>pinot-spark-4-connector</module>
+      </modules>
+    </profile>
+  </profiles>
 </project>
