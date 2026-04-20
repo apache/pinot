@@ -162,6 +162,12 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
   private Set<String> _routableServers;
 
+  // Snapshot of {@code _enabledServerInstanceMap} restricted to {@code _routableServers} (enabled minus excluded).
+  // Maintained in lockstep with {@code _routableServers} under {@code _globalLock.writeLock()}. Callers that select
+  // workers outside of per-table instance selection (MSE intermediate-stage worker picking) read this snapshot so
+  // that FailureDetector-driven exclusions are honored.
+  private volatile Map<String, ServerInstance> _routableServerInstanceMap = Collections.emptyMap();
+
   // Process assignment change timestamp. Used to check if buildRouting needs to be re-run for a given table to avoid
   // race conditions with processSegmentAssignmentChange()
   private long _processAssignmentChangeSnapshotTimestampMs;
@@ -442,6 +448,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       }
     }
     _routableServers = enabledServers;
+    _routableServerInstanceMap = buildRoutableServerInstanceMap();
     long calculateChangedServersEndTimeMs = System.currentTimeMillis();
 
     // Early terminate if there is no changed servers
@@ -531,6 +538,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     Set<String> routableServers = new HashSet<>(_routableServers);
     routableServers.remove(instanceId);
     _routableServers = routableServers;
+    _routableServerInstanceMap = buildRoutableServerInstanceMap();
     List<String> changedServers = Collections.singletonList(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
@@ -576,6 +584,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     Set<String> routableServers = new HashSet<>(_routableServers);
     routableServers.add(instanceId);
     _routableServers = routableServers;
+    _routableServerInstanceMap = buildRoutableServerInstanceMap();
     List<String> changedServers = Collections.singletonList(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
@@ -1170,6 +1179,27 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   @Override
   public Map<String, ServerInstance> getEnabledServerInstanceMap() {
     return _enabledServerInstanceMap;
+  }
+
+  @Override
+  public Map<String, ServerInstance> getRoutableServerInstanceMap() {
+    return _routableServerInstanceMap;
+  }
+
+  // Must be called under {@code _globalLock.writeLock()} whenever {@code _routableServers} is reassigned.
+  private Map<String, ServerInstance> buildRoutableServerInstanceMap() {
+    Set<String> routableServers = _routableServers;
+    if (routableServers == null || routableServers.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<String, ServerInstance> map = Maps.newHashMapWithExpectedSize(routableServers.size());
+    for (String instanceId : routableServers) {
+      ServerInstance instance = _enabledServerInstanceMap.get(instanceId);
+      if (instance != null) {
+        map.put(instanceId, instance);
+      }
+    }
+    return map;
   }
 
   private String getIdealStatePath(String tableNameWithType) {
