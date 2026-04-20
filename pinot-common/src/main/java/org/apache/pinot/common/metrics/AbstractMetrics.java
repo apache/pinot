@@ -567,9 +567,24 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Same {@code gauge} and exported Prometheus metric name as the per-partition overload without a topic when
+   * {@code streamTopicName} is null or blank. When a topic is provided, registers using the composite JMX key
+   * expected by {@code server.yml} so the same metric gains {@code topic} and {@code partition} labels (not a separate
+   * gauge enum value or metric family—only the MBean naming differs for the exporter).
+   */
+  public void setOrUpdatePartitionGauge(final String tableName, final int partitionId,
+      @Nullable final String streamTopicName, final G gauge, final Supplier<Long> valueSupplier) {
+    if (StringUtils.isNotBlank(streamTopicName)) {
+      setOrUpdatePartitionGaugeForStreamTopic(tableName, streamTopicName, partitionId, gauge, valueSupplier);
+    } else {
+      setOrUpdatePartitionGauge(tableName, partitionId, gauge, valueSupplier);
+    }
+  }
+
+  /**
    * Registers a per-partition table gauge keyed by table name with type, Kafka (or other stream) topic, and partition
    * group id. The resulting MBean name matches {@code server.yml} rules so Prometheus exports {@code topic} and
-   * {@code partition} labels (see apache/pinot#18099).
+   * {@code partition} labels on the same metric series as the table+partition-only registration (see apache/pinot#18099).
    */
   public void setOrUpdatePartitionGaugeForStreamTopic(final String tableNameWithType, final String topicName,
       final int partitionGroupId, final G gauge, final Supplier<Long> valueSupplier) {
@@ -785,6 +800,18 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void removePartitionGauge(final String tableName, final int partitionId, final G gauge) {
     final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
     removeGauge(fullGaugeName);
+  }
+
+  /**
+   * Counterpart to the per-partition overload that takes an optional {@code streamTopicName}.
+   */
+  public void removePartitionGauge(final String tableName, final int partitionId,
+      @Nullable final String streamTopicName, final G gauge) {
+    if (StringUtils.isNotBlank(streamTopicName)) {
+      removePartitionGaugeForStreamTopic(tableName, streamTopicName, partitionId, gauge);
+    } else {
+      removePartitionGauge(tableName, partitionId, gauge);
+    }
   }
 
   /**
