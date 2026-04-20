@@ -297,6 +297,47 @@ public class WorkerManagerTest {
     assertNull(brokerRequest.getPinotQuery().getFilterExpression());
   }
 
+  @Test
+  public void testBrokerPruningPreservesQueryOptionsOnRoutingRequest() {
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+    RoutingTable routingTable = new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("segment1"), List.of())),
+        List.of(), 0);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", routingTable));
+
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("testTable_OFFLINE", "testTable_OFFLINE");
+    tableNameMap.put("testTable", "testTable");
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(schema);
+    when(tableCache.getTableConfig("testTable_OFFLINE"))
+        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        workerManager);
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SET useLeafServerForIntermediateStage=true;"
+            + " SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+    }
+
+    BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest);
+    // Query options must be preserved on the broker-pruning routing path so that
+    // routing-affecting options are visible to the routing manager.
+    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
+    assertNotNull(queryOptions);
+    assertEquals(queryOptions.get("useLeafServerForIntermediateStage"), "true");
+  }
+
   /**
    * Tests that literal-only stages (e.g. UNION ALL of constant values) are assigned to the same
    * servers as the table-scanning stages, not to all enabled servers across all tenants.

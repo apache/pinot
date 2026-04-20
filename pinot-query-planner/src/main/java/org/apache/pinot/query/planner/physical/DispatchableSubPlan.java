@@ -54,12 +54,6 @@ public class DispatchableSubPlan {
 
   public DispatchableSubPlan(PairList<Integer, String> fields,
       Map<Integer, DispatchablePlanFragment> queryStageMap,
-      Set<String> tableNames, Map<String, Set<String>> tableToUnavailableSegmentsMap) {
-    this(fields, queryStageMap, tableNames, tableToUnavailableSegmentsMap, 0);
-  }
-
-  public DispatchableSubPlan(PairList<Integer, String> fields,
-      Map<Integer, DispatchablePlanFragment> queryStageMap,
       Set<String> tableNames, Map<String, Set<String>> tableToUnavailableSegmentsMap,
       long numSegmentsPrunedByBroker) {
     _queryResultFields = fields;

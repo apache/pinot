@@ -663,7 +663,12 @@ public class WorkerManager {
       return null;
     }
     try {
-      return PlanNodeRoutingQueryBuilder.createPinotQueryForRouting(tableName, leafStageRoot, false);
+      PinotQuery pinotQuery = PlanNodeRoutingQueryBuilder.createPinotQueryForRouting(tableName, leafStageRoot, false);
+      Map<String, String> queryOptions = context.getPlannerContext().getOptions();
+      if (MapUtils.isNotEmpty(queryOptions)) {
+        pinotQuery.setQueryOptions(new HashMap<>(queryOptions));
+      }
+      return pinotQuery;
     } catch (RuntimeException e) {
       LOGGER.warn("Broker pruning skipped for table {} due to unsupported leaf stage shape: {}",
           tableName, e.getMessage());
