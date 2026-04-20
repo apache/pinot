@@ -22,7 +22,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>pinot-spark-4</artifactId>
+    <artifactId>pinot-connectors</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>1.6.0-SNAPSHOT</version>
   </parent>
@@ -32,6 +32,11 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
+    <!-- Apache Spark 4 requires JDK 17+; Pinot compiles the Spark 4 jars with release=21
+         (class file 65). The module is only registered in the reactor under a JDK-21+ profile
+         in pinot-connectors/pom.xml. The property here hardens the compile target if someone
+         invokes this module directly. -->
+    <jdk.version>21</jdk.version>
   </properties>
 
   <profiles>
@@ -169,6 +174,37 @@
       </testResource>
     </testResources>
     <plugins>
+      <!-- Hard-fail early with a clear message on JDK 17/11 or Scala 2.12 instead of letting an
+           obscure Maven resolution error leak through. The parent-pom module activation gates
+           this module out of older builds, but this enforcer catches someone invoking
+           `./mvnw -pl pinot-connectors/pinot-spark-4-connector` directly on an older JDK or
+           under -Pscala-2.12. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-spark4-prereqs</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[21,)</version>
+                  <message>pinot-spark-4-connector requires JDK 21 or newer. Use pinot-spark-3-connector for older JDKs.</message>
+                </requireJavaVersion>
+                <requireProperty>
+                  <property>scala.compat.version</property>
+                  <regex>^2\.13$</regex>
+                  <regexMessage>pinot-spark-4-connector requires Scala 2.13 (Apache Spark 4 does not publish Scala 2.12 artifacts). Remove -Pscala-2.12 or exclude this module.</regexMessage>
+                </requireProperty>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <!-- disable surefire -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

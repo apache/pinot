@@ -40,10 +40,11 @@ The produced jar is compiled with `--release 21` (class file major version 65), 
 not load on a JDK 17 runtime despite Spark 4 itself supporting JDK 17. If JDK 17 runtime is
 required, use the Spark 3 batch ingestion module.
 
-This module lives under the top-level [`pinot-spark-4/`](../) umbrella and is only built when
-the active JDK is 21 or later (see the `pinot-spark-4` profile in the root
-[`pom.xml`](../../pom.xml)). Automatically excluded under `-Pscala-2.12` — Apache Spark 4 is
-Scala 2.13 only.
+This module sits next to [`pinot-batch-ingestion-spark-3`](../pinot-batch-ingestion-spark-3)
+under `pinot-plugins/pinot-batch-ingestion/` and is only registered in the reactor when the
+active JDK is 21 or later (see the `pinot-batch-ingestion-spark-4` profile in
+[`pinot-plugins/pinot-batch-ingestion/pom.xml`](../pom.xml)). Automatically excluded under
+`-Pscala-2.12` — Apache Spark 4 is Scala 2.13 only.
 
 ## Runners
 
@@ -111,5 +112,5 @@ impact on production behavior.
 Run the tests:
 
 ```
-./mvnw -pl pinot-spark-4/pinot-batch-ingestion-spark-4 -am test
+./mvnw -pl pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-4 -am test
 ```

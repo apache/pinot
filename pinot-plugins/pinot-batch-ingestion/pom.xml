@@ -43,8 +43,22 @@
     <module>pinot-batch-ingestion-hadoop</module>
     <module>pinot-batch-ingestion-standalone</module>
   </modules>
-  <!-- The Spark 4 batch ingestion lives in the top-level pinot-spark-4/ module and is
-       registered in the root pom under the pinot-spark-4 profile (JDK 21+). -->
+
+  <profiles>
+    <!-- Apache Spark 4 requires JDK 17+ and Scala 2.13 only. Register the Spark 4 batch
+         ingestion plugin only when the active JDK is 21 or later; on JDK 11/17 the module is
+         absent from the reactor entirely. Spark 3 users on older JDKs continue to build
+         pinot-batch-ingestion-spark-3 as before. -->
+    <profile>
+      <id>pinot-batch-ingestion-spark-4</id>
+      <activation>
+        <jdk>[21,)</jdk>
+      </activation>
+      <modules>
+        <module>pinot-batch-ingestion-spark-4</module>
+      </modules>
+    </profile>
+  </profiles>
 
   <dependencies>
     <dependency>
