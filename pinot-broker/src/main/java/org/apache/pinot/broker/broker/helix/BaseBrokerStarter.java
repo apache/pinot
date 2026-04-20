@@ -136,8 +136,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerStarter.class);
 
   /**
-   * Jitter for the first response-store cleanup run is drawn from {@code [0, frequencyMs / this value)} in addition
-   * to one full {@code frequencyMs} delay, to desynchronize brokers on shared storage without extra user config.
+   * When {@link CommonConstants.CursorConfigs#RESPONSE_STORE_CLEANER_INITIAL_DELAY} is unset, the first cleanup run
+   * is scheduled after one full frequency period plus jitter in {@code [0, frequencyMs / this value)}, to
+   * desynchronize brokers on shared storage.
    */
   private static final int RESPONSE_STORE_CLEANUP_INITIAL_DELAY_JITTER_DIVISOR = 4;
 
@@ -535,10 +536,20 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     Preconditions.checkArgument(cleanupFrequencyMs > 0,
         "Invalid config '%s': cleanup frequency must be positive, got %s ms",
         CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD, cleanupFrequencyMs);
-    // First run after one full period plus jitter (internal; not user-configurable to avoid config proliferation).
-    long jitterUpperBound = Math.max(1L, cleanupFrequencyMs / RESPONSE_STORE_CLEANUP_INITIAL_DELAY_JITTER_DIVISOR);
-    long cleanupInitialDelayMs =
-        cleanupFrequencyMs + ThreadLocalRandom.current().nextLong(jitterUpperBound);
+    String initialDelayStr =
+        _brokerConf.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_INITIAL_DELAY);
+
+    long cleanupInitialDelayMs;
+    if (initialDelayStr != null) {
+      cleanupInitialDelayMs = TimeUtils.convertPeriodToMillis(initialDelayStr);
+      Preconditions.checkArgument(cleanupInitialDelayMs >= 0,
+          "Invalid config '%s': cleanup initial delay must be non-negative, got %s ms",
+          CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_INITIAL_DELAY, cleanupInitialDelayMs);
+    } else {
+      long jitterUpperBound = Math.max(1L, cleanupFrequencyMs / RESPONSE_STORE_CLEANUP_INITIAL_DELAY_JITTER_DIVISOR);
+      cleanupInitialDelayMs =
+          cleanupFrequencyMs + ThreadLocalRandom.current().nextLong(jitterUpperBound);
+    }
 
     _responseStoreCleanupExecutor.scheduleWithFixedDelay(() -> {
       try {

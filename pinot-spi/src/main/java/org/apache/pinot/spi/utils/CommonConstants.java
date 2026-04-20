@@ -2237,6 +2237,8 @@ public class CommonConstants {
     public static final String RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD =
         PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".cleaner.frequencyPeriod";
     public static final String DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD = "1h";
+    public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
+        PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".cleaner.initialDelay";
   }
 
   public static class ForwardIndexConfigs {
