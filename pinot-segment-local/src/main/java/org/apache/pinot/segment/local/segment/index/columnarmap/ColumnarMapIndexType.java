@@ -140,8 +140,6 @@ public class ColumnarMapIndexType
     if (context.getFieldSpec().getDataType() != FieldSpec.DataType.MAP) {
       return null;
     }
-    // TODO: Implement MutableColumnarMapIndexImpl in PR 2 (query layer).
-    //  Until then, REALTIME tables with COLUMNAR_MAP will fail at segment creation.
-    throw new UnsupportedOperationException("Mutable COLUMNAR_MAP index not available in this build");
+    return new MutableColumnarMapIndexImpl(context, config);
   }
 }

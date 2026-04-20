@@ -57,7 +57,14 @@ import org.slf4j.LoggerFactory;
  *   <li>Key metadata (70 bytes/key, big-endian): tierFlag(byte), storedTypeOrdinal(byte),
  *       numDocs(int), nullBitmapOffset(long), nullBitmapLen(long), fwdOffset(long),
  *       fwdLen(long), invOffset(long), invLen(long), dictIdFwdOffset(long),
- *       dictIdFwdLen(long)</li>
+ *       dictIdFwdLen(long).
+ *       <br>Slot semantic depends on tierFlag:
+ *       <br>- TIER_DENSE: nullBitmapOffset/Len point to a Roaring bitmap of ABSENT docs.
+ *           Presence is derived as the complement at load time.
+ *       <br>- TIER_SPARSE: nullBitmapOffset/Len point to a Roaring bitmap of PRESENT docs
+ *           (presence bitmap reused into the same slot). fwd/inv/dictIdFwd slots are 0;
+ *           values live in the JSON sidecar. nullBitmapLen == 0 indicates a legacy segment
+ *           written before sparse presence was tracked.</li>
  *   <li>Per-key data: null bitmap (RLE-optimized Roaring) + forward index + optional
  *       inverted index + optional dictId forward index</li>
  *   <li>Value dictionary: per-key sorted distinct values for dictionary-encoded keys</li>
@@ -223,8 +230,19 @@ public class ImmutableColumnarMapIndexReader implements ColumnarMapIndexReader {
         // Build presence bitmap as complement of null bitmap (for backward compat with query layer)
         _presenceBitmaps[i] = ImmutableRoaringBitmap.flip(_nullBitmaps[i], 0L, (long) _numDocs);
       } else if (_tierFlags[i] == TIER_SPARSE) {
-        // Sparse key: no per-key data in SPMX
-        _presenceBitmaps[i] = ImmutableRoaringBitmap.bitmapOf();
+        // Sparse key: per-key data in SPMX is just a presence bitmap (docs where key is PRESENT).
+        // The same metadata slot used as nullBitmapOffset/Len for dense keys is reused here for
+        // presenceOffset/Len. nullBitmapLen == 0 indicates a legacy segment without sparse
+        // presence — fall back to empty (preserving the pre-fix broken behavior, no worse than
+        // before). New segments always populate this for sparse keys, so IS NULL / IS NOT NULL
+        // queries return correct results.
+        if (nullBitmapLen > 0) {
+          byte[] bitmapBytes = new byte[(int) nullBitmapLen];
+          dataBuffer.copyTo(_perKeyDataSectionOffset + nullBitmapOffset, bitmapBytes, 0, bitmapBytes.length);
+          _presenceBitmaps[i] = new ImmutableRoaringBitmap(ByteBuffer.wrap(bitmapBytes));
+        } else {
+          _presenceBitmaps[i] = ImmutableRoaringBitmap.bitmapOf();
+        }
         _nullBitmaps[i] = null;
       }
     }
@@ -666,8 +684,11 @@ public class ImmutableColumnarMapIndexReader implements ColumnarMapIndexReader {
 
   @Override
   public DataSource getKeyDataSource(String key) {
-    // Implemented in ColumnarMapDataSource (Task 15)
-    return null;
+    // Per-key DataSource construction lives in ColumnarMapDataSource (handles dense/sparse
+    // tier dispatch + per-key forward/inverted index wrapping). The reader-level SPI method
+    // is intentionally not implemented; calling it directly bypasses the data source layer
+    // and would skip the sparse-key fall-back to NullDataSource.
+    throw new UnsupportedOperationException("Use ColumnarMapDataSource.getKeyDataSource() instead");
   }
 
   /// Returns a FixedBitIntReaderWriter for reading bit-packed dictIds for the given key,

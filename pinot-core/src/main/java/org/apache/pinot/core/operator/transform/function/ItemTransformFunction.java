@@ -21,13 +21,17 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -42,6 +46,8 @@ public class ItemTransformFunction extends BaseTransformFunction {
   TransformFunction _keyValue;
   Dictionary _keyDictionary;
   private TransformResultMetadata _resultMetadata;
+  @Nullable
+  private ImmutableRoaringBitmap _keyNullBitmap;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
@@ -82,6 +88,9 @@ public class ItemTransformFunction extends BaseTransformFunction {
       _resultMetadata =
           new TransformResultMetadata(keyType, keyDS.getDataSourceMetadata().isSingleValue(),
               _keyDictionary != null);
+      // Capture per-key null bitmap for null-aware item() evaluation
+      NullValueVectorReader nullReader = keyDS.getNullValueVector();
+      _keyNullBitmap = nullReader != null ? nullReader.getNullBitmap() : null;
     } else {
       throw new RuntimeException("The left operand for a MAP ITEM operation must resolve to a Map Data Source");
     }
@@ -90,6 +99,14 @@ public class ItemTransformFunction extends BaseTransformFunction {
   @Override
   public String getName() {
     return FUNCTION_NAME;
+  }
+
+  /**
+   * Returns the key path for this item expression: [columnName, keyName].
+   * Used by TransformBlock to bypass the transform function and resolve the MAP key directly.
+   */
+  public String[] getKeyPath() {
+    return _keyPath;
   }
 
   @Override
@@ -126,5 +143,31 @@ public class ItemTransformFunction extends BaseTransformFunction {
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     return valueBlock.getBlockValueSet(_keyPath).getStringValuesSV();
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    // Skip when the query did not enable null handling — matches the convention used by
+    // BaseTransformFunction subclasses that emit nulls only under the explicit query flag.
+    // Without this gate, COLUMNAR_MAP queries would surface IS NULL semantics on tables that
+    // never opted in.
+    if (!_nullHandlingEnabled || _keyNullBitmap == null || _keyNullBitmap.isEmpty()) {
+      return null;
+    }
+    int[] docIds = valueBlock.getDocIds();
+    int numDocs = valueBlock.getNumDocs();
+    // Block-overlap shortcut: if the segment-level null bitmap doesn't intersect the docId
+    // range covered by this block, allocate nothing. Cheap when most blocks have no nulls.
+    if (numDocs > 0 && !_keyNullBitmap.intersects(docIds[0], (long) docIds[numDocs - 1] + 1)) {
+      return null;
+    }
+    RoaringBitmap blockNullBitmap = new RoaringBitmap();
+    for (int i = 0; i < numDocs; i++) {
+      if (_keyNullBitmap.contains(docIds[i])) {
+        blockNullBitmap.add(i);
+      }
+    }
+    return blockNullBitmap.isEmpty() ? null : blockNullBitmap;
   }
 }

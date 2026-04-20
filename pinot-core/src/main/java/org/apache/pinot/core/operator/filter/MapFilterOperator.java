@@ -32,12 +32,18 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.segment.index.columnarmap.ColumnarMapDataSource;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.reader.ColumnarMapIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -49,6 +55,8 @@ public class MapFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_MAP";
 
   private final JsonMatchFilterOperator _jsonMatchOperator;
+  private final BaseFilterOperator _perKeyInvertedIndexOperator;
+  private final BitmapBasedFilterOperator _presenceBitmapOperator;
   private final ExpressionFilterOperator _expressionFilterOperator;
   private final String _columnName;
   private final String _keyName;
@@ -68,6 +76,7 @@ public class MapFilterOperator extends BaseFilterOperator {
     _columnName = arguments.get(0).getIdentifier();
     _keyName = arguments.get(1).getLiteral().getStringValue();
 
+    // Strategy 1: Try JSON index on the parent MAP column
     JsonIndexReader jsonIndex = null;
     if (canUseJsonIndex(_predicate.getType())) {
       DataSource dataSource = indexSegment.getDataSourceNullable(_columnName);
@@ -83,14 +92,52 @@ public class MapFilterOperator extends BaseFilterOperator {
         }
       }
     }
+
     if (jsonIndex != null) {
       FilterContext filterContext = createFilterContext();
       _jsonMatchOperator = new JsonMatchFilterOperator(jsonIndex, filterContext, numDocs);
+      _perKeyInvertedIndexOperator = null;
+      _presenceBitmapOperator = null;
       _expressionFilterOperator = null;
-    } else {
-      _jsonMatchOperator = null;
-      _expressionFilterOperator = new ExpressionFilterOperator(indexSegment, queryContext, predicate, numDocs);
+      return;
     }
+
+    // Strategy 2: Try per-key inverted index from MapDataSource (COLUMNAR_MAP)
+    _jsonMatchOperator = null;
+    DataSource dataSource = indexSegment.getDataSourceNullable(_columnName);
+    if (dataSource instanceof MapDataSource && canUseJsonIndex(_predicate.getType())) {
+      MapDataSource mapDS = (MapDataSource) dataSource;
+      DataSource keyDS = mapDS.getKeyDataSource(_keyName);
+      if (keyDS != null && keyDS.getInvertedIndex() != null) {
+        PredicateEvaluator predicateEvaluator =
+            PredicateEvaluatorProvider.getPredicateEvaluator(predicate, keyDS, queryContext);
+        _perKeyInvertedIndexOperator =
+            FilterOperatorUtils.getLeafFilterOperator(queryContext, predicateEvaluator, keyDS, numDocs);
+        _presenceBitmapOperator = null;
+        _expressionFilterOperator = null;
+        return;
+      }
+    }
+
+    // Strategy 2b: IS_NULL / IS_NOT_NULL via presence bitmap (O(1) bitmap lookup)
+    _perKeyInvertedIndexOperator = null;
+    Predicate.Type predType = _predicate.getType();
+    if (predType == Predicate.Type.IS_NOT_NULL || predType == Predicate.Type.IS_NULL) {
+      if (dataSource instanceof ColumnarMapDataSource) {
+        ColumnarMapDataSource columnarDS = (ColumnarMapDataSource) dataSource;
+        ColumnarMapIndexReader reader = columnarDS.getColumnarMapIndexReader();
+        ImmutableRoaringBitmap presenceBitmap = reader.getPresenceBitmap(_keyName);
+        // IS_NOT_NULL: docs IN the presence bitmap; IS_NULL: docs NOT in bitmap (inverted)
+        boolean inverted = (predType == Predicate.Type.IS_NULL);
+        _presenceBitmapOperator = new BitmapBasedFilterOperator(presenceBitmap, inverted, numDocs);
+        _expressionFilterOperator = null;
+        return;
+      }
+    }
+
+    // Strategy 3: Full scan fallback via ExpressionFilterOperator
+    _presenceBitmapOperator = null;
+    _expressionFilterOperator = new ExpressionFilterOperator(indexSegment, queryContext, predicate, numDocs);
   }
 
   /**
@@ -127,6 +174,10 @@ public class MapFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     if (_jsonMatchOperator != null) {
       return _jsonMatchOperator.getTrues();
+    } else if (_perKeyInvertedIndexOperator != null) {
+      return _perKeyInvertedIndexOperator.getTrues();
+    } else if (_presenceBitmapOperator != null) {
+      return _presenceBitmapOperator.getTrues();
     } else {
       return _expressionFilterOperator.getTrues();
     }
@@ -136,6 +187,10 @@ public class MapFilterOperator extends BaseFilterOperator {
   public boolean canOptimizeCount() {
     if (_jsonMatchOperator != null) {
       return _jsonMatchOperator.canOptimizeCount();
+    } else if (_perKeyInvertedIndexOperator != null) {
+      return _perKeyInvertedIndexOperator.canOptimizeCount();
+    } else if (_presenceBitmapOperator != null) {
+      return _presenceBitmapOperator.canOptimizeCount();
     } else {
       return _expressionFilterOperator.canOptimizeCount();
     }
@@ -145,6 +200,10 @@ public class MapFilterOperator extends BaseFilterOperator {
   public int getNumMatchingDocs() {
     if (_jsonMatchOperator != null) {
       return _jsonMatchOperator.getNumMatchingDocs();
+    } else if (_perKeyInvertedIndexOperator != null) {
+      return _perKeyInvertedIndexOperator.getNumMatchingDocs();
+    } else if (_presenceBitmapOperator != null) {
+      return _presenceBitmapOperator.getNumMatchingDocs();
     } else {
       return _expressionFilterOperator.getNumMatchingDocs();
     }
@@ -154,6 +213,10 @@ public class MapFilterOperator extends BaseFilterOperator {
   public boolean canProduceBitmaps() {
     if (_jsonMatchOperator != null) {
       return _jsonMatchOperator.canProduceBitmaps();
+    } else if (_perKeyInvertedIndexOperator != null) {
+      return _perKeyInvertedIndexOperator.canProduceBitmaps();
+    } else if (_presenceBitmapOperator != null) {
+      return _presenceBitmapOperator.canProduceBitmaps();
     } else {
       return _expressionFilterOperator.canProduceBitmaps();
     }
@@ -163,6 +226,10 @@ public class MapFilterOperator extends BaseFilterOperator {
   public BitmapCollection getBitmaps() {
     if (_jsonMatchOperator != null) {
       return _jsonMatchOperator.getBitmaps();
+    } else if (_perKeyInvertedIndexOperator != null) {
+      return _perKeyInvertedIndexOperator.getBitmaps();
+    } else if (_presenceBitmapOperator != null) {
+      return _presenceBitmapOperator.getBitmaps();
     } else {
       return _expressionFilterOperator.getBitmaps();
     }
@@ -182,6 +249,10 @@ public class MapFilterOperator extends BaseFilterOperator {
 
     if (_jsonMatchOperator != null) {
       stringBuilder.append(",delegateTo:json_match");
+    } else if (_perKeyInvertedIndexOperator != null) {
+      stringBuilder.append(",delegateTo:per_key_inverted_index");
+    } else if (_presenceBitmapOperator != null) {
+      stringBuilder.append(",delegateTo:presence_bitmap");
     } else {
       stringBuilder.append(",delegateTo:expression_filter");
     }
@@ -205,6 +276,10 @@ public class MapFilterOperator extends BaseFilterOperator {
 
     if (_jsonMatchOperator != null) {
       attributeBuilder.putString("delegateTo", "json_match");
+    } else if (_perKeyInvertedIndexOperator != null) {
+      attributeBuilder.putString("delegateTo", "per_key_inverted_index");
+    } else if (_presenceBitmapOperator != null) {
+      attributeBuilder.putString("delegateTo", "presence_bitmap");
     } else {
       attributeBuilder.putString("delegateTo", "expression_filter");
     }
