@@ -33,12 +33,12 @@ This example demonstrates how to use the Pinot Spark 4 Connector to read data fr
 
 - The Pinot Spark 4 Connector shaded JAR built and available at:
   ```
-  $PINOT_HOME/pinot-spark-4/pinot-spark-4-connector/target/pinot-spark-4-connector-*-shaded.jar
+  $PINOT_HOME/pinot-connectors/pinot-spark-4-connector/target/pinot-spark-4-connector-*-shaded.jar
   ```
 
 - Example Scala script located at:
   ```
-  $PINOT_HOME/pinot-spark-4/pinot-spark-4-connector/examples/read_pinot_from_proxy_with_auth_token.scala
+  $PINOT_HOME/pinot-connectors/pinot-spark-4-connector/examples/read_pinot_from_proxy_with_auth_token.scala
   ```
 
 ## How to Run
@@ -46,7 +46,7 @@ This example demonstrates how to use the Pinot Spark 4 Connector to read data fr
 Launch the example in `spark-shell` with the following command:
 
 ```bash
-spark-shell --master 'local[*]' --name read-pinot --jars "$PINOT_HOME/pinot-spark-4/pinot-spark-4-connector/target/pinot-spark-4-connector-*-shaded.jar" < "$PINOT_HOME/pinot-spark-4/pinot-spark-4-connector/examples/read_pinot_from_proxy_with_auth_token.scala"
+spark-shell --master 'local[*]' --name read-pinot --jars "$PINOT_HOME/pinot-connectors/pinot-spark-4-connector/target/pinot-spark-4-connector-*-shaded.jar" < "$PINOT_HOME/pinot-connectors/pinot-spark-4-connector/examples/read_pinot_from_proxy_with_auth_token.scala"
 ```
 
 
