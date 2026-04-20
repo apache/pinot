@@ -90,6 +90,10 @@
         plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-3/pinot-batch-ingestion-spark-3-${project.version}-shaded.jar
       </destName>
     </file>
+    <!-- pinot-batch-ingestion-spark-4 is built only under the root-pom pinot-spark-4 profile
+         (JDK 21+). The fileSet entry at the bottom of this descriptor includes the resulting
+         shaded jar when present and silently no-ops when it is not, so this single descriptor
+         works for both JDK 11 and JDK 21 bin-dist builds. -->
     <!-- End Include Pinot Batch Ingestion Plugins-->
     <!-- Start Include Pinot File System Plugins-->
     <file>
@@ -271,6 +275,17 @@
       <directory>${pinot.root}/pinot-tools/target/pinot-tools-pkg/bin</directory>
       <outputDirectory>bin</outputDirectory>
       <fileMode>0755</fileMode>
+    </fileSet>
+    <!-- Conditionally include pinot-batch-ingestion-spark-4 when its shaded jar exists. The
+         module is built only on JDK 21+ (see root-pom pinot-spark-4 profile). Using a fileSet
+         here rather than a top-level <file> entry means this silently matches nothing on JDK 11
+         builds and pulls in the jar on JDK 21 builds, so one descriptor handles both paths. -->
+    <fileSet>
+      <directory>${pinot.root}/pinot-spark-4/pinot-batch-ingestion-spark-4/target</directory>
+      <outputDirectory>plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-4</outputDirectory>
+      <includes>
+        <include>pinot-batch-ingestion-spark-4-${project.version}-shaded.jar</include>
+      </includes>
     </fileSet>
   </fileSets>
 </assembly>
