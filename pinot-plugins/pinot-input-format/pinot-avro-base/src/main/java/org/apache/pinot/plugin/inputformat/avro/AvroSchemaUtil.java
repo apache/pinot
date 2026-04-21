@@ -34,6 +34,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// Stateless helpers for mapping between Avro schema shapes and Pinot's [DataType] / Avro JSON schema representations.
@@ -98,11 +99,22 @@ public class AvroSchemaUtil {
 
   /**
    * Returns the Pinot data type associated with the given Avro schema, including logical types.
+   *
+   * <p>Recognizes the UUID logical type on both STRING-backed schemas (Avro spec §logical-types.uuid) and FIXED(16)
+   * schemas (used by some producers including Confluent's fixed-uuid mode). Both forms arrive at
+   * {@link org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor} as either a {@link java.util.UUID} (for
+   * STRING-backed logical UUIDs) or a 16-byte {@code byte[]} (for FIXED-backed ones), and both are accepted by
+   * {@link org.apache.pinot.spi.utils.UuidUtils#toBytes(Object)}.
    */
   public static DataType valueOf(Schema schema) {
     LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(schema);
-    if (logicalType != null && UUID.equals(logicalType.getName()) && schema.getType() == Schema.Type.STRING) {
-      return DataType.UUID;
+    if (logicalType != null && UUID.equals(logicalType.getName())) {
+      if (schema.getType() == Schema.Type.STRING) {
+        return DataType.UUID;
+      }
+      if (schema.getType() == Schema.Type.FIXED && schema.getFixedSize() == UuidUtils.UUID_NUM_BYTES) {
+        return DataType.UUID;
+      }
     }
     return valueOf(schema.getType());
   }

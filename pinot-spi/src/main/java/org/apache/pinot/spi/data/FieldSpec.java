@@ -86,6 +86,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
+  // NOTE: The nil UUID (all-zero bytes, "00000000-0000-0000-0000-000000000000") is used as the default null sentinel
+  // for UUID columns. Applications that legitimately ingest the nil UUID as a real data value cannot distinguish it
+  // from a null row unless column-based null handling is enabled (enableColumnBasedNullHandling=true in the schema).
+  // Strongly recommend enabling column-based null handling for UUID columns to avoid this ambiguity.
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_UUID = UuidUtils.nullUuidBytes();
   public static final BigDecimal DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
 

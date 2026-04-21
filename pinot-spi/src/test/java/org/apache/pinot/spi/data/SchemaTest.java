@@ -112,7 +112,7 @@ public class SchemaTest {
     schema.addField(new DimensionFieldSpec("uuidMv", FieldSpec.DataType.UUID, false));
 
     IllegalStateException exception = Assert.expectThrows(IllegalStateException.class, schema::validate);
-    assertThat(exception).hasMessageContaining("single-value fields");
+    assertThat(exception).hasMessageContaining("UUID columns cannot be multi-value");
   }
 
   @Test
