@@ -173,7 +173,7 @@ public class DataSchema {
       int length = buffer.getInt();
       byte[] bytes = new byte[length];
       buffer.get(bytes);
-      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
+      columnDataTypes[i] = parseColumnDataType(new String(bytes, UTF_8));
     }
     return new DataSchema(columnNames, columnDataTypes);
   }
@@ -196,9 +196,21 @@ public class DataSchema {
       int length = buffer.readInt();
       byte[] bytes = new byte[length];
       buffer.readFully(bytes);
-      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
+      columnDataTypes[i] = parseColumnDataType(new String(bytes, UTF_8));
     }
     return new DataSchema(columnNames, columnDataTypes);
+  }
+
+  private static ColumnDataType parseColumnDataType(String name) {
+    try {
+      return ColumnDataType.valueOf(name);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "Unrecognized ColumnDataType '" + name + "' received from a peer node. This typically means the peer is "
+              + "running a newer build that introduced a data type not yet known to this node. Upgrade all brokers "
+              + "and servers to the same build before querying columns of that type, or keep those columns out of "
+              + "queries until the rolling upgrade is complete.", e);
+    }
   }
 
   @SuppressWarnings("MethodDoesntCallSuperMethod")
