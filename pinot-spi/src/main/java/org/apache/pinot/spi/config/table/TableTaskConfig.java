@@ -57,9 +57,9 @@ public class TableTaskConfig extends BaseJsonConfig {
    * <ul>
    *   <li>{@code null} (default) — inherit the cluster-level setting
    *       ({@code controller.task.concurrentSchedulingEnabled}).</li>
-   *   <li>{@code true} — opt this table into the concurrent scheduling path that uses a per-table
-   *       JVM lock (plus the distributed ZK lock) instead of a global controller-wide
-   *       {@code synchronized} lock. Allows task generation for other tables to proceed in
+   *   <li>{@code true} — opt this table into the concurrent scheduling path, which drops the
+   *       controller-wide {@code synchronized} lock and relies on the distributed ZK lock for
+   *       same-table coordination. Allows task generation for other tables to proceed in
    *       parallel.</li>
    *   <li>{@code false} — force legacy behavior for this table even when the cluster default is
    *       concurrent. Useful as a per-table escape hatch.</li>
