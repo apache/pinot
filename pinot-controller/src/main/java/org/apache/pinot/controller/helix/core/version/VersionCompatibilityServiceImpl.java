@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * <p><b>Caching:</b> Helix is queried at most once per {@link #_cacheTtlMs} milliseconds.
  * The TTL is seeded from {@link ControllerConf} at construction time and may be overridden at
  * runtime by the Helix cluster config key
- * {@link ControllerConf.ControllerPeriodicTasksConf#VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS}.
+ * {@link ControllerConf.ControllerPeriodicTasksConf#VERSION_COMPATIBILITY_CACHE_TTL_SECONDS}.
  *
  * <p><b>Live-instance filtering:</b> Only instances with an active Helix LiveInstance ZNode
  * participate in min/max version calculations.  Dead instances with stale InstanceConfigs are
@@ -81,7 +81,7 @@ public class VersionCompatibilityServiceImpl implements VersionCompatibilityServ
   public VersionCompatibilityServiceImpl(PinotHelixResourceManager helixResourceManager,
       ControllerConf controllerConf) {
     _helixResourceManager = helixResourceManager;
-    _cacheTtlMs = clampTtlMs(controllerConf.getVersionHealthCheckCacheTtlSeconds() * 1000L);
+    _cacheTtlMs = clampTtlMs(controllerConf.getVersionCompatibilityCacheTtlSeconds() * 1000L);
   }
 
   private static long clampTtlMs(long ttlMs) {
@@ -190,22 +190,22 @@ public class VersionCompatibilityServiceImpl implements VersionCompatibilityServ
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     if (!changedConfigs.contains(
-        ControllerConf.ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS)) {
+        ControllerConf.ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS)) {
       return;
     }
     String raw = clusterConfigs.get(
-        ControllerConf.ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS);
+        ControllerConf.ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS);
     long newTtlSec;
     try {
       newTtlSec = Long.parseLong(raw);
     } catch (NumberFormatException e) {
       LOGGER.warn("Ignoring invalid cluster config value for {}: {}",
-          ControllerConf.ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS, raw);
+          ControllerConf.ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS, raw);
       return;
     }
     if (newTtlSec <= 0) {
       LOGGER.warn("Ignoring non-positive cluster config value for {}: {}",
-          ControllerConf.ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS, newTtlSec);
+          ControllerConf.ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS, newTtlSec);
       return;
     }
     long newTtlMs = clampTtlMs(newTtlSec * 1000L);

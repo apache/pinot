@@ -307,15 +307,16 @@ public class ControllerConf extends PinotConfiguration {
 
     public static final String DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_PERIOD = "-1s"; // Disabled by default
 
-    // Cluster version health check task
-    public static final String VERSION_HEALTH_CHECK_FREQUENCY_PERIOD =
-        "controller.versionHealthCheck.frequencyPeriod";
-    public static final String DEFAULT_VERSION_HEALTH_CHECK_FREQUENCY_PERIOD = "5m";
+    // Cluster version metrics emitter: periodically (re)publishes the per-(component, version)
+    // live-instance-count gauge. Only the lead controller publishes.
+    public static final String CLUSTER_VERSION_METRICS_FREQUENCY_PERIOD =
+        "controller.clusterVersionMetrics.frequencyPeriod";
+    public static final String DEFAULT_CLUSTER_VERSION_METRICS_FREQUENCY_PERIOD = "5m";
     // How long the VersionCompatibilityService caches the Helix snapshot before re-reading.
     // Can also be overridden at runtime via the Helix cluster config with the same key.
-    public static final String VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS =
-        "controller.versionHealthCheck.cacheTtlSeconds";
-    public static final int DEFAULT_VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS = 30;
+    public static final String VERSION_COMPATIBILITY_CACHE_TTL_SECONDS =
+        "controller.versionCompatibility.cacheTtlSeconds";
+    public static final int DEFAULT_VERSION_COMPATIBILITY_CACHE_TTL_SECONDS = 30;
   }
 
   public static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
@@ -1018,27 +1019,27 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(ControllerPeriodicTasksConf.STALE_INSTANCES_CLEANUP_TASK_INSTANCES_RETENTION_PERIOD, retentionPeriod);
   }
 
-  public int getVersionHealthCheckFrequencyInSeconds() {
-    String period = getProperty(ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_FREQUENCY_PERIOD,
-        ControllerPeriodicTasksConf.DEFAULT_VERSION_HEALTH_CHECK_FREQUENCY_PERIOD);
-    if (!isValidPeriodWithLogging(ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_FREQUENCY_PERIOD, period)) {
-      period = ControllerPeriodicTasksConf.DEFAULT_VERSION_HEALTH_CHECK_FREQUENCY_PERIOD;
+  public int getClusterVersionMetricsFrequencyInSeconds() {
+    String period = getProperty(ControllerPeriodicTasksConf.CLUSTER_VERSION_METRICS_FREQUENCY_PERIOD,
+        ControllerPeriodicTasksConf.DEFAULT_CLUSTER_VERSION_METRICS_FREQUENCY_PERIOD);
+    if (!isValidPeriodWithLogging(ControllerPeriodicTasksConf.CLUSTER_VERSION_METRICS_FREQUENCY_PERIOD, period)) {
+      period = ControllerPeriodicTasksConf.DEFAULT_CLUSTER_VERSION_METRICS_FREQUENCY_PERIOD;
     }
     return (int) convertPeriodToSeconds(period);
   }
 
-  public void setVersionHealthCheckFrequencyInSeconds(int seconds) {
-    setProperty(ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_FREQUENCY_PERIOD,
+  public void setClusterVersionMetricsFrequencyInSeconds(int seconds) {
+    setProperty(ControllerPeriodicTasksConf.CLUSTER_VERSION_METRICS_FREQUENCY_PERIOD,
         Integer.toString(seconds) + "s");
   }
 
-  public int getVersionHealthCheckCacheTtlSeconds() {
-    return getProperty(ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS,
-        ControllerPeriodicTasksConf.DEFAULT_VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS);
+  public int getVersionCompatibilityCacheTtlSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_VERSION_COMPATIBILITY_CACHE_TTL_SECONDS);
   }
 
-  public void setVersionHealthCheckCacheTtlSeconds(int seconds) {
-    setProperty(ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS, seconds);
+  public void setVersionCompatibilityCacheTtlSeconds(int seconds) {
+    setProperty(ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS, seconds);
   }
 
   public int getDefaultTableMinReplicas() {

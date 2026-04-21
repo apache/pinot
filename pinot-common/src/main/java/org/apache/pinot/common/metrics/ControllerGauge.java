@@ -226,7 +226,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // HTTP thread utilization
   HTTP_THREAD_UTILIZATION("httpThreadUtilization", true),
   // Track the concurrent executions of the API resources that use @ManagedAsync
-  MANAGED_ASYNC_ACTIVE_THREADS("threads", true);
+  MANAGED_ASYNC_ACTIVE_THREADS("threads", true),
+
+  // Per-component, per-version live instance count. Suffixed with "<componentType>.<rawVersion>"
+  // (e.g. SERVER.1.2.3). Overwritten on each emit cycle; stale labels are cleared by the emitter.
+  CLUSTER_INSTANCE_VERSION_COUNT("instances", true);
 
 
   private final String _gaugeName;

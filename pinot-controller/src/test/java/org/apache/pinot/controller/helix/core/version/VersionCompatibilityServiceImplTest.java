@@ -100,7 +100,7 @@ public class VersionCompatibilityServiceImplTest {
 
   private static ControllerConf confWithTtlSeconds(long ttlSec) {
     ControllerConf cc = new ControllerConf();
-    cc.setProperty(ControllerConf.ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS,
+    cc.setProperty(ControllerConf.ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS,
         String.valueOf(ttlSec));
     return cc;
   }
@@ -318,9 +318,9 @@ public class VersionCompatibilityServiceImplTest {
 
     // Change TTL to a different positive value; cache should be invalidated.
     svc.onChange(Collections.singleton(
-            ControllerConf.ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS),
+            ControllerConf.ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS),
         Collections.singletonMap(
-            ControllerConf.ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS, "5"));
+            ControllerConf.ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS, "5"));
     svc.getClusterVersionSummary();
     assertEquals(svc.fetchCount(), fetchesBefore + 1,
         "onChange with new TTL should invalidate cache and force refetch");
@@ -334,9 +334,9 @@ public class VersionCompatibilityServiceImplTest {
     int fetchesBefore = svc.fetchCount();
 
     svc.onChange(Collections.singleton(
-            ControllerConf.ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS),
+            ControllerConf.ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS),
         Collections.singletonMap(
-            ControllerConf.ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS, "not-a-number"));
+            ControllerConf.ControllerPeriodicTasksConf.VERSION_COMPATIBILITY_CACHE_TTL_SECONDS, "not-a-number"));
     svc.getClusterVersionSummary();
     assertEquals(svc.fetchCount(), fetchesBefore,
         "onChange with malformed value should neither invalidate nor crash");

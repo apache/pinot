@@ -120,7 +120,7 @@ import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
-import org.apache.pinot.controller.helix.core.version.ClusterVersionHealthCheckTask;
+import org.apache.pinot.controller.helix.core.version.ClusterVersionMetricsEmitter;
 import org.apache.pinot.controller.helix.core.version.VersionCompatibilityService;
 import org.apache.pinot.controller.helix.core.version.VersionCompatibilityServiceImpl;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
@@ -1068,9 +1068,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     PeriodicTask tenantRebalanceChecker =
         new TenantRebalanceChecker(_config, _helixResourceManager, _tenantRebalancer);
     periodicTasks.add(tenantRebalanceChecker);
-    ClusterVersionHealthCheckTask versionHealthCheckTask =
-        new ClusterVersionHealthCheckTask(_leadControllerManager, _config, _versionCompatibilityService);
-    periodicTasks.add(versionHealthCheckTask);
+    ClusterVersionMetricsEmitter clusterVersionMetricsEmitter = new ClusterVersionMetricsEmitter(
+        _leadControllerManager, _config, _versionCompatibilityService, _controllerMetrics);
+    periodicTasks.add(clusterVersionMetricsEmitter);
 
     return periodicTasks;
   }
