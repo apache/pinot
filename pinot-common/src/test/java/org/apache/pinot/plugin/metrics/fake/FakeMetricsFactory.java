@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.metrics.fake;
 
-import com.google.auto.service.AutoService;
 import java.util.function.Function;
 import org.apache.pinot.spi.annotations.metrics.MetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
@@ -33,7 +32,6 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
  * A test-only {@link PinotMetricsFactory} backed by the in-memory {@link FakePinotMetricsRegistry}. Used by
  * pinot-common tests so they can exercise {@code AbstractMetrics} without depending on a plugin module.
  */
-@AutoService(PinotMetricsFactory.class)
 @MetricsFactory
 public class FakeMetricsFactory implements PinotMetricsFactory {
   private PinotMetricsRegistry _registry;

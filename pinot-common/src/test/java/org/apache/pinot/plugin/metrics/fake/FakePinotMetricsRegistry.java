@@ -84,7 +84,8 @@ public class FakePinotMetricsRegistry implements PinotMetricsRegistry {
 
   @Override
   public PinotHistogram newHistogram(PinotMetricName name, boolean biased) {
-    return null;
+    throw new UnsupportedOperationException("FakePinotMetricsRegistry does not implement histograms; "
+        + "add a FakePinotHistogram if a test needs one");
   }
 
   @Override

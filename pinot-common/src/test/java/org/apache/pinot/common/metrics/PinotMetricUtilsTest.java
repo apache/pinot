@@ -113,6 +113,11 @@ public class PinotMetricUtilsTest {
 
   @Test
   public void testPinotMetricName() {
+    // Explicitly install the fake factory so this test doesn't rely on whichever factory a prior test left behind.
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, FakeMetricsFactory.class.getName());
+    PinotMetricUtils.init(new PinotConfiguration(properties));
+
     PinotMetricName testMetricName1 =
         PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMetricName");
     PinotMetricName testMetricName2 =
