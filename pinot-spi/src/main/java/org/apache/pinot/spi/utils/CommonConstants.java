@@ -2204,21 +2204,21 @@ public class CommonConstants {
     public static final String KEY_OF_CANCEL_TIMEOUT_MS = "pinot.server.query.cancel.timeout.ms";
     public static final long DEFAULT_OF_CANCEL_TIMEOUT_MS = 1000;
 
-    /// gRPC keep-alive time for broker dispatch channels, in seconds. Values &gt; 0 enable keep-alive pings so that a
-    /// silently unreachable server (e.g. kernel-dead node, one-way network partition) transitions the dispatch channel
-    /// out of `READY`, which in turn lets the broker's FailureDetector exclude it from routing.
+    /// gRPC keep-alive time for broker dispatch channels, in milliseconds. Values &gt; 0 enable keep-alive pings so
+    /// that a silently unreachable server (e.g. kernel-dead node, one-way network partition) transitions the dispatch
+    /// channel out of `READY`, which in turn lets the broker's FailureDetector exclude it from routing.
     ///
     /// Defaults are chosen to be safe against Netty's default gRPC server enforcement
     /// (`permitKeepAliveTime` = 5 minutes, `permitKeepAliveWithoutCalls` = false); operators may tune these down for
     /// faster silent-peer detection once the server side has been configured to permit a higher ping rate.
-    public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_SECONDS =
-        "pinot.query.multistage.dispatch.channel.keep.alive.time.seconds";
-    public static final int DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_SECONDS = 300;
+    public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS =
+        "pinot.query.multistage.dispatch.channel.keep.alive.time.ms";
+    public static final int DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS = 300_000;
 
-    /// gRPC keep-alive timeout for broker dispatch channels, in seconds. Only applies when keep-alive is enabled.
-    public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_SECONDS =
-        "pinot.query.multistage.dispatch.channel.keep.alive.timeout.seconds";
-    public static final int DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_SECONDS = 30;
+    /// gRPC keep-alive timeout for broker dispatch channels, in milliseconds. Only applies when keep-alive is enabled.
+    public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_MS =
+        "pinot.query.multistage.dispatch.channel.keep.alive.timeout.ms";
+    public static final int DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_MS = 30_000;
 
     /// Whether to send gRPC keep-alive pings on dispatch channels even when there are no active calls. Default is
     /// `false` because Netty's default gRPC server rejects pings-without-calls with `GOAWAY (ENHANCE_YOUR_CALM)`.
