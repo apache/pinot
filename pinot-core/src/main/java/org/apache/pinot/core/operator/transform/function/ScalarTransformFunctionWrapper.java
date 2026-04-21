@@ -376,6 +376,25 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     return _stringValuesMV;
   }
 
+  @Override
+  public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
+      return super.transformToBytesValuesMV(valueBlock);
+    }
+    int length = valueBlock.getNumDocs();
+    initBytesValuesMV(length);
+    getNonLiteralValues(valueBlock);
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numNonLiteralArguments; j++) {
+        _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
+      }
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _bytesValuesMV[i] =
+          value != null ? toBytesArray((ByteArray[]) _resultType.toInternal(value)) : NullValuePlaceHolder.BYTES_ARRAY;
+    }
+    return _bytesValuesMV;
+  }
+
   /**
    * Helper method to fetch values for the non-literal transform functions based on the parameter types.
    */
@@ -489,9 +508,36 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BYTES_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesMV(valueBlock);
           break;
+        case UUID_ARRAY:
+          _nonLiteralValues[i] = toUuidValuesMV(transformFunction.transformToBytesValuesMV(valueBlock));
+          break;
         default:
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);
       }
     }
+  }
+
+  private static UUID[][] toUuidValuesMV(byte[][][] bytesValuesMV) {
+    int numDocs = bytesValuesMV.length;
+    UUID[][] uuidValuesMV = new UUID[numDocs][];
+    for (int i = 0; i < numDocs; i++) {
+      byte[][] bytesValues = bytesValuesMV[i];
+      int numValues = bytesValues.length;
+      UUID[] uuidValues = new UUID[numValues];
+      for (int j = 0; j < numValues; j++) {
+        uuidValues[j] = UuidUtils.toUUID(bytesValues[j]);
+      }
+      uuidValuesMV[i] = uuidValues;
+    }
+    return uuidValuesMV;
+  }
+
+  private static byte[][] toBytesArray(ByteArray[] byteArray) {
+    int numValues = byteArray.length;
+    byte[][] bytesArray = new byte[numValues][];
+    for (int i = 0; i < numValues; i++) {
+      bytesArray[i] = byteArray[i].getBytes();
+    }
+    return bytesArray;
   }
 }

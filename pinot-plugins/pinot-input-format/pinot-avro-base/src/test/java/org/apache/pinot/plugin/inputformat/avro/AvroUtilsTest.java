@@ -24,17 +24,14 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.LogicalTypes;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 
 
 public class AvroUtilsTest {
@@ -164,25 +161,29 @@ public class AvroUtilsTest {
   }
 
   @Test
-  public void testGetPinotSchemaFromAvroSchemaRejectsUuidArray() {
+  public void testGetPinotSchemaFromAvroSchemaWithUuidArray() {
     org.apache.avro.Schema uuidSchema =
         LogicalTypes.uuid().addToSchema(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING));
     org.apache.avro.Schema avroSchema = org.apache.avro.SchemaBuilder.record("uuidArrayRecord").fields()
         .name("uuidArray").type().array().items(uuidSchema).noDefault().endRecord();
 
-    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class,
-        () -> AvroUtils.getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, null, null,
-            new ArrayList<>(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE));
-    assertTrue(exception.getMessage().contains("ARRAY<uuid>"));
+    Schema inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, null, null,
+        new ArrayList<>(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
+
+    Schema expectedSchema =
+        new Schema.SchemaBuilder().addMultiValueDimension("uuidArray", DataType.UUID).build();
+    assertEquals(inferredPinotSchema, expectedSchema);
   }
 
   @Test
-  public void testGetAvroSchemaFromPinotSchemaRejectsMvUuid() {
-    Schema pinotSchema = new Schema();
-    pinotSchema.addField(new DimensionFieldSpec("uuidMv", DataType.UUID, false));
+  public void testGetAvroSchemaFromPinotSchemaWithMvUuid() {
+    Schema pinotSchema = new Schema.SchemaBuilder().addMultiValueDimension("uuidMv", DataType.UUID).build();
 
-    IllegalStateException exception =
-        Assert.expectThrows(IllegalStateException.class, () -> AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema));
-    assertTrue(exception.getMessage().contains("single-value"));
+    org.apache.avro.Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema);
+    org.apache.avro.Schema fieldSchema = avroSchema.getField("uuidMv").schema();
+
+    assertEquals(fieldSchema.getType(), org.apache.avro.Schema.Type.ARRAY);
+    assertEquals(fieldSchema.getElementType().getType(), org.apache.avro.Schema.Type.STRING);
+    assertEquals(fieldSchema.getElementType().getLogicalType().getName(), "uuid");
   }
 }

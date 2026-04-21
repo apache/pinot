@@ -191,7 +191,14 @@ public class AvroSchemaUtil {
         uuidType.put("logicalType", "uuid");
         ArrayNode uuidUnion = JsonUtils.newArrayNode();
         uuidUnion.add("null");
-        uuidUnion.add(uuidType);
+        if (fieldSpec.isSingleValueField()) {
+          uuidUnion.add(uuidType);
+        } else {
+          ObjectNode uuidArrayType = JsonUtils.newObjectNode();
+          uuidArrayType.put("type", "array");
+          uuidArrayType.set("items", uuidType);
+          uuidUnion.add(uuidArrayType);
+        }
         jsonSchema.set("type", uuidUnion);
         return jsonSchema;
       case BYTES:
