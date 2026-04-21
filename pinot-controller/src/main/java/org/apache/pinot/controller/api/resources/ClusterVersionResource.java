@@ -71,7 +71,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
     key = SWAGGER_AUTHORIZATION_KEY,
     description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
-@Path("/cluster")
+@Path("/")
 public class ClusterVersionResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterVersionResource.class);
   private static final Set<String> VALID_COMPONENT_TYPES = Set.of("CONTROLLER", "BROKER", "SERVER", "MINION");
@@ -89,7 +89,7 @@ public class ClusterVersionResource {
    *                      or {@code MINION}. When absent all component types are returned.
    */
   @GET
-  @Path("/versions")
+  @Path("/cluster/versions")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_VERSION)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get cluster-wide version summary for all or one component type")
@@ -140,7 +140,7 @@ public class ClusterVersionResource {
    * {@link ClusterVersionSummary#getComponentSummaries()} field.
    */
   @GET
-  @Path("/compatibility")
+  @Path("/cluster/compatibility")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_VERSION)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check cluster version compatibility (rollout-order validation)")
