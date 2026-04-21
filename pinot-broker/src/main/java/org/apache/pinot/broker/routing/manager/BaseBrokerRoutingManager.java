@@ -40,6 +40,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -162,10 +163,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
   private Set<String> _routableServers;
 
-  // Snapshot of {@code _enabledServerInstanceMap} restricted to {@code _routableServers} (enabled minus excluded).
-  // Maintained in lockstep with {@code _routableServers} under {@code _globalLock.writeLock()}. Callers that select
-  // workers outside of per-table instance selection (MSE intermediate-stage worker picking) read this snapshot so
-  // that FailureDetector-driven exclusions are honored.
+  /// Snapshot of `_enabledServerInstanceMap` restricted to `_routableServers` (enabled minus excluded). Maintained in
+  /// lockstep with `_routableServers` under `_globalLock.writeLock()`. Callers that select workers outside of
+  /// per-table instance selection (MSE intermediate-stage worker picking) read this snapshot so that
+  /// FailureDetector-driven exclusions are honored.
   private volatile Map<String, ServerInstance> _routableServerInstanceMap = Collections.emptyMap();
 
   // Process assignment change timestamp. Used to check if buildRouting needs to be re-run for a given table to avoid
@@ -1186,8 +1187,11 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return _routableServerInstanceMap;
   }
 
-  // Must be called under {@code _globalLock.writeLock()} whenever {@code _routableServers} is reassigned.
+  /// Must be called under `_globalLock.writeLock()` whenever `_routableServers` is reassigned.
+  @GuardedBy("_globalLock.writeLock()")
   private Map<String, ServerInstance> buildRoutableServerInstanceMap() {
+    assert ((ReentrantReadWriteLock) _globalLock).isWriteLockedByCurrentThread()
+        : "buildRoutableServerInstanceMap must be called under _globalLock.writeLock()";
     Set<String> routableServers = _routableServers;
     if (routableServers == null || routableServers.isEmpty()) {
       return Collections.emptyMap();

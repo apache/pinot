@@ -86,7 +86,7 @@ class DispatchClient {
   }
 
   /// Immutable gRPC keep-alive configuration for broker dispatch channels. Keep-alive is disabled when
-  /// {@code timeSeconds} is not positive, matching the convention in {@link org.apache.pinot.common.config.GrpcConfig}.
+  /// `timeSeconds` is not positive, matching the convention in [org.apache.pinot.common.config.GrpcConfig].
   static final class KeepAliveConfig {
     static final KeepAliveConfig DISABLED = new KeepAliveConfig(-1, 30, false);
 
