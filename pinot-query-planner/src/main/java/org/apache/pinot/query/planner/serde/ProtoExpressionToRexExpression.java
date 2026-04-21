@@ -146,6 +146,7 @@ public class ProtoExpressionToRexExpression {
         }
         return new RexExpression.Literal(dataType, values);
       }
+      case UUID_ARRAY:
       case BYTES_ARRAY: {
         Expressions.BytesArray bytesArray = literal.getBytesArray();
         int numValues = bytesArray.getValuesCount();
@@ -184,6 +185,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.BYTES;
       case UUID:
         return ColumnDataType.UUID;
+      case UUID_ARRAY:
+        return ColumnDataType.UUID_ARRAY;
       case INT_ARRAY:
         return ColumnDataType.INT_ARRAY;
       case LONG_ARRAY:

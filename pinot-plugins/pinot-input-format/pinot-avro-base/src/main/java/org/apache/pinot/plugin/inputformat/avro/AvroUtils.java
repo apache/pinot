@@ -162,11 +162,13 @@ public class AvroUtils {
 
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
       if (fieldSpec.getDataType() == DataType.UUID) {
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            "UUID data type only supports single-value fields: %s", fieldSpec.getName());
         org.apache.avro.Schema uuidSchema = LogicalTypes.uuid().addToSchema(org.apache.avro.Schema.create(
             org.apache.avro.Schema.Type.STRING));
-        fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type(uuidSchema).noDefault();
+        if (fieldSpec.isSingleValueField()) {
+          fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type(uuidSchema).noDefault();
+        } else {
+          fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items(uuidSchema).noDefault();
+        }
         continue;
       }
       DataType storedType = fieldSpec.getDataType().getStoredType();
@@ -254,11 +256,7 @@ public class AvroUtils {
     try {
       org.apache.avro.Schema fieldSchema = extractSupportedSchema(field.schema());
       if (fieldSchema.getType() == org.apache.avro.Schema.Type.ARRAY) {
-        DataType elementDataType = AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()));
-        Preconditions.checkState(elementDataType != DataType.UUID,
-            "Avro ARRAY<uuid> cannot be mapped to Pinot UUID because UUID data type only supports single-value "
-                + "fields: %s", field.name());
-        return elementDataType;
+        return AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()));
       } else {
         return AvroSchemaUtil.valueOf(fieldSchema);
       }
@@ -337,11 +335,9 @@ public class AvroUtils {
           extractSchemaWithComplexTypeHandling(elementType, fieldsToUnnest, delimiter, path, pinotSchema, fieldTypeMap,
               timeUnit, collectionNotUnnestedToJson);
         } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE
-            && AvroSchemaUtil.isPrimitiveType(elementType.getType())) {
+            && (AvroSchemaUtil.isPrimitiveType(elementType.getType())
+                || AvroSchemaUtil.valueOf(elementType) == DataType.UUID)) {
           DataType elementDataType = AvroSchemaUtil.valueOf(elementType);
-          Preconditions.checkState(elementDataType != DataType.UUID,
-              "Avro ARRAY<uuid> cannot be mapped to Pinot UUID because UUID data type only supports single-value "
-                  + "fields: %s", path);
           addFieldToPinotSchema(pinotSchema, elementDataType, path, false, fieldTypeMap, timeUnit);
         } else if (shallConvertToJson(collectionNotUnnestedToJson, elementType)) {
           addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);

@@ -525,9 +525,9 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public <R> R accept(Visitor<R> visitor) {
-      Set<ByteArray> matchingByteArrays = new ObjectOpenHashSet<>(_matchingValues.size());
-      for (UuidKey key : _matchingValues) {
-        matchingByteArrays.add(key.toByteArray());
+      Set<ByteArray> matchingByteArrays = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(_matchingValues.size()));
+      for (UuidKey matchingValue : _matchingValues) {
+        matchingByteArrays.add(matchingValue.toByteArray());
       }
       return visitor.visitBytes(matchingByteArrays);
     }

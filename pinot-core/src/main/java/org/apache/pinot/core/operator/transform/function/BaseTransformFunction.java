@@ -81,6 +81,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, false, false);
   protected static final TransformResultMetadata BYTES_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, false, false);
+  protected static final TransformResultMetadata UUID_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.UUID, false, false);
   protected static final TransformResultMetadata UNKNOWN_METADATA =
       new TransformResultMetadata(DataType.UNKNOWN, true, false);
 
@@ -474,13 +476,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       if (resultDataType == DataType.UUID) {
-        // UUID transform functions should override transformToBytesValuesSV to return raw 16-byte values.
-        // As a safe fallback, convert via the string representation.
-        String[] stringValues = transformToStringValuesSV(valueBlock);
-        for (int i = 0; i < length; i++) {
-          _bytesValuesSV[i] = UuidUtils.toBytes(stringValues[i]);
-        }
-        return _bytesValuesSV;
+        // UUID transform functions must override transformToBytesValuesSV to return the raw 16-byte representation.
+        // Do NOT fall back to transformToStringValuesSV here — that method calls this one for UUID results, creating
+        // an infinite recursion that ends in StackOverflowError.
+        throw new UnsupportedOperationException(
+            "UUID transform function must override transformToBytesValuesSV: " + getClass().getName());
       }
       switch (resultDataType.getStoredType()) {
         case BIG_DECIMAL:
@@ -794,6 +794,20 @@ public abstract class BaseTransformFunction implements TransformFunction {
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initStringValuesMV(length);
+    DataType resultDataType = getResultMetadata().getDataType();
+    if (resultDataType == DataType.UUID) {
+      byte[][][] bytesValuesMV = transformToBytesValuesMV(valueBlock);
+      for (int i = 0; i < length; i++) {
+        byte[][] bytesValues = bytesValuesMV[i];
+        int numValues = bytesValues.length;
+        String[] stringValues = new String[numValues];
+        for (int j = 0; j < numValues; j++) {
+          stringValues[j] = UuidUtils.toString(bytesValues[j]);
+        }
+        _stringValuesMV[i] = stringValues;
+      }
+      return _stringValuesMV;
+    }
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
@@ -805,7 +819,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _stringValuesMV[i] = stringValues;
       }
     } else {
-      DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(valueBlock);

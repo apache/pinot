@@ -72,6 +72,7 @@ public class DataTableSerDeTest {
   private static final long[][] TIMESTAMP_ARRAYS = new long[NUM_ROWS][];
   private static final String[][] STRING_ARRAYS = new String[NUM_ROWS][];
   private static final ByteArray[][] BYTES_ARRAYS = new ByteArray[NUM_ROWS][];
+  private static final ByteArray[][] UUID_ARRAYS = new ByteArray[NUM_ROWS][];
   private static final BigDecimal[][] BIG_DECIMAL_ARRAYS = new BigDecimal[NUM_ROWS][];
   private static final Map<String, Object>[] MAPS = new Map[NUM_ROWS];
 
@@ -448,6 +449,15 @@ public class DataTableSerDeTest {
             BYTES_ARRAYS[rowId] = bytesArray;
             dataTableBuilder.setColumn(colId, bytesArray);
             break;
+          case UUID_ARRAY:
+            length = RANDOM.nextInt(20);
+            ByteArray[] uuidArray = new ByteArray[length];
+            for (int i = 0; i < length; i++) {
+              uuidArray[i] = new ByteArray(UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong())));
+            }
+            UUID_ARRAYS[rowId] = uuidArray;
+            dataTableBuilder.setColumn(colId, uuidArray);
+            break;
           case STRING_ARRAY:
             length = RANDOM.nextInt(20);
             String[] stringArray = new String[length];
@@ -561,6 +571,10 @@ public class DataTableSerDeTest {
             break;
           case BYTES_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getBytesArray(rowId, colId), BYTES_ARRAYS[rowId]),
+                ERROR_MESSAGE);
+            break;
+          case UUID_ARRAY:
+            Assert.assertTrue(Arrays.equals(newDataTable.getBytesArray(rowId, colId), UUID_ARRAYS[rowId]),
                 ERROR_MESSAGE);
             break;
           case STRING_ARRAY:

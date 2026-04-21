@@ -191,17 +191,14 @@ public class RelToPlanNodeConverterTest {
   }
 
   @Test
-  public void testConvertToColumnDataTypeForUUIDArrayRejected() {
+  public void testConvertToColumnDataTypeForUUIDArray() {
     RelDataType uuidArrayType =
         new ArraySqlType(new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.UUID), true);
 
-    IllegalArgumentException logicalException = Assert.expectThrows(IllegalArgumentException.class,
-        () -> RelToPlanNodeConverter.convertToColumnDataType(uuidArrayType));
-    Assert.assertTrue(logicalException.getMessage().contains("UUID arrays are not supported"));
-
-    IllegalArgumentException physicalException = Assert.expectThrows(IllegalArgumentException.class,
-        () -> PRelToPlanNodeConverter.convertToColumnDataType(uuidArrayType));
-    Assert.assertTrue(physicalException.getMessage().contains("UUID arrays are not supported"));
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(uuidArrayType),
+        DataSchema.ColumnDataType.UUID_ARRAY);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(uuidArrayType),
+        DataSchema.ColumnDataType.UUID_ARRAY);
   }
 
   @Test

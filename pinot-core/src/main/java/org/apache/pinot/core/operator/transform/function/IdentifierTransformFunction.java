@@ -42,6 +42,7 @@ public class IdentifierTransformFunction implements TransformFunction {
   private final Dictionary _dictionary;
   private final TransformResultMetadata _resultMetadata;
   private String[] _uuidStringValuesSV;
+  private String[][] _uuidStringValuesMV;
 
   public IdentifierTransformFunction(String columnName, ColumnContext columnContext) {
     _columnName = columnName;
@@ -166,6 +167,25 @@ public class IdentifierTransformFunction implements TransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType() == DataType.UUID) {
+      int numDocs = valueBlock.getNumDocs();
+      String[][] uuidStringValuesMV = _uuidStringValuesMV;
+      if (uuidStringValuesMV == null || uuidStringValuesMV.length < numDocs) {
+        uuidStringValuesMV = new String[numDocs][];
+        _uuidStringValuesMV = uuidStringValuesMV;
+      }
+      byte[][][] bytesValuesMV = valueBlock.getBlockValueSet(_columnName).getBytesValuesMV();
+      for (int i = 0; i < numDocs; i++) {
+        byte[][] bytesValues = bytesValuesMV[i];
+        int numValues = bytesValues.length;
+        String[] uuidValues = new String[numValues];
+        for (int j = 0; j < numValues; j++) {
+          uuidValues[j] = UuidUtils.toString(bytesValues[j]);
+        }
+        uuidStringValuesMV[i] = uuidValues;
+      }
+      return uuidStringValuesMV;
+    }
     return valueBlock.getBlockValueSet(_columnName).getStringValuesMV();
   }
 

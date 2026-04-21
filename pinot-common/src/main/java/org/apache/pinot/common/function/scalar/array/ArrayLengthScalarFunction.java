@@ -59,6 +59,9 @@ public class ArrayLengthScalarFunction implements PinotScalarFunction {
       TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BYTES_ARRAY,
           new FunctionInfo(ArrayLengthScalarFunction.class.getMethod("arrayLength", byte[][].class),
               ArrayLengthScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.UUID_ARRAY,
+          new FunctionInfo(ArrayLengthScalarFunction.class.getMethod("arrayLength", byte[][].class),
+              ArrayLengthScalarFunction.class, false));
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }

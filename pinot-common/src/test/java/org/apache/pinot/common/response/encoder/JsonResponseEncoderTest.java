@@ -30,6 +30,7 @@ import java.util.UUID;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -138,7 +139,7 @@ public class JsonResponseEncoderTest {
         "intCol", "longCol", "floatCol", "doubleCol", "bigDecimalCol", "booleanCol", "timestampCol",
         "stringCol", "jsonCol", "mapCol", "bytesCol", "objectCol", "intArrayCol", "longArrayCol",
         "floatArrayCol", "doubleArrayCol", "booleanArrayCol", "timestampArrayCol", "stringArrayCol",
-        "bytesArrayCol", "unknownCol"
+        "bytesArrayCol", "uuidArrayCol", "unknownCol"
     };
 
     DataSchema.ColumnDataType[] columnTypes = {
@@ -162,6 +163,7 @@ public class JsonResponseEncoderTest {
         ColumnDataType.TIMESTAMP_ARRAY,
         ColumnDataType.STRING_ARRAY,
         ColumnDataType.BYTES_ARRAY,
+        ColumnDataType.UUID_ARRAY,
         ColumnDataType.UNKNOWN
     };
 
@@ -194,6 +196,10 @@ public class JsonResponseEncoderTest {
     byte[][] bytesArrayVal = new byte[][] {
         new byte[] {1, 2}, new byte[] {3, 4}
     };
+    byte[][] uuidArrayVal = new byte[][] {
+        UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000"),
+        UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440001")
+    };
     Object unknownVal = null;  // UNKNOWN is represented as null in this example.
 
     // Build a single row that contains all the above values.
@@ -201,7 +207,7 @@ public class JsonResponseEncoderTest {
     Object[] row = new Object[] {
         intVal, longVal, floatVal, doubleVal, bigDecimalVal, booleanVal, timestampVal, stringVal,
         jsonVal, mapVal, bytesVal, objectVal, intArrayVal, longArrayVal, floatArrayVal, doubleArrayVal,
-        booleanArrayVal, timestampArrayVal, stringArrayVal, bytesArrayVal, unknownVal
+        booleanArrayVal, timestampArrayVal, stringArrayVal, bytesArrayVal, uuidArrayVal, unknownVal
     };
 
     // Convert each value using the schema's formatting (if needed).
