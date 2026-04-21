@@ -317,7 +317,7 @@
     <junit-jupiter-api.version>5.14.3</junit-jupiter-api.version>
     <mockito-core.version>5.23.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
-    <testcontainers.version>2.0.4</testcontainers.version>
+    <testcontainers.version>2.0.5</testcontainers.version>
     <h2.version>2.4.240</h2.version>
     <jnr-posix.version>3.1.22</jnr-posix.version>
     <scalatest.version>3.2.20</scalatest.version>
