@@ -71,9 +71,11 @@ Skills are plain Markdown with YAML frontmatter — Claude reads them and follow
 
 ## `/run-test`
 
-**What it does.** Given a test class name (or `Class#method`), finds the source file via glob, walks up to the owning module, and builds the correct `./mvnw -pl <module> -am -Dtest=<Class>[#<method>] test` command. If the test matches integration-test heuristics, it adds `-Dsurefire.failIfNoSpecifiedTests=false`.
+**What it does.** Given a test class name (or `Class#method`), finds the source file via glob, walks up to the owning module, and builds the correct `./mvnw -pl <module> -am -Dtest=<Class>[#<method>] -Dsurefire.failIfNoSpecifiedTests=false test` command.
 
-**Integration test detection:** path contains `pinot-integration-tests`, OR filename ends with `IntegrationTest.java` / `IT.java` / `ClusterTest.java` / `EndToEndTest.java`, OR the module is `pinot-integration-tests` / `pinot-compatibility-verifier`.
+**Why `-Dsurefire.failIfNoSpecifiedTests=false` is always needed:** with `-am`, Maven builds upstream modules and runs Surefire in each one. Upstream modules don't have the target test, so Surefire's default behaviour (fail when the `-Dtest` filter matches nothing) kills the build at the first upstream module. The flag makes "no tests matched in this module" a no-op and lets the build progress to the module that actually contains the test.
+
+**Integration test heuristics** (used only to warn the user about expected runtime, not to change the command): path contains `pinot-integration-tests`, OR filename ends with `IntegrationTest.java` / `IT.java` / `ClusterTest.java` / `EndToEndTest.java`, OR the module is `pinot-integration-tests` / `pinot-compatibility-verifier`.
 
 **Example scenarios:**
 

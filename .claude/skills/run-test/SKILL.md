@@ -40,22 +40,21 @@ Usage:
 
 3. **Find the owning module.** Walk up from the test file until you find a `pom.xml` that is not the repo root. That's the module.
 
-4. **Detect integration tests.** A test is an integration test if *any* of these hold:
+4. **Note on the `failIfNoSpecifiedTests` flag.** Always pass `-Dsurefire.failIfNoSpecifiedTests=false`, regardless of whether the target is a unit or integration test. With `-am`, Maven runs the full Surefire goal on every upstream module (e.g. `pinot-spi` → `pinot-common` → … → target module). Each of those modules invokes Surefire with the same `-Dtest=<className>` filter, and Surefire's default behaviour is to **fail the whole build** when the pattern doesn't match any test in a given module. Without this flag, the build dies at the first upstream module that doesn't happen to contain `<className>`. This applies equally to unit tests (upstream modules don't have the test) and integration tests (the `pinot-integration-tests` module has tests the filter doesn't match).
+
+   Optional: detect integration tests for reporting/warnings only. A test is an integration test if *any* of these hold:
    - The file path contains `pinot-integration-tests`.
    - The file is named `*IntegrationTest.java`, `*IT.java`, `*ClusterTest.java`, or `*EndToEndTest.java`.
    - The module is `pinot-integration-tests` or `pinot-compatibility-verifier`.
-   Integration tests need `-Dsurefire.failIfNoSpecifiedTests=false` to avoid "no tests matching" failures when the module has other test classes the filter won't match.
+
+   Use this only to warn the user about expected runtime ("integration tests typically take 10–20 min"), not to alter the command.
 
 5. **Build the command.**
-   - Unit test:
-     ```
-     ./mvnw -pl <module> -am -Dtest=<className>[#<methodName>] test
-     ```
-   - Integration test:
-     ```
-     ./mvnw -pl <module> -am -Dtest=<className>[#<methodName>] -Dsurefire.failIfNoSpecifiedTests=false test
-     ```
+   ```
+   ./mvnw -pl <module> -am -Dtest=<className>[#<methodName>] -Dsurefire.failIfNoSpecifiedTests=false test
+   ```
    - `-am` is intentional: the test needs upstream module JARs built.
+   - `-Dsurefire.failIfNoSpecifiedTests=false` is always required when `-am` is set (see step 4).
 
 6. **Run and report.** Print the exact command before running so the user can copy/tweak it. On failure, show the last ~60 lines of the Maven output (or the Surefire report path under `<module>/target/surefire-reports/`) so the user can jump straight to the stack trace.
 
