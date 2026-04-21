@@ -54,4 +54,9 @@ public interface PinotGauge<T> extends PinotMetric, SettableValue<T> {
    * @return the metric's current value
    */
   T value();
+
+  @Override
+  default T getValue() {
+    return value();
+  }
 }
