@@ -200,6 +200,19 @@ public class AvroSchemaUtilTest {
     Assert.assertEquals(jsonNode.get("type").get(1).get("logicalType").asText(), "uuid");
   }
 
+  @Test
+  public void testToAvroSchemaJsonObjectForUuidArray() {
+    FieldSpec fieldSpec = new DimensionFieldSpec("uuidCol", FieldSpec.DataType.UUID, false);
+
+    JsonNode jsonNode = AvroSchemaUtil.toAvroSchemaJsonObject(fieldSpec);
+
+    Assert.assertEquals(jsonNode.get("name").asText(), "uuidCol");
+    Assert.assertEquals(jsonNode.get("type").get(0).asText(), "null");
+    Assert.assertEquals(jsonNode.get("type").get(1).get("type").asText(), "array");
+    Assert.assertEquals(jsonNode.get("type").get(1).get("items").get("type").asText(), "string");
+    Assert.assertEquals(jsonNode.get("type").get(1).get("items").get("logicalType").asText(), "uuid");
+  }
+
   private void validateComplexLogicalTypeRecordData(GenericRecord convertedRecord) {
     Assert.assertEquals(convertedRecord.get("uid"),
         UUID.fromString("1bca8360-894c-47b3-93b0-515e2c5877ce"));

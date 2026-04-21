@@ -43,6 +43,8 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
   private static final String UUID_FROM_STRING_COLUMN = "uuidFromString";
   private static final String UUID_FROM_BYTES_COLUMN = "uuidFromBytes";
   private static final String UUID_AS_BYTES_COLUMN = "uuidAsBytes";
+  private static final String UUID_ARRAY_FROM_STRING_COLUMN = "uuidArrayFromString";
+  private static final String UUID_ARRAY_FROM_BYTES_COLUMN = "uuidArrayFromBytes";
   private static final String TIME_COLUMN = "ts";
   private static final List<String> UUID_INPUT_VALUES = List.of(
       "550E8400-E29B-41D4-A716-446655440000",
@@ -98,7 +100,7 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
 
   @Override
   protected List<String> getNoDictionaryColumns() {
-    return List.of(UUID_FROM_BYTES_COLUMN, UUID_AS_BYTES_COLUMN);
+    return List.of(UUID_FROM_BYTES_COLUMN, UUID_AS_BYTES_COLUMN, UUID_ARRAY_FROM_BYTES_COLUMN);
   }
 
   @Override
@@ -113,6 +115,8 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
         .addSingleValueDimension(UUID_FROM_STRING_COLUMN, FieldSpec.DataType.UUID)
         .addSingleValueDimension(UUID_FROM_BYTES_COLUMN, FieldSpec.DataType.UUID)
         .addSingleValueDimension(UUID_AS_BYTES_COLUMN, FieldSpec.DataType.BYTES)
+        .addMultiValueDimension(UUID_ARRAY_FROM_STRING_COLUMN, FieldSpec.DataType.UUID)
+        .addMultiValueDimension(UUID_ARRAY_FROM_BYTES_COLUMN, FieldSpec.DataType.UUID)
         .addDateTimeField(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
   }
@@ -121,11 +125,15 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
   public List<File> createAvroFiles()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("uuidRecord", null, null, false);
+    org.apache.avro.Schema uuidStringArraySchema = org.apache.avro.Schema.createArray(create(Type.STRING));
+    org.apache.avro.Schema uuidBytesArraySchema = org.apache.avro.Schema.createArray(create(Type.BYTES));
     avroSchema.setFields(List.of(
         new Field(ID_COLUMN, create(Type.INT), null, null),
         new Field(UUID_FROM_STRING_COLUMN, create(Type.STRING), null, null),
         new Field(UUID_FROM_BYTES_COLUMN, create(Type.BYTES), null, null),
         new Field(UUID_AS_BYTES_COLUMN, create(Type.BYTES), null, null),
+        new Field(UUID_ARRAY_FROM_STRING_COLUMN, uuidStringArraySchema, null, null),
+        new Field(UUID_ARRAY_FROM_BYTES_COLUMN, uuidBytesArraySchema, null, null),
         new Field(TIME_COLUMN, create(Type.LONG), null, null)));
 
     try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
@@ -138,6 +146,8 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
         record.put(UUID_FROM_STRING_COLUMN, uuidInputValue);
         record.put(UUID_FROM_BYTES_COLUMN, ByteBuffer.wrap(uuidBytes));
         record.put(UUID_AS_BYTES_COLUMN, ByteBuffer.wrap(uuidBytes));
+        record.put(UUID_ARRAY_FROM_STRING_COLUMN, uuidStringArray(i, uuidStringArraySchema));
+        record.put(UUID_ARRAY_FROM_BYTES_COLUMN, uuidBytesArray(i, uuidBytesArraySchema));
         record.put(TIME_COLUMN, BASE_TIMESTAMP_MILLIS + i);
         writers.get(0).append(record);
       }
@@ -190,6 +200,24 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
         "SELECT %s FROM %s WHERE %s NOT IN (CAST('%s' AS UUID), CAST('%s' AS UUID)) ORDER BY %s", ID_COLUMN,
         getTableName(), UUID_FROM_STRING_COLUMN, DISTINCT_UUID_VALUES.get(0), DISTINCT_UUID_VALUES.get(3), ID_COLUMN));
     assertIdRows(rows, 1, 3, 4);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testUuidArrayProjection(boolean useMultiStageQueryEngine)
+      throws Exception {
+    JsonNode rows = postRows(useMultiStageQueryEngine, String.format(
+        "SELECT %s, %s, %s, arrayLength(%s), arrayLength(%s) FROM %s ORDER BY %s", ID_COLUMN,
+        UUID_ARRAY_FROM_STRING_COLUMN, UUID_ARRAY_FROM_BYTES_COLUMN, UUID_ARRAY_FROM_STRING_COLUMN,
+        UUID_ARRAY_FROM_BYTES_COLUMN, getTableName(), ID_COLUMN));
+
+    assertEquals(rows.size(), UUID_VALUES.size());
+    for (int i = 0; i < UUID_VALUES.size(); i++) {
+      assertEquals(rows.get(i).get(0).asInt(), i);
+      assertUuidArray(rows.get(i).get(1), i);
+      assertUuidArray(rows.get(i).get(2), i);
+      assertEquals(rows.get(i).get(3).asInt(), 2);
+      assertEquals(rows.get(i).get(4).asInt(), 2);
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -395,6 +423,26 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
     for (int i = 0; i < expectedIds.length; i++) {
       assertEquals(rows.get(i).get(0).asInt(), expectedIds[i]);
     }
+  }
+
+  private static GenericData.Array<String> uuidStringArray(int rowIndex, org.apache.avro.Schema schema) {
+    GenericData.Array<String> array = new GenericData.Array<>(2, schema);
+    array.add(UUID_INPUT_VALUES.get(rowIndex));
+    array.add(UUID_INPUT_VALUES.get((rowIndex + 1) % UUID_INPUT_VALUES.size()));
+    return array;
+  }
+
+  private static GenericData.Array<ByteBuffer> uuidBytesArray(int rowIndex, org.apache.avro.Schema schema) {
+    GenericData.Array<ByteBuffer> array = new GenericData.Array<>(2, schema);
+    array.add(ByteBuffer.wrap(UuidUtils.toBytes(UUID_INPUT_VALUES.get(rowIndex))));
+    array.add(ByteBuffer.wrap(UuidUtils.toBytes(UUID_INPUT_VALUES.get((rowIndex + 1) % UUID_INPUT_VALUES.size()))));
+    return array;
+  }
+
+  private static void assertUuidArray(JsonNode array, int rowIndex) {
+    assertEquals(array.size(), 2);
+    assertEquals(array.get(0).asText(), UUID_VALUES.get(rowIndex));
+    assertEquals(array.get(1).asText(), UUID_VALUES.get((rowIndex + 1) % UUID_VALUES.size()));
   }
 
   private static String uuidHex(String uuidValue) {

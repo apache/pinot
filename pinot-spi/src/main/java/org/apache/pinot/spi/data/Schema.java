@@ -621,10 +621,8 @@ public final class Schema implements Serializable {
    *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL,
    *   BOOLEAN, TIMESTAMP, STRING, JSON, UUID, BYTES</li>
    *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, BYTES</li>
-   *   <li>UUID columns must be single-value</li>
+   *   <li>JSON columns must be single-value</li>
    * </ul>
-   * <p>Note: BIG_DECIMAL and JSON multi-value restrictions are additionally enforced by
-   * {@code SchemaUtils.validate()}.
    */
   public void validate() {
     for (FieldSpec fieldSpec : _fieldSpecMap.values()) {
@@ -636,8 +634,10 @@ public final class Schema implements Serializable {
       } catch (IllegalStateException e) {
         throw new IllegalStateException(e.getMessage() + ": " + fieldName);
       }
-      if (dataType == DataType.UUID && !fieldSpec.isSingleValueField()) {
-        throw new IllegalStateException("UUID columns cannot be multi-value: " + fieldName);
+      if (!fieldSpec.isSingleValueField()) {
+        if (dataType == DataType.JSON) {
+          throw new IllegalStateException("JSON columns cannot be multi-value: " + fieldName);
+        }
       }
     }
   }

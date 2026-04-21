@@ -58,15 +58,13 @@ public class UuidLookupTable extends LookupTable {
 
   @Override
   public boolean containsKey(@Nullable Object key) {
-    Object normalizedKey = normalizeKey(key);
-    return normalizedKey != null && _lookupTable.containsKey(normalizedKey);
+    return key != null && _lookupTable.containsKey(key);
   }
 
   @Nullable
   @Override
   public Object lookup(@Nullable Object key) {
-    Object normalizedKey = normalizeKey(key);
-    return normalizedKey != null ? _lookupTable.get(normalizedKey) : null;
+    return key != null ? _lookupTable.get(key) : null;
   }
 
   @SuppressWarnings("rawtypes")

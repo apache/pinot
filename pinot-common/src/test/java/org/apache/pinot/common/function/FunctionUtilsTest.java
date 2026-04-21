@@ -168,5 +168,11 @@ public class FunctionUtilsTest {
     assertEquals(FunctionUtils.getColumnDataType(UUID.class), ColumnDataType.UUID);
     assertEquals(FunctionUtils.getRelDataType(new JavaTypeFactoryImpl(), UUID.class).getSqlTypeName(),
         SqlTypeName.UUID);
+    assertEquals(FunctionUtils.getParameterType(UUID[].class), PinotDataType.UUID_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new UUID[]{UUID.randomUUID()}), PinotDataType.UUID_ARRAY);
+    assertEquals(FunctionUtils.getDataType(UUID[].class), DataType.UUID);
+    assertEquals(FunctionUtils.getColumnDataType(UUID[].class), ColumnDataType.UUID_ARRAY);
+    assertEquals(FunctionUtils.getRelDataType(new JavaTypeFactoryImpl(), UUID[].class).getComponentType()
+        .getSqlTypeName(), SqlTypeName.UUID);
   }
 }

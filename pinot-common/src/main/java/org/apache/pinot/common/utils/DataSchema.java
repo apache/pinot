@@ -394,6 +394,12 @@ public class DataSchema {
         return typeFactory.createArrayType(BYTES.toType(typeFactory), -1);
       }
     },
+    UUID_ARRAY(BYTES_ARRAY, NullValuePlaceHolder.INTERNAL_BYTES_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(UUID.toType(typeFactory), -1);
+      }
+    },
     UNKNOWN(null) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
@@ -405,7 +411,7 @@ public class DataSchema {
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
     private static final EnumSet<ColumnDataType> ARRAY_TYPES =
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BIG_DECIMAL_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY,
-            STRING_ARRAY, BYTES_ARRAY);
+            STRING_ARRAY, BYTES_ARRAY, UUID_ARRAY);
     private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES =
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BIG_DECIMAL_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
@@ -492,6 +498,7 @@ public class DataSchema {
         case JSON:
           return DataType.JSON;
         case UUID:
+        case UUID_ARRAY:
           return DataType.UUID;
         case BYTES:
         case BYTES_ARRAY:
@@ -523,6 +530,8 @@ public class DataSchema {
      *   <li>BYTES: byte[] -> ByteArray</li>
      *   <li>BOOLEAN_ARRAY: boolean[] -> int[]</li>
      *   <li>TIMESTAMP_ARRAY: Timestamp[] -> long[]</li>
+     *   <li>BYTES_ARRAY: byte[][] -> ByteArray[]</li>
+     *   <li>UUID_ARRAY: UUID[]/String[]/byte[][] -> ByteArray[]</li>
      * </ul>
      */
     public Object toInternal(Object value) {
@@ -539,6 +548,10 @@ public class DataSchema {
           return fromBooleanArray((boolean[]) value);
         case TIMESTAMP_ARRAY:
           return fromTimestampArray((Timestamp[]) value);
+        case BYTES_ARRAY:
+          return fromBytesArray((byte[][]) value);
+        case UUID_ARRAY:
+          return fromUuidArray(value);
         case OBJECT:
           // For OBJECT type, we need to convert based on the actual type of the value. This can happen when the scalar
           // function returns Object type, e.g. cast function.
@@ -595,6 +608,8 @@ public class DataSchema {
           return toTimestampArray((long[]) value);
         case BYTES_ARRAY:
           return toBytesArray(value);
+        case UUID_ARRAY:
+          return toUuidArray(value);
         default:
           return value;
       }
@@ -645,6 +660,8 @@ public class DataSchema {
           return toStringArray(value);
         case BYTES_ARRAY:
           return toBytesArray(value);
+        case UUID_ARRAY:
+          return toUuidArray(value);
         case UNKNOWN: // fall through
         case OBJECT:
           return (Serializable) value;
@@ -674,6 +691,8 @@ public class DataSchema {
           return formatTimestampArray((Timestamp[]) value);
         case BYTES_ARRAY:
           return formatBytesArray((byte[][]) value);
+        case UUID_ARRAY:
+          return formatUuidArray(value);
         default:
           return (Serializable) value;
       }
@@ -725,6 +744,8 @@ public class DataSchema {
           return (String[]) value;
         case BYTES_ARRAY:
           return formatBytesArray((ByteArray[]) value);
+        case UUID_ARRAY:
+          return formatUuidArray(value);
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
@@ -894,6 +915,9 @@ public class DataSchema {
     }
 
     private static byte[][] toBytesArray(Object value) {
+      if (value instanceof byte[][]) {
+        return (byte[][]) value;
+      }
       if (value instanceof ByteArray[]) {
         ByteArray[] wrapped = (ByteArray[]) value;
         byte[][] raw = new byte[wrapped.length][];
@@ -915,6 +939,59 @@ public class DataSchema {
       throw new IllegalStateException(String.format("Cannot convert: '%s' to byte[][]", value));
     }
 
+    private static ByteArray[] fromBytesArray(byte[][] bytesArray) {
+      int length = bytesArray.length;
+      ByteArray[] wrapped = new ByteArray[length];
+      for (int i = 0; i < length; i++) {
+        wrapped[i] = new ByteArray(bytesArray[i]);
+      }
+      return wrapped;
+    }
+
+    private static UUID[] toUuidArray(Object value) {
+      if (value instanceof UUID[]) {
+        return (UUID[]) value;
+      }
+      byte[][] bytesArray = toBytesArray(value);
+      int length = bytesArray.length;
+      UUID[] uuidArray = new UUID[length];
+      for (int i = 0; i < length; i++) {
+        uuidArray[i] = UuidUtils.toUUID(bytesArray[i]);
+      }
+      return uuidArray;
+    }
+
+    private static ByteArray[] fromUuidArray(Object value) {
+      if (value instanceof ByteArray[]) {
+        return (ByteArray[]) value;
+      }
+      if (value instanceof ObjectArrayList) {
+        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
+        int size = list.size();
+        ByteArray[] wrapped = new ByteArray[size];
+        for (int i = 0; i < size; i++) {
+          wrapped[i] = new ByteArray(UuidUtils.toBytes(list.get(i)));
+        }
+        return wrapped;
+      }
+      if (value instanceof byte[][]) {
+        byte[][] bytesArray = (byte[][]) value;
+        int length = bytesArray.length;
+        ByteArray[] wrapped = new ByteArray[length];
+        for (int i = 0; i < length; i++) {
+          wrapped[i] = new ByteArray(UuidUtils.toBytes(bytesArray[i]));
+        }
+        return wrapped;
+      }
+      Object[] valueArray = (Object[]) value;
+      int length = valueArray.length;
+      ByteArray[] wrapped = new ByteArray[length];
+      for (int i = 0; i < length; i++) {
+        wrapped[i] = new ByteArray(UuidUtils.toBytes(valueArray[i]));
+      }
+      return wrapped;
+    }
+
     private static String[] formatBytesArray(byte[][] bytesArray) {
       int length = bytesArray.length;
       String[] formattedBytesArray = new String[length];
@@ -931,6 +1008,49 @@ public class DataSchema {
         formattedBytesArray[i] = byteArray[i].toHexString();
       }
       return formattedBytesArray;
+    }
+
+    private static String[] formatUuidArray(Object value) {
+      if (value instanceof byte[][]) {
+        return formatUuidArray((byte[][]) value);
+      }
+      if (value instanceof ByteArray[]) {
+        return formatUuidArray((ByteArray[]) value);
+      }
+      if (value instanceof ObjectArrayList) {
+        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
+        int size = list.size();
+        String[] formattedUuidArray = new String[size];
+        for (int i = 0; i < size; i++) {
+          formattedUuidArray[i] = formatUuid(list.get(i));
+        }
+        return formattedUuidArray;
+      }
+      Object[] valueArray = (Object[]) value;
+      int length = valueArray.length;
+      String[] formattedUuidArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedUuidArray[i] = formatUuid(valueArray[i]);
+      }
+      return formattedUuidArray;
+    }
+
+    private static String[] formatUuidArray(byte[][] bytesArray) {
+      int length = bytesArray.length;
+      String[] formattedUuidArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedUuidArray[i] = UuidUtils.toString(bytesArray[i]);
+      }
+      return formattedUuidArray;
+    }
+
+    private static String[] formatUuidArray(ByteArray[] byteArray) {
+      int length = byteArray.length;
+      String[] formattedUuidArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedUuidArray[i] = UuidUtils.toString(byteArray[i]);
+      }
+      return formattedUuidArray;
     }
 
     public static ColumnDataType fromDataType(DataType dataType, boolean isSingleValue) {
@@ -990,6 +1110,8 @@ public class DataSchema {
           return TIMESTAMP_ARRAY;
         case STRING:
           return STRING_ARRAY;
+        case UUID:
+          return UUID_ARRAY;
         case BYTES:
           return BYTES_ARRAY;
         default:

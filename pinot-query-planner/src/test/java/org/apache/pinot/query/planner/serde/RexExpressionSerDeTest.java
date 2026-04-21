@@ -39,7 +39,8 @@ public class RexExpressionSerDeTest {
           ColumnDataType.UUID, ColumnDataType.BYTES, ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY,
           ColumnDataType.FLOAT_ARRAY,
           ColumnDataType.DOUBLE_ARRAY, ColumnDataType.BOOLEAN_ARRAY, ColumnDataType.TIMESTAMP_ARRAY,
-          ColumnDataType.STRING_ARRAY, ColumnDataType.UNKNOWN);
+          ColumnDataType.STRING_ARRAY, ColumnDataType.BYTES_ARRAY, ColumnDataType.UUID_ARRAY,
+          ColumnDataType.UNKNOWN);
   private static final Random RANDOM = new Random();
   private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -102,6 +103,12 @@ public class RexExpressionSerDeTest {
   @Test
   public void testUuidLiteral() {
     verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.UUID, new ByteArray(UuidUtils.toBytes(UUID_VALUE))));
+  }
+
+  @Test
+  public void testUuidArrayLiteral() {
+    ByteArray[] values = {new ByteArray(UuidUtils.toBytes(UUID_VALUE))};
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.UUID_ARRAY, values));
   }
 
   @Test

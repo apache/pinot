@@ -184,6 +184,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         case TIMESTAMP_ARRAY:
         case STRING_ARRAY:
         case BYTES_ARRAY:
+        case UUID_ARRAY:
           // Define the inner field for a string element.
           children = List.of(new Field("element", FieldType.nullable(new ArrowType.Utf8()), null));
           // Define the field for the list column.
@@ -349,6 +350,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case TIMESTAMP_ARRAY:
             case STRING_ARRAY:
             case BYTES_ARRAY:
+            case UUID_ARRAY:
               ListVector listVector = (ListVector) vector;
               String[] stringArray = (String[]) value;
               // Start a new list entry for the current row.
@@ -474,6 +476,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case TIMESTAMP_ARRAY:
             case STRING_ARRAY:
             case BYTES_ARRAY:
+            case UUID_ARRAY:
               ListVector listVector = (ListVector) vector;
               List<?> arrayValues = listVector.getObject(i);
               String[] array = new String[arrayValues.size()];

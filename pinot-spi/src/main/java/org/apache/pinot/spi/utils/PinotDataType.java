@@ -1326,23 +1326,15 @@ public enum PinotDataType {
     }
   },
 
-  /// MV companion to [#UUID]; element type [UUID]. Pinot has no UUID storage type — declaring the column as MV STRING
-  /// produces canonical-form strings, MV BYTES produces 16-byte big-endian.
   UUID_ARRAY {
     @Override
-    public UUID[] convert(Object value, PinotDataType sourceType) {
-      return sourceType.toUuidArray(value);
+    public byte[][] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toUuidBytesArray(value);
     }
 
     @Override
-    public String[] toInternal(Object value) {
-      UUID[] uuidArray = (UUID[]) value;
-      int length = uuidArray.length;
-      String[] result = new String[length];
-      for (int i = 0; i < length; i++) {
-        result[i] = uuidArray[i].toString();
-      }
-      return result;
+    public byte[][] toInternal(Object value) {
+      return toUuidBytesArray(value);
     }
   },
 
@@ -1701,6 +1693,28 @@ public enum PinotDataType {
     }
   }
 
+  public byte[][] toUuidBytesArray(Object value) {
+    if (value instanceof byte[][]) {
+      byte[][] values = (byte[][]) value;
+      byte[][] uuidBytes = new byte[values.length][];
+      for (int i = 0; i < values.length; i++) {
+        uuidBytes[i] = UuidUtils.toBytes(values[i]);
+      }
+      return uuidBytes;
+    }
+    if (isSingleValue()) {
+      return new byte[][]{UuidUtils.toBytes(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      byte[][] uuidBytes = new byte[length][];
+      for (int i = 0; i < length; i++) {
+        uuidBytes[i] = UuidUtils.toBytes(valueArray[i]);
+      }
+      return uuidBytes;
+    }
+  }
+
   public LocalDate[] toLocalDateArray(Object value) {
     if (value instanceof LocalDate[]) {
       return (LocalDate[]) value;
@@ -1789,8 +1803,10 @@ public enum PinotDataType {
   /// Converts to the internal representation of the value.
   /// - `BOOLEAN` → `Integer` (0/1)
   /// - `TIMESTAMP` → `Long` (epoch millis)
+  /// - `UUID` → `byte[]` (16-byte big-endian)
   /// - `PRIMITIVE_BOOLEAN_ARRAY` / `BOOLEAN_ARRAY` → `Integer[]` (per-element 0/1)
   /// - `TIMESTAMP_ARRAY` → `Long[]` (per-element epoch millis)
+  /// - `UUID_ARRAY` → `byte[][]` (per-element 16-byte big-endian)
   public Object toInternal(Object value) {
     return value;
   }
@@ -1995,10 +2011,7 @@ public enum PinotDataType {
         }
         throw new IllegalStateException("There is no multi-value type for JSON");
       case UUID:
-        if (fieldSpec.isSingleValueField()) {
-          return UUID;
-        }
-        throw new IllegalStateException("UUID data type only supports single-value fields");
+        return fieldSpec.isSingleValueField() ? UUID : UUID_ARRAY;
       case BYTES:
         return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
       case MAP:

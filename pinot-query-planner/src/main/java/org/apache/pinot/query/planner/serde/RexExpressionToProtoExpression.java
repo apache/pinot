@@ -132,6 +132,7 @@ public class RexExpressionToProtoExpression {
           literalBuilder.setStringArray(
               Expressions.StringArray.newBuilder().addAllValues(Arrays.asList((String[]) value)).build());
           break;
+        case UUID_ARRAY:
         case BYTES_ARRAY: {
           ByteArray[] bytesArray = (ByteArray[]) value;
           Expressions.BytesArray.Builder builder = Expressions.BytesArray.newBuilder();
@@ -172,6 +173,8 @@ public class RexExpressionToProtoExpression {
         return Expressions.ColumnDataType.BYTES;
       case UUID:
         return Expressions.ColumnDataType.UUID;
+      case UUID_ARRAY:
+        return Expressions.ColumnDataType.UUID_ARRAY;
       case MAP:
         return Expressions.ColumnDataType.MAP;
       case INT_ARRAY:

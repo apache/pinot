@@ -152,6 +152,14 @@ public class DataBlockTestUtils {
           }
           row[colId] = bytesArray;
           break;
+        case UUID_ARRAY:
+          length = RANDOM.nextInt(ARRAY_SIZE);
+          ByteArray[] uuidArray = new ByteArray[length];
+          for (int i = 0; i < length; i++) {
+            uuidArray[i] = new ByteArray(UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong())));
+          }
+          row[colId] = uuidArray;
+          break;
         case MAP:
           length = RANDOM.nextInt(ARRAY_SIZE);
           Map<String, Object> map = new HashMap<>();

@@ -373,16 +373,9 @@ public class MutableSegmentImpl implements MutableSegment {
       } else {
         dictionary = null;
         if (!fieldSpec.isSingleValueField()) {
-          // Raw MV columns
-          switch (storedType) {
-            case INT:
-            case LONG:
-            case FLOAT:
-            case DOUBLE:
-              break;
-            default:
-              throw new UnsupportedOperationException(
-                  "Unsupported data type: " + dataType + " for MV no-dictionary column: " + column);
+          if (!dataType.isFixedWidth()) {
+            throw new UnsupportedOperationException(
+                "Unsupported data type: " + dataType + " for MV no-dictionary column: " + column);
           }
         }
       }

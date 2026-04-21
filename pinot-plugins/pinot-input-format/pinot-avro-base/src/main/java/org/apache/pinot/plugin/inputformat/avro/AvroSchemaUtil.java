@@ -163,7 +163,14 @@ public class AvroSchemaUtil {
           ObjectNode uuidType = JsonUtils.newObjectNode();
           uuidType.put("type", "string");
           uuidType.put("logicalType", UUID);
-          jsonSchema.set("type", convertToJsonArray("null", uuidType));
+          if (fieldSpec.isSingleValueField()) {
+            jsonSchema.set("type", convertToJsonArray("null", uuidType));
+          } else {
+            ObjectNode uuidArrayType = JsonUtils.newObjectNode();
+            uuidArrayType.put("type", "array");
+            uuidArrayType.set("items", uuidType);
+            jsonSchema.set("type", convertToJsonArray("null", uuidArrayType));
+          }
         } else {
           jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
         }

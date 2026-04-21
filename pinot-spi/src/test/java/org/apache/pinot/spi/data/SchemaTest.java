@@ -107,12 +107,11 @@ public class SchemaTest {
   }
 
   @Test
-  public void testUUIDValidationRejectsMV() {
+  public void testUUIDValidationAllowsMV() {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec("uuidMv", FieldSpec.DataType.UUID, false));
 
-    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class, schema::validate);
-    assertThat(exception).hasMessageContaining("UUID columns cannot be multi-value");
+    schema.validate();
   }
 
   @Test

@@ -76,13 +76,19 @@
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
         <configuration>
+          <skip>true</skip>
           <protoTestSourceRoot>${basedir}/src/test/resources</protoTestSourceRoot>
         </configuration>
         <executions>
           <execution>
+            <id>generate-test-protobuf-java</id>
+            <phase>generate-test-sources</phase>
             <goals>
               <goal>test-compile</goal>
             </goals>
+            <configuration>
+              <skip>false</skip>
+            </configuration>
           </execution>
         </executions>
       </plugin>
