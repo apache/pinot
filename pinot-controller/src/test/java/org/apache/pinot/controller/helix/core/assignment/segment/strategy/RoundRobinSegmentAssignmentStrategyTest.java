@@ -93,7 +93,7 @@ public class RoundRobinSegmentAssignmentStrategyTest {
     // Counter advances once per replica, so replicas within each segment occupy consecutive instance slots.
     int startIdx = INSTANCES.indexOf(firstInstances.get(0));
     for (int r = 0; r < NUM_REPLICAS; r++) {
-      assertEquals(firstInstances.get(r), INSTANCES.get((startIdx + r) % NUM_INSTANCES));
+      assertEquals(firstInstances.get(r), INSTANCES.get((startIdx - r + NUM_INSTANCES) % NUM_INSTANCES));
     }
     currentAssignment.put(SEGMENTS.get(0),
         SegmentAssignmentUtils.getInstanceStateMap(firstInstances, SegmentStateModel.ONLINE));
@@ -105,7 +105,7 @@ public class RoundRobinSegmentAssignmentStrategyTest {
           _segmentAssignment.assignSegment(SEGMENTS.get(segId), currentAssignment, _instancePartitionsMap);
       assertEquals(instances.size(), NUM_REPLICAS);
       for (int r = 0; r < NUM_REPLICAS; r++) {
-        assertEquals(instances.get(r), INSTANCES.get((nextIdx + r) % NUM_INSTANCES));
+        assertEquals(instances.get(r), INSTANCES.get((nextIdx - r + NUM_INSTANCES) % NUM_INSTANCES));
       }
       nextIdx = (nextIdx + NUM_REPLICAS) % NUM_INSTANCES;
       currentAssignment.put(SEGMENTS.get(segId),
