@@ -45,6 +45,7 @@ yarn-error.log*
 
 #quickstart files
 quickstart*
+!.claude/skills/quickstart/
 
 #build symlink directory
 build
