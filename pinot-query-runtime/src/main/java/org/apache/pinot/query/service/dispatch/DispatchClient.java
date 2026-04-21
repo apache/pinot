@@ -77,43 +77,43 @@ class DispatchClient {
     // Enable gRPC keep-alive when configured so that a silently unreachable peer transitions the channel out of READY,
     // which lets the broker's FailureDetector exclude it from routing.
     if (keepAliveConfig.isEnabled()) {
-      channelBuilder.keepAliveTime(keepAliveConfig.getTimeSeconds(), TimeUnit.SECONDS)
-          .keepAliveTimeout(keepAliveConfig.getTimeoutSeconds(), TimeUnit.SECONDS)
+      channelBuilder.keepAliveTime(keepAliveConfig.getTimeMs(), TimeUnit.MILLISECONDS)
+          .keepAliveTimeout(keepAliveConfig.getTimeoutMs(), TimeUnit.MILLISECONDS)
           .keepAliveWithoutCalls(keepAliveConfig.isWithoutCalls());
     }
     _channel = channelBuilder.build();
     _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel);
   }
 
-  /// Immutable gRPC keep-alive configuration for broker dispatch channels. Keep-alive is disabled when
-  /// `timeSeconds` is not positive, matching the convention in [org.apache.pinot.common.config.GrpcConfig].
+  /// Immutable gRPC keep-alive configuration for broker dispatch channels. Keep-alive is disabled when `timeMs` is not
+  /// positive.
   static final class KeepAliveConfig {
-    static final KeepAliveConfig DISABLED = new KeepAliveConfig(-1, 30, false);
+    static final KeepAliveConfig DISABLED = new KeepAliveConfig(-1, 30_000, false);
 
-    private final int _timeSeconds;
-    private final int _timeoutSeconds;
+    private final int _timeMs;
+    private final int _timeoutMs;
     private final boolean _withoutCalls;
 
-    KeepAliveConfig(int timeSeconds, int timeoutSeconds, boolean withoutCalls) {
-      if (timeSeconds > 0) {
-        Preconditions.checkArgument(timeoutSeconds > 0,
-            "keepAliveTimeoutSeconds must be positive when keep-alive is enabled, got: %s", timeoutSeconds);
+    KeepAliveConfig(int timeMs, int timeoutMs, boolean withoutCalls) {
+      if (timeMs > 0) {
+        Preconditions.checkArgument(timeoutMs > 0,
+            "keepAliveTimeoutMs must be positive when keep-alive is enabled, got: %s", timeoutMs);
       }
-      _timeSeconds = timeSeconds;
-      _timeoutSeconds = timeoutSeconds;
+      _timeMs = timeMs;
+      _timeoutMs = timeoutMs;
       _withoutCalls = withoutCalls;
     }
 
     boolean isEnabled() {
-      return _timeSeconds > 0;
+      return _timeMs > 0;
     }
 
-    int getTimeSeconds() {
-      return _timeSeconds;
+    int getTimeMs() {
+      return _timeMs;
     }
 
-    int getTimeoutSeconds() {
-      return _timeoutSeconds;
+    int getTimeoutMs() {
+      return _timeoutMs;
     }
 
     boolean isWithoutCalls() {

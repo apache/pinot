@@ -171,10 +171,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.KEY_OF_CANCEL_TIMEOUT_MS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_CANCEL_TIMEOUT_MS);
     Duration cancelTimeout = Duration.ofMillis(cancelMillis);
-    int dispatchKeepAliveTimeSeconds = config.getProperty(
+    int dispatchKeepAliveTimeMs = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS);
-    int dispatchKeepAliveTimeoutSeconds = config.getProperty(
+    int dispatchKeepAliveTimeoutMs = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_MS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_MS);
     boolean dispatchKeepAliveWithoutCalls = config.getProperty(
@@ -182,8 +182,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS);
     _queryDispatcher =
         new QueryDispatcher(new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig), failureDetector,
-            tlsConfig, isQueryCancellationEnabled(), cancelTimeout, dispatchKeepAliveTimeSeconds,
-            dispatchKeepAliveTimeoutSeconds, dispatchKeepAliveWithoutCalls);
+            tlsConfig, isQueryCancellationEnabled(), cancelTimeout, dispatchKeepAliveTimeMs,
+            dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),

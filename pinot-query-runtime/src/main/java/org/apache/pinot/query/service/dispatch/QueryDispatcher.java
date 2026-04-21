@@ -125,13 +125,13 @@ public class QueryDispatcher {
         DispatchClient.KeepAliveConfig.DISABLED);
   }
 
-  /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive
-  /// {@code keepAliveTimeSeconds} disables keep-alive.
+  /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
+  /// disables keep-alive.
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
-      boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeSeconds, int keepAliveTimeoutSeconds,
+      boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
       boolean keepAliveWithoutCalls) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
-        new DispatchClient.KeepAliveConfig(keepAliveTimeSeconds, keepAliveTimeoutSeconds, keepAliveWithoutCalls));
+        new DispatchClient.KeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls));
   }
 
   private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
