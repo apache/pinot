@@ -840,8 +840,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Returns a map from the task type to the {@link TaskSchedulingInfo} of the tasks scheduled.
    */
   @Deprecated(forRemoval = true)
-  protected Map<String, TaskSchedulingInfo> scheduleTasks(List<String> tableNamesWithType, boolean isLeader,
-      @Nullable String minionInstanceTag) {
+  protected synchronized Map<String, TaskSchedulingInfo> scheduleTasks(List<String> tableNamesWithType,
+      boolean isLeader, @Nullable String minionInstanceTag) {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setTablesToSchedule(new HashSet<>(tableNamesWithType))
         .setLeader(isLeader)
@@ -1026,7 +1026,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   @Deprecated(forRemoval = true)
-  protected TaskSchedulingInfo scheduleTask(String taskType, List<String> tables,
+  protected synchronized TaskSchedulingInfo scheduleTask(String taskType, List<String> tables,
       @Nullable String minionInstanceTag) {
     Preconditions.checkState(_taskGeneratorRegistry.getAllTaskTypes().contains(taskType),
         "Task type: %s is not registered", taskType);
