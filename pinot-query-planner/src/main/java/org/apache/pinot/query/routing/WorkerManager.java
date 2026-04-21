@@ -149,7 +149,6 @@ public class WorkerManager {
         metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
         metadata.setPartitionFunction(childMetadata.getPartitionFunction());
         // Fake a segments map so that the worker can be correctly identified as leaf stage
-        // TODO: Add a query test for LOOKUP join
         Map<String, List<String>> segmentsMap = Map.of(TableType.OFFLINE.name(), List.of());
         Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
             Maps.newHashMapWithExpectedSize(workerIdToServerInstanceMap.size());
