@@ -68,10 +68,9 @@ class HashExchange extends BlockExchange {
     }
     RowHeapDataBlock rowHeapBlock = block.asRowHeap();
     List<Object[]> rows = rowHeapBlock.getRows();
-    int numRows = rows.size();
-    for (int r = 0; r < numRows; r++) {
-      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(r, ROUTE_SCOPE);
-      Object[] row = rows.get(r);
+    int r = 0;
+    for (Object[] row : rows) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(r++, ROUTE_SCOPE);
       int mailboxId = _keySelector.computeHash(row) % numMailboxes;
       mailboxIdToRowsMap[mailboxId].add(row);
     }
