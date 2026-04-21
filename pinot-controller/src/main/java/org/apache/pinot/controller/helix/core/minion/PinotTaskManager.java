@@ -36,7 +36,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
@@ -129,13 +128,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   protected final @Nullable DistributedTaskLockManager _distributedTaskLockManager;
 
   // Cluster-level default for concurrent task scheduling. When true (and not overridden per table),
-  // scheduleTasks uses per-table JVM locks instead of a global synchronized lock.
+  // scheduleTasks runs without a controller-wide synchronized lock so that scheduling for different
+  // tables can proceed in parallel. Same-table concurrency is coordinated by the distributed ZK
+  // lock; two scheduleTasks calls targeting the same table will contend on the ZK lock and one will
+  // skip generation with a "could not acquire lock" error for that table.
   protected final boolean _clusterConcurrentSchedulingEnabled;
-
-  // Per-table JVM locks used by the concurrent scheduling path. Acquired before the distributed ZK
-  // lock to preserve backward compatibility with the legacy single-controller behavior (two concurrent
-  // scheduleTasks calls targeting the same table serialize on this lock, so both eventually complete).
-  private final ConcurrentHashMap<String, ReentrantLock> _tableJvmLocks = new ConcurrentHashMap<>();
 
   // Dynamically updatable task queue configs
   private volatile int _taskQueueMaxSize;
@@ -208,14 +205,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     _clusterConcurrentSchedulingEnabled = controllerConf.isPinotTaskManagerConcurrentSchedulingEnabled();
     LOGGER.info("Concurrent task scheduling cluster default: {}", _clusterConcurrentSchedulingEnabled);
     if (_clusterConcurrentSchedulingEnabled && _distributedTaskLockManager == null) {
-      // In the concurrent path, scheduleTasks no longer holds a controller-wide monitor, so it is
-      // not mutually exclusive with ad-hoc createTask calls (which still take synchronized(this)).
-      // The distributed ZK lock is the only remaining primitive that coordinates cron/periodic
-      // task generation with ad-hoc task creation for the same table. Warn operators who enable
-      // the concurrent default without also enabling distributed locking.
+      // The concurrent path relies on the distributed ZK lock to coordinate same-table task
+      // generation (and to mutually exclude with ad-hoc createTask, which still takes
+      // synchronized(this)). Running without distributed locking leaves those races unprotected.
       LOGGER.warn("Concurrent task scheduling is enabled but distributed locking is disabled. "
-          + "Cron/periodic scheduleTasks will not be mutually exclusive with ad-hoc createTask for the "
-          + "same table. Enable {} to close this race window.",
+          + "Same-table scheduleTasks and ad-hoc createTask will not be mutually exclusive. "
+          + "Enable {} to close this race window.",
           ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING);
     }
   }
@@ -539,11 +534,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
     removeAllTasksFromCronExpressions(tableWithType);
     _tableTaskSchedulerUpdaterMap.remove(tableWithType);
-    // Drop the per-table JVM scheduling lock entry (if any). Safe to remove unconditionally: any
-    // concurrent holder keeps its reference to the ReentrantLock object and will still unlock it
-    // correctly; a subsequent scheduleTasks call for a table with this name will recreate a fresh
-    // entry via computeIfAbsent.
-    _tableJvmLocks.remove(tableWithType);
   }
 
   private synchronized void removeAllTasksFromCronExpressions(String tableWithType) {
@@ -863,24 +853,27 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Helper method to schedule tasks (all task types) for the given tables that have the tasks enabled.
    * Returns a map from the task type to the {@link TaskSchedulingInfo} of the tasks scheduled.
    *
-   * <p>Dispatches between two locking strategies based on the resolved concurrent-scheduling flag
-   * (cluster default, optionally overridden per table):
+   * <p>Dispatches between two paths based on the resolved concurrent-scheduling flag (cluster
+   * default, optionally overridden per table):
    * <ul>
-   *   <li><b>Legacy path</b> ({@code concurrentSchedulingEnabled = false}): the call runs under a global
-   *       {@code synchronized(this)} — same mutual exclusion the method had before this refactor.</li>
-   *   <li><b>Concurrent path</b> ({@code concurrentSchedulingEnabled = true}): the call acquires a JVM
-   *       {@link ReentrantLock} per target table (in sorted order to avoid deadlock) inside
-   *       {@link #doScheduleTasks}. Task generation for different tables can run in parallel.</li>
+   *   <li><b>Legacy path</b> ({@code concurrentSchedulingEnabled = false}): the call runs under a
+   *       global {@code synchronized(this)} — same mutual exclusion the method had before this
+   *       refactor.</li>
+   *   <li><b>Concurrent path</b> ({@code concurrentSchedulingEnabled = true}): the call holds no
+   *       controller-wide monitor. Task generation for different tables proceeds in parallel;
+   *       same-table concurrency is coordinated by the distributed ZK lock (enabling
+   *       {@link ControllerConf.ControllerPeriodicTasksConf#ENABLE_DISTRIBUTED_LOCKING} is
+   *       strongly recommended when opting into this path).</li>
    * </ul>
    * Both paths share the same underlying body in {@link #doScheduleTasks}.
    */
   public Map<String, TaskSchedulingInfo> scheduleTasks(TaskSchedulingContext context) {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
     if (shouldUseConcurrentPath(context)) {
-      return doScheduleTasks(context, true);
+      return doScheduleTasks(context);
     }
     synchronized (this) {
-      return doScheduleTasks(context, false);
+      return doScheduleTasks(context);
     }
   }
 
@@ -936,15 +929,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   /**
-   * Shared body used by both the legacy (synchronized) and concurrent (per-table JVM lock) paths.
-   *
-   * @param context            scheduling request
-   * @param useJvmPerTableLock when true, acquire a per-table JVM {@link ReentrantLock} around each
-   *                           task-type's ZK-lock-and-generate block. When false, the caller is
-   *                           already holding {@code synchronized(this)} so no extra JVM locking is
-   *                           needed.
+   * Shared body used by both the legacy (synchronized) and concurrent paths. The caller decides
+   * whether to wrap this call in {@code synchronized(this)}.
    */
-  private Map<String, TaskSchedulingInfo> doScheduleTasks(TaskSchedulingContext context, boolean useJvmPerTableLock) {
+  private Map<String, TaskSchedulingInfo> doScheduleTasks(TaskSchedulingContext context) {
     Map<String, List<TableConfig>> enabledTableConfigMap = new HashMap<>();
     Set<String> targetTables = context.getTablesToSchedule();
     Set<String> targetDatabases = context.getDatabasesToSchedule();
@@ -992,33 +980,18 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         // 2. Multiple simultaneous ad-hoc requests
         // 3. Leadership changes during task generation
         List<String> enabledTables = getTableNames(enabledTableConfigs);
-        List<ReentrantLock> acquiredJvmLocks = new ArrayList<>();
         Map<String, DistributedTaskLockManager.TaskLock> acquiredTaskLocks = new HashMap<>();
+        for (String tableName : enabledTables) {
+          try {
+            DistributedTaskLockManager.TaskLock lock = acquireTaskLock(taskType, tableName, "scheduled");
+            if (lock != null) {
+              acquiredTaskLocks.put(tableName, lock);
+            }
+          } catch (RuntimeException ignore) {
+          }
+        }
+
         try {
-          if (useJvmPerTableLock) {
-            // Acquire per-table JVM locks in a stable (sorted) order across concurrent callers to
-            // avoid deadlock when the target tables overlap. This preserves the legacy behavior in
-            // which two scheduleTasks calls targeting the same table serialize rather than one
-            // failing to acquire the distributed lock.
-            List<String> sortedTables = new ArrayList<>(enabledTables);
-            Collections.sort(sortedTables);
-            for (String tableName : sortedTables) {
-              ReentrantLock jvmLock = _tableJvmLocks.computeIfAbsent(tableName, k -> new ReentrantLock());
-              jvmLock.lock();
-              acquiredJvmLocks.add(jvmLock);
-            }
-          }
-
-          for (String tableName : enabledTables) {
-            try {
-              DistributedTaskLockManager.TaskLock lock = acquireTaskLock(taskType, tableName, "scheduled");
-              if (lock != null) {
-                acquiredTaskLocks.put(tableName, lock);
-              }
-            } catch (RuntimeException ignore) {
-            }
-          }
-
           tasksScheduled.put(taskType, scheduleTask(taskGenerator, enabledTableConfigs, context.isLeader(),
               context.getMinionInstanceTag(), context.getTriggeredBy(), acquiredTaskLocks));
         } catch (RuntimeException e) {
@@ -1030,10 +1003,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           assert acquiredTaskLocks.isEmpty() || _distributedTaskLockManager != null;
           for (Map.Entry<String, DistributedTaskLockManager.TaskLock> taskLockEntry : acquiredTaskLocks.entrySet()) {
             _distributedTaskLockManager.releaseLock(taskLockEntry.getValue());
-          }
-          // Release JVM locks in reverse of acquisition order.
-          for (int i = acquiredJvmLocks.size() - 1; i >= 0; i--) {
-            acquiredJvmLocks.get(i).unlock();
           }
         }
       } else {
