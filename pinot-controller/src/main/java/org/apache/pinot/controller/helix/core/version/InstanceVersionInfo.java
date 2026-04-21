@@ -89,8 +89,16 @@ public class InstanceVersionInfo {
   }
 
   /**
-   * Derives the component type from an instance name prefix.  Returns {@code "UNKNOWN"} for any
-   * instance name that does not match one of the known prefixes.
+   * Sentinel returned by {@link #componentTypeOf(String)} for instances whose prefix does not
+   * match any of the known component kinds. Distinct from
+   * {@link org.apache.pinot.common.version.PinotVersion#UNKNOWN} (which names an unparseable
+   * <em>version</em>, not an instance kind).
+   */
+  public static final String UNKNOWN_TYPE = "UNKNOWN_TYPE";
+
+  /**
+   * Derives the component type from an instance name prefix.  Returns {@link #UNKNOWN_TYPE} for
+   * any instance name that does not match one of the known prefixes.
    *
    * <p>Note: this is stricter than {@link org.apache.pinot.spi.utils.InstanceTypeUtils#isServer}
    * which treats unprefixed names as servers. For version-compatibility reporting we prefer to
@@ -109,6 +117,6 @@ public class InstanceVersionInfo {
     if (instanceName.startsWith(Helix.PREFIX_OF_MINION_INSTANCE)) {
       return "MINION";
     }
-    return "UNKNOWN";
+    return UNKNOWN_TYPE;
   }
 }

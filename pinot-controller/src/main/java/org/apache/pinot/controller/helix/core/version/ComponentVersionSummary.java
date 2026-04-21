@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.version;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -72,11 +73,13 @@ public class ComponentVersionSummary {
     _componentType = componentType;
     _liveInstanceCount = liveInstanceCount;
     _offlineInstanceCount = offlineInstanceCount;
-    _versionCounts = versionCounts;
+    _versionCounts = versionCounts == null
+        ? Collections.emptyMap() : Collections.unmodifiableMap(versionCounts);
     _minVersion = minVersion;
     _maxVersion = maxVersion;
     _unknownVersionCount = unknownVersionCount;
-    _instances = instances;
+    _instances = instances == null
+        ? Collections.emptyList() : Collections.unmodifiableList(instances);
   }
 
   public String getComponentType() {

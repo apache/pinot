@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.version;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Collections;
 import java.util.Map;
 
 
@@ -53,7 +54,8 @@ public class ClusterVersionSummary {
     _clusterName = clusterName;
     _snapshotTimeMs = snapshotTimeMs;
     _dataAvailable = dataAvailable;
-    _componentSummaries = componentSummaries;
+    _componentSummaries = componentSummaries == null
+        ? Collections.emptyMap() : Collections.unmodifiableMap(componentSummaries);
   }
 
   public String getClusterName() {

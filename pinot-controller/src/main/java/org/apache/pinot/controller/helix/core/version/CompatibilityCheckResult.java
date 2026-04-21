@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.version;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Collections;
 import java.util.List;
 
 
@@ -55,7 +56,8 @@ public class CompatibilityCheckResult {
     _checkType = checkType;
     _ok = ok;
     _message = message;
-    _warnings = warnings;
+    _warnings = warnings == null
+        ? Collections.emptyList() : Collections.unmodifiableList(warnings);
     _clusterVersionSummary = clusterVersionSummary;
   }
 

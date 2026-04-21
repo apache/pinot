@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.version;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 
@@ -45,6 +47,12 @@ public final class VersionParsingUtils {
   private static final int RANK_RC = 1;
   private static final int RANK_RELEASE = 2;
 
+  // Matches strict `major.minor.patch` optionally followed by `-SNAPSHOT` or `-rc<N>`.
+  // The suffix must immediately follow the numeric patch component — arbitrary intermediate
+  // qualifiers (e.g. `1.2.3-foo-rc10`) are rejected to avoid ambiguous parses.
+  private static final Pattern VERSION_PATTERN =
+      Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:-(SNAPSHOT|rc(\\d+)))?$");
+
   private VersionParsingUtils() {
   }
 
@@ -64,42 +72,28 @@ public final class VersionParsingUtils {
       return null;
     }
 
-    String s = rawVersion.trim();
-    int preReleaseRank = RANK_RELEASE;
-    int preReleaseNum = 0;
-    boolean isSnapshot = false;
-
-    // Strip known suffixes
-    if (s.endsWith("-SNAPSHOT")) {
-      isSnapshot = true;
-      preReleaseRank = RANK_SNAPSHOT;
-      s = s.substring(0, s.length() - "-SNAPSHOT".length());
-    } else {
-      // Check for -rc<N>
-      int rcIdx = s.lastIndexOf("-rc");
-      if (rcIdx >= 0) {
-        String numPart = s.substring(rcIdx + 3);
-        try {
-          preReleaseNum = numPart.isEmpty() ? 0 : Integer.parseInt(numPart);
-          preReleaseRank = RANK_RC;
-          s = s.substring(0, rcIdx);
-        } catch (NumberFormatException ignored) {
-          // not a recognized rc suffix — treat as release
-        }
-      }
-    }
-
-    // Parse major.minor.patch
-    String[] parts = s.split("\\.", -1);
-    if (parts.length < 3) {
+    Matcher m = VERSION_PATTERN.matcher(rawVersion.trim());
+    if (!m.matches()) {
       return null;
     }
     try {
-      int major = Integer.parseInt(parts[0]);
-      int minor = Integer.parseInt(parts[1]);
-      // patch may contain extra text; strip non-digits suffix
-      String patchStr = parts[2].replaceAll("[^0-9].*", "");
-      int patch = patchStr.isEmpty() ? 0 : Integer.parseInt(patchStr);
+      int major = Integer.parseInt(m.group(1));
+      int minor = Integer.parseInt(m.group(2));
+      int patch = Integer.parseInt(m.group(3));
+      String suffix = m.group(4);
+      boolean isSnapshot = false;
+      int preReleaseRank = RANK_RELEASE;
+      int preReleaseNum = 0;
+      if (suffix != null) {
+        if ("SNAPSHOT".equals(suffix)) {
+          isSnapshot = true;
+          preReleaseRank = RANK_SNAPSHOT;
+        } else {
+          // -rc<N>
+          preReleaseRank = RANK_RC;
+          preReleaseNum = Integer.parseInt(m.group(5));
+        }
+      }
       return new ParsedVersion(major, minor, patch, isSnapshot, preReleaseRank, preReleaseNum, rawVersion);
     } catch (NumberFormatException ignored) {
       return null;

@@ -80,6 +80,21 @@ public class VersionParsingUtilsTest {
   }
 
   @Test
+  public void testParseStrictFormatRejectsExtraQualifiers() {
+    // The `-rc<N>` suffix must immediately follow the patch component; arbitrary intermediate
+    // qualifiers must NOT be silently mis-parsed.
+    assertNull(VersionParsingUtils.parse("1.2.3-foo-rc10"));
+    assertNull(VersionParsingUtils.parse("1.2.3-bench-rc"));
+    assertNull(VersionParsingUtils.parse("1.2.3-rc"));
+    assertNull(VersionParsingUtils.parse("1.2.3-rcX"));
+    assertNull(VersionParsingUtils.parse("1.2.3-rc1-extra"));
+    assertNull(VersionParsingUtils.parse("1.2.3.4"));
+    assertNull(VersionParsingUtils.parse("v1.2.3"));
+    // Leading / trailing whitespace is trimmed before matching.
+    assertNotNull(VersionParsingUtils.parse("  1.2.3  "));
+  }
+
+  @Test
   public void testCompareReleaseOrdering() {
     // Snapshot < rc < release within the same base version
     assertTrue(VersionParsingUtils.compare("1.2.3-SNAPSHOT", "1.2.3-rc1") < 0);

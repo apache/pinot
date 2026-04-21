@@ -28,6 +28,8 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -72,6 +74,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/cluster")
 public class ClusterVersionResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterVersionResource.class);
+  private static final Set<String> VALID_COMPONENT_TYPES = Set.of("CONTROLLER", "BROKER", "SERVER", "MINION");
 
   @Inject
   VersionCompatibilityService _versionCompatibilityService;
@@ -103,15 +106,18 @@ public class ClusterVersionResource {
 
       if (componentType != null) {
         String type = componentType.toUpperCase().trim();
-        ComponentVersionSummary comp = summary.getComponentSummaries().get(type);
-        if (comp == null) {
+        if (!VALID_COMPONENT_TYPES.contains(type)) {
           throw new ControllerApplicationException(LOGGER,
               "Unknown componentType '" + componentType + "'. Valid values: CONTROLLER, BROKER, SERVER, MINION",
               Response.Status.BAD_REQUEST);
         }
+        // When data is unavailable, component summaries are empty. Return the summary as-is so
+        // callers can distinguish "unavailable" (dataAvailable=false) from "bad input".
+        ComponentVersionSummary comp = summary.getComponentSummaries().get(type);
+        Map<String, ComponentVersionSummary> filteredMap =
+            (comp == null) ? Collections.emptyMap() : Collections.singletonMap(type, comp);
         ClusterVersionSummary filtered = new ClusterVersionSummary(
-            summary.getClusterName(), summary.getSnapshotTimeMs(), summary.isDataAvailable(),
-            Collections.singletonMap(type, comp));
+            summary.getClusterName(), summary.getSnapshotTimeMs(), summary.isDataAvailable(), filteredMap);
         return JsonUtils.objectToString(filtered);
       }
 

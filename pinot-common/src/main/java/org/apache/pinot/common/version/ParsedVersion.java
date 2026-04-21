@@ -97,6 +97,12 @@ public final class ParsedVersion implements Comparable<ParsedVersion> {
     return Integer.compare(_preReleaseNum, other._preReleaseNum);
   }
 
+  /**
+   * Semantic equality: two versions with the same numeric / pre-release components are equal
+   * regardless of their raw string form. For example, {@code "1.2.3"} and {@code "1.2.3"} parsed
+   * from different sources compare equal, but this also means that formatting differences in the
+   * raw string are intentionally ignored. Mirrors the {@link #compareTo(ParsedVersion)} contract.
+   */
   @Override
   public boolean equals(Object o) {
     if (this == o) {

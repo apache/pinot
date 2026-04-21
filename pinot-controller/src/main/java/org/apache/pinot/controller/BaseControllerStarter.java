@@ -241,7 +241,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
-  protected VersionCompatibilityServiceImpl _versionCompatibilityService;
+  protected VersionCompatibilityService _versionCompatibilityService;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)

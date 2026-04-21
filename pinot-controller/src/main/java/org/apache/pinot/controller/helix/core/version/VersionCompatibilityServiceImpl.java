@@ -58,6 +58,10 @@ public class VersionCompatibilityServiceImpl implements VersionCompatibilityServ
   private static final Logger LOGGER = LoggerFactory.getLogger(VersionCompatibilityServiceImpl.class);
 
   static final String CHECK_TYPE_ROLLOUT_ORDER = "ROLLOUT_ORDER";
+  // Fallback cluster name used only when Helix is unreachable AND no cached snapshot exists.
+  // Distinct from PinotVersion.UNKNOWN and InstanceVersionInfo.UNKNOWN_TYPE to avoid cognitive
+  // collision in downstream JSON output.
+  private static final String UNKNOWN_CLUSTER = "UNKNOWN_CLUSTER";
   private static final String CONTROLLER = "CONTROLLER";
   private static final String BROKER = "BROKER";
   private static final String SERVER = "SERVER";
@@ -77,7 +81,20 @@ public class VersionCompatibilityServiceImpl implements VersionCompatibilityServ
   public VersionCompatibilityServiceImpl(PinotHelixResourceManager helixResourceManager,
       ControllerConf controllerConf) {
     _helixResourceManager = helixResourceManager;
-    _cacheTtlMs = controllerConf.getVersionHealthCheckCacheTtlSeconds() * 1000L;
+    _cacheTtlMs = clampTtlMs(controllerConf.getVersionHealthCheckCacheTtlSeconds() * 1000L);
+  }
+
+  private static long clampTtlMs(long ttlMs) {
+    if (ttlMs <= 0) {
+      LOGGER.warn("Non-positive version compatibility cache TTL ({}ms); clamping to 1s", ttlMs);
+      return 1000L;
+    }
+    if (ttlMs > MAX_CACHE_TTL_MS) {
+      LOGGER.warn("Version compatibility cache TTL ({}ms) exceeds max ({}ms); clamping",
+          ttlMs, MAX_CACHE_TTL_MS);
+      return MAX_CACHE_TTL_MS;
+    }
+    return ttlMs;
   }
 
   // -------------------------------------------------------------------------
@@ -99,8 +116,11 @@ public class VersionCompatibilityServiceImpl implements VersionCompatibilityServ
   public CompatibilityCheckResult checkRolloutOrderCompatibility() {
     ClusterVersionSummary summary = getOrRefreshCache()._summary;
     if (!summary.isDataAvailable()) {
-      return new CompatibilityCheckResult(CHECK_TYPE_ROLLOUT_ORDER, false,
-          "Version data is unavailable (Helix read failed).", Collections.emptyList(), summary);
+      String msg = "Version data is unavailable (Helix read failed).";
+      // Include the message as the first warning too, so clients that only inspect `warnings`
+      // still see the cause rather than an empty list.
+      return new CompatibilityCheckResult(CHECK_TYPE_ROLLOUT_ORDER, false, msg,
+          Collections.singletonList(msg), summary);
     }
 
     List<String> warnings = new ArrayList<>();
@@ -188,7 +208,7 @@ public class VersionCompatibilityServiceImpl implements VersionCompatibilityServ
           ControllerConf.ControllerPeriodicTasksConf.VERSION_HEALTH_CHECK_CACHE_TTL_SECONDS, newTtlSec);
       return;
     }
-    long newTtlMs = Math.min(newTtlSec * 1000L, MAX_CACHE_TTL_MS);
+    long newTtlMs = clampTtlMs(newTtlSec * 1000L);
     _cacheTtlMs = newTtlMs;
     LOGGER.info("Version compatibility cache TTL updated to {}ms via cluster config", newTtlMs);
     invalidateCache();
@@ -217,9 +237,12 @@ public class VersionCompatibilityServiceImpl implements VersionCompatibilityServ
 
   /**
    * Queries Helix and rebuilds the cached snapshot.  Synchronized so that multiple threads
-   * do not all attempt a Helix read simultaneously on cache miss. On failure, stores an
-   * unavailable snapshot (with a fresh timestamp) so the TTL back-off prevents a thundering
-   * herd during a sustained ZK outage.
+   * do not all attempt a Helix read simultaneously on cache miss. On failure, if a previous
+   * good snapshot exists it is retained (stale-but-good), and only the {@link CachedSnapshot}'s
+   * {@code _fetchedAtMs} (the TTL-back-off timestamp) is updated so we don't hammer Helix on
+   * every request during a sustained outage. The underlying data's {@code snapshotTimeMs}
+   * remains at the original capture time so callers can still observe staleness. An unavailable
+   * snapshot is published only when there is no good snapshot to serve.
    */
   private synchronized CachedSnapshot refresh() {
     // Double-check: another thread may have refreshed while we waited.
@@ -230,10 +253,9 @@ public class VersionCompatibilityServiceImpl implements VersionCompatibilityServ
 
     long now = System.currentTimeMillis();
     try {
-      List<InstanceConfig> allConfigs =
-          HelixHelper.getInstanceConfigs(_helixResourceManager.getHelixZkManager());
-      Set<String> liveNames = new HashSet<>(_helixResourceManager.getAllLiveInstances());
-      String clusterName = _helixResourceManager.getHelixClusterName();
+      List<InstanceConfig> allConfigs = fetchAllInstanceConfigs();
+      Set<String> liveNames = new HashSet<>(fetchLiveInstanceNames());
+      String clusterName = fetchClusterName();
 
       ClusterVersionSummary summary = buildSummary(clusterName, allConfigs, liveNames, now);
       CachedSnapshot snapshot = new CachedSnapshot(summary, buildInstanceIndex(summary), now);
@@ -241,13 +263,44 @@ public class VersionCompatibilityServiceImpl implements VersionCompatibilityServ
       return snapshot;
     } catch (Exception e) {
       LOGGER.error("Failed to refresh version compatibility cache from Helix", e);
-      // Publish an unavailable snapshot with a fresh timestamp so subsequent calls respect the
-      // TTL back-off rather than hammering Helix on every request.
+      if (current != null && current._summary.isDataAvailable()) {
+        // Stale-but-good: keep the previously cached summary; only advance the TTL back-off
+        // timestamp so we don't hammer Helix on every request during a sustained outage.
+        LOGGER.warn("Serving stale version snapshot from {}ms ago due to Helix read failure",
+            now - current._summary.getSnapshotTimeMs());
+        CachedSnapshot stale = new CachedSnapshot(current._summary, current._instanceIndex, now);
+        _cacheRef.set(stale);
+        return stale;
+      }
+      // No good snapshot to fall back to — publish an unavailable snapshot with a fresh
+      // timestamp so subsequent calls respect the TTL back-off.
+      String clusterName = safeGetClusterName();
       ClusterVersionSummary empty = new ClusterVersionSummary(
-          _helixResourceManager.getHelixClusterName(), now, false, Collections.emptyMap());
+          clusterName, now, false, Collections.emptyMap());
       CachedSnapshot snapshot = new CachedSnapshot(empty, Collections.emptyMap(), now);
       _cacheRef.set(snapshot);
       return snapshot;
+    }
+  }
+
+  // Test seams: subclasses may override to supply fake data.
+  protected List<InstanceConfig> fetchAllInstanceConfigs() {
+    return HelixHelper.getInstanceConfigs(_helixResourceManager.getHelixZkManager());
+  }
+
+  protected List<String> fetchLiveInstanceNames() {
+    return _helixResourceManager.getAllLiveInstances();
+  }
+
+  protected String fetchClusterName() {
+    return _helixResourceManager.getHelixClusterName();
+  }
+
+  private String safeGetClusterName() {
+    try {
+      return fetchClusterName();
+    } catch (Exception e) {
+      return UNKNOWN_CLUSTER;
     }
   }
 
@@ -265,7 +318,7 @@ public class VersionCompatibilityServiceImpl implements VersionCompatibilityServ
     int unrecognizedCount = 0;
     for (InstanceConfig config : allConfigs) {
       String type = InstanceVersionInfo.componentTypeOf(config.getInstanceName());
-      if ("UNKNOWN".equals(type)) {
+      if (InstanceVersionInfo.UNKNOWN_TYPE.equals(type)) {
         unrecognizedCount++;
         continue;
       }
