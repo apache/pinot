@@ -62,10 +62,10 @@ public class RoundRobinSegmentAssignmentStrategy extends BalancedNumSegmentAssig
     List<String> instances =
         SegmentAssignmentUtils.getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, _replication);
     List<String> assignedInstances = new ArrayList<>();
+    int instanceId = TABLE_ROUND_ROBIN_COUNTER.compute(_tableName,
+        (key, value) -> value == null ? RANDOM.nextInt(instances.size()) : (value + _replication) % instances.size());
     for (int i = 0; i < _replication; i++) {
-      int instanceId = TABLE_ROUND_ROBIN_COUNTER.compute(_tableName,
-          (key, value) -> value == null ? RANDOM.nextInt(instances.size()) : (value + 1) % instances.size());
-      assignedInstances.add(instances.get(instanceId));
+      assignedInstances.add(instances.get((instanceId - i) % instances.size()));
     }
     return assignedInstances;
   }
