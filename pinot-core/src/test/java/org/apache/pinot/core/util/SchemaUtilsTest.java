@@ -306,11 +306,19 @@ public class SchemaUtilsTest {
         .addMultiValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build();
     checkValidationFails(pinotSchema);
 
-    // UUID MV: caught by SchemaUtils.validate (Schema.build allows it)
-    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("myUuidCol", FieldSpec.DataType.UUID).build();
-    checkValidationFails(pinotSchema);
+    // UUID MV: caught by Schema.validate() (called from Schema.build()), so build() itself throws
+    try {
+      new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+          .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+          .addMultiValueDimension("myUuidCol", FieldSpec.DataType.UUID).build();
+      Assert.fail("Schema.build() should have rejected a multi-value UUID column");
+    } catch (RuntimeException e) {
+      // expected — Schema.build() wraps Schema.validate()'s IllegalStateException
+      Assert.assertTrue(e.getCause() instanceof IllegalStateException,
+          "Expected cause to be IllegalStateException from Schema.validate()");
+      Assert.assertTrue(e.getCause().getMessage().contains("UUID columns cannot be multi-value"),
+          "Expected UUID MV rejection message, got: " + e.getCause().getMessage());
+    }
 
     pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)

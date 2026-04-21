@@ -150,6 +150,45 @@ public class AvroSchemaUtilTest {
   }
 
   @Test
+  public void testValueOfUuidStringLogicalType() {
+    String schemaStr = "{\"type\":\"record\",\"name\":\"r\",\"fields\":[{\"name\":\"id\","
+        + "\"type\":{\"type\":\"string\",\"logicalType\":\"uuid\"}}]}";
+    Schema schema = new Schema.Parser().parse(schemaStr);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(schema.getField("id").schema()),
+        FieldSpec.DataType.UUID, "STRING logicalType:uuid should map to UUID");
+  }
+
+  @Test
+  public void testValueOfUuidFixed16LogicalType() {
+    // FIXED(16) + logicalType:uuid — produced by Confluent fixed-uuid mode and Parquet uuid
+    String schemaStr = "{\"type\":\"record\",\"name\":\"r\",\"fields\":[{\"name\":\"id\","
+        + "\"type\":{\"type\":\"fixed\",\"name\":\"uuid_fixed\",\"size\":16,\"logicalType\":\"uuid\"}}]}";
+    Schema schema = new Schema.Parser().parse(schemaStr);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(schema.getField("id").schema()),
+        FieldSpec.DataType.UUID, "FIXED(16) logicalType:uuid should map to UUID");
+  }
+
+  @Test
+  public void testValueOfFixed16WithoutLogicalTypeIsBytes() {
+    // FIXED(16) without logicalType should stay as BYTES
+    String schemaStr = "{\"type\":\"record\",\"name\":\"r\",\"fields\":[{\"name\":\"raw\","
+        + "\"type\":{\"type\":\"fixed\",\"name\":\"raw16\",\"size\":16}}]}";
+    Schema schema = new Schema.Parser().parse(schemaStr);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(schema.getField("raw").schema()),
+        FieldSpec.DataType.BYTES, "FIXED(16) without logicalType:uuid should stay BYTES");
+  }
+
+  @Test
+  public void testValueOfFixedWrongSizeWithUuidLogicalTypeIsBytes() {
+    // FIXED of non-16 size with logicalType:uuid should not map to UUID
+    String schemaStr = "{\"type\":\"record\",\"name\":\"r\",\"fields\":[{\"name\":\"id\","
+        + "\"type\":{\"type\":\"fixed\",\"name\":\"uuid32\",\"size\":32,\"logicalType\":\"uuid\"}}]}";
+    Schema schema = new Schema.Parser().parse(schemaStr);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(schema.getField("id").schema()),
+        FieldSpec.DataType.BYTES, "FIXED(32) with logicalType:uuid should stay BYTES");
+  }
+
+  @Test
   public void testToAvroSchemaJsonObjectForUuid() {
     FieldSpec fieldSpec = new DimensionFieldSpec("uuidCol", FieldSpec.DataType.UUID, true);
 
