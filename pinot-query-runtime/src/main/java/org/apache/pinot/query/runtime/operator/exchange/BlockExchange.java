@@ -30,6 +30,7 @@ import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +43,7 @@ public abstract class BlockExchange implements AutoCloseable {
   // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
+  private static final String SEND_BLOCK_SCOPE = "BlockExchange.sendBlock";
 
   private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
@@ -162,7 +164,9 @@ public abstract class BlockExchange implements AutoCloseable {
       sendingMailbox.send(block);
     } else {
       Iterator<? extends MseBlock.Data> splits = _splitter.split(block, MAX_MAILBOX_CONTENT_SIZE_BYTES);
+      int i = 0;
       while (splits.hasNext()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i++, SEND_BLOCK_SCOPE);
         sendingMailbox.send(splits.next());
       }
     }

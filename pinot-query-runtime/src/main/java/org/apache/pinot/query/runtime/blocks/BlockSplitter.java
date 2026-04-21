@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -53,6 +54,7 @@ public interface BlockSplitter {
    */
   class Default implements BlockSplitter, MseBlock.Data.Visitor<Iterator<MseBlock.Data>, Integer> {
     private static final int MEDIAN_COLUMN_SIZE_BYTES = 8;
+    private static final String SPLIT_SCOPE = "BlockSplitter.Default.split";
 
     private Default() {
     }
@@ -78,7 +80,9 @@ public interface BlockSplitter {
         return Iterators.singletonIterator(block);
       }
       List<MseBlock.Data> blockChunks = new ArrayList<>(numChunks);
+      int chunkIdx = 0;
       for (int fromIndex = 0; fromIndex < numRows; fromIndex += numRowsPerChunk) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(chunkIdx++, SPLIT_SCOPE);
         int toIndex = Math.min(fromIndex + numRowsPerChunk, numRows);
         blockChunks.add(new RowHeapDataBlock(rows.subList(fromIndex, toIndex), dataSchema, block.getAggFunctions()));
       }

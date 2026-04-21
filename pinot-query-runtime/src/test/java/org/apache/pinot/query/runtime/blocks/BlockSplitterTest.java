@@ -27,6 +27,9 @@ import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.common.datablock.DataBlockTestUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -98,6 +101,30 @@ public class BlockSplitterTest {
         DataBlockTestUtils.getRandomRows(dataSchema, TOTAL_ROW_COUNT, 1));
     ColumnarDataBlock columnarBlock = DataBlockBuilder.buildFromColumns(columnars, dataSchema);
     validateNonSplittableBlock(columnarBlock);
+  }
+
+  @Test
+  public void splitRespectsTerminationBetweenChunks()
+      throws Exception {
+    // Given: a row-heap block that will be split into multiple chunks.
+    DataSchema dataSchema = getDataSchema();
+    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TOTAL_ROW_COUNT, 1);
+    RowHeapDataBlock heapBlock = new RowHeapDataBlock(rows, dataSchema);
+    int estRowSizeInBytes = dataSchema.size() * TEST_EST_BYTES_PER_COLUMN;
+    int maxBlockSize = estRowSizeInBytes * 10 + 1;
+
+    try (QueryThreadContext ctx = QueryThreadContext.openForMseTest()) {
+      // Sanity check: without termination, split yields at least one chunk.
+      Iterator<? extends MseBlock.Data> baseline = BlockSplitter.DEFAULT.split(heapBlock, maxBlockSize);
+      Assert.assertTrue(baseline.hasNext());
+      baseline.next();
+
+      // Flag the query for termination. The per-chunk poll at chunkIdx=0 must observe this.
+      ctx.getExecutionContext().terminate(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "test");
+
+      // When/Then: split throws at the first per-chunk poll.
+      Assert.assertThrows(TerminationException.class, () -> BlockSplitter.DEFAULT.split(heapBlock, maxBlockSize));
+    }
   }
 
   private void validateNonSplittableBlock(BaseDataBlock nonSplittableBlock) {

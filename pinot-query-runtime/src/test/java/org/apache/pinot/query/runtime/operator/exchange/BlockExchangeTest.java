@@ -28,6 +28,9 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -164,6 +167,28 @@ public class BlockExchangeTest {
     Assert.assertEquals(sentBlocks.size(), 2, "expected to send two blocks");
     Assert.assertEquals(sentBlocks.get(0).asRowHeap().getRows(), outBlockOne.getRows());
     Assert.assertEquals(sentBlocks.get(1).asRowHeap().getRows(), outBlockTwo.getRows());
+  }
+
+  @Test
+  public void sendBlockRespectsTerminationBetweenSplits()
+      throws Exception {
+    // Given: a remote (non-local) mailbox and a splitter that yields multiple splits.
+    List<SendingMailbox> destinations = List.of(_mailbox1);
+    DataSchema schema = new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING});
+    RowHeapDataBlock inBlock = new RowHeapDataBlock(List.of(new Object[]{"one"}, new Object[]{"two"}), schema);
+    RowHeapDataBlock splitOne = new RowHeapDataBlock(Collections.singletonList(new Object[]{"one"}), schema);
+    RowHeapDataBlock splitTwo = new RowHeapDataBlock(Collections.singletonList(new Object[]{"two"}), schema);
+    BlockSplitter splitter = (block, maxSize) -> List.<MseBlock.Data>of(splitOne, splitTwo).iterator();
+    BlockExchange exchange = new TestBlockExchange(destinations, splitter);
+
+    try (QueryThreadContext ctx = QueryThreadContext.openForMseTest()) {
+      // Flag the query for termination. The per-split poll at i=0 must observe this.
+      ctx.getExecutionContext().terminate(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "test");
+
+      // When/Then: send throws promptly and no split is actually delivered to the mailbox.
+      Assert.assertThrows(TerminationException.class, () -> exchange.send(inBlock));
+      Mockito.verify(_mailbox1, Mockito.never()).send(Mockito.any(MseBlock.Data.class));
+    }
   }
 
   private static class TestBlockExchange extends BlockExchange {

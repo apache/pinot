@@ -23,12 +23,14 @@ import java.util.function.Function;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
  * Broadcast blocks to all receiving servers.
  */
 class BroadcastExchange extends BlockExchange {
+  private static final String ROUTE_SCOPE = "BroadcastExchange.route";
 
   protected BroadcastExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
     super(sendingMailboxes, splitter, BroadcastExchange.RANDOM_INDEX_CHOOSER);
@@ -41,7 +43,9 @@ class BroadcastExchange extends BlockExchange {
 
   @Override
   protected void route(List<SendingMailbox> destinations, MseBlock.Data block) {
+    int i = 0;
     for (SendingMailbox mailbox : destinations) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i++, ROUTE_SCOPE);
       sendBlock(mailbox, block);
     }
   }
