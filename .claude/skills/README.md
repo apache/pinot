@@ -123,16 +123,32 @@ Skills are plain Markdown with YAML frontmatter — Claude reads them and follow
 
 **A reasonable first pass** for a single-method benchmark: `--args "-wi 1 -i 2 -f 1 -r 5s -w 5s"`. That's 1 warmup × 5s + 2 measurement × 5s × 1 fork ≈ 20s per method post-setup. Setup itself (the `@Setup` phase, which often builds Pinot segments) can still take 1–10 minutes for benchmarks that construct real tables.
 
+**Invocation style** (from validation: skill always uses this rather than the generated `.sh`):
+```
+java -Xms4G -Xmx8G -cp '<tree>/pinot-perf/target/pinot-perf-pkg/lib/*' \
+  org.openjdk.jmh.Main 'org.apache.pinot.perf.<BenchmarkClass>' \
+  -wi 1 -i 2 -f 1 -r 5s -w 5s \
+  -jvmArgsAppend='<full add-opens/add-exports set from pinot_tests.yml>'
+```
+
+Why `org.openjdk.jmh.Main` instead of the per-benchmark `pinot-<Class>.sh`:
+- Benchmark classes have a custom `main()` that builds `OptionsBuilder` directly and ignores CLI args. Going through `org.openjdk.jmh.Main` bypasses it so flags like `-wi`, `-i`, `-r`, `-w`, and crucially `-jvmArgsAppend` actually take effect.
+- The generated script hard-codes `-Xms24G -Xmx24G` which OOMs any laptop with less than ~32GB.
+- The `--add-opens` / `--add-exports` flags are mandatory for any benchmark that extends `BaseClusterIntegrationTest` on JDK 21 — without them ZK startup dies with `InaccessibleObjectException`. The canonical set lives in `.github/workflows/pinot_tests.yml`.
+
 **Example scenarios:**
 
-- **Typical run** → `/bench-compare BenchmarkDictionary --args "-wi 1 -i 2 -f 1 -r 5s -w 5s"` → creates worktree at `/tmp/pinot-bench-baseline` from `merge-base HEAD upstream/master`, builds `pinot-perf` there, runs the generated `pinot-perf/target/pinot-perf-pkg/bin/pinot-BenchmarkDictionary.sh` in both trees, diffs the JMH tables into a before/after summary.
-- **Explicit baseline** → `/bench-compare BenchmarkDictionary release-1.5.0` → same but against a tagged release.
-- **Vector benchmark** → `/bench-compare BenchmarkVectorIndex` → uses the `exec:java` form from `pinot-perf/README.md` instead of a shell script (the vector suite doesn't have a generated launcher).
-- **No JMH args passed** → skill warns about multi-hour ETA and asks for confirmation.
+- **Typical run** → `/bench-compare BenchmarkDictionary --args "-wi 1 -i 2 -f 1 -r 5s -w 5s"` — worktree at `/tmp/pinot-bench-baseline`, builds `pinot-perf` there, runs via `org.openjdk.jmh.Main`, diffs the JMH tables.
+- **Cluster-backed benchmark** (e.g. `BenchmarkEquiJoin`, extends `BaseClusterIntegrationTest`) → skill automatically includes the full JDK-21 add-opens set in `-jvmArgsAppend`.
+- **Explicit baseline** → `/bench-compare BenchmarkDictionary release-1.5.0` → same flow against a tagged release.
+- **Vector benchmark** → `/bench-compare BenchmarkVectorIndex` → uses the `exec:java` form from `pinot-perf/README.md`; it has its own CLI conventions.
 
 **Known quirks:**
-- JMH's `-l` flag does not produce a "list-only" run here — Pinot benchmark classes have custom `main()` methods that ignore it. There is no fast sanity check; your first real run is also the first verification.
-- The generated `pinot-<Class>.sh` scripts hard-code `-Xms24G -Xmx24G`. On machines with <32GB RAM, use the direct `java -cp '<lib>/*' -Xms4G -Xmx4G <class>` form instead.
+
+- **Stale-jar trap (the real failure mode).** If the current tree's `pinot-perf/target/pinot-perf-pkg/lib/` was built from a previous ref that pulled in different versions of a transitive dep (e.g. `zookeeper-3.9.4.jar` + `zookeeper-3.9.5.jar`), the classpath glob loads both and you get `NoSuchMethodError` at runtime. Pinot/Helix often swallows this as `ZkTimeoutException: Unable to connect to zookeeper server within timeout: 1000`, which looks like an infrastructure/timing issue but is actually a classpath bug. The skill defends against this by always using `./mvnw -pl pinot-perf clean package -DskipTests -am` on the current tree (the worktree is a fresh checkout so baseline is immune). **If you see `ZkTimeoutException` in a second run, don't tune timeouts — check `lib/` for version duplicates.**
+- JMH's `-l` flag doesn't help — Pinot benchmark classes have custom `main()` methods that ignore CLI args. There is no fast sanity check; the first real run is also the first verification.
+- The generated `pinot-<Class>.sh` scripts hard-code `-Xms24G -Xmx24G`. Avoid them; use the `java -cp 'lib/*'` form with your own `-Xmx`.
+- Only ~21 of ~60 benchmark classes are configured as appassembler programs — not every benchmark has a `.sh`. Direct `java -cp` works for all of them.
 - Worktrees require a clean `.git`. Abort if rebase/merge is in progress.
 - Benchmarks fork their own JVMs; don't be surprised by multiple `java` processes during the run.
 

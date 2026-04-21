@@ -127,3 +127,4 @@ hf_cache/
 # Python
 __pycache__/
 *.py[cod]
+.bench-compare/
