@@ -179,6 +179,7 @@ public class QueryKillingManager {
       _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN, 1);
     } catch (Exception e) {
       LOGGER.error("Error in scan-based killing evaluation for query {}", queryId, e);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN_ERROR, 1);
     }
   }
 }

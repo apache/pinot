@@ -1785,11 +1785,40 @@ public class CommonConstants {
     public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 0.0;
 
     // Scan-based query killing
-    public static final String SCAN_BASED_KILLING_MODE_DISABLED = "disabled";
-    public static final String SCAN_BASED_KILLING_MODE_LOG_ONLY = "logOnly";
-    public static final String SCAN_BASED_KILLING_MODE_ENFORCE = "enforce";
+    public enum ScanKillingMode {
+      DISABLED("disabled"),
+      LOG_ONLY("logOnly"),
+      ENFORCE("enforce");
+
+      private final String _configValue;
+
+      ScanKillingMode(String configValue) {
+        _configValue = configValue;
+      }
+
+      public String getConfigValue() {
+        return _configValue;
+      }
+
+      /**
+       * Parses a config string into a {@link ScanKillingMode}. Case-insensitive.
+       * Returns {@code null} if the value is not recognized.
+       */
+      public static ScanKillingMode fromConfigValue(String value) {
+        if (value == null) {
+          return null;
+        }
+        for (ScanKillingMode mode : values()) {
+          if (mode._configValue.equalsIgnoreCase(value)) {
+            return mode;
+          }
+        }
+        return null;
+      }
+    }
+
     public static final String CONFIG_OF_SCAN_BASED_KILLING_MODE = "accounting.scan.based.killing.mode";
-    public static final String DEFAULT_SCAN_BASED_KILLING_MODE = SCAN_BASED_KILLING_MODE_DISABLED;
+    public static final ScanKillingMode DEFAULT_SCAN_BASED_KILLING_MODE = ScanKillingMode.DISABLED;
 
     public static final String CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME =
         "accounting.scan.based.killing.strategy.factory.class.name";

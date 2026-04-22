@@ -117,6 +117,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   QUERIES_KILLED("query", true),
   QUERIES_KILLED_SCAN("queriesKilledScan", true),
   QUERIES_KILLED_SCAN_DRY_RUN("queriesKilledScanDryRun", true),
+  QUERIES_KILLED_SCAN_ERROR("queriesKilledScanError", true),
   QUERIES_THROTTLED("query", true),
   HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
   HEAP_PANIC_LEVEL_EXCEEDED("count", true),

@@ -238,7 +238,7 @@ public class QueryKillingManagerTest {
     // Configure a custom factory class name
     Map<String, Object> props = new HashMap<>();
     props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE,
-        CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_ENFORCE);
+        "enforce");
     props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME,
         AlwaysKillStrategyFactory.class.getName());
     PinotConfiguration pinotConfig = new PinotConfiguration(props);
@@ -262,7 +262,7 @@ public class QueryKillingManagerTest {
   public void testInvalidFactoryClassFallsBackGracefully() {
     Map<String, Object> props = new HashMap<>();
     props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE,
-        CommonConstants.Accounting.SCAN_BASED_KILLING_MODE_ENFORCE);
+        "enforce");
     props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME,
         "com.nonexistent.FakeFactory");
     props.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, 100L);

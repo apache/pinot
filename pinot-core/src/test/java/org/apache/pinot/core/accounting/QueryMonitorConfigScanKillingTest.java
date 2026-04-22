@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -39,7 +40,7 @@ public class QueryMonitorConfigScanKillingTest {
   public void testDefaultModeIsDisabled() {
     PinotConfiguration config = new PinotConfiguration();
     QueryMonitorConfig qmc = new QueryMonitorConfig(config, MAX_HEAP);
-    assertEquals(qmc.getScanBasedKillingMode(), Accounting.SCAN_BASED_KILLING_MODE_DISABLED);
+    assertEquals(qmc.getScanBasedKillingMode(), ScanKillingMode.DISABLED);
     assertFalse(qmc.isScanBasedKillingEnabled());
     assertFalse(qmc.isScanBasedKillingLogOnly());
   }
@@ -47,12 +48,12 @@ public class QueryMonitorConfigScanKillingTest {
   @Test
   public void testEnforceMode() {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, Accounting.SCAN_BASED_KILLING_MODE_ENFORCE);
+    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "enforce");
     config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "500000000");
     config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED, "50000000");
 
     QueryMonitorConfig qmc = new QueryMonitorConfig(config, MAX_HEAP);
-    assertEquals(qmc.getScanBasedKillingMode(), Accounting.SCAN_BASED_KILLING_MODE_ENFORCE);
+    assertEquals(qmc.getScanBasedKillingMode(), ScanKillingMode.ENFORCE);
     assertTrue(qmc.isScanBasedKillingEnabled());
     assertFalse(qmc.isScanBasedKillingLogOnly());
     assertEquals(qmc.getScanBasedKillingMaxEntriesScannedInFilter(), 500_000_000L);
@@ -62,11 +63,11 @@ public class QueryMonitorConfigScanKillingTest {
   @Test
   public void testLogOnlyMode() {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, Accounting.SCAN_BASED_KILLING_MODE_LOG_ONLY);
+    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "logOnly");
     config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "500000000");
 
     QueryMonitorConfig qmc = new QueryMonitorConfig(config, MAX_HEAP);
-    assertEquals(qmc.getScanBasedKillingMode(), Accounting.SCAN_BASED_KILLING_MODE_LOG_ONLY);
+    assertEquals(qmc.getScanBasedKillingMode(), ScanKillingMode.LOG_ONLY);
     assertTrue(qmc.isScanBasedKillingEnabled());
     assertTrue(qmc.isScanBasedKillingLogOnly());
   }
@@ -82,7 +83,7 @@ public class QueryMonitorConfigScanKillingTest {
     changedConfigs.add(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER);
 
     Map<String, String> clusterConfigs = new HashMap<>();
-    clusterConfigs.put(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, Accounting.SCAN_BASED_KILLING_MODE_ENFORCE);
+    clusterConfigs.put(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "enforce");
     clusterConfigs.put(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "200000000");
 
     QueryMonitorConfig newConfig = new QueryMonitorConfig(oldConfig, changedConfigs, clusterConfigs);
@@ -96,7 +97,7 @@ public class QueryMonitorConfigScanKillingTest {
   public void testDynamicConfigUpdateToLogOnly() {
     // Start in enforce mode
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, Accounting.SCAN_BASED_KILLING_MODE_ENFORCE);
+    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "enforce");
     config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "100000000");
     QueryMonitorConfig oldConfig = new QueryMonitorConfig(config, MAX_HEAP);
     assertTrue(oldConfig.isScanBasedKillingEnabled());
@@ -107,7 +108,7 @@ public class QueryMonitorConfigScanKillingTest {
     changedConfigs.add(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE);
 
     Map<String, String> clusterConfigs = new HashMap<>();
-    clusterConfigs.put(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, Accounting.SCAN_BASED_KILLING_MODE_LOG_ONLY);
+    clusterConfigs.put(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "logOnly");
 
     QueryMonitorConfig newConfig = new QueryMonitorConfig(oldConfig, changedConfigs, clusterConfigs);
     assertTrue(newConfig.isScanBasedKillingEnabled());
@@ -123,7 +124,7 @@ public class QueryMonitorConfigScanKillingTest {
     config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "100000000");
 
     QueryMonitorConfig qmc = new QueryMonitorConfig(config, MAX_HEAP);
-    assertEquals(qmc.getScanBasedKillingMode(), Accounting.SCAN_BASED_KILLING_MODE_DISABLED);
+    assertEquals(qmc.getScanBasedKillingMode(), ScanKillingMode.DISABLED);
     assertFalse(qmc.isScanBasedKillingEnabled());
     assertFalse(qmc.isScanBasedKillingLogOnly());
   }
@@ -132,7 +133,7 @@ public class QueryMonitorConfigScanKillingTest {
   public void testInvalidModeInDynamicUpdateFallsBackToDisabled() {
     // Start in enforce mode
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, Accounting.SCAN_BASED_KILLING_MODE_ENFORCE);
+    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "enforce");
     config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "100000000");
     QueryMonitorConfig oldConfig = new QueryMonitorConfig(config, MAX_HEAP);
     assertTrue(oldConfig.isScanBasedKillingEnabled());
@@ -145,18 +146,18 @@ public class QueryMonitorConfigScanKillingTest {
     clusterConfigs.put(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "typoEnforce");
 
     QueryMonitorConfig newConfig = new QueryMonitorConfig(oldConfig, changedConfigs, clusterConfigs);
-    assertEquals(newConfig.getScanBasedKillingMode(), Accounting.SCAN_BASED_KILLING_MODE_DISABLED);
+    assertEquals(newConfig.getScanBasedKillingMode(), ScanKillingMode.DISABLED);
     assertFalse(newConfig.isScanBasedKillingEnabled());
   }
 
   @Test
-  public void testCaseSensitiveMode() {
-    // "Enforce" (capital E) should be invalid — mode values are case-sensitive
+  public void testCaseInsensitiveMode() {
+    // "Enforce" (capital E) should parse correctly — mode values are case-insensitive
     PinotConfiguration config = new PinotConfiguration();
     config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "Enforce");
 
     QueryMonitorConfig qmc = new QueryMonitorConfig(config, MAX_HEAP);
-    assertEquals(qmc.getScanBasedKillingMode(), Accounting.SCAN_BASED_KILLING_MODE_DISABLED);
-    assertFalse(qmc.isScanBasedKillingEnabled());
+    assertEquals(qmc.getScanBasedKillingMode(), ScanKillingMode.ENFORCE);
+    assertTrue(qmc.isScanBasedKillingEnabled());
   }
 }
