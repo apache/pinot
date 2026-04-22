@@ -324,11 +324,10 @@ public class QueryMonitorConfig {
 
     if (changedConfigs.contains(
         CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER)) {
-      _scanBasedKillingMaxEntriesScannedInFilter = Long.parseLong(
-          clusterConfigs.getOrDefault(
-              CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER,
-              String.valueOf(
-                  CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER)));
+      _scanBasedKillingMaxEntriesScannedInFilter = parseLongOrDefault(
+          clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER),
+          CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER,
+          CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER);
     } else {
       _scanBasedKillingMaxEntriesScannedInFilter =
           oldConfig.getScanBasedKillingMaxEntriesScannedInFilter();
@@ -336,21 +335,20 @@ public class QueryMonitorConfig {
 
     if (changedConfigs.contains(
         CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED)) {
-      _scanBasedKillingMaxDocsScanned = Long.parseLong(
-          clusterConfigs.getOrDefault(
-              CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED,
-              String.valueOf(CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_DOCS_SCANNED)));
+      _scanBasedKillingMaxDocsScanned = parseLongOrDefault(
+          clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED),
+          CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED,
+          CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_DOCS_SCANNED);
     } else {
       _scanBasedKillingMaxDocsScanned = oldConfig.getScanBasedKillingMaxDocsScanned();
     }
 
     if (changedConfigs.contains(
         CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER)) {
-      _scanBasedKillingMaxEntriesScannedPostFilter = Long.parseLong(
-          clusterConfigs.getOrDefault(
-              CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER,
-              String.valueOf(
-                  CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER)));
+      _scanBasedKillingMaxEntriesScannedPostFilter = parseLongOrDefault(
+          clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER),
+          CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER,
+          CommonConstants.Accounting.DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER);
     } else {
       _scanBasedKillingMaxEntriesScannedPostFilter =
           oldConfig.getScanBasedKillingMaxEntriesScannedPostFilter();
@@ -380,6 +378,23 @@ public class QueryMonitorConfig {
         mode, CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE,
         Arrays.toString(ScanKillingMode.values()), ScanKillingMode.DISABLED.getConfigValue());
     return ScanKillingMode.DISABLED;
+  }
+
+  /**
+   * Parses a long value from a config string, falling back to the default if the value
+   * is null, empty, or not a valid number.
+   */
+  private static long parseLongOrDefault(@Nullable String value, String configKey, long defaultValue) {
+    if (value == null || value.isEmpty()) {
+      return defaultValue;
+    }
+    try {
+      return Long.parseLong(value);
+    } catch (NumberFormatException e) {
+      LOGGER.error("Invalid numeric value '{}' for config '{}'. Defaulting to {}.",
+          value, configKey, defaultValue);
+      return defaultValue;
+    }
   }
 
   public long getMaxHeapSize() {

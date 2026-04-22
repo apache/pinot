@@ -160,4 +160,32 @@ public class QueryMonitorConfigScanKillingTest {
     assertEquals(qmc.getScanBasedKillingMode(), ScanKillingMode.ENFORCE);
     assertTrue(qmc.isScanBasedKillingEnabled());
   }
+
+  @Test
+  public void testInvalidThresholdValuesFallBackToDefaults() {
+    // Start with valid config
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "enforce");
+    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "100000000");
+    config.setProperty(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED, "50000000");
+    QueryMonitorConfig oldConfig = new QueryMonitorConfig(config, MAX_HEAP);
+
+    // Dynamic update with invalid values (empty string, non-numeric)
+    Set<String> changedConfigs = new HashSet<>();
+    changedConfigs.add(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER);
+    changedConfigs.add(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED);
+    changedConfigs.add(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER);
+
+    Map<String, String> clusterConfigs = new HashMap<>();
+    clusterConfigs.put(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "");
+    clusterConfigs.put(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED, "notANumber");
+    clusterConfigs.put(Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER, "  ");
+
+    QueryMonitorConfig newConfig = new QueryMonitorConfig(oldConfig, changedConfigs, clusterConfigs);
+
+    // All should fall back to defaults instead of throwing
+    assertEquals(newConfig.getScanBasedKillingMaxEntriesScannedInFilter(), Long.MAX_VALUE);
+    assertEquals(newConfig.getScanBasedKillingMaxDocsScanned(), Long.MAX_VALUE);
+    assertEquals(newConfig.getScanBasedKillingMaxEntriesScannedPostFilter(), Long.MAX_VALUE);
+  }
 }
