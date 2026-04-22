@@ -138,9 +138,8 @@ public class QueryMonitorConfig {
     _workloadSleepTimeMs =
         config.getProperty(Accounting.Keys.WORKLOAD_SLEEP_TIME_MS, Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS);
 
-    _workloadCostEnforcementEnabled =
-        config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
-            CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
+    _workloadCostEnforcementEnabled = config.getProperty(Accounting.Keys.WORKLOAD_ENABLE_COST_ENFORCEMENT,
+        Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
 
     _scanBasedKillingMode = validateScanKillingMode(config.getProperty(
         CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE,
