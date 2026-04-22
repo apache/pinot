@@ -849,7 +849,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
-        new SegmentMessageHandlerFactory(instanceDataManager, _serverMetrics);
+        createSegmentMessageHandlerFactory(instanceDataManager, _serverMetrics);
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
@@ -1253,6 +1253,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected AdminApiApplication createServerAdminApp() {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf);
+  }
+
+  /**
+   * Creates the {@link SegmentMessageHandlerFactory} used to handle user-defined Helix messages for segments.
+   * Subclasses can override to return a custom factory that handles additional message sub-types.
+   */
+  protected SegmentMessageHandlerFactory createSegmentMessageHandlerFactory(InstanceDataManager instanceDataManager,
+      ServerMetrics serverMetrics) {
+    return new SegmentMessageHandlerFactory(instanceDataManager, serverMetrics);
   }
 
   private void refreshMessageCount() {
