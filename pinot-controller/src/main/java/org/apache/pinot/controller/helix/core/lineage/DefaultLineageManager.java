@@ -77,10 +77,10 @@ public class DefaultLineageManager implements LineageManager {
     String tableNameWithType = tableConfig.getTableName();
     long lineageCleanupRetentionMs = getRetentionMsFromConfig(
         tableConfig.getValidationConfig().getLineageEntryCleanupRetentionPeriod(),
-        LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS, tableNameWithType);
+        LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS, tableNameWithType, "lineageEntryCleanupRetentionPeriod");
     long replacedSegmentsRetentionMs = getRetentionMsFromConfig(
         tableConfig.getValidationConfig().getReplacedSegmentsRetentionPeriod(),
-        REPLACED_SEGMENTS_RETENTION_IN_MILLIS, tableNameWithType);
+        REPLACED_SEGMENTS_RETENTION_IN_MILLIS, tableNameWithType, "replacedSegmentsRetentionPeriod");
     Set<String> segmentsForTable = new HashSet<>(allSegments);
     Iterator<LineageEntry> lineageEntryIterator = lineage.getLineageEntries().values().iterator();
     while (lineageEntryIterator.hasNext()) {
@@ -122,12 +122,14 @@ public class DefaultLineageManager implements LineageManager {
   /**
    * Helper function to decide whether we should delete segmentsFrom (replaced segments) given a lineage entry.
    *
-   * The replaced segments are safe to delete if the following conditions are all satisfied
-   * 1) Table is "APPEND"
-   * 2) It has been more than 24 hours since the lineage entry became "COMPLETED" state.
+   * The replaced segments are safe to delete if either:
+   * 1) The table is not "REFRESH" (e.g. "APPEND"), in which case they are deleted immediately, or
+   * 2) The lineage entry has been in "COMPLETED" state for longer than {@code replacedSegmentsRetentionMs}
+   *    (configurable via {@code replacedSegmentsRetentionPeriod} in table config, defaulting to 1 day).
    *
    * @param tableConfig a table config
    * @param lineageEntry lineage entry
+   * @param replacedSegmentsRetentionMs configured retention in ms for replaced segments
    * @return True if we can safely delete the replaced segments. False otherwise.
    */
   private boolean shouldDeleteReplacedSegments(TableConfig tableConfig, LineageEntry lineageEntry,
@@ -141,18 +143,19 @@ public class DefaultLineageManager implements LineageManager {
     return lineageEntry.getTimestamp() < (System.currentTimeMillis() - replacedSegmentsRetentionMs);
   }
 
-  private static long getRetentionMsFromConfig(@Nullable String period, long defaultMs, String tableNameWithType) {
+  private static long getRetentionMsFromConfig(@Nullable String period, long defaultMs, String tableNameWithType,
+      String configFieldName) {
     if (!StringUtils.isEmpty(period)) {
       try {
         long ms = TimeUtils.convertPeriodToMillis(period);
-        if (ms == 0) {
-          LOGGER.warn("Retention period '{}' resolves to 0ms for table: {}: replaced/zombie segments will be deleted "
-              + "immediately with no rollback window", period, tableNameWithType);
+        if (ms <= 0) {
+          LOGGER.warn("Retention period '{}' for config field '{}' resolves to {}ms for table: {}: cleanup will run "
+              + "immediately with no rollback window", period, configFieldName, ms, tableNameWithType);
         }
         return ms;
       } catch (Exception e) {
-        LOGGER.warn("Unable to parse retention period: {} for table: {}, using default: {}ms", period,
-            tableNameWithType, defaultMs);
+        LOGGER.warn("Unable to parse retention period '{}' for config field '{}' on table: {}, using default: {}ms",
+            period, configFieldName, tableNameWithType, defaultMs);
       }
     }
     return defaultMs;
