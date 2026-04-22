@@ -246,6 +246,43 @@ public class PinotClientRequest {
     }
   }
 
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query/sql/validateSyntax")
+  @ApiOperation(value = "Validate the syntax of a SQL query without executing it",
+      notes = "Parses the query using Pinot's Calcite-based SQL parser. No table metadata or "
+          + "schema validation is performed, and the query is not executed. Supports both "
+          + "single-stage and multi-stage queries. Returns HTTP 200 in both the valid and invalid "
+          + "cases; clients should inspect the `valid` field of the response body.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Syntax validation result"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  @ManualAuthorization
+  public Response validateSqlSyntax(String query,
+      @Context org.glassfish.grizzly.http.server.Request requestContext,
+      @Context HttpHeaders httpHeaders) {
+    try {
+      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      if (!requestJson.has(Request.SQL)) {
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("{\"error\": \"Payload is missing the query string field 'sql'\"}")
+            .build();
+      }
+      return Response.ok(validateSqlSyntax((ObjectNode) requestJson)).build();
+    } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
+      throw wae;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while validating SQL syntax for POST request", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("{\"error\": \"" + e.getMessage() + "\"}")
+          .build();
+    }
+  }
+
   @GET
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
@@ -616,6 +653,17 @@ public class PinotClientRequest {
         }
       default:
         return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
+    }
+  }
+
+  @VisibleForTesting
+  SqlSyntaxValidationResponse validateSqlSyntax(ObjectNode sqlRequestJson) {
+    try {
+      SqlNodeAndOptions sqlNodeAndOptions =
+          RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
+      return SqlSyntaxValidationResponse.valid(sqlNodeAndOptions.getSqlType().name());
+    } catch (Exception e) {
+      return SqlSyntaxValidationResponse.invalid(e.getMessage());
     }
   }
 
