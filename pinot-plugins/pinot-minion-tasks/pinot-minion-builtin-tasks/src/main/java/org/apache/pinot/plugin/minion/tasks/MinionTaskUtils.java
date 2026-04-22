@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
@@ -35,6 +36,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.auth.NullAuthProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
@@ -45,6 +47,7 @@ import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -57,6 +60,7 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -84,6 +88,17 @@ public class MinionTaskUtils {
    * Production should leave this unset (defaults to false); local FS then always uses TAR push.
    */
   public static final String ALLOW_METADATA_PUSH_WITH_LOCAL_FS = "allowMetadataPushWithLocalFs";
+
+  /**
+   * Task config key for an optional safety margin subtracted from retention when filtering segments.
+   * Value is a period string (e.g. "1h", "30m"). Segments within {@code (now - endTime) > (retention - buffer)}
+   * are excluded from task generation. This is a table-level config — not per-merge-level — because retention
+   * itself is table-level.
+   * <p>
+   * Currently used by {@code MergeRollupTask} and {@code UpsertCompactMergeTask}. Not applied to
+   * {@code UpsertCompactionTask} (legacy single-segment compaction, being superseded by UpsertCompactMergeTask).
+   */
+  public static final String RETENTION_EXPIRY_BUFFER_PERIOD_KEY = "retentionExpiryBufferPeriod";
 
   private MinionTaskUtils() {
   }
@@ -450,5 +465,112 @@ public class MinionTaskUtils {
           "'deleteRecordColumn' must be provided with validDocIdsType: %s", validDocIdsType);
     }
     return validDocIdsType;
+  }
+
+  /**
+   * Filters out segments that are past (or near) the table's retention period. This prevents task generators from
+   * selecting segments that RetentionManager may delete before the task executor downloads them.
+   * <p>
+   * Uses the same retention logic as {@code TimeRetentionStrategy}: a segment is considered expired if
+   * {@code currentTimeMs - endTimeMs > effectiveRetentionMs}, where effectiveRetentionMs is
+   * {@code retentionMs - bufferMs}.
+   * <p>
+   * If {@link #RETENTION_EXPIRY_BUFFER_PERIOD_KEY} is set in {@code taskConfigs}, the effective retention is reduced
+   * by that amount, excluding segments earlier — before RetentionManager actually deletes them. This is a table-level
+   * config, not a per-merge-level config, because retention itself is table-level.
+   * <p>
+   * <b>Note on hybrid tables:</b> This method reads only the table-level retention config
+   * ({@code segmentsConfig.retentionTimeUnit/Value}). It does not account for hybrid retention strategies that use
+   * the offline table's time boundary. If hybrid retention is enabled (off by default), RetentionManager may use a
+   * different deletion boundary than what this method computes, so the filter may not perfectly match the controller's
+   * deletion decisions for hybrid tables.
+   * <p>
+   * <b>Watermark impact (MergeRollupTask):</b> This filter runs before watermark advancement. If all segments in an
+   * early time bucket are filtered out, the watermark will advance past them permanently. This is a one-way door but
+   * is expected: those segments would be purged by RetentionManager regardless. If this is caused by a misconfigured
+   * {@code retentionExpiryBufferPeriod}, correcting the config will not recover already-skipped buckets.
+   *
+   * @apiNote Callers are expected to pass only completed segments (status DONE or UPLOADED). This method does not
+   * check segment status, unlike {@code TimeRetentionStrategy.isPurgeable()} which skips incomplete segments. All
+   * current callers ({@code UpsertCompactMergeTaskGenerator.getCandidateSegments},
+   * {@code MergeRollupTaskGenerator.getNonConsumingSegmentsZKMetadataForRealtimeTable}) already guarantee this.
+   *
+   * @param segments      the candidate segments to filter (must not be null)
+   * @param tableConfig   the table config containing retention settings
+   * @param taskConfigs   task-level configs; may contain {@link #RETENTION_EXPIRY_BUFFER_PERIOD_KEY}. Null if
+   *                      unavailable.
+   * @param currentTimeMs the current time in milliseconds (pass {@code System.currentTimeMillis()})
+   * @return filtered list excluding segments past effective retention; returns the original list if retention is not
+   *         configured or cannot be parsed
+   */
+  public static List<SegmentZKMetadata> filterSegmentsPastRetention(List<SegmentZKMetadata> segments,
+      TableConfig tableConfig, @Nullable Map<String, String> taskConfigs, long currentTimeMs) {
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
+    String retentionTimeValue = validationConfig.getRetentionTimeValue();
+    if (retentionTimeUnit == null || retentionTimeValue == null) {
+      return segments;
+    }
+
+    long retentionMs;
+    try {
+      retentionMs = TimeUnit.valueOf(retentionTimeUnit.toUpperCase()).toMillis(Long.parseLong(retentionTimeValue));
+    } catch (Exception e) {
+      LOGGER.warn("Failed to parse retention config for table: {}, skipping retention filter",
+          tableConfig.getTableName(), e);
+      return segments;
+    }
+
+    if (retentionMs <= 0) {
+      LOGGER.warn("Retention is non-positive ({}ms) for table: {}, skipping retention filter",
+          retentionMs, tableConfig.getTableName());
+      return segments;
+    }
+
+    long bufferMs = 0;
+    if (taskConfigs != null) {
+      String bufferPeriod = taskConfigs.get(RETENTION_EXPIRY_BUFFER_PERIOD_KEY);
+      if (bufferPeriod != null) {
+        try {
+          bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
+          if (bufferMs < 0) {
+            LOGGER.warn("Invalid retentionExpiryBufferPeriod '{}' for table: {}, using 0",
+                bufferPeriod, tableConfig.getTableName());
+            bufferMs = 0;
+          }
+        } catch (Exception e) {
+          LOGGER.warn("Failed to parse retentionExpiryBufferPeriod '{}' for table: {}, using 0",
+              bufferPeriod, tableConfig.getTableName(), e);
+        }
+      }
+    }
+
+    long effectiveRetentionMs = retentionMs - bufferMs;
+    if (effectiveRetentionMs <= 0) {
+      LOGGER.warn("retentionExpiryBufferPeriod ({}) >= retention ({}ms) for table: {}, skipping retention filter",
+          bufferMs, retentionMs, tableConfig.getTableName());
+      return segments;
+    }
+
+    String tableNameWithType = tableConfig.getTableName();
+    List<SegmentZKMetadata> filtered = new ArrayList<>();
+    int excludedCount = 0;
+    for (SegmentZKMetadata segment : segments) {
+      long endTimeMs = segment.getEndTimeMs();
+      if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
+        filtered.add(segment);
+        continue;
+      }
+      if (currentTimeMs - endTimeMs > effectiveRetentionMs) {
+        excludedCount++;
+        continue;
+      }
+      filtered.add(segment);
+    }
+    if (excludedCount > 0) {
+      LOGGER.info("Excluded {} segments past retention for table: {} (retentionMs={}, bufferMs={}, effectiveMs={})",
+          excludedCount, tableNameWithType, retentionMs, bufferMs, effectiveRetentionMs);
+    }
+    return filtered;
   }
 }

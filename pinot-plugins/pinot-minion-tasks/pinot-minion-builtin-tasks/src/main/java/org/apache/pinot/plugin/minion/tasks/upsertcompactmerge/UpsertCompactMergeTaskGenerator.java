@@ -44,6 +44,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtil
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -147,8 +148,13 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
 
       // Get completed segments and filter out the segments based on the buffer time configuration
+      long currentTimeMs = System.currentTimeMillis();
       List<SegmentZKMetadata> candidateSegments =
-          getCandidateSegments(taskConfigs, allSegments, System.currentTimeMillis());
+          getCandidateSegments(taskConfigs, allSegments, currentTimeMs);
+      // Complements the bufferTimePeriod filter above: getCandidateSegments ensures freshness (don't compact
+      // segments still being written), while this filter excludes segments nearing deletion by RetentionManager.
+      candidateSegments =
+          MinionTaskUtils.filterSegmentsPastRetention(candidateSegments, tableConfig, taskConfigs, currentTimeMs);
 
       if (candidateSegments.isEmpty()) {
         LOGGER.info("No segments were eligible for compactMerge task for table: {}", tableNameWithType);
