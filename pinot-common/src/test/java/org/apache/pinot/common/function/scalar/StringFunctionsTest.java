@@ -24,6 +24,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class StringFunctionsTest {
@@ -347,6 +348,27 @@ public class StringFunctionsTest {
     // Demonstrate the difference between hammingDistance and levenshteinDistance
     assertEquals(StringFunctions.hammingDistance("cat", "cats"), -1); // Hamming can't handle different lengths
     assertEquals(StringFunctions.levenshteinDistance("cat", "cats"), 1); // Levenshtein can handle different lengths
+  }
+
+  @Test
+  public void testSoundex() {
+    assertEquals(StringFunctions.soundex("Robert"), "R163");
+    assertEquals(StringFunctions.soundex("Rupert"), "R163");
+    assertEquals(StringFunctions.soundex("Ashcraft"), "A261");
+    // Empty string returns SQL-standard fallback code
+    assertEquals(StringFunctions.soundex(""), "0000");
+    assertNull(StringFunctions.soundex(null));
+  }
+
+  @Test
+  public void testDifference() {
+    assertEquals(StringFunctions.difference("Robert", "Rupert"), 4);
+    assertEquals(StringFunctions.difference("Smith", "Johnson"), 1);
+    assertEquals(StringFunctions.difference("Ann", "Ann"), 4);
+    // "0000" vs "0000" — both encode to the standard empty fallback, all 4 positions match
+    assertEquals(StringFunctions.difference("", ""), 4);
+    // "R163" vs "0000" — first characters differ, no positions match
+    assertEquals(StringFunctions.difference("Robert", ""), 0);
   }
 
   @Test
