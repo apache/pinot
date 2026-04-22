@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.EfSearchAware;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
@@ -32,6 +35,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -78,7 +82,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
-    VectorSearchParams params = new VectorSearchParams(16, false, null);
+    VectorSearchParams params = new VectorSearchParams(16, false, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null);
 
@@ -86,6 +90,7 @@ public class VectorSimilarityFilterOperatorTest {
     Assert.assertEquals(result.getCardinality(), 2);
     // Verify nprobe was set before search
     verify(mockReader).setNprobe(16);
+    verify(mockReader).clearNprobe();
   }
 
   @Test
@@ -100,7 +105,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
 
-    VectorSearchParams params = new VectorSearchParams(16, false, null);
+    VectorSearchParams params = new VectorSearchParams(16, false, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null);
 
@@ -136,7 +141,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
-    VectorSearchParams params = new VectorSearchParams(null, true, null);
+    VectorSearchParams params = new VectorSearchParams(null, true, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         10, params, mockForward);
 
@@ -157,20 +162,20 @@ public class VectorSimilarityFilterOperatorTest {
 
     VectorIndexReader mockReader = mock(VectorIndexReader.class);
     float[] queryVector = {1.0f, 0.0f};
-    // maxCandidates=50, topK=5 -> should search for 50
-    when(mockReader.getDocIds(queryVector, 50)).thenReturn(annResult);
+    // maxCandidates=50, topK=5, numDocs=40 -> should clamp to 40
+    when(mockReader.getDocIds(queryVector, 40)).thenReturn(annResult);
 
     ForwardIndexReader<?> mockForward = createMockForwardIndexReader(new float[][]{{1.0f, 0.0f}});
 
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 5);
 
-    VectorSearchParams params = new VectorSearchParams(null, true, 50);
+    VectorSearchParams params = new VectorSearchParams(null, true, 50, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
-        100, params, mockForward);
+        40, params, mockForward);
 
     operator.getBitmaps();
-    verify(mockReader).getDocIds(queryVector, 50);
+    verify(mockReader).getDocIds(queryVector, 40);
   }
 
   @Test
@@ -187,7 +192,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
-    VectorSearchParams params = new VectorSearchParams(null, false, null);
+    VectorSearchParams params = new VectorSearchParams(null, false, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null);
 
@@ -197,26 +202,26 @@ public class VectorSimilarityFilterOperatorTest {
 
   @Test
   public void testRerankWithoutForwardIndexSkipsRerank() {
-    // If rerank is enabled but no forward index reader, skip rerank
     MutableRoaringBitmap annResult = new MutableRoaringBitmap();
     annResult.add(0);
-    annResult.add(1);
+    annResult.add(3);
 
     VectorIndexReader mockReader = mock(VectorIndexReader.class);
     float[] queryVector = {1.0f, 0.0f};
-    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+    when(mockReader.getDocIds(queryVector, 2)).thenReturn(annResult);
 
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
 
-    VectorSearchParams params = new VectorSearchParams(null, true, null);
-    // Note: forwardIndexReader is null -- rerank should be skipped gracefully
+    VectorSearchParams params = new VectorSearchParams(null, true, null, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, null);
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
-    // Should still return the ANN results without reranking
     Assert.assertEquals(result.getCardinality(), 2);
+    Assert.assertTrue(result.contains(0));
+    Assert.assertTrue(result.contains(3));
+    verify(mockReader).getDocIds(queryVector, 2);
   }
 
   @Test
@@ -233,11 +238,32 @@ public class VectorSimilarityFilterOperatorTest {
     VectorIndexReader mockReader = mock(VectorIndexReader.class);
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, new float[]{1.0f, 2.0f}, 5);
-    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 100);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, VectorSearchParams.DEFAULT, null,
+        createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.COSINE));
     String explain = operator.toExplainString();
     Assert.assertTrue(explain.contains("VECTOR_SIMILARITY_INDEX"));
     Assert.assertTrue(explain.contains("embedding"));
     Assert.assertTrue(explain.contains("5"));
+    Assert.assertTrue(explain.contains("backend:IVF_PQ"));
+    Assert.assertTrue(explain.contains("distanceFunction:COSINE"));
+    Assert.assertTrue(explain.contains("effectiveExactRerank:false"));
+    Assert.assertTrue(explain.contains("effectiveCandidateCount:5"));
+  }
+
+  @Test
+  public void testExplainUsesClampedEffectiveNprobe() {
+    NprobeAwareVectorReader mockReader = mock(NprobeAwareVectorReader.class);
+    when(mockReader.getIndexDebugInfo()).thenReturn(Map.of("backend", "IVF_FLAT", "nlist", 4, "effectiveNprobe", 4));
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, new float[]{1.0f, 2.0f}, 5);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, new VectorSearchParams(16, false, null, null, null, null, null), null,
+        createVectorIndexConfig("IVF_FLAT", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("effectiveNprobe:4"));
   }
 
   @Test
@@ -259,7 +285,7 @@ public class VectorSimilarityFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
 
-    VectorSearchParams params = new VectorSearchParams(8, true, 20);
+    VectorSearchParams params = new VectorSearchParams(8, true, 20, null, null, null, null);
     VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
         100, params, mockForward);
 
@@ -269,12 +295,291 @@ public class VectorSimilarityFilterOperatorTest {
     Assert.assertTrue(result.contains(0));
     // Verify nprobe was set
     verify(mockReader).setNprobe(8);
+    verify(mockReader).clearNprobe();
+  }
+
+  @Test
+  public void testNprobeClearedWhenSearchThrows() {
+    NprobeAwareVectorReader mockReader = mock(NprobeAwareVectorReader.class);
+    float[] queryVector = {1.0f, 2.0f};
+    when(mockReader.getDocIds(queryVector, 2)).thenThrow(new RuntimeException("boom"));
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
+
+    VectorSearchParams params = new VectorSearchParams(16, false, null, null, null, null, null);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, params, null);
+
+    try {
+      operator.getBitmaps();
+      Assert.fail("Expected vector search failure");
+    } catch (RuntimeException e) {
+      Assert.assertEquals(e.getMessage(), "boom");
+    }
+
+    verify(mockReader).setNprobe(16);
+    verify(mockReader).clearNprobe();
+  }
+
+  @Test
+  public void testIvfPqDefaultRerankUsesExpandedCandidateCount() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+    annResult.add(1);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(queryVector, 10)).thenReturn(annResult);
+
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(new float[][]{
+        {1.0f, 0.0f},
+        {0.0f, 1.0f}
+    });
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 10,
+        VectorSearchParams.DEFAULT, mockForward,
+        createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
+
+    operator.getBitmaps();
+    verify(mockReader).getDocIds(queryVector, 10);
+  }
+
+  @Test
+  public void testExplicitRerankDisableOverridesIvfPqDefault() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(queryVector, 2)).thenReturn(annResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 10,
+        new VectorSearchParams(null, false, null, null, null, null, null),
+        createMockForwardIndexReader(new float[][]{{1.0f, 0.0f}}),
+        createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
+
+    operator.getBitmaps();
+    verify(mockReader).getDocIds(queryVector, 2);
+  }
+
+  @Test
+  public void testCosineRerankUsesConfiguredDistance() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+    annResult.add(1);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    float[][] vectors = {
+        {10.0f, 0.0f},  // farther in L2, identical in cosine
+        {0.9f, 0.1f},   // closer in L2, slightly worse cosine
+    };
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 10,
+        new VectorSearchParams(null, true, null, null, null, null, null), createMockForwardIndexReader(vectors),
+        createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.COSINE));
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 1);
+    Assert.assertTrue(result.contains(0), "Configured cosine rerank should keep the cosine-identical vector");
+  }
+
+  @Test
+  public void testFilteredAnnReportsCorrectExecutionMode() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+    annResult.add(1);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 2);
+
+    // Without metadata filter: ANN_TOP_K
+    VectorSimilarityFilterOperator noFilter = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, VectorSearchParams.DEFAULT, null, null, false);
+    String explainNoFilter = noFilter.toExplainString();
+    Assert.assertTrue(explainNoFilter.contains("executionMode:ANN_TOP_K"),
+        "Expected ANN_TOP_K but got: " + explainNoFilter);
+
+    // With metadata filter: ANN_THEN_FILTER
+    VectorSimilarityFilterOperator withFilter = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, VectorSearchParams.DEFAULT, null, null, true);
+    String explainWithFilter = withFilter.toExplainString();
+    Assert.assertTrue(explainWithFilter.contains("executionMode:ANN_THEN_FILTER"),
+        "Expected ANN_THEN_FILTER but got: " + explainWithFilter);
+  }
+
+  @Test
+  public void testFilteredAnnWithRerankReportsCorrectMode() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(new float[][]{{1.0f, 0.0f}});
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, new VectorSearchParams(null, true, null, null, null, null, null), mockForward, null, true);
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("executionMode:ANN_THEN_FILTER_THEN_RERANK"),
+        "Expected ANN_THEN_FILTER_THEN_RERANK but got: " + explain);
+  }
+
+  @Test
+  public void testThresholdSearchReturnsOnlyWithinDistance() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+    annResult.add(1);
+    annResult.add(2);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    // Doc 0: exact distance 0.0 (same vector) -> within threshold 0.5
+    // Doc 1: exact distance 2.0 (L2 squared to [0,1]) -> outside threshold 0.5
+    // Doc 2: exact distance 0.01 (L2 squared to [0.9,0.1]) -> within threshold 0.5
+    float[][] vectors = {
+        {1.0f, 0.0f},
+        {0.0f, 1.0f},
+        {0.9f, 0.1f},
+    };
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(vectors);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
+
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f, null, null, null);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, params, mockForward,
+        createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN), false);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertTrue(result.contains(0), "Doc 0 should be within threshold");
+    Assert.assertFalse(result.contains(1), "Doc 1 should be outside threshold");
+    Assert.assertTrue(result.contains(2), "Doc 2 should be within threshold");
+  }
+
+  @Test
+  public void testThresholdSearchReportsCorrectExecutionMode() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
+
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f, null, null, null);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, params, null, null, false);
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("executionMode:ANN_THRESHOLD_SCAN"),
+        "Expected ANN_THRESHOLD_SCAN but got: " + explain);
+  }
+
+  @Test
+  public void testThresholdWithFilterReportsCorrectMode() {
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(annResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 10);
+
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.5f, null, null, null);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, params, null, null, true);
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("executionMode:ANN_THRESHOLD_THEN_FILTER"),
+        "Expected ANN_THRESHOLD_THEN_FILTER but got: " + explain);
+  }
+
+  @Test
+  public void testFilteredAnnDoesNotOverfetch() {
+    // Filtered ANN should NOT over-fetch: vectorSimilarity(col, q, 5) must return at most 5 docs.
+    // The metadata filter (bitmap AND) reduces this set further.
+    MutableRoaringBitmap annResult = new MutableRoaringBitmap();
+    annResult.add(0);
+
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(queryVector, 5)).thenReturn(annResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 5);
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, VectorSearchParams.DEFAULT, null, null, true);
+    operator.getBitmaps();
+    // Verify topK is used as-is (no over-fetch)
+    verify(mockReader).getDocIds(queryVector, 5);
+  }
+
+  @Test
+  public void testHnswRuntimeControlsAreDispatchedAndCleared() {
+    EfSearchAwareVectorReader mockReader = mock(EfSearchAwareVectorReader.class);
+    float[] queryVector = {1.0f, 2.0f};
+    MutableRoaringBitmap expectedResult = new MutableRoaringBitmap();
+    expectedResult.add(0);
+    when(mockReader.getDocIds(queryVector, 1)).thenReturn(expectedResult);
+
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
+    VectorSearchParams params = new VectorSearchParams(null, false, null, null, 32, false, false);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, params, null,
+        createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 1);
+    verify(mockReader).setEfSearch(32);
+    verify(mockReader).setUseRelativeDistance(false);
+    verify(mockReader).setUseBoundedQueue(false);
+    verify(mockReader).clearEfSearch();
+    verify(mockReader).clearUseRelativeDistance();
+    verify(mockReader).clearUseBoundedQueue();
+    verify(mockReader, never()).getIndexDebugInfo();
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("effectiveEfSearch:32"), explain);
+    Assert.assertTrue(explain.contains("effectiveHnswUseRelativeDistance:false"), explain);
+    Assert.assertTrue(explain.contains("effectiveHnswUseBoundedQueue:false"), explain);
   }
 
   /**
    * Interface combining VectorIndexReader and NprobeAware for mocking IVF_FLAT readers.
    */
   interface NprobeAwareVectorReader extends VectorIndexReader, NprobeAware {
+  }
+
+  interface EfSearchAwareVectorReader extends VectorIndexReader, EfSearchAware {
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -294,5 +599,11 @@ public class VectorSimilarityFilterOperatorTest {
       when(mockReader.getFloatMV(Mockito.eq(i), Mockito.any())).thenReturn(vectors[i]);
     }
     return mockReader;
+  }
+
+  private VectorIndexConfig createVectorIndexConfig(String backendType,
+      VectorIndexConfig.VectorDistanceFunction distanceFunction) {
+    return new VectorIndexConfig(false, backendType, 2, 1, distanceFunction,
+        Map.of("nlist", "4", "pqM", "2", "pqNbits", "8", "trainSampleSize", "16"));
   }
 }

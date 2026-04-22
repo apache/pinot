@@ -1467,6 +1467,112 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateFieldConfigDuplicateColumnName() {
+    final Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol1", FieldSpec.DataType.STRING)
+        .build();
+    final TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME).build();
+
+    final FieldConfig fc1 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+    final FieldConfig fc2 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+    tableConfig.setFieldConfigList(Arrays.asList(fc1, fc2));
+
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for duplicate FieldConfig column name");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "Duplicate FieldConfig for column: myCol1");
+    }
+  }
+
+  @Test
+  public void testValidateFieldConfigDuplicateColumnNameDifferentEncoding() {
+    final Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol1", FieldSpec.DataType.STRING)
+        .build();
+    final TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME).build();
+
+    final FieldConfig fc1 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+    final FieldConfig fc2 =
+        new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, null, null, null, null, null);
+    tableConfig.setFieldConfigList(Arrays.asList(fc1, fc2));
+
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for duplicate FieldConfig column name even with different encoding");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "Duplicate FieldConfig for column: myCol1");
+    }
+  }
+
+  @Test
+  public void testValidateFieldConfigDuplicateColumnNameWithIndexes()
+      throws Exception {
+    final Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol1", FieldSpec.DataType.STRING)
+        .build();
+    final TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME).build();
+
+    final ObjectNode indexes = JsonNodeFactory.instance.objectNode();
+    indexes.set("forward", JsonNodeFactory.instance.objectNode().put("compressionCodec", "ZSTANDARD"));
+    final FieldConfig fc1 = new FieldConfig.Builder("myCol1")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+    final FieldConfig fc2 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+    tableConfig.setFieldConfigList(Arrays.asList(fc1, fc2));
+
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for duplicate FieldConfig column name");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "Duplicate FieldConfig for column: myCol1");
+    }
+  }
+
+  @Test
+  public void testValidateFieldConfigNoDuplicates() {
+    final Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myCol2", FieldSpec.DataType.INT)
+        .build();
+    final TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME).build();
+
+    final FieldConfig fc1 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+    final FieldConfig fc2 =
+        new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, null, null, null, null, null);
+    tableConfig.setFieldConfigList(Arrays.asList(fc1, fc2));
+
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("Should not fail for distinct column names", e);
+    }
+  }
+
+  @Test
+  public void testValidateFieldConfigSingleEntry() {
+    final Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol1", FieldSpec.DataType.STRING)
+        .build();
+    final TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME).build();
+
+    final FieldConfig fc1 = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
+    tableConfig.setFieldConfigList(Arrays.asList(fc1));
+
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("Should not fail for single FieldConfig entry", e);
+    }
+  }
+
+  @Test
   public void testValidateBFOnBoolean() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.BOOLEAN)

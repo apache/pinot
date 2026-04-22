@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-controller</artifactId>
   <name>Pinot Controller</name>
@@ -83,6 +83,11 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-java-client</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

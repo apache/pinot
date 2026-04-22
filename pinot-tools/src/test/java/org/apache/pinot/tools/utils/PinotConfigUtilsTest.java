@@ -27,7 +27,6 @@ import java.util.Map;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -74,34 +73,6 @@ public class PinotConfigUtilsTest {
       throws SocketException, UnknownHostException {
     PinotConfigUtils.generateControllerConf(
         "localhost:2181", "", "localhost", "9000", "/tmp/pinot", ControllerConf.ControllerMode.DUAL, true);
-  }
-
-  @Test
-  public void testGenerateMinionConf()
-      throws SocketException, UnknownHostException {
-    String clusterName = "testCluster";
-    String zkAddress = "localhost:2181";
-    String minionHost = "localhost";
-    int minionPort = 9000;
-
-    Map<String, Object> config = PinotConfigUtils.generateMinionConf(clusterName, zkAddress, minionHost, minionPort);
-
-    assertEquals(config.get(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME), clusterName);
-    assertEquals(config.get(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER), zkAddress);
-    assertEquals(config.get(CommonConstants.Helix.KEY_OF_MINION_HOST), minionHost);
-    assertEquals(config.get(CommonConstants.Helix.KEY_OF_MINION_PORT), minionPort);
-  }
-
-  @Test
-  public void testGetResourceTrackingConf() {
-    Map<String, Object> config = PinotConfigUtils.getResourceTrackingConf();
-
-    assertTrue((Boolean) config.get(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
-    assertTrue((Boolean) config.get(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT));
-    assertTrue((Boolean) config.get(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
-    assertTrue((Boolean) config.get(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT));
-    assertTrue((Boolean) config.get(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING));
-    assertTrue((Boolean) config.get(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING));
   }
 
   @Test

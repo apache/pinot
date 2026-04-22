@@ -126,6 +126,15 @@ Do not push until all four checks pass cleanly.
 - **Segment/index changes** usually live under `pinot-segment-local` and `pinot-segment-spi`.
 - **Config or API changes** should update relevant configs and docs where applicable.
 
+## Mandatory code review
+
+After completing any coding task (bug fix, feature, refactor, etc.), you MUST run the `code-reviewer` agent before presenting the work as done. This is non-negotiable.
+
+- Pass ONLY the review scope and a one-line change description. Do NOT pass your analysis, reasoning, or opinions — the reviewer must judge the code independently.
+- Example invocation: `"Review unstaged changes in pinot-broker. Change: added timeout to scatter-gather calls."`
+- If the reviewer finds CRITICAL issues, fix them before proceeding. MAJOR issues should be fixed unless you have strong justification. MINOR issues are at your discretion.
+- Do not skip the review even if the change seems trivial.
+
 ## Common gotchas
 - This is a large multi-module Maven project. Building the entire project takes a long time — prefer building only the modules you need with `-pl <module> -am`.
 - When running tests, use `-Dtest=ClassName` to run a specific test class rather than the full suite.

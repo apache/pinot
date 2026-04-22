@@ -68,8 +68,6 @@ public class VectorIndexConfig extends IndexConfig {
   public VectorIndexConfig(@Nullable Map<String, String> properties) {
     super(false);
     Preconditions.checkArgument(properties != null, "Properties must not be null");
-    Preconditions.checkArgument(properties.containsKey(VECTOR_INDEX_TYPE),
-        "Properties must contain vector index type");
     _vectorIndexType = properties.get(VECTOR_INDEX_TYPE);
     Preconditions.checkArgument(properties.containsKey(VECTOR_DIMENSION),
         "Properties must contain vector dimension");

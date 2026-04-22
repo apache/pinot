@@ -380,7 +380,7 @@ jobs:
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
         old_commit: [
-          "release-1.4.0", "master"
+          "release-1.5.0", "master"
         ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
@@ -438,7 +438,7 @@ jobs:
       matrix:
         test_suite: [ "compatibility-verifier/multi-stage-query-engine-test-suite" ]
         old_commit: [
-          "release-1.4.0", "master"
+          "release-1.5.0", "master"
         ]
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:

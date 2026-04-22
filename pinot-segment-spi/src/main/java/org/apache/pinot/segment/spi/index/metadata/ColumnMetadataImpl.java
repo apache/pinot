@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi.index.metadata;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -33,9 +32,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.text.StringEscapeUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -298,10 +295,6 @@ public class ColumnMetadataImpl implements ColumnMetadata {
       }
       builder.setMinMaxValueInvalid(config.getBoolean(Column.getKeyFor(column, Column.MIN_MAX_VALUE_INVALID), false));
     }
-    // Only support zero padding
-    String padding = config.getString(Segment.SEGMENT_PADDING_CHARACTER, null);
-    Preconditions.checkState(String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR)
-        .equals(StringEscapeUtils.unescapeJava(padding)), "Got non-zero string padding: %s", padding);
 
     String partitionFunctionName = config.getString(Column.getKeyFor(column, Column.PARTITION_FUNCTION), null);
     if (partitionFunctionName != null) {

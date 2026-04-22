@@ -79,6 +79,8 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.restlet.resources.BatchConfig;
+import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -89,9 +91,7 @@ import org.apache.pinot.common.utils.helix.IdealStateSingleCommit;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
-import org.apache.pinot.controller.api.resources.BatchConfig;
 import org.apache.pinot.controller.api.resources.Constants;
-import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -610,8 +610,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     // Copy the segment file to the controller
     String segmentLocation = committingSegmentDescriptor.getSegmentLocation();
     Preconditions.checkArgument(segmentLocation != null, "Segment location must be provided");
-    if (segmentLocation.regionMatches(true, 0, CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME, 0,
-        CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME.length())) {
+    if (isPeerUrl(segmentLocation)) {
       LOGGER.info("No moving needed for segment on peer servers: {}", segmentLocation);
       return;
     }
@@ -633,6 +632,11 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       }
     }
     committingSegmentDescriptor.setSegmentLocation(uriToMoveTo);
+  }
+
+  private boolean isPeerUrl(String segmentLocation) {
+    return segmentLocation.regionMatches(true, 0, CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME, 0,
+        CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME.length());
   }
 
   /**
@@ -674,9 +678,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     // Step-1: Update PROPERTYSTORE
     LOGGER.info("Committing segment metadata for segment: {}", committingSegmentName);
     long startTimeNs1 = System.nanoTime();
-    SegmentZKMetadata committingSegmentZKMetadata =
-        toCommitting ? updateSegmentZKMetadataToCommitting(realtimeTableName, committingSegmentDescriptor)
-            : updateSegmentZKMetadataToDone(realtimeTableName, committingSegmentDescriptor, Status.IN_PROGRESS);
+    SegmentZKMetadata committingSegmentZKMetadata = toCommitting
+        ? updateSegmentZKMetadataToCommitting(realtimeTableName, committingSegmentDescriptor)
+        : updateSegmentZKMetadataToDone(realtimeTableName, committingSegmentDescriptor, Status.IN_PROGRESS);
 
     preProcessNewSegmentZKMetadata();
 
@@ -692,7 +696,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     LOGGER.info("Updating Idealstate for previous: {} and new segment: {}", committingSegmentName,
         newConsumingSegmentName);
     long startTimeNs3 = System.nanoTime();
-    Map<String, Map<String, String>> instanceStatesMapAfterStep3 = Collections.emptyMap();
+    Map<String, Map<String, String>> instanceStatesMapAfterStep3;
     boolean newConsumingSegmentInIdealState = false;
 
     // When multiple segments of the same table complete around the same time it is possible that
@@ -791,8 +795,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     Preconditions.checkState(segmentMetadata != null, "Failed to find segment metadata from descriptor for segment: %s",
         segmentName);
     String segmentLocation = committingSegmentDescriptor.getSegmentLocation();
-    String downloadUrl =
-        isPeerURL(segmentLocation) ? CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD : segmentLocation;
+    Preconditions.checkArgument(segmentLocation != null, "Segment location must be provided");
+    String downloadUrl = isPeerUrl(segmentLocation)
+        ? CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD
+        : segmentLocation;
     SegmentZKMetadataUtils.updateCommittingSegmentZKMetadata(realtimeTableName, segmentZKMetadata, segmentMetadata,
         downloadUrl, committingSegmentDescriptor.getSegmentSizeBytes(), committingSegmentDescriptor.getNextOffset());
     persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, stat.getVersion());
@@ -979,6 +985,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         FlushThresholdUpdater flushThresholdUpdater =
             _flushThresholdUpdateManager.getFlushThresholdUpdater(streamConfig);
         flushThresholdUpdater.onSegmentCommit(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata);
+        updateCommittingSegmentSizeGauge(streamConfig, committingSegmentDescriptor.getSegmentSizeBytes());
       } catch (Exception e) {
         LOGGER.error("Caught exception while updating flush threshold for table: {}, segment: {}", realtimeTableName,
             segmentName, e);
@@ -986,11 +993,6 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     } finally {
       _numCompletingSegments.addAndGet(-1);
     }
-  }
-
-  private boolean isPeerURL(String segmentLocation) {
-    return segmentLocation != null && segmentLocation.toLowerCase()
-        .startsWith(CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME);
   }
 
   /**
@@ -1041,11 +1043,33 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     FlushThresholdUpdater flushThresholdUpdater = _flushThresholdUpdateManager.getFlushThresholdUpdater(streamConfig);
     if (committingSegmentZKMetadata != null) {
       flushThresholdUpdater.onSegmentCommit(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata);
+      long segmentSize = committingSegmentDescriptor.getSegmentSizeBytes();
+      // Segment size might not be available for pauseless ingestion
+      if (segmentSize > 0) {
+        updateCommittingSegmentSizeGauge(streamConfig, segmentSize);
+      }
     }
     flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata,
         getMaxNumPartitionsPerInstance(instancePartitions, numPartitions, numReplicas));
+    updateFlushThresholdGauge(streamConfig, newSegmentZKMetadata.getSizeThresholdToFlushSegment());
 
     persistSegmentZKMetadata(realtimeTableName, newSegmentZKMetadata, -1);
+  }
+
+  private void updateCommittingSegmentSizeGauge(StreamConfig streamConfig, long segmentSize) {
+    String realtimeTableName = streamConfig.getTableNameWithType();
+    String topicName = streamConfig.getTopicName();
+    _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.COMMITTING_SEGMENT_SIZE, segmentSize);
+    _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, topicName,
+        ControllerGauge.COMMITTING_SEGMENT_SIZE_WITH_TOPIC, segmentSize);
+  }
+
+  private void updateFlushThresholdGauge(StreamConfig streamConfig, int flushThreshold) {
+    String realtimeTableName = streamConfig.getTableNameWithType();
+    String topicName = streamConfig.getTopicName();
+    _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.NUM_ROWS_THRESHOLD, flushThreshold);
+    _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, topicName,
+        ControllerGauge.NUM_ROWS_THRESHOLD_WITH_TOPIC, flushThreshold);
   }
 
   private String computeStartOffset(String nextOffset, StreamConfig streamConfig, int partitionId) {

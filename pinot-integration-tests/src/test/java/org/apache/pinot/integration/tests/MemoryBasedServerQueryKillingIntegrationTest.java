@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.testng.annotations.Test;
 
@@ -41,12 +40,12 @@ public class MemoryBasedServerQueryKillingIntegrationTest extends BaseQueryKilli
   protected void overrideServerConf(PinotConfiguration serverConf) {
     super.overrideServerConf(serverConf);
 
-    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
-    serverConf.setProperty(prefix + Accounting.CONFIG_OF_FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
-    serverConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    serverConf.setProperty(prefix + Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    serverConf.setProperty(prefix + Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
-    serverConf.setProperty(prefix + Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.15f);
+    String prefix = Accounting.SERVER_PREFIX + ".";
+    serverConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.Keys.OOM_PROTECTION_KILLING_QUERY, true);
+    serverConf.setProperty(prefix + Accounting.Keys.ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
+    serverConf.setProperty(prefix + Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.15f);
   }
 
   @Test(dataProvider = "expensiveQueries")

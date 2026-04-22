@@ -78,6 +78,10 @@ public class QueryServerEnclosure {
     _queryRunner.shutDown();
   }
 
+  public void cancel(long requestId) {
+    _queryRunner.cancel(requestId);
+  }
+
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadataMap) {
     QueryExecutionContext executionContext = QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId");

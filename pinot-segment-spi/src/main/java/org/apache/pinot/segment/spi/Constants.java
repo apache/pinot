@@ -23,6 +23,9 @@ public class Constants {
   }
 
   public static final int EOF = Integer.MIN_VALUE;
+
+  // TODO: Consider modifying it to -1 to be more readable when stored in segment metadata. Reader accepts all negative
+  //       values as unknown in release 1.6.0. Change writer side after 1.6.0 release.
   public static final int UNKNOWN_CARDINALITY = Integer.MIN_VALUE;
 
   public static final String HLL_LOG2M_KEY = "log2m";

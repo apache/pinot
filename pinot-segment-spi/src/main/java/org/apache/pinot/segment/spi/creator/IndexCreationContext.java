@@ -102,6 +102,8 @@ public interface IndexCreationContext {
    */
   File getConsumerDir();
 
+  boolean isMutableSegmentCompacted();
+
   /**
    * This contains immutableToMutableIdMap mapping generated in {@link SegmentIndexCreationDriver}
    *
@@ -109,7 +111,7 @@ public interface IndexCreationContext {
    * docId mapping
    * @return
    */
-  int[] getImmutableToMutableIdMap();
+  int[] getMutableToImmutableDocIdMap();
 
   String getTableNameWithType();
 
@@ -135,28 +137,25 @@ public interface IndexCreationContext {
     private boolean _optimizedDictionary;
     private boolean _fixedLength;
     private boolean _textCommitOnClose;
-    private boolean _realtimeConversion = false;
+    private boolean _realtimeConversion;
     private File _consumerDir;
-    private int[] _immutableToMutableIdMap;
+    private boolean _mutableSegmentCompacted;
+    private int[] _mutableToImmutableDocIdMap;
     private String _tableNameWithType;
     private boolean _continueOnError;
 
-    public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
-      return withLengthOfLongestEntry(columnIndexCreationInfo.getLengthOfLongestEntry())
-          .withMaxNumberOfMultiValueElements(columnIndexCreationInfo.getMaxNumberOfMultiValueElements())
-          .withMaxRowLengthInBytes(columnIndexCreationInfo.getMaxRowLengthInBytes())
-          .withMinValue((Comparable<?>) columnIndexCreationInfo.getMin())
-          .withMaxValue((Comparable<?>) columnIndexCreationInfo.getMax())
-          .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
-          .withSortedUniqueElementsArray(columnIndexCreationInfo.getSortedUniqueElementsArray())
-          .withColumnStatistics(columnIndexCreationInfo.getColumnStatistics())
-          .withCardinality(columnIndexCreationInfo.getDistinctValueCount())
-          .withFixedLength(columnIndexCreationInfo.isFixedLength())
-          .sorted(columnIndexCreationInfo.isSorted());
-    }
-
     public Builder withColumnStatistics(ColumnStatistics columnStatistics) {
       _columnStatistics = columnStatistics;
+      _minValue = (Comparable<?>) columnStatistics.getMinValue();
+      _maxValue = (Comparable<?>) columnStatistics.getMaxValue();
+      _sortedUniqueElementsArray = columnStatistics.getUniqueValuesSet();
+      _cardinality = columnStatistics.getCardinality();
+      _lengthOfLongestEntry = columnStatistics.getLengthOfLongestElement();
+      _fixedLength = columnStatistics.isFixedLength();
+      _sorted = columnStatistics.isSorted();
+      _totalNumberOfEntries = columnStatistics.getTotalNumberOfEntries();
+      _maxNumberOfMultiValueElements = columnStatistics.getMaxNumberOfMultiValues();
+      _maxRowLengthInBytes = columnStatistics.getMaxRowLengthInBytes();
       return this;
     }
 
@@ -267,8 +266,13 @@ public interface IndexCreationContext {
       return this;
     }
 
-    public Builder withImmutableToMutableIdMap(int[] immutableToMutableIdMap) {
-      _immutableToMutableIdMap = immutableToMutableIdMap;
+    public Builder withMutableSegmentCompacted(boolean mutableSegmentCompacted) {
+      _mutableSegmentCompacted = mutableSegmentCompacted;
+      return this;
+    }
+
+    public Builder withMutableToImmutableDocIdMap(int[] mutableToImmutableDocIdMap) {
+      _mutableToImmutableDocIdMap = mutableToImmutableDocIdMap;
       return this;
     }
 
@@ -287,7 +291,8 @@ public interface IndexCreationContext {
           _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
           _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled,
           _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose, _columnStatistics,
-          _realtimeConversion, _consumerDir, _immutableToMutableIdMap, _tableNameWithType, _continueOnError);
+          _realtimeConversion, _consumerDir, _mutableSegmentCompacted, _mutableToImmutableDocIdMap, _tableNameWithType,
+          _continueOnError);
     }
 
     public Builder withSortedUniqueElementsArray(Object sortedUniqueElementsArray) {
@@ -301,7 +306,6 @@ public interface IndexCreationContext {
   }
 
   final class Common implements IndexCreationContext {
-
     private final File _indexDir;
     private final int _lengthOfLongestEntry;
     private final int _maxNumberOfMultiValueElements;
@@ -323,17 +327,18 @@ public interface IndexCreationContext {
     private final ColumnStatistics _columnStatistics;
     private final boolean _realtimeConversion;
     private final File _consumerDir;
-    private final int[] _immutableToMutableIdMap;
+    private final boolean _mutableSegmentCompacted;
+    private final int[] _mutableToImmutableDocIdMap;
     private final String _tableNameWithType;
     private final boolean _continueOnError;
 
-    private Common(File indexDir, int lengthOfLongestEntry,
-        int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
-        FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
-        int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
-        boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength,
-        boolean textCommitOnClose, ColumnStatistics columnStatistics, boolean realtimeConversion, File consumerDir,
-        int[] immutableToMutableIdMap, String tableNameWithType, boolean continueOnError) {
+    private Common(File indexDir, int lengthOfLongestEntry, int maxNumberOfMultiValueElements, int maxRowLengthInBytes,
+        boolean onHeap, FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries, int totalDocs,
+        boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue, boolean forwardIndexDisabled,
+        Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength, boolean textCommitOnClose,
+        ColumnStatistics columnStatistics, boolean realtimeConversion, File consumerDir,
+        boolean mutableSegmentCompacted, int[] mutableToImmutableDocIdMap, String tableNameWithType,
+        boolean continueOnError) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
@@ -355,7 +360,8 @@ public interface IndexCreationContext {
       _columnStatistics = columnStatistics;
       _realtimeConversion = realtimeConversion;
       _consumerDir = consumerDir;
-      _immutableToMutableIdMap = immutableToMutableIdMap;
+      _mutableSegmentCompacted = mutableSegmentCompacted;
+      _mutableToImmutableDocIdMap = mutableToImmutableDocIdMap;
       _tableNameWithType = tableNameWithType;
       _continueOnError = continueOnError;
     }
@@ -455,8 +461,13 @@ public interface IndexCreationContext {
     }
 
     @Override
-    public int[] getImmutableToMutableIdMap() {
-      return _immutableToMutableIdMap;
+    public boolean isMutableSegmentCompacted() {
+      return _mutableSegmentCompacted;
+    }
+
+    @Override
+    public int[] getMutableToImmutableDocIdMap() {
+      return _mutableToImmutableDocIdMap;
     }
 
     @Override

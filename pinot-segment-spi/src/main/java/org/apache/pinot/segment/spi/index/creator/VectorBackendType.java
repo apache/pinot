@@ -29,6 +29,9 @@ package org.apache.pinot.segment.spi.index.creator;
  *       mutable and immutable segments.</li>
  *   <li>{@link #IVF_FLAT} - Inverted File with flat (uncompressed) vectors. Supported for
  *       immutable/offline segments only in phase 1.</li>
+ *   <li>{@link #IVF_PQ} - Inverted File with product-quantized vectors. Supported for
+ *       immutable/offline segments only in phase 2.</li>
+ *   <li>{@link #IVF_ON_DISK} - Inverted File with disk-backed vectors (FileChannel random reads).</li>
  * </ul>
  */
 public enum VectorBackendType {
@@ -59,16 +62,109 @@ public enum VectorBackendType {
    *   <li>{@code minRowsForIndex} - minimum rows required to build the index</li>
    * </ul>
    */
-  IVF_FLAT("Inverted File with flat vectors");
+  IVF_FLAT("Inverted File with flat vectors"),
+
+  /**
+   * Inverted File with product-quantized vectors.
+   *
+   * <p>Backend-specific properties:</p>
+   * <ul>
+   *   <li>{@code nlist} - number of Voronoi cells/clusters</li>
+   *   <li>{@code pqM} - number of PQ sub-quantizers</li>
+   *   <li>{@code pqNbits} - bits per PQ codebook entry</li>
+   *   <li>{@code trainSampleSize} - number of vectors sampled for training</li>
+   *   <li>{@code trainingSeed} - random seed for reproducible training</li>
+   * </ul>
+   */
+  IVF_PQ("Inverted File with product-quantized vectors"),
+
+  /**
+   * Inverted File with disk-backed vectors (FileChannel random-access).
+   *
+   * <p>Backend-specific properties:</p>
+   * <ul>
+   *   <li>{@code nlist} - number of Voronoi cells/clusters</li>
+   *   <li>{@code trainSampleSize} - number of vectors sampled for training</li>
+   *   <li>{@code trainingSeed} - random seed for reproducible training</li>
+   *   <li>{@code minRowsForIndex} - minimum rows required to build the index</li>
+   * </ul>
+   */
+  IVF_ON_DISK("Inverted File with disk-backed vectors (FileChannel)");
 
   private final String _description;
+  private final VectorBackendCapabilities _capabilities;
 
   VectorBackendType(String description) {
     _description = description;
+    _capabilities = buildCapabilities();
   }
 
   public String getDescription() {
     return _description;
+  }
+
+  /**
+   * Returns the query-time capabilities of this backend.
+   * Used by the runtime to select execution modes without backend-specific branching.
+   */
+  public VectorBackendCapabilities getCapabilities() {
+    return _capabilities;
+  }
+
+  private VectorBackendCapabilities buildCapabilities() {
+    // Use name() rather than enum constants because this runs during enum construction
+    // before constants are fully initialized.
+    switch (name()) {
+      case "HNSW":
+        return new VectorBackendCapabilities.Builder()
+            .supportsTopKAnn(true)
+            .supportsFilterAwareSearch(true)
+            .supportsApproximateRadius(false)
+            .supportsExactRerank(true)
+            .supportsRuntimeSearchParams(true)
+            .build();
+      case "IVF_FLAT":
+        return new VectorBackendCapabilities.Builder()
+            .supportsTopKAnn(true)
+            .supportsFilterAwareSearch(true)
+            .supportsApproximateRadius(true)
+            .supportsExactRerank(true)
+            .supportsRuntimeSearchParams(true)
+            .build();
+      case "IVF_PQ":
+        return new VectorBackendCapabilities.Builder()
+            .supportsTopKAnn(true)
+            .supportsFilterAwareSearch(true)
+            .supportsApproximateRadius(true)
+            .supportsExactRerank(true)
+            .supportsRuntimeSearchParams(true)
+            .build();
+      case "IVF_ON_DISK":
+        return new VectorBackendCapabilities.Builder()
+            .supportsTopKAnn(true)
+            .supportsFilterAwareSearch(true)
+            .supportsApproximateRadius(true)
+            .supportsExactRerank(true)
+            .supportsRuntimeSearchParams(true)
+            .build();
+      default:
+        return new VectorBackendCapabilities.Builder()
+            .supportsTopKAnn(true)
+            .supportsExactRerank(true)
+            .build();
+    }
+  }
+
+  public boolean supportsMutableSegments() {
+    return this == HNSW;
+  }
+
+  public boolean supportsNprobe() {
+    return this == IVF_FLAT || this == IVF_PQ || this == IVF_ON_DISK;
+  }
+
+  public boolean defaultExactRerankEnabled() {
+    return this == IVF_PQ;
   }
 
   /**
@@ -86,7 +182,7 @@ public enum VectorBackendType {
       return valueOf(value.toUpperCase());
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
-          "Unknown vector backend type: '" + value + "'. Supported types: HNSW, IVF_FLAT");
+          "Unknown vector backend type: '" + value + "'. Supported types: HNSW, IVF_FLAT, IVF_PQ, IVF_ON_DISK");
     }
   }
 

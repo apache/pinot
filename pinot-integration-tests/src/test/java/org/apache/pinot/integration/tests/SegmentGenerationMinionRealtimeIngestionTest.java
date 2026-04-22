@@ -89,7 +89,7 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
   private void addSchemaWithCustomSchemaName(Schema schema, String schemaName)
       throws IOException {
     schema.setSchemaName(schemaName);
-    getControllerRequestClient().addSchema(schema);
+    addSchema(schema);
   }
 
   /**

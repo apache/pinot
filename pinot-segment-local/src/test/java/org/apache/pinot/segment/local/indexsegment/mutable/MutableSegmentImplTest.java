@@ -19,8 +19,10 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.File;
-import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.URL;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -32,6 +34,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -78,8 +81,9 @@ public class MutableSegmentImplTest {
 
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
+    config.setInstanceType(InstanceType.SERVER);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, InstanceType.SERVER);
+    driver.init(config);
     driver.build();
     _immutableSegment = ImmutableSegmentLoader.load(new File(TEMP_DIR, driver.getSegmentName()), ReadMode.mmap);
 
@@ -129,8 +133,7 @@ public class MutableSegmentImplTest {
   }
 
   @Test
-  public void testDataSourceForSVColumns()
-      throws IOException {
+  public void testDataSourceForSVColumns() {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
@@ -165,8 +168,7 @@ public class MutableSegmentImplTest {
   }
 
   @Test
-  public void testDataSourceForMVColumns()
-      throws IOException {
+  public void testDataSourceForMVColumns() {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
@@ -224,6 +226,51 @@ public class MutableSegmentImplTest {
       assertEquals(freshSegment.getSegmentMetadata().getLatestIngestionTimestamp(), ingestionTimeMs);
     } finally {
       freshSegment.destroy();
+    }
+  }
+
+  @Test
+  public void testVectorIndexConfigOnMutableSegmentWithoutMutableVectorReader() {
+    Schema vectorSchema = new Schema.SchemaBuilder().setSchemaName("vectorSchema")
+        .addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addMultiValueDimension("embedding", FieldSpec.DataType.FLOAT)
+        .build();
+    VectorIndexConfig vectorIndexConfig =
+        new VectorIndexConfig(false, "IVF_PQ", 4, 1, VectorIndexConfig.VectorDistanceFunction.COSINE,
+            Map.of("nlist", "1", "pqM", "2", "pqNbits", "8", "trainSampleSize", "4"));
+    MutableSegmentImpl mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImplWithVectorIndexConfigs(vectorSchema, Set.of(), Set.of(),
+            Set.of(),
+            Map.of("embedding", vectorIndexConfig), null);
+    try {
+      DataSource dataSource = mutableSegment.getDataSource("embedding");
+      Assert.assertNull(dataSource.getVectorIndex(),
+          "IVF-based vector indexes should not build a mutable vector reader for consuming segments");
+      assertEquals(dataSource.getVectorIndexConfig(), vectorIndexConfig);
+    } finally {
+      mutableSegment.destroy();
+    }
+  }
+
+  @Test
+  public void testDestroyClearsIndexContainerMap()
+      throws ReflectiveOperationException {
+    MutableSegmentImpl freshSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema);
+    boolean destroyed = false;
+    try {
+      Field indexContainerMapField = MutableSegmentImpl.class.getDeclaredField("_indexContainerMap");
+      indexContainerMapField.setAccessible(true);
+      Map<?, ?> indexContainerMap = (Map<?, ?>) indexContainerMapField.get(freshSegment);
+      Assert.assertFalse(indexContainerMap.isEmpty());
+
+      freshSegment.destroy();
+      destroyed = true;
+
+      Assert.assertTrue(indexContainerMap.isEmpty());
+    } finally {
+      if (!destroyed) {
+        freshSegment.destroy();
+      }
     }
   }
 

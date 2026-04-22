@@ -25,11 +25,14 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -173,6 +176,18 @@ public class IvfFlatVectorIndexTest {
     runRoundTripTest(VectorIndexConfig.VectorDistanceFunction.L2, 100, 10, 8);
   }
 
+  @Test
+  public void testRoundTripSq8Quantizer()
+      throws IOException {
+    runQuantizedRoundTripTest(VectorQuantizerType.SQ8);
+  }
+
+  @Test
+  public void testRoundTripSq4Quantizer()
+      throws IOException {
+    runQuantizedRoundTripTest(VectorQuantizerType.SQ4);
+  }
+
   private void runRoundTripTest(VectorIndexConfig.VectorDistanceFunction distanceFunction,
       int numVectors, int dimension, int nlist)
       throws IOException {
@@ -207,6 +222,34 @@ public class IvfFlatVectorIndexTest {
         }
       }
       Assert.assertEquals(allDocIds.size(), numVectors, "All doc IDs should appear in inverted lists");
+    }
+  }
+
+  private void runQuantizedRoundTripTest(VectorQuantizerType quantizerType)
+      throws IOException {
+    int numVectors = 64;
+    int dimension = 8;
+    int nlist = 8;
+    float[][] vectors = generateRandomVectors(numVectors, dimension, TEST_SEED);
+    VectorIndexConfig config = createConfig(VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, dimension, nlist,
+        quantizerType);
+
+    try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator(COLUMN_NAME, _tempDir, config)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+
+    File indexFile = new File(_tempDir, COLUMN_NAME + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(indexFile.exists(), "Index file should exist after quantized seal()");
+
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+      Assert.assertEquals(reader.getQuantizerType(), quantizerType);
+      reader.setNprobe(reader.getNlist());
+      ImmutableRoaringBitmap result = reader.getDocIds(vectors[0], 5);
+      Assert.assertTrue(result.contains(0), "Quantized IVF search should still retrieve the exact stored vector");
+      Assert.assertEquals(reader.getIndexDebugInfo().get("quantizer"), quantizerType.name());
     }
   }
 
@@ -260,6 +303,34 @@ public class IvfFlatVectorIndexTest {
   public void testSearchCosine()
       throws IOException {
     testSearchWithDistanceFunction(VectorIndexConfig.VectorDistanceFunction.COSINE);
+  }
+
+  @Test
+  public void testApproximateRadiusSearchRespectsThresholdAndCandidateCap()
+      throws IOException {
+    int numVectors = 100;
+    int dimension = 8;
+    int nlist = 10;
+    VectorIndexConfig config = createConfig(VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, dimension, nlist);
+    float[][] vectors = generateRandomVectors(numVectors, dimension, TEST_SEED);
+
+    try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator(COLUMN_NAME, _tempDir, config)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+      reader.setNprobe(nlist);
+      ImmutableRoaringBitmap onlyExactMatch = reader.getDocIdsWithinApproximateRadius(vectors[0], 0.0f, 10);
+      Assert.assertTrue(onlyExactMatch.contains(0), "radius 0 should include the exact vector itself");
+
+      ImmutableRoaringBitmap capped =
+          reader.getDocIdsWithinApproximateRadius(vectors[0], Float.POSITIVE_INFINITY, 3);
+      Assert.assertTrue(capped.getCardinality() <= 3, "radius search should obey maxCandidates cap");
+      Assert.assertTrue(capped.getCardinality() > 0, "radius search should return at least one candidate");
+    }
   }
 
   @Test
@@ -427,6 +498,65 @@ public class IvfFlatVectorIndexTest {
 
       MutableRoaringBitmap result = (MutableRoaringBitmap) reader.getDocIds(vectors[0], 5);
       Assert.assertTrue(result.getCardinality() > 0);
+    }
+  }
+
+  @Test
+  public void testReaderClearNprobeResetsToDefault()
+      throws IOException {
+    int numVectors = 24;
+    int dimension = 6;
+    int nlist = 4;
+
+    VectorIndexConfig config = createConfig(VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, dimension, nlist);
+    float[][] vectors = generateRandomVectors(numVectors, dimension, TEST_SEED);
+
+    try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator(COLUMN_NAME, _tempDir, config)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+      int defaultNprobe = Math.min(4, reader.getNlist());
+      Assert.assertEquals(reader.getNprobe(), defaultNprobe);
+      reader.setNprobe(1);
+      Assert.assertEquals(reader.getNprobe(), 1);
+      reader.clearNprobe();
+      Assert.assertEquals(reader.getNprobe(), defaultNprobe);
+    }
+  }
+
+  @Test
+  public void testReaderNprobeOverrideIsThreadLocal()
+      throws Exception {
+    int numVectors = 24;
+    int dimension = 6;
+    int nlist = 4;
+
+    VectorIndexConfig config = createConfig(VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, dimension, nlist);
+    float[][] vectors = generateRandomVectors(numVectors, dimension, TEST_SEED);
+
+    try (IvfFlatVectorIndexCreator creator = new IvfFlatVectorIndexCreator(COLUMN_NAME, _tempDir, config)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+      int defaultNprobe = reader.getNprobe();
+      reader.setNprobe(1);
+      Assert.assertEquals(reader.getNprobe(), 1);
+
+      AtomicInteger otherThreadNprobe = new AtomicInteger(-1);
+      Thread thread = new Thread(() -> otherThreadNprobe.set(reader.getNprobe()));
+      thread.start();
+      thread.join();
+
+      Assert.assertEquals(otherThreadNprobe.get(), defaultNprobe);
+      Assert.assertEquals(reader.getNprobe(), 1);
     }
   }
 
@@ -694,12 +824,18 @@ public class IvfFlatVectorIndexTest {
 
   private VectorIndexConfig createConfig(VectorIndexConfig.VectorDistanceFunction distanceFunction,
       int dimension, int nlist) {
+    return createConfig(distanceFunction, dimension, nlist, VectorQuantizerType.FLAT);
+  }
+
+  private VectorIndexConfig createConfig(VectorIndexConfig.VectorDistanceFunction distanceFunction,
+      int dimension, int nlist, VectorQuantizerType quantizerType) {
     Map<String, String> properties = new HashMap<>();
     properties.put("vectorIndexType", "IVF_FLAT");
     properties.put("vectorDimension", String.valueOf(dimension));
     properties.put("vectorDistanceFunction", distanceFunction.name());
     properties.put("nlist", String.valueOf(nlist));
     properties.put("trainingSeed", String.valueOf(TEST_SEED));
+    properties.put("quantizer", quantizerType.name());
     return new VectorIndexConfig(false, "IVF_FLAT", dimension, 1, distanceFunction, properties);
   }
 

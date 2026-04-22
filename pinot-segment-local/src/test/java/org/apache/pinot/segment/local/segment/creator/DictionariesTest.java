@@ -41,7 +41,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriver
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPreIndexStatsCollector;
-import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
@@ -542,7 +542,7 @@ public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
       case STRING:
         return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
       case BYTES:
-        return new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
+        return new BytesColumnPreIndexStatsCollector(column, statsCollectorConfig);
       default:
         throw new IllegalArgumentException("Illegal data type for stats builder: " + dataType);
     }

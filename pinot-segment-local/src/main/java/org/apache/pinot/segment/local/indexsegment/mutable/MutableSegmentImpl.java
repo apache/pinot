@@ -87,6 +87,8 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.VectorIndexConfigProvider;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
@@ -194,6 +196,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
   private volatile long _minimumIngestionLagMs = Long.MAX_VALUE;
 
+  private final boolean _hasColumnWithReuseMutableTextIndex;
+
   // multi-column text index fields
   private final MultiColumnRealtimeLuceneTextIndex _multiColumnTextIndex;
   private final Object2IntOpenHashMap _multiColumnPos;
@@ -300,6 +304,7 @@ public class MutableSegmentImpl implements MutableSegment {
             StandardIndexes.nullValueVector()); // null value vector implements other contract
 
     // Initialize for each column
+    boolean hasColumnWithReuseMutableTextIndex = false;
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
 
@@ -390,7 +395,8 @@ public class MutableSegmentImpl implements MutableSegment {
         nullValueVector = null;
       }
 
-      Map<IndexType, MutableIndex> mutableIndexes = new HashMap<>();
+      Map<IndexType, MutableIndex> mutableIndexes =
+          new MutableIndexes(indexConfigs.getConfig(StandardIndexes.vector()));
       for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
         if (!specialIndexes.contains(indexType)) {
           addMutableIndex(mutableIndexes, indexType, context, indexConfigs);
@@ -406,15 +412,18 @@ public class MutableSegmentImpl implements MutableSegment {
       // If the raw value is provided, use it for the forward/dictionary index of this column by wrapping the
       // already created MutableIndex with a SameValue implementation. This optimization can only be done when
       // the mutable index is being reused
-      Object rawValueForTextIndex = indexConfigs.getConfig(StandardIndexes.text()).getRawValueForTextIndex();
       boolean reuseMutableIndex = indexConfigs.getConfig(StandardIndexes.text()).isReuseMutableIndex();
-      if (rawValueForTextIndex != null && reuseMutableIndex) {
-        if (dictionary == null) {
-          MutableIndex forwardIndex = mutableIndexes.get(StandardIndexes.forward());
-          mutableIndexes.put(StandardIndexes.forward(),
-              new SameValueMutableForwardIndex(rawValueForTextIndex, (MutableForwardIndex) forwardIndex));
-        } else {
-          dictionary = new SameValueMutableDictionary(rawValueForTextIndex, dictionary);
+      if (reuseMutableIndex) {
+        hasColumnWithReuseMutableTextIndex = true;
+        Object rawValueForTextIndex = indexConfigs.getConfig(StandardIndexes.text()).getRawValueForTextIndex();
+        if (rawValueForTextIndex != null) {
+          if (dictionary == null) {
+            MutableIndex forwardIndex = mutableIndexes.get(StandardIndexes.forward());
+            mutableIndexes.put(StandardIndexes.forward(),
+                new SameValueMutableForwardIndex(rawValueForTextIndex, (MutableForwardIndex) forwardIndex));
+          } else {
+            dictionary = new SameValueMutableDictionary(rawValueForTextIndex, dictionary);
+          }
         }
       }
 
@@ -422,6 +431,7 @@ public class MutableSegmentImpl implements MutableSegment {
           new IndexContainer(fieldSpec, partitionFunction, partitions, new ValuesInfo(), mutableIndexes, dictionary,
               nullValueVector, sourceColumn, valueAggregator));
     }
+    _hasColumnWithReuseMutableTextIndex = hasColumnWithReuseMutableTextIndex;
 
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
     _dedupTimeColumn =
@@ -1326,6 +1336,7 @@ public class MutableSegmentImpl implements MutableSegment {
     for (IndexContainer indexContainer : _indexContainerMap.values()) {
       indexContainer.close();
     }
+    _indexContainerMap.clear();
 
     if (_multiColumnTextIndex != null) {
       try {
@@ -1574,6 +1585,11 @@ public class MutableSegmentImpl implements MutableSegment {
     return !_indexCapacityThresholdBreached;
   }
 
+  /// Returns `true` when any column has re-use mutable text index enabled.
+  public boolean hasColumnWithReuseMutableTextIndex() {
+    return _hasColumnWithReuseMutableTextIndex;
+  }
+
   // NOTE: Okay for single-writer
   @SuppressWarnings("NonAtomicOperationOnVolatileField")
   private static class ValuesInfo {
@@ -1707,6 +1723,22 @@ public class MutableSegmentImpl implements MutableSegment {
       _mutableIndexes.forEach(closer::accept);
       closer.accept(StandardIndexes.dictionary(), _dictionary);
       closer.accept(StandardIndexes.nullValueVector(), _nullValueVector);
+    }
+  }
+
+  private static final class MutableIndexes extends HashMap<IndexType, MutableIndex>
+      implements VectorIndexConfigProvider {
+    @Nullable
+    private final VectorIndexConfig _vectorIndexConfig;
+
+    private MutableIndexes(@Nullable VectorIndexConfig vectorIndexConfig) {
+      _vectorIndexConfig = vectorIndexConfig != null && vectorIndexConfig.isEnabled() ? vectorIndexConfig : null;
+    }
+
+    @Nullable
+    @Override
+    public VectorIndexConfig getVectorIndexConfig() {
+      return _vectorIndexConfig;
     }
   }
 }

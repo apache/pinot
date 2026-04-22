@@ -85,6 +85,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.data.manager.realtime.ServerRateLimitConfigChangeListener;
 import org.apache.pinot.core.instance.context.ServerContext;
+import org.apache.pinot.core.query.scheduler.QuerySchedulerThreadPoolConfigChangeListener;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.NettyInspector;
@@ -751,9 +752,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Initialize workload budget manager and thread accountant. Workload budget manager must be initialized first
     // because it might be used by the accountant.
-    PinotConfiguration schedulerConfig = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
-    WorkloadBudgetManager.set(createWorkloadBudgetManager(schedulerConfig));
-    _threadAccountant = ThreadAccountantUtils.createAccountant(schedulerConfig, _instanceId,
+    PinotConfiguration accountingConfig = ThreadAccountantUtils.extractAccountingConfig(_serverConf,
+        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    WorkloadBudgetManager.set(createWorkloadBudgetManager(accountingConfig));
+    _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
@@ -803,6 +805,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottlerSet);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
+    ResourceManager resourceManager = _serverInstance.getQueryScheduler().getResourceManager();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new QuerySchedulerThreadPoolConfigChangeListener(resourceManager));
+
+    // Keep the Lucene searcher pool in sync with query_worker_threads changes
+    resourceManager.addThreadPoolResizeListener((newRunnerThreads, newWorkerThreads) -> {
+      _realtimeLuceneTextIndexSearcherPool.resize(newWorkerThreads);
+    });
 
     if (sendStatsPredicate.needWatchForInstanceConfigChange()) {
       LOGGER.info("Initializing and registering the SendStatsPredicate");

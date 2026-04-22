@@ -66,7 +66,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     _eventObserver.notifyProgress(pinotTaskConfig, "Refreshing segment: " + indexDir);
 
     // We set _taskStartTime before fetching the tableConfig. Task Generation relies on tableConfig/Schema updates
-    // happening after the last processed time. So we explicity use the timestamp before fetching tableConfig as the
+    // happening after the last processed time. So we explicitly use the timestamp before fetching tableConfig as the
     // processedTime.
     _taskStartTime = System.currentTimeMillis();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -126,7 +126,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
           refreshColumnSet.add(column);
         }
 
-        // TODO: Maybe we can support singleValue to multi-value conversions are supproted and vice-versa.
+        // TODO: support single-value to multi-value column conversions and vice-versa.
       } else {
         refreshColumnSet.add(column);
       }
@@ -150,7 +150,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
           getSchema(tableNameWithType));
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader, InstanceType.MINION);
+      driver.init(config, recordReader);
       driver.build();
       _eventObserver.notifyProgress(pinotTaskConfig,
           "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
@@ -175,6 +175,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
   private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
       SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.MINION);
     config.setOutDir(workingDir.getPath());
     config.setSegmentName(segmentName);
 

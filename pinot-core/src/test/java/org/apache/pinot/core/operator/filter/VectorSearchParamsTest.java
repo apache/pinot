@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -35,10 +36,14 @@ public class VectorSearchParamsTest {
   public void testDefaultParams() {
     VectorSearchParams params = VectorSearchParams.DEFAULT;
     Assert.assertEquals(params.getNprobe(), VectorSearchParams.DEFAULT_NPROBE);
-    Assert.assertFalse(params.isExactRerank());
+    Assert.assertNull(params.getExactRerankOverride());
+    Assert.assertFalse(params.isExactRerank(VectorBackendType.HNSW));
+    Assert.assertFalse(params.isExactRerank(VectorBackendType.IVF_FLAT));
+    Assert.assertTrue(params.isExactRerank(VectorBackendType.IVF_PQ));
     Assert.assertFalse(params.isMaxCandidatesExplicit());
-    Assert.assertEquals(params.getEffectiveMaxCandidates(10), 100);
-    Assert.assertEquals(params.getEffectiveMaxCandidates(5), 50);
+    Assert.assertEquals(params.getEffectiveMaxCandidates(10, 1_000), 100);
+    Assert.assertEquals(params.getEffectiveMaxCandidates(5, 1_000), 50);
+    Assert.assertEquals(params.getEffectiveMaxCandidates(10, 25), 25);
   }
 
   @Test
@@ -67,7 +72,7 @@ public class VectorSearchParamsTest {
     opts.put(QueryOptionKey.VECTOR_NPROBE, "16");
     VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
     Assert.assertEquals(params.getNprobe(), 16);
-    Assert.assertFalse(params.isExactRerank());
+    Assert.assertFalse(params.isExactRerank(VectorBackendType.HNSW));
   }
 
   @Test
@@ -75,7 +80,8 @@ public class VectorSearchParamsTest {
     Map<String, String> opts = new HashMap<>();
     opts.put(QueryOptionKey.VECTOR_EXACT_RERANK, "true");
     VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
-    Assert.assertTrue(params.isExactRerank());
+    Assert.assertEquals(params.getExactRerankOverride(), Boolean.TRUE);
+    Assert.assertTrue(params.isExactRerank(VectorBackendType.HNSW));
     Assert.assertEquals(params.getNprobe(), VectorSearchParams.DEFAULT_NPROBE);
   }
 
@@ -85,9 +91,10 @@ public class VectorSearchParamsTest {
     opts.put(QueryOptionKey.VECTOR_MAX_CANDIDATES, "200");
     VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
     Assert.assertTrue(params.isMaxCandidatesExplicit());
-    Assert.assertEquals(params.getEffectiveMaxCandidates(10), 200);
-    // Max candidates should be at least topK
-    Assert.assertEquals(params.getEffectiveMaxCandidates(500), 500);
+    Assert.assertEquals(params.getEffectiveMaxCandidates(10, 500), 200);
+    // Max candidates should never exceed the segment cardinality.
+    Assert.assertEquals(params.getEffectiveMaxCandidates(500, 100), 100);
+    Assert.assertEquals(params.getEffectiveMaxCandidates(10, 100), 100);
   }
 
   @Test
@@ -98,8 +105,8 @@ public class VectorSearchParamsTest {
     opts.put(QueryOptionKey.VECTOR_MAX_CANDIDATES, "100");
     VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
     Assert.assertEquals(params.getNprobe(), 8);
-    Assert.assertTrue(params.isExactRerank());
-    Assert.assertEquals(params.getEffectiveMaxCandidates(10), 100);
+    Assert.assertTrue(params.isExactRerank(VectorBackendType.HNSW));
+    Assert.assertEquals(params.getEffectiveMaxCandidates(10, 1_000), 100);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -121,13 +128,14 @@ public class VectorSearchParamsTest {
     Map<String, String> opts = new HashMap<>();
     opts.put(QueryOptionKey.VECTOR_EXACT_RERANK, "false");
     VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
-    // "false" is still falsy, so should return DEFAULT since no vector option is truly set
-    Assert.assertSame(params, VectorSearchParams.DEFAULT);
+    Assert.assertNotSame(params, VectorSearchParams.DEFAULT);
+    Assert.assertEquals(params.getExactRerankOverride(), Boolean.FALSE);
+    Assert.assertFalse(params.isExactRerank(VectorBackendType.IVF_PQ));
   }
 
   @Test
   public void testToString() {
-    VectorSearchParams params = new VectorSearchParams(8, true, 100);
+    VectorSearchParams params = new VectorSearchParams(8, true, 100, null, null, null, null);
     String s = params.toString();
     Assert.assertTrue(s.contains("nprobe=8"));
     Assert.assertTrue(s.contains("exactRerank=true"));
@@ -136,8 +144,73 @@ public class VectorSearchParamsTest {
 
   @Test
   public void testDefaultMaxCandidatesToString() {
-    VectorSearchParams params = new VectorSearchParams(null, false, null);
+    VectorSearchParams params = new VectorSearchParams(null, null, null, null, null, null, null);
     String s = params.toString();
+    Assert.assertTrue(s.contains("backend_default"));
     Assert.assertTrue(s.contains("default(topK*10)"));
+  }
+
+  @Test
+  public void testExplicitDisableOverridesIvfPqDefault() {
+    VectorSearchParams params = new VectorSearchParams(null, false, null, null, null, null, null);
+    Assert.assertFalse(params.isExactRerank(VectorBackendType.IVF_PQ));
+  }
+
+  @Test
+  public void testDistanceThresholdFromQueryOptions() {
+    Map<String, String> opts = new HashMap<>();
+    opts.put(QueryOptionKey.VECTOR_DISTANCE_THRESHOLD, "0.5");
+    VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
+    Assert.assertTrue(params.hasDistanceThreshold());
+    Assert.assertEquals(params.getDistanceThreshold(), 0.5f);
+  }
+
+  @Test
+  public void testNoDistanceThresholdByDefault() {
+    VectorSearchParams params = VectorSearchParams.DEFAULT;
+    Assert.assertFalse(params.hasDistanceThreshold());
+    Assert.assertTrue(Float.isNaN(params.getDistanceThreshold()));
+  }
+
+  @Test
+  public void testDistanceThresholdToString() {
+    VectorSearchParams params = new VectorSearchParams(null, null, null, 0.3f, null, null, null);
+    String s = params.toString();
+    Assert.assertTrue(s.contains("distanceThreshold=0.3"));
+  }
+
+  @Test
+  public void testDistanceThresholdDirectConstructor() {
+    VectorSearchParams params = new VectorSearchParams(4, null, null, 1.5f, null, null, null);
+    Assert.assertTrue(params.hasDistanceThreshold());
+    Assert.assertEquals(params.getDistanceThreshold(), 1.5f);
+    Assert.assertEquals(params.getNprobe(), 4);
+  }
+
+  @Test
+  public void testNegativeDistanceThresholdForDotProduct() {
+    // Negative thresholds are valid for dot-product distance (negated dot product)
+    Map<String, String> opts = new HashMap<>();
+    opts.put(QueryOptionKey.VECTOR_DISTANCE_THRESHOLD, "-0.8");
+    VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
+    Assert.assertTrue(params.hasDistanceThreshold());
+    Assert.assertEquals(params.getDistanceThreshold(), -0.8f);
+  }
+
+  @Test
+  public void testHnswRuntimeControlsFromQueryOptions() {
+    Map<String, String> opts = new HashMap<>();
+    opts.put(QueryOptionKey.VECTOR_EF_SEARCH, "64");
+    opts.put(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE, "false");
+    opts.put(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE, "false");
+
+    VectorSearchParams params = VectorSearchParams.fromQueryOptions(opts);
+
+    Assert.assertEquals(params.getEfSearch(), Integer.valueOf(64));
+    Assert.assertEquals(params.getHnswUseRelativeDistance(), Boolean.FALSE);
+    Assert.assertEquals(params.getHnswUseBoundedQueue(), Boolean.FALSE);
+    Assert.assertTrue(params.toString().contains("efSearch=64"));
+    Assert.assertTrue(params.toString().contains("hnswUseRelativeDistance=false"));
+    Assert.assertTrue(params.toString().contains("hnswUseBoundedQueue=false"));
   }
 }

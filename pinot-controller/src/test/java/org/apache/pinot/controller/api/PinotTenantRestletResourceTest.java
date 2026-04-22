@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.helix.HelixAdmin;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -33,7 +34,6 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
@@ -50,25 +50,23 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTale";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
 
-  private ControllerRequestURLBuilder _urlBuilder;
-
   @BeforeClass
   public void setUp()
       throws Exception {
     DEFAULT_INSTANCE.setupSharedStateAndValidate();
-    _urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
   }
 
   @Test
   public void testTableListForTenant()
       throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     // Check that there is no existing tables
-    String listTablesUrl = _urlBuilder.forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
-    JsonNode listTablesResponse = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
+    JsonNode listTablesResponse =
+        JsonUtils.stringToJsonNode(adminClient.getTenantClient().getTenantTables(TagNameUtils.DEFAULT_TENANT_NAME,
+            null, false));
     assertTrue(listTablesResponse.get("tables").isEmpty());
 
     // Add 2 brokers with non-default broker tag
-    String createInstanceUrl = _urlBuilder.forInstanceCreate();
     String brokerTenant = "test";
     String brokerTag = TagNameUtils.getBrokerTagForTenant(brokerTenant);
     Instance brokerInstance1 =
@@ -77,26 +75,26 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     Instance brokerInstance2 =
         new Instance("2.3.4.5", 2345, InstanceType.BROKER, Collections.singletonList(brokerTag), null, 0, 0, 0, 0,
             false);
-    sendPostRequest(createInstanceUrl, brokerInstance1.toJsonString());
-    sendPostRequest(createInstanceUrl, brokerInstance2.toJsonString());
+    adminClient.getInstanceClient().createInstance(brokerInstance1.toJsonString());
+    adminClient.getInstanceClient().createInstance(brokerInstance2.toJsonString());
 
     // Add a table to the default tenant
-    String createSchemaUrl = _urlBuilder.forSchemaCreate();
-    ControllerTest.sendPostRequest(createSchemaUrl, createDummySchema(RAW_TABLE_NAME).toSingleLineJsonString());
-    String createTableUrl = _urlBuilder.forTableCreate();
-    ControllerTest.sendPostRequest(createTableUrl,
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build().toJsonString());
+    adminClient.getSchemaClient().createSchema(createDummySchema(RAW_TABLE_NAME).toSingleLineJsonString());
+    adminClient.getTableClient()
+        .createTable(new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build().toJsonString(),
+            null);
 
     // Add a second table to the non-default tenant
     String rawTableName2 = "testTable2";
     String offlineTableName2 = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName2);
-    ControllerTest.sendPostRequest(createSchemaUrl, createDummySchema(rawTableName2).toSingleLineJsonString());
-    ControllerTest.sendPostRequest(createTableUrl,
+    adminClient.getSchemaClient().createSchema(createDummySchema(rawTableName2).toSingleLineJsonString());
+    adminClient.getTableClient().createTable(
         new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName2).setBrokerTenant(brokerTenant).build()
-            .toJsonString());
+            .toJsonString(), null);
 
     // There should be 2 tables returned when querying default tenant for servers w/o specifying ?type=server
-    listTablesResponse = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
+    listTablesResponse = JsonUtils.stringToJsonNode(adminClient.getTenantClient()
+        .getTenantTables(TagNameUtils.DEFAULT_TENANT_NAME, null, false));
     JsonNode tables = listTablesResponse.get("tables");
     assertEquals(tables.size(), 2);
     Set<String> tableSet = new HashSet<>();
@@ -105,8 +103,8 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     assertEquals(tableSet, Sets.newHashSet(OFFLINE_TABLE_NAME, offlineTableName2));
 
     // There should be 2 tables returned when specifying ?type=server as that is the default
-    listTablesUrl = _urlBuilder.forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME, "server");
-    listTablesResponse = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
+    listTablesResponse = JsonUtils.stringToJsonNode(
+        adminClient.getTenantClient().getTenantTables(TagNameUtils.DEFAULT_TENANT_NAME, "server", false));
     tables = listTablesResponse.get("tables");
     assertEquals(tables.size(), 2);
     tableSet = new HashSet<>();
@@ -115,15 +113,15 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     assertEquals(tableSet, Sets.newHashSet(OFFLINE_TABLE_NAME, offlineTableName2));
 
     // There should be only 1 table returned when specifying ?type=broker for the default tenant
-    listTablesUrl = _urlBuilder.forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME, "broker");
-    listTablesResponse = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
+    listTablesResponse = JsonUtils.stringToJsonNode(
+        adminClient.getTenantClient().getTenantTables(TagNameUtils.DEFAULT_TENANT_NAME, "broker", false));
     tables = listTablesResponse.get("tables");
     assertEquals(tables.size(), 1);
     assertEquals(tables.get(0).asText(), OFFLINE_TABLE_NAME);
 
     // There should be only 1 table returned when specifying ?type=broker for the non-default tenant
-    listTablesUrl = _urlBuilder.forTablesFromTenant(brokerTenant, "broker");
-    listTablesResponse = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
+    listTablesResponse = JsonUtils.stringToJsonNode(
+        adminClient.getTenantClient().getTenantTables(brokerTenant, "broker", false));
     tables = listTablesResponse.get("tables");
     assertEquals(tables.size(), 1);
     assertEquals(tables.get(0).asText(), offlineTableName2);
@@ -137,15 +135,16 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.deleteSchema(rawTableName2);
     DEFAULT_INSTANCE.waitForEVToDisappear(OFFLINE_TABLE_NAME);
     DEFAULT_INSTANCE.waitForEVToDisappear(offlineTableName2);
-    sendDeleteRequest(_urlBuilder.forInstance("Broker_1.2.3.4_1234"));
-    sendDeleteRequest(_urlBuilder.forInstance("Broker_2.3.4.5_2345"));
+    adminClient.getInstanceClient().dropInstance("Broker_1.2.3.4_1234");
+    adminClient.getInstanceClient().dropInstance("Broker_2.3.4.5_2345");
   }
 
   @Test
   public void testListInstance()
       throws Exception {
-    String listInstancesUrl = _urlBuilder.forTenantGet(TagNameUtils.DEFAULT_TENANT_NAME);
-    JsonNode instanceList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listInstancesUrl));
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    JsonNode instanceList = JsonUtils.stringToJsonNode(
+        adminClient.getTenantClient().getTenantInstances(TagNameUtils.DEFAULT_TENANT_NAME, null, null));
     assertEquals(instanceList.get("ServerInstances").size(), DEFAULT_NUM_SERVER_INSTANCES);
     assertEquals(instanceList.get("BrokerInstances").size(), DEFAULT_NUM_BROKER_INSTANCES);
   }
@@ -153,13 +152,12 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
   @Test
   public void testToggleTenantState()
       throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
     // Create an offline table
-    String createSchemaUrl = _urlBuilder.forSchemaCreate();
-    ControllerTest.sendPostRequest(createSchemaUrl, createDummySchema(RAW_TABLE_NAME).toSingleLineJsonString());
-    String createTableUrl = _urlBuilder.forTableCreate();
-    sendPostRequest(createTableUrl,
+    adminClient.getSchemaClient().createSchema(createDummySchema(RAW_TABLE_NAME).toSingleLineJsonString());
+    adminClient.getTableClient().createTable(
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(DEFAULT_MIN_NUM_REPLICAS)
-            .build().toJsonString());
+            .build().toJsonString(), null);
 
     // Broker resource should be updated
     HelixAdmin helixAdmin = DEFAULT_INSTANCE.getHelixAdmin();
@@ -176,39 +174,31 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     }
 
     // Disable server instances
-    String disableServerInstanceUrl =
-        _urlBuilder.forTenantInstancesToggle(TagNameUtils.DEFAULT_TENANT_NAME, "server", "disable");
-    JsonUtils.stringToJsonNode(ControllerTest.sendPostRequest(disableServerInstanceUrl));
+    adminClient.getTenantClient().setTenantState(TagNameUtils.DEFAULT_TENANT_NAME, "server", "disable");
     checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, 0);
 
     // Enable server instances
-    String enableServerInstanceUrl =
-        _urlBuilder.forTenantInstancesToggle(TagNameUtils.DEFAULT_TENANT_NAME, "server", "enable");
-    JsonUtils.stringToJsonNode(ControllerTest.sendPostRequest(enableServerInstanceUrl));
+    adminClient.getTenantClient().setTenantState(TagNameUtils.DEFAULT_TENANT_NAME, "server", "enable");
     checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, DEFAULT_NUM_SERVER_INSTANCES);
 
     // Disable broker instances
-    String disableBrokerInstanceUrl =
-        _urlBuilder.forTenantInstancesToggle(TagNameUtils.DEFAULT_TENANT_NAME, "broker", "disable");
-    JsonUtils.stringToJsonNode(ControllerTest.sendPostRequest(disableBrokerInstanceUrl));
+    adminClient.getTenantClient().setTenantState(TagNameUtils.DEFAULT_TENANT_NAME, "broker", "disable");
     checkNumOnlineInstancesFromExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, 0);
 
     // Enable broker instances
-    String enableBrokerInstanceUrl =
-        _urlBuilder.forTenantInstancesToggle(TagNameUtils.DEFAULT_TENANT_NAME, "broker", "enable");
-    JsonUtils.stringToJsonNode(ControllerTest.sendPostRequest(enableBrokerInstanceUrl));
+    adminClient.getTenantClient().setTenantState(TagNameUtils.DEFAULT_TENANT_NAME, "broker", "enable");
     checkNumOnlineInstancesFromExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
         DEFAULT_NUM_BROKER_INSTANCES);
 
     // Check exception in case of enum mismatch of State
     try {
-      String mismatchStateBrokerInstanceUrl =
-          _urlBuilder.forTenantInstancesToggle(TagNameUtils.DEFAULT_TENANT_NAME, "broker", "random");
-      sendPostRequest(mismatchStateBrokerInstanceUrl);
+      adminClient.getTenantClient().setTenantState(TagNameUtils.DEFAULT_TENANT_NAME, "broker", "random");
       fail("Passing invalid state to tenant toggle state does not fail.");
-    } catch (IOException e) {
-      // Expected 500 Bad Request
-      assertTrue(e.getMessage().contains("Error: State mentioned random is wrong. Valid States: Enable, Disable"));
+    } catch (Throwable e) {
+      // PinotAdminClient wraps validation errors in PinotAdminException or a transport RuntimeException
+      String message = e.getMessage();
+      assertTrue(message != null
+          && message.contains("State mentioned random is wrong. Valid States: Enable, Disable"));
     }
 
     // Delete table and schema

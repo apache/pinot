@@ -229,6 +229,9 @@ public class QueryOptionsUtilsTest {
     org.testng.Assert.assertTrue(QueryOptionsUtils.isVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "true")));
     org.testng.Assert.assertFalse(QueryOptionsUtils.isVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "false")));
     org.testng.Assert.assertFalse(QueryOptionsUtils.isVectorExactRerank(Map.of()));
+    assertEquals(QueryOptionsUtils.getVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "true")), Boolean.TRUE);
+    assertEquals(QueryOptionsUtils.getVectorExactRerank(Map.of(VECTOR_EXACT_RERANK, "false")), Boolean.FALSE);
+    assertNull(QueryOptionsUtils.getVectorExactRerank(Map.of()));
   }
 
   @Test
@@ -254,6 +257,28 @@ public class QueryOptionsUtilsTest {
     Map<String, String> opts = Map.of("VECTORNPROBE", "16");
     Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(opts);
     assertEquals(QueryOptionsUtils.getVectorNprobe(resolved), Integer.valueOf(16));
+  }
+
+  @Test
+  public void testInvertedIndexDistinctCostRatioValid() {
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "2.5")), Double.valueOf(2.5));
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, " 3.5 ")), Double.valueOf(3.5));
+    assertNull(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(Map.of()));
+  }
+
+  @Test
+  public void testInvertedIndexDistinctCostRatioRejectsNonFiniteValues() {
+    for (String value : new String[]{"NaN", "Infinity", "-Infinity", "0", "-1"}) {
+      try {
+        QueryOptionsUtils.getInvertedIndexDistinctCostRatio(Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, value));
+        fail();
+      } catch (IllegalArgumentException e) {
+        assertEquals(e.getMessage(),
+            INVERTED_INDEX_DISTINCT_COST_RATIO + " must be a positive number, got: " + value);
+      }
+    }
   }
 
   private static Object getValue(Map<String, String> map, String key) {

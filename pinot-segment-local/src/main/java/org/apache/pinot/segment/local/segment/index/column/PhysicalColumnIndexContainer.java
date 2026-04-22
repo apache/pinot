@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       Set.of(StandardIndexes.FORWARD_ID, StandardIndexes.DICTIONARY_ID, StandardIndexes.NULL_VALUE_VECTOR_ID);
 
   private final IndexTypeMap _indexTypeMap;
+  @Nullable
+  private final VectorIndexConfig _vectorIndexConfig;
 
   // Reference to shared segment-level multi-column text index reader.
   // This reader is closed on segment destroy() and not in this class' close() method.
@@ -62,6 +65,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     if (fieldIndexConfigs == null) {
       fieldIndexConfigs = FieldIndexConfigs.EMPTY;
     }
+    _vectorIndexConfig = fieldIndexConfigs.getConfig(StandardIndexes.vector());
 
     ArrayList<IndexType> indexTypes = new ArrayList<>();
     ArrayList<IndexReader> readers = new ArrayList<>();
@@ -103,6 +107,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
     return _indexTypeMap.getIndex(indexType);
+  }
+
+  @Nullable
+  @Override
+  public VectorIndexConfig getVectorIndexConfig() {
+    return _vectorIndexConfig != null && _vectorIndexConfig.isEnabled() ? _vectorIndexConfig : null;
   }
 
   @Override

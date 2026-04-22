@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
@@ -54,6 +53,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.restlet.resources.BatchConfig;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;

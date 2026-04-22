@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.MutableSegment;
-import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -61,19 +60,6 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     _pinotSegmentRecordReader = new PinotSegmentRecordReader();
     _validDocIdsBitmap = validDocIds;
     _validDocIdsIterator = validDocIds.getIntIterator();
-    _deleteRecordColumn = deleteRecordColumn;
-  }
-
-  public CompactedPinotSegmentRecordReader(ThreadSafeMutableRoaringBitmap validDocIds) {
-    this(validDocIds, null);
-  }
-
-  public CompactedPinotSegmentRecordReader(ThreadSafeMutableRoaringBitmap validDocIds,
-      @Nullable String deleteRecordColumn) {
-    Preconditions.checkNotNull(validDocIds, "Valid document IDs cannot be null");
-    _pinotSegmentRecordReader = new PinotSegmentRecordReader();
-    _validDocIdsBitmap = validDocIds.getMutableRoaringBitmap().toRoaringBitmap();
-    _validDocIdsIterator = _validDocIdsBitmap.getIntIterator();
     _deleteRecordColumn = deleteRecordColumn;
   }
 

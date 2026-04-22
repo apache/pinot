@@ -119,7 +119,7 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     // Create and upload test table configs and schemas to ZooKeeper
     setupTestTablesInZooKeeper();
 
-    // Trigger instance config processing to populate _routableServers
+    // Trigger instance config processing to populate _routableServerInstanceMap
     triggerInstanceConfigProcessing();
   }
 
@@ -166,7 +166,7 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
 
   private void triggerInstanceConfigProcessing() {
     // Trigger BrokerRoutingManager to process instance config changes
-    // This will populate _routableServers which is needed for buildRouting to work
+    // This will populate _routableServerInstanceMap which is needed for buildRouting to work
     try {
       _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
     } catch (Exception e) {

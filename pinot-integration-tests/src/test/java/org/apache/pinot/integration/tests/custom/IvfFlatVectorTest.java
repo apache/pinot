@@ -53,8 +53,10 @@ public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME = "IvfFlatVectorTest";
   private static final String VECTOR_COL = "embedding";
   private static final String VECTORS_L2_DIST = "embeddingL2Dist";
+  private static final String CATEGORY = "category";
   private static final int VECTOR_DIM_SIZE = 128;
   private static final int NLIST = 8;
+  private static final int NUM_CATEGORIES = 5;
 
   @Override
   protected long getCountStarResult() {
@@ -90,6 +92,7 @@ public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addMultiValueDimension(VECTOR_COL, FieldSpec.DataType.FLOAT)
         .addSingleValueDimension(VECTORS_L2_DIST, FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension(CATEGORY, FieldSpec.DataType.STRING)
         .build();
   }
 
@@ -102,7 +105,9 @@ public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
     avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(VECTOR_COL, floatArraySchema, null, null),
         new org.apache.avro.Schema.Field(VECTORS_L2_DIST,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null)
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null),
+        new org.apache.avro.Schema.Field(CATEGORY,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null)
     ));
 
     float[] queryVector = new float[VECTOR_DIM_SIZE];
@@ -117,6 +122,7 @@ public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
         float[] vector = createRandomVector(VECTOR_DIM_SIZE);
         record.put(VECTOR_COL, convertToFloatCollection(vector));
         record.put(VECTORS_L2_DIST, l2Distance(vector, queryVector));
+        record.put(CATEGORY, "cat_" + (i % NUM_CATEGORIES));
         writers.get(i % getNumAvroFiles()).append(record);
       }
       return avroFilesAndWriters.getAvroFiles();
@@ -201,6 +207,82 @@ public class IvfFlatVectorTest extends CustomDataQueryClusterIntegrationTest {
       double storedDist = rows.get(i).get(1).asDouble();
       assertEquals(computedDist, storedDist, 1e-5,
           "Computed L2 distance should match pre-computed value");
+    }
+  }
+
+  /**
+   * Tests threshold search with vectorDistanceThreshold query option.
+   * The threshold is in euclideanDistance space (squared L2, no sqrt).
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testThresholdSearch(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String queryVector = "ARRAY[1.1" + StringUtils.repeat(", 1.1", VECTOR_DIM_SIZE - 1) + "]";
+
+    // Get p25 of L2 distances (sqrt), then square it for the internal threshold
+    String percentileQuery = String.format(
+        "SELECT PERCENTILE(%s, 25) FROM %s", VECTORS_L2_DIST, getTableName());
+    JsonNode percentileResult = postQuery(percentileQuery);
+    double l2Dist = percentileResult.get("resultTable").get("rows").get(0).get(0).asDouble();
+    double threshold = l2Dist * l2Dist;
+
+    String thresholdQuery = String.format(
+        "SET vectorDistanceThreshold = %f; "
+            + "SELECT l2Distance(%s, %s) AS dist FROM %s "
+            + "WHERE vectorSimilarity(%s, %s, %d) "
+            + "ORDER BY dist ASC LIMIT 100",
+        threshold, VECTOR_COL, queryVector, getTableName(),
+        VECTOR_COL, queryVector, 200);
+
+    JsonNode result = postQuery(thresholdQuery);
+    assertNotNull(result.get("resultTable"), "Threshold query should return a resultTable");
+    JsonNode rows = result.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Threshold search should return results");
+
+    for (int i = 0; i < rows.size(); i++) {
+      double dist = rows.get(i).get(0).asDouble();
+      assertTrue(dist <= l2Dist + 1e-3,
+          "Row " + i + " l2Distance (" + dist + ") should be within sqrt(threshold) (" + l2Dist + ")");
+    }
+  }
+
+  /**
+   * Tests compound pattern: metadata filter + threshold search.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCompoundFilterAndThreshold(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String queryVector = "ARRAY[1.1" + StringUtils.repeat(", 1.1", VECTOR_DIM_SIZE - 1) + "]";
+    String targetCategory = "cat_1";
+
+    String percentileQuery = String.format(
+        "SELECT PERCENTILE(%s, 50) FROM %s", VECTORS_L2_DIST, getTableName());
+    JsonNode percentileResult = postQuery(percentileQuery);
+    double l2Dist = percentileResult.get("resultTable").get("rows").get(0).get(0).asDouble();
+    double threshold = l2Dist * l2Dist;
+
+    String compoundQuery = String.format(
+        "SET vectorDistanceThreshold = %f; "
+            + "SELECT l2Distance(%s, %s) AS dist, %s FROM %s "
+            + "WHERE vectorSimilarity(%s, %s, %d) AND %s = '%s' "
+            + "ORDER BY dist ASC LIMIT 100",
+        threshold, VECTOR_COL, queryVector, CATEGORY, getTableName(),
+        VECTOR_COL, queryVector, 200, CATEGORY, targetCategory);
+
+    JsonNode result = postQuery(compoundQuery);
+    assertNotNull(result.get("resultTable"), "Compound query should return a resultTable");
+    JsonNode rows = result.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0, "Compound query should return results");
+
+    for (int i = 0; i < rows.size(); i++) {
+      double dist = rows.get(i).get(0).asDouble();
+      String cat = rows.get(i).get(1).asText();
+      assertTrue(dist <= l2Dist + 1e-3,
+          "Row " + i + " l2Distance (" + dist + ") exceeds threshold");
+      assertEquals(cat, targetCategory,
+          "Row " + i + " category mismatch");
     }
   }
 

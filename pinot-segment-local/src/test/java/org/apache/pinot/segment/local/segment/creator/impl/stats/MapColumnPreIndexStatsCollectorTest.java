@@ -23,9 +23,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
+import org.apache.pinot.segment.local.segment.index.map.MapIndexReaderWrapper;
+import org.apache.pinot.segment.local.segment.index.map.MapKeyIndexReader;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -38,6 +40,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.*;
 
 
@@ -114,7 +117,7 @@ public class MapColumnPreIndexStatsCollectorTest {
     assertEquals(keyStrStats.getTotalNumberOfEntries(), 3);
     assertEquals(keyStrStats.getMaxNumberOfMultiValues(), 0);
     assertFalse(keyStrStats.isSorted());
-    assertEquals(keyStrStats.getLengthOfLargestElement(), 5);
+    assertEquals(keyStrStats.getLengthOfLongestElement(), 5);
     assertTrue(keyStrStats instanceof StringColumnPreIndexStatsCollector);
 
     AbstractColumnStatisticsCollector keyIntStats = mapCollector.getKeyStatistics("kInt");
@@ -217,7 +220,7 @@ public class MapColumnPreIndexStatsCollectorTest {
     assertEquals(mapNoDict.getMaxNumberOfMultiValues(), mapDict.getMaxNumberOfMultiValues());
     assertEquals(mapNoDict.isSorted(), mapDict.isSorted());
     assertEquals(mapNoDict.getLengthOfShortestElement(), mapDict.getLengthOfShortestElement());
-    assertEquals(mapNoDict.getLengthOfLargestElement(), mapDict.getLengthOfLargestElement());
+    assertEquals(mapNoDict.getLengthOfLongestElement(), mapDict.getLengthOfLongestElement());
     assertEquals(mapNoDict.getMaxRowLengthInBytes(), mapDict.getMaxRowLengthInBytes());
 
     // Partition metadata
@@ -228,10 +231,8 @@ public class MapColumnPreIndexStatsCollectorTest {
       assertNull(pfDict);
     } else {
       assertEquals(pfNoDict.getName(), pfDict.getName());
-      assertEquals(mapNoDict.getNumPartitions(), mapDict.getNumPartitions());
-      Set<Integer> partsNoDict = mapNoDict.getPartitions();
-      Set<Integer> partsDict = mapDict.getPartitions();
-      assertEquals(partsNoDict, partsDict);
+      assertEquals(pfNoDict.getNumPartitions(), pfDict.getNumPartitions());
+      assertEquals(mapNoDict.getPartitions(), mapDict.getPartitions());
     }
 
     // Compare per-key collectors exposed via getKeyStatistics
@@ -305,7 +306,7 @@ public class MapColumnPreIndexStatsCollectorTest {
     int expectedMin = Math.min(l1, Math.min(l2, l3));
     int expectedMax = Math.max(l1, Math.max(l2, l3));
     assertEquals(col.getLengthOfShortestElement(), expectedMin);
-    assertEquals(col.getLengthOfLargestElement(), expectedMax);
+    assertEquals(col.getLengthOfLongestElement(), expectedMax);
     assertEquals(col.getMaxRowLengthInBytes(), expectedMax);
   }
 
@@ -470,7 +471,7 @@ public class MapColumnPreIndexStatsCollectorTest {
 
     AbstractColumnStatisticsCollector keyStats = col.getKeyStatistics("blob");
     assertNotNull(keyStats);
-    assertTrue(keyStats instanceof BytesColumnPredIndexStatsCollector);
+    assertTrue(keyStats instanceof BytesColumnPreIndexStatsCollector);
     assertEquals(keyStats.getMinValue(), new ByteArray(new byte[]{1, 2}));
     assertEquals(keyStats.getMaxValue(), new ByteArray(new byte[]{1, 3}));
     assertEquals(keyStats.getCardinality(), 2);
@@ -501,6 +502,53 @@ public class MapColumnPreIndexStatsCollectorTest {
   }
 
   @Test
+  public void testAllEmptyMaps() {
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+
+    // Collect multiple rows with empty maps
+    col.collect(new HashMap<>());
+    col.collect(new HashMap<>());
+    col.collect(new HashMap<>());
+    col.seal();
+
+    // Should not throw AIOOBE; should return null for min/max/uniqueValuesSet
+    assertNull(col.getMinValue());
+    assertNull(col.getMaxValue());
+    assertNull(col.getUniqueValuesSet());
+    assertEquals(col.getCardinality(), 0);
+    assertEquals(col.getTotalNumberOfEntries(), 3);
+    // Serialized empty map is Integer.BYTES (4) bytes
+    assertEquals(col.getLengthOfShortestElement(), Integer.BYTES);
+    assertEquals(col.getLengthOfLongestElement(), Integer.BYTES);
+    assertEquals(col.getMaxRowLengthInBytes(), Integer.BYTES);
+    assertTrue(col.getAllKeyFrequencies().isEmpty());
+  }
+
+  @Test
+  public void testMixOfEmptyAndNonEmptyMaps() {
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+
+    col.collect(new HashMap<>());
+    col.collect(Map.of("k1", "v1"));
+    col.collect(new HashMap<>());
+    col.seal();
+
+    assertEquals(col.getMinValue(), "k1");
+    assertEquals(col.getMaxValue(), "k1");
+    assertNotNull(col.getUniqueValuesSet());
+    assertEquals(col.getUniqueValuesSet(), new String[]{"k1"});
+    assertEquals(col.getCardinality(), 1);
+    assertEquals(col.getTotalNumberOfEntries(), 3);
+
+    // Key appeared in 1 of 3 rows, so seal() inserted one default null value (2 total)
+    AbstractColumnStatisticsCollector k1Stats = col.getKeyStatistics("k1");
+    assertNotNull(k1Stats);
+    assertEquals(k1Stats.getTotalNumberOfEntries(), 2);
+  }
+
+  @Test
   public void testNoDictCreatesNoDictChildCollectors() {
     StatsCollectorConfig cfgNoDict = newConfig(true);
     MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfgNoDict);
@@ -513,5 +561,53 @@ public class MapColumnPreIndexStatsCollectorTest {
 
     assertTrue(col.getKeyStatistics("kInt") instanceof NoDictColumnStatisticsCollector);
     assertTrue(col.getKeyStatistics("kStr") instanceof NoDictColumnStatisticsCollector);
+  }
+
+  private static MapIndexReaderWrapper mapReaderWithValueType(FieldSpec.DataType valueType) {
+    FieldSpec keySpec = new DimensionFieldSpec("key", FieldSpec.DataType.STRING, true);
+    FieldSpec valueSpec = new DimensionFieldSpec("value", valueType, true);
+    ComplexFieldSpec complexFieldSpec = new ComplexFieldSpec("testMap", FieldSpec.DataType.MAP, true,
+        Map.of(ComplexFieldSpec.KEY_FIELD, keySpec, ComplexFieldSpec.VALUE_FIELD, valueSpec));
+    return new MapIndexReaderWrapper(mock(ForwardIndexReader.class), ComplexFieldSpec.toMapFieldSpec(complexFieldSpec));
+  }
+
+  @Test
+  public void testGetKeyStoredTypeReturnsPrimitiveStoredTypes() {
+    for (FieldSpec.DataType type : new FieldSpec.DataType[]{
+        FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE,
+        FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES
+    }) {
+      assertEquals(mapReaderWithValueType(type).getKeyStoredType("k"), type, "Stored type mismatch for: " + type);
+    }
+  }
+
+  @Test
+  public void testGetKeyStoredTypeForBooleanIsInt() {
+    assertEquals(mapReaderWithValueType(FieldSpec.DataType.BOOLEAN).getKeyStoredType("k"), FieldSpec.DataType.INT);
+  }
+
+  @Test
+  public void testGetKeyStoredTypeForTimestampIsLong() {
+    assertEquals(mapReaderWithValueType(FieldSpec.DataType.TIMESTAMP).getKeyStoredType("k"), FieldSpec.DataType.LONG);
+  }
+
+  @Test
+  public void testGetKeyStoredTypeForJsonIsString() {
+    assertEquals(mapReaderWithValueType(FieldSpec.DataType.JSON).getKeyStoredType("k"), FieldSpec.DataType.STRING);
+  }
+
+  @Test
+  public void testGetStoredTypeIsAlwaysMap() {
+    assertEquals(mapReaderWithValueType(FieldSpec.DataType.STRING).getStoredType(), FieldSpec.DataType.MAP);
+  }
+
+  @Test
+  public void testMapKeyIndexReaderGetStoredTypeReturnsStoredType() {
+    assertEquals(new MapKeyIndexReader(mock(ForwardIndexReader.class), "k",
+        new DimensionFieldSpec("k", FieldSpec.DataType.BOOLEAN, true)).getStoredType(), FieldSpec.DataType.INT);
+    assertEquals(new MapKeyIndexReader(mock(ForwardIndexReader.class), "k",
+        new DimensionFieldSpec("k", FieldSpec.DataType.TIMESTAMP, true)).getStoredType(), FieldSpec.DataType.LONG);
+    assertEquals(new MapKeyIndexReader(mock(ForwardIndexReader.class), "k",
+        new DimensionFieldSpec("k", FieldSpec.DataType.JSON, true)).getStoredType(), FieldSpec.DataType.STRING);
   }
 }

@@ -28,7 +28,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
-import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -45,7 +44,6 @@ import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
-import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -239,9 +237,7 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testSegmentReload()
       throws Exception {
-    ControllerTest.sendPostRequest(
-        StringUtil.join("/", getControllerBaseApiUrl(), "segments", getTableName(),
-            "reload?forceDownload=false"), null);
+    getOrCreateAdminClient().getSegmentClient().reloadTable(getTableName(), null, false);
 
     // wait for reload to finish
     Thread.sleep(1000);

@@ -21,9 +21,9 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Map;
+import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
+import org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
-import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.Assert;
 import org.testng.annotations.Test;

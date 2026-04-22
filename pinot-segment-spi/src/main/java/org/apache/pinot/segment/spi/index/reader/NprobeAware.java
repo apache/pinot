@@ -25,17 +25,25 @@ package org.apache.pinot.segment.spi.index.reader;
  * At query time, the {@code nprobe} parameter controls how many cells are searched. Higher
  * values improve recall at the cost of latency.</p>
  *
- * <p>Implementations should be thread-safe with respect to concurrent calls to
- * {@link VectorIndexReader#getDocIds(float[], int)} after {@link #setNprobe(int)} has been called.
- * In practice, nprobe is set once per query before any search call.</p>
+ * <p>Implementations should treat {@link #setNprobe(int)} as query-scoped state and support
+ * {@link #clearNprobe()} after the query finishes. Pinot's vector operators set nprobe once
+ * before the ANN lookup and clear it in a {@code finally} block.</p>
  */
 public interface NprobeAware {
 
   /**
    * Sets the number of inverted-list probes for the next search.
    *
-   * @param nprobe number of cells to probe (must be &gt;= 1)
-   * @throws IllegalArgumentException if nprobe is less than 1
-   */
+  * @param nprobe number of cells to probe (must be &gt;= 1)
+  * @throws IllegalArgumentException if nprobe is less than 1
+  */
   void setNprobe(int nprobe);
+
+  /**
+   * Clears any query-scoped nprobe override and restores the reader's default behavior.
+   *
+   * <p>The default implementation is a no-op for readers that do not retain per-query state.</p>
+   */
+  default void clearNprobe() {
+  }
 }

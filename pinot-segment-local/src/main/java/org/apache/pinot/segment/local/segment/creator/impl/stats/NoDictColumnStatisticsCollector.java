@@ -23,8 +23,9 @@ import com.google.common.base.Utf8;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.commons.lang3.NotImplementedException;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -35,7 +36,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Column statistics collector for no-dictionary columns that avoids storing unique values and thus reduces memory
  * Behavior:
- * - getUniqueValuesSet() throws NotImplementedException
+ * - getUniqueValuesSet() returns null
  * - getCardinality() returns approximate cardinality using HLL++
  * - Doesn't handle cases where values are of different types (e.g. int and long). This is expected.
  *   Individual type collectors (e.g. IntColumnPreIndexStatsCollector) also don't handle this case.
@@ -43,24 +44,30 @@ import org.slf4j.LoggerFactory;
  *   So if such a case is encountered, it will be raised as an exception during collect()
  * Doesn't handle MAP data type as MapColumnPreIndexStatsCollector is optimized for no-dictionary collection
  */
-@SuppressWarnings({"rawtypes"})
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCollector {
   private static final Logger LOGGER = LoggerFactory.getLogger(NoDictColumnStatisticsCollector.class);
+  // Track exact uniques up to a threshold to avoid small-N underestimation and test flakiness
+  private static final int EXACT_UNIQUE_TRACKING_THRESHOLD = 2048;
+
+  private final boolean _isFixedWidth;
   private Comparable _minValue;
   private Comparable _maxValue;
   private int _minLength = Integer.MAX_VALUE;
-  private int _maxLength = -1; // default return value is -1
-  private int _maxRowLength = -1; // default return value is -1
+  private int _maxLength = 0;
+  private boolean _isAscii;
+  private int _maxRowLength = 0;
   private boolean _sealed = false;
+
   // HLL Plus generally returns approximate cardinality >= actual cardinality which is desired
   private final HyperLogLogPlus _hllPlus;
-  // Track exact uniques up to a threshold to avoid small-N underestimation and test flakiness
-  private static final int EXACT_UNIQUE_TRACKING_THRESHOLD = 2048;
   // Single-threaded: simple Set is sufficient; set to null once threshold exceeded to cap memory
   private Set<Object> _exactUniques = new HashSet<>();
 
   public NoDictColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
+    _isFixedWidth = _valueType.isFixedWidth();
+    _isAscii = _valueType == DataType.STRING;
     // Use default p and sp; can be made configurable via StatsCollectorConfig later if needed
     _hllPlus = new HyperLogLogPlus(
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P,
@@ -75,17 +82,19 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       Object[] values = (Object[]) entry;
       int rowLength = 0;
       for (Object value : values) {
-        if (value instanceof BigDecimal) {
-          // Pinot doesn't support multi-value BigDecimal as of now
-          throw new UnsupportedOperationException();
-        }
-        updateMinMax(value);
+        Comparable comparable = toComparable(value);
+        updateMinMax(comparable);
         updateHllPlus(value);
         trackExactUnique(value);
-        int len = getValueLength(value);
-        _minLength = Math.min(_minLength, len);
-        _maxLength = Math.max(_maxLength, len);
-        rowLength += len;
+        if (!_isFixedWidth) {
+          int length = getValueLength(value);
+          _minLength = Math.min(_minLength, length);
+          _maxLength = Math.max(_maxLength, length);
+          if (_isAscii) {
+            _isAscii = length == ((String) value).length();
+          }
+          rowLength += length;
+        }
       }
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       _maxRowLength = Math.max(_maxRowLength, rowLength);
@@ -130,29 +139,32 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
       updateTotalNumberOfEntries(length);
     } else {
-      Comparable value = toComparable(entry);
-      addressSorted(value);
-      updateMinMax(entry);
+      Comparable comparable = toComparable(entry);
+      addressSorted(comparable);
+      updateMinMax(comparable);
       updateHllPlus(entry);
       trackExactUnique(entry);
-      int len = getValueLength(entry);
-      _minLength = Math.min(_minLength, len);
-      _maxLength = Math.max(_maxLength, len);
-      if (isPartitionEnabled()) {
-        updatePartition(value.toString());
+      if (!_isFixedWidth) {
+        int length = getValueLength(entry);
+        _minLength = Math.min(_minLength, length);
+        _maxLength = Math.max(_maxLength, length);
+        if (_isAscii) {
+          _isAscii = length == ((String) entry).length();
+        }
       }
-      _maxRowLength = Math.max(_maxRowLength, len);
+      if (isPartitionEnabled()) {
+        updatePartition(comparable.toString());
+      }
       _totalNumberOfEntries++;
     }
   }
 
-  private void updateMinMax(Object value) {
-    Comparable comp = toComparable(value);
-    if (_minValue == null || comp.compareTo(_minValue) < 0) {
-      _minValue = comp;
+  private void updateMinMax(Comparable value) {
+    if (_minValue == null || value.compareTo(_minValue) < 0) {
+      _minValue = value;
     }
-    if (_maxValue == null || comp.compareTo(_maxValue) > 0) {
-      _maxValue = comp;
+    if (_maxValue == null || value.compareTo(_maxValue) > 0) {
+      _maxValue = value;
     }
   }
 
@@ -167,55 +179,40 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   }
 
   private int getValueLength(Object value) {
-    if (value instanceof byte[]) {
-      return ((byte[]) value).length;
+    switch (_valueType) {
+      case BIG_DECIMAL:
+        return BigDecimalUtils.byteSize((BigDecimal) value);
+      case STRING:
+        return Utf8.encodedLength((String) value);
+      case BYTES:
+        return ((byte[]) value).length;
+      default:
+        throw new IllegalStateException("Unsupported variable-width value type: " + _valueType);
     }
-    if (value instanceof CharSequence) {
-      return Utf8.encodedLength((CharSequence) value);
-    }
-    if (value instanceof BigDecimal) {
-      return BigDecimalUtils.byteSize((BigDecimal) value);
-    }
-    if (value instanceof Number) {
-      return 8; // fixed-width approximation as it's not actually required for numeric fields which are of fixed length
-    }
-    throw new IllegalStateException("Unsupported value type " + value.getClass());
   }
 
+  @Nullable
   @Override
-  public Object getMinValue() {
+  public Comparable getMinValue() {
     if (_sealed) {
       return _minValue;
     }
     throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
+  @Nullable
   @Override
-  public Object getMaxValue() {
+  public Comparable getMaxValue() {
     if (_sealed) {
       return _maxValue;
     }
     throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
 
+  @Nullable
   @Override
   public Object getUniqueValuesSet() {
-    throw new NotImplementedException("getUniqueValuesSet is not supported in NoDictColumnStatisticsCollector");
-  }
-
-  @Override
-  public int getLengthOfShortestElement() {
-    return _minLength == Integer.MAX_VALUE ? -1 : _minLength;
-  }
-
-  @Override
-  public int getLengthOfLargestElement() {
-    return _maxLength;
-  }
-
-  @Override
-  public int getMaxRowLengthInBytes() {
-    return _maxRowLength;
+    return null;
   }
 
   @Override
@@ -232,19 +229,41 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   }
 
   @Override
+  public int getLengthOfShortestElement() {
+    if (_isFixedWidth) {
+      return _valueType.size();
+    } else {
+      return _minLength != Integer.MAX_VALUE ? _minLength : 0;
+    }
+  }
+
+  @Override
+  public int getLengthOfLongestElement() {
+    return _isFixedWidth ? _valueType.size() : _maxLength;
+  }
+
+  @Override
+  public boolean isAscii() {
+    return _isAscii;
+  }
+
+  @Override
+  public int getMaxRowLengthInBytes() {
+    if (_isFixedWidth) {
+      int elementSize = _valueType.size();
+      return isSingleValue() ? elementSize : _maxNumberOfMultiValues * elementSize;
+    } else {
+      return isSingleValue() ? _maxLength : _maxRowLength;
+    }
+  }
+
+  @Override
   public void seal() {
     _sealed = true;
   }
 
   private void updateHllPlus(Object value) {
-    if (value instanceof BigDecimal) {
-      // Canonicalize BigDecimal as string to avoid scale-related equality issues:
-      // BigDecimals with different scales (e.g., 1.0 vs 1.00) are not equal by default,
-      // but their string representations normalize the value for cardinality tracking.
-      _hllPlus.offer(((BigDecimal) value).toString());
-    } else {
-      _hllPlus.offer(value);
-    }
+    _hllPlus.offer(value);
   }
 
   private void trackExactUnique(Object value) {
@@ -258,7 +277,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       // Use string representation to avoid scale-related equality issues:
       // BigDecimals with different scales (e.g., 1.0 vs 1.00) are not equal by default,
       // but their string representations normalize the value for cardinality tracking.
-      key = ((BigDecimal) value).toString();
+      key = value.toString();
     } else {
       key = value;
     }

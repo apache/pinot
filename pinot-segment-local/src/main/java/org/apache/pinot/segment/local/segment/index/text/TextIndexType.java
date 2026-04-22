@@ -105,7 +105,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       throws IOException {
     Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
         "Text index is currently only supported on STRING type columns");
-    return new LuceneTextIndexCreator(context, indexConfig.isStoreInSegmentFile(), indexConfig);
+    return new LuceneTextIndexCreator(context, indexConfig);
   }
 
   @Override

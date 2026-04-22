@@ -218,7 +218,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
         .build();
-    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
+    updateCachedTableConfigAndSchema(tableConfig, schema);
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
@@ -419,13 +419,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
+    updateCachedTableConfigAndSchema(tableConfig, schema);
     return indexLoadingConfig;
   }
 
   @Override
   public Pair<TableConfig, Schema> getCachedTableConfigAndSchema() {
     return _cachedTableConfigAndSchema;
+  }
+
+  @Override
+  public void updateCachedTableConfigAndSchema(TableConfig tableConfig, Schema schema) {
+    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
   }
 
   @Override

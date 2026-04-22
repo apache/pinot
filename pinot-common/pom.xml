@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-common</artifactId>
   <name>Pinot Common</name>
@@ -46,7 +46,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration  combine.children="override">
+        <configuration combine.children="override">
           <forkCount>1</forkCount>
           <reuseForks>true</reuseForks>
           <properties>
@@ -55,13 +55,6 @@
               <value>false</value>  <!-- This will disable all default listeners -->
             </property>
           </properties>
-          <!--Disabling tests as Pinot currently uses Yammer and these tests fail for DropwizardMetricsFactory-->
-          <excludes>
-            <exclude>**/DropwizardBrokerPrometheusMetricsTest.java</exclude>
-            <exclude>**/DropwizardServerPrometheusMetricsTest.java</exclude>
-            <exclude>**/DropwizardMinionPrometheusMetricsTest.java</exclude>
-            <exclude>**/DropwizardControllerPrometheusMetricsTest.java</exclude>
-          </excludes>
         </configuration>
       </plugin>
 
@@ -283,11 +276,6 @@
 
     <!-- Test -->
     <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-yammer</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
@@ -300,11 +288,6 @@
     <dependency>
       <groupId>nl.jqno.equalsverifier</groupId>
       <artifactId>equalsverifier</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-dropwizard</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -423,10 +406,8 @@
                 </goals>
                 <configuration>
                   <target name="generate-code">
-                    <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath"/>
-                    <fmpp configuration="src/main/codegen/config.fmpp"
-                        sourceRoot="src/main/codegen/templates"
-                        outputRoot="${project.build.directory}/generated-sources/"/>
+                    <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath" />
+                    <fmpp configuration="src/main/codegen/config.fmpp" sourceRoot="src/main/codegen/templates" outputRoot="${project.build.directory}/generated-sources/" />
                   </target>
                 </configuration>
               </execution>

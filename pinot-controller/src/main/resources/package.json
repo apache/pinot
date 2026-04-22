@@ -45,7 +45,7 @@
     "eslint-plugin-react-hooks": "4.6.2",
     "prettier": "2.8.8",
     "typescript": "^5.7.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.2"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "1.2.36",
@@ -60,7 +60,7 @@
     "@types/react-dom": "16.9.16",
     "@types/react-router": "5.1.20",
     "@types/react-router-dom": "5.3.3",
-    "axios": "0.30.3",
+    "axios": "1.15.0",
     "clsx": "1.1.1",
     "codemirror": "5.65.5",
     "cross-fetch": "3.1.5",

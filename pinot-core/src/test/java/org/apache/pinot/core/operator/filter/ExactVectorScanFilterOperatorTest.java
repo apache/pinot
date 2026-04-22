@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -143,10 +145,76 @@ public class ExactVectorScanFilterOperatorTest {
     ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
     VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, new float[]{1.0f, 2.0f}, 5);
     ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
-        "embedding", 1);
+        "embedding", 1, createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.COSINE),
+        "ivf_pq_index_unavailable");
     String explain = operator.toExplainString();
     Assert.assertTrue(explain.contains("exact_scan"));
     Assert.assertTrue(explain.contains("embedding"));
+    Assert.assertTrue(explain.contains("backend:IVF_PQ"));
+    Assert.assertTrue(explain.contains("distanceFunction:COSINE"));
+    Assert.assertTrue(explain.contains("fallbackReason:ivf_pq_index_unavailable"));
+  }
+
+  @Test
+  public void testExactSearchUsesConfiguredCosineDistance() {
+    float[][] vectors = {
+        {10.0f, 0.0f},
+        {0.9f, 0.1f}
+    };
+    float[] queryVector = {1.0f, 0.0f};
+
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(vectors);
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
+
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 2, createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.COSINE),
+        "ivf_pq_index_unavailable");
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 1);
+    Assert.assertTrue(result.contains(0), "Configured cosine distance should prefer the collinear vector");
+  }
+
+  @Test
+  public void testExactSearchUsesConfiguredInnerProductDistance() {
+    float[][] vectors = {
+        {10.0f, 0.0f},
+        {0.0f, 1.0f}
+    };
+    float[] queryVector = {1.0f, 0.0f};
+
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(vectors);
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
+
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 2, createVectorIndexConfig("IVF_PQ", VectorIndexConfig.VectorDistanceFunction.INNER_PRODUCT),
+        "ivf_pq_index_unavailable");
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 1);
+    Assert.assertTrue(result.contains(0), "Configured inner-product distance should prefer the largest dot product");
+  }
+
+  @Test
+  public void testExactSearchWithoutVectorConfigPreservesL2Fallback() {
+    float[][] vectors = {
+        {10.0f, 0.0f},
+        {0.9f, 0.1f}
+    };
+    float[] queryVector = {1.0f, 0.0f};
+
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(vectors);
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, queryVector, 1);
+
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 2);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 1);
+    Assert.assertTrue(result.contains(1), "Missing vector config should continue to use L2 exact-scan ranking");
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -166,5 +234,11 @@ public class ExactVectorScanFilterOperatorTest {
       when(mockReader.getFloatMV(Mockito.eq(i), Mockito.any())).thenReturn(vectors[i]);
     }
     return mockReader;
+  }
+
+  private VectorIndexConfig createVectorIndexConfig(String backendType,
+      VectorIndexConfig.VectorDistanceFunction distanceFunction) {
+    return new VectorIndexConfig(false, backendType, 2, 1, distanceFunction,
+        Map.of("nlist", "4", "pqM", "2", "pqNbits", "8", "trainSampleSize", "16"));
   }
 }

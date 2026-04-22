@@ -112,19 +112,34 @@ public class WorkerManager {
     DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(0);
     metadata.setWorkerIdToServerInstanceMap(
         Collections.singletonMap(0, new QueryServerInstance(_instanceId, _hostName, _port, _port)));
+
+    // Two-pass assignment: leaf stages must be assigned first so that the candidate server information
+    // (_nonLookupTables or _leafServerInstances) is fully populated before intermediate stages use it.
+    // Without this, literal-only stages (e.g. UNION ALL of constants) that are traversed before any table scan
+    // would see an empty candidate set and fall back to all enabled servers across all tenants.
     for (PlanFragment child : rootFragment.getChildren()) {
-      assignWorkersToNonRootFragment(child, context);
+      assignWorkersToNonRootFragment(child, context, true);
+    }
+    for (PlanFragment child : rootFragment.getChildren()) {
+      assignWorkersToNonRootFragment(child, context, false);
     }
   }
 
-  private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context) {
+  /// Post-order traversal that assigns workers to either leaf or intermediate fragments.
+  /// @param leafOnly when true, only leaf fragments are assigned; when false, only intermediate fragments are assigned
+  private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context,
+      boolean leafOnly) {
     List<PlanFragment> children = fragment.getChildren();
     for (PlanFragment child : children) {
-      assignWorkersToNonRootFragment(child, context);
+      assignWorkersToNonRootFragment(child, context, leafOnly);
     }
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
-    if (isLeafPlan(metadata)) {
+    boolean isLeaf = isLeafPlan(metadata);
+    if (leafOnly != isLeaf) {
+      return;
+    }
+    if (isLeaf) {
       // TODO: Revisit this logic and see if we can generalize this
       // For LOOKUP join, join is leaf stage because there is no exchange added to the right side of the join. When we
       // find a single local exchange child in the leaf stage, assign workers based on the local exchange child.
@@ -134,7 +149,6 @@ public class WorkerManager {
         metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
         metadata.setPartitionFunction(childMetadata.getPartitionFunction());
         // Fake a segments map so that the worker can be correctly identified as leaf stage
-        // TODO: Add a query test for LOOKUP join
         Map<String, List<String>> segmentsMap = Map.of(TableType.OFFLINE.name(), List.of());
         Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
             Maps.newHashMapWithExpectedSize(workerIdToServerInstanceMap.size());
@@ -211,10 +225,11 @@ public class WorkerManager {
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
 
     if (context.getTableNames().isEmpty()) {
-      // For constant expression query (no table is accessed), assign it to a random enabled server.
+      // For constant expression query (no table is accessed), assign it to a random routable server so we don't pick
+      // a server that's been excluded from routing by the FailureDetector.
       // TODO: Consider short-circuiting it and directly calculating the result on broker.
 
-      Collection<ServerInstance> serverInstances = _routingManager.getEnabledServerInstanceMap().values();
+      Collection<ServerInstance> serverInstances = _routingManager.getRoutableServerInstanceMap().values();
       int numServers = serverInstances.size();
       if (numServers == 0) {
         LOGGER.error("[RequestId: {}] No server instance found for constant expression query", context.getRequestId());
@@ -366,12 +381,13 @@ public class WorkerManager {
     if (context.isUseLeafServerForIntermediateStage()) {
       Set<QueryServerInstance> leafServerInstances = context.getLeafServerInstances();
       if (leafServerInstances.isEmpty()) {
-        // Fall back to use all enabled servers if no leaf server is found (e.g., when querying an empty table).
+        // Fall back to use all routable servers if no leaf server is found (e.g., when querying an empty table).
+        // Routable excludes servers removed from routing by the FailureDetector.
         LOGGER.warn("[RequestId: {}] No leaf server found with useLeafServerForIntermediateStage enabled, "
-            + "falling back to all enabled servers", context.getRequestId());
-        Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
-        candidateServers = new ArrayList<>(enabledServerInstanceMap.size());
-        for (ServerInstance serverInstance : enabledServerInstanceMap.values()) {
+            + "falling back to all routable servers", context.getRequestId());
+        Map<String, ServerInstance> routableServerInstanceMap = _routingManager.getRoutableServerInstanceMap();
+        candidateServers = new ArrayList<>(routableServerInstanceMap.size());
+        for (ServerInstance serverInstance : routableServerInstanceMap.values()) {
           candidateServers.add(new QueryServerInstance(serverInstance));
         }
         if (candidateServers.isEmpty()) {
@@ -411,21 +427,24 @@ public class WorkerManager {
         }
       }
     }
-    Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
+    // Use the routable server map so that FailureDetector-excluded servers are filtered out from both the fallback and
+    // the per-table lookup paths. The {@code servers} set is already filtered via per-table InstanceSelector, but the
+    // routable map narrows the fallback path too.
+    Map<String, ServerInstance> routableServerInstanceMap = _routingManager.getRoutableServerInstanceMap();
     List<QueryServerInstance> candidateServers;
     if (servers.isEmpty()) {
-      // Fall back to use all enabled servers if no server is found for the tables.
+      // Fall back to use all routable servers if no server is found for the tables.
       // TODO: Revisit if we should throw an exception instead.
       LOGGER.warn("[RequestId: {}] No server instance found for intermediate stage for tables: {}, "
-          + "falling back to all enabled servers", context.getRequestId(), nonLookupTables);
-      candidateServers = new ArrayList<>(enabledServerInstanceMap.size());
-      for (ServerInstance serverInstance : enabledServerInstanceMap.values()) {
+          + "falling back to all routable servers", context.getRequestId(), nonLookupTables);
+      candidateServers = new ArrayList<>(routableServerInstanceMap.size());
+      for (ServerInstance serverInstance : routableServerInstanceMap.values()) {
         candidateServers.add(new QueryServerInstance(serverInstance));
       }
     } else {
       candidateServers = new ArrayList<>(servers.size());
       for (String server : servers) {
-        ServerInstance serverInstance = enabledServerInstanceMap.get(server);
+        ServerInstance serverInstance = routableServerInstanceMap.get(server);
         if (serverInstance != null) {
           candidateServers.add(new QueryServerInstance(serverInstance));
         }

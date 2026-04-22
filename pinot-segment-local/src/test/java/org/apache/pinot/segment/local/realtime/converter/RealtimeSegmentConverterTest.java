@@ -185,7 +185,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -267,7 +267,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -351,7 +351,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -433,7 +433,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -559,7 +559,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -685,7 +685,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -839,7 +839,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       // Verify the converted segment metadata preserves the partition function config
       File indexDir = new File(outputDir, segmentName);
@@ -928,7 +928,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       // Verify the converted segment metadata preserves the Murmur3 function config
       File indexDir = new File(outputDir, segmentName);
@@ -1015,7 +1015,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -1136,7 +1136,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegment, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(new File(outputDir, segmentName));
 
@@ -1252,7 +1252,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegment, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(new File(outputDir, segmentName));
 
@@ -1348,7 +1348,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegment, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -1473,7 +1473,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(mutableSegment, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
               tableNameWithType, tableConfig, segmentName, false);
-      converter.build(SegmentVersion.v3, null);
+      converter.build(SegmentVersion.v3);
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);

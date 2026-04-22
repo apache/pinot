@@ -35,7 +35,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
  *
  * PinotTaskExecutor:
  * The same watermark is used by the <code>RealtimeToOfflineSegmentsTaskExecutor</code>, to:
- * - Verify that is is running the latest task scheduled by the task generator
+ * - Verify that it is running the latest task scheduled by the task generator
  * - Update the watermark as the end of the window that it executed for
  */
 public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {

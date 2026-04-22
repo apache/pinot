@@ -265,10 +265,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, TEMP_DIR, RAW_TABLE_NAME, createTableConfig(),
             _schema);
+    config.setInstanceType(InstanceType.SERVER);
     config.setOutDir(TEMP_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, InstanceType.SERVER);
+    driver.init(config);
     driver.build();
   }
 
@@ -1998,6 +1999,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     FileUtils.deleteQuietly(TEMP_DIR);
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.SERVER);
     config.setOutDir(TEMP_DIR.getAbsolutePath());
     config.setSegmentName(SEGMENT_NAME);
 
@@ -2010,7 +2012,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows), InstanceType.SERVER);
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
   }
 

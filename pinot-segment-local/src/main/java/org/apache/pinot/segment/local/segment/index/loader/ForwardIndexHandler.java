@@ -36,7 +36,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCrea
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPreIndexStatsCollector;
-import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
@@ -51,7 +51,6 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
-import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -861,12 +860,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
           segmentName, column);
-      ColumnIndexCreationInfo creationInfo =
-          new ColumnIndexCreationInfo(statsCollector, true, useVarLength, false, fieldSpec.getDefaultNullValue());
       IndexCreationContext context = IndexCreationContext.builder()
           .withIndexDir(indexDir)
           .withFieldSpec(fieldSpec)
-          .withColumnIndexCreationInfo(creationInfo)
+          .withColumnStatistics(statsCollector)
           .withTotalDocs(numDocs)
           .withDictionary(true)
           .withTableNameWithType(_tableConfig.getTableName())
@@ -1021,7 +1018,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         statsCollector.collect(columnReader.getValue(i));
       }
       // NOTE: No need to seal the stats collector because value length is updated while collecting stats.
-      return columnMetadata.isSingleValue() ? statsCollector.getLengthOfLargestElement()
+      return columnMetadata.isSingleValue() ? statsCollector.getLengthOfLongestElement()
           : statsCollector.getMaxRowLengthInBytes();
     }
   }
@@ -1049,7 +1046,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       case STRING:
         return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
       case BYTES:
-        return new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
+        return new BytesColumnPreIndexStatsCollector(column, statsCollectorConfig);
       case MAP:
         return new MapColumnPreIndexStatsCollector(column, statsCollectorConfig);
       default:

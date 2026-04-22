@@ -19,9 +19,11 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import com.google.common.base.Preconditions;
-import java.util.HashMap;
+import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.EmptyColumnStatistics;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -29,6 +31,7 @@ import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.roaringbitmap.PeekableIntIterator;
@@ -39,17 +42,19 @@ import org.roaringbitmap.RoaringBitmap;
  * Stats container for an in-memory realtime segment.
  */
 public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContainer {
-  private final Map<String, ColumnStatistics> _columnStatisticsMap = new HashMap<>();
+  private final Map<String, ColumnStatistics> _columnStatisticsMap;
   private final int _totalDocCount;
 
   public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
       @Nullable String sortedColumn, @Nullable RoaringBitmap validDocIds, StatsCollectorConfig statsCollectorConfig) {
     _totalDocCount = validDocIds != null ? validDocIds.getCardinality() : mutableSegment.getNumDocsIndexed();
 
-    for (String columnName : mutableSegment.getPhysicalColumnNames()) {
-      DataSource dataSource = mutableSegment.getDataSource(columnName);
-      boolean isSortedColumn = columnName.equals(sortedColumn);
-      _columnStatisticsMap.put(columnName,
+    Set<String> columns = mutableSegment.getPhysicalColumnNames();
+    _columnStatisticsMap = Maps.newHashMapWithExpectedSize(columns.size());
+    for (String column : columns) {
+      DataSource dataSource = mutableSegment.getDataSource(column);
+      boolean isSortedColumn = column.equals(sortedColumn);
+      _columnStatisticsMap.put(column,
           createColumnStatistics(dataSource, sortedDocIds, isSortedColumn, validDocIds, statsCollectorConfig));
     }
   }
@@ -60,10 +65,16 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
    */
   private ColumnStatistics createColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds,
       boolean isSortedColumn, @Nullable RoaringBitmap validDocIds, StatsCollectorConfig statsCollectorConfig) {
-    Preconditions.checkState(!isSortedColumn || dataSource.getDataSourceMetadata().isSingleValue(),
+    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    Preconditions.checkState(!isSortedColumn || dataSourceMetadata.isSingleValue(),
         "Sorted column must be single-valued, but column '%s' is multi-valued",
-        dataSource.getDataSourceMetadata().getFieldSpec().getName());
+        dataSourceMetadata.getFieldSpec().getName());
 
+    if (dataSourceMetadata.getNumDocs() == 0 || (validDocIds != null && validDocIds.isEmpty())) {
+      return new EmptyColumnStatistics(dataSourceMetadata.getFieldSpec(), dataSourceMetadata.getPartitionFunction(),
+          dataSourceMetadata.getPartitions());
+    }
+    // TODO: Add compaction support to MAP
     if (dataSource instanceof MutableMapDataSource) {
       return createMapColumnStatistics(dataSource, validDocIds, statsCollectorConfig);
     }

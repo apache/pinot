@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.testng.annotations.Test;
 
@@ -41,13 +40,13 @@ public class CpuBasedBrokerQueryKillingIntegrationTest extends BaseQueryKillingI
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     super.overrideBrokerConf(brokerConf);
 
-    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
-    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
-    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED, true);
-    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS, 500);
-    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 1.1f);
-    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, 1.1f);
+    String prefix = Accounting.BROKER_PREFIX + ".";
+    brokerConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    brokerConf.setProperty(prefix + Accounting.Keys.CPU_TIME_BASED_KILLING_ENABLED, true);
+    brokerConf.setProperty(prefix + Accounting.Keys.CPU_TIME_BASED_KILLING_THRESHOLD_MS, 500);
+    brokerConf.setProperty(prefix + Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO, 1.1f);
+    brokerConf.setProperty(prefix + Accounting.Keys.PANIC_LEVEL_HEAP_USAGE_RATIO, 1.1f);
   }
 
   @Test

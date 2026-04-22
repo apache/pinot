@@ -38,28 +38,70 @@ public class WindowValueAggregatorFactory {
    */
   public static WindowValueAggregator<Object> getWindowValueAggregator(String functionName,
       DataSchema.ColumnDataType columnDataType, boolean supportRemoval) {
-    // TODO: Add type specific aggregator implementations
+    DataSchema.ColumnDataType storedType = columnDataType.getStoredType();
     switch (functionName) {
       // NOTE: Keep both 'SUM0' and '$SUM0' for backward compatibility where 'SUM0' is SqlKind and '$SUM0' is function
       // name.
       case "SUM":
       case "SUM0":
       case "$SUM0":
-        return new SumWindowValueAggregator();
+        return createSumAggregator(storedType);
       case "AVG":
         return new AvgWindowValueAggregator();
       case "MIN":
-        return new MinWindowValueAggregator(supportRemoval);
+        return createMinAggregator(storedType, supportRemoval);
       case "MAX":
-        return new MaxWindowValueAggregator(supportRemoval);
+        return createMaxAggregator(storedType, supportRemoval);
       case "COUNT":
         return new CountWindowValueAggregator();
       case "BOOLAND":
-        return new BoolAndValueAggregator();
+        return new BoolAndWindowValueAggregator();
       case "BOOLOR":
-        return new BoolOrValueAggregator();
+        return new BoolOrWindowValueAggregator();
       default:
         throw new IllegalArgumentException("Unsupported aggregate function: " + functionName);
+    }
+  }
+
+  private static WindowValueAggregator<Object> createMinAggregator(DataSchema.ColumnDataType storedType,
+      boolean supportRemoval) {
+    switch (storedType) {
+      case INT:
+        return new MinIntWindowValueAggregator(supportRemoval);
+      case LONG:
+        return new MinLongWindowValueAggregator(supportRemoval);
+      case FLOAT:
+      case DOUBLE:
+        return new MinDoubleWindowValueAggregator(supportRemoval);
+      default:
+        return new MinComparableWindowValueAggregator(supportRemoval);
+    }
+  }
+
+  private static WindowValueAggregator<Object> createMaxAggregator(DataSchema.ColumnDataType storedType,
+      boolean supportRemoval) {
+    switch (storedType) {
+      case INT:
+        return new MaxIntWindowValueAggregator(supportRemoval);
+      case LONG:
+        return new MaxLongWindowValueAggregator(supportRemoval);
+      case FLOAT:
+      case DOUBLE:
+        return new MaxDoubleWindowValueAggregator(supportRemoval);
+      default:
+        return new MaxComparableWindowValueAggregator(supportRemoval);
+    }
+  }
+
+  private static WindowValueAggregator<Object> createSumAggregator(DataSchema.ColumnDataType storedType) {
+    switch (storedType) {
+      case INT:
+      case LONG:
+        return new SumLongWindowValueAggregator();
+      case BIG_DECIMAL:
+        return new SumBigDecimalWindowValueAggregator();
+      default:
+        return new SumDoubleWindowValueAggregator();
     }
   }
 }

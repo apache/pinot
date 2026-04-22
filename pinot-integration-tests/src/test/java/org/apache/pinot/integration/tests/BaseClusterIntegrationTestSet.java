@@ -17,33 +17,33 @@
  * under the License.
  */
 package org.apache.pinot.integration.tests;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URL;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.http.HttpStatus;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.client.admin.PinotAdminException;
+import org.apache.pinot.client.admin.PinotAdminNotFoundException;
+import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.ServerRebalanceJobStatusResponse;
+import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.TableView;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
-import org.apache.pinot.controller.api.resources.TableViews;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
@@ -693,33 +693,33 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   public String reloadTableAndValidateResponse(String tableName, TableType tableType, boolean forceDownload)
-      throws IOException {
+      throws Exception {
     String response =
-        sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload), null);
+        getOrCreateAdminClient().getSegmentClient().reloadTable(tableName, tableType.name(), forceDownload);
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     JsonNode responseJson = JsonUtils.stringToJsonNode(response);
     JsonNode tableLevelDetails = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
     String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
     assertEquals(isZKWriteSuccess, "SUCCESS");
     String jobId = tableLevelDetails.get("reloadJobId").asText();
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forSegmentReloadStatus(jobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
+    PinotTableReloadStatusResponse jobStatus =
+        getOrCreateAdminClient().getSegmentClient().getSegmentReloadStatusObject(jobId);
 
     // Validate all fields are present
-    assertEquals(jobStatus.get("metadata").get("jobId").asText(), jobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_SEGMENT");
-    assertEquals(jobStatus.get("metadata").get("tableName").asText(), tableNameWithType);
+    assertEquals(jobStatus.getMetadata().getJobId(), jobId);
+    assertEquals(jobStatus.getMetadata().getJobType(), "RELOAD_SEGMENT");
+    assertEquals(jobStatus.getMetadata().getTableNameWithType(), tableNameWithType);
     return jobId;
   }
 
   public boolean isReloadJobCompleted(String reloadJobId)
       throws Exception {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forSegmentReloadStatus(reloadJobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
+    PinotTableReloadStatusResponse jobStatus = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentReloadStatusObject(reloadJobId);
 
-    assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_SEGMENT");
-    return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
+    assertEquals(jobStatus.getMetadata().getJobId(), reloadJobId);
+    assertEquals(jobStatus.getMetadata().getJobType(), "RELOAD_SEGMENT");
+    return jobStatus.getTotalSegmentCount() == jobStatus.getSuccessCount();
   }
 
   /// TODO: Unify this and [OfflineClusterIntegrationTest#testDefaultColumns(boolean)]
@@ -890,14 +890,12 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   private void testTableNeedReload(String tableNameWithType, boolean expectedNeedReload)
       throws IOException {
-    String needBeforeReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithType, false);
-    String needBeforeReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithType, true);
-    JsonNode jsonNeedReloadResponseWithNoVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithNoVerbose);
-    JsonNode jsonNeedReloadResponseWithVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithVerbose);
+    TableSegmentsReloadCheckResponse responseNoVerbose = checkIfReloadIsNeeded(tableNameWithType, false);
+    TableSegmentsReloadCheckResponse responseVerbose = checkIfReloadIsNeeded(tableNameWithType, true);
     // Tests if reload is needed on the table
-    assertEquals(jsonNeedReloadResponseWithNoVerbose.get("needReload").asBoolean(), expectedNeedReload);
-    assertEquals(jsonNeedReloadResponseWithVerbose.get("needReload").asBoolean(), expectedNeedReload);
-    assertFalse(jsonNeedReloadResponseWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
+    assertEquals(responseNoVerbose.isNeedReload(), expectedNeedReload);
+    assertEquals(responseVerbose.isNeedReload(), expectedNeedReload);
+    assertFalse(responseVerbose.getServerToSegmentsCheckReloadList().isEmpty());
   }
 
   private DimensionFieldSpec constructNewDimension(FieldSpec.DataType dataType, boolean singleValue) {
@@ -911,24 +909,35 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     return new MetricFieldSpec(column, dataType);
   }
 
+  protected RebalanceResult triggerTableRebalance(RebalanceConfig rebalanceConfig, TableType tableType)
+      throws IOException, PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("type", tableType.toString());
+    String[] params = rebalanceConfig.toQueryString().split("&");
+    for (String param : params) {
+      String[] kv = param.split("=", 2);
+      if (kv.length == 2) {
+        queryParams.put(kv[0], kv[1]);
+      }
+    }
+    return getOrCreateAdminClient().getRebalanceClient()
+        .rebalanceTableObject(getTableName(), queryParams);
+  }
+
+  @Deprecated
   protected String getTableRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
-    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
-        + "?type=" + tableType.toString() + "&" + rebalanceConfig.toQueryString();
+    return controllerUrl(StringUtil.join("/", "tables", getTableName(), "rebalance"))
+        + "?type=" + tableType + "&" + rebalanceConfig.toQueryString();
   }
 
   protected void waitForRebalanceToComplete(String rebalanceJobId, long timeoutMs) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(rebalanceJobId);
-        SimpleHttpResponse httpResponse =
-            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-        ServerRebalanceJobStatusResponse rebalanceStatus =
-            JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
+        ServerRebalanceJobStatusResponse rebalanceStatus = getOrCreateAdminClient().getRebalanceClient()
+            .getRebalanceStatusObject(rebalanceJobId);
         return rebalanceStatus.getTableRebalanceProgressStats().getStatus() == RebalanceResult.Status.DONE;
-      } catch (HttpErrorStatusException e) {
-        if (e.getStatusCode() != HttpStatus.SC_NOT_FOUND) {
-          Assert.fail("Caught unexpected HTTP error while waiting for rebalance to complete: " + e.getMessage(), e);
-        }
+      } catch (PinotAdminNotFoundException e) {
+        // Job may not be registered in ZK yet; keep polling
         return null;
       } catch (Exception e) {
         Assert.fail("Caught exception while waiting for rebalance to complete", e);
@@ -940,17 +949,12 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   protected void waitForTableEVISConverge(String tableName, long timeoutMs) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forIdealState(tableName);
-        SimpleHttpResponse httpResponse =
-            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-        TableViews.TableView idealState =
-            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
-
-        requestUrl = getControllerRequestURLBuilder().forExternalView(tableName);
-        httpResponse = getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null);
-        TableViews.TableView externalView =
-            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
-        return idealState._realtime.equals(externalView._realtime) && idealState._offline.equals(externalView._offline);
+        TableView idealState =
+            getOrCreateAdminClient().getTableClient().getIdealStateObject(tableName);
+        TableView externalView =
+            getOrCreateAdminClient().getTableClient().getExternalViewObject(tableName);
+        return Objects.equals(idealState._realtime, externalView._realtime)
+            && Objects.equals(idealState._offline, externalView._offline);
       } catch (Exception e) {
         Assert.fail("Caught exception while waiting for table EV and IS to converge", e);
         return null;
@@ -1005,8 +1009,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     rebalanceConfig.setForceCommit(true);
 
     // Execute rebalance
-    String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+    RebalanceResult rebalanceResult = triggerTableRebalance(rebalanceConfig, TableType.REALTIME);
 
     // Get original consuming segments (if present)
     Set<String> originalConsumingSegmentsToMove = null;
@@ -1028,9 +1031,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Check if segments were committed (only if there were consuming segments to move)
     if (originalConsumingSegmentsToMove != null && !originalConsumingSegmentsToMove.isEmpty()) {
-      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
       ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
-          JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
+          getOrCreateAdminClient().getTableClient().getConsumingSegmentsInfo(getTableName(),
+              ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
       LLCSegmentName consumingSegmentNow = new LLCSegmentName(
           consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
       LLCSegmentName consumingSegmentOriginal =
