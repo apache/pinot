@@ -37,7 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupSegmentAssignmentStrategy.class);
 
   protected HelixManager _helixManager;
