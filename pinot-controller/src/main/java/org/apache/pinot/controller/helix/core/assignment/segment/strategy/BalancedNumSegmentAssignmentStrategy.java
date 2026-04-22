@@ -46,7 +46,7 @@ public class BalancedNumSegmentAssignmentStrategy implements SegmentAssignmentSt
     SegmentsValidationAndRetentionConfig validationAndRetentionConfig = tableConfig.getValidationConfig();
     Preconditions.checkState(validationAndRetentionConfig != null, "segmentsConfig is null");
     _replication = tableConfig.getReplication();
-    LOGGER.info("Initialized BalancedNumSegmentAssignmentStrategy for table: {} with replication: {}",
+    LOGGER.info("Initialized {} for table: {} with replication: {}", this.getClass().getSimpleName(),
         tableConfig.getTableName(), _replication);
   }
 

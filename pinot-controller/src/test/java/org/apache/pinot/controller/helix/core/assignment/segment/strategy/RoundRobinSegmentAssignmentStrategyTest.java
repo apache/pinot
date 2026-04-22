@@ -112,4 +112,32 @@ public class RoundRobinSegmentAssignmentStrategyTest {
           SegmentAssignmentUtils.getInstanceStateMap(instances, SegmentStateModel.ONLINE));
     }
   }
+
+  @Test
+  public void testAssignSegmentWithChangedInstanceCount() {
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+
+    // Assign one segment to observe the current counter position
+    List<String> firstInstances =
+        _segmentAssignment.assignSegment("changeTest_0", currentAssignment, _instancePartitionsMap);
+    int prevInstanceId = INSTANCES.indexOf(firstInstances.get(0));
+
+    // Switch to a new instance list with a different count (7 instead of 10)
+    int newNumInstances = 7;
+    List<String> newInstances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, newNumInstances);
+    InstancePartitions newInstancePartitions = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
+    newInstancePartitions.setInstances(0, 0, newInstances);
+    Map<InstancePartitionsType, InstancePartitions> newInstancePartitionsMap =
+        Collections.singletonMap(InstancePartitionsType.OFFLINE, newInstancePartitions);
+
+    // Counter after the first assignment is prevInstanceId. Next compute advances by NUM_REPLICAS modulo the new size.
+    int expectedStartIdx = (prevInstanceId + NUM_REPLICAS) % newNumInstances;
+    List<String> secondInstances =
+        _segmentAssignment.assignSegment("changeTest_1", currentAssignment, newInstancePartitionsMap);
+    assertEquals(secondInstances.size(), NUM_REPLICAS);
+    for (int r = 0; r < NUM_REPLICAS; r++) {
+      assertEquals(secondInstances.get(r),
+          newInstances.get((expectedStartIdx - r + newNumInstances) % newNumInstances));
+    }
+  }
 }

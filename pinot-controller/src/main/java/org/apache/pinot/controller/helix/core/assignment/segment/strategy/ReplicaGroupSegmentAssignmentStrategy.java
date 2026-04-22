@@ -54,11 +54,13 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
     _replication = tableConfig.getReplication();
     _partitionColumn = TableConfigUtils.getPartitionColumn(tableConfig);
     if (_partitionColumn == null) {
-      LOGGER.info("Initialized ReplicaGroupSegmentAssignmentStrategy "
-          + "with replication: {} without partition column for table: {} ", _replication, _tableName);
+      LOGGER.info("Initialized {} "
+              + "with replication: {} without partition column for table: {} ", this.getClass().getSimpleName(),
+          _replication, _tableName);
     } else {
-      LOGGER.info("Initialized ReplicaGroupSegmentAssignmentStrategy "
-          + "with replication: {} and partition column: {} for table: {}", _replication, _partitionColumn, _tableName);
+      LOGGER.info("Initialized {} "
+              + "with replication: {} and partition column: {} for table: {}", this.getClass().getSimpleName(),
+          _replication, _partitionColumn, _tableName);
     }
   }
 

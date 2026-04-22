@@ -33,16 +33,17 @@ import org.apache.pinot.spi.config.table.TableConfig;
  * Segment assignment strategy class where segments are assigned in a round-robin fashion across available instances.
  * It can be used in the same scenarios as {@link BalancedNumSegmentAssignmentStrategy}, except the new segment will
  * not be assigned to the instance with the least number of segments, but instead assigned to the next instance in a
- * round-robin fashion. Rebalance with this strategy is identical to {@link BalancedNumSegmentAssignmentStrategy}
+ * round-robin fashion. Rebalance with this strategy is identical to {@link BalancedNumSegmentAssignmentStrategy}.
  *
- * When the number of instances increases, this is useful when we don't care about the existing
- * segments as they might be removed later by the retention, or there are significantly unbalanced demands on newer
- * segments. This strategy works better than {@link BalancedNumSegmentAssignmentStrategy} since it might need a
- * bootstrap rebalance in this case
+ * <p>When the number of instances increases, this is useful when we don't care about the existing segments as they
+ * might be removed later by retention, or there are significantly unbalanced demands on newer segments. This strategy
+ * works better than {@link BalancedNumSegmentAssignmentStrategy} since that strategy may require a bootstrap rebalance
+ * in this case. Note that bootstrap rebalances with this strategy are non-deterministic in ordering because the
+ * round-robin counter is not persisted.
  *
- * The round-robin counter is maintained per table and stored in memory, and does not sync across controller instances,
- * which means the segment assignment may not be strictly round-robin after controller restarts, and when there are
- * multiple controllers assigning new segments.
+ * <p>The round-robin counter is maintained per table in memory and does not sync across controller instances, which
+ * means segment assignment may not be strictly round-robin after controller restarts or when multiple controllers
+ * assign segments concurrently.
  */
 public class RoundRobinSegmentAssignmentStrategy extends BalancedNumSegmentAssignmentStrategy {
   private static final Map<String, Integer> TABLE_ROUND_ROBIN_COUNTER = new ConcurrentHashMap<>();
@@ -55,6 +56,10 @@ public class RoundRobinSegmentAssignmentStrategy extends BalancedNumSegmentAssig
     _tableName = tableConfig.getTableName();
   }
 
+  /**
+   * Assign the segment to the next n_replica instances from the current round-robin counter, and the counter increases
+   * regardless whether the segment is actually added to the ideal state or not.
+   */
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions) {
