@@ -24,10 +24,10 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 
 
 public class QueryMonitorConfig {
