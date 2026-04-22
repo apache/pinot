@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,11 +32,27 @@ import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RawValueBitmapInvertedIndexCreator;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.RawValueBitmapInvertedIndexReader;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -295,6 +312,84 @@ public class RawValueBitmapInvertedIndexTest {
         return Double.MAX_VALUE;
       case STRING:
         return "non_existent_value";
+      default:
+        throw new IllegalStateException("Unsupported data type: " + dataType);
+    }
+  }
+
+  // Handler-level tests: exercise InvertedIndexHandler with a real segment on disk.
+
+  @Test(dataProvider = "dataTypes")
+  public void testInvertedIndexHandlerRawMVColumn(DataType dataType)
+      throws Exception {
+    String colName = "rawMV_" + dataType;
+    File tempDir = Files.createTempDirectory("handler-mv-inv-idx").toFile();
+    tempDir.deleteOnExit();
+    String segmentName = "testSegment";
+    File indexDir = new File(tempDir, segmentName);
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addMultiValueDimension(colName, dataType)
+        .build();
+
+    // Build segment with RAW MV column but WITHOUT inverted index.
+    // Inverted index on RAW columns cannot be created at build time — only via handler on reload.
+    TableConfig buildConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
+        .setNoDictionaryColumns(List.of(colName))
+        .build();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(buildConfig, schema);
+    config.setOutDir(tempDir.getAbsolutePath());
+    config.setSegmentName(segmentName);
+
+    List<GenericRow> rows = new ArrayList<>();
+    for (int i = 0; i < 50; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue(colName, generateMVValues(dataType, i));
+      rows.add(row);
+    }
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    // Reload: run InvertedIndexHandler to simulate segment reload after table config change.
+    TableConfig reloadTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
+        .setNoDictionaryColumns(List.of(colName))
+        .setInvertedIndexColumns(List.of(colName))
+        .build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(reloadTableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(indexDir, ReadMode.mmap)) {
+      InvertedIndexHandler handler = new InvertedIndexHandler(segmentDirectory,
+          indexLoadingConfig.getFieldIndexConfigByColName(), reloadTableConfig, schema);
+      try (SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+        handler.updateIndices(writer);
+      }
+    }
+
+    // Assert: inverted index exists and column remains RAW.
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
+    Assert.assertFalse(metadata.getColumnMetadataFor(colName).hasDictionary(),
+        "RAW MV column must not get a dictionary after handler runs");
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(indexDir, ReadMode.mmap)) {
+      SegmentDirectory.Reader reader = segmentDirectory.createReader();
+      Assert.assertTrue(reader.hasIndexFor(colName, StandardIndexes.inverted()),
+          "Inverted index must exist for RAW MV column: " + colName);
+    }
+
+    FileUtils.deleteQuietly(tempDir);
+  }
+
+  private Object[] generateMVValues(DataType dataType, int seed) {
+    switch (dataType) {
+      case INT:
+        return new Object[]{seed % 10, (seed + 1) % 10};
+      case LONG:
+        return new Object[]{(long) (seed % 10), (long) ((seed + 1) % 10)};
+      case FLOAT:
+        return new Object[]{(float) (seed % 10), (float) ((seed + 1) % 10)};
+      case DOUBLE:
+        return new Object[]{(double) (seed % 10), (double) ((seed + 1) % 10)};
+      case STRING:
+        return new Object[]{"tag_" + seed % 5, "tag_" + (seed + 1) % 3};
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }

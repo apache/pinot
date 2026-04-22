@@ -212,8 +212,53 @@ public class InvertedIndexHandler extends BaseIndexHandler {
                   "Unsupported data type for raw inverted index: " + columnMetadata.getDataType());
           }
         } else {
-          // Multi-value columns not supported for raw inverted index
-          throw new IllegalStateException("Raw inverted index not supported for multi-value columns: " + columnName);
+          // Multi-value RAW column
+          int maxNumValues = columnMetadata.getMaxNumberOfMultiValues();
+          switch (columnMetadata.getDataType()) {
+            case INT: {
+              int[] valueBuffer = new int[maxNumValues];
+              for (int i = 0; i < numDocs; i++) {
+                int length = forwardIndexReader.getIntMV(i, valueBuffer, readerContext);
+                creator.add(valueBuffer, length);
+              }
+              break;
+            }
+            case LONG: {
+              long[] valueBuffer = new long[maxNumValues];
+              for (int i = 0; i < numDocs; i++) {
+                int length = forwardIndexReader.getLongMV(i, valueBuffer, readerContext);
+                creator.add(valueBuffer, length);
+              }
+              break;
+            }
+            case FLOAT: {
+              float[] valueBuffer = new float[maxNumValues];
+              for (int i = 0; i < numDocs; i++) {
+                int length = forwardIndexReader.getFloatMV(i, valueBuffer, readerContext);
+                creator.add(valueBuffer, length);
+              }
+              break;
+            }
+            case DOUBLE: {
+              double[] valueBuffer = new double[maxNumValues];
+              for (int i = 0; i < numDocs; i++) {
+                int length = forwardIndexReader.getDoubleMV(i, valueBuffer, readerContext);
+                creator.add(valueBuffer, length);
+              }
+              break;
+            }
+            case STRING: {
+              String[] valueBuffer = new String[maxNumValues];
+              for (int i = 0; i < numDocs; i++) {
+                int length = forwardIndexReader.getStringMV(i, valueBuffer, readerContext);
+                creator.add(valueBuffer, length);
+              }
+              break;
+            }
+            default:
+              throw new IllegalStateException(
+                  "Unsupported data type for raw MV inverted index: " + columnMetadata.getDataType());
+          }
         }
         creator.close();
       }
