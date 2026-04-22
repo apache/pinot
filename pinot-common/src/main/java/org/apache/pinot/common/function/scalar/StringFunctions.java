@@ -26,7 +26,6 @@ import java.text.Normalizer;
 import java.util.Base64;
 import java.util.UUID;
 import javax.annotation.Nullable;
-import org.apache.commons.codec.EncoderException;
 import org.apache.commons.codec.language.Soundex;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.URIUtils;
@@ -935,11 +934,14 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static int difference(String input1, String input2) {
-    try {
-      return SOUNDEX.difference(input1, input2);
-    } catch (EncoderException e) {
-      // Soundex.difference(String, String) does not throw in practice
-      throw new RuntimeException("Unexpected error computing DIFFERENCE", e);
+    String code1 = soundex(input1);
+    String code2 = soundex(input2);
+    int matches = 0;
+    for (int i = 0; i < 4; i++) {
+      if (code1.charAt(i) == code2.charAt(i)) {
+        matches++;
+      }
     }
+    return matches;
   }
 }
