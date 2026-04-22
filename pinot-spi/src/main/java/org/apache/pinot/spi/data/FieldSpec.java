@@ -304,6 +304,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return DEFAULT_MAX_LENGTH;
   }
 
+  /// Returns the max length of the column if it is not using the default length, `null` otherwise.
+  /// This method should be used to write the `ColumnMetadata`.
+  @JsonIgnore
+  @Nullable
+  public Integer getNonDefaultMaxLength() {
+    int effectiveMaxLength = getEffectiveMaxLength();
+    return effectiveMaxLength != DEFAULT_MAX_LENGTH ? effectiveMaxLength : null;
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   // Use getEffectiveMaxLength() for default-aware access.
   @Nullable
@@ -335,6 +344,21 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         return getDefaultJsonMaxLengthExceedStrategy();
       default:
         return MaxLengthExceedStrategy.NO_ACTION;
+    }
+  }
+
+  /// Returns the max length exceed strategy of the column if it is not using the default strategy, `null` otherwise.
+  /// This method should be used to write the `ColumnMetadata`.
+  @JsonIgnore
+  @Nullable
+  public MaxLengthExceedStrategy getNonDefaultMaxLengthExceedStrategy() {
+    MaxLengthExceedStrategy effectiveMaxLengthExceedStrategy = getEffectiveMaxLengthExceedStrategy();
+    if (_dataType == DataType.STRING) {
+      return effectiveMaxLengthExceedStrategy != MaxLengthExceedStrategy.TRIM_LENGTH ? effectiveMaxLengthExceedStrategy
+          : null;
+    } else {
+      return effectiveMaxLengthExceedStrategy != MaxLengthExceedStrategy.NO_ACTION ? effectiveMaxLengthExceedStrategy
+          : null;
     }
   }
 
