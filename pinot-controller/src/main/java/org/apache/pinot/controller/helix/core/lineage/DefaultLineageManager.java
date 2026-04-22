@@ -24,15 +24,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class DefaultLineageManager implements LineageManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLineageManager.class);
   private static final long REPLACED_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
   private static final long LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
 
@@ -68,6 +74,13 @@ public class DefaultLineageManager implements LineageManager {
     // 1. The original segments can be deleted once the merged segments are successfully uploaded
     // 2. The zombie lineage entry & merged segments should be deleted if the segment replacement failed in
     //    the middle
+    String tableNameWithType = tableConfig.getTableName();
+    long lineageCleanupRetentionMs = getRetentionMsFromConfig(
+        tableConfig.getValidationConfig().getLineageEntryCleanupRetentionPeriod(),
+        LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS, tableNameWithType);
+    long replacedSegmentsRetentionMs = getRetentionMsFromConfig(
+        tableConfig.getValidationConfig().getReplacedSegmentsRetentionPeriod(),
+        REPLACED_SEGMENTS_RETENTION_IN_MILLIS, tableNameWithType);
     Set<String> segmentsForTable = new HashSet<>(allSegments);
     Iterator<LineageEntry> lineageEntryIterator = lineage.getLineageEntries().values().iterator();
     while (lineageEntryIterator.hasNext()) {
@@ -81,13 +94,13 @@ public class DefaultLineageManager implements LineageManager {
         } else {
           // If the lineage state is 'COMPLETED' and we already preserved the original segments for the required
           // retention, it is safe to delete all segments from 'segmentsFrom'
-          if (shouldDeleteReplacedSegments(tableConfig, lineageEntry)) {
+          if (shouldDeleteReplacedSegments(tableConfig, lineageEntry, replacedSegmentsRetentionMs)) {
             segmentsToDelete.addAll(sourceSegments);
           }
         }
       } else if (lineageEntry.getState() == LineageEntryState.REVERTED || (
           lineageEntry.getState() == LineageEntryState.IN_PROGRESS && lineageEntry.getTimestamp()
-              < System.currentTimeMillis() - LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS)) {
+              < System.currentTimeMillis() - lineageCleanupRetentionMs)) {
         // If the lineage state is 'IN_PROGRESS' or 'REVERTED', we need to clean up the zombie lineage
         // entry and its segments
         Set<String> destinationSegments = new HashSet<>(lineageEntry.getSegmentsTo());
@@ -117,14 +130,31 @@ public class DefaultLineageManager implements LineageManager {
    * @param lineageEntry lineage entry
    * @return True if we can safely delete the replaced segments. False otherwise.
    */
-  private boolean shouldDeleteReplacedSegments(TableConfig tableConfig, LineageEntry lineageEntry) {
-    // TODO: Currently, we preserve the replaced segments for 1 day for REFRESH tables only. Once we support
+  private boolean shouldDeleteReplacedSegments(TableConfig tableConfig, LineageEntry lineageEntry,
+      long replacedSegmentsRetentionMs) {
+    // TODO: Currently, we preserve the replaced segments for REFRESH tables only. Once we support
     // data rollback for APPEND tables, we should remove this check.
     String batchSegmentIngestionType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
-    if (!batchSegmentIngestionType.equalsIgnoreCase("REFRESH")
-        || lineageEntry.getTimestamp() < System.currentTimeMillis() - REPLACED_SEGMENTS_RETENTION_IN_MILLIS) {
+    if (!batchSegmentIngestionType.equalsIgnoreCase("REFRESH")) {
       return true;
     }
-    return false;
+    return lineageEntry.getTimestamp() < (System.currentTimeMillis() - replacedSegmentsRetentionMs);
+  }
+
+  private static long getRetentionMsFromConfig(@Nullable String period, long defaultMs, String tableNameWithType) {
+    if (!StringUtils.isEmpty(period)) {
+      try {
+        long ms = TimeUtils.convertPeriodToMillis(period);
+        if (ms == 0) {
+          LOGGER.warn("Retention period '{}' resolves to 0ms for table: {}: replaced/zombie segments will be deleted "
+              + "immediately with no rollback window", period, tableNameWithType);
+        }
+        return ms;
+      } catch (Exception e) {
+        LOGGER.warn("Unable to parse retention period: {} for table: {}, using default: {}ms", period,
+            tableNameWithType, defaultMs);
+      }
+    }
+    return defaultMs;
   }
 }
