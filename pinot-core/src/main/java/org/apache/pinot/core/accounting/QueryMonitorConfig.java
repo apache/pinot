@@ -157,8 +157,6 @@ public class QueryMonitorConfig {
     _scanBasedKillingStrategyFactoryClassName = config.getProperty(
         CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME,
         (String) null);
-    _workloadCostEnforcementEnabled = config.getProperty(Accounting.Keys.WORKLOAD_ENABLE_COST_ENFORCEMENT,
-        Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
   }
 
   QueryMonitorConfig(QueryMonitorConfig oldConfig, Set<String> changedConfigs, Map<String, String> clusterConfigs) {
