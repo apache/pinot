@@ -381,6 +381,27 @@ public class ColumnMetadataImpl implements ColumnMetadata {
               generateFieldSpec(ComplexFieldSpec.getFullChildName(column, childField), config));
         }
         fieldSpec = new ComplexFieldSpec(fieldName, dataType, true, childFieldSpecs);
+        // Restore keyTypes and defaultValueType from segment metadata for MAP columns
+        if (dataType == DataType.MAP) {
+          List<String> keyNames = config.getList(String.class,
+              Column.getKeyFor(column, Column.COLUMNAR_MAP_KEY_NAMES), null);
+          if (keyNames != null && !keyNames.isEmpty()) {
+            Map<String, DataType> keyTypes = new HashMap<>();
+            for (String keyName : keyNames) {
+              String typeStr = config.getString(
+                  Column.getKeyFor(column, Column.COLUMNAR_MAP_KEY_TYPE_PREFIX + "." + keyName), null);
+              if (typeStr != null) {
+                keyTypes.put(keyName, DataType.valueOf(typeStr));
+              }
+            }
+            ((ComplexFieldSpec) fieldSpec).setKeyTypes(keyTypes);
+          }
+          String defaultTypeStr = config.getString(
+              Column.getKeyFor(column, Column.COLUMNAR_MAP_DEFAULT_VALUE_TYPE), null);
+          if (defaultTypeStr != null) {
+            ((ComplexFieldSpec) fieldSpec).setDefaultValueType(DataType.valueOf(defaultTypeStr));
+          }
+        }
         break;
       default:
         throw new IllegalStateException("Unsupported field type: " + fieldType);
