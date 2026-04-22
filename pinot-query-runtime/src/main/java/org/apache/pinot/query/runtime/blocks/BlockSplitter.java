@@ -80,9 +80,10 @@ public interface BlockSplitter {
         return Iterators.singletonIterator(block);
       }
       List<MseBlock.Data> blockChunks = new ArrayList<>(numChunks);
-      int chunkIdx = 0;
       for (int fromIndex = 0; fromIndex < numRows; fromIndex += numRowsPerChunk) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(chunkIdx++, SPLIT_SCOPE);
+        // Chunks are bounded by maxBlockSize (typically ~4MB), so check termination on every iteration rather than
+        // via the periodic helper (which samples every 8192 records).
+        QueryThreadContext.checkTerminationAndSampleUsage(SPLIT_SCOPE);
         int toIndex = Math.min(fromIndex + numRowsPerChunk, numRows);
         blockChunks.add(new RowHeapDataBlock(rows.subList(fromIndex, toIndex), dataSchema, block.getAggFunctions()));
       }

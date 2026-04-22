@@ -164,9 +164,10 @@ public abstract class BlockExchange implements AutoCloseable {
       sendingMailbox.send(block);
     } else {
       Iterator<? extends MseBlock.Data> splits = _splitter.split(block, MAX_MAILBOX_CONTENT_SIZE_BYTES);
-      int i = 0;
       while (splits.hasNext()) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i++, SEND_BLOCK_SCOPE);
+        // Splits are bounded by MAX_MAILBOX_CONTENT_SIZE_BYTES (~4MB), so check termination on every iteration
+        // rather than via the periodic helper (which samples every 8192 records).
+        QueryThreadContext.checkTerminationAndSampleUsage(SEND_BLOCK_SCOPE);
         sendingMailbox.send(splits.next());
       }
     }
