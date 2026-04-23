@@ -309,7 +309,7 @@
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
     <c3p0.version>0.12.0</c3p0.version>
-    <mchange-commons-java.version>0.4.0</mchange-commons-java.version>
+    <mchange-commons-java.version>0.5.0</mchange-commons-java.version>
     <animal-sniffer-annotations.version>1.27</animal-sniffer-annotations.version>
 
     <!-- Test Libraries -->
