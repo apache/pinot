@@ -75,7 +75,6 @@
         </plugins>
       </build>
     </profile>
-
     <profile>
       <id>integration-tests-set-1</id>
       <activation>
