@@ -189,6 +189,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = helixManager.getHelixPropertyStore();
     _segmentLocks = segmentLocks;
     _segmentReloadSemaphore = segmentReloadSemaphore;
+    // These two executors are using the same underlying thread pool, only that they're wrapped with different decorator
     _segmentReloadExecutor = new SegmentOperationsExecutorService(segmentReloadRefreshExecutor,
         SegmentOperationsTaskType.RELOAD, tableConfig.getTableName());
     _segmentRefreshExecutor = new SegmentOperationsExecutorService(segmentReloadRefreshExecutor,
