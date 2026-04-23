@@ -62,6 +62,14 @@ public class QueryConfig extends BaseJsonConfig {
 
   private final Long _maxEntriesScannedPostFilter;
 
+
+  public QueryConfig(@Nullable Long timeoutMs, @Nullable Boolean disableGroovy,
+      @Nullable Boolean useApproximateFunction, @Nullable Map<String, String> expressionOverrideMap,
+      @Nullable Long maxQueryResponseSizeBytes, @Nullable Long maxServerResponseSizeBytes) {
+    this(timeoutMs, disableGroovy, useApproximateFunction, expressionOverrideMap,
+        maxQueryResponseSizeBytes, maxServerResponseSizeBytes, null, null, null);
+  }
+
   @JsonCreator
   public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs,
       @JsonProperty("disableGroovy") @Nullable Boolean disableGroovy,
