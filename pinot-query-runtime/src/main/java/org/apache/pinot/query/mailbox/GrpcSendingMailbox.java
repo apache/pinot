@@ -49,6 +49,7 @@ import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +59,7 @@ import org.slf4j.LoggerFactory;
  */
 public class GrpcSendingMailbox implements SendingMailbox {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
+  private static final String SEND_SCOPE = "GrpcSendingMailbox";
 
   private static final List<ByteString> EMPTY_BYTEBUFFER_LIST = Collections.emptyList();
   private final String _id;
@@ -94,6 +96,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   @Override
   public void send(MseBlock.Data data) {
+    QueryThreadContext.checkTerminationAndSampleUsage(SEND_SCOPE);
     sendInternal(data, List.of());
   }
 

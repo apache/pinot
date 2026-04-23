@@ -38,7 +38,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
  * them up if necessary).
  */
 class HashExchange extends BlockExchange {
-  private static final String ROUTE_SCOPE = "HashExchange.route";
+  private static final String ROUTE_SCOPE = "HashExchange";
 
   private final KeySelector<?> _keySelector;
 

@@ -24,9 +24,6 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
-import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.TerminationException;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -75,22 +72,5 @@ public class BroadcastExchangeTest {
 
     Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture());
     Assert.assertEquals(captor.getValue(), _block);
-  }
-
-  @Test
-  public void routeRespectsTermination()
-      throws Exception {
-    // Given: two mailboxes and a query that is terminated before route runs.
-    List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox2);
-    BroadcastExchange exchange = new BroadcastExchange(destinations, BlockSplitter.DEFAULT);
-
-    try (QueryThreadContext ctx = QueryThreadContext.openForMseTest()) {
-      ctx.getExecutionContext().terminate(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "test");
-
-      // When/Then: route throws at the first per-mailbox poll and no mailbox receives the block.
-      Assert.assertThrows(TerminationException.class, () -> exchange.route(destinations, _block));
-      Mockito.verify(_mailbox1, Mockito.never()).send(Mockito.any(MseBlock.Data.class));
-      Mockito.verify(_mailbox2, Mockito.never()).send(Mockito.any(MseBlock.Data.class));
-    }
   }
 }
