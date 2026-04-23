@@ -173,9 +173,10 @@ public class ClassLoaderTest {
         ClassNotFoundException.class, () -> pluginManager.loadClass(
             "pinot-dropwizard", COMMONS_MATH_UTILS));
 
-    assertTrue(pluginManager.loadClass(pluginName, COMMONS_IO_UTILS).getProtectionDomain()
-            .getCodeSource().getLocation().getPath().endsWith("commons-io-2.11.0.jar"),
-        "This is self-first, so class should come from pinot-yammer realm");
+    String commonsIoUrlPath = pluginManager.loadClass(pluginName, COMMONS_IO_UTILS)
+        .getProtectionDomain().getCodeSource().getLocation().getPath();
+    assertTrue(Pattern.matches(".*/assemblybased-pinot-plugin/commons-io-[.\\d]+.jar$", commonsIoUrlPath),
+        "This is self-first, so class should come from the assembly-based plugin realm");
 
     assertThrows("Class is part of a different plugin, so should not be accessible",
         ClassNotFoundException.class, () -> pluginManager.loadClass(pluginName, DROPWIZARD_METRICS_REGISTRY));
