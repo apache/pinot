@@ -47,9 +47,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   @Nullable
   protected final StateTransitionThreadPoolManager _stateTransitionThreadPoolManager;
 
-  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager,
+  public SegmentOnlineOfflineStateModelFactory(InstanceDataManager instanceDataManager,
       @Nullable StateTransitionThreadPoolManager stateTransitionThreadPoolManager) {
-    _instanceId = instanceId;
+    _instanceId = instanceDataManager.getInstanceId();
     _instanceDataManager = instanceDataManager;
     _stateTransitionThreadPoolManager = stateTransitionThreadPoolManager;
   }
