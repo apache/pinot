@@ -87,6 +87,8 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -128,12 +130,16 @@ import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
+import org.apache.pinot.common.utils.helix.PinotZkMultiResult;
+import org.apache.pinot.common.utils.helix.PinotZkOp;
+import org.apache.pinot.common.utils.helix.ZkMultiWriter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
@@ -231,6 +237,10 @@ public class PinotHelixResourceManager {
   private final boolean _enableBatchMessageMode;
   private final int _deletedSegmentsRetentionInDays;
   private final boolean _enableTieredSegmentAssignment;
+  @Nullable
+  private final String _zkAddress;
+  private final int _zkSessionTimeoutMs;
+  private final int _zkConnectTimeoutMs;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -243,16 +253,37 @@ public class PinotHelixResourceManager {
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
   private final QueryWorkloadManager _queryWorkloadManager;
+  // Dedicated ZkClient for transactional multi-path writes (atomic ZK multi()). Lazily built on
+  // first multiWriteZK call. A dedicated session is used because Helix 1.3.2 does not expose
+  // multi() on BaseDataAccessor, and the underlying ZkClient inside ZKHelixManager is not publicly
+  // reachable — reusing it would require reflection, which breaks on Helix point-release field
+  // renames. The resulting extra session is consistent with the controller's existing footprint
+  // (_propertyStore cache client, _leadControllerManager manager client are each distinct).
+  private volatile ZkClient _zkClient;
+  private volatile boolean _stopped;
 
   public PinotHelixResourceManager(String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
       boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
+    this(helixClusterName, dataDir, isSingleTenantCluster, enableBatchMessageMode, deletedSegmentsRetentionInDays,
+        enableTieredSegmentAssignment, lineageManager, null,
+        CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS,
+        CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS);
+  }
+
+  private PinotHelixResourceManager(String helixClusterName, @Nullable String dataDir,
+      boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
+      boolean enableTieredSegmentAssignment, LineageManager lineageManager, @Nullable String zkAddress,
+      int zkSessionTimeoutMs, int zkConnectTimeoutMs) {
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     _enableTieredSegmentAssignment = enableTieredSegmentAssignment;
+    _zkAddress = zkAddress;
+    _zkSessionTimeoutMs = zkSessionTimeoutMs;
+    _zkConnectTimeoutMs = zkConnectTimeoutMs;
     _instanceAdminEndpointCache =
         CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
             .build(new CacheLoader<>() {
@@ -275,7 +306,11 @@ public class PinotHelixResourceManager {
     this(controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
-        LineageManagerFactory.create(controllerConf));
+        LineageManagerFactory.create(controllerConf), controllerConf.getZkStr(),
+        controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
+            CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS),
+        controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG,
+            CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS));
   }
 
   /**
@@ -336,7 +371,14 @@ public class PinotHelixResourceManager {
    * Stop the Pinot controller instance.
    */
   public synchronized void stop() {
+    _stopped = true;
     _segmentDeletionManager.stop();
+    ZkClient zkClient = _zkClient;
+    if (zkClient != null) {
+      _zkClient = null;
+      LOGGER.info("Closing dedicated multiWriteZK ZkClient");
+      ZkStarter.closeAsync(zkClient);
+    }
   }
 
   /**
@@ -2079,6 +2121,56 @@ public class PinotHelixResourceManager {
 
   public boolean setZKData(String path, ZNRecord record, int expectedVersion, int accessOption) {
     return _helixDataAccessor.getBaseDataAccessor().set(path, record, expectedVersion, accessOption);
+  }
+
+  /**
+   * Submits a list of znode operations as a single atomic ZooKeeper {@code multi()} transaction.
+   * Each op is independently a {@link PinotZkOp#set}, {@link PinotZkOp#create},
+   * {@link PinotZkOp#delete}, or {@link PinotZkOp#check} (version assertion without mutation) on
+   * any path. Either every op commits or none do. Per-op version checks make this the transactional
+   * CAS primitive for cross-znode controller writes.
+   * <p>Returns a {@link PinotZkMultiResult}. On atomic rollback (e.g. version mismatch, node
+   * missing, node already exists), the result carries the failing op index and ZK error code —
+   * no exception is thrown. <b>Unlike</b> the single-znode wrappers on this class ({@code
+   * setZKData}, {@code createZKNode}, {@code deleteZKPath}) which return {@code boolean} on
+   * any failure, {@code multiWriteZK} throws on connectivity / session failures (they are not an
+   * atomic outcome and cannot be meaningfully rolled back into a per-op result).
+   * <p>Requires the controller to have been constructed with a non-null zkAddress (via the
+   * {@link ControllerConf} constructor); otherwise throws {@link IllegalStateException}. Also
+   * throws {@link IllegalStateException} if called after {@link #stop()}.
+   */
+  public PinotZkMultiResult multiWriteZK(List<PinotZkOp> ops) {
+    return ZkMultiWriter.multi(getOrBuildMultiWriteZkClient(), ops);
+  }
+
+  private ZkClient getOrBuildMultiWriteZkClient() {
+    ZkClient c = _zkClient;
+    if (c != null) {
+      return c;
+    }
+    synchronized (this) {
+      if (_zkClient == null) {
+        Preconditions.checkState(!_stopped, "PinotHelixResourceManager is stopped");
+        Preconditions.checkState(_zkAddress != null,
+            "multiWriteZK unavailable: zkAddress not configured on PinotHelixResourceManager");
+        LOGGER.info("Building dedicated multiWriteZK ZkClient at {} (session={}ms, connect={}ms)",
+            _zkAddress, _zkSessionTimeoutMs, _zkConnectTimeoutMs);
+        ZkClient built = new ZkClient.Builder()
+            .setZkServer(_zkAddress)
+            .setSessionTimeout(_zkSessionTimeoutMs)
+            .setConnectionTimeout(_zkConnectTimeoutMs)
+            .setZkSerializer(new ZNRecordSerializer())
+            .build();
+        if (!built.waitUntilConnected(_zkConnectTimeoutMs, TimeUnit.MILLISECONDS)) {
+          ZkStarter.closeAsync(built);
+          throw new RuntimeException(
+              "Timed out connecting to ZK at " + _zkAddress + " after " + _zkConnectTimeoutMs
+                  + "ms for multiWriteZK");
+        }
+        _zkClient = built;
+      }
+      return _zkClient;
+    }
   }
 
   public boolean createZKNode(String path, ZNRecord record, int accessOption, long ttl) {

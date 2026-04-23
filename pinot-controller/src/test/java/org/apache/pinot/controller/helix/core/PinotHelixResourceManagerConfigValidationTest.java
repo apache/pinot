@@ -20,12 +20,15 @@ package org.apache.pinot.controller.helix.core;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
+import java.util.List;
 import java.util.TreeMap;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.helix.PinotZkOp;
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
@@ -160,6 +163,37 @@ public class PinotHelixResourceManagerConfigValidationTest {
 
     // Verify instance WAS persisted
     verify(_helixAdmin).addInstance(eq("testCluster"), any(InstanceConfig.class));
+  }
+
+  @Test
+  public void testMultiWriteZkThrowsWhenZkAddressNotConfigured() {
+    // 7-arg test constructor leaves _zkAddress null; multiWriteZK must refuse to lazy-build.
+    List<PinotZkOp> ops = List.of(PinotZkOp.set("/anything", new ZNRecord("x"), 0));
+    try {
+      _resourceManager.multiWriteZK(ops);
+      fail("Expected IllegalStateException");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage().contains("zkAddress"),
+          "Unexpected message: " + expected.getMessage());
+    }
+  }
+
+  @Test
+  public void testMultiWriteZkThrowsAfterStop()
+      throws Exception {
+    // _segmentDeletionManager is normally wired by start(); mock it so stop() doesn't NPE.
+    setField("_segmentDeletionManager", Mockito.mock(SegmentDeletionManager.class));
+    _resourceManager.stop();
+    List<PinotZkOp> ops = List.of(PinotZkOp.set("/anything", new ZNRecord("x"), 0));
+    try {
+      _resourceManager.multiWriteZK(ops);
+      fail("Expected IllegalStateException");
+    } catch (IllegalStateException expected) {
+      // either "stopped" or "zkAddress" message is acceptable — both mean "no client available"
+      assertTrue(
+          expected.getMessage().contains("stopped") || expected.getMessage().contains("zkAddress"),
+          "Unexpected message: " + expected.getMessage());
+    }
   }
 
   private void setField(String fieldName, Object value)
