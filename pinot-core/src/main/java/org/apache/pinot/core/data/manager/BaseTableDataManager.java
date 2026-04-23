@@ -116,7 +116,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
-import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1631,20 +1630,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
       // Column is deleted
       if (fieldSpecInSchema == null) {
-        // Timestamp-index derived columns ($col$GRANULARITY) are materialized in the segment when the timestamp
-        // index is configured, but are not present in the table schema as first-class columns. If the timestamp
-        // index is later removed from the table config, applyTimestampIndex no longer injects the derived column
-        // into the IndexLoadingConfig schema, causing a false "column deleted" stale verdict. These columns are
-        // managed by the timestamp index staleness check (via "column added" when re-enabling) and by
-        // SegmentPreProcessor at reload time, so skipping them here is safe.
-        // We only skip when the base column is still present in the schema; if the base column was also removed,
-        // the column is not a timestamp-derived orphan and must still trigger "column deleted".
-        if (TimestampIndexUtils.isValidColumnWithGranularity(columnName)) {
-          String baseColumn = columnName.substring(1, columnName.indexOf('$', 1));
-          if (schema.getFieldSpecFor(baseColumn) != null) {
-            continue;
-          }
-        }
         LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: column deleted",
             tableNameWithType, columnName, segmentName);
         return new StaleSegment(segmentName, true, "column deleted: " + columnName);
