@@ -228,7 +228,7 @@
     <commons-csv.version>1.14.1</commons-csv.version>
     <commons-configuration2.version>2.14.0</commons-configuration2.version>
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
-    <commons-io.version>2.21.0</commons-io.version>
+    <commons-io.version>2.22.0</commons-io.version>
     <commons-codec.version>1.21.0</commons-codec.version>
     <commons-cli.version>1.11.0</commons-cli.version>
     <commons-net.version>3.13.0</commons-net.version>
