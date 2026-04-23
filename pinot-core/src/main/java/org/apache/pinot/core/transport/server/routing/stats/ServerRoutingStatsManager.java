@@ -46,10 +46,16 @@ import org.slf4j.LoggerFactory;
 
 
 /**
+ * {@code ServerRoutingStatsManager} manages the query routing stats for each server and used by the Adaptive
+ * Server Selection feature (when enabled). The stats are maintained at the broker and are updated when a query is
+ * submitted to a server and when a server responds after processing a query.
  *
- *  {@code ServerRoutingStatsManager} manages the query routing stats for each server and used by the Adaptive
- *  Server Selection feature (when enabled). The stats are maintained at the broker and are updated when a query is
- *  submitted to a server and when a server responds after processing a query.
+ * <p>Thread safety: {@code onChange} is invoked on the Helix config-change callback thread.
+ * {@code exportStatsAsMetrics} runs on the single-threaded {@code _periodicTaskExecutor}.
+ * {@code _enableStatsMetricExport} and {@code _statsMetricExportIntervalMs} are {@code volatile} so
+ * writes from the Helix callback thread are immediately visible to the export thread. All other config
+ * fields ({@code _alpha}, {@code _autoDecayWindowMs}, etc.) are written once during {@code init()}
+ * before any executor threads start, so no additional synchronization is needed for those.
  */
 public class ServerRoutingStatsManager implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerRoutingStatsManager.class);
@@ -72,8 +78,8 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
   private double _avgInitializationVal;
   private int _hybridScoreExponent;
   private int _hybridScoreQueueFloor;
-  private boolean _enableStatsMetricExport;
-  private long _statsMetricExportIntervalMs;
+  private volatile boolean _enableStatsMetricExport;
+  private volatile long _statsMetricExportIntervalMs;
   private volatile ScheduledFuture<?> _metricExportFuture;
 
   public ServerRoutingStatsManager(PinotConfiguration pinotConfig, BrokerMetrics brokerMetrics) {
