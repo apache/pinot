@@ -155,6 +155,16 @@ public abstract class IndexedTable extends BaseTable {
     _resizeTimeNs += resizeTimeNs;
   }
 
+  /**
+   * Trims this table to at most {@code trimSize} entries if it has an ORDER BY clause. No-op otherwise.
+   * Intended for coordinated trim across multiple tables (e.g., in a partitioned combine).
+   */
+  public void trim() {
+    if (_hasOrderBy && !_lookupMap.isEmpty()) {
+      resize();
+    }
+  }
+
   @Override
   public void finish(boolean sort, boolean storeFinalResult) {
     if (_hasOrderBy) {

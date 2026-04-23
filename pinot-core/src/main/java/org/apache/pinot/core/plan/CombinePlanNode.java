@@ -31,6 +31,7 @@ import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.NonblockingGroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.PartitionedGroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SequentialSortedGroupByCombineOperator;
@@ -178,10 +179,13 @@ public class CombinePlanNode implements PlanNode {
       return new SortedGroupByCombineOperator(operators, _queryContext, _executorService);
     }
 
-    // Allow fallback to the legacy ConcurrentHashMap-based operator via instance config or query option
+    // Allow per-query algorithm override via instance config or query option
     String algo = _queryContext.getGroupByAlgorithm();
     if (GroupByCombineOperator.ALGORITHM.equalsIgnoreCase(algo)) {
       return new GroupByCombineOperator(operators, _queryContext, _executorService);
+    }
+    if (PartitionedGroupByCombineOperator.ALGORITHM.equalsIgnoreCase(algo)) {
+      return new PartitionedGroupByCombineOperator(operators, _queryContext, _executorService);
     }
 
     // Default to non-blocking combine which uses per-thread SimpleIndexedTables

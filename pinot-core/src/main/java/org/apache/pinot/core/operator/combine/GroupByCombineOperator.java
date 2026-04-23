@@ -58,17 +58,22 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   protected static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
-  private final int _numAggregationFunctions;
+  protected final int _numAggregationFunctions;
   /// Number of key columns: union group-by columns plus the synthetic $groupingId column for grouping sets.
   /// Key columns precede the aggregation columns in the record layout.
-  private final int _numKeyColumns;
-  private final int _numColumns;
+  protected final int _numKeyColumns;
+  protected final int _numColumns;
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
 
-  // Shared indexed table used during combine; accessed only under synchronized(this)
+  // Shared indexed table for the single-slot tournament exchange. Written exactly once (null → non-null) under
+  // synchronized(this) via DCL. Subsequent reads are unsynchronized volatile reads, which is safe because the field
+  // never reverts to null in this class. Subclasses that call stealSharedTable() / depositSharedTable() must do so
+  // under synchronized(this).
   private volatile IndexedTable _indexedTable;
+  // Written by multiple worker threads via updateCombineResultsStats(). Only transitions false→true,
+  // so concurrent volatile writes are safe without additional synchronization.
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
@@ -163,6 +168,17 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, numThreads, _executorService);
   }
 
+  protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock, int numThreads, int numGroupsHint) {
+    return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, numThreads, _executorService,
+        numGroupsHint);
+  }
+
+  protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock, int numThreads, int numGroupsHint,
+      int groupTrimThresholdOverride) {
+    return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, numThreads, _executorService,
+        numGroupsHint, groupTrimThresholdOverride);
+  }
+
   protected void updateCombineResultsStats(GroupByResultsBlock resultsBlock) {
     if (resultsBlock.isGroupsTrimmed()) {
       _groupsTrimmed = true;
@@ -220,6 +236,15 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   }
 
   /**
+   * Waits for all worker tasks to finish, up to the given timeout. Returns {@code true} if all tasks completed before
+   * the timeout expired, {@code false} otherwise.
+   */
+  protected boolean awaitOperatorLatch(long timeoutMs)
+      throws InterruptedException {
+    return _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+  }
+
+  /**
    * {@inheritDoc}
    *
    * <p>Combines intermediate group-by results produced by underlying operators and returns a merged results block.
@@ -236,7 +261,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   public BaseResultsBlock mergeResults()
       throws Exception {
     long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
-    boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+    boolean opCompleted = awaitOperatorLatch(timeoutMs);
     if (!opCompleted) {
       return getTimeoutResultsBlock(timeoutMs);
     }
@@ -244,6 +269,14 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     Throwable ex = _processingException.get();
     if (ex != null) {
       return getExceptionResultsBlock(ex);
+    }
+
+    if (_indexedTable == null) {
+      // No segments were processed (e.g. _numOperators == 0 or all blocks contained no groups).
+      // This should not happen in normal execution but is guarded defensively.
+      String msg = "No groups produced by combine operator (indexedTable is null)";
+      LOGGER.warn(msg);
+      return new ExceptionResultsBlock(new QueryErrorMessage(QueryErrorCode.QUERY_EXECUTION, msg, msg));
     }
 
     return getMergedResultsBlock(_indexedTable);

@@ -1468,11 +1468,13 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + GROUPBY_TRIM_THRESHOLD;
     public static final int DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD = 1_000_000;
-    // Server-level default group-by combine algorithm; can be overridden per query via groupByAlgorithm option
+    // Server-level default group-by combine algorithm; can be overridden per query via groupByAlgorithm option.
+    // Valid values: "CONCURRENT" (stable, lock-based), "NON-BLOCKING" (tournament-exchange, ~2× faster),
+    // "PARTITIONED-NON-BLOCKING" (partitioned tournament-exchange, for high-thread-count scenarios).
+    // Defaults to "CONCURRENT" for safe rollout; operators can opt in to "NON-BLOCKING" via server config or query
+    // option after validating in their environment.
     public static final String GROUP_BY_ALGORITHM = "group.by.algorithm";
-    public static final String CONFIG_OF_QUERY_EXECUTOR_GROUP_BY_ALGORITHM =
-        QUERY_EXECUTOR_CONFIG_PREFIX + "." + GROUP_BY_ALGORITHM;
-    public static final String DEFAULT_QUERY_EXECUTOR_GROUP_BY_ALGORITHM = "NON-BLOCKING";
+    public static final String DEFAULT_QUERY_EXECUTOR_GROUP_BY_ALGORITHM = "CONCURRENT";
     // Do sort-aggregation when LIMIT is below this threshold
     public static final int DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD = 10_000;
     // Use sequential instead of pair-wise combine for sort-aggr when numSegments is below this threshold

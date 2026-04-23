@@ -28,6 +28,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.NonblockingGroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.PartitionedGroupByCombineOperator;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.DataProvider;
@@ -78,6 +79,24 @@ public class InterSegmentNonBlockingGroupBySingleValueQueriesTest extends BaseSi
         getBrokerResponse(query, TRIM_ENABLED_PLAN_MAKER, Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
             GroupByCombineOperator.ALGORITHM)), 120000L, 0L,
         expectedNumEntriesScannedPostFilter, 120000L, expectedResultTable);
+  }
+
+  @Test(dataProvider = "groupByOrderByDataProvider")
+  public void testGroupByOrderByWithPartitionedAlgorithm(String query, long expectedNumEntriesScannedPostFilter,
+      ResultTable expectedResultTable) {
+    QueriesTestUtils.testInterSegmentsResult(
+        getBrokerResponse(query, Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
+            PartitionedGroupByCombineOperator.ALGORITHM)),
+        120000L, 0L, expectedNumEntriesScannedPostFilter, 120000L, expectedResultTable);
+  }
+
+  @Test(dataProvider = "groupByOrderByDataProvider")
+  public void testGroupByOrderByWithPartitionedAlgorithmAndTrim(String query, long expectedNumEntriesScannedPostFilter,
+      ResultTable expectedResultTable) {
+    QueriesTestUtils.testInterSegmentsResult(
+        getBrokerResponse(query, TRIM_ENABLED_PLAN_MAKER, Map.of(QueryOptionKey.GROUP_BY_ALGORITHM,
+            PartitionedGroupByCombineOperator.ALGORITHM)),
+        120000L, 0L, expectedNumEntriesScannedPostFilter, 120000L, expectedResultTable);
   }
 
   /**

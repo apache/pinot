@@ -27,9 +27,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -37,6 +39,7 @@ import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.NonblockingGroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.PartitionedGroupByCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -60,36 +63,69 @@ import org.openjdk.jmh.runner.options.TimeValue;
 /**
  * Benchmarks end-to-end server-side group-by combine operators on synthetic segment-level result blocks.
  *
- * <p>The benchmark materializes fresh intermediate records per invocation so that repeated runs do not reuse mutable
- * records from prior combines.
+ * <p>Group key cardinality: {@code CARDINALITY_D1 × CARDINALITY_D2 = 5000 × 2000 = 10M} unique groups.
+ *
+ * <p>Approximate unique groups in the combined result by (numSegments, numRecordsPerSegment):
+ * <ul>
+ *   <li>(10,  100k) ≈  1 M unique groups (10M total input records per combine)</li>
+ *   <li>(100, 100k) ≈  6 M unique groups (10M total input records per combine)</li>
+ *   <li>(10,  1M)   ≈  6 M unique groups (10M total input records per combine)</li>
+ *   <li>(100, 1M)   ≈ 10 M unique groups (100M total input records per combine)</li>
+ * </ul>
+ *
+ * <p>Segment data is stored in a pool of {@value #SEGMENT_DATA_POOL_SIZE} unique {@link SegmentData} objects and
+ * cycled across all {@code numSegments} operators. Records are created lazily inside each operator's
+ * {@code getNextBlock()} call so that memory usage is proportional to concurrent thread count rather than
+ * total segment count — enabling large-scale tests (100 segments × 1M records) within an 8 GB heap.
  */
 @State(Scope.Benchmark)
-@Fork(value = 1, jvmArgs = {"-server", "-Xms8G", "-Xmx8G", "-XX:MaxDirectMemorySize=8G"})
+@Fork(value = 1, jvmArgs = {"-server", "-Xms16G", "-Xmx16G", "-XX:MaxDirectMemorySize=8G"})
 public class BenchmarkGroupByCombineOperator {
   private static final String QUERY =
       "SELECT d1, d2, SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2 ORDER BY SUM(m1) DESC LIMIT 500";
-  private static final int NUM_SEGMENTS = 32;
-  private static final int CARDINALITY_D1 = 4096;
-  private static final int CARDINALITY_D2 = 2048;
+  // 5000 × 2000 = 10M unique group keys
+  private static final int CARDINALITY_D1 = 5000;
+  private static final int CARDINALITY_D2 = 2000;
+  // Number of unique SegmentData objects in the pool; large numSegments cycle through this pool.
+  private static final int SEGMENT_DATA_POOL_SIZE = 10;
   private static final long QUERY_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
+
+  // NON-BLOCKING-NO-STEAL: variant of NON-BLOCKING that always creates a fresh local table
+  // instead of stealing the shared table on first use, to quantify the steal optimization's benefit.
+  private static final String NON_BLOCKING_NO_STEAL = "NON-BLOCKING-NO-STEAL";
 
   @Param({
       GroupByCombineOperator.ALGORITHM,
-      NonblockingGroupByCombineOperator.ALGORITHM
+      NonblockingGroupByCombineOperator.ALGORITHM,
+      NON_BLOCKING_NO_STEAL,
+      PartitionedGroupByCombineOperator.ALGORITHM
   })
   private String _algorithm;
 
-  @Param({"10000", "100000", "500000"})
+  // numSegments: number of segment operators presented to the combine.
+  // With SEGMENT_DATA_POOL_SIZE=10, numSegments > 10 cycles through the pool (simulates key overlap).
+  @Param({"10", "100"})
+  private int _numSegments;
+
+  // numRecordsPerSegment: approximate number of unique groups per segment block.
+  // With cardinality=10M, 100k records/seg ≈ 100k unique groups, 1M records/seg ≈ 950k unique groups.
+  @Param({"100000", "1000000"})
   private int _numRecordsPerSegment;
 
   @Param({"8"})
   private int _numThreads;
 
+  // numPartitions: only used by PARTITIONED-NON-BLOCKING; ignored by other algorithms.
+  @Param({"8", "32", "128"})
+  private int _numPartitions;
+
+  // Pre-created value pools; d2Values is Integer[] so boxes are allocated once at setup time, not per-record.
   private final String[] _d1Values = new String[CARDINALITY_D1];
   private final Integer[] _d2Values = new Integer[CARDINALITY_D2];
 
   private DataSchema _dataSchema;
-  private SegmentData[] _segmentData;
+  // Pool of unique segment datasets; cycled across all _numSegments operators.
+  private SegmentData[] _segmentDataPool;
   private Constructor<IntermediateRecord> _intermediateRecordConstructor;
   private ExecutorService _executorService;
 
@@ -109,15 +145,16 @@ public class BenchmarkGroupByCombineOperator {
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
-    _segmentData = new SegmentData[NUM_SEGMENTS];
+
+    _segmentDataPool = new SegmentData[SEGMENT_DATA_POOL_SIZE];
     Random random = new Random(8675309L);
-    for (int i = 0; i < NUM_SEGMENTS; i++) {
-      _segmentData[i] = new SegmentData(_numRecordsPerSegment);
+    for (int i = 0; i < SEGMENT_DATA_POOL_SIZE; i++) {
+      _segmentDataPool[i] = new SegmentData(_numRecordsPerSegment);
       for (int j = 0; j < _numRecordsPerSegment; j++) {
-        _segmentData[i]._d1Ids[j] = random.nextInt(CARDINALITY_D1);
-        _segmentData[i]._d2Ids[j] = random.nextInt(CARDINALITY_D2);
-        _segmentData[i]._sumValues[j] = random.nextInt(1000);
-        _segmentData[i]._maxValues[j] = random.nextInt(1000);
+        _segmentDataPool[i]._d1Ids[j] = random.nextInt(CARDINALITY_D1);
+        _segmentDataPool[i]._d2Ids[j] = random.nextInt(CARDINALITY_D2);
+        _segmentDataPool[i]._sumValues[j] = random.nextInt(1000);
+        _segmentDataPool[i]._maxValues[j] = random.nextInt(1000);
       }
     }
 
@@ -128,16 +165,14 @@ public class BenchmarkGroupByCombineOperator {
   }
 
   @Setup(Level.Invocation)
-  public void setupInvocation()
-      throws Exception {
+  public void setupInvocation() {
     _queryContext = QueryContextConverterUtils.getQueryContext(QUERY);
     _queryContext.setEndTimeMs(System.currentTimeMillis() + QUERY_TIMEOUT_MS);
     _queryContext.setMaxExecutionThreads(_numThreads);
 
-    _operators = new ArrayList<>(NUM_SEGMENTS);
-    for (SegmentData segmentData : _segmentData) {
-      _operators.add(new StaticGroupByOperator(
-          new GroupByResultsBlock(_dataSchema, createIntermediateRecords(segmentData), _queryContext)));
+    _operators = new ArrayList<>(_numSegments);
+    for (int i = 0; i < _numSegments; i++) {
+      _operators.add(new LazyGroupByOperator(_segmentDataPool[i % SEGMENT_DATA_POOL_SIZE]));
     }
   }
 
@@ -166,6 +201,10 @@ public class BenchmarkGroupByCombineOperator {
     switch (_algorithm) {
       case NonblockingGroupByCombineOperator.ALGORITHM:
         return new NonblockingGroupByCombineOperator(_operators, _queryContext, _executorService);
+      case NON_BLOCKING_NO_STEAL:
+        return new NoStealNonblockingGroupByCombineOperator(_operators, _queryContext, _executorService);
+      case PartitionedGroupByCombineOperator.ALGORITHM:
+        return new PartitionedGroupByCombineOperator(_operators, _queryContext, _executorService, _numPartitions);
       default:
         return new GroupByCombineOperator(_operators, _queryContext, _executorService);
     }
@@ -187,8 +226,8 @@ public class BenchmarkGroupByCombineOperator {
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder options = new OptionsBuilder().include(BenchmarkGroupByCombineOperator.class.getSimpleName())
-        .warmupIterations(1).warmupTime(TimeValue.seconds(5)).measurementIterations(3)
-        .measurementTime(TimeValue.seconds(10)).forks(1);
+        .warmupIterations(1).warmupTime(TimeValue.seconds(10)).measurementIterations(3)
+        .measurementTime(TimeValue.seconds(15)).forks(1);
     new Runner(options.build()).run();
   }
 
@@ -206,18 +245,27 @@ public class BenchmarkGroupByCombineOperator {
     }
   }
 
-  private static final class StaticGroupByOperator extends BaseOperator<GroupByResultsBlock> {
-    private static final String EXPLAIN_NAME = "STATIC_GROUP_BY";
+  /**
+   * Segment operator that creates fresh IntermediateRecords on each {@link #getNextBlock()} call.
+   * This avoids accumulation bugs from mutable Record objects being reused across invocations, and keeps
+   * peak memory proportional to concurrent thread count rather than total segment count.
+   */
+  private final class LazyGroupByOperator extends BaseOperator<GroupByResultsBlock> {
+    private static final String EXPLAIN_NAME = "LAZY_GROUP_BY";
 
-    private final GroupByResultsBlock _resultsBlock;
+    private final SegmentData _segmentData;
 
-    private StaticGroupByOperator(GroupByResultsBlock resultsBlock) {
-      _resultsBlock = resultsBlock;
+    private LazyGroupByOperator(SegmentData segmentData) {
+      _segmentData = segmentData;
     }
 
     @Override
     protected GroupByResultsBlock getNextBlock() {
-      return _resultsBlock;
+      try {
+        return new GroupByResultsBlock(_dataSchema, createIntermediateRecords(_segmentData), _queryContext);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
 
     @Override
@@ -233,6 +281,65 @@ public class BenchmarkGroupByCombineOperator {
     @Override
     public ExecutionStatistics getExecutionStatistics() {
       return new ExecutionStatistics(0, 0, 0, 0);
+    }
+  }
+
+  /**
+   * Variant of {@link NonblockingGroupByCombineOperator} that always creates a fresh local table instead of first
+   * trying to steal the shared slot. Used to quantify the steal-before-create optimization's benefit.
+   */
+  private static final class NoStealNonblockingGroupByCombineOperator extends GroupByCombineOperator {
+    NoStealNonblockingGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
+        ExecutorService executorService) {
+      super(operators, queryContext, executorService);
+    }
+
+    @Override
+    protected void processSegments() {
+      int operatorId;
+      IndexedTable indexedTable = null;
+      while (_processingException.get() == null && (operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+        Operator operator = _operators.get(operatorId);
+        try {
+          if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+            ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
+          }
+          GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
+          // Always create a fresh local table (no steal from shared slot)
+          if (indexedTable == null) {
+            indexedTable = createIndexedTable(resultsBlock, 1);
+          }
+          mergeGroupByResultsBlock(indexedTable, resultsBlock, EXPLAIN_NAME);
+        } catch (RuntimeException e) {
+          throw wrapOperatorException(operator, e);
+        } finally {
+          if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+            ((AcquireReleaseColumnsSegmentOperator) operator).release();
+          }
+        }
+      }
+
+      boolean setGroupByResult = false;
+      while (indexedTable != null && !setGroupByResult) {
+        IndexedTable indexedTableToMerge;
+        synchronized (this) {
+          if (!hasSharedTable()) {
+            depositSharedTable(indexedTable);
+            setGroupByResult = true;
+            continue;
+          } else {
+            indexedTableToMerge = stealSharedTable();
+          }
+        }
+        if (indexedTable.size() > indexedTableToMerge.size()) {
+          indexedTable.merge(indexedTableToMerge);
+          indexedTable.absorbTrimStats(indexedTableToMerge);
+        } else {
+          indexedTableToMerge.merge(indexedTable);
+          indexedTableToMerge.absorbTrimStats(indexedTable);
+          indexedTable = indexedTableToMerge;
+        }
+      }
     }
   }
 }

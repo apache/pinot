@@ -31,13 +31,14 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Non-blocking combine operator for group-by queries.
- * <p>
- * Each worker thread builds its own {@link org.apache.pinot.core.data.table.SimpleIndexedTable} (uncontended
- * {@code HashMap}) and processes segments independently. After processing, threads merge their local tables via a
- * lock-free tournament exchange protocol, depositing the final merged table into the shared slot for
- * {@link #mergeResults()} to collect.
- * <p>
- * Parallelism is bounded by the configured max execution threads via {@link GroupByCombineOperator}.
+ *
+ * <p>Each worker thread builds its own thread-local {@link org.apache.pinot.core.data.table.SimpleIndexedTable}
+ * (uncontended {@code HashMap}) and processes segments without any cross-thread contention during accumulation.
+ * After all segments are processed, threads merge their local tables into a single result via a lock-free tournament
+ * exchange protocol: each thread tries to claim the empty shared slot, or steals the current occupant and merges
+ * (larger absorbs smaller), looping until the winning table is deposited.
+ *
+ * <p>Parallelism is bounded by the configured max execution threads via {@link GroupByCombineOperator}.
  */
 @SuppressWarnings("rawtypes")
 public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
@@ -52,9 +53,8 @@ public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
   }
 
   /**
-   * Executes query on one segment in a worker thread and merges the results into a thread-local indexed table.
-   * After all segments are processed the thread merges its local table into the shared slot via a lock-free
-   * tournament exchange.
+   * Processes all assigned segments into a thread-local indexed table, then deposits it into the shared slot via the
+   * lock-free tournament exchange.
    */
   @Override
   protected void processSegments() {
@@ -68,14 +68,7 @@ public class NonblockingGroupByCombineOperator extends GroupByCombineOperator {
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
         if (indexedTable == null) {
-          synchronized (this) {
-            if (hasSharedTable()) {
-              indexedTable = stealSharedTable();
-            }
-          }
-          if (indexedTable == null) {
-            indexedTable = createIndexedTable(resultsBlock, 1);
-          }
+          indexedTable = createIndexedTable(resultsBlock, 1);
         }
         mergeGroupByResultsBlock(indexedTable, resultsBlock, EXPLAIN_NAME);
       } catch (RuntimeException e) {
