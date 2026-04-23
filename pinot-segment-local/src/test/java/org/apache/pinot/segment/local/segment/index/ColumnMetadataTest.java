@@ -32,7 +32,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.BaseSegmentCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -186,7 +186,7 @@ public class ColumnMetadataTest {
       throws Exception {
     // Build the Segment metadata.
     SegmentGeneratorConfig config = createSegmentConfigWithCreator();
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
 
@@ -204,7 +204,7 @@ public class ColumnMetadataTest {
       throws Exception {
     // Build the Segment metadata.
     SegmentGeneratorConfig config = createSegmentConfigWithoutCreator();
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
 
@@ -221,7 +221,7 @@ public class ColumnMetadataTest {
       throws Exception {
     // Build the Segment metadata.
     SegmentGeneratorConfig config = createSegmentConfigWithoutCreator();
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
 
@@ -241,7 +241,7 @@ public class ColumnMetadataTest {
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(
         Collections.singletonMap("column3", new ColumnPartitionConfig("BoundedColumnValue", 4, functionConfig)));
     config.setSegmentPartitionConfig(segmentPartitionConfig);
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
 
@@ -314,7 +314,7 @@ public class ColumnMetadataTest {
     // column4 is not a time column and should cause an exception to be thrown when the segment is sealed and time
     // metadata is being parsed and written
     config.setTimeColumnName("column4");
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     assertThrows(NumberFormatException.class, driver::build);
   }
@@ -328,7 +328,7 @@ public class ColumnMetadataTest {
     // metadata is being parsed and written
     config.setTimeColumnName("column4");
     config.setContinueOnError(true);
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
 
