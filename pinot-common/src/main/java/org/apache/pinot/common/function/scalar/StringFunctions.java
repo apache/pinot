@@ -254,7 +254,7 @@ public class StringFunctions {
 
   /**
    * @see StringUtils#ordinalIndexOf(CharSequence, CharSequence, int)
-   * Return the Nth occurence of a substring within the String
+   * Return the Nth occurrence of a substring within the String
    * @param input
    * @param find substring to find
    * @param instance Integer denoting the instance no.
@@ -267,7 +267,7 @@ public class StringFunctions {
 
   /**
    * @see StringUtils#indexOf(CharSequence, CharSequence)
-   * Return the 1st occurence of a substring within the String
+   * Return the 1st occurrence of a substring within the String
    * @param input
    * @param find substring to find
    * @return start index of the 1st instance of substring in main string
@@ -279,7 +279,7 @@ public class StringFunctions {
 
   /**
    * @see StringUtils#lastIndexOf(CharSequence, CharSequence)
-   * Return the last occurence of a substring within the String
+   * Return the last occurrence of a substring within the String
    * @param input
    * @param find substring to find
    * @return start index of the last instance of substring in main string
@@ -291,7 +291,7 @@ public class StringFunctions {
 
   /**
    * @see StringUtils#lastIndexOf(CharSequence, CharSequence, int)
-   * Return the Nth occurence of a substring in string starting from the end of the string.
+   * Return the Nth occurrence of a substring in string starting from the end of the string.
    * @param input
    * @param find substring to find
    * @param instance Integer denoting the instance no.
