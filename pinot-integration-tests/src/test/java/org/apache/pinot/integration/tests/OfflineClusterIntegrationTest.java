@@ -871,7 +871,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "hsomething, something, something and wise");
 
-    // Test occurence
+    // Test occurrence
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
@@ -989,7 +989,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "hsomething, something, something and wise");
 
-    // Test occurence
+    // Test occurrence
     sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
