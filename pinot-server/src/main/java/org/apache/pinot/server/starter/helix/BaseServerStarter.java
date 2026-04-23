@@ -776,8 +776,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
 
     initSegmentFetcher(_serverConf);
-    StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, _transitionThreadPoolManager);
+    StateModelFactory<?> stateModelFactory = createSegmentOnlineOfflineStateModelFactory(instanceDataManager);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
     // Start the data manager as a pre-connect callback so that it starts after connecting to the ZK in order to access
@@ -1262,6 +1261,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected SegmentMessageHandlerFactory createSegmentMessageHandlerFactory(InstanceDataManager instanceDataManager,
       ServerMetrics serverMetrics) {
     return new SegmentMessageHandlerFactory(instanceDataManager, serverMetrics);
+  }
+
+  /**
+   * Creates the {@link SegmentOnlineOfflineStateModelFactory} used to handle Helix state transitions for segments.
+   * The {@link StateTransitionThreadPoolManager} should be initialized by
+   * {@link BaseServerStarter#initTransitionThreadPoolManager()} before this method is called.
+   * Subclasses can override to return a custom factory.
+   */
+  protected SegmentOnlineOfflineStateModelFactory createSegmentOnlineOfflineStateModelFactory(
+      InstanceDataManager instanceDataManager) {
+    return new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, _transitionThreadPoolManager);
   }
 
   private void refreshMessageCount() {
