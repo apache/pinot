@@ -58,11 +58,12 @@ public class VectorIndexTest {
           .filter(fc -> fc.getName().equals("studentID")).collect(Collectors.toList()).get(0);
       JsonNode indexConfig = fieldConfig.getIndexes().get(VectorIndexType.INDEX_DISPLAY_NAME);
       assertNotNull(indexConfig);
-      assertFalse(indexConfig.get("disabled").asBoolean());
+      // Slim serialization: disabled=false (default) is omitted from the JSON entirely.
+      assertNull(indexConfig.get("disabled"));
       assertTrue(fieldConfig.getIndexTypes().isEmpty());
       assertNull(fieldConfig.getProperties());
       Assert.assertEquals(indexConfig.toString(),
-          "{\"disabled\":false,\"vectorIndexType\":\"HNSW\",\"vectorDimension\":1536,"
+          "{\"vectorIndexType\":\"HNSW\",\"vectorDimension\":1536,"
               + "\"version\":1,\"vectorDistanceFunction\":\"COSINE\",\"properties\":{\"vectorIndexType\":"
               + "\"HNSW\",\"vectorDimension\":\"1536\",\"vectorDistanceFunction\":\"COSINE\",\"version\":\"1\"}}");
     }

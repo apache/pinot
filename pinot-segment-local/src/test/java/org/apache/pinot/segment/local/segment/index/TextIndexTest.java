@@ -50,7 +50,8 @@ public class TextIndexTest {
           .filter(fc -> fc.getName().equals("dimStr")).collect(Collectors.toList()).get(0);
       JsonNode indexConfig = fieldConfig.getIndexes().get(TextIndexType.INDEX_DISPLAY_NAME);
       assertNotNull(indexConfig);
-      assertFalse(indexConfig.get("disabled").asBoolean());
+      // Slim serialization: disabled=false (default) is omitted from the JSON entirely.
+      assertNull(indexConfig.get("disabled"));
       assertTrue(fieldConfig.getIndexTypes().isEmpty());
       assertNull(fieldConfig.getProperties());
     }

@@ -23,7 +23,6 @@ import com.google.common.collect.Lists;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.range.RangeIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.range.RangeIndexType;
-import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.testng.annotations.Test;
@@ -47,7 +46,9 @@ public class RangeIndexTest {
           .filter(fc -> fc.getName().equals("dimInt")).collect(Collectors.toList()).get(0);
       JsonNode indexConfig = fieldConfig.getIndexes().get(RangeIndexType.INDEX_DISPLAY_NAME);
       assertNotNull(indexConfig);
-      assertEquals(RangeIndexConfig.DEFAULT.getVersion(), indexConfig.get("version").asInt());
+      // Slim serialization: 'version' equals the class default (2), so it is omitted from the
+      // serialized JSON. The resolved RangeIndexConfig still carries the default value.
+      assertNull(indexConfig.get("version"));
       assertTrue(fieldConfig.getIndexTypes().isEmpty());
       assertNull(fieldConfig.getProperties());
     }

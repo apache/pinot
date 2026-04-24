@@ -126,7 +126,8 @@ public class VectorConfigTest {
     VectorIndexConfig initialConf = new VectorIndexConfig(false);
 
     String confAsJson = JsonUtils.objectToString(initialConf);
-    Assert.assertEquals(confAsJson, "{\"disabled\":false,\"vectorDimension\":0,\"version\":0}");
+    // Slim serialization: disabled=false and primitive int defaults (0) are omitted.
+    Assert.assertEquals(confAsJson, "{}");
 
     VectorIndexConfig readConf = JsonUtils.stringToObject(confAsJson, VectorIndexConfig.class);
     Assert.assertEquals(readConf, initialConf, "Unexpected configuration after serialization and deserialization");
