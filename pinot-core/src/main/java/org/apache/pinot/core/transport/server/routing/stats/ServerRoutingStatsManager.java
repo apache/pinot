@@ -19,6 +19,7 @@
 
 package org.apache.pinot.core.transport.server.routing.stats;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
@@ -149,9 +150,24 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
     }
     if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS)) {
       String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
-      long newIntervalMs = value != null ? Long.parseLong(value)
-          : _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
-              AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+      long newIntervalMs;
+      if (value != null) {
+        try {
+          newIntervalMs = Long.parseLong(value);
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid value '{}' for config '{}'; ignoring interval change", value,
+              AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
+          return;
+        }
+        if (newIntervalMs <= 0) {
+          LOGGER.warn("Non-positive value {} for config '{}'; ignoring interval change", newIntervalMs,
+              AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS);
+          return;
+        }
+      } else {
+        newIntervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
+            AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+      }
       if (newIntervalMs != _statsMetricExportIntervalMs) {
         _statsMetricExportIntervalMs = newIntervalMs;
         _metricExportFuture.cancel(false);
@@ -164,6 +180,11 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
 
   public boolean isEnabled() {
     return _isEnabled;
+  }
+
+  @VisibleForTesting
+  public long getStatsMetricExportIntervalMs() {
+    return _statsMetricExportIntervalMs;
   }
 
   public void shutDown() {

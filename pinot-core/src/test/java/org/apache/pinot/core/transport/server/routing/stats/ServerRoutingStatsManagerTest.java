@@ -541,6 +541,54 @@ public class ServerRoutingStatsManagerTest {
   }
 
   @Test
+  public void testStatsMetricExportIntervalDynamicUpdateIgnoresBadValues() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, 100000L);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    long intervalBefore = manager.getStatsMetricExportIntervalMs();
+
+    // Non-numeric value: must be silently ignored without throwing.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, "abc"));
+    assertEquals(manager.getStatsMetricExportIntervalMs(), intervalBefore,
+        "Interval must not change on non-numeric config value");
+
+    // Zero: must be silently ignored.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, "0"));
+    assertEquals(manager.getStatsMetricExportIntervalMs(), intervalBefore,
+        "Interval must not change on zero config value");
+
+    // Negative value: must be silently ignored.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, "-1"));
+    assertEquals(manager.getStatsMetricExportIntervalMs(), intervalBefore,
+        "Interval must not change on negative config value");
+
+    // Key removed from cluster config — must fall back to the static broker config value (100000L).
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
+        Collections.emptyMap());
+    assertEquals(manager.getStatsMetricExportIntervalMs(), 100000L,
+        "Interval must revert to static config when cluster key is removed");
+
+    manager.shutDown();
+  }
+
+  @Test
   public void testMseAndSseStatsIsolation() {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
