@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
-import java.util.HashMap;
+import com.google.common.collect.Maps;
+import java.util.Collection;
 import java.util.Map;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
@@ -36,7 +37,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreIndexStatsCollectorImpl.class);
 
   private final StatsCollectorConfig _statsCollectorConfig;
-  private Map<String, AbstractColumnStatisticsCollector> _columnStatsCollectorMap;
+  private Map<String, ColumnStatistics> _columnStatisticsMap;
   private int _totalDocCount;
 
   public SegmentPreIndexStatsCollectorImpl(StatsCollectorConfig statsCollectorConfig) {
@@ -45,47 +46,50 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
 
   @Override
   public void init() {
-    _columnStatsCollectorMap = new HashMap<>();
-    Map<String, FieldIndexConfigs> indexConfigsByCol = FieldIndexConfigsUtil.createIndexConfigsByColName(
-        _statsCollectorConfig.getTableConfig(), _statsCollectorConfig.getSchema());
-
-    Schema dataSchema = _statsCollectorConfig.getSchema();
-    for (FieldSpec fieldSpec : dataSchema.getAllFieldSpecs()) {
+    Schema schema = _statsCollectorConfig.getSchema();
+    Collection<FieldSpec> fieldSpecs = schema.getAllFieldSpecs();
+    _columnStatisticsMap = Maps.newHashMapWithExpectedSize(fieldSpecs.size());
+    Map<String, FieldIndexConfigs> indexConfigsByCol =
+        FieldIndexConfigsUtil.createIndexConfigsByColName(_statsCollectorConfig.getTableConfig(), schema);
+    for (FieldSpec fieldSpec : fieldSpecs) {
+      if (fieldSpec.isVirtualColumn()) {
+        continue;
+      }
       String column = fieldSpec.getName();
       AbstractColumnStatisticsCollector collector = StatsCollectorUtil.createStatsCollector(
           column, fieldSpec, indexConfigsByCol.get(column), _statsCollectorConfig);
-      _columnStatsCollectorMap.put(column, collector);
+      _columnStatisticsMap.put(column, collector);
     }
   }
 
   @Override
   public void build() {
-    for (AbstractColumnStatisticsCollector columnStatsCollector : _columnStatsCollectorMap.values()) {
-      columnStatsCollector.seal();
+    if (_totalDocCount > 0) {
+      for (ColumnStatistics columnStatistics : _columnStatisticsMap.values()) {
+        ((AbstractColumnStatisticsCollector) columnStatistics).seal();
+      }
+    } else {
+      for (Map.Entry<String, ColumnStatistics> entry : _columnStatisticsMap.entrySet()) {
+        ColumnStatistics columnStatistics = entry.getValue();
+        entry.setValue(
+            new EmptyColumnStatistics(columnStatistics.getFieldSpec(), columnStatistics.getPartitionFunction(),
+                columnStatistics.getPartitions()));
+      }
     }
   }
 
   @Override
   public ColumnStatistics getColumnProfileFor(String column) {
-    return _columnStatsCollectorMap.get(column);
+    return _columnStatisticsMap.get(column);
   }
 
   @Override
   public void collectRow(GenericRow row) {
-    for (Map.Entry<String, Object> columnNameAndValue : row.getFieldToValueMap().entrySet()) {
-      final String columnName = columnNameAndValue.getKey();
-      final Object value = columnNameAndValue.getValue();
-
-      if (_columnStatsCollectorMap.containsKey(columnName)) {
-        try {
-          _columnStatsCollectorMap.get(columnName).collect(value);
-        } catch (Exception e) {
-          LOGGER.error("Exception while collecting stats for column:{} in row:{}", columnName, row);
-          throw e;
-        }
-      }
+    for (Map.Entry<String, ColumnStatistics> entry : _columnStatisticsMap.entrySet()) {
+      String column = entry.getKey();
+      ColumnStatistics columnStatistics = entry.getValue();
+      ((AbstractColumnStatisticsCollector) columnStatistics).collect(row.getValue(column));
     }
-
     _totalDocCount++;
   }
 
@@ -97,19 +101,19 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   @Override
   public void logStats() {
     try {
-      for (final String column : _columnStatsCollectorMap.keySet()) {
-        AbstractColumnStatisticsCollector statisticsCollector = _columnStatsCollectorMap.get(column);
+      for (final String column : _columnStatisticsMap.keySet()) {
+        ColumnStatistics columnStatistics = _columnStatisticsMap.get(column);
 
         LOGGER.info("********** logging for column : {} ********************* ", column);
-        LOGGER.info("min value : {}", statisticsCollector.getMinValue());
-        LOGGER.info("max value : {}", statisticsCollector.getMaxValue());
-        LOGGER.info("cardinality : {}", statisticsCollector.getCardinality());
-        LOGGER.info("length of largest column : {}", statisticsCollector.getLengthOfLargestElement());
-        LOGGER.info("is sorted : {}", statisticsCollector.isSorted());
+        LOGGER.info("min value : {}", columnStatistics.getMinValue());
+        LOGGER.info("max value : {}", columnStatistics.getMaxValue());
+        LOGGER.info("cardinality : {}", columnStatistics.getCardinality());
+        LOGGER.info("length of longest element : {}", columnStatistics.getLengthOfLongestElement());
+        LOGGER.info("is sorted : {}", columnStatistics.isSorted());
         LOGGER.info("column type : {}", _statsCollectorConfig.getSchema().getFieldSpecFor(column).getDataType());
 
-        if (statisticsCollector.getPartitionFunction() != null) {
-          LOGGER.info("partitions: {}", statisticsCollector.getPartitions().toString());
+        if (columnStatistics.getPartitionFunction() != null) {
+          LOGGER.info("partitions: {}", columnStatistics.getPartitions().toString());
         }
         LOGGER.info("***********************************************");
       }

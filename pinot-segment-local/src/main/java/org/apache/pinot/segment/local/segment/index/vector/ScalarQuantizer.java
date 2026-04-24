@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.vector;
 import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
@@ -202,16 +201,17 @@ public class ScalarQuantizer implements VectorQuantizer {
   public float computeDistance(float[] query, byte[] encodedDoc,
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     Preconditions.checkState(_trained, "Quantizer must be trained before computing distance");
-    float[] decoded = decode(encodedDoc);
+    Preconditions.checkArgument(query.length == _dimension,
+        "Query dimension mismatch: expected %s, got %s", _dimension, query.length);
     switch (distanceFunction) {
       case EUCLIDEAN:
       case L2:
-        return (float) VectorFunctions.euclideanDistance(query, decoded);
+        return (float) computeEuclideanDistance(query, encodedDoc);
       case COSINE:
-        return (float) VectorFunctions.cosineDistance(query, decoded);
+        return (float) computeCosineDistance(query, encodedDoc);
       case INNER_PRODUCT:
       case DOT_PRODUCT:
-        return (float) -VectorFunctions.dotProduct(query, decoded);
+        return (float) computeNegativeDotProduct(query, encodedDoc);
       default:
         throw new IllegalArgumentException("Unsupported distance function: " + distanceFunction);
     }
@@ -358,6 +358,67 @@ public class ScalarQuantizer implements VectorQuantizer {
   // -----------------------------------------------------------------------
   // Internal
   // -----------------------------------------------------------------------
+
+  private double computeEuclideanDistance(float[] query, byte[] encodedDoc) {
+    validateEncodedLength(encodedDoc);
+    double distance = 0.0d;
+    for (int d = 0; d < _dimension; d++) {
+      double decodedValue = decodeValue(encodedDoc, d);
+      double diff = query[d] - decodedValue;
+      distance += diff * diff;
+    }
+    return distance;
+  }
+
+  private double computeCosineDistance(float[] query, byte[] encodedDoc) {
+    validateEncodedLength(encodedDoc);
+    double dotProduct = 0.0d;
+    double queryNorm = 0.0d;
+    double docNorm = 0.0d;
+    for (int d = 0; d < _dimension; d++) {
+      double decodedValue = decodeValue(encodedDoc, d);
+      dotProduct += query[d] * decodedValue;
+      queryNorm += query[d] * query[d];
+      docNorm += decodedValue * decodedValue;
+    }
+    if (queryNorm == 0.0d || docNorm == 0.0d) {
+      return 1.0d;
+    }
+    return 1.0d - (dotProduct / (Math.sqrt(queryNorm) * Math.sqrt(docNorm)));
+  }
+
+  private double computeNegativeDotProduct(float[] query, byte[] encodedDoc) {
+    validateEncodedLength(encodedDoc);
+    double dotProduct = 0.0d;
+    for (int d = 0; d < _dimension; d++) {
+      dotProduct += query[d] * decodeValue(encodedDoc, d);
+    }
+    return -dotProduct;
+  }
+
+  private void validateEncodedLength(byte[] encodedDoc) {
+    int expectedLen = getEncodedBytesPerVector();
+    Preconditions.checkArgument(encodedDoc.length == expectedLen,
+        "Encoded length mismatch: expected %s, got %s", expectedLen, encodedDoc.length);
+  }
+
+  private float decodeValue(byte[] encoded, int dimensionIndex) {
+    if (_bitWidth == BitWidth.SQ8) {
+      return decodeSq8Value(encoded, dimensionIndex);
+    }
+    return decodeSq4Value(encoded, dimensionIndex);
+  }
+
+  private float decodeSq8Value(byte[] encoded, int dimensionIndex) {
+    int quantized = encoded[dimensionIndex] & 0xFF;
+    return _minValues[dimensionIndex] + quantized / _scales[dimensionIndex];
+  }
+
+  private float decodeSq4Value(byte[] encoded, int dimensionIndex) {
+    int encodedByte = encoded[dimensionIndex / 2] & 0xFF;
+    int quantized = (dimensionIndex & 1) == 0 ? (encodedByte >>> 4) : (encodedByte & 0x0F);
+    return _minValues[dimensionIndex] + quantized / _scales[dimensionIndex];
+  }
 
   private void computeScales() {
     for (int d = 0; d < _dimension; d++) {

@@ -29,7 +29,7 @@ import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.FailureDetector;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -79,11 +79,10 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     // Enable thread CPU/memory tracking but not killing queries
     brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
-    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        ResourceUsageAccountantFactory.class.getName());
-    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    String prefix = Accounting.BROKER_PREFIX + ".";
+    brokerConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
   }
 
   @Override
@@ -93,11 +92,10 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     // Enable thread CPU/memory tracking but not killing queries
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
-    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        ResourceUsageAccountantFactory.class.getName());
-    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    String prefix = Accounting.SERVER_PREFIX + ".";
+    serverConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
   }
 
   @Test

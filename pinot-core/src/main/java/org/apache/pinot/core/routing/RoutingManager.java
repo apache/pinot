@@ -49,6 +49,19 @@ public interface RoutingManager {
   Map<String, ServerInstance> getEnabledServerInstanceMap();
 
   /**
+   * Get all routable server instances in the cluster -- enabled servers that have not been excluded from routing by
+   * the broker (e.g. by the FailureDetector). Callers that pick workers without going through per-table instance
+   * selection (such as MSE intermediate stage worker selection) should prefer this over
+   * {@link #getEnabledServerInstanceMap()} so that FailureDetector exclusions are honored.
+   *
+   * <p>The default implementation delegates to {@link #getEnabledServerInstanceMap()} for backward compatibility with
+   * implementations that do not track exclusions separately.
+   */
+  default Map<String, ServerInstance> getRoutableServerInstanceMap() {
+    return getEnabledServerInstanceMap();
+  }
+
+  /**
    * Returns whether the given table is enabled
    * @param tableNameWithType Table name with type
    * @return Whether the given table is enabled

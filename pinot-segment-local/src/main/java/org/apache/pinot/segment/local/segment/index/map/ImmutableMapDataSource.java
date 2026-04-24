@@ -23,20 +23,16 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.MapIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings("rawtypes")
 public class ImmutableMapDataSource extends BaseMapDataSource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ImmutableMapDataSource.class);
   private final MapIndexReader _mapIndexReader;
 
   public ImmutableMapDataSource(ColumnMetadata columnMetadata, ColumnIndexContainer columnIndexContainer) {
@@ -46,13 +42,13 @@ public class ImmutableMapDataSource extends BaseMapDataSource {
     if (forwardIndex instanceof MapIndexReader) {
       mapIndexReader = (MapIndexReader) forwardIndex;
     } else {
-      mapIndexReader = new MapIndexReaderWrapper(forwardIndex, getFieldSpec());
+      mapIndexReader = new MapIndexReaderWrapper(forwardIndex, getFieldSpec(), columnMetadata.getTotalDocs());
     }
     _mapIndexReader = mapIndexReader;
   }
 
   @Override
-  public MapIndexReader<ForwardIndexReaderContext, IndexReader> getMapIndexReader() {
+  public MapIndexReader<ForwardIndexReaderContext> getMapIndexReader() {
     return _mapIndexReader;
   }
 

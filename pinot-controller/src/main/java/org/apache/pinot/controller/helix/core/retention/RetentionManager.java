@@ -85,6 +85,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
   private volatile boolean _isHybridTableRetentionStrategyEnabled;
+  private volatile boolean _useCreationTimeFallbackForRetention;
   private final BrokerServiceHelper _brokerServiceHelper;
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
@@ -97,6 +98,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     _untrackedSegmentsRetentionTimeInDays = config.getUntrackedSegmentsRetentionTimeInDays();
     _agedSegmentsDeletionBatchSize = config.getAgedSegmentsDeletionBatchSize();
     _isHybridTableRetentionStrategyEnabled = config.isHybridTableRetentionStrategyEnabled();
+    _useCreationTimeFallbackForRetention = config.isRetentionCreationTimeFallbackEnabled();
     _brokerServiceHelper = brokerServiceHelper;
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}", getIntervalInSeconds());
   }
@@ -146,7 +148,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     RetentionStrategy retentionStrategy;
     try {
       retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
-          Long.parseLong(retentionTimeValue));
+          Long.parseLong(retentionTimeValue), _useCreationTimeFallbackForRetention);
     } catch (Exception e) {
       LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue,
           tableNameWithType);
@@ -534,10 +536,31 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       updateHybridTableRetentionStrategyEnabled(
           clusterConfigs.get(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY));
     }
+
+    if (changedConfigs.contains(
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK)) {
+      updateRetentionCreationTimeFallbackEnabled(
+          clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK));
+    }
   }
 
   private void updateUntrackedSegmentDeletionEnabled(String newValue) {
     boolean oldValue = _untrackedSegmentDeletionEnabled;
+
+    // When the cluster config key is deleted, newValue will be null. Reset to default.
+    boolean defaultValue =
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_ENABLE_UNTRACKED_SEGMENT_DELETION;
+    if (newValue == null) {
+      if (oldValue != defaultValue) {
+        _untrackedSegmentDeletionEnabled = defaultValue;
+        LOGGER.info("Cluster config for untrackedSegmentDeletionEnabled was removed, "
+            + "reverting from {} to default ({})", oldValue, defaultValue);
+      } else {
+        LOGGER.info("Cluster config for untrackedSegmentDeletionEnabled was removed, "
+            + "already at default ({})", defaultValue);
+      }
+      return;
+    }
 
     // Validate that the value is a proper boolean string
     if (!"true".equalsIgnoreCase(newValue) && !"false".equalsIgnoreCase(newValue)) {
@@ -557,6 +580,21 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private void updateUntrackedSegmentsRetentionTimeInDays(String newValue) {
     int oldValue = _untrackedSegmentsRetentionTimeInDays;
+
+    // When the cluster config key is deleted, newValue will be null. Reset to default.
+    if (newValue == null) {
+      int defaultValue = ControllerConf.ControllerPeriodicTasksConf.DEFAULT_UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS;
+      if (oldValue != defaultValue) {
+        _untrackedSegmentsRetentionTimeInDays = defaultValue;
+        LOGGER.info("Cluster config for untrackedSegmentsRetentionTimeInDays was removed, "
+            + "reverting from {} to default ({})", oldValue, defaultValue);
+      } else {
+        LOGGER.info("Cluster config for untrackedSegmentsRetentionTimeInDays was removed, "
+            + "already at default ({})", defaultValue);
+      }
+      return;
+    }
+
     try {
       int parsedValue = Integer.parseInt(newValue);
       if (parsedValue <= 0) {
@@ -577,22 +615,79 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private void updateHybridTableRetentionStrategyEnabled(String newValue) {
     boolean oldValue = _isHybridTableRetentionStrategyEnabled;
-    try {
-      boolean parsedValue = Boolean.parseBoolean(newValue);
-      if (oldValue == parsedValue) {
-        LOGGER.info("No change in isHybridTableRetentionStrategyEnabled, current value: {}", oldValue);
+
+    // When the cluster config key is deleted, newValue will be null. Reset to default.
+    boolean defaultValue = ControllerConf.DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY;
+    if (newValue == null) {
+      if (oldValue != defaultValue) {
+        _isHybridTableRetentionStrategyEnabled = defaultValue;
+        LOGGER.info("Cluster config for isHybridTableRetentionStrategyEnabled was removed, "
+            + "reverting from {} to default ({})", oldValue, defaultValue);
       } else {
-        _isHybridTableRetentionStrategyEnabled = parsedValue;
-        LOGGER.info("Updated isHybridTableRetentionStrategyEnabled from {} to {}", oldValue, parsedValue);
+        LOGGER.info("Cluster config for isHybridTableRetentionStrategyEnabled was removed, "
+            + "already at default ({})", defaultValue);
       }
-    } catch (Exception e) {
+      return;
+    }
+
+    // Validate that the value is a proper boolean string
+    if (!"true".equalsIgnoreCase(newValue) && !"false".equalsIgnoreCase(newValue)) {
       LOGGER.warn("Invalid value for isHybridTableRetentionStrategyEnabled: {}, keeping current value: {}", newValue,
           oldValue);
+      return;
+    }
+
+    boolean parsedValue = Boolean.parseBoolean(newValue);
+    if (oldValue == parsedValue) {
+      LOGGER.info("No change in isHybridTableRetentionStrategyEnabled, current value: {}", oldValue);
+    } else {
+      _isHybridTableRetentionStrategyEnabled = parsedValue;
+      LOGGER.info("Updated isHybridTableRetentionStrategyEnabled from {} to {}", oldValue, parsedValue);
+    }
+  }
+
+  private void updateRetentionCreationTimeFallbackEnabled(String newValue) {
+    boolean oldValue = _useCreationTimeFallbackForRetention;
+
+    // When the cluster config key is deleted, newValue will be null.
+    // Reset to default since this flag gates destructive retention deletion.
+    boolean defaultValue =
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_ENABLE_RETENTION_CREATION_TIME_FALLBACK;
+    if (newValue == null) {
+      if (oldValue != defaultValue) {
+        _useCreationTimeFallbackForRetention = defaultValue;
+        LOGGER.info("Cluster config for retentionCreationTimeFallbackEnabled was removed, "
+            + "reverting from {} to default ({})", oldValue, defaultValue);
+      } else {
+        LOGGER.info("Cluster config for retentionCreationTimeFallbackEnabled was removed, "
+            + "already at default ({})", defaultValue);
+      }
+      return;
+    }
+
+    // Validate that the value is a proper boolean string
+    if (!"true".equalsIgnoreCase(newValue) && !"false".equalsIgnoreCase(newValue)) {
+      LOGGER.warn("Invalid value for retentionCreationTimeFallbackEnabled: {}, keeping current value: {}", newValue,
+          oldValue);
+      return;
+    }
+
+    boolean parsedValue = Boolean.parseBoolean(newValue);
+    if (oldValue == parsedValue) {
+      LOGGER.info("No change in retentionCreationTimeFallbackEnabled, current value: {}", oldValue);
+    } else {
+      _useCreationTimeFallbackForRetention = parsedValue;
+      LOGGER.info("Updated retentionCreationTimeFallbackEnabled from {} to {}", oldValue, parsedValue);
     }
   }
 
   @VisibleForTesting
   public boolean isUntrackedSegmentDeletionEnabled() {
     return _untrackedSegmentDeletionEnabled;
+  }
+
+  @VisibleForTesting
+  public boolean isRetentionCreationTimeFallbackEnabled() {
+    return _useCreationTimeFallbackForRetention;
   }
 }

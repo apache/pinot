@@ -65,6 +65,21 @@ public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.FLOAT;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(Float.valueOf(stringValue), null);
+  }
+
+  @Override
+  public int indexOf(float floatValue) {
+    return getDictId(floatValue, null);
+  }
+
+  @Override
   public int compare(int dictId1, int dictId2) {
     return Float.compare(getFloatValue(dictId1), getFloatValue(dictId2));
   }
@@ -171,20 +186,6 @@ public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.FLOAT;
-  }
-
-  @Override
-  public int indexOf(String stringValue) {
-    return getDictId(Float.valueOf(stringValue), null);
-  }
-
-  @Override
-  public int indexOf(float floatValue) {
-    return getDictId(floatValue, null);
-  }
-
   public Float get(int dictId) {
     return getFloatValue(dictId);
   }

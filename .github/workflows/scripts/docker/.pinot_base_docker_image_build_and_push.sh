@@ -30,11 +30,13 @@ fi
 
 cd docker/images/pinot-base/pinot-base-${BASE_IMAGE_TYPE}
 
-docker buildx build \
+docker build \
   --no-cache \
   --platform=${BUILD_PLATFORM} \
   --file ${OPEN_JDK_DIST}.dockerfile \
-  --tag apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG} \
+  --tag apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-${ARCH} \
   --build-arg JAVA_VERSION=${JDK_VERSION:-11} \
-  --push \
+  --build-arg ARCH=${ARCH} \
   .
+
+docker push apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-${ARCH}

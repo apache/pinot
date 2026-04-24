@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -63,6 +64,7 @@ public class ServerRoutingStatsManager {
   private long _warmupDurationMs;
   private double _avgInitializationVal;
   private int _hybridScoreExponent;
+  private boolean _enableStatsMetricExport;
 
   public ServerRoutingStatsManager(PinotConfiguration pinotConfig, BrokerMetrics brokerMetrics) {
     _config = pinotConfig;
@@ -99,6 +101,16 @@ public class ServerRoutingStatsManager {
     // Entries in this map are never deleted unless the broker process restarts. This is okay for now because the
     // number of servers will be finite and should not cause memory bloat.
     _serverQueryStatsMap = new ConcurrentHashMap<>();
+
+    _enableStatsMetricExport = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT,
+        AdaptiveServerSelector.DEFAULT_ENABLE_STATS_METRIC_EXPORT);
+    if (_enableStatsMetricExport) {
+      long intervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
+          AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+      _periodicTaskExecutor.scheduleAtFixedRate(this::exportStatsAsMetrics, intervalMs, intervalMs,
+          TimeUnit.MILLISECONDS);
+      LOGGER.info("Adaptive server routing stats metric export enabled with interval {}ms.", intervalMs);
+    }
   }
 
   public boolean isEnabled() {
@@ -389,5 +401,36 @@ public class ServerRoutingStatsManager {
   private void recordQueueSizeMetrics() {
     int queueSize = getQueueSize();
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ROUTING_STATS_MANAGER_QUEUE_SIZE, queueSize);
+  }
+
+  private void exportStatsAsMetrics() {
+    try {
+      for (Map.Entry<String, ServerRoutingStatsEntry> entry : _serverQueryStatsMap.entrySet()) {
+        String serverInstanceId = entry.getKey();
+        ServerRoutingStatsEntry stats = entry.getValue();
+
+        int numInFlightRequests;
+        double latencyEma;
+        double hybridScore;
+
+        stats.getServerReadLock().lock();
+        try {
+          numInFlightRequests = stats.getNumInFlightRequests();
+          latencyEma = stats.getLatencyEMA();
+          hybridScore = stats.computeHybridScore();
+        } finally {
+          stats.getServerReadLock().unlock();
+        }
+
+        _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS,
+            "server." + serverInstanceId, numInFlightRequests);
+        _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ADAPTIVE_SERVER_LATENCY_EMA, "server." + serverInstanceId,
+            (long) latencyEma);
+        _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ADAPTIVE_SERVER_HYBRID_SCORE, "server." + serverInstanceId,
+            (long) hybridScore);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Exception caught while exporting routing stats as metrics.", e);
+    }
   }
 }

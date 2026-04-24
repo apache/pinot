@@ -212,6 +212,11 @@ public class MutableSegmentEntriesAboveThresholdTest implements PinotBuffersAfte
     }
 
     @Override
+    public boolean isAscii() {
+      return _mutableForwardIndex.isAscii();
+    }
+
+    @Override
     public void setDictId(int docId, int dictId) {
       _mutableForwardIndex.setDictId(docId, dictId);
     }

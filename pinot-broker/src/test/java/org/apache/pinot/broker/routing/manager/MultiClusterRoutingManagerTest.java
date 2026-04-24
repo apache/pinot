@@ -264,6 +264,28 @@ public class MultiClusterRoutingManagerTest {
     assertTrue(result.containsKey("server2"));
   }
 
+  @Test
+  public void testGetRoutableServerInstanceMapCombinesAll() {
+    ServerInstance server1 = createMockServerInstance("server1");
+    ServerInstance server2 = createMockServerInstance("server2");
+
+    Map<String, ServerInstance> localRoutable = new HashMap<>();
+    localRoutable.put("server1", server1);
+
+    Map<String, ServerInstance> remoteRoutable = new HashMap<>();
+    remoteRoutable.put("server2", server2);
+
+    when(_localClusterRoutingManager.getRoutableServerInstanceMap()).thenReturn(localRoutable);
+    when(_remoteClusterRoutingManager1.getRoutableServerInstanceMap()).thenReturn(remoteRoutable);
+    when(_remoteClusterRoutingManager2.getRoutableServerInstanceMap()).thenReturn(new HashMap<>());
+
+    Map<String, ServerInstance> result = _multiClusterRoutingManager.getRoutableServerInstanceMap();
+
+    assertEquals(result.size(), 2);
+    assertTrue(result.containsKey("server1"));
+    assertTrue(result.containsKey("server2"));
+  }
+
   // Helper methods
 
   private BrokerRequest createMockBrokerRequest(String tableName) {

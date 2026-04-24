@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.HashMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusPredicate;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.ApproximateRadiusVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
@@ -176,9 +179,44 @@ public class VectorRadiusFilterOperatorTest {
 
     String explain = operator.toExplainString();
     Assert.assertTrue(explain.contains("VECTOR_SIMILARITY_RADIUS"));
-    Assert.assertTrue(explain.contains("vector_index_with_scan"));
+    Assert.assertTrue(explain.contains("vector_index_topk_with_scan"));
     Assert.assertTrue(explain.contains("embedding"));
     Assert.assertTrue(explain.contains("0.5"));
+  }
+
+  @Test
+  public void testApproximateRadiusPathUsesReaderCapability() {
+    MutableRoaringBitmap candidateResult = new MutableRoaringBitmap();
+    candidateResult.add(0);
+    candidateResult.add(1);
+
+    ApproximateRadiusVectorIndexReader mockVectorReader = mock(ApproximateRadiusVectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockVectorReader.getDocIdsWithinApproximateRadius(Mockito.eq(queryVector), Mockito.eq(0.5f),
+        Mockito.anyInt())).thenReturn(candidateResult);
+
+    float[][] vectors = {
+        {1.0f, 0.0f},
+        {0.8f, 0.2f},
+        {0.0f, 1.0f}
+    };
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(vectors);
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityRadiusPredicate predicate = new VectorSimilarityRadiusPredicate(lhs, queryVector, 0.5f);
+
+    VectorIndexConfig config = createVectorIndexConfig("IVF_FLAT", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
+    VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
+        mockForward, mockVectorReader, predicate, "embedding", 3, config);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 2);
+    Mockito.verify(mockVectorReader).getDocIdsWithinApproximateRadius(Mockito.eq(queryVector), Mockito.eq(0.5f),
+        Mockito.anyInt());
+    Mockito.verify(mockVectorReader, Mockito.never()).getDocIds(Mockito.any(float[].class), Mockito.anyInt());
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("vector_index_approx_radius_with_scan"));
+    Assert.assertTrue(explain.contains("approximateRadiusPath:true"));
   }
 
   @Test
@@ -193,6 +231,48 @@ public class VectorRadiusFilterOperatorTest {
 
     String explain = operator.toExplainString();
     Assert.assertTrue(explain.contains("exact_scan"));
+  }
+
+  @Test
+  public void testEuclideanThresholdUsesConfiguredDistanceFunction() {
+    float[] queryVector = {1.0f, 0.0f};
+    float[][] vectors = {
+        {1.0f, 0.0f},
+        {0.9f, 0.1f},
+        {0.0f, 1.0f}
+    };
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(vectors);
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityRadiusPredicate predicate = new VectorSimilarityRadiusPredicate(lhs, queryVector, 0.05f);
+    VectorIndexConfig config = createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
+
+    VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
+        mockForward, null, predicate, "embedding", 3, config);
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+
+    Assert.assertTrue(result.contains(0));
+    Assert.assertTrue(result.contains(1));
+    Assert.assertFalse(result.contains(2));
+  }
+
+  @Test
+  public void testCosineThresholdUsesConfiguredDistanceFunction() {
+    float[] queryVector = {10.0f, 0.0f};
+    float[][] vectors = {
+        {1.0f, 0.0f},   // cosine distance 0
+        {0.0f, 1.0f}    // cosine distance 1
+    };
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(vectors);
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityRadiusPredicate predicate = new VectorSimilarityRadiusPredicate(lhs, queryVector, 0.1f);
+    VectorIndexConfig config = createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.COSINE);
+
+    VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
+        mockForward, null, predicate, "embedding", 2, config);
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+
+    Assert.assertTrue(result.contains(0), "cosine threshold should include same-direction vectors");
+    Assert.assertFalse(result.contains(1), "cosine threshold should exclude orthogonal vectors");
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -212,5 +292,10 @@ public class VectorRadiusFilterOperatorTest {
       when(mockReader.getFloatMV(Mockito.eq(i), Mockito.any())).thenReturn(vectors[i]);
     }
     return mockReader;
+  }
+
+  private VectorIndexConfig createVectorIndexConfig(String backendType,
+      VectorIndexConfig.VectorDistanceFunction distanceFunction) {
+    return new VectorIndexConfig(false, backendType, 2, 1, distanceFunction, new HashMap<>());
   }
 }

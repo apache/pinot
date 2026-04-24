@@ -314,6 +314,149 @@ public class DictionaryIndexTypeTest {
       postConversionAsserts();
     }
 
+    @Test
+    public void oldToNewConfConversionWithRawEncodingAndNoDictionaryColumns()
+        throws IOException {
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimInt\","
+          + "\"encodingType\": \"RAW\","
+          + "\"indexes\": {"
+          + "  \"forward\": {"
+          + "    \"compressionCodec\": \"ZSTANDARD\""
+          + "  }"
+          + "}"
+          + "}");
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+
+      convertToUpdatedFormat();
+
+      final FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
+      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertNotNull(fieldConfig.getIndexes());
+      assertTrue(fieldConfig.getIndexes().isObject());
+      assertNotNull(fieldConfig.getIndexes().get("forward"));
+
+      final long dimIntCount = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimInt"))
+          .count();
+      Assert.assertEquals(dimIntCount, 1L);
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithRawEncodingAndNoDictionaryColumnsMultipleCols()
+        throws IOException {
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimInt\","
+          + "\"encodingType\": \"RAW\","
+          + "\"indexes\": {"
+          + "  \"forward\": {\"compressionCodec\": \"ZSTANDARD\"}"
+          + "}"
+          + "}");
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimStr\","
+          + "\"encodingType\": \"RAW\","
+          + "\"indexes\": {"
+          + "  \"forward\": {\"compressionCodec\": \"LZ4\"}"
+          + "}"
+          + "}");
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\", \"dimStr\"]", _stringListTypeRef));
+
+      convertToUpdatedFormat();
+
+      final FieldConfig dimInt = getFieldConfigByColumn("dimInt");
+      final FieldConfig dimStr = getFieldConfigByColumn("dimStr");
+      Assert.assertEquals(dimInt.getEncodingType(), FieldConfig.EncodingType.RAW);
+      Assert.assertEquals(dimStr.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertNotNull(dimInt.getIndexes().get("forward"));
+      assertNotNull(dimStr.getIndexes().get("forward"));
+
+      for (final String col : new String[]{"dimInt", "dimStr"}) {
+        final long count = _tableConfig.getFieldConfigList().stream()
+            .filter(fc -> fc.getName().equals(col))
+            .count();
+        Assert.assertEquals(count, 1L, "Duplicate FieldConfig for " + col);
+      }
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithRawEncodingNoDictionaryColumnsPartialOverlap()
+        throws IOException {
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimInt\","
+          + "\"encodingType\": \"RAW\","
+          + "\"indexes\": {"
+          + "  \"forward\": {\"compressionCodec\": \"ZSTANDARD\"}"
+          + "}"
+          + "}");
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\", \"dimStr\"]", _stringListTypeRef));
+
+      convertToUpdatedFormat();
+
+      final FieldConfig dimInt = getFieldConfigByColumn("dimInt");
+      Assert.assertEquals(dimInt.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertNotNull(dimInt.getIndexes().get("forward"));
+
+      final FieldConfig dimStr = getFieldConfigByColumn("dimStr");
+      Assert.assertEquals(dimStr.getEncodingType(), FieldConfig.EncodingType.RAW);
+
+      for (final String col : new String[]{"dimInt", "dimStr"}) {
+        final long count = _tableConfig.getFieldConfigList().stream()
+            .filter(fc -> fc.getName().equals(col))
+            .count();
+        Assert.assertEquals(count, 1L, "Duplicate FieldConfig for " + col);
+      }
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithRawEncodingNoDictionaryColumnsAndNoIndexes()
+        throws IOException {
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimInt\","
+          + "\"encodingType\": \"RAW\""
+          + "}");
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+
+      convertToUpdatedFormat();
+
+      final FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
+      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+
+      final long count = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimInt"))
+          .count();
+      Assert.assertEquals(count, 1L);
+      postConversionAsserts();
+    }
+
+    @Test
+    public void oldToNewConfConversionWithNonRawEncodingAndNoDictionaryColumns()
+        throws IOException {
+      addFieldIndexConfig("{"
+          + "\"name\": \"dimInt\","
+          + "\"encodingType\": \"DICTIONARY\""
+          + "}");
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+
+      convertToUpdatedFormat();
+
+      final FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
+      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+
+      final long count = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimInt"))
+          .count();
+      Assert.assertEquals(count, 1L);
+      postConversionAsserts();
+    }
+
     private FieldConfig getFieldConfigByColumn(String column) {
       assertNotNull(_tableConfig.getFieldConfigList());
       assertFalse(_tableConfig.getFieldConfigList().isEmpty());

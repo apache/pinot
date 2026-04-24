@@ -30,10 +30,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.distinct.table.DistinctTable;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -60,7 +67,6 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
-// TODO: add tests for Agg / GroupBy / Distinct result blocks
 public class LeafOperatorTest {
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
   private final AtomicReference<LeafOperator> _operatorRef = new AtomicReference<>();
@@ -398,6 +404,103 @@ public class LeafOperatorTest {
     // Child thread should exit
     executorService.shutdown();
     assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS));
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldReturnAggregationResultBlock() {
+    // Given:
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT COUNT(*), SUM(intCol) FROM tbl");
+    AggregationFunction[] aggFunctions = queryContext.getAggregationFunctions();
+    AggregationResultsBlock aggBlock =
+        new AggregationResultsBlock(aggFunctions, Arrays.asList(2L, 10.0), queryContext);
+    DataSchema schema = aggBlock.getDataSchema();
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(aggBlock);
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    MseBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    List<Object[]> rows = ((MseBlock.Data) resultBlock).asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{2L, 10.0});
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the aggregation block");
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldReturnGroupByResultBlock() {
+    // Given:
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT strCol, COUNT(*) FROM tbl GROUP BY strCol");
+    DataSchema schema = new DataSchema(new String[]{"strCol", "count(*)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
+    List<Record> records = Arrays.asList(new Record(new Object[]{"a", 3L}), new Record(new Object[]{"b", 5L}));
+    Table table = mock(Table.class);
+    when(table.getDataSchema()).thenReturn(schema);
+    when(table.size()).thenReturn(records.size());
+    when(table.iterator()).thenAnswer(inv -> records.iterator());
+    GroupByResultsBlock groupByBlock = new GroupByResultsBlock(table, queryContext);
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(groupByBlock);
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    MseBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    List<Object[]> rows = ((MseBlock.Data) resultBlock).asRowHeap().getRows();
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0), new Object[]{"a", 3L});
+    assertEquals(rows.get(1), new Object[]{"b", 5L});
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the group-by block");
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldReturnDistinctResultBlock() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCT intCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    List<Object[]> distinctRows = Arrays.asList(new Object[]{1}, new Object[]{2}, new Object[]{3});
+    DistinctTable distinctTable = mock(DistinctTable.class);
+    when(distinctTable.getDataSchema()).thenReturn(schema);
+    when(distinctTable.size()).thenReturn(distinctRows.size());
+    when(distinctTable.getRows()).thenReturn(distinctRows);
+    DistinctResultsBlock distinctBlock = new DistinctResultsBlock(distinctTable, queryContext);
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(distinctBlock);
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    MseBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    List<Object[]> rows = ((MseBlock.Data) resultBlock).asRowHeap().getRows();
+    assertEquals(rows.size(), 3);
+    assertEquals(rows.get(0), new Object[]{1});
+    assertEquals(rows.get(1), new Object[]{2});
+    assertEquals(rows.get(2), new Object[]{3});
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the distinct block");
 
     operator.close();
   }

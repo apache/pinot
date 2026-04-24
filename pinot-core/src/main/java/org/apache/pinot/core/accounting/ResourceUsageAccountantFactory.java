@@ -26,10 +26,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.TrackingScope;
@@ -39,7 +39,7 @@ import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,22 +83,21 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
 
     public ResourceUsageAccountant(PinotConfiguration config, String instanceId, InstanceType instanceType) {
       LOGGER.info("Initializing ResourceUsageAccountant");
-      boolean cpuSamplingEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING,
-          CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_CPU_SAMPLING);
+      boolean cpuSamplingEnabled =
+          config.getProperty(Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, Accounting.DEFAULT_ENABLE_THREAD_CPU_SAMPLING);
       if (cpuSamplingEnabled && !ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
         LOGGER.warn("Thread CPU time measurement is not enabled in the JVM, disabling CPU sampling");
         cpuSamplingEnabled = false;
       }
       _cpuSamplingEnabled = cpuSamplingEnabled;
-      boolean memorySamplingEnabled =
-          config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING,
-              CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING);
+      boolean memorySamplingEnabled = config.getProperty(Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING,
+          Accounting.DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING);
       if (memorySamplingEnabled && !ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
         LOGGER.warn("Thread memory measurement is not enabled in the JVM, disabling memory sampling");
         memorySamplingEnabled = false;
       }
       _memorySamplingEnabled = memorySamplingEnabled;
-      _watcherTask = new WatcherTask(config);
+      _watcherTask = new WatcherTask(config, instanceType);
       _queryResourceAggregator =
           new QueryResourceAggregator(instanceId, instanceType, cpuSamplingEnabled, memorySamplingEnabled,
               _watcherTask._queryMonitorConfig);
@@ -133,6 +132,11 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       if (_memorySamplingEnabled) {
         threadTracker.updateMemorySnapshot();
       }
+    }
+
+    @Override
+    public boolean waitIfPaused() {
+      return _queryResourceAggregator.waitIfPaused();
     }
 
     @Override
@@ -201,11 +205,13 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
 
     private class WatcherTask implements Runnable, PinotClusterConfigChangeListener {
       final AtomicReference<QueryMonitorConfig> _queryMonitorConfig = new AtomicReference<>();
+      final InstanceType _instanceType;
 
       long _nextQueryAggregateTimeMs;
       long _nextWorkloadAggregateTimeMs;
 
-      WatcherTask(PinotConfiguration config) {
+      WatcherTask(PinotConfiguration config, InstanceType instanceType) {
+        _instanceType = instanceType;
         QueryMonitorConfig queryMonitorConfig = new QueryMonitorConfig(config, ResourceUsageUtils.getMaxHeapSize());
         _queryMonitorConfig.set(queryMonitorConfig);
         logQueryMonitorConfig(queryMonitorConfig);
@@ -291,29 +297,16 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       }
 
       @Override
-      public synchronized void onChange(Set<String> changedConfigs,
-          Map<String, String> clusterConfigs) {        // Filter configs that have CommonConstants
-        // .PREFIX_SCHEDULER_PREFIX
-        Set<String> filteredChangedConfigs = changedConfigs.stream()
-            .filter(config -> config.startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
-            .map(config -> config.replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""))
-            .collect(Collectors.toSet());
-
-        if (filteredChangedConfigs.isEmpty()) {
+      public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+        ThreadAccountantUtils.AccountingConfigChange change =
+            ThreadAccountantUtils.filterAccountingConfigChange(changedConfigs, clusterConfigs, _instanceType);
+        if (change.isEmpty()) {
           LOGGER.debug("No relevant configs changed, skipping update for QueryMonitorConfig.");
           return;
         }
-
-        Map<String, String> filteredClusterConfigs = clusterConfigs.entrySet()
-            .stream()
-            .filter(entry -> entry.getKey().startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
-            .collect(Collectors.toMap(
-                entry -> entry.getKey().replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""),
-                Map.Entry::getValue));
-
         QueryMonitorConfig oldConfig = getQueryMonitorConfig();
         QueryMonitorConfig newConfig =
-            new QueryMonitorConfig(oldConfig, filteredChangedConfigs, filteredClusterConfigs);
+            new QueryMonitorConfig(oldConfig, change.getChangedConfigs(), change.getClusterConfigs());
         _queryMonitorConfig.set(newConfig);
         logQueryMonitorConfig(newConfig);
       }
@@ -330,6 +323,8 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
         LOGGER.info("_minMemoryFootprintForKill: {}", queryMonitorConfig.getMinMemoryFootprintForKill());
         LOGGER.info("_cpuTimeBasedKillingEnabled: {}", queryMonitorConfig.isCpuTimeBasedKillingEnabled());
         LOGGER.info("_cpuTimeBasedKillingThresholdNs: {}", queryMonitorConfig.getCpuTimeBasedKillingThresholdNs());
+        LOGGER.info("_oomPreQueryKillPauseDurationMs: {}", queryMonitorConfig.getOomPreQueryKillPauseDurationMs());
+        LOGGER.info("_oomPanicPreQueryKillPauseEnabled: {}", queryMonitorConfig.isOomPanicPreQueryKillPauseEnabled());
         LOGGER.info("_workloadSleepTimeMs: {}", queryMonitorConfig.getWorkloadSleepTimeMs());
         LOGGER.info("_workloadCostEnforcementEnabled: {}", queryMonitorConfig.isWorkloadCostEnforcementEnabled());
       }

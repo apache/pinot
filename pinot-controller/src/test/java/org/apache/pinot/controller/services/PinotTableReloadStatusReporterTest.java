@@ -23,16 +23,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.restlet.resources.PinotControllerJobMetadataDto;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 
 
 public class PinotTableReloadStatusReporterTest {
@@ -78,10 +80,25 @@ public class PinotTableReloadStatusReporterTest {
     assertEquals(serverToSegmentsMap, Map.of("anyServer", List.of("anySegment")));
     serverToSegmentsMap = _instance.getServerToSegments(tableName, "seg01|seg02", "svr02");
     assertEquals(serverToSegmentsMap, Map.of("svr02", List.of("seg01", "seg02")));
-    try {
-      _instance.getServerToSegments(tableName, "seg01,seg02", null);
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Only one segment is expected but got: [seg01, seg02]"));
-    }
+
+    serverToSegmentsMap = _instance.getServerToSegments(tableName, "seg01|seg02", null);
+    assertEquals(serverToSegmentsMap,
+        Map.of("svr01", List.of("seg01", "seg02"), "svr02", List.of("seg02"), "svr03", List.of("seg01")));
+  }
+
+  @Test
+  public void testGetServerToSegmentsUsesExactInstanceMappingFromJobMetadata()
+      throws Exception {
+    Map<String, List<String>> instanceToSegmentsMap = Map.of(
+        "svr01", List.of("seg01"),
+        "svr02", List.of("seg02"));
+    PinotControllerJobMetadataDto jobMetadata = new PinotControllerJobMetadataDto()
+        .setTableNameWithType("testTable")
+        .setInstanceToSegmentsMap(JsonUtils.objectToString(instanceToSegmentsMap));
+
+    Map<String, List<String>> serverToSegmentsMap = _instance.getServerToSegments(jobMetadata);
+
+    assertEquals(serverToSegmentsMap, instanceToSegmentsMap);
+    verifyNoInteractions(_pinotHelixResourceManager);
   }
 }

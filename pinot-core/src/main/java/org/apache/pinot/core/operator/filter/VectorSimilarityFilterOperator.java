@@ -243,6 +243,12 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
         .append(", effectiveCandidateCount:").append(explainContext.getEffectiveSearchCount())
         .append(", vector literal:").append(Arrays.toString(_predicate.getValue()))
         .append(", topK to search:").append(_predicate.getTopK());
+    if (explainContext.getEffectiveHnswUseRelativeDistance() != null) {
+      sb.append(", effectiveHnswUseRelativeDistance:").append(explainContext.getEffectiveHnswUseRelativeDistance());
+    }
+    if (explainContext.getEffectiveHnswUseBoundedQueue() != null) {
+      sb.append(", effectiveHnswUseBoundedQueue:").append(explainContext.getEffectiveHnswUseBoundedQueue());
+    }
     if (explainContext.getEffectiveThreshold() >= 0) {
       sb.append(", effectiveThreshold:").append(explainContext.getEffectiveThreshold());
     }
@@ -275,6 +281,14 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     attributeBuilder.putLongIdempotent("effectiveEfSearch", explainContext.getEffectiveEfSearch());
     attributeBuilder.putBool("effectiveExactRerank", explainContext.isEffectiveExactRerank());
     attributeBuilder.putLongIdempotent("effectiveCandidateCount", explainContext.getEffectiveSearchCount());
+    if (explainContext.getEffectiveHnswUseRelativeDistance() != null) {
+      attributeBuilder.putBool("effectiveHnswUseRelativeDistance",
+          explainContext.getEffectiveHnswUseRelativeDistance());
+    }
+    if (explainContext.getEffectiveHnswUseBoundedQueue() != null) {
+      attributeBuilder.putBool("effectiveHnswUseBoundedQueue",
+          explainContext.getEffectiveHnswUseBoundedQueue());
+    }
     if (explainContext.getEffectiveThreshold() >= 0) {
       attributeBuilder.putString("effectiveThreshold", String.valueOf(explainContext.getEffectiveThreshold()));
     }
@@ -401,14 +415,19 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       LOGGER.debug("Set nprobe={} on {} reader for column: {}", nprobe, getBackendName(), column);
     }
     if (_vectorIndexReader instanceof EfSearchAware) {
+      EfSearchAware efSearchAware = (EfSearchAware) _vectorIndexReader;
       Integer efSearch = _searchParams.getEfSearch();
       if (efSearch != null) {
-        ((EfSearchAware) _vectorIndexReader).setEfSearch(efSearch);
-        // EfSearchAware stores the value for explain output only. Actual Lucene graph traversal
-        // is not currently affected — see CommonConstants.VECTOR_EF_SEARCH for details.
-        LOGGER.warn("vectorEfSearch={} was set for column: {} but does not yet affect HNSW graph "
-                + "traversal. The value appears in EXPLAIN output only.",
-            efSearch, column);
+        efSearchAware.setEfSearch(efSearch);
+        VectorSearchMetrics.getInstance().recordEfSearchOverride();
+      }
+      Boolean useRelativeDistance = _searchParams.getHnswUseRelativeDistance();
+      if (useRelativeDistance != null) {
+        efSearchAware.setUseRelativeDistance(useRelativeDistance);
+      }
+      Boolean useBoundedQueue = _searchParams.getHnswUseBoundedQueue();
+      if (useBoundedQueue != null) {
+        efSearchAware.setUseBoundedQueue(useBoundedQueue);
       }
     }
   }
@@ -419,7 +438,10 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       LOGGER.debug("Cleared nprobe on {} reader for column: {}", getBackendName(), column);
     }
     if (_vectorIndexReader instanceof EfSearchAware) {
-      ((EfSearchAware) _vectorIndexReader).clearEfSearch();
+      EfSearchAware efSearchAware = (EfSearchAware) _vectorIndexReader;
+      efSearchAware.clearEfSearch();
+      efSearchAware.clearUseRelativeDistance();
+      efSearchAware.clearUseBoundedQueue();
       LOGGER.debug("Cleared efSearch on {} reader for column: {}", getBackendName(), column);
     }
   }
@@ -518,14 +540,21 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     ImmutableRoaringBitmap preFilter = _preFilterBitmap;
     double filterSelectivity = (preFilter != null && _numDocs > 0)
         ? (double) preFilter.getCardinality() / _numDocs : -1.0;
-    Integer efSearch = _searchParams.getEfSearch();
-    int effectiveEfSearch = efSearch != null ? efSearch : 0;
+    Map<String, Object> indexDebugInfo =
+        _backendType.supportsNprobe() ? _vectorIndexReader.getIndexDebugInfo() : Collections.emptyMap();
+    int effectiveEfSearch =
+        resolveEffectiveEfSearch(_backendType, _searchParams);
+    Boolean effectiveHnswUseRelativeDistance =
+        resolveEffectiveHnswUseRelativeDistance(_backendType, _searchParams);
+    Boolean effectiveHnswUseBoundedQueue =
+        resolveEffectiveHnswUseBoundedQueue(_backendType, _searchParams);
     Float threshold = _hasThresholdPredicate ? _distanceThreshold : null;
     float effectiveThreshold = threshold != null ? threshold : -1f;
     _vectorExplainContext = new VectorExplainContext(_backendType, _distanceFunction, executionMode,
-        resolveEffectiveNprobe(_backendType, _searchParams, _vectorIndexReader.getIndexDebugInfo()),
+        resolveEffectiveNprobe(_backendType, _searchParams, indexDebugInfo),
         _effectiveExactRerank, _effectiveSearchCount, fallbackReason, null,
-        effectiveEfSearch, effectiveThreshold, _vectorSearchMode, filterSelectivity);
+        effectiveEfSearch, effectiveThreshold, _vectorSearchMode, filterSelectivity,
+        effectiveHnswUseRelativeDistance, effectiveHnswUseBoundedQueue);
   }
 
   private static int resolveEffectiveNprobe(VectorBackendType backendType, VectorSearchParams searchParams,
@@ -541,6 +570,34 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
     Integer effectiveNprobe = parseInteger(indexDebugInfo.get("effectiveNprobe"));
     return effectiveNprobe != null ? effectiveNprobe : searchParams.getNprobe();
+  }
+
+  private static int resolveEffectiveEfSearch(VectorBackendType backendType, VectorSearchParams searchParams) {
+    if (backendType != VectorBackendType.HNSW) {
+      return 0;
+    }
+    Integer efSearch = searchParams.getEfSearch();
+    return efSearch != null ? efSearch : 0;
+  }
+
+  @Nullable
+  private static Boolean resolveEffectiveHnswUseRelativeDistance(VectorBackendType backendType,
+      VectorSearchParams searchParams) {
+    if (backendType != VectorBackendType.HNSW) {
+      return null;
+    }
+    Boolean value = searchParams.getHnswUseRelativeDistance();
+    return value != null ? value : Boolean.TRUE;
+  }
+
+  @Nullable
+  private static Boolean resolveEffectiveHnswUseBoundedQueue(VectorBackendType backendType,
+      VectorSearchParams searchParams) {
+    if (backendType != VectorBackendType.HNSW) {
+      return null;
+    }
+    Boolean value = searchParams.getHnswUseBoundedQueue();
+    return value != null ? value : Boolean.TRUE;
   }
 
   @Nullable

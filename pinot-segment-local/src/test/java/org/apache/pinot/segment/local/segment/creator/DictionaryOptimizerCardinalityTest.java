@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -134,7 +134,7 @@ public class DictionaryOptimizerCardinalityTest implements PinotBuffersAfterClas
     segmentGenSpec.setOptimizeDictionary(true);
     segmentGenSpec.setNoDictionaryCardinalityRatioThreshold(0.1); // cardinality must be <10% of total docs to override
 
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGenSpec);
     driver.build();
 

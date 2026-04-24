@@ -22,7 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -38,8 +38,8 @@ public class WorkloadBudgetManagerTest {
   @BeforeClass
   void setup() {
     _config = new PinotConfiguration();
-    _config.setProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
-    _config.setProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS, _enforcementWindowMs);
+    _config.setProperty(Accounting.Keys.WORKLOAD_ENABLE_COST_COLLECTION, true);
+    _config.setProperty(Accounting.Keys.WORKLOAD_ENFORCEMENT_WINDOW_MS, _enforcementWindowMs);
   }
 
   @Test
