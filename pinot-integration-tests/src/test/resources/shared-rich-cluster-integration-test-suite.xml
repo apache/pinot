@@ -25,6 +25,9 @@
       <class name="org.apache.pinot.integration.tests.SegmentUploadIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.IngestionConfigHybridIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.tpch.TPCHQueryIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.BaseDedupIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.StaleSegmentCheckIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.SegmentWriterUploaderIntegrationTest"/>
     </classes>
   </test>
 </suite>

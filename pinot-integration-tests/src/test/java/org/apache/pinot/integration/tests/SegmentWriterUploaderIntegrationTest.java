@@ -53,7 +53,7 @@ import org.testng.annotations.Test;
 /**
  * Tests creating segments via the {@link SegmentWriter} implementations
  */
-public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentWriterUploaderIntegrationTest extends SharedRichClusterIntegrationTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWriterUploaderIntegrationTest.class);
 
@@ -209,6 +209,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   @AfterClass
   public void tearDown()
       throws Exception {
+    deleteSchema(getTableName());
     stopServer();
     stopBroker();
     stopController();

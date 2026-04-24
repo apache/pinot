@@ -222,6 +222,7 @@ public class IngestionConfigHybridIntegrationTest extends SharedRichClusterInteg
       throws Exception {
     dropOfflineTable(getTableName());
     dropRealtimeTable(getTableName());
+    deleteSchema(getTableName());
     stopServer();
     stopBroker();
     stopController();

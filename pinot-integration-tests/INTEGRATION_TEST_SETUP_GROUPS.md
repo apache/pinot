@@ -175,23 +175,33 @@ Keep these no-override tests out of the first shared-rich-cluster pass:
 - `UdfTest`: manual UDF cluster with known non-daemon thread caveat.
 - `AdminConsoleIntegrationTest`: can join only if the shared controller enables Swagger for the whole suite.
 
-### First-Wave Timing
+### Current Draft Suite Timing
 
-The first draft suite moves three low-risk no-override classes behind the shared
+The current draft suite moves six low-risk no-override classes behind the shared
 rich cluster:
 
 - `SegmentUploadIntegrationTest`
 - `IngestionConfigHybridIntegrationTest`
 - `TPCHQueryIntegrationTest`
+- `BaseDedupIntegrationTest`
+- `StaleSegmentCheckIntegrationTest`
+- `SegmentWriterUploaderIntegrationTest`
 
-On this workstation, the same 25 TestNG tests passed in both modes:
+On this workstation, the same 32 TestNG tests passed in both modes:
 
 | Mode | Command | Wall time |
 | --- | --- | ---: |
-| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 57.46s |
-| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 43.63s |
+| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 87.26s |
+| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 51.32s |
 
-That is a 13.83s wall-clock reduction, about 24% for this small first wave.
+That is a 35.94s wall-clock reduction, about 41% for this draft batch.
+
+Attempted but not included yet:
+
+- `PauselessRealtimeIngestionWithDedupIntegrationTest`: intermittently hit unavailable realtime segments under
+  strict replica-group routing in the shared run.
+- Logical-table classes: setup can be attached to the shared cluster, but the inherited logical-table query-timeout
+  assertion needs a targeted fix before adding the batch.
 
 ### Suite Infrastructure
 

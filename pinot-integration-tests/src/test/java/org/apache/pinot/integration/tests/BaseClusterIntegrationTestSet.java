@@ -75,7 +75,7 @@ import static org.testng.Assert.assertTrue;
  * Shared set of common tests for cluster integration tests.
  * <p>To enable the test, override it and add @Test annotation.
  */
-public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrationTest {
+public abstract class BaseClusterIntegrationTestSet extends SharedRichClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTestSet.class);
 
   // Default settings

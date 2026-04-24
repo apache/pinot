@@ -184,6 +184,9 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
   public void tearDown()
       throws IOException {
     dropRealtimeTable(getTableName());
+    dropRealtimeTable(DEDUP_TABLE_WITH_REPLICAS);
+    deleteSchema(getTableName());
+    deleteSchema(DEDUP_TABLE_WITH_REPLICAS);
     stopServer();
     stopBroker();
     stopController();

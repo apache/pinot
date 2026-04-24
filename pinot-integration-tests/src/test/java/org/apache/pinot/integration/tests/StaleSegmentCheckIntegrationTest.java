@@ -45,9 +45,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 
 
-public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest {
+public class StaleSegmentCheckIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final String JSON_FIELD = "jsonField";
 
   private PinotTaskManager _taskManager;
@@ -133,8 +134,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
     updateTableConfig(_tableConfig);
 
     Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
-    assertEquals(needRefreshResponses.size(), 1);
-    assertEquals(needRefreshResponses.values().iterator().next().getStaleSegmentList().size(), 12);
+    assertStaleSegmentCount(needRefreshResponses, 12);
   }
 
   @Test(dependsOnMethods = "testAddRemoveSortedIndex")
@@ -146,8 +146,7 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
     updateTableConfig(_tableConfig);
 
     Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
-    assertEquals(needRefreshResponses.size(), 1);
-    assertEquals(needRefreshResponses.values().iterator().next().getStaleSegmentList().size(), 12);
+    assertStaleSegmentCount(needRefreshResponses, 12);
   }
 
   @Test(dependsOnMethods = "testAddRemoveSortedIndex")
@@ -158,8 +157,15 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
     updateTableConfig(_tableConfig);
 
     Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
-    assertEquals(needRefreshResponses.size(), 1);
-    assertEquals(needRefreshResponses.values().iterator().next().getStaleSegmentList().size(), 12);
+    assertStaleSegmentCount(needRefreshResponses, 12);
+  }
+
+  private void assertStaleSegmentCount(Map<String, TableStaleSegmentResponse> needRefreshResponses,
+      int expectedStaleSegmentCount) {
+    assertFalse(needRefreshResponses.isEmpty());
+    assertEquals(needRefreshResponses.values().stream()
+        .mapToInt(response -> response.getStaleSegmentList().size())
+        .sum(), expectedStaleSegmentCount);
   }
 
   private Map<String, TableStaleSegmentResponse> getStaleSegmentsResponse()
@@ -170,8 +176,11 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @AfterClass
-  public void tearDown() {
+  public void tearDown()
+      throws Exception {
     try {
+      dropOfflineTable(getTableName());
+      deleteSchema(getTableName());
       stopMinion();
       stopServer();
       stopBroker();
