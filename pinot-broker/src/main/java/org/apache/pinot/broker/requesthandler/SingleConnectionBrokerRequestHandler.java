@@ -66,9 +66,9 @@ import org.slf4j.LoggerFactory;
 public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SingleConnectionBrokerRequestHandler.class);
 
-  private final BrokerReduceService _brokerReduceService;
-  private final QueryRouter _queryRouter;
-  private final FailureDetector _failureDetector;
+  protected final BrokerReduceService _brokerReduceService;
+  protected final QueryRouter _queryRouter;
+  protected final FailureDetector _failureDetector;
 
   public SingleConnectionBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
@@ -101,36 +101,82 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
-    BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
-    BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
-
-    assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
+    assert route.getOfflineBrokerRequest() != null || route.getRealtimeBrokerRequest() != null;
     if (requestContext.isSampledRequest()) {
       serverBrokerRequest.getPinotQuery().putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
     }
 
     String rawTableName = TableNameBuilder.extractRawTableName(serverBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, rawTableName, route, timeoutMs);
-    Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
-    if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
+
+    ScatterResult scatterResult = doScatter(requestId, rawTableName, route, timeoutMs, serverStats);
+
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
+        System.nanoTime() - scatterGatherStartTimeNs);
+
+    if (scatterResult.isTimedOut()) {
       BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
           ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
       _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
     }
+
+    long reduceStartTimeNs = System.nanoTime();
+    long reduceTimeoutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
+
+    Map<ServerRoutingInstance, DataTable> dataTableMap =
+        mergeWithCachedDataTables(scatterResult.getDataTableMap(), serverBrokerRequest, requestContext);
+
+    BrokerResponseNative brokerResponse =
+        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, serverBrokerRequest, dataTableMap,
+            reduceTimeoutMs, _brokerMetrics);
+    long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);
+
+    brokerResponse.setNumServersQueried(scatterResult.getNumServersQueried());
+    brokerResponse.setNumServersResponded(scatterResult.getNumServersResponded());
+    brokerResponse.setBrokerReduceTimeMs(TimeUnit.NANOSECONDS.toMillis(reduceTimeNanos));
+
+    if (scatterResult.getSendException() != null) {
+      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.BROKER_REQUEST_SEND,
+          scatterResult.getSendException().getMessage()));
+    }
+    List<ServerRoutingInstance> serversNotResponded = scatterResult.getServersNotResponded();
+    if (!serversNotResponded.isEmpty()) {
+      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.SERVER_NOT_RESPONDING,
+          String.format("%d servers %s not responded", serversNotResponded.size(), serversNotResponded)));
+      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
+          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED
+          : BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED;
+      _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
+    }
+    if (brokerResponse.getExceptionsSize() > 0) {
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
+    }
+    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
+        scatterResult.getTotalResponseSize());
+
+    return brokerResponse;
+  }
+
+  /**
+   * Executes scatter-gather: sends the query to servers and collects per-server DataTables.
+   * Subclasses may override to wrap or replace the scatter step (e.g., for cache integration).
+   */
+  protected ScatterResult doScatter(long requestId, String rawTableName, TableRouteInfo route, long timeoutMs,
+      ServerStats serverStats)
+      throws Exception {
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(requestId, rawTableName, route, timeoutMs);
+    Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
+    boolean timedOut = asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT;
     ServerRoutingInstance failedServer = asyncQueryResponse.getFailedServer();
     if (failedServer != null) {
       _failureDetector.markServerUnhealthy(failedServer.getInstanceId(), failedServer.getHostname());
     }
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
-        System.nanoTime() - scatterGatherStartTimeNs);
     // TODO Use scatterGatherStats as serverStats
     serverStats.setServerStats(asyncQueryResponse.getServerStats());
 
-    int numServersQueried = finalResponses.size();
     long totalResponseSize = 0;
-    Map<ServerRoutingInstance, DataTable> dataTableMap = Maps.newHashMapWithExpectedSize(numServersQueried);
+    Map<ServerRoutingInstance, DataTable> dataTableMap = Maps.newHashMapWithExpectedSize(finalResponses.size());
     List<ServerRoutingInstance> serversNotResponded = new ArrayList<>();
     for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : finalResponses.entrySet()) {
       ServerResponse serverResponse = entry.getValue();
@@ -142,41 +188,67 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
         serversNotResponded.add(entry.getKey());
       }
     }
-    int numServersResponded = dataTableMap.size();
+    return new ScatterResult(dataTableMap, serversNotResponded, totalResponseSize, timedOut,
+        asyncQueryResponse.getException());
+  }
 
-    long reduceStartTimeNs = System.nanoTime();
-    long reduceTimeoutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
-    BrokerResponseNative brokerResponse =
-        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, serverBrokerRequest, dataTableMap,
-            reduceTimeoutMs, _brokerMetrics);
-    long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);
+  /**
+   * Hook for subclasses to merge cached DataTables into the live scatter result before reduce.
+   * The default implementation returns the live map unchanged.
+   */
+  protected Map<ServerRoutingInstance, DataTable> mergeWithCachedDataTables(
+      Map<ServerRoutingInstance, DataTable> liveDataTableMap, BrokerRequest serverBrokerRequest,
+      RequestContext requestContext) {
+    return liveDataTableMap;
+  }
 
-    brokerResponse.setNumServersQueried(numServersQueried);
-    brokerResponse.setNumServersResponded(numServersResponded);
-    brokerResponse.setBrokerReduceTimeMs(TimeUnit.NANOSECONDS.toMillis(reduceTimeNanos));
+  /**
+   * Carries the scatter-gather result before the reduce step.
+   */
+  public static final class ScatterResult {
+    private final Map<ServerRoutingInstance, DataTable> _dataTableMap;
+    private final List<ServerRoutingInstance> _serversNotResponded;
+    private final long _totalResponseSize;
+    private final boolean _timedOut;
+    private final Exception _sendException;
 
-    Exception brokerRequestSendException = asyncQueryResponse.getException();
-    if (brokerRequestSendException != null) {
-      brokerResponse.addException(
-          new QueryProcessingException(QueryErrorCode.BROKER_REQUEST_SEND, brokerRequestSendException.getMessage()));
+    public ScatterResult(Map<ServerRoutingInstance, DataTable> dataTableMap,
+        List<ServerRoutingInstance> serversNotResponded, long totalResponseSize, boolean timedOut,
+        Exception sendException) {
+      _dataTableMap = dataTableMap;
+      _serversNotResponded = serversNotResponded;
+      _totalResponseSize = totalResponseSize;
+      _timedOut = timedOut;
+      _sendException = sendException;
     }
-    int numServersNotResponded = serversNotResponded.size();
-    if (numServersNotResponded != 0) {
-      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.SERVER_NOT_RESPONDING,
-          String.format("%d servers %s not responded", numServersNotResponded, serversNotResponded)));
 
-      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
-          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED
-          : BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED;
-      _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
+    public Map<ServerRoutingInstance, DataTable> getDataTableMap() {
+      return _dataTableMap;
     }
-    if (brokerResponse.getExceptionsSize() > 0) {
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
-    }
-    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);
 
-    return brokerResponse;
+    public List<ServerRoutingInstance> getServersNotResponded() {
+      return _serversNotResponded;
+    }
+
+    public int getNumServersQueried() {
+      return _dataTableMap.size() + _serversNotResponded.size();
+    }
+
+    public int getNumServersResponded() {
+      return _dataTableMap.size();
+    }
+
+    public long getTotalResponseSize() {
+      return _totalResponseSize;
+    }
+
+    public boolean isTimedOut() {
+      return _timedOut;
+    }
+
+    public Exception getSendException() {
+      return _sendException;
+    }
   }
 
   /**
