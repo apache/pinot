@@ -131,19 +131,50 @@ public class ArrowBlockConverterTest {
 
   @Test
   public void testRoundTripViaAsRowHeap() {
-    // End-to-end: RowHeap -> ArrowBlockConverter -> ArrowBlock.asRowHeap() -> rows.
-    DataSchema schema = new DataSchema(new String[]{"id", "name"},
-        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
-    RowHeapDataBlock source = new RowHeapDataBlock(
-        rows(new Object[]{1, "Alice"}, new Object[]{2, "Bob"}), schema);
+    // End-to-end: RowHeap -> ArrowBlockConverter -> ArrowBlock.asRowHeap() -> rows, covering every
+    // scalar type the converter supports. This is a regression guard for the ArrowBlock.asRowHeap() implementation,
+    // which must produce the right Pinot internal types (e.g. BOOLEAN as Integer, BYTES as ByteArray)
+    DataSchema schema = new DataSchema(
+        new String[]{"i", "l", "f", "d", "s", "b", "bool", "ts"},
+        new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
+            ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP});
+    RowHeapDataBlock source = new RowHeapDataBlock(rows(
+        new Object[]{7, 70L, 0.7f, 0.7, "Alice", new ByteArray(new byte[]{1, 2}), 1, 1_700_000_000_000L},
+        new Object[]{null, null, null, null, null, null, null, null},
+        new Object[]{8, 80L, 0.8f, 0.8, "Bob", new ByteArray(new byte[]{3}), 0, 1_800_000_000_000L}),
+        schema);
 
     try (ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(source, _allocator)) {
       List<Object[]> out = arrowBlock.asRowHeap().getRows();
-      assertEquals(out.size(), 2);
-      assertEquals(out.get(0)[0], 1);
-      assertEquals(out.get(0)[1], "Alice");
-      assertEquals(out.get(1)[0], 2);
-      assertEquals(out.get(1)[1], "Bob");
+      assertEquals(out.size(), 3);
+
+      // Row 0: values use Pinot's internal boxed types (BOOLEAN -> Integer, BYTES -> ByteArray).
+      assertEquals(out.get(0)[0], 7);
+      assertEquals(out.get(0)[1], 70L);
+      assertEquals(out.get(0)[2], 0.7f);
+      assertEquals(out.get(0)[3], 0.7);
+      assertEquals(out.get(0)[4], "Alice");
+      assertEquals(out.get(0)[5], new ByteArray(new byte[]{1, 2}));
+      assertEquals(out.get(0)[6], 1);
+      assertEquals(out.get(0)[7], 1_700_000_000_000L);
+
+      // Row 1: every cell is null.
+      for (int col = 0; col < schema.size(); col++) {
+        assertNull(out.get(1)[col], "row 1 col " + col + " must be null");
+      }
+
+      assertEquals(out.get(2)[5], new ByteArray(new byte[]{3}));
+      assertEquals(out.get(2)[6], 0);
+
+      // asSerialized() must not throw — DataBlockBuilder's strict casts pass only if asRowHeap
+      // emitted the right Pinot internal types.
+      SerializedDataBlock serialized = arrowBlock.asSerialized();
+      assertEquals(serialized.getNumRows(), 3);
+      DataBlock db = serialized.getDataBlock();
+      assertEquals(db.getBytes(0, 5), new ByteArray(new byte[]{1, 2}));
+      assertEquals(db.getInt(0, 6), 1);
+      assertEquals(db.getInt(2, 6), 0);
     }
   }
 

@@ -20,11 +20,10 @@ package org.apache.pinot.query.runtime.blocks;
 
 import java.util.Arrays;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.NullVector;
-import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
 /**
@@ -106,27 +105,46 @@ public class ArrowBlock implements MseBlock.Data, AutoCloseable {
   public RowHeapDataBlock asRowHeap() {
     int numRows = getNumRows();
     int numCols = _dataBlock.getNumberOfColumns();
+    DataSchema schema = getDataSchema();
+    // Dispatch on Pinot's stored column type (not on the Arrow vector's  class) so the row-heap
+    // cells carry the types downstream expects
+    ColumnDataType[] storedTypes = schema.getStoredColumnDataTypes();
     VectorSchemaRoot root = _dataBlock.getRoot();
     Object[][] rows = new Object[numRows][numCols];
     for (int colIdx = 0; colIdx < numCols; colIdx++) {
       FieldVector vector = root.getVector(colIdx);
-      if (vector instanceof NullVector) {
-        continue;
-      }
-      if (vector instanceof VarCharVector) {
-        for (int row = 0; row < numRows; row++) {
-          Object value = vector.getObject(row);
-          if (value != null) {
-            rows[row][colIdx] = value.toString();
-          }
+      ColumnDataType storedType = storedTypes[colIdx];
+      for (int row = 0; row < numRows; row++) {
+        if (vector.isNull(row)) {
+          continue;
         }
-      } else {
-        for (int row = 0; row < numRows; row++) {
-          rows[row][colIdx] = vector.getObject(row);
+        switch (storedType) {
+          case INT:
+            rows[row][colIdx] = _dataBlock.getInt(row, colIdx);
+            break;
+          case LONG:
+            rows[row][colIdx] = _dataBlock.getLong(row, colIdx);
+            break;
+          case FLOAT:
+            rows[row][colIdx] = _dataBlock.getFloat(row, colIdx);
+            break;
+          case DOUBLE:
+            rows[row][colIdx] = _dataBlock.getDouble(row, colIdx);
+            break;
+          case STRING:
+            rows[row][colIdx] = _dataBlock.getString(row, colIdx);
+            break;
+          case BYTES:
+            rows[row][colIdx] = _dataBlock.getBytes(row, colIdx);
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                "ArrowBlock.asRowHeap does not support column stored type " + storedType
+                    + " (column '" + schema.getColumnName(colIdx) + "')");
         }
       }
     }
-    return new RowHeapDataBlock(Arrays.asList(rows), getDataSchema());
+    return new RowHeapDataBlock(Arrays.asList(rows), schema);
   }
 
   /**
