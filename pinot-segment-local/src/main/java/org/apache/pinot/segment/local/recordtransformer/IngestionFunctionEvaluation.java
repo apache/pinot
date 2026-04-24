@@ -48,10 +48,12 @@ public final class IngestionFunctionEvaluation {
   }
 
   /**
-   * Enricher: each target field is set to {@code evaluate(record)} (map iteration order; segment-local evaluators).
+   * Enricher: each target field is set to {@code evaluate(record)} (map iteration order; same {@link FunctionEvaluator}
+   * type as {@link org.apache.pinot.segment.local.recordtransformer.enricher.function.CustomFunctionEnricher} and
+   * {@link org.apache.pinot.segment.local.recordtransformer.ExpressionTransformer}).
    */
   public static void applyEnricherEvaluations(GenericRow record,
-      Map<String, org.apache.pinot.segment.local.function.FunctionEvaluator> fieldToFunctionEvaluator) {
+      Map<String, FunctionEvaluator> fieldToFunctionEvaluator) {
     fieldToFunctionEvaluator.forEach(
         (field, evaluator) -> record.putValue(field, evaluator.evaluate(record)));
   }
