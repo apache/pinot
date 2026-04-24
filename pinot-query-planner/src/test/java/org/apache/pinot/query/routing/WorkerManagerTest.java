@@ -247,7 +247,7 @@ public class WorkerManagerTest {
         workerManager);
 
     try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
-        "SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
+        "SET useBrokerPruning=true; SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
       DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
       assertNotNull(dispatchableSubPlan);
       // Pruned count should propagate from RoutingTable through DispatchablePlanContext to DispatchableSubPlan

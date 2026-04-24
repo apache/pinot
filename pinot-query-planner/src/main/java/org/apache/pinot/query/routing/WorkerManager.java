@@ -560,7 +560,9 @@ public class WorkerManager {
       if (!routingTable.getUnavailableSegments().isEmpty()) {
         metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
       }
-      context.addNumSegmentsPrunedByBroker(routingTable.getNumPrunedSegments());
+      if (routingPinotQuery != null) {
+        context.addNumSegmentsPrunedByBroker(routingTable.getNumPrunedSegments());
+      }
     }
     // Sort server instances to ensure deterministic worker ID assignment.
     // This is critical for pre-partitioned exchanges where worker ID N on one stage
