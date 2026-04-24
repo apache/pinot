@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -229,7 +230,7 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
 
     String url = DEFAULT_INSTANCE.getControllerBaseApiUrl() + "/sql/ddl";
     String body = "{\"sql\": \"SHOW CREATE TABLE " + tbl + "\"}";
-    java.util.Map<String, String> hdrs = new java.util.LinkedHashMap<>();
+    Map<String, String> hdrs = new LinkedHashMap<>();
     hdrs.put("Content-Type", "application/json");
     // Pass database via header with no SQL db. qualifier — the resolved database must appear in
     // the emitted DDL so replaying without the header still targets the correct tenant.
@@ -238,7 +239,10 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
     JsonNode response = JsonUtils.stringToJsonNode(raw);
     assertEquals(response.get("operation").asText(), "SHOW_CREATE_TABLE");
     String ddl = response.get("ddl").asText();
-    assertTrue(ddl.startsWith("CREATE TABLE default." + tbl),
+    // The database name "default" is a SQL reserved keyword, so the canonical emitter must
+    // double-quote it to round-trip. The qualifier must still be present — otherwise replaying
+    // the DDL without the Database header would target the wrong tenant.
+    assertTrue(ddl.startsWith("CREATE TABLE \"default\"." + tbl),
         "Expected DDL to carry db-qualified name; got:\n" + ddl);
   }
 
@@ -340,21 +344,19 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
   }
 
   private static int postRawExpectFailureBody(String url, String body) {
-    Map<String, String> headers = Collections.singletonMap("Content-Type", "application/json");
+    // Use postRequestWithStatusCode which does not throw on error — the HTTP status code is
+    // returned directly from the underlying response. Scanning exception messages for numeric
+    // substrings is fragile because the error body may itself contain integers that look like
+    // status codes (e.g. the echoed request body or a column count).
     try {
-      sendPostRequest(url, body, headers);
-      fail("Expected request to fail with HTTP error");
-      return -1;
-    } catch (IOException e) {
-      // The wrapper throws an HttpErrorStatusException whose message starts with the status code.
-      String msg = e.getMessage() == null ? "" : e.getMessage();
-      // Status code is the first integer prefix in the message; default to 500 if not parseable.
-      for (int code : new int[]{400, 404, 409, 500}) {
-        if (msg.contains(String.valueOf(code))) {
-          return code;
-        }
+      Pair<Integer, String> result = postRequestWithStatusCode(url, body);
+      int status = result.getLeft();
+      if (status >= 200 && status < 300) {
+        fail("Expected request to fail with HTTP error but got status " + status);
       }
-      return 500;
+      return status;
+    } catch (IOException e) {
+      throw new RuntimeException("Unexpected IO error contacting controller", e);
     }
   }
 }
