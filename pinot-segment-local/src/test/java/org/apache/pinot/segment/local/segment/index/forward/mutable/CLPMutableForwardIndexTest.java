@@ -29,7 +29,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvide
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -75,8 +74,7 @@ public class CLPMutableForwardIndexTest implements PinotBuffersAfterClassCheckRu
     // use arbitrary cardinality and avg string length
     // we will test with complete randomness
     int initialCapacity = 5;
-    try (CLPMutableForwardIndex readerWriter = new CLPMutableForwardIndex("col1", FieldSpec.DataType.STRING,
-        _memoryManager, initialCapacity)) {
+    try (CLPMutableForwardIndex readerWriter = new CLPMutableForwardIndex("col1", _memoryManager, initialCapacity)) {
       ingestData(readerWriter);
       validateStats(readerWriter.getCLPStats());
     }

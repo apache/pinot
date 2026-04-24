@@ -372,7 +372,7 @@ public abstract class ColumnarSegmentBuildingTestBase {
         "Cardinality mismatch for column " + columnName);
     Assert.assertEquals(metadata1.hasDictionary(), metadata2.hasDictionary(),
         "Dictionary flag mismatch for column " + columnName);
-    Assert.assertEquals(metadata1.getColumnMaxLength(), metadata2.getColumnMaxLength(),
+    Assert.assertEquals(metadata1.getLengthOfLongestElement(), metadata2.getLengthOfLongestElement(),
         "Column max length mismatch for column " + columnName);
 
     // Validate sorting and indexing properties

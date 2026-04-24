@@ -21,11 +21,8 @@
 if [ -z "${DOCKER_IMAGE_NAME}" ]; then
   DOCKER_IMAGE_NAME="apachepinot/pinot"
 fi
-if [ -z "${PINOT_GIT_URL}" ]; then
-  PINOT_GIT_URL="https://github.com/apache/pinot.git"
-fi
-if [ -z "${PINOT_BRANCH}" ]; then
-  PINOT_BRANCH="master"
+if [ -z "${PINOT_GIT_REF}" ]; then
+  PINOT_GIT_REF="master"
 fi
 
 cd ${DOCKER_FILE_BASE_DIR}
@@ -35,8 +32,7 @@ docker image prune --all --filter "until=1h" -f
 docker build \
     --no-cache \
     --file Dockerfile \
-    --build-arg PINOT_GIT_URL=${PINOT_GIT_URL} \
-    --build-arg PINOT_BRANCH=${PINOT_BRANCH} \
+    --build-arg PINOT_GIT_REF=${PINOT_GIT_REF} \
     --tag ${DOCKER_IMAGE_NAME}:${PINOT_SHA} \
     .
 

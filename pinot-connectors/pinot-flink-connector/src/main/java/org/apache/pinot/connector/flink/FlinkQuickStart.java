@@ -35,7 +35,7 @@ import org.apache.flink.types.Row;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminTransport;
 import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
-import org.apache.pinot.connector.flink.sink.PinotSinkFunction;
+import org.apache.pinot.connector.flink.sink.PinotSink;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -78,7 +78,7 @@ public final class FlinkQuickStart {
     List<Row> data = loadData();
     StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
     execEnv.setParallelism(2);
-    DataStream<Row> srcDs = execEnv.fromCollection(data).returns(TEST_TYPE_INFO).keyBy(r -> r.getField(0));
+    DataStream<Row> srcDs = execEnv.fromData(data, TEST_TYPE_INFO).keyBy(r -> r.getField(0));
 
     URI controllerUri = URI.create(DEFAULT_CONTROLLER_URL);
     String controllerAddress = controllerUri.getAuthority();
@@ -94,9 +94,8 @@ public final class FlinkQuickStart {
       Schema schema = client.getSchemaClient().getSchemaObject("starbucksStores");
       TableConfig tableConfig =
           client.getTableClient().getTableConfigObjectForType("starbucksStores", TableType.OFFLINE);
-      srcDs.addSink(
-          new PinotSinkFunction<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema,
-              DEFAULT_CONTROLLER_URL));
+      srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema,
+          DEFAULT_CONTROLLER_URL));
     }
     execEnv.execute();
   }

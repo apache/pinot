@@ -23,8 +23,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import org.apache.avro.file.DataFileStream;
@@ -54,6 +56,11 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
   private static final int REALTIME_TABLE_CONFIG_RETRY_COUNT = 5;
   private static final long REALTIME_TABLE_CONFIG_RETRY_WAIT_MS = 1_000L;
   private static final long KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS = 60_000L;
+  private static final long COUNT_RECORDS_DRAIN_TIMEOUT_MS = 60_000L;
+  private static final Duration COUNT_RECORDS_END_OFFSETS_TIMEOUT = Duration.ofSeconds(10);
+  private static final Duration COUNT_RECORDS_POSITION_TIMEOUT = Duration.ofSeconds(5);
+  private static final Duration COUNT_RECORDS_PRIMING_POLL_TIMEOUT = Duration.ofMillis(200);
+  private static final Duration COUNT_RECORDS_POLL_TIMEOUT = Duration.ofSeconds(2);
 
   @Override
   public void addTableConfig(TableConfig tableConfig)
@@ -247,6 +254,13 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
 
   /**
    * Count records visible in the topic with the given isolation level.
+   *
+   * <p>For {@code read_committed}, {@link KafkaConsumer#endOffsets(java.util.Collection, Duration)}
+   * returns the LSO (Last Stable Offset) per partition; for {@code read_uncommitted} it returns the
+   * log-end-offset. We poll until every partition's position catches up to that snapshot rather than
+   * breaking on the first empty poll. On a freshly assigned consumer the first poll often returns
+   * empty while metadata/fetch sessions are being established, and breaking on it produced false
+   * zero counts and spurious {@code markers were not propagated} failures.
    */
   private int countRecords(String brokerList, String isolationLevel) {
     Properties props = new Properties();
@@ -265,25 +279,77 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
         LOGGER.warn("No partitions found for topic {}", getKafkaTopic());
         return 0;
       }
+      List<TopicPartition> topicPartitions = new ArrayList<>(partitions.size());
       for (PartitionInfo pi : partitions) {
-        TopicPartition tp = new TopicPartition(pi.topic(), pi.partition());
-        consumer.assign(Collections.singletonList(tp));
-        consumer.seekToBeginning(Collections.singletonList(tp));
-        long deadline = System.currentTimeMillis() + 30_000L;
-        int partitionRecords = 0;
-        while (System.currentTimeMillis() < deadline) {
-          ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofSeconds(5));
-          if (records.isEmpty()) {
-            break;
-          }
-          partitionRecords += records.count();
+        topicPartitions.add(new TopicPartition(pi.topic(), pi.partition()));
+      }
+      consumer.assign(topicPartitions);
+      consumer.seekToBeginning(topicPartitions);
+      // Prime the consumer's metadata/fetch session with a short poll so the subsequent
+      // endOffsets() and position() calls do not block on cold metadata resolution. Any records
+      // returned here advance the consumer position and must be counted, otherwise we could return
+      // a caught-up position with totalRecords==0.
+      ConsumerRecords<byte[], byte[]> primingRecords = consumer.poll(COUNT_RECORDS_PRIMING_POLL_TIMEOUT);
+      totalRecords += primingRecords.count();
+      Map<TopicPartition, Long> endOffsets = consumer.endOffsets(topicPartitions, COUNT_RECORDS_END_OFFSETS_TIMEOUT);
+      long totalEndOffset = 0L;
+      for (Long offset : endOffsets.values()) {
+        totalEndOffset += offset;
+      }
+      if (totalEndOffset == 0L) {
+        // Two cases, both correctly returning 0:
+        //  - read_committed: LSO is at 0 on every partition, i.e. no transaction has been finalized yet.
+        //  - read_uncommitted: the topic is genuinely empty.
+        // A timeout from endOffsets() throws TimeoutException and goes to the catch block below,
+        // so reaching here means the broker returned 0 for every partition.
+        LOGGER.info("countRecords({}): endOffsets returned 0 for all partitions ({})", isolationLevel, endOffsets);
+        return totalRecords;
+      }
+      long deadline = System.currentTimeMillis() + COUNT_RECORDS_DRAIN_TIMEOUT_MS;
+      boolean caughtUp = false;
+      while (System.currentTimeMillis() < deadline) {
+        if (allPartitionsCaughtUp(consumer, topicPartitions, endOffsets)) {
+          caughtUp = true;
+          break;
         }
-        totalRecords += partitionRecords;
+        ConsumerRecords<byte[], byte[]> records = consumer.poll(COUNT_RECORDS_POLL_TIMEOUT);
+        totalRecords += records.count();
+      }
+      if (!caughtUp) {
+        LOGGER.warn("countRecords({}) drain timed out after {}ms; returning partial count {}. positions={}, "
+                + "endOffsets={}", isolationLevel, COUNT_RECORDS_DRAIN_TIMEOUT_MS, totalRecords,
+            currentPositions(consumer, topicPartitions), endOffsets);
       }
     } catch (Exception e) {
-      LOGGER.error("Error counting records with {}: {}", isolationLevel, e.getMessage());
+      LOGGER.error("Error counting records with {}", isolationLevel, e);
     }
     return totalRecords;
+  }
+
+  private boolean allPartitionsCaughtUp(KafkaConsumer<byte[], byte[]> consumer, List<TopicPartition> topicPartitions,
+      Map<TopicPartition, Long> endOffsets) {
+    for (TopicPartition tp : topicPartitions) {
+      Long endOffset = endOffsets.get(tp);
+      // position(tp, Duration) bounds the call so a slow metadata/offset fetch cannot exceed the
+      // outer drain deadline.
+      if (endOffset == null || consumer.position(tp, COUNT_RECORDS_POSITION_TIMEOUT) < endOffset) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private Map<TopicPartition, Long> currentPositions(KafkaConsumer<byte[], byte[]> consumer,
+      List<TopicPartition> topicPartitions) {
+    Map<TopicPartition, Long> positions = new LinkedHashMap<>();
+    for (TopicPartition tp : topicPartitions) {
+      try {
+        positions.put(tp, consumer.position(tp, COUNT_RECORDS_POSITION_TIMEOUT));
+      } catch (Exception e) {
+        positions.put(tp, -1L);
+      }
+    }
+    return positions;
   }
 
   private boolean isRetryableRealtimePartitionMetadataError(Throwable throwable) {

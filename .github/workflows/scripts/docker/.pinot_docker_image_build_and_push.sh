@@ -21,21 +21,21 @@
 if [ -z "${DOCKER_IMAGE_NAME}" ]; then
   DOCKER_IMAGE_NAME="apachepinot/pinot"
 fi
-if [ -z "${PINOT_GIT_URL}" ]; then
-  PINOT_GIT_URL="https://github.com/apache/pinot.git"
-fi
-if [ -z "${PINOT_BRANCH}" ]; then
-  PINOT_BRANCH="master"
+if [ -z "${PINOT_GIT_REF}" ]; then
+  PINOT_GIT_REF="master"
 fi
 if [ -z "${BUILD_PLATFORM}" ]; then
   BUILD_PLATFORM="linux/arm64,linux/amd64"
 fi
 
-# Get pinot commit id
+# Get pinot commit id.
+# Use clone + checkout instead of clone -b so that commit SHAs work in
+# addition to branch/tag names.
 ROOT_DIR=`pwd`
 rm -rf /tmp/pinot
-git clone -b ${PINOT_BRANCH} --single-branch ${PINOT_GIT_URL} /tmp/pinot
+git clone --no-single-branch https://github.com/apache/pinot.git /tmp/pinot
 cd /tmp/pinot
+git checkout "${PINOT_GIT_REF}"
 COMMIT_ID=`git rev-parse --short HEAD`
 VERSION=`mvn help:evaluate -Dexpression=project.version -q -DforceStdout`
 rm -rf /tmp/pinot
@@ -63,7 +63,7 @@ docker buildx build \
     --no-cache \
     --platform=${BUILD_PLATFORM} \
     --file Dockerfile \
-    --build-arg PINOT_GIT_URL=${PINOT_GIT_URL} --build-arg PINOT_BRANCH=${PINOT_BRANCH} \
+    --build-arg PINOT_GIT_REF=${PINOT_GIT_REF} \
     ${DOCKER_BUILD_TAGS} \
     --push \
     .

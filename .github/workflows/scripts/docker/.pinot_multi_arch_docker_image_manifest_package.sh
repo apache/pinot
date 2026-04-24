@@ -49,16 +49,14 @@ for tag in "${tags[@]}"; do
     docker manifest push \
       ${DOCKER_IMAGE_NAME}:${tag}-${baseImageTag}
 
-    if [ "${baseImageTag}" == "11-amazoncorretto" ]; then
-      if [ "${tag}" == "latest" ]; then
-        echo "Creating manifest for tag: latest"
+    if [ "${baseImageTag}" == "21-ms-openjdk" ]; then
+        echo "Creating manifest for tag: ${tag}"
         docker manifest create \
-          ${DOCKER_IMAGE_NAME}:latest \
+          ${DOCKER_IMAGE_NAME}:${tag} \
           ${DOCKER_AMEND_TAGS_CMD}
 
         docker manifest push \
-          ${DOCKER_IMAGE_NAME}:latest
-      fi
+          ${DOCKER_IMAGE_NAME}:${tag}
     fi
   done
 done

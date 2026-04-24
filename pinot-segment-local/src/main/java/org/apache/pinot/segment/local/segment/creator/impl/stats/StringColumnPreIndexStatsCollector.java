@@ -37,6 +37,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   private Set<String> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
+  private boolean _isAscii = true;
   private int _maxRowLength = 0;
   private String[] _sortedValues;
   private boolean _sealed = false;
@@ -58,17 +59,19 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       int rowLength = 0;
       for (Object obj : values) {
         String value = (String) obj;
-        _values.add(value);
         if (_clpStatsCollector != null) {
           _clpStatsCollector.collect(value);
         }
-
         int length = Utf8.encodedLength(value);
-        _minLength = Math.min(_minLength, length);
-        _maxLength = Math.max(_maxLength, length);
+        if (_values.add(value)) {
+          _minLength = Math.min(_minLength, length);
+          _maxLength = Math.max(_maxLength, length);
+          if (_isAscii) {
+            _isAscii = length == value.length();
+          }
+        }
         rowLength += length;
       }
-
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       _maxRowLength = Math.max(_maxRowLength, rowLength);
       updateTotalNumberOfEntries(values);
@@ -82,9 +85,12 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         if (isPartitionEnabled()) {
           updatePartition(value);
         }
-        int valueLength = Utf8.encodedLength(value);
-        _minLength = Math.min(_minLength, valueLength);
-        _maxLength = Math.max(_maxLength, valueLength);
+        int length = Utf8.encodedLength(value);
+        if (_isAscii) {
+          _isAscii = length == value.length();
+        }
+        _minLength = Math.min(_minLength, length);
+        _maxLength = Math.max(_maxLength, length);
         _maxRowLength = _maxLength;
       }
       _totalNumberOfEntries++;
@@ -124,23 +130,28 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
+  public int getCardinality() {
+    return _sealed ? _sortedValues.length : _values.size();
+  }
+
+  @Override
   public int getLengthOfShortestElement() {
     return _minLength;
   }
 
   @Override
-  public int getLengthOfLargestElement() {
+  public int getLengthOfLongestElement() {
     return _maxLength;
+  }
+
+  @Override
+  public boolean isAscii() {
+    return _isAscii;
   }
 
   @Override
   public int getMaxRowLengthInBytes() {
     return _maxRowLength;
-  }
-
-  @Override
-  public int getCardinality() {
-    return _sealed ? _sortedValues.length : _values.size();
   }
 
   @Override

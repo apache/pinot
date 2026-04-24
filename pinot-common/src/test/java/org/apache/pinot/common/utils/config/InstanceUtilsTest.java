@@ -112,6 +112,77 @@ public class InstanceUtilsTest {
   }
 
   @Test
+  public void testToInstance() {
+    // Controller — minimal, no optional fields
+    Instance controller = new Instance("localhost", 1234, InstanceType.CONTROLLER, null, null, 0, 0, 0, 0, false);
+    Instance rtController = InstanceUtils.toInstance(InstanceUtils.toHelixInstanceConfig(controller));
+    assertInstanceEquals(rtController, controller);
+
+    // Broker — with tags
+    List<String> brokerTags = Collections.singletonList("DefaultTenant_BROKER");
+    Instance broker = new Instance("localhost", 2345, InstanceType.BROKER, brokerTags, null, 0, 0, 0, 0, false);
+    Instance rtBroker = InstanceUtils.toInstance(InstanceUtils.toHelixInstanceConfig(broker));
+    assertInstanceEquals(rtBroker, broker);
+
+    // Server — with tags, pools, all optional ports, queriesDisabled
+    List<String> serverTags = Arrays.asList("T1_OFFLINE", "T2_REALTIME");
+    Map<String, Integer> poolMap = new TreeMap<>();
+    poolMap.put("T1_OFFLINE", 0);
+    poolMap.put("T2_REALTIME", 1);
+    Instance server = new Instance("localhost", 3456, InstanceType.SERVER, serverTags, poolMap, 123, 234, 345, 456,
+        true);
+    Instance rtServer = InstanceUtils.toInstance(InstanceUtils.toHelixInstanceConfig(server));
+    assertInstanceEquals(rtServer, server);
+
+    // Minion — with tags, no pools
+    List<String> minionTags = Collections.singletonList("minion_untagged");
+    Instance minion = new Instance("localhost", 4567, InstanceType.MINION, minionTags, null, 0, 0, 0, 0, false);
+    Instance rtMinion = InstanceUtils.toInstance(InstanceUtils.toHelixInstanceConfig(minion));
+    assertInstanceEquals(rtMinion, minion);
+
+    // Server with legacy 'Server_<hostname>' format in hostName field
+    InstanceConfig legacyServerConfig = new InstanceConfig("Server_localhost_3456");
+    legacyServerConfig.setHostName("Server_localhost");
+    legacyServerConfig.setPort("3456");
+    legacyServerConfig.addTag("T1_OFFLINE");
+    Instance legacyServer = InstanceUtils.toInstance(legacyServerConfig);
+    assertEquals(legacyServer.getHost(), "localhost");
+    assertEquals(legacyServer.getPort(), 3456);
+    assertEquals(legacyServer.getType(), InstanceType.SERVER);
+
+    // Unknown instance type prefix
+    InstanceConfig unknownConfig = new InstanceConfig("Unknown_localhost_1234");
+    unknownConfig.setHostName("localhost");
+    unknownConfig.setPort("1234");
+    try {
+      InstanceUtils.toInstance(unknownConfig);
+      throw new AssertionError("Expected IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Unknown_localhost_1234"));
+    }
+  }
+
+  private void assertInstanceEquals(Instance actual, Instance expected) {
+    assertEquals(actual.getHost(), expected.getHost());
+    assertEquals(actual.getPort(), expected.getPort());
+    assertEquals(actual.getType(), expected.getType());
+    // toHelixInstanceConfig converts null tags to empty list
+    List<String> expectedTags = expected.getTags() != null ? expected.getTags() : Collections.emptyList();
+    assertEquals(actual.getTags(), expectedTags);
+    assertEquals(actual.getPools(), expected.getPools());
+    // toHelixInstanceConfig strips ports <= 0, so toInstance reads them back as -1
+    int expectedGrpc = expected.getGrpcPort() > 0 ? expected.getGrpcPort() : -1;
+    int expectedAdmin = expected.getAdminPort() > 0 ? expected.getAdminPort() : -1;
+    int expectedQueryService = expected.getQueryServicePort() > 0 ? expected.getQueryServicePort() : -1;
+    int expectedQueryMailbox = expected.getQueryMailboxPort() > 0 ? expected.getQueryMailboxPort() : -1;
+    assertEquals(actual.getGrpcPort(), expectedGrpc);
+    assertEquals(actual.getAdminPort(), expectedAdmin);
+    assertEquals(actual.getQueryServicePort(), expectedQueryService);
+    assertEquals(actual.getQueryMailboxPort(), expectedQueryMailbox);
+    assertEquals(actual.isQueriesDisabled(), expected.isQueriesDisabled());
+  }
+
+  @Test
   public void testUpdateHelixInstanceConfig() {
     Instance instance =
         new Instance("localhost", 1234, InstanceType.SERVER, Collections.singletonList("DefaultTenant_OFFLINE"), null,

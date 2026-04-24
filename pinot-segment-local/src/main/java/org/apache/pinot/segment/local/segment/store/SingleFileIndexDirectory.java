@@ -49,7 +49,10 @@ import org.apache.pinot.segment.spi.memory.EmptyIndexBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +84,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   // This breaks the abstraction with PinotDataBuffer....a workaround for
   // now till PinotDataBuffer can support large buffers again
   private static final int MAX_ALLOCATION_SIZE = 2000 * 1024 * 1024;
+
+  private static final String TASK_CONFIG_JSON_PROPERTY = "task.config.json";
 
   private final File _segmentDirectory;
   private final SegmentDirectoryLoaderContext _segmentDirectoryLoaderContext;
@@ -340,11 +345,46 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       properties.putAll(_segmentDirectoryLoaderContext.getSegmentCustomConfigs());
     }
 
+    // Propagate the table's task config (serialized as JSON) to remote/empty index buffers so that
+    // downstream readers backed by external storage can resolve any configuration they require
+    // (e.g. credentials, regions, endpoints) from the ingestion task config rather than relying
+    // solely on ambient environment defaults, which may be incomplete or unavailable in this context.
+    String taskConfigJson = serializeTaskConfigToJsonFromContext();
+    if (taskConfigJson != null) {
+      properties.setProperty(TASK_CONFIG_JSON_PROPERTY, taskConfigJson);
+    }
+
     // Create empty buffers for all zero-size entries
     for (IndexEntry entry : zeroSizeEntries) {
       entry._buffer = new EmptyIndexBuffer(properties,
           _segmentMetadata.getName(),
           _segmentMetadata.getTableName());
+    }
+  }
+
+  @Nullable
+  private String serializeTaskConfigToJsonFromContext() {
+    if (_segmentDirectoryLoaderContext == null) {
+      return null;
+    }
+    TableConfig tableConfig = _segmentDirectoryLoaderContext.getTableConfig();
+    if (tableConfig == null) {
+      return null;
+    }
+    TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+    if (taskConfig == null) {
+      return null;
+    }
+    Map<String, Map<String, String>> taskTypeConfigsMap = taskConfig.getTaskTypeConfigsMap();
+    if (taskTypeConfigsMap == null || taskTypeConfigsMap.isEmpty()) {
+      return null;
+    }
+    try {
+      return JsonUtils.objectToString(taskTypeConfigsMap);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to serialize task config to JSON for segment: {}",
+          _segmentMetadata.getName(), e);
+      return null;
     }
   }
 

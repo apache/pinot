@@ -79,4 +79,15 @@ public interface ResponseStore {
    */
   boolean deleteResponse(String requestId)
       throws Exception;
+
+  /**
+   * Delete all responses that have expired before the given timestamp. Implementations should iterate through stored
+   * responses and delete those whose expiration time is at or before {@code expiredBeforeMs}.
+   *
+   * @param expiredBeforeMs Epoch milliseconds cutoff; responses with expirationTimeMs &lt;= this value are deleted.
+   * @return The number of responses successfully deleted.
+   * @throws Exception Thrown if an unrecoverable error occurs during cleanup.
+   */
+  int deleteExpiredResponses(long expiredBeforeMs)
+      throws Exception;
 }

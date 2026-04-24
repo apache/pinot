@@ -18,62 +18,24 @@
  */
 package org.apache.pinot.segment.local.function;
 
-import com.google.common.base.Preconditions;
-import java.util.Collections;
-import java.util.List;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.TimeConverter;
-import org.apache.pinot.spi.utils.TimeUtils;
 
 
 /**
- * An implementation of {@link FunctionEvaluator} for converting the time value based on the {@link TimeFieldSpec}.
+ * Deprecated forwarding wrapper for the legacy time spec evaluator type name.
+ *
+ * <p>Instances inherit the thread-safety characteristics of
+ * {@link org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator}.
+ *
+ * <p>TODO: Delete this shim after Pinot 1.6.0 is released.
+ *
+ * @deprecated Use {@link org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator} instead.
  */
-public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
-  private final String _incomingTimeColumn;
-  private final String _outgoingTimeColumn;
-  private final TimeConverter _incomingTimeConverter;
-  private final TimeConverter _outgoingTimeConverter;
-  private boolean _isValidated = false;
-
+@Deprecated
+public class TimeSpecFunctionEvaluator extends org.apache.pinot.common.evaluator.TimeSpecFunctionEvaluator
+    implements FunctionEvaluator {
   public TimeSpecFunctionEvaluator(TimeGranularitySpec incomingGranularitySpec,
       TimeGranularitySpec outgoingGranularitySpec) {
-    Preconditions.checkState(!incomingGranularitySpec.equals(outgoingGranularitySpec));
-    _incomingTimeColumn = incomingGranularitySpec.getName();
-    _outgoingTimeColumn = outgoingGranularitySpec.getName();
-    Preconditions.checkState(!_incomingTimeColumn.equals(_outgoingTimeColumn));
-    _incomingTimeConverter = new TimeConverter(incomingGranularitySpec);
-    _outgoingTimeConverter = new TimeConverter(outgoingGranularitySpec);
-  }
-
-  @Override
-  public List<String> getArguments() {
-    return Collections.singletonList(_incomingTimeColumn);
-  }
-
-  /**
-   * Performs time transformation
-   */
-  @Override
-  public Object evaluate(GenericRow genericRow) {
-    return evaluate(genericRow.getValue(_incomingTimeColumn));
-  }
-
-  @Override
-  public Object evaluate(Object[] values) {
-    return evaluate(values[0]);
-  }
-
-  private Object evaluate(Object incomingTimeValue) {
-    if (!_isValidated) {
-      if (_incomingTimeColumn == null || !TimeUtils
-          .timeValueInValidRange(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue))) {
-        throw new IllegalStateException("No valid time value found in incoming time column: " + _incomingTimeColumn);
-      }
-      _isValidated = true;
-    }
-    return _outgoingTimeConverter.fromMillisSinceEpoch(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue));
+    super(incomingGranularitySpec, outgoingGranularitySpec);
   }
 }

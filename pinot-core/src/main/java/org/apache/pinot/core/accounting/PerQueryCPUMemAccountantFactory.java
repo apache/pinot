@@ -30,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -41,6 +40,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -50,7 +50,6 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.slf4j.Logger;
@@ -118,14 +117,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       LOGGER.info("Initializing PerQueryCPUMemResourceUsageAccountant");
       _instanceId = instanceId;
       _instanceType = instanceType;
-      boolean cpuSamplingEnabled = config.getProperty(Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING,
-          Accounting.DEFAULT_ENABLE_THREAD_CPU_SAMPLING);
+      boolean cpuSamplingEnabled =
+          config.getProperty(Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, Accounting.DEFAULT_ENABLE_THREAD_CPU_SAMPLING);
       if (cpuSamplingEnabled && !ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
         LOGGER.warn("Thread CPU time measurement is not enabled in the JVM, disabling CPU sampling");
         cpuSamplingEnabled = false;
       }
       _cpuSamplingEnabled = cpuSamplingEnabled;
-      boolean memorySamplingEnabled = config.getProperty(Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING,
+      boolean memorySamplingEnabled = config.getProperty(Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING,
           Accounting.DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING);
       if (memorySamplingEnabled && !ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
         LOGGER.warn("Thread memory measurement is not enabled in the JVM, disabling memory sampling");
@@ -367,27 +366,15 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       @Override
       public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-        // Filter configs that have CommonConstants.PREFIX_SCHEDULER_PREFIX
-        Set<String> filteredChangedConfigs = changedConfigs.stream()
-            .filter(config -> config.startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
-            .map(config -> config.replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""))
-            .collect(Collectors.toSet());
-
-        if (filteredChangedConfigs.isEmpty()) {
+        ThreadAccountantUtils.AccountingConfigChange change =
+            ThreadAccountantUtils.filterAccountingConfigChange(changedConfigs, clusterConfigs, _instanceType);
+        if (change.isEmpty()) {
           LOGGER.debug("No relevant configs changed, skipping update for QueryMonitorConfig.");
           return;
         }
-
-        Map<String, String> filteredClusterConfigs = clusterConfigs.entrySet()
-            .stream()
-            .filter(entry -> entry.getKey().startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
-            .collect(Collectors.toMap(
-                entry -> entry.getKey().replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""),
-                Map.Entry::getValue));
-
         QueryMonitorConfig oldConfig = _queryMonitorConfig.get();
         QueryMonitorConfig newConfig =
-            new QueryMonitorConfig(oldConfig, filteredChangedConfigs, filteredClusterConfigs);
+            new QueryMonitorConfig(oldConfig, change.getChangedConfigs(), change.getClusterConfigs());
         _queryMonitorConfig.set(newConfig);
         logQueryMonitorConfig(newConfig);
       }

@@ -35,6 +35,7 @@ public class ScalarQuantizerTest {
   private static final int DIMENSION = 128;
   private static final float TOLERANCE_SQ8 = 0.01f;
   private static final float TOLERANCE_SQ4 = 0.1f;
+  private static final float DISTANCE_TOLERANCE = 1e-4f;
 
   @Test
   public void testSq8TrainAndEncode() {
@@ -129,6 +130,27 @@ public class ScalarQuantizerTest {
     float ipDistance = sq.computeDistance(query, encodedDoc,
         VectorIndexConfig.VectorDistanceFunction.INNER_PRODUCT);
     assertNotNull(ipDistance);
+  }
+
+  @Test
+  public void testDirectDistanceMatchesDecodePathForSq8() {
+    assertDirectDistanceMatchesDecodePath(ScalarQuantizer.BitWidth.SQ8);
+  }
+
+  @Test
+  public void testDirectDistanceMatchesDecodePathForSq4() {
+    assertDirectDistanceMatchesDecodePath(ScalarQuantizer.BitWidth.SQ4);
+  }
+
+  @Test
+  public void testCosineDistanceWithZeroNormQueryReturnsFiniteFallback() {
+    float[][] vectors = generateRandomVectors(1000, DIMENSION, 42);
+    ScalarQuantizer sq = ScalarQuantizer.train(vectors, DIMENSION, ScalarQuantizer.BitWidth.SQ8);
+
+    float[] zeroQuery = new float[DIMENSION];
+    byte[] encodedDoc = sq.encode(vectors[0]);
+
+    assertEquals(sq.computeDistance(zeroQuery, encodedDoc, VectorIndexConfig.VectorDistanceFunction.COSINE), 1.0f);
   }
 
   @Test
@@ -272,6 +294,23 @@ public class ScalarQuantizerTest {
     return result;
   }
 
+  private void assertDirectDistanceMatchesDecodePath(ScalarQuantizer.BitWidth bitWidth) {
+    float[][] vectors = generateRandomVectors(1000, DIMENSION, 42);
+    ScalarQuantizer quantizer = ScalarQuantizer.train(vectors, DIMENSION, bitWidth);
+
+    float[] query = vectors[0];
+    float[] document = vectors[1];
+    byte[] encodedDoc = quantizer.encode(document);
+    float[] decodedDoc = quantizer.decode(encodedDoc);
+
+    assertEquals(quantizer.computeDistance(query, encodedDoc, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN),
+        exactDistance(query, decodedDoc, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN), DISTANCE_TOLERANCE);
+    assertEquals(quantizer.computeDistance(query, encodedDoc, VectorIndexConfig.VectorDistanceFunction.INNER_PRODUCT),
+        exactDistance(query, decodedDoc, VectorIndexConfig.VectorDistanceFunction.INNER_PRODUCT), DISTANCE_TOLERANCE);
+    assertEquals(quantizer.computeDistance(query, encodedDoc, VectorIndexConfig.VectorDistanceFunction.COSINE),
+        exactDistance(query, decodedDoc, VectorIndexConfig.VectorDistanceFunction.COSINE), DISTANCE_TOLERANCE);
+  }
+
   private static int[] findTopKApprox(float[] query, byte[][] encoded, ScalarQuantizer sq, int k,
       VectorIndexConfig.VectorDistanceFunction df) {
     int n = encoded.length;
@@ -307,7 +346,7 @@ public class ScalarQuantizerTest {
           float diff = a[d] - b[d];
           sum += diff * diff;
         }
-        return (float) Math.sqrt(sum);
+        return sum;
       case COSINE:
         float dot = 0;
         float normA = 0;
@@ -319,6 +358,12 @@ public class ScalarQuantizerTest {
         }
         float denom = (float) (Math.sqrt(normA) * Math.sqrt(normB));
         return denom > 0 ? 1.0f - dot / denom : 1.0f;
+      case INNER_PRODUCT:
+      case DOT_PRODUCT:
+        for (int d = 0; d < a.length; d++) {
+          sum += a[d] * b[d];
+        }
+        return -sum;
       default:
         throw new IllegalArgumentException("Unsupported: " + df);
     }

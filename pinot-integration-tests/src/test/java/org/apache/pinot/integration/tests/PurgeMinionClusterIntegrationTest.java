@@ -203,7 +203,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
   public void testFirstRunPurge()
       throws Exception {
     // Expected purge task generation :
-    // 1. No previous purge run so all segment should be processed and purge metadata sould be added to the segments
+    // 1. No previous purge run so all segment should be processed and purge metadata should be added to the segments
     // 2. Check that we cannot run on same time two purge generation ensuring running segment will be skipped
     // 3. Check segment ZK metadata to ensure purge time is updated into the metadata
     // 4. Check after the first run of the purge if we rerun a purge task generation no task should be scheduled

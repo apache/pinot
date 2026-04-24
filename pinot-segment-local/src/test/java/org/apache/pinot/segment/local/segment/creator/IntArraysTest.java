@@ -27,7 +27,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -62,7 +62,7 @@ public class IntArraysTest {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
 
     final SegmentGeneratorConfig config = SegmentTestUtils
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "weeksSinceEpochSunday",

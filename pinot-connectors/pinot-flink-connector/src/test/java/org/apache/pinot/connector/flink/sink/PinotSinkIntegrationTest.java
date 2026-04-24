@@ -114,8 +114,8 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     // Single-thread write
     StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
     execEnv.setParallelism(1);
-    DataStream<Row> srcDs = execEnv.fromCollection(_data).returns(_typeInfo);
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
+    DataStream<Row> srcDs = execEnv.fromData(_data, _typeInfo);
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
     execEnv.execute();
     verifySegments(1, 6);
 
@@ -124,8 +124,8 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     // Parallel write
     execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
     execEnv.setParallelism(2);
-    srcDs = execEnv.fromCollection(_data).returns(_typeInfo).keyBy(r -> r.getField(0));
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
+    srcDs = execEnv.fromData(_data, _typeInfo).keyBy(r -> r.getField(0));
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema));
     execEnv.execute();
     verifySegments(2, 6);
   }

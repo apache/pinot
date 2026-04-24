@@ -21,7 +21,7 @@ package org.apache.pinot.core.accounting;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 
 
 public class QueryMonitorConfig {
@@ -62,6 +62,12 @@ public class QueryMonitorConfig {
 
   private final boolean _queryKilledMetricEnabled;
 
+  // how long to pause query threads (ms) before proceeding with kill; non-positive means disabled
+  private final long _oomPreQueryKillPauseDurationMs;
+
+  // whether to also apply the OOM pause before killing at panic level
+  private final boolean _oomPanicPreQueryKillPauseEnabled;
+
   private final int _workloadSleepTimeMs;
 
   private final boolean _workloadCostEnforcementEnabled;
@@ -69,214 +75,172 @@ public class QueryMonitorConfig {
   public QueryMonitorConfig(PinotConfiguration config, long maxHeapSize) {
     _maxHeapSize = maxHeapSize;
 
-    _minMemoryFootprintForKill = (long) (maxHeapSize * config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO,
-        CommonConstants.Accounting.DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO));
+    _minMemoryFootprintForKill =
+        (long) (maxHeapSize * config.getProperty(Accounting.Keys.MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO,
+            Accounting.DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO));
 
-    _panicLevel =
-        (long) (maxHeapSize * config.getProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
-            CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
+    _panicLevel = (long) (maxHeapSize * config.getProperty(Accounting.Keys.PANIC_LEVEL_HEAP_USAGE_RATIO,
+        Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
 
     // kill the most expensive query if heap usage exceeds this
-    _criticalLevel =
-        (long) (maxHeapSize * config.getProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO,
-            CommonConstants.Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO));
+    _criticalLevel = (long) (maxHeapSize * config.getProperty(Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO,
+        Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO));
 
-    _alarmingLevel =
-        (long) (maxHeapSize * config.getProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO,
-            CommonConstants.Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO));
+    _alarmingLevel = (long) (maxHeapSize * config.getProperty(Accounting.Keys.ALARMING_LEVEL_HEAP_USAGE_RATIO,
+        Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO));
 
-    _normalSleepTime = config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_MS,
-        CommonConstants.Accounting.DEFAULT_SLEEP_TIME_MS);
+    _normalSleepTime = config.getProperty(Accounting.Keys.SLEEP_TIME_MS, Accounting.DEFAULT_SLEEP_TIME_MS);
 
-    _alarmingSleepTimeDenominator = config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_DENOMINATOR,
-        CommonConstants.Accounting.DEFAULT_SLEEP_TIME_DENOMINATOR);
+    _alarmingSleepTimeDenominator =
+        config.getProperty(Accounting.Keys.SLEEP_TIME_DENOMINATOR, Accounting.DEFAULT_SLEEP_TIME_DENOMINATOR);
 
     _alarmingSleepTime = _normalSleepTime / _alarmingSleepTimeDenominator;
 
-    _oomKillQueryEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY,
-        CommonConstants.Accounting.DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY);
+    _oomKillQueryEnabled = config.getProperty(Accounting.Keys.OOM_PROTECTION_KILLING_QUERY,
+        Accounting.DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY);
 
-    _publishHeapUsageMetric = config.getProperty(CommonConstants.Accounting.CONFIG_OF_PUBLISHING_JVM_USAGE,
-        CommonConstants.Accounting.DEFAULT_PUBLISHING_JVM_USAGE);
+    _publishHeapUsageMetric =
+        config.getProperty(Accounting.Keys.PUBLISHING_JVM_USAGE, Accounting.DEFAULT_PUBLISHING_JVM_USAGE);
 
-    _cpuTimeBasedKillingEnabled =
-        config.getProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED,
-            CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_ENABLED);
+    _cpuTimeBasedKillingEnabled = config.getProperty(Accounting.Keys.CPU_TIME_BASED_KILLING_ENABLED,
+        Accounting.DEFAULT_CPU_TIME_BASED_KILLING_ENABLED);
 
-    _cpuTimeBasedKillingThresholdNs =
-        config.getProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS,
-            CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS) * 1000_000L;
+    _cpuTimeBasedKillingThresholdNs = config.getProperty(Accounting.Keys.CPU_TIME_BASED_KILLING_THRESHOLD_MS,
+        Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS) * 1000_000L;
 
-    _queryKilledMetricEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
-        CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
+    _queryKilledMetricEnabled =
+        config.getProperty(Accounting.Keys.QUERY_KILLED_METRIC_ENABLED, Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
 
-    _workloadSleepTimeMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS,
-        CommonConstants.Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS);
+    _oomPreQueryKillPauseDurationMs = config.getProperty(Accounting.Keys.OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS,
+        Accounting.DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS);
 
-    _workloadCostEnforcementEnabled =
-        config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
-            CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
+    _oomPanicPreQueryKillPauseEnabled = config.getProperty(Accounting.Keys.OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE,
+        Accounting.DEFAULT_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED);
+
+    _workloadSleepTimeMs =
+        config.getProperty(Accounting.Keys.WORKLOAD_SLEEP_TIME_MS, Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS);
+
+    _workloadCostEnforcementEnabled = config.getProperty(Accounting.Keys.WORKLOAD_ENABLE_COST_ENFORCEMENT,
+        Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
   }
 
   QueryMonitorConfig(QueryMonitorConfig oldConfig, Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     _maxHeapSize = oldConfig._maxHeapSize;
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO)) {
-        _minMemoryFootprintForKill =
-            (long) (_maxHeapSize * CommonConstants.Accounting.DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO);
-      } else {
-        _minMemoryFootprintForKill = (long) (_maxHeapSize * Double.parseDouble(
-            clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO)));
-      }
+    if (changedConfigs.contains(Accounting.Keys.MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO)) {
+      String str = clusterConfigs.get(Accounting.Keys.MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO);
+      double value = str != null ? Double.parseDouble(str) : Accounting.DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO;
+      _minMemoryFootprintForKill = (long) (_maxHeapSize * value);
     } else {
       _minMemoryFootprintForKill = oldConfig._minMemoryFootprintForKill;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)) {
-        _panicLevel = (long) (_maxHeapSize * CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO);
-      } else {
-        _panicLevel = (long) (_maxHeapSize * Double.parseDouble(
-            clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)));
-      }
+    if (changedConfigs.contains(Accounting.Keys.PANIC_LEVEL_HEAP_USAGE_RATIO)) {
+      String str = clusterConfigs.get(Accounting.Keys.PANIC_LEVEL_HEAP_USAGE_RATIO);
+      double value = str != null ? Double.parseDouble(str) : Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO;
+      _panicLevel = (long) (_maxHeapSize * value);
     } else {
       _panicLevel = oldConfig._panicLevel;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO)) {
-        _criticalLevel = (long) (_maxHeapSize * CommonConstants.Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO);
-      } else {
-        _criticalLevel = (long) (_maxHeapSize * Double.parseDouble(
-            clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO)));
-      }
+    if (changedConfigs.contains(Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO)) {
+      String str = clusterConfigs.get(Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO);
+      double value = str != null ? Double.parseDouble(str) : Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO;
+      _criticalLevel = (long) (_maxHeapSize * value);
     } else {
       _criticalLevel = oldConfig._criticalLevel;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO)) {
-        _alarmingLevel = (long) (_maxHeapSize * CommonConstants.Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO);
-      } else {
-        _alarmingLevel = (long) (_maxHeapSize * Double.parseDouble(
-            clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO)));
-      }
+    if (changedConfigs.contains(Accounting.Keys.ALARMING_LEVEL_HEAP_USAGE_RATIO)) {
+      String str = clusterConfigs.get(Accounting.Keys.ALARMING_LEVEL_HEAP_USAGE_RATIO);
+      double value = str != null ? Double.parseDouble(str) : Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO;
+      _alarmingLevel = (long) (_maxHeapSize * value);
     } else {
       _alarmingLevel = oldConfig._alarmingLevel;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_MS)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_MS)) {
-        _normalSleepTime = CommonConstants.Accounting.DEFAULT_SLEEP_TIME_MS;
-      } else {
-        _normalSleepTime = Integer.parseInt(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_MS));
-      }
+    if (changedConfigs.contains(Accounting.Keys.SLEEP_TIME_MS)) {
+      String str = clusterConfigs.get(Accounting.Keys.SLEEP_TIME_MS);
+      _normalSleepTime = str != null ? Integer.parseInt(str) : Accounting.DEFAULT_SLEEP_TIME_MS;
     } else {
       _normalSleepTime = oldConfig._normalSleepTime;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_DENOMINATOR)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_DENOMINATOR)) {
-        _alarmingSleepTimeDenominator = CommonConstants.Accounting.DEFAULT_SLEEP_TIME_DENOMINATOR;
-      } else {
-        _alarmingSleepTimeDenominator =
-            Integer.parseInt(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_DENOMINATOR));
-      }
+    if (changedConfigs.contains(Accounting.Keys.SLEEP_TIME_DENOMINATOR)) {
+      String str = clusterConfigs.get(Accounting.Keys.SLEEP_TIME_DENOMINATOR);
+      _alarmingSleepTimeDenominator = str != null ? Integer.parseInt(str) : Accounting.DEFAULT_SLEEP_TIME_DENOMINATOR;
     } else {
       _alarmingSleepTimeDenominator = oldConfig._alarmingSleepTimeDenominator;
     }
 
     _alarmingSleepTime = _normalSleepTime / _alarmingSleepTimeDenominator;
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY)) {
-        _oomKillQueryEnabled = CommonConstants.Accounting.DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY;
-      } else {
-        _oomKillQueryEnabled =
-            Boolean.parseBoolean(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY));
-      }
+    if (changedConfigs.contains(Accounting.Keys.OOM_PROTECTION_KILLING_QUERY)) {
+      String str = clusterConfigs.get(Accounting.Keys.OOM_PROTECTION_KILLING_QUERY);
+      _oomKillQueryEnabled =
+          str != null ? Boolean.parseBoolean(str) : Accounting.DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY;
     } else {
       _oomKillQueryEnabled = oldConfig._oomKillQueryEnabled;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_PUBLISHING_JVM_USAGE)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_PUBLISHING_JVM_USAGE)) {
-        _publishHeapUsageMetric = CommonConstants.Accounting.DEFAULT_PUBLISHING_JVM_USAGE;
-      } else {
-        _publishHeapUsageMetric =
-            Boolean.parseBoolean(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_PUBLISHING_JVM_USAGE));
-      }
+    if (changedConfigs.contains(Accounting.Keys.PUBLISHING_JVM_USAGE)) {
+      String str = clusterConfigs.get(Accounting.Keys.PUBLISHING_JVM_USAGE);
+      _publishHeapUsageMetric = str != null ? Boolean.parseBoolean(str) : Accounting.DEFAULT_PUBLISHING_JVM_USAGE;
     } else {
       _publishHeapUsageMetric = oldConfig._publishHeapUsageMetric;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED)) {
-        _cpuTimeBasedKillingEnabled = CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_ENABLED;
-      } else {
-        _cpuTimeBasedKillingEnabled = Boolean.parseBoolean(
-            clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED));
-      }
+    if (changedConfigs.contains(Accounting.Keys.CPU_TIME_BASED_KILLING_ENABLED)) {
+      String str = clusterConfigs.get(Accounting.Keys.CPU_TIME_BASED_KILLING_ENABLED);
+      _cpuTimeBasedKillingEnabled =
+          str != null ? Boolean.parseBoolean(str) : Accounting.DEFAULT_CPU_TIME_BASED_KILLING_ENABLED;
     } else {
       _cpuTimeBasedKillingEnabled = oldConfig._cpuTimeBasedKillingEnabled;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS)) {
-        _cpuTimeBasedKillingThresholdNs =
-            CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS * 1000_000L;
-      } else {
-        _cpuTimeBasedKillingThresholdNs =
-            Long.parseLong(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS))
-                * 1000_000L;
-      }
+    if (changedConfigs.contains(Accounting.Keys.CPU_TIME_BASED_KILLING_THRESHOLD_MS)) {
+      String str = clusterConfigs.get(Accounting.Keys.CPU_TIME_BASED_KILLING_THRESHOLD_MS);
+      long valueMs = str != null ? Long.parseLong(str) : Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS;
+      _cpuTimeBasedKillingThresholdNs = valueMs * 1000_000L;
     } else {
       _cpuTimeBasedKillingThresholdNs = oldConfig._cpuTimeBasedKillingThresholdNs;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED)) {
-        _queryKilledMetricEnabled = CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED;
-      } else {
-        _queryKilledMetricEnabled =
-            Boolean.parseBoolean(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED));
-      }
+    if (changedConfigs.contains(Accounting.Keys.QUERY_KILLED_METRIC_ENABLED)) {
+      String str = clusterConfigs.get(Accounting.Keys.QUERY_KILLED_METRIC_ENABLED);
+      _queryKilledMetricEnabled =
+          str != null ? Boolean.parseBoolean(str) : Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED;
     } else {
       _queryKilledMetricEnabled = oldConfig._queryKilledMetricEnabled;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS)) {
-        _workloadSleepTimeMs = CommonConstants.Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS;
-      } else {
-        _workloadSleepTimeMs =
-            Integer.parseInt(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS));
-      }
+    if (changedConfigs.contains(Accounting.Keys.OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS)) {
+      String str = clusterConfigs.get(Accounting.Keys.OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS);
+      _oomPreQueryKillPauseDurationMs =
+          str != null ? Long.parseLong(str) : Accounting.DEFAULT_OOM_PRE_QUERY_KILL_PAUSE_DURATION_MS;
+    } else {
+      _oomPreQueryKillPauseDurationMs = oldConfig._oomPreQueryKillPauseDurationMs;
+    }
+
+    if (changedConfigs.contains(Accounting.Keys.OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE)) {
+      String str = clusterConfigs.get(Accounting.Keys.OOM_PANIC_ALLOW_PRE_QUERY_KILL_PAUSE);
+      _oomPanicPreQueryKillPauseEnabled =
+          str != null ? Boolean.parseBoolean(str) : Accounting.DEFAULT_OOM_PANIC_PRE_QUERY_KILL_PAUSE_ENABLED;
+    } else {
+      _oomPanicPreQueryKillPauseEnabled = oldConfig._oomPanicPreQueryKillPauseEnabled;
+    }
+
+    if (changedConfigs.contains(Accounting.Keys.WORKLOAD_SLEEP_TIME_MS)) {
+      String str = clusterConfigs.get(Accounting.Keys.WORKLOAD_SLEEP_TIME_MS);
+      _workloadSleepTimeMs = str != null ? Integer.parseInt(str) : Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS;
     } else {
       _workloadSleepTimeMs = oldConfig._workloadSleepTimeMs;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT)) {
-      if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT)) {
-        _workloadCostEnforcementEnabled = CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT;
-      } else {
-        _workloadCostEnforcementEnabled = Boolean.parseBoolean(
-            clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT));
-      }
+    if (changedConfigs.contains(Accounting.Keys.WORKLOAD_ENABLE_COST_ENFORCEMENT)) {
+      String str = clusterConfigs.get(Accounting.Keys.WORKLOAD_ENABLE_COST_ENFORCEMENT);
+      _workloadCostEnforcementEnabled =
+          str != null ? Boolean.parseBoolean(str) : Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT;
     } else {
       _workloadCostEnforcementEnabled = oldConfig._workloadCostEnforcementEnabled;
     }
@@ -328,6 +292,18 @@ public class QueryMonitorConfig {
 
   public boolean isQueryKilledMetricEnabled() {
     return _queryKilledMetricEnabled;
+  }
+
+  public boolean isOomPreQueryKillPauseEnabled() {
+    return _oomPreQueryKillPauseDurationMs > 0;
+  }
+
+  public long getOomPreQueryKillPauseDurationMs() {
+    return _oomPreQueryKillPauseDurationMs;
+  }
+
+  public boolean isOomPanicPreQueryKillPauseEnabled() {
+    return _oomPanicPreQueryKillPauseEnabled;
   }
 
   public int getWorkloadSleepTimeMs() {

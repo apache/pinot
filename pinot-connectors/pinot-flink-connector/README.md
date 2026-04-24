@@ -28,7 +28,7 @@ including the upsert tables. You can read more about the motivation and design i
 // Set up flink env and data source
 StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
 execEnv.setParallelism(2); // optional
-DataStream<Row> srcDs = execEnv.fromCollection(data).returns(TEST_TYPE_INFO)
+DataStream<Row> srcDs = execEnv.fromData(data, TEST_TYPE_INFO);
 
 // Create a PinotAdminClient to fetch Pinot schema and table config
 String controllerUrl = "http://localhost:9000";
@@ -49,7 +49,7 @@ try (PinotAdminClient client = new PinotAdminClient(controllerAddress, propertie
   TableConfig tableConfig =
       client.getTableClient().getTableConfigObjectForType("starbucksStores", TableType.OFFLINE);
   // create Flink Pinot Sink
-  srcDs.addSink(new PinotSinkFunction<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema,
+  srcDs.sinkTo(new PinotSink<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema,
       controllerUrl));
 }
 execEnv.execute();
@@ -60,7 +60,7 @@ execEnv.execute();
 // Set up flink env and data source
 StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
 execEnv.setParallelism(2); // mandatory for upsert tables
-DataStream<Row> srcDs = execEnv.fromCollection(data).returns(TEST_TYPE_INFO)
+DataStream<Row> srcDs = execEnv.fromData(data, TEST_TYPE_INFO);
 
 // Create a PinotAdminClient to fetch Pinot schema and table config
 String controllerUrl = "http://localhost:9000";
@@ -83,7 +83,7 @@ try (PinotAdminClient client = new PinotAdminClient(controllerAddress, propertie
 
   // create Flink Pinot Sink (partition it same as the realtime stream(e.g. kafka) in case of upsert tables)
   srcDs.partitionCustom((Partitioner<Integer>) (key, partitions) -> key % partitions, r -> (Integer) r.getField("primaryKey"))
-      .addSink(new PinotSinkFunction<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema,
+      .sinkTo(new PinotSink<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema,
           controllerUrl));
 }
 execEnv.execute();

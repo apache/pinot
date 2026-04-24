@@ -138,13 +138,39 @@ public interface Dictionary extends IndexReader {
    */
   Comparable getMaxVal();
 
-  /**
-   * Returns a sorted array of all values in the dictionary. For type INT/LONG/FLOAT/DOUBLE, primitive type array will
-   * be returned; for type BIG_DECIMAL, {@code BigDecimal[]} will be returned; for type STRING, {@code String[]} will be
-   * returned; for type BYTES, {@code ByteArray[]} will be returned.
-   * This method is for the stats collection phase when sealing the consuming segment.
-   */
-  Object getSortedValues();
+  /// Returns a sorted array of all values in the dictionary. For type INT/LONG/FLOAT/DOUBLE, primitive type array
+  /// will be returned; for type BIG_DECIMAL, `BigDecimal[]` will be returned; for type STRING, `String[]` will be
+  /// returned; for type BYTES, `ByteArray[]` will be returned.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default Object getSortedValues() {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Returns the length (in bytes) of the shortest element in the dictionary.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default int getLengthOfShortestElement() {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Returns the length (in bytes) of the longest element in the dictionary.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default int getLengthOfLongestElement() {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Returns `true` when all elements in a STRING dictionary contain only ASCII characters, `false` otherwise.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default boolean isAscii() {
+    throw new UnsupportedOperationException();
+  }
 
   // Single-value read APIs
 

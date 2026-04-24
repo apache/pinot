@@ -76,6 +76,7 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -265,12 +266,20 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, serverNettyPort);
     int serverGrpcPort = NetUtils.findOpenPort(serverNettyPort + 1);
     serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, serverGrpcPort);
+    // Assign the multi-stage query engine ports explicitly using the incremental findOpenPort pattern so that
+    // rapid back-to-back server starts in the same JVM don't collide on OS-ephemeral ports. Otherwise
+    // BaseServerStarter.init() falls back to NetUtils.findOpenPort() which probes and releases a ServerSocket(0)
+    // before the gRPC server binds, opening a window where the same port can be handed to a later caller.
+    int queryServerPort = NetUtils.findOpenPort(serverGrpcPort + 1);
+    serverConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, queryServerPort);
+    int queryRunnerPort = NetUtils.findOpenPort(queryServerPort + 1);
+    serverConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, queryRunnerPort);
     if (_serverAdminApiPort == 0) {
       _serverAdminApiPort = serverAdminApiPort;
       _serverNettyPort = serverNettyPort;
       _serverGrpcPort = serverGrpcPort;
     }
-    _nextServerPort = serverGrpcPort + 1;
+    _nextServerPort = queryRunnerPort + 1;
 
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
