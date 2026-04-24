@@ -85,6 +85,13 @@ spark-submit \
 - HTTPS/TLS support for secure connections
 
 ## Quick Start
+
+> **New to the connector?** The companion
+> [End-to-end Docker tutorial](documentation/end-to-end-docker-tutorial.md) brings up a Pinot
+> cluster, a Spark 4 driver on JDK 21, and walks through both read and write paths with copy-
+> pasteable commands. Recommended first read — it also documents the classpath + JDK gotchas
+> you are likely to hit.
+
 ```scala
 import org.apache.spark.sql.SparkSession
 
