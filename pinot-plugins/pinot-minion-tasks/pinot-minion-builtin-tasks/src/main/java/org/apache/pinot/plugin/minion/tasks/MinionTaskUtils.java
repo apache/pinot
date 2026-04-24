@@ -39,6 +39,7 @@ import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.RetentionUtils;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.InstanceUtils;
@@ -556,9 +557,7 @@ public class MinionTaskUtils {
     List<SegmentZKMetadata> filtered = new ArrayList<>();
     int excludedCount = 0;
     for (SegmentZKMetadata segment : segments) {
-      long endTimeMs = segment.getEndTimeMs();
-      if ((TimeUtils.timeValueInValidRange(endTimeMs))
-          && (currentTimeMs - endTimeMs > effectiveRetentionMs)) {
+      if (RetentionUtils.isPurgeable(tableNameWithType, segment, effectiveRetentionMs, currentTimeMs)) {
         excludedCount++;
       } else {
         filtered.add(segment);
