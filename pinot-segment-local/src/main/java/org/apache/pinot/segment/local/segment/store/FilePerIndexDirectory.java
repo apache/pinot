@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -99,8 +100,16 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public void removeIndex(String columnName, IndexType<?, ?, ?> indexType) {
-    // TODO: this leaks the removed data buffer (it's not going to be freed in close() method)
-    _indexBuffers.remove(new IndexKey(columnName, indexType));
+    IndexKey key = new IndexKey(columnName, indexType);
+    PinotDataBuffer removed = _indexBuffers.remove(key);
+    if (removed != null) {
+      try {
+        removed.close();
+      } catch (IOException e) {
+        throw new UncheckedIOException(
+            "Failed to close buffer for column " + columnName + ", index " + indexType.getId(), e);
+      }
+    }
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
     } else if (indexType == StandardIndexes.vector()) {
