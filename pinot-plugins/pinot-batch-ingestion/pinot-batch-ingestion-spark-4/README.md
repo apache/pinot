@@ -29,6 +29,11 @@ The runners in this module are straight ports of the Spark 3 runners; they targe
 ingestion spec format and shared base classes in
 [pinot-batch-ingestion-spark-base](../../pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-base/).
 
+> **Looking for an end-to-end walkthrough?** The Spark 4 connector's
+> [End-to-end Docker tutorial](../../../pinot-connectors/pinot-spark-4-connector/documentation/end-to-end-docker-tutorial.md)
+> covers the full write flow from a Spark DataFrame to a queryable Pinot table, and calls out
+> where these runners plug in (the push step after segment generation).
+
 ## Compatibility
 
 | Pinot module                        | Spark | Scala       | JDK (build & runtime) |
