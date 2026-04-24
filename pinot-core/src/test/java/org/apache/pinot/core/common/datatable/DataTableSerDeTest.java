@@ -20,6 +20,7 @@ package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -67,6 +68,8 @@ public class DataTableSerDeTest {
   private static final int[][] BOOLEAN_ARRAYS = new int[NUM_ROWS][];
   private static final long[][] TIMESTAMP_ARRAYS = new long[NUM_ROWS][];
   private static final String[][] STRING_ARRAYS = new String[NUM_ROWS][];
+  private static final ByteArray[][] BYTES_ARRAYS = new ByteArray[NUM_ROWS][];
+  private static final BigDecimal[][] BIG_DECIMAL_ARRAYS = new BigDecimal[NUM_ROWS][];
   private static final Map<String, Object>[] MAPS = new Map[NUM_ROWS];
 
   @Test(dataProvider = "versionProvider")
@@ -400,6 +403,15 @@ public class DataTableSerDeTest {
             DOUBLE_ARRAYS[rowId] = doubleArray;
             dataTableBuilder.setColumn(colId, doubleArray);
             break;
+          case BIG_DECIMAL_ARRAY:
+            length = RANDOM.nextInt(20);
+            BigDecimal[] bigDecimalArray = new BigDecimal[length];
+            for (int i = 0; i < length; i++) {
+              bigDecimalArray[i] = BigDecimal.valueOf(RANDOM.nextDouble());
+            }
+            BIG_DECIMAL_ARRAYS[rowId] = bigDecimalArray;
+            dataTableBuilder.setColumn(colId, bigDecimalArray);
+            break;
           case BOOLEAN_ARRAY:
             length = RANDOM.nextInt(2);
             int[] booleanArray = new int[length];
@@ -419,7 +431,14 @@ public class DataTableSerDeTest {
             dataTableBuilder.setColumn(colId, timestampArray);
             break;
           case BYTES_ARRAY:
-            // TODO: add once implementation of datatable bytes array support is added
+            length = RANDOM.nextInt(20);
+            ByteArray[] bytesArray = new ByteArray[length];
+            for (int i = 0; i < length; i++) {
+              bytesArray[i] =
+                  new ByteArray(RandomStringUtils.random(RANDOM.nextInt(20)).getBytes(StandardCharsets.UTF_8));
+            }
+            BYTES_ARRAYS[rowId] = bytesArray;
+            dataTableBuilder.setColumn(colId, bytesArray);
             break;
           case STRING_ARRAY:
             length = RANDOM.nextInt(20);
@@ -516,6 +535,10 @@ public class DataTableSerDeTest {
             Assert.assertTrue(Arrays.equals(newDataTable.getDoubleArray(rowId, colId), DOUBLE_ARRAYS[rowId]),
                 ERROR_MESSAGE);
             break;
+          case BIG_DECIMAL_ARRAY:
+            Assert.assertTrue(Arrays.equals(newDataTable.getBigDecimalArray(rowId, colId), BIG_DECIMAL_ARRAYS[rowId]),
+                ERROR_MESSAGE);
+            break;
           case BOOLEAN_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), BOOLEAN_ARRAYS[rowId]),
                 ERROR_MESSAGE);
@@ -525,7 +548,8 @@ public class DataTableSerDeTest {
                 ERROR_MESSAGE);
             break;
           case BYTES_ARRAY:
-            // TODO: add once implementation of datatable bytes array support is added
+            Assert.assertTrue(Arrays.equals(newDataTable.getBytesArray(rowId, colId), BYTES_ARRAYS[rowId]),
+                ERROR_MESSAGE);
             break;
           case STRING_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]),

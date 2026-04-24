@@ -242,6 +242,11 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
+  public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }

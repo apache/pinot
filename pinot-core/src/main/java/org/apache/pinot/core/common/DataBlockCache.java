@@ -358,6 +358,24 @@ public class DataBlockCache implements AutoCloseable {
   }
 
   /**
+   * Get the BigDecimal values for a multi-valued column.
+   *
+   * @param column Column name
+   * @return Array of BigDecimal values
+   */
+  public BigDecimal[][] getBigDecimalValuesForMVColumn(String column) {
+    BigDecimal[][] bigDecimalValues = getValues(FieldSpec.DataType.BIG_DECIMAL, column);
+    if (markLoaded(FieldSpec.DataType.BIG_DECIMAL, column)) {
+      if (bigDecimalValues == null) {
+        bigDecimalValues = new BigDecimal[_length][];
+        putValues(FieldSpec.DataType.BIG_DECIMAL, column, bigDecimalValues);
+      }
+      _dataFetcher.fetchBigDecimalValues(column, _docIds, _length, bigDecimalValues);
+    }
+    return bigDecimalValues;
+  }
+
+  /**
    * Get the string values for a multi-valued column.
    *
    * @param column Column name

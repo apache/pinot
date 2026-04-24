@@ -264,6 +264,9 @@ public interface ColumnReader extends Closeable, Serializable {
   MultiValueResult<double[]> nextDoubleMV()
       throws IOException;
 
+  BigDecimal[] nextBigDecimalMV()
+      throws IOException;
+
   String[] nextStringMV()
       throws IOException;
 
@@ -376,6 +379,9 @@ public interface ColumnReader extends Closeable, Serializable {
       throws IOException;
 
   MultiValueResult<double[]> getDoubleMV(int docId)
+      throws IOException;
+
+  BigDecimal[] getBigDecimalMV(int docId)
       throws IOException;
 
   String[] getStringMV(int docId)

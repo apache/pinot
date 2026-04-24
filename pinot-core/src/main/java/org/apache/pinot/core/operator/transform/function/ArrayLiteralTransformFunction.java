@@ -37,6 +37,7 @@ import org.roaringbitmap.RoaringBitmap;
  * The <code>LiteralTransformFunction</code> class is a special transform function which is a wrapper on top of a
  * LITERAL. The data type is inferred from the literal string.
  */
+// TODO: Support BIG_DECIMAL literal type, then implement transformToBigDecimalValuesMV.
 public class ArrayLiteralTransformFunction implements TransformFunction {
   public static final String FUNCTION_NAME = "arrayValueConstructor";
 
@@ -440,6 +441,11 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       _doubleArrayResult = doubleArrayResult;
     }
     return doubleArrayResult;
+  }
+
+  @Override
+  public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
+    throw new UnsupportedOperationException();
   }
 
   @Override

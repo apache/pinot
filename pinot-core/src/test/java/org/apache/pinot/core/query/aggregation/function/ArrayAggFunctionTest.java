@@ -515,6 +515,32 @@ public class ArrayAggFunctionTest extends AbstractAggregationFunctionTest {
   }
 
   @Test
+  void aggregationBigDecimalWithNullHandlingEnabled() {
+    new DataTypeScenario(FieldSpec.DataType.BIG_DECIMAL).getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "1.5",
+            "null",
+            "2.5"
+        ).andOnSecondInstance("myField",
+            "1.5",
+            "null",
+            "2.5"
+        ).whenQuery("select arrayagg(myField, 'BIG_DECIMAL') from testTable")
+        .thenResultIs(new Object[]{new String[]{"1.5", "2.5", "1.5", "2.5"}});
+  }
+
+  @Test
+  void aggregationDistinctBigDecimalWithNullHandlingEnabled() {
+    new DataTypeScenario(FieldSpec.DataType.BIG_DECIMAL).getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "1.5",
+            "null",
+            "1.5"
+        ).whenQuery("select arrayagg(myField, 'BIG_DECIMAL', true) from testTable")
+        .thenResultIs(new Object[]{new String[]{"1.5"}});
+  }
+
+  @Test
   void aggregationStringWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.STRING).getDeclaringTable(false)
         .onFirstInstance("myField",

@@ -328,12 +328,29 @@ public class GroupByResultsBlock extends BaseResultsBlock {
           dataTableBuilder.setColumn(columnIndex, (double[]) value);
         }
         break;
+      case BIG_DECIMAL_ARRAY:
+        if (value instanceof ObjectArrayList) {
+          //noinspection unchecked
+          dataTableBuilder.setColumn(columnIndex,
+              ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) value));
+        } else {
+          dataTableBuilder.setColumn(columnIndex, (BigDecimal[]) value);
+        }
+        break;
       case STRING_ARRAY:
         if (value instanceof ObjectArrayList) {
           //noinspection unchecked
           dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toStringArray((ObjectArrayList<String>) value));
         } else {
           dataTableBuilder.setColumn(columnIndex, (String[]) value);
+        }
+        break;
+      case BYTES_ARRAY:
+        if (value instanceof ObjectArrayList) {
+          //noinspection unchecked
+          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toBytesArray((ObjectArrayList<ByteArray>) value));
+        } else {
+          dataTableBuilder.setColumn(columnIndex, (ByteArray[]) value);
         }
         break;
       default:

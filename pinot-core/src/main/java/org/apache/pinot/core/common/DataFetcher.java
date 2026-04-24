@@ -265,6 +265,18 @@ public class DataFetcher implements AutoCloseable {
   }
 
   /**
+   * Fetch the BigDecimal values for a multi-valued column.
+   *
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchBigDecimalValues(String column, int[] inDocIds, int length, BigDecimal[][] outValues) {
+    _columnValueReaderMap.get(column).readBigDecimalValuesMV(inDocIds, length, outValues);
+  }
+
+  /**
    * Fetch the string values for a multi-valued column.
    *
    * @param column Column name
@@ -540,6 +552,21 @@ public class DataFetcher implements AutoCloseable {
           int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
           double[] values = new double[numValues];
           _dictionary.readDoubleValues(_reusableMVDictIds, numValues, values);
+          valuesBuffer[i] = values;
+        }
+      } else {
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, readerContext);
+      }
+    }
+
+    void readBigDecimalValuesMV(int[] docIds, int length, BigDecimal[][] valuesBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        for (int i = 0; i < length; i++) {
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
+          BigDecimal[] values = new BigDecimal[numValues];
+          _dictionary.readBigDecimalValues(_reusableMVDictIds, numValues, values);
           valuesBuffer[i] = values;
         }
       } else {

@@ -140,6 +140,11 @@ public class DataBlockValSet implements BlockValSet {
   }
 
   @Override
+  public BigDecimal[][] getBigDecimalValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public String[][] getStringValuesMV() {
     throw new UnsupportedOperationException();
   }

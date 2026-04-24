@@ -217,6 +217,14 @@ public class TransformBlockValSet implements BlockValSet {
   }
 
   @Override
+  public BigDecimal[][] getBigDecimalValuesMV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
+      recordTransformValues(scope, DataType.BIG_DECIMAL, false);
+      return _transformFunction.transformToBigDecimalValuesMV(_valueBlock);
+    }
+  }
+
+  @Override
   public String[][] getStringValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.STRING, false);
@@ -271,10 +279,22 @@ public class TransformBlockValSet implements BlockValSet {
             _numMVEntries[i] = doubleValues[i].length;
           }
           return _numMVEntries;
+        case BIG_DECIMAL:
+          BigDecimal[][] bigDecimalValues = getBigDecimalValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = bigDecimalValues[i].length;
+          }
+          return _numMVEntries;
         case STRING:
           String[][] stringValues = getStringValuesMV();
           for (int i = 0; i < numDocs; i++) {
             _numMVEntries[i] = stringValues[i].length;
+          }
+          return _numMVEntries;
+        case BYTES:
+          byte[][][] bytesValues = getBytesValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = bytesValues[i].length;
           }
           return _numMVEntries;
         default:

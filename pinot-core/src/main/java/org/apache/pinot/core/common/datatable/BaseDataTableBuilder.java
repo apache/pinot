@@ -30,6 +30,7 @@ import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
 
 
@@ -153,6 +154,32 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     _currentRowDataByteBuffer.putInt(values.length);
     for (double value : values) {
       _variableSizeDataOutputStream.writeDouble(value);
+    }
+  }
+
+  @Override
+  public void setColumn(int colId, BigDecimal[] values)
+      throws IOException {
+    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(values.length);
+    for (BigDecimal value : values) {
+      byte[] bytes = BigDecimalUtils.serialize(value);
+      _variableSizeDataOutputStream.writeInt(bytes.length);
+      _variableSizeDataByteArrayOutputStream.write(bytes);
+    }
+  }
+
+  @Override
+  public void setColumn(int colId, ByteArray[] values)
+      throws IOException {
+    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(values.length);
+    for (ByteArray value : values) {
+      byte[] bytes = value.getBytes();
+      _variableSizeDataOutputStream.writeInt(bytes.length);
+      _variableSizeDataByteArrayOutputStream.write(bytes);
     }
   }
 

@@ -165,8 +165,14 @@ public class DataBlockBuilder {
             case DOUBLE_ARRAY:
               setColumn(fixedSize, varSize, (double[]) value);
               break;
+            case BIG_DECIMAL_ARRAY:
+              setColumn(fixedSize, varSize, (BigDecimal[]) value);
+              break;
             case STRING_ARRAY:
               setColumn(fixedSize, varSize, (String[]) value, dictionary);
+              break;
+            case BYTES_ARRAY:
+              setColumn(fixedSize, varSize, (ByteArray[]) value);
               break;
             // Null
             case UNKNOWN:
@@ -337,9 +343,8 @@ public class DataBlockBuilder {
       case STRING: {
         ToIntFunction<String> didSupplier = k -> dictionary.size();
         int nullPlaceHolder = dictionary.computeIfAbsent((String) storedType.getNullPlaceholder(), didSupplier);
-
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
               nullBitmap.add(rowId);
@@ -355,7 +360,7 @@ public class DataBlockBuilder {
       case BYTES: {
         ByteArray nullPlaceholder = (ByteArray) storedType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
               nullBitmap.add(rowId);
@@ -370,7 +375,7 @@ public class DataBlockBuilder {
       case MAP: {
         Map nullPlaceholder = (Map) storedType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
               nullBitmap.add(rowId);
@@ -386,7 +391,7 @@ public class DataBlockBuilder {
       case INT_ARRAY: {
         int[] nullPlaceholder = (int[]) storedType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
               nullBitmap.add(rowId);
@@ -401,7 +406,7 @@ public class DataBlockBuilder {
       case LONG_ARRAY: {
         long[] nullPlaceholder = (long[]) storedType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
               nullBitmap.add(rowId);
@@ -416,7 +421,7 @@ public class DataBlockBuilder {
       case FLOAT_ARRAY: {
         float[] nullPlaceholder = (float[]) storedType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
               nullBitmap.add(rowId);
@@ -431,7 +436,7 @@ public class DataBlockBuilder {
       case DOUBLE_ARRAY: {
         double[] nullPlaceholder = (double[]) storedType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
               nullBitmap.add(rowId);
@@ -443,10 +448,25 @@ public class DataBlockBuilder {
         });
         break;
       }
+      case BIG_DECIMAL_ARRAY: {
+        BigDecimal[] nullPlaceholder = (BigDecimal[]) storedType.getNullPlaceholder();
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = start; rowId < end; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              setColumn(fixedSize, varSize, nullPlaceholder);
+            } else {
+              setColumn(fixedSize, varSize, (BigDecimal[]) value);
+            }
+          }
+        });
+        break;
+      }
       case STRING_ARRAY: {
         String[] nullPlaceholder = (String[]) storedType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
               nullBitmap.add(rowId);
@@ -458,11 +478,26 @@ public class DataBlockBuilder {
         });
         break;
       }
+      case BYTES_ARRAY: {
+        ByteArray[] nullPlaceholder = (ByteArray[]) storedType.getNullPlaceholder();
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = start; rowId < end; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              setColumn(fixedSize, varSize, nullPlaceholder);
+            } else {
+              setColumn(fixedSize, varSize, (ByteArray[]) value);
+            }
+          }
+        });
+        break;
+      }
       // Custom intermediate result for aggregation function
       case OBJECT: {
         assert aggFunction != null;
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
               setNull(fixedSize, varSize);
@@ -476,7 +511,7 @@ public class DataBlockBuilder {
       // Null
       case UNKNOWN:
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             setNull(fixedSize, varSize);
           }
         });
@@ -627,6 +662,17 @@ public class DataBlockBuilder {
     }
   }
 
+  private static void setColumn(ByteBuffer fixedSize, PagedPinotOutputStream varSize, BigDecimal[] values)
+      throws IOException {
+    writeVarOffsetInFixed(fixedSize, varSize);
+    fixedSize.putInt(values.length);
+    for (BigDecimal value : values) {
+      byte[] bytes = BigDecimalUtils.serialize(value);
+      varSize.writeInt(bytes.length);
+      varSize.write(bytes);
+    }
+  }
+
   private static void setColumn(ByteBuffer fixedSize, PagedPinotOutputStream varSize, String[] values,
       Object2IntOpenHashMap<String> dictionary)
       throws IOException {
@@ -635,6 +681,17 @@ public class DataBlockBuilder {
     for (String value : values) {
       int dictId = dictionary.computeIfAbsent(value, k -> dictionary.size());
       varSize.writeInt(dictId);
+    }
+  }
+
+  private static void setColumn(ByteBuffer fixedSize, PagedPinotOutputStream varSize, ByteArray[] values)
+      throws IOException {
+    writeVarOffsetInFixed(fixedSize, varSize);
+    fixedSize.putInt(values.length);
+    for (ByteArray value : values) {
+      byte[] bytes = value.getBytes();
+      varSize.writeInt(bytes.length);
+      varSize.write(bytes);
     }
   }
 

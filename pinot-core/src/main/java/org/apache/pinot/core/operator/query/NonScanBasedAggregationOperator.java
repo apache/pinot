@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -274,6 +275,13 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
           doubleSet.add(dictionary.getDoubleValue(dictId));
         }
         return doubleSet;
+      case BIG_DECIMAL:
+        ObjectOpenHashSet<BigDecimal> bigDecimalSet = new ObjectOpenHashSet<>(dictionarySize);
+        for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, EXPLAIN_NAME);
+          bigDecimalSet.add(dictionary.getBigDecimalValue(dictId));
+        }
+        return bigDecimalSet;
       case STRING:
         ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(dictionarySize);
         for (int dictId = 0; dictId < dictionarySize; dictId++) {

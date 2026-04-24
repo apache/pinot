@@ -20,8 +20,8 @@ package org.apache.pinot.spi.utils;
 
 import java.io.File;
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -2252,9 +2252,11 @@ public class CommonConstants {
     public static final long[] LONG_ARRAY = new long[0];
     public static final float[] FLOAT_ARRAY = new float[0];
     public static final double[] DOUBLE_ARRAY = new double[0];
+    public static final BigDecimal[] BIG_DECIMAL_ARRAY = new BigDecimal[0];
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
-    public static final Object MAP = Collections.emptyMap();
+    public static final ByteArray[] INTERNAL_BYTES_ARRAY = new ByteArray[0];
+    public static final Object MAP = Map.of();
   }
 
   public static class CursorConfigs {

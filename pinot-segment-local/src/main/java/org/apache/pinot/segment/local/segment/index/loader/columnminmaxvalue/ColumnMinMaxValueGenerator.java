@@ -300,16 +300,29 @@ public class ColumnMinMaxValueGenerator {
           break;
         }
         case BIG_DECIMAL: {
-          Preconditions.checkState(isSingleValue, "Unsupported multi-value BIG_DECIMAL column: %s", columnName);
           BigDecimal min = null;
           BigDecimal max = null;
-          for (int docId = 0; docId < numDocs; docId++) {
-            BigDecimal value = rawIndexReader.getBigDecimal(docId, readerContext);
-            if (min == null || min.compareTo(value) > 0) {
-              min = value;
+          if (isSingleValue) {
+            for (int docId = 0; docId < numDocs; docId++) {
+              BigDecimal value = rawIndexReader.getBigDecimal(docId, readerContext);
+              if (min == null || min.compareTo(value) > 0) {
+                min = value;
+              }
+              if (max == null || max.compareTo(value) < 0) {
+                max = value;
+              }
             }
-            if (max == null || max.compareTo(value) < 0) {
-              max = value;
+          } else {
+            for (int docId = 0; docId < numDocs; docId++) {
+              BigDecimal[] values = rawIndexReader.getBigDecimalMV(docId, readerContext);
+              for (BigDecimal value : values) {
+                if (min == null || min.compareTo(value) > 0) {
+                  min = value;
+                }
+                if (max == null || max.compareTo(value) < 0) {
+                  max = value;
+                }
+              }
             }
           }
           minValue = min;

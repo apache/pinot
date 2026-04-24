@@ -935,6 +935,13 @@ public enum PinotDataType {
     }
   },
 
+  BIG_DECIMAL_ARRAY {
+    @Override
+    public BigDecimal[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBigDecimalArray(value);
+    }
+  },
+
   BOOLEAN_ARRAY {
     @Override
     public boolean[] convert(Object value, PinotDataType sourceType) {
@@ -1264,6 +1271,24 @@ public enum PinotDataType {
     }
   }
 
+  public BigDecimal[] toBigDecimalArray(Object value) {
+    if (value instanceof BigDecimal[]) {
+      return (BigDecimal[]) value;
+    }
+    if (isSingleValue()) {
+      return new BigDecimal[]{toBigDecimal(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      BigDecimal[] bigDecimalArray = new BigDecimal[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        bigDecimalArray[i] = singleValueType.toBigDecimal(valueArray[i]);
+      }
+      return bigDecimalArray;
+    }
+  }
+
   private static Object[] toObjectArray(Object array) {
     if (array instanceof Collection) {
       return ((Collection<?>) array).toArray();
@@ -1365,6 +1390,12 @@ public enum PinotDataType {
       case PRIMITIVE_DOUBLE_ARRAY:
       case DOUBLE_ARRAY:
         return DOUBLE;
+      case BIG_DECIMAL_ARRAY:
+        return BIG_DECIMAL;
+      case BOOLEAN_ARRAY:
+        return BOOLEAN;
+      case TIMESTAMP_ARRAY:
+        return TIMESTAMP;
       case STRING_ARRAY:
         return STRING;
       case BYTES_ARRAY:
@@ -1372,10 +1403,6 @@ public enum PinotDataType {
       case OBJECT_ARRAY:
       case COLLECTION:
         return OBJECT;
-      case BOOLEAN_ARRAY:
-        return BOOLEAN;
-      case TIMESTAMP_ARRAY:
-        return TIMESTAMP;
       default:
         throw new IllegalStateException("There is no single-value type for " + this);
     }
@@ -1437,6 +1464,9 @@ public enum PinotDataType {
     if (cls == Double.class) {
       return DOUBLE_ARRAY;
     }
+    if (cls == BigDecimal.class) {
+      return BIG_DECIMAL_ARRAY;
+    }
     if (cls == String.class) {
       return STRING_ARRAY;
     }
@@ -1493,10 +1523,7 @@ public enum PinotDataType {
       case DOUBLE:
         return fieldSpec.isSingleValueField() ? DOUBLE : DOUBLE_ARRAY;
       case BIG_DECIMAL:
-        if (fieldSpec.isSingleValueField()) {
-          return BIG_DECIMAL;
-        }
-        throw new IllegalStateException("There is no multi-value type for BigDecimal");
+        return fieldSpec.isSingleValueField() ? BIG_DECIMAL : BIG_DECIMAL_ARRAY;
       case BOOLEAN:
         return fieldSpec.isSingleValueField() ? BOOLEAN : BOOLEAN_ARRAY;
       case TIMESTAMP:
@@ -1557,8 +1584,12 @@ public enum PinotDataType {
         return PRIMITIVE_FLOAT_ARRAY;
       case DOUBLE_ARRAY:
         return PRIMITIVE_DOUBLE_ARRAY;
+      case BIG_DECIMAL_ARRAY:
+        return BIG_DECIMAL_ARRAY;
       case STRING_ARRAY:
         return STRING_ARRAY;
+      case BYTES_ARRAY:
+        return BYTES_ARRAY;
       default:
         throw new IllegalStateException("Cannot convert ColumnDataType: " + columnDataType + " to PinotDataType");
     }

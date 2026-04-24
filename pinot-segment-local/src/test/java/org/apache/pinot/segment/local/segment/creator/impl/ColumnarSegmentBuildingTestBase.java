@@ -80,6 +80,7 @@ public abstract class ColumnarSegmentBuildingTestBase {
   protected static final String MV_LONG_COL = "mvLongCol";
   protected static final String MV_FLOAT_COL = "mvFloatCol";
   protected static final String MV_DOUBLE_COL = "mvDoubleCol";
+  protected static final String MV_BIG_DECIMAL_COL = "mvBigDecimalCol";
   protected static final String MV_STRING_COL = "mvStringCol";
   protected static final String MV_BYTES_COL = "mvBytesCol";
 
@@ -116,6 +117,7 @@ public abstract class ColumnarSegmentBuildingTestBase {
         .addMultiValueDimension(MV_LONG_COL, FieldSpec.DataType.LONG)
         .addMultiValueDimension(MV_FLOAT_COL, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(MV_DOUBLE_COL, FieldSpec.DataType.DOUBLE)
+        .addMultiValueDimension(MV_BIG_DECIMAL_COL, FieldSpec.DataType.BIG_DECIMAL)
         .addMultiValueDimension(MV_STRING_COL, FieldSpec.DataType.STRING)
         .addMultiValueDimension(MV_BYTES_COL, FieldSpec.DataType.BYTES)
         .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
@@ -136,6 +138,7 @@ public abstract class ColumnarSegmentBuildingTestBase {
         .addMultiValueDimension(MV_LONG_COL, FieldSpec.DataType.LONG)
         .addMultiValueDimension(MV_FLOAT_COL, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(MV_DOUBLE_COL, FieldSpec.DataType.DOUBLE)
+        .addMultiValueDimension(MV_BIG_DECIMAL_COL, FieldSpec.DataType.BIG_DECIMAL)
         .addMultiValueDimension(MV_STRING_COL, FieldSpec.DataType.STRING)
         .addMultiValueDimension(MV_BYTES_COL, FieldSpec.DataType.BYTES)
         .addDateTime(TIME_COL, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
@@ -200,6 +203,7 @@ public abstract class ColumnarSegmentBuildingTestBase {
     allColumns.add(MV_LONG_COL);
     allColumns.add(MV_FLOAT_COL);
     allColumns.add(MV_DOUBLE_COL);
+    allColumns.add(MV_BIG_DECIMAL_COL);
     allColumns.add(MV_STRING_COL);
     allColumns.add(MV_BYTES_COL);
 
@@ -235,6 +239,10 @@ public abstract class ColumnarSegmentBuildingTestBase {
           spec.setNullable(true);
         })
         .addDimensionField(MV_DOUBLE_COL, FieldSpec.DataType.DOUBLE, spec -> {
+          spec.setSingleValueField(false);
+          spec.setNullable(true);
+        })
+        .addDimensionField(MV_BIG_DECIMAL_COL, FieldSpec.DataType.BIG_DECIMAL, spec -> {
           spec.setSingleValueField(false);
           spec.setNullable(true);
         })
@@ -511,6 +519,8 @@ public abstract class ColumnarSegmentBuildingTestBase {
           : new Object[]{(float) i * 1.1f, (float) (i + 1) * 1.1f, (float) (i + 2) * 1.1f});
       row.putValue(MV_DOUBLE_COL, random.nextDouble() < nullProbability ? null
           : new Object[]{(double) i * 2.2, (double) (i + 1) * 2.2, (double) (i + 2) * 2.2});
+      row.putValue(MV_BIG_DECIMAL_COL, random.nextDouble() < nullProbability ? null
+          : new Object[]{new BigDecimal(i + ".1"), new BigDecimal((i + 1) + ".2"), new BigDecimal((i + 2) + ".3")});
       row.putValue(MV_STRING_COL, random.nextDouble() < nullProbability ? null
           : new Object[]{"mv1_" + i, "mv2_" + i, "mv3_" + (i % 3)});
       row.putValue(MV_BYTES_COL, random.nextDouble() < nullProbability ? null

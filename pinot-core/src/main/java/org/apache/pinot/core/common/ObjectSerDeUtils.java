@@ -165,7 +165,10 @@ public class ObjectSerDeUtils {
     TupleIntSketchAccumulator(48),
     CpcSketchAccumulator(49),
     OrderedStringSet(50),
-    FunnelStepEventAccumulator(51);
+    FunnelStepEventAccumulator(51),
+    BigDecimalArrayList(52),
+    BigDecimalSet(53),
+    BytesArrayList(54);
 
     private final int _value;
 
@@ -204,6 +207,12 @@ public class ObjectSerDeUtils {
           Object next = objectArrayList.get(0);
           if (next instanceof String) {
             return ObjectType.StringArrayList;
+          }
+          if (next instanceof BigDecimal) {
+            return ObjectType.BigDecimalArrayList;
+          }
+          if (next instanceof ByteArray) {
+            return ObjectType.BytesArrayList;
           }
           throw new IllegalArgumentException(
               "Unsupported type of value: " + next.getClass().getSimpleName());
@@ -256,6 +265,8 @@ public class ObjectSerDeUtils {
         ObjectSet objectSet = (ObjectSet) value;
         if (objectSet.isEmpty() || objectSet.iterator().next() instanceof String) {
           return ObjectType.StringSet;
+        } else if (objectSet.iterator().next() instanceof BigDecimal) {
+          return ObjectType.BigDecimalSet;
         } else {
           return ObjectType.BytesSet;
         }
@@ -1363,6 +1374,131 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<ObjectArrayList<BigDecimal>> BIG_DECIMAL_ARRAY_LIST_SER_DE =
+      new ObjectSerDe<ObjectArrayList<BigDecimal>>() {
+        @Override
+        public byte[] serialize(ObjectArrayList<BigDecimal> list) {
+          int size = list.size();
+          // Header: size, then a length-prefix per element, followed by the serialized BigDecimal bytes.
+          long bufferSize = (1 + (long) size) * Integer.BYTES;
+          byte[][] valueBytesArray = new byte[size][];
+          for (int i = 0; i < size; i++) {
+            byte[] valueBytes = BigDecimalUtils.serialize(list.get(i));
+            bufferSize += valueBytes.length;
+            valueBytesArray[i] = valueBytes;
+          }
+          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+          byte[] bytes = new byte[(int) bufferSize];
+          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+          byteBuffer.putInt(size);
+          for (byte[] valueBytes : valueBytesArray) {
+            byteBuffer.putInt(valueBytes.length);
+            byteBuffer.put(valueBytes);
+          }
+          return bytes;
+        }
+
+        @Override
+        public ObjectArrayList<BigDecimal> deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        @Override
+        public ObjectArrayList<BigDecimal> deserialize(ByteBuffer byteBuffer) {
+          int size = byteBuffer.getInt();
+          ObjectArrayList<BigDecimal> list = new ObjectArrayList<>(size);
+          for (int i = 0; i < size; i++) {
+            int length = byteBuffer.getInt();
+            byte[] valueBytes = new byte[length];
+            byteBuffer.get(valueBytes);
+            list.add(BigDecimalUtils.deserialize(valueBytes));
+          }
+          return list;
+        }
+      };
+
+  public static final ObjectSerDe<Set<BigDecimal>> BIG_DECIMAL_SET_SER_DE = new ObjectSerDe<Set<BigDecimal>>() {
+    @Override
+    public byte[] serialize(Set<BigDecimal> set) {
+      int size = set.size();
+      long bufferSize = (1 + (long) size) * Integer.BYTES;
+      byte[][] valueBytesArray = new byte[size][];
+      int index = 0;
+      for (BigDecimal value : set) {
+        byte[] valueBytes = BigDecimalUtils.serialize(value);
+        bufferSize += valueBytes.length;
+        valueBytesArray[index++] = valueBytes;
+      }
+      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+      byte[] bytes = new byte[(int) bufferSize];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (byte[] valueBytes : valueBytesArray) {
+        byteBuffer.putInt(valueBytes.length);
+        byteBuffer.put(valueBytes);
+      }
+      return bytes;
+    }
+
+    @Override
+    public ObjectOpenHashSet<BigDecimal> deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public ObjectOpenHashSet<BigDecimal> deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      ObjectOpenHashSet<BigDecimal> set = new ObjectOpenHashSet<>(size);
+      for (int i = 0; i < size; i++) {
+        int length = byteBuffer.getInt();
+        byte[] valueBytes = new byte[length];
+        byteBuffer.get(valueBytes);
+        set.add(BigDecimalUtils.deserialize(valueBytes));
+      }
+      return set;
+    }
+  };
+
+  public static final ObjectSerDe<ObjectArrayList<ByteArray>> BYTES_ARRAY_LIST_SER_DE =
+      new ObjectSerDe<ObjectArrayList<ByteArray>>() {
+        @Override
+        public byte[] serialize(ObjectArrayList<ByteArray> list) {
+          int size = list.size();
+          long bufferSize = (1 + (long) size) * Integer.BYTES;
+          for (int i = 0; i < size; i++) {
+            bufferSize += list.get(i).length();
+          }
+          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+          byte[] bytes = new byte[(int) bufferSize];
+          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+          byteBuffer.putInt(size);
+          for (int i = 0; i < size; i++) {
+            byte[] valueBytes = list.get(i).getBytes();
+            byteBuffer.putInt(valueBytes.length);
+            byteBuffer.put(valueBytes);
+          }
+          return bytes;
+        }
+
+        @Override
+        public ObjectArrayList<ByteArray> deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        @Override
+        public ObjectArrayList<ByteArray> deserialize(ByteBuffer byteBuffer) {
+          int size = byteBuffer.getInt();
+          ObjectArrayList<ByteArray> list = new ObjectArrayList<>(size);
+          for (int i = 0; i < size; i++) {
+            int length = byteBuffer.getInt();
+            byte[] valueBytes = new byte[length];
+            byteBuffer.get(valueBytes);
+            list.add(new ByteArray(valueBytes));
+          }
+          return list;
+        }
+      };
+
   public static final ObjectSerDe<Int2LongMap> INT_2_LONG_MAP_SER_DE = new ObjectSerDe<Int2LongMap>() {
 
     @Override
@@ -1803,6 +1939,9 @@ public class ObjectSerDeUtils {
       DATA_SKETCH_CPC_ACCUMULATOR_SER_DE,
       ORDERED_STRING_SET_SER_DE,
       FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE,
+      BIG_DECIMAL_ARRAY_LIST_SER_DE,
+      BIG_DECIMAL_SET_SER_DE,
+      BYTES_ARRAY_LIST_SER_DE,
   };
   //@formatter:on
 

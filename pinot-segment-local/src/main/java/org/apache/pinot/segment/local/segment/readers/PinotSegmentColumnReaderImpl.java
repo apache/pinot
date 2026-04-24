@@ -263,6 +263,14 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   }
 
   @Override
+  public BigDecimal[] nextBigDecimalMV() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    return _segmentColumnReader.getBigDecimalMV(_nextDocId++);
+  }
+
+  @Override
   public String[] nextStringMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
@@ -368,6 +376,11 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   @Override
   public MultiValueResult<double[]> getDoubleMV(int docId) {
     return MultiValueResult.of(_segmentColumnReader.getDoubleMV(docId), null);
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalMV(int docId) {
+    return _segmentColumnReader.getBigDecimalMV(docId);
   }
 
   @Override

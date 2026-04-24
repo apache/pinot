@@ -149,6 +149,7 @@ public class ForwardIndexCreatorFactory {
         return new MultiValueFixedByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
             maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
             targetDocsPerChunk);
+      case BIG_DECIMAL:
       case STRING:
       case BYTES:
         return new MultiValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
